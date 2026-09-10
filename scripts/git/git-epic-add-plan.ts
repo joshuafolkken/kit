@@ -1,6 +1,6 @@
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { git_epic_add_body, type RewriteInput } from './git-epic-add-body'
-import { git_epic_chains, type InsertPosition } from './git-epic-chains'
+import { git_epic_chains, type InsertOutcome, type InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse, type DependencyLink } from './git-epic-parse'
 import { format_dependency_links, to_issue_reference } from './git-epic-reference'
@@ -19,6 +19,11 @@ interface PlanInput {
 	labels: ReadonlyArray<string>
 	children: ReadonlyArray<number>
 	position?: InsertPosition | undefined
+	// `--order-before` / `--order-after`: move the task-list row to `position` and write nothing else —
+	// no declaration, no `blocked-by` (joshuafolkken/kit#1738). The position is carried in the field
+	// above rather than in one of its own, because where the row goes is the same question either way;
+	// what this flag decides is whether a dependency is recorded behind it.
+	is_order_only?: boolean | undefined
 	// The epic's current children with their native relations, as `epic:next` reads them.
 	recorded: ReadonlyArray<EpicChild>
 	// The epic's own repository — what a declared bare number names. Needed since
@@ -45,6 +50,18 @@ interface AddPlan {
 	// declared-but-unrecorded order the caller re-pointed is exactly as much a replacement as a recorded
 	// one. Reporting from `removed` let those vanish without a word.
 	replaced: ReadonlyArray<DependencyLink>
+	// The placed children an order-only move puts on the wrong side of an order the declaration already
+	// states — ahead of an issue declared to block them, or behind one they are declared to block
+	// (joshuafolkken/kit#1738). `epic:next` filters by `blocked_by` **before** it applies task-list
+	// order, so such a row cannot take effect until the declaration itself changes, and a run that only
+	// printed `📋 Placed …` would report a reordering that nothing can observe.
+	//
+	// **Reported rather than refused.** Reordering inside a partly-ordered epic is legitimate — the row
+	// still decides where the child sits among the runnable ones once its blocker closes — so only this
+	// one pairing is worth a word, and refusing it would take a route the Issue did not ask to close.
+	// It is empty for every insertion that writes its own declaration, since that declaration is what
+	// the move would have contradicted.
+	contradicted: ReadonlyArray<number>
 	// The `--decision-file` record as it will be written, with `replaced` appended. Carried on the plan
 	// rather than recomposed by the caller so the epic's `## Decisions` and the child comments cannot
 	// end up with two different texts.
@@ -116,7 +133,7 @@ function to_nothing_to_do_error(position: InsertPosition | undefined): string {
 	const nothing = 'Every issue given is already tracked by this epic; nothing to add.'
 	if (position !== undefined) return nothing
 
-	return `${nothing} Name \`--before <M>\` or \`--after <M>\` to declare an order between children it already tracks.`
+	return `${nothing} Name \`--before <M>\` or \`--after <M>\` to declare an order between children it already tracks, or \`--order-before <M>\` / \`--order-after <M>\` to move the row without declaring one.`
 }
 
 function find_movement_error(
@@ -187,6 +204,51 @@ function to_rewrite_input(context: PlanContext, decision: string | undefined): R
 // would put the line on the child comments and leave the epic without it. The caller-supplied record
 // has already been validated by `find_decision_error`; what is appended here is generated, not read
 // from a file.
+// An ordinary insertion records every link the declaration names that GitHub does not, which repairs a
+// declared-but-unrecorded order in passing. **An order-only move records nothing at all**
+// (joshuafolkken/kit#1738): `--order-*` exists so a row can move with no dependency appearing behind
+// it, and a repair made under it would put back exactly the `blocked-by` the caller asked not to have.
+// The declaration is unchanged either way, so the repair is still there for the next insertion to make.
+function to_added_links(
+	context: PlanContext,
+	links_after: ReadonlyArray<DependencyLink>,
+): ReadonlyArray<DependencyLink> {
+	if (context.input.is_order_only === true) return []
+
+	return epic_graph.missing_relations(links_after, context.input.recorded, context.input.repo)
+}
+
+// Whether the declaration already says `blocker` has to finish before `blocked`. A chain is written in
+// execution order, so naming the blocker at a lower index is the whole test — and it covers the
+// transitive case for free, which is what makes `#890 -> #891 -> #892` answer for `#890` and `#892`.
+function does_declare_order(
+	chains: ReadonlyArray<ReadonlyArray<number>>,
+	blocker: number,
+	blocked: number,
+): boolean {
+	return chains.some((chain) => {
+		const at_blocker = chain.indexOf(blocker)
+
+		return at_blocker !== -1 && at_blocker < chain.indexOf(blocked)
+	})
+}
+
+// The placed children this move puts on the wrong side of a declared order — see `contradicted` above.
+// Asked only of an order-only move: every other insertion rewrites the declaration to match the row it
+// placed, so there is nothing left for the row to contradict.
+function to_contradicted(context: PlanContext): ReadonlyArray<number> {
+	const { position } = context.input
+	if (position === undefined || context.input.is_order_only !== true) return []
+
+	const chains = context.chains_before
+
+	return context.placed.filter((child) =>
+		position.kind === 'before'
+			? does_declare_order(chains, position.target, child)
+			: does_declare_order(chains, child, position.target),
+	)
+}
+
 function to_plan(context: PlanContext): PlanOutcome {
 	const { removed: replaced } = git_epic_chains.diff_links(
 		context.chains_before,
@@ -203,11 +265,12 @@ function to_plan(context: PlanContext): PlanOutcome {
 			body: rewritten.body,
 			additions: context.additions,
 			relocations: context.relocations,
-			added: epic_graph.missing_relations(links_after, context.input.recorded, context.input.repo),
+			added: to_added_links(context, links_after),
 			// Only the links a relation actually backs: asking `gh` to remove one that was never
 			// recorded is reported as a failure the user cannot act on.
 			removed: epic_graph.recorded_relations(replaced, context.input.recorded, context.input.repo),
 			replaced,
+			contradicted: to_contradicted(context),
 			decision,
 		},
 	}
@@ -218,6 +281,22 @@ function to_plan(context: PlanContext): PlanOutcome {
 // half the job (joshuafolkken/kit#1350). `undefined` is "none was asked for", which is not a refusal.
 function find_decision_error(decision: string | undefined): string | undefined {
 	return decision === undefined ? undefined : git_epic_decision.find_decision_error(decision)
+}
+
+// Asked of the declaration as it stands, because a relocation's removal can collapse the very
+// ambiguity this refuses (joshuafolkken/kit#1701).
+//
+// **An order-only move is not asked at all** (joshuafolkken/kit#1738). The ambiguity is about where a
+// *dependency* would attach — `--before <hub>` cannot say which of the chains running through the hub
+// the new link joins — and `--order-*` attaches no link, so the question has no subject. Asking it
+// anyway would refuse a row move on the strength of a declaration the move never touches.
+function find_ambiguity_error(
+	input: PlanInput,
+	chains_before: ReadonlyArray<ReadonlyArray<number>>,
+): string | undefined {
+	if (input.is_order_only === true) return undefined
+
+	return git_epic_chains.find_position_ambiguity(chains_before, input.position)
 }
 
 // The refusals about what is being placed and where: the position may not name one of the issues
@@ -239,9 +318,7 @@ function find_placement_error(
 			input.position,
 			tracked,
 		) ??
-		// Asked of the declaration as it stands, because a relocation's removal can collapse the very
-		// ambiguity this refuses (joshuafolkken/kit#1701).
-		git_epic_chains.find_position_ambiguity(chains_before, input.position)
+		find_ambiguity_error(input, chains_before)
 	)
 }
 
@@ -261,6 +338,31 @@ function find_input_error(
 	)
 }
 
+// The declaration the body will carry. A relocation is a removal followed by the ordinary insertion,
+// so `--before` re-points the chain it lands in and the vacated chain closes around it — both by
+// construction rather than by a second code path (joshuafolkken/kit#1701).
+//
+// **An order-only move takes neither step** (joshuafolkken/kit#1738): the declaration it started with
+// is the declaration it ends with, which is `keep_declaration` — the same passthrough `--add` with no
+// position already uses. Because the chains come back identical, `diff_links` finds nothing replaced
+// and the body rewrite leaves the `## Dependencies` section byte-identical, so "writes no dependency"
+// holds by construction rather than by a filter applied afterwards.
+function to_chains_after(
+	input: PlanInput,
+	chains_before: ReadonlyArray<ReadonlyArray<number>>,
+	moves: { placed: ReadonlyArray<number>; relocations: ReadonlyArray<number> },
+	tracked: ReadonlyArray<number>,
+): InsertOutcome {
+	if (input.is_order_only === true) return git_epic_chains.keep_declaration(chains_before)
+
+	return git_epic_chains.insert_children(
+		git_epic_chains.remove_children(chains_before, moves.relocations),
+		moves.placed,
+		input.position,
+		tracked,
+	)
+}
+
 function build_plan(input: PlanInput): PlanOutcome {
 	const tracked = git_epic_parse.parse_task_list_issue_numbers(input.body)
 	const chains_before = git_epic_parse.parse_dependency_chains(input.body)
@@ -269,18 +371,12 @@ function build_plan(input: PlanInput): PlanOutcome {
 
 	const additions = to_additions(input, tracked, declared_numbers(chains_before))
 	const relocations = to_relocations(input, tracked)
-	// A relocation is a removal followed by the ordinary insertion, so `--before` re-points the chain
-	// it lands in and the vacated chain closes around it — both by construction rather than by a second
-	// code path (joshuafolkken/kit#1701). `tracked` reaches the chain builder so it can tell a child
-	// with no order yet from a number that is not a child at all; `find_movement_error` has already
-	// refused the second (joshuafolkken/kit#949).
+	// `tracked` reaches the chain builder so it can tell a child with no order yet from a number that is
+	// not a child at all; `find_movement_error` has already refused the second (joshuafolkken/kit#949).
+	// What the builder does with a relocation, and what an order-only move does instead, is on
+	// `to_chains_after` above.
 	const placed = to_placed(input.children, additions, relocations)
-	const inserted = git_epic_chains.insert_children(
-		git_epic_chains.remove_children(chains_before, relocations),
-		placed,
-		input.position,
-		tracked,
-	)
+	const inserted = to_chains_after(input, chains_before, { placed, relocations }, tracked)
 	if ('error' in inserted) return { error: inserted.error }
 
 	return to_plan({

@@ -14,17 +14,31 @@ const PROMOTE_FLAG = '--promote'
 const ADD_FLAG = '--add'
 const BEFORE_FLAG = '--before'
 const AFTER_FLAG = '--after'
+// The same two places with the declaration withheld: move the task-list row and write neither the
+// dependency declaration nor the `blocked-by` relation (joshuafolkken/kit#1738). They exist because
+// `epic:next` offers children in task-list order, so "no dependency, but run this one first" had no
+// spelling at all — only a false dependency, or a row nobody would reach.
+const ORDER_BEFORE_FLAG = '--order-before'
+const ORDER_AFTER_FLAG = '--order-after'
 // The decision record for an insertion, read the same way `--rationale-file` is read for a creation:
 // from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
 // contributes is placing it in the epic's `## Decisions` and on each child (joshuafolkken/kit#1350).
 const DECISION_FLAG = '--decision-file'
 // Which flags consume the argument after them — per parser, for the reason `epic-cli-argv.ts` gives.
 const VALUE_FLAGS: ReadonlySet<string> = new Set([RATIONALE_FLAG, ORIGIN_FLAG])
-const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([BEFORE_FLAG, AFTER_FLAG, DECISION_FLAG])
+const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	BEFORE_FLAG,
+	AFTER_FLAG,
+	ORDER_BEFORE_FLAG,
+	ORDER_AFTER_FLAG,
+	DECISION_FLAG,
+])
 const ADD_KNOWN_FLAGS: ReadonlySet<string> = new Set([
 	ADD_FLAG,
 	BEFORE_FLAG,
 	AFTER_FLAG,
+	ORDER_BEFORE_FLAG,
+	ORDER_AFTER_FLAG,
 	DECISION_FLAG,
 ])
 
@@ -108,13 +122,16 @@ function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments 
 	}
 }
 
-// `--add <E> <N...> [--before <M> | --after <M>]`: the epic to insert into, then the children. The
-// epic comes first for the same reason it does under `--promote`, so the children stay a bare list
-// of numbers (joshuafolkken/kit#890).
+// `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]`: the epic
+// to insert into, then the children. The epic comes first for the same reason it does under
+// `--promote`, so the children stay a bare list of numbers (joshuafolkken/kit#890).
 interface AddArguments {
 	epic_number: number
 	children: Array<number>
 	position?: InsertPosition | undefined
+	// `--order-before` / `--order-after` rather than `--before` / `--after`: the row moves and nothing
+	// else is written (joshuafolkken/kit#1738).
+	is_order_only?: boolean | undefined
 	decision_path?: string | undefined
 }
 
@@ -123,43 +140,78 @@ function is_addition(argv: ReadonlyArray<string>): boolean {
 	return argv.includes(ADD_FLAG)
 }
 
-// The outcome of reading `--before` / `--after`: the position, nothing, or a refusal. One shape for
-// all three so the caller branches on a field rather than on a value's type.
+// The outcome of reading a positioning flag: the position, nothing, or a refusal. One shape for all
+// three so the caller branches on a field rather than on a value's type. `is_order_only` rides on the
+// same value because one flag decides both halves — where the row goes, and whether a dependency is
+// written behind it (joshuafolkken/kit#1738).
 interface PositionOutcome {
 	position?: InsertPosition
+	is_order_only?: boolean
 	is_refused: boolean
 }
 
 const NO_POSITION: PositionOutcome = { is_refused: false }
 const REFUSED_POSITION: PositionOutcome = { is_refused: true }
 
-// More than one positioning flag names more than one place, whether they are the same flag twice or
-// one of each. `read_flag_value` would answer with the first, which is a silent choice rather than a
-// refusal — the same hazard the two-different-flags case was already refused for.
-function is_position_ambiguous(argv: ReadonlyArray<string>): boolean {
-	return count_flag(argv, BEFORE_FLAG) + count_flag(argv, AFTER_FLAG) > 1
+// The four positioning flags as one table: the place each one names, and whether a dependency is
+// written behind the row it moves. **One table rather than two branches** (joshuafolkken/kit#1738) —
+// `--order-before` asks the same placement question `--before` does, so a second parsing path could
+// come to disagree with this one about what a repeated flag or a non-numeric target means.
+interface PositionFlag {
+	flag: string
+	kind: InsertKind
+	is_order_only: boolean
 }
 
-function read_position_target(
-	argv: ReadonlyArray<string>,
-): { kind: InsertKind; raw: string } | undefined {
-	if (is_position_ambiguous(argv)) return undefined
-	const before = read_flag_value(argv, BEFORE_FLAG)
-	if (before !== undefined) return { kind: 'before', raw: before }
-	const after = read_flag_value(argv, AFTER_FLAG)
+const POSITION_FLAGS: ReadonlyArray<PositionFlag> = [
+	{ flag: BEFORE_FLAG, kind: 'before', is_order_only: false },
+	{ flag: AFTER_FLAG, kind: 'after', is_order_only: false },
+	{ flag: ORDER_BEFORE_FLAG, kind: 'before', is_order_only: true },
+	{ flag: ORDER_AFTER_FLAG, kind: 'after', is_order_only: true },
+]
 
-	return after === undefined ? undefined : { kind: 'after', raw: after }
+// More than one positioning flag names more than one place, whether they are the same flag twice, one
+// of each direction, or a dependency-writing flag beside an order-only one. `read_flag_value` would
+// answer with the first, which is a silent choice rather than a refusal — and here the silent choice
+// would decide whether a `blocked-by` is written at all.
+function is_position_ambiguous(argv: ReadonlyArray<string>): boolean {
+	return POSITION_FLAGS.reduce((total, entry) => total + count_flag(argv, entry.flag), 0) > 1
+}
+
+interface PositionTarget extends PositionFlag {
+	raw: string
+}
+
+function to_position_target(
+	argv: ReadonlyArray<string>,
+	entry: PositionFlag,
+): PositionTarget | undefined {
+	const raw = read_flag_value(argv, entry.flag)
+
+	return raw === undefined ? undefined : { ...entry, raw }
+}
+
+function read_position_target(argv: ReadonlyArray<string>): PositionTarget | undefined {
+	if (is_position_ambiguous(argv)) return undefined
+
+	return POSITION_FLAGS.map((entry) => to_position_target(argv, entry)).find(
+		(found) => found !== undefined,
+	)
 }
 
 // A target that is not an issue number is refused for the same reason two flags are: guessing would
 // insert somewhere.
 function parse_position(argv: ReadonlyArray<string>): PositionOutcome {
-	const has_flag = argv.includes(BEFORE_FLAG) || argv.includes(AFTER_FLAG)
+	const has_flag = POSITION_FLAGS.some((entry) => argv.includes(entry.flag))
 	const target = read_position_target(argv)
 	if (target === undefined) return has_flag ? REFUSED_POSITION : NO_POSITION
 	if (!ISSUE_NUMBER_PATTERN.test(target.raw)) return REFUSED_POSITION
 
-	return { position: { kind: target.kind, target: Number(target.raw) }, is_refused: false }
+	return {
+		position: { kind: target.kind, target: Number(target.raw) },
+		is_order_only: target.is_order_only,
+		is_refused: false,
+	}
 }
 
 function has_unknown_flag(argv: ReadonlyArray<string>): boolean {
@@ -195,6 +247,7 @@ function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefi
 	return {
 		...subject,
 		position: outcome.position,
+		is_order_only: outcome.is_order_only,
 		decision_path: read_flag_value(argv, DECISION_FLAG),
 	}
 }
@@ -231,7 +284,11 @@ function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTa
 // instruction the epic itself does not record.
 function format_add_arguments(local: AddArguments): string {
 	const { position } = local
-	const suffix = position === undefined ? '' : ` --${position.kind} ${String(position.target)}`
+	// The order-only prefix rides along, since it is what decides whether the other checkout writes a
+	// dependency — a suggestion that dropped it would be a different instruction (joshuafolkken/kit#1738).
+	const prefix = local.is_order_only === true ? '--order-' : '--'
+	const suffix =
+		position === undefined ? '' : ` ${prefix}${position.kind} ${String(position.target)}`
 
 	return `${[local.epic_number, ...local.children].map(String).join(' ')}${suffix}`
 }
@@ -320,6 +377,8 @@ export {
 	AFTER_FLAG,
 	BEFORE_FLAG,
 	DECISION_FLAG,
+	ORDER_AFTER_FLAG,
+	ORDER_BEFORE_FLAG,
 	ORDERED_FLAG,
 	ORIGIN_FLAG,
 	PROMOTE_FLAG,

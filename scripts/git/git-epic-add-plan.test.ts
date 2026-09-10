@@ -3,7 +3,7 @@ import { EPIC_FIXTURE_REPO, git_epic_add_fixture } from './git-epic-add-fixture'
 import { git_epic_add_plan, type PlanInput, type PlanOutcome } from './git-epic-add-plan'
 import { git_epic_parse } from './git-epic-parse'
 
-const { child, plan_of } = git_epic_add_fixture
+const { child, plan_of, error_of } = git_epic_add_fixture
 const REPO = EPIC_FIXTURE_REPO
 const EPIC_NUMBER = 893
 const DEPENDENCIES_HEADING = '## Dependencies'
@@ -57,12 +57,6 @@ function plan(overrides: Partial<PlanInput>): PlanOutcome {
 		recorded: ORDERED_CHILDREN,
 		...overrides,
 	})
-}
-
-function error_of(outcome: PlanOutcome): string {
-	if ('plan' in outcome) throw new Error('expected a refusal')
-
-	return outcome.error
 }
 
 describe('git_epic_add_plan.build_plan — no position given', () => {

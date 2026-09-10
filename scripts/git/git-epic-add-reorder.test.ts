@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { EPIC_FIXTURE_REPO, git_epic_add_fixture } from './git-epic-add-fixture'
+import {
+	BLANK,
+	DEPENDENCIES_HEADING,
+	EPIC_FIXTURE_REPO,
+	git_epic_add_fixture,
+	PROGRESS_HEADING,
+} from './git-epic-add-fixture'
 import { git_epic_add_plan, type PlanInput, type PlanOutcome } from './git-epic-add-plan'
-import { git_epic_chains } from './git-epic-chains'
 import { git_epic_parse, UNORDERED_DEPENDENCIES } from './git-epic-parse'
 
 // Declaring an order between two children an epic **already tracks** (joshuafolkken/kit#1701).
@@ -13,31 +18,12 @@ import { git_epic_parse, UNORDERED_DEPENDENCIES } from './git-epic-parse'
 // insertion path, so `--before` still re-points, `--after` still branches, and the vacated chain
 // still closes around it — by construction rather than by a second code path.
 
-const { child, plan_of } = git_epic_add_fixture
+const { child, plan_of, error_of, rows, body_of, tracked_of, declared_of, links_of } =
+	git_epic_add_fixture
 const EPIC_NUMBER = 893
-const DEPENDENCIES_HEADING = '## Dependencies'
-const PROGRESS_HEADING = '## Progress'
-const BLANK = ''
 const ORDERED_CHAIN = '#890 -> #891 -> #892'
 const FIRST_CHAIN = '#890 -> #891'
 const AMBIGUOUS = 'appears in more than one declared chain'
-
-function rows(...numbers: ReadonlyArray<number>): Array<string> {
-	return numbers.map((issue_number) => `- [ ] #${String(issue_number)}`)
-}
-
-function body_of(declaration: ReadonlyArray<string>, tracked: ReadonlyArray<number>): string {
-	return [
-		DEPENDENCIES_HEADING,
-		BLANK,
-		...declaration,
-		BLANK,
-		PROGRESS_HEADING,
-		BLANK,
-		...rows(...tracked),
-		BLANK,
-	].join('\n')
-}
 
 const ORDERED_BODY = body_of([ORDERED_CHAIN], [890, 891, 892])
 const UNORDERED_BODY = body_of([UNORDERED_DEPENDENCIES], [890, 891])
@@ -59,26 +45,6 @@ function plan(overrides: Partial<PlanInput>): PlanOutcome {
 		recorded: ORDERED_CHILDREN,
 		...overrides,
 	})
-}
-
-function error_of(outcome: PlanOutcome): string {
-	if ('plan' in outcome) throw new Error('expected a refusal')
-
-	return outcome.error
-}
-
-function tracked_of(outcome: PlanOutcome): Array<number> {
-	return git_epic_parse.parse_task_list_issue_numbers(plan_of(outcome).body)
-}
-
-function declared_of(outcome: PlanOutcome): Array<string> {
-	return git_epic_chains.render_chains(
-		git_epic_parse.parse_dependency_chains(plan_of(outcome).body),
-	)
-}
-
-function links_of(links: ReadonlyArray<{ blocker: number; blocked: number }>): Array<string> {
-	return links.map((link) => `${String(link.blocker)}->${String(link.blocked)}`)
 }
 
 describe('git_epic_add_plan.build_plan — a tracked child given a position', () => {

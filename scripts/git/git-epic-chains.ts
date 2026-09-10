@@ -397,6 +397,11 @@ const git_epic_chains = {
 	links_of,
 	diff_links,
 	find_position_ambiguity,
+	// Exported since joshuafolkken/kit#1738 so `--order-before` / `--order-after` can pass the
+	// declaration through by the same function `--add` without a position uses. An order-only move is
+	// "leave the declaration exactly as it stood" applied to a call that *does* name a position, so a
+	// second copy of the passthrough would be the clone `CLAUDE.md` prohibits.
+	keep_declaration,
 	remove_children,
 	remove_links,
 	insert_children,

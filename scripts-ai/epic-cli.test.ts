@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BEFORE_FLAG, epic_cli } from './epic-cli'
+import { BEFORE_FLAG, epic_cli, ORDER_AFTER_FLAG, ORDER_BEFORE_FLAG } from './epic-cli'
 
 const PROMOTE = '--promote'
 const EPIC = '858'
@@ -10,6 +10,12 @@ const RATIONALE_PATH = 'reasons.md'
 
 const TITLE = 'Epic: split the parser work'
 const ORIGIN_REFERENCE = 'joshuafolkken/app-kit#144'
+
+// `--add 893 894`, plus whatever positioning the case is about. The subject is the same in every
+// positioning test, so only the flags under test are written out.
+function add_with(flags: ReadonlyArray<string>): ReturnType<typeof epic_cli.parse_add_arguments> {
+	return epic_cli.parse_add_arguments(['--add', '893', '894', ...flags])
+}
 
 describe('epic_cli.parse_create_arguments — title and children', () => {
 	it('reads the title and the child issue numbers', () => {
@@ -191,6 +197,52 @@ describe('epic_cli.parse_add_arguments', () => {
 		expect(epic_cli.parse_add_arguments(['--add', '893', '893', '894'])?.children).toStrictEqual([
 			894,
 		])
+	})
+})
+
+// `--order-before` / `--order-after` name the same place `--before` / `--after` do and withhold the
+// dependency behind it (joshuafolkken/kit#1738). They go through the one positioning parser, so the
+// question these cases ask is whether the order-only half survives the trip.
+describe('epic_cli.parse_add_arguments — the order-only positioning flags', () => {
+	it('reads an --order-before target and marks the insertion order-only', () => {
+		const parsed = add_with([ORDER_BEFORE_FLAG, '891'])
+
+		expect(parsed?.children).toStrictEqual([894])
+		expect(parsed?.position).toStrictEqual({ kind: 'before', target: 891 })
+		expect(parsed?.is_order_only).toBe(true)
+	})
+
+	it('reads an --order-after target', () => {
+		const parsed = add_with([ORDER_AFTER_FLAG, '890'])
+
+		expect(parsed?.position).toStrictEqual({ kind: 'after', target: 890 })
+		expect(parsed?.is_order_only).toBe(true)
+	})
+
+	// The distinction is the whole option, so a plain position must not come back looking order-only.
+	it('leaves a plain --before insertion writing its dependency', () => {
+		expect(add_with([BEFORE_FLAG, '891'])?.is_order_only).toBe(false)
+	})
+})
+
+// One dependency-writing flag beside an order-only one is two answers to "does this write a
+// dependency", and taking the first would decide it silently — the one choice a caller reaching for
+// `--order-*` is explicitly avoiding.
+describe('epic_cli.parse_add_arguments — what the order-only flags refuse', () => {
+	it('refuses --order-before beside --before', () => {
+		expect(add_with([BEFORE_FLAG, '891', ORDER_BEFORE_FLAG, '892'])).toBeUndefined()
+	})
+
+	it('refuses --order-after beside --after', () => {
+		expect(add_with(['--after', '891', ORDER_AFTER_FLAG, '892'])).toBeUndefined()
+	})
+
+	it('refuses a repeated --order-before', () => {
+		expect(add_with([ORDER_BEFORE_FLAG, '891', ORDER_BEFORE_FLAG, '892'])).toBeUndefined()
+	})
+
+	it('refuses an --order-before target that is not an issue number', () => {
+		expect(add_with([ORDER_BEFORE_FLAG, 'soon'])).toBeUndefined()
 	})
 })
 
