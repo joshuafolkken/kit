@@ -49,6 +49,7 @@ function lane_of(issue: string, seed: number): LaneInfo {
 		branch: `${issue}-lane`,
 		directory: path.join(LANE_ROOT, issue),
 		seed,
+		output: undefined,
 		is_stranded: false,
 	}
 }

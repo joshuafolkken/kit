@@ -155,7 +155,14 @@ describe('read_children and read_lanes', () => {
 
 	it('reports each open lane by issue and state', async () => {
 		list_lanes.mockResolvedValue([
-			{ issue: '1520', branch: '1520-lane', directory: '/lanes/1520', seed: 1, is_stranded: false },
+			{
+				issue: '1520',
+				branch: '1520-lane',
+				directory: '/lanes/1520',
+				seed: 1,
+				output: undefined,
+				is_stranded: false,
+			},
 		])
 
 		await expect(run_progress_read.read_lanes()).resolves.toEqual([

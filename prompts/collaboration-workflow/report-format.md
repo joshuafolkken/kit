@@ -113,7 +113,7 @@ Telegram 本文も同じ書式で書き、**`--task-type confirmation` で送る
 
 **この書式は「止まったとき」だけのものである。閾値を超えたこと自体は区切りではなく、停止したことが区切りである。** 4 行が答えているのは「誰が何を引き継ぐか」であり、同じセッションが走り続けているあいだ引き継ぐ人はいないからである。**まだ止まっていないランは区切りの報告を書かない** — そのときの記録は epic の進捗コメントであって、この書式ではない。
 
-**どこが「止まった」かは入口ごとに違い、条件は入口の側にある。** joshuafolkken/kit#1567 以降、`pnpm josh cost --over 150000` が `over` と答えたあと、`epicrun` は**drain に入る** — 新しい子を取らず、すでに走っている子の完了だけを待つ — ので、drain 中はまだ停止しておらず、`pnpm josh lane:list` が `none` に達して実際に止まったときに書く。`queue` は 1 件ずつ走るため待つものが無く、`over` を読んだその区切りで止まって書く。`fullrun` / `halfrun` は joshuafolkken/kit#1605 以降**入口でも同じ判定を問う**ので、`over` ならまだ何も作っていない入口でそのまま止まって書く — 「残っていること」は着手していない Issue そのものである。**この書式を lane の状態で条件づけない**: lane を開かない入口が永久に条件を満たせなくなり、書けない側は禁じたはずの完了報告の書式へ落ちる。単一ソースは [`.claude/skills/workflow-commands/epicrun.md`](../../.claude/skills/workflow-commands/epicrun.md) →「The hand-off」。
+**どこが「止まった」かは入口ごとに違い、条件は入口の側にある。** joshuafolkken/kit#1713 以降、`pnpm josh cost --over 150000` が `over` と答えたら、`epicrun` は走っている lane を**待たずに引き継いで、そのターンで止まる** — 各 lane が unit の出力パスを自分の `.env` に記録しており、新しいセッションが `pnpm josh lane:list` からそれを読んで poll を継ぐ — ので、止まったその場で書く。例外は poll できない lane（`unreadable`、または記録の無い `open`）があるときだけで、そのときは停止せずループへ戻るので、まだ書かない。`queue` は 1 件ずつ走るため待つものが無く、`over` を読んだその区切りで止まって書く。`fullrun` / `halfrun` は joshuafolkken/kit#1605 以降**入口でも同じ判定を問う**ので、`over` ならまだ何も作っていない入口でそのまま止まって書く — 「残っていること」は着手していない Issue そのものである。**この書式を lane の状態で条件づけない**: lane を開かない入口が永久に条件を満たせなくなり、書けない側は禁じたはずの完了報告の書式へ落ちる。単一ソースは [`.claude/skills/workflow-commands/epicrun.md`](../../.claude/skills/workflow-commands/epicrun.md) →「The hand-off」。
 
 ### 概要 3 行の書き方（ここが本体）
 

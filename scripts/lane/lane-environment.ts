@@ -14,6 +14,12 @@ import { PORT_SEED_KEY, ports } from '#ports'
 // are as necessary inside a lane as outside one, and a lane that had to have them re-entered would
 // not be a place a run could start unattended.
 
+// Where the delegated unit running this lane's child writes (joshuafolkken/kit#1713). It goes in the
+// lane's own `.env` — the store `lane-registry.ts` already reads — rather than in a ledger beside the
+// trees, so `git worktree remove` erases the record along with the lane it described and there is
+// nothing left to go stale. `.env` is gitignored in kit and in every consumer `josh sync` reaches,
+// which is the objection that sent the run hold's stamp to the temp directory instead.
+const LANE_OUTPUT_KEY = 'JOSH_LANE_OUTPUT'
 const ASSIGNMENT_SEPARATOR = '='
 // `export PORT_SEED=3` is a form dotenv readers accept, so an assignment written that way has to be
 // read as the seed line rather than copied through beside the one appended below.
@@ -36,12 +42,20 @@ function strip_export(line: string): string {
 		: trimmed
 }
 
-function is_seed_line(line: string): boolean {
+function is_key_line(line: string, key: string): boolean {
 	const body = strip_export(line)
 
-	if (!body.startsWith(PORT_SEED_KEY)) return false
+	if (!body.startsWith(key)) return false
 
-	return body.slice(PORT_SEED_KEY.length).trimStart().startsWith(ASSIGNMENT_SEPARATOR)
+	return body.slice(key.length).trimStart().startsWith(ASSIGNMENT_SEPARATOR)
+}
+
+function is_seed_line(line: string): boolean {
+	return is_key_line(line, PORT_SEED_KEY)
+}
+
+function is_output_line(line: string): boolean {
+	return is_key_line(line, LANE_OUTPUT_KEY)
 }
 
 // `trimEnd` rather than a trailing-newline pattern: the file is rejoined with one newline at the end
@@ -64,7 +78,7 @@ function unquote(raw: string): string {
 	return is_quoted(raw) ? raw.slice(FIRST_CHARACTER_END, LAST_CHARACTER_START) : raw
 }
 
-function seed_value(line: string): string {
+function assignment_value(line: string): string {
 	return unquote(line.slice(line.indexOf(ASSIGNMENT_SEPARATOR) + FIRST_CHARACTER_END).trim())
 }
 
@@ -82,9 +96,24 @@ function read_root_seed(root_content: string): number {
 	// here and as the real seed everywhere else — and the lane band would then run straight over the
 	// main work tree's own ports.
 	const line = split_lines(root_content).findLast((entry) => is_seed_line(entry))
-	const raw = line === undefined ? undefined : seed_value(line)
+	const raw = line === undefined ? undefined : assignment_value(line)
 
 	return ports.resolve_seed({ [PORT_SEED_KEY]: raw })
+}
+
+/**
+ * The output path a lane's `.env` records, or `undefined` where it records none.
+ *
+ * **A blank assignment is `undefined` rather than an empty path** (joshuafolkken/kit#1713). A lane
+ * whose record was cleared has nothing to poll, and an empty string handed to
+ * `pnpm josh run:liveness --output` is a relative path — refused by its own root check, so the
+ * child would come back `undetermined` for ever rather than saying the record is missing.
+ */
+function read_lane_output(content: string): string | undefined {
+	const line = split_lines(content).findLast((entry) => is_output_line(entry))
+	const raw = line === undefined ? undefined : assignment_value(line)
+
+	return raw === undefined || raw.length === 0 ? undefined : raw
 }
 
 /**
@@ -93,34 +122,54 @@ function read_root_seed(root_content: string): number {
  * Replacing in place rather than appending is what keeps the file honest for a person reading it:
  * two `PORT_SEED` lines would work — the last wins — and would say two different things.
  */
-// Every other seed line is dropped rather than rewritten alongside: a file carrying two of them
-// works — the last wins — and says two different things to the person reading it.
-function replace_seed_line(
+// Every other line for the same key is dropped rather than rewritten alongside: a file carrying two
+// of them works — the last wins — and says two different things to the person reading it.
+function replace_assignment(
 	lines: ReadonlyArray<string>,
 	keep: number,
 	assignment: string,
+	key: string,
 ): Array<string> {
 	return lines.flatMap((entry, index) => {
 		if (index === keep) return [assignment]
 
-		return is_seed_line(entry) ? [] : [entry]
+		return is_key_line(entry, key) ? [] : [entry]
 	})
 }
 
-function lane_file_content(root_content: string, seed: number): string {
-	const assignment = `${PORT_SEED_KEY}${ASSIGNMENT_SEPARATOR}${String(seed)}`
-	const lines = split_lines(root_content)
-	const last_seed = lines.findLastIndex((entry) => is_seed_line(entry))
+function upsert_assignment(content: string, key: string, value: string): string {
+	const assignment = `${key}${ASSIGNMENT_SEPARATOR}${value}`
+	const lines = split_lines(content)
+	const last = lines.findLastIndex((entry) => is_key_line(entry, key))
 	const body =
-		last_seed === -1 ? [...lines, assignment] : replace_seed_line(lines, last_seed, assignment)
+		last === -1 ? [...lines, assignment] : replace_assignment(lines, last, assignment, key)
 
 	return `${body.join('\n')}\n`
 }
 
+function lane_file_content(root_content: string, seed: number): string {
+	return upsert_assignment(root_content, PORT_SEED_KEY, String(seed))
+}
+
+/**
+ * The lane's `.env` with its recorded output path replaced, or with one appended where it had none.
+ *
+ * **The value is quoted, and the seed's is not.** A seed is digits; a path can hold a space or a
+ * `#`, and dotenv readers cut a value at an unquoted ` #` — so an unquoted record would come back
+ * truncated to something that still looks like a path. `read_lane_output` unquotes symmetrically.
+ */
+function with_lane_output(content: string, output: string): string {
+	return upsert_assignment(content, LANE_OUTPUT_KEY, `"${output}"`)
+}
+
 const lane_environment = {
+	LANE_OUTPUT_KEY,
+	is_output_line,
 	is_seed_line,
 	lane_file_content,
+	read_lane_output,
 	read_root_seed,
+	with_lane_output,
 }
 
 export { lane_environment }

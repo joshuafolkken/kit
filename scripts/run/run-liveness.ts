@@ -335,7 +335,17 @@ async function check(request: LivenessRequest): Promise<LivenessDecision> {
 
 // The constants are exported by name rather than through the namespace: read back off a namespace
 // object their literal types widen to `string`, and `ProcessTrace` would then admit anything.
-const run_liveness = { check, decide, read_child_settled, read_output_frozen, sample_output }
+// `to_safe_path` is on the namespace because `josh lane:output` refuses a path this command could
+// not read (joshuafolkken/kit#1713). Recorded, such a path makes every poll answer `undetermined`
+// for ever — so the two have to agree, and agreeing means one function rather than two.
+const run_liveness = {
+	check,
+	decide,
+	read_child_settled,
+	read_output_frozen,
+	sample_output,
+	to_safe_path,
+}
 
 export type {
 	LivenessDecision,

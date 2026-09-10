@@ -41,6 +41,14 @@ function seed_columns(seed: number | undefined): Array<string> {
 	return [String(seed), String(development_port(seed)), String(preview_port(seed))]
 }
 
+// The recorded output path goes last and is labelled, so it is told apart from the directory beside
+// it (joshuafolkken/kit#1713). A lane that records none prints `output -` rather than nothing at
+// all: a session that did not open the lane has to be able to see that the record is missing, not
+// read a shorter row as one field it failed to notice.
+function output_column(output: string | undefined): string {
+	return `output ${output ?? UNKNOWN_VALUE}`
+}
+
 function describe_lane(lane: LaneInfo): string {
 	const [seed, development, preview] = seed_columns(lane.seed)
 
@@ -52,6 +60,7 @@ function describe_lane(lane: LaneInfo): string {
 		lane.branch,
 		lane_state(lane),
 		lane.directory,
+		output_column(lane.output),
 	].join(COLUMN_SEPARATOR)
 }
 

@@ -20,6 +20,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Fetch GitHub issue details',
 		category: 'AI tools',
 	},
+	'issue:read': {
+		script: 'scripts/issue/issue-read-cli.ts',
+		description: "Print each issue's title, body and every comment on it, in one call",
+		category: 'AI tools',
+	},
 	'issue:state': {
 		script: 'scripts/issue/issue-state-cli.ts',
 		description:
@@ -184,6 +189,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Close every lane an interruption left without its work tree',
 		category: 'AI tools',
 		default_script_arguments: ['prune'],
+	},
+	'lane:output': {
+		...LANE_ARGUMENTS,
+		description: 'Record, or read back, where the unit running a lane’s child writes',
+		category: 'AI tools',
+		default_script_arguments: ['output'],
 	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',

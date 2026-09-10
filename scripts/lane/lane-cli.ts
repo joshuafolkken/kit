@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
 import { lane_open, type OpenOutcome } from './lane-open'
+import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
 import { lane_seed_policy } from './lane-seed'
@@ -18,6 +19,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const SINGLE_ARGUMENT = 1
+const ISSUE_AND_PATH_ARGUMENTS = 2
 const ALL_FLAG = '--all'
 const NONE_TOKEN = 'none'
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
@@ -27,6 +29,7 @@ const USAGE = [
 	'       josh lane:close <issue-number> | josh lane:close --all',
 	'       josh lane:list',
 	'       josh lane:prune',
+	'       josh lane:output <issue-number> [<path>]',
 ].join('\n')
 
 type Handler = (rest: ReadonlyArray<string>) => Promise<number>
@@ -37,12 +40,16 @@ function report_usage(): number {
 	return FAILURE_EXIT_CODE
 }
 
+function parse_lane_issue(value: string | undefined): string | undefined {
+	if (value === undefined) return undefined
+
+	return ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
+}
+
 function parse_issue(rest: ReadonlyArray<string>): string | undefined {
-	const [first] = rest
+	if (rest.length > SINGLE_ARGUMENT) return undefined
 
-	if (first === undefined || rest.length > SINGLE_ARGUMENT) return undefined
-
-	return ISSUE_NUMBER_PATTERN.test(first) ? first : undefined
+	return parse_lane_issue(rest[0])
 }
 
 // The two refusals name what to type next, because both are states a person recovers from rather
@@ -151,11 +158,64 @@ async function prune_command(rest: ReadonlyArray<string>): Promise<number> {
 	return report_sweep(await lane_close.prune_lanes())
 }
 
+// The recorded path goes to standard output on both arms, so
+// `unit_output=$(pnpm josh lane:output <N>) && pnpm josh run:liveness <N> --output "$unit_output"`
+// works in a session that opened the lane and in one that never saw it alike. **The `&&` rather than
+// a substitution inside the argument**: a substitution discards the exit status, so the `none` below
+// would reach `--output` as a relative path and poll `undetermined` for ever.
+function report_record(outcome: RecordOutcome, issue: string): number {
+	if (outcome.kind !== 'recorded') {
+		console.error(lane_output.describe_refusal(outcome, issue))
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(outcome.output)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// `none` for a lane that records nothing yet — the same token `lane:list` and `lane:close` print for
+// an empty answer — but with a **non-zero** exit, unlike either of those. The reader here is a
+// command substitution, and `--output none` is a relative path `run:liveness` answers `undetermined`
+// for: polled that way a lane says "could not read" for ever rather than "the record is missing". A
+// non-zero exit is what stops the `&&` in the documented one-liner before it gets there.
+function report_output(outcome: ReadOutcome, issue: string): number {
+	if (outcome.kind === 'no-lane') {
+		console.error(lane_output.describe_refusal(outcome, issue))
+
+		return FAILURE_EXIT_CODE
+	}
+
+	if (outcome.kind === 'none') {
+		console.error(lane_output.NO_OUTPUT)
+		console.info(NONE_TOKEN)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(outcome.output)
+
+	return SUCCESS_EXIT_CODE
+}
+
+async function output_command(rest: ReadonlyArray<string>): Promise<number> {
+	const [first, second] = rest
+	const issue = parse_lane_issue(first)
+
+	if (issue === undefined || rest.length > ISSUE_AND_PATH_ARGUMENTS) return report_usage()
+
+	if (second === undefined) return report_output(await lane_output.read_output(issue), issue)
+
+	return report_record(await lane_output.record_output(issue, second), issue)
+}
+
 const HANDLERS: Record<string, Handler> = {
 	open: open_command,
 	close: close_command,
 	list: list_command,
 	prune: prune_command,
+	output: output_command,
 }
 
 async function dispatch(argv: ReadonlyArray<string>): Promise<number> {
@@ -189,6 +249,7 @@ const lane_cli = {
 	USAGE,
 	main,
 	parse_issue,
+	parse_lane_issue,
 	refusal_message,
 	run,
 }
