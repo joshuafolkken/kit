@@ -50,6 +50,24 @@ function format_issue_references(issue_numbers: ReadonlyArray<number>): string {
 	return join_references(issue_numbers.map((issue_number) => to_issue_reference(issue_number)))
 }
 
+// The `blocked-by` relations a positioned `--add` dropped, named the same way wherever they are
+// reported — on stdout and inside the `--decision-file` record (joshuafolkken/kit#1711). One string
+// rather than two, because the two are read side by side: a reader comparing the console against the
+// record must not have to decide whether two spellings mean the same thing.
+//
+// **Each chain is backticked, never bare and never several to a span.** A line that is *nothing but*
+// `#A -> #B` is read as a dependency declaration anywhere in an epic body — which is what
+// `find_decision_error` refuses a record for — and the `## Decisions` section is parsed with the rest
+// of the body. The label in front already keeps this line out of that pattern; the backticks are what
+// keeps it out if the label is ever reworded. One span **per link** rather than one around the list,
+// because a relocation drops two at once and a single span holding `#890 -> #891, #891 -> #892` reads
+// as one malformed chain in the artifact this line exists to leave behind.
+function format_replaced_relations(links: ReadonlyArray<DependencyLink>): string {
+	const quoted = links.map((link) => `\`${format_dependency_link(link)}\``)
+
+	return `Replaced blocked-by: ${join_references(quoted)}.`
+}
+
 const git_epic_reference = {
 	DEPENDENCY_ARROW,
 	REFERENCE_SEPARATOR,
@@ -58,6 +76,7 @@ const git_epic_reference = {
 	format_dependency_link,
 	format_dependency_links,
 	format_issue_references,
+	format_replaced_relations,
 }
 
 export type { IssueReference }
@@ -70,4 +89,5 @@ export {
 	format_dependency_link,
 	format_dependency_links,
 	format_issue_references,
+	format_replaced_relations,
 }

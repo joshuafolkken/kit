@@ -283,3 +283,29 @@ describe('git_epic_add_plan.build_plan — a task-list row inside a fenced block
 		expect(plan_of(moved).body).toContain('```md\n- [ ] #892\n```')
 	})
 })
+
+// `replaced` against `removed` (joshuafolkken/kit#1711). `removed` is the work list handed to `gh`, so
+// it is filtered down to relations that exist to be removed; `replaced` is what the declaration
+// dropped, filtered by nothing. Reporting from the work list is how a declared-but-unrecorded order
+// could be re-pointed without a word.
+describe('git_epic_add_plan.build_plan — the relations a position replaces', () => {
+	it('names a dropped link the epic never recorded natively', () => {
+		const unrecorded = plan({
+			position: { kind: 'before', target: 891 },
+			recorded: [child(890), child(891), child(892)],
+		})
+
+		expect(links_of(plan_of(unrecorded).replaced)).toStrictEqual(['890->891', '891->892'])
+		expect(plan_of(unrecorded).removed).toStrictEqual([])
+	})
+
+	it('names nothing for an addition that declares no order', () => {
+		const appended = plan({
+			body: UNORDERED_BODY,
+			children: [894],
+			recorded: [child(890), child(891)],
+		})
+
+		expect(plan_of(appended).replaced).toStrictEqual([])
+	})
+})

@@ -2,6 +2,11 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Wrapped in backticks, as a past participle. `josh epic --add` writes the relation it replaced into
+  # the decision record with the chain in a code span, because a line that is nothing but `#A -> #B` is
+  # read as a dependency declaration anywhere in an epic body (joshuafolkken/kit#1711) — the code and
+  # the docs both have to say why the span is there.
+  - backticked
   # The system call that replaces a process image, which is what `spawn` reaches without a shell.
   # `run-wake-session.ts` names it to say why a NUL byte in an argument is the one character that has
   # to be rejected: it terminates the string there, so the argument that runs is a prefix of the one
