@@ -2090,7 +2090,7 @@ Standard output carries one token per line — the runnable issues, in the order
 
 The command is read-only and never applies or removes a label.
 
-**The entry point that consumes this answer is `backlogrun`** ([#1631](https://github.com/joshuafolkken/kit/issues/1631)) — the shorthand keyword that runs the opted-in backlog without naming an epic, defined in `.claude/skills/workflow-commands/backlogrun.md`. It is a separate keyword rather than an argument to `epicrun` because the two declare different authorizations: `epicrun #E` approves one epic's children, and `backlogrun` approves everything a person has opted in with `auto-ok`. Its loop is written against the contract above — the tokens are bare numbers scoped to this repository, `error` is told apart by reading the token rather than the exit status, and every merged issue is fed back through `--exclude`. Which issues may run stays a person's decision; the order and the parallelism are the run's.
+**The entry point that consumes this answer is `backlogrun`** ([#1631](https://github.com/joshuafolkken/kit/issues/1631)) — the shorthand keyword that runs the opted-in backlog without naming an epic, defined in `.claude/skills/workflow-commands/backlogrun.md`. It is a separate keyword rather than an argument to `epicrun` because the two declare different authorizations: `epicrun #E` approves one epic's children, and `backlogrun` approves everything a person has opted in with `auto-ok`. Its loop is written against the contract above — the tokens are bare numbers scoped to this repository, `error` is told apart by reading the token rather than the exit status, and every merged issue is fed back through `--exclude`. Which issues carry the label stays a person's decision; the order and the parallelism are the run's. **An issue the run itself files joins the pool once `epic:bundle` places it under an opted-in epic** — admitted and bounded by `backlogrun.md` → "What one invocation approves" ([#1675](https://github.com/joshuafolkken/kit/issues/1675)), rather than denied.
 
 ### `josh backlog:plan`
 
@@ -2446,7 +2446,7 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:carry --be
 
 **The 8-hour whole-run bound is the record's own age.** Held that way it survives the cut too, and a `started_at` that is not a date reads as spent rather than as current — a record nothing can ever expire is the one state the bound exists to make impossible.
 
-**What may be run is untouched.** This command carries a budget and nothing else: `auto-ok` is still applied only by a person, so a resumed session is offered exactly the issues the first one was.
+**What may be run is untouched.** This command carries a budget and nothing else: `auto-ok` is still applied only by a person, so a resumed session is offered by exactly the rules the first one was — a pool that grew across the seam is `backlogrun.md` → "What one invocation approves", never this command's doing.
 
 Where a `backlogrun` asks it, and what it does with each answer, is `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation".
 
@@ -2470,7 +2470,7 @@ pnpm josh run:wake --loop --interval 30
 
 **The supervisor never declares itself the record's owner.** The owner is meant to be the process _spending_ the budget, and that is the session it wakes, not itself. Named as owner, this long-lived process would still be alive when the woken session ran `--begin`, which is answered `busy` — and the run would never resume. So it reads the carry record and never claims it, while the woken session claims it with `--owner "$PPID"` exactly as before.
 
-**What may be run is untouched.** The waker adds nothing to the argument vector but an invocation rebuilt to say exactly what the record said, and writes no label: `auto-ok` is still a person's to apply, so a woken session is offered exactly the issues the first one was.
+**What may be run is untouched.** The waker adds nothing to the argument vector but an invocation rebuilt to say exactly what the record said, and writes no label: `auto-ok` is still a person's to apply, so a woken session is offered by exactly the rules the first one was — a pool that grew across the seam is `backlogrun.md` → "What one invocation approves", never the waker's doing.
 
 **What it launches is a constant, not configuration.** It runs `claude -p` with the recorded invocation as the prompt, resolved through `PATH` exactly as the `josh eval` harness resolves the same binary. It was an environment variable first, and that put the choice of _which binary runs unattended, overnight, with the person's own credentials_ in reach of anything that can set an environment; shape-checking the name does not address that, and removing the choice does. Supporting a second agent is its own decision with its own security thinking, and belongs in an Issue of its own.
 

@@ -27,10 +27,15 @@ const INVOCATION_RULE_MARKER = '/ `epicrun` / `backlogrun` workflow'
 // whether an issue outside every epic was approved.
 const AUTHORIZATION_MARKERS: ReadonlyArray<string> = [
 	'separate keyword rather than an argument to `epicrun`',
-	"**What may be run stays a person's decision.**",
+	"**Which issues may be opted in stays a person's decision.**",
 	'`auto-ok` is applied only by a person',
-	// The issues the run files are approved to be *filed*, not to be run: they carry no `auto-ok`.
-	'**filing them, not running them**',
+	// joshuafolkken/kit#1675 withdrew the promise that a run's own filings never run: bundled into an
+	// opted-in epic they are offered, and `epic:bundle` makes that bundling Tier A. What replaces the
+	// promise is the brake, so the section is pinned by its heading and by the ceiling that bounds the
+	// loop — a rewrite that drops either is the self-widening the withdrawal had to answer for.
+	'**and an issue this run filed, once it has become such a child**',
+	'### The brake that replaces the promise',
+	'**Ten filings per invocation**',
 ]
 
 // The output contract of `pnpm josh backlog:next`, which the loop is written against. Each of these

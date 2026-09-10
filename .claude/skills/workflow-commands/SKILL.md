@@ -1012,6 +1012,10 @@ those commands' park-and-continue rule exists to avoid.
   honestly closable means do not file (`prompts/collaboration-workflow/wip-cap.md`).
 - **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
   tracks is one `epic:next` never offers, so an unbundled observation is parked rather than recorded.
+  **Where that epic's root carries `auto-ok` the filing joins the backlog's pool**, which is admitted
+  and bounded rather than denied: `.claude/skills/workflow-commands/backlogrun.md` → "What one
+  invocation approves" is the single source of how this obligation and that authorization boundary
+  meet (joshuafolkken/kit#1675).
 - **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent, and the Issue in
   hand is implemented as it was. Name what was filed in the completion report.
 
@@ -1050,8 +1054,12 @@ it — read off the subject rather than judged**:
 **It governs this route only — the fourth row of §2d's table.** A review finding routed to branch 2
 of `prompts/review.md` → "Review round cap" is filed under that section's own bar — a confirmed
 defect reaching a runtime path, with a written failure scenario — and **does not take the depth
-test**: a defect in a `josh` command's behavior is depth 0 by construction, so gating it on a
-citation would drop the one kind of finding both documents agree is never dropped.
+test**: it has already cleared a bar this route has not, so gating it on a citation as well would
+drop the one kind of finding both documents agree is never dropped. **That bar is the reason, and the
+subject's depth is not** — the sentence here used to say that a defect in a `josh` command's behavior
+is depth 0 by construction, and joshuafolkken/kit#1694 and joshuafolkken/kit#1703 are both branch-2
+filings whose subject is the epic tooling, which the table above puts at depth 1
+(joshuafolkken/kit#1675).
 
 **This is not the count cap that was rejected.** A cap is rationing — past the number the finding is
 lost, and nothing about it says which findings were worth having. This changes what counts as a
