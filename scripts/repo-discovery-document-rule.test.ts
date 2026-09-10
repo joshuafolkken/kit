@@ -13,18 +13,22 @@ const JOSH_COMMANDS_DOC = 'docs/josh-commands.md'
 // The owner restriction and its non-overridability are pinned literally: they are the part most
 // easily softened into "prefers the same owner" during a reword, and softening them is exactly the
 // change that would make the variable unsafe.
-const AI_DOC_MARKERS: ReadonlyArray<string> = [
-	'| `JOSH_REPO_PATHS`',
-	'The owner restriction is unconditional and cannot be overridden',
-	'an entry naming a different owner is dropped',
-	'never by its directory name',
-]
+//
+// joshuafolkken/kit#1720: they are pinned at the command reference rather than in the AI document.
+// The restriction is enforced in code (`repo_map_logic.is_same_owner`) and the agent-facing rule it
+// serves — a repository we do not own is Tier C — is resident under "Communication", so the prose
+// here described behavior rather than instructing anyone: the residency criterion
+// (`.claude/skills/workflow-commands/SKILL.md` → §3) leaves the row resident and moves the body to
+// the command reference the section lead already links to. Nothing was deleted; the assertions moved
+// with the text.
+const AI_DOC_MARKERS: ReadonlyArray<string> = ['| `JOSH_REPO_PATHS`']
 
 const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
 	'#### The discovered repository map',
 	'**The owner restriction is unconditional and cannot be overridden.**',
 	'**The directory name is never used as the repository name**',
 	'Remotes on any host other than GitHub are excluded before the owner is even compared',
+	'an override naming a different owner is dropped exactly like a discovered sibling would be',
 ]
 
 describe('repository map documentation', () => {

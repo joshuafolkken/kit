@@ -53,13 +53,8 @@ These are read from a `.env` file at the project root, by the AI scripts, by `jo
 | `TELEGRAM_BOT_TOKEN` | Bot token for Telegram notifications (from BotFather)                                                                                                                                                                   |
 | `TELEGRAM_CHAT_ID`   | Target chat or user ID for Telegram messages                                                                                                                                                                            |
 | `JOSH_SESSION_LANG`  | Language for session dialogue and artifact prose (e.g. `ja`, `en`). When unset, dialogue matches the conversation and artifact prose defaults to `ja`. Scope and the English-pinned exceptions: "Output language" above |
-| `PORT_SEED`          | Integer offsetting this project's dev and preview ports together                                                                                                                                                        |
+| `PORT_SEED`          | Integer offsetting this project's dev and preview ports together; unset or blank means `0` (`5173` / `4173`)                                                                                                            |
 | `JOSH_REPO_PATHS`    | Overrides for the repository map (`owner/repo=/absolute/path`, comma-separated)                                                                                                                                         |
-
-The two that behave in ways worth knowing before you hit them:
-
-- **`PORT_SEED`** lets several kit projects run their servers at once. Unset or blank means `0` — the historical `5173` / `4173`, which is what keeps CI and un-migrated projects unaffected. **An invalid value is a hard error, never a silent fall back to the shared default**, and a busy port still fails loudly with no retry on another port. `josh port` and `playwright.config.ts` both read the seed from `.env`, so the E2E suite waits on the same port the preview script starts. See [`josh port`](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md#josh-port).
-- **`JOSH_REPO_PATHS`** is only for the exceptions — discovery is automatic, keyed by each work tree's `origin` remote and never by its directory name. **The owner restriction is unconditional and cannot be overridden**: an entry naming a different owner is dropped exactly like a discovered sibling would be. `josh doctor` prints the resulting map. See [`josh doctor`](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md#josh-doctor).
 
 **GitHub operations are `gh api` (REST) — instructing prose included — and need `gh` installed; some environments lack it.** Auth: `gh auth login`; `GH_TOKEN` in CI/cloud. See `prompts/collaboration-workflow/gh-rest.md`.
 
@@ -258,6 +253,8 @@ Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` / `backlog
 - Do **NOT** ask confirmation questions like "May I proceed with `halfrun new`?" or "Shall I run `fullrun`?". A confirmation prompt is not an acceptable substitute for explicit invocation.
 - Instead, **prompt the user to type the command themselves**. Use the exact phrasing: "Please run \`<command>\` to start this task." For example: "Please run \`halfrun new\` to start this task." or "Please run \`fullrun #412\` to execute this Issue." The user must type the command on the next turn.
 - This rule applies even when the user has previously authorized a related workflow in an earlier turn. Each invocation must be re-typed by the user in the current turn.
+
+**A session cut inside a declared budget is not a new invocation** — a `backlogrun` cut and resumed is the one invocation a person typed, and it continues rather than waiting to be retyped. A run with no budget left, or none begun, has nothing to carry, so the bullet above still stands. **`backlogrun` alone**: an `epicrun` or `fullrun` cut still waits for the keyword. Single source: `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation".
 
 **`epicrun` parks a child instead of stopping the session**, and its procedure is read from `.claude/skills/workflow-commands/epicrun.md` → "park and continue", which is that rule's single source.
 
