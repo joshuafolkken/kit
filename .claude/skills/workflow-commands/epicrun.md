@@ -1614,8 +1614,12 @@ being reported.
 - **`over`** — **the run hands its lanes over and stops at once.** Open no new lane and take no new
   child from `epic:next`. Confirm that every lane still in flight records an output path — the
   recording is made at dispatch, and one missing is filled in now with
-  `pnpm josh lane:output <N> <path>` — then take the next bullet in the same turn. **There is no
-  waiting here at all**: nothing has to finish, because nothing is being abandoned.
+  `pnpm josh lane:output <N> <path>` — then take one of the next two bullets in the same turn.
+  **There is no waiting here at all**: nothing has to finish, because nothing is being abandoned.
+- **A lane nobody could poll** — `unreadable`, or `open` with no recorded path and none that can be
+  supplied — **and the cut does not happen.** Name that lane in the epic progress comment and go back
+  to step 1 of the loop; the reading is asked again at the next merge. This is the `unreadable` lane's
+  treatment, unchanged from the drain and stated in full below.
 - **Every in-flight lane records a path** — **stop and ask the person to cut the session.** This is
   joshuafolkken/kit#1567's change and it replaces "compact and continue": a session that compacts
   still bills its whole history on every later request, which is how `epicrun #1474` reached $0.241 a

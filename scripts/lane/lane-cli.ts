@@ -159,8 +159,10 @@ async function prune_command(rest: ReadonlyArray<string>): Promise<number> {
 }
 
 // The recorded path goes to standard output on both arms, so
-// `pnpm josh run:liveness <N> --output "$(pnpm josh lane:output <N>)"` is one line in either a
-// session that opened the lane or one that never saw it.
+// `unit_output=$(pnpm josh lane:output <N>) && pnpm josh run:liveness <N> --output "$unit_output"`
+// works in a session that opened the lane and in one that never saw it alike. **The `&&` rather than
+// a substitution inside the argument**: a substitution discards the exit status, so the `none` below
+// would reach `--output` as a relative path and poll `undetermined` for ever.
 function report_record(outcome: RecordOutcome, issue: string): number {
 	if (outcome.kind !== 'recorded') {
 		console.error(lane_output.describe_refusal(outcome, issue))

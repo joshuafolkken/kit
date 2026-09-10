@@ -12,8 +12,11 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // harness names a unit's output file after that session's own id and the unit's, and neither is
 // written anywhere on disk — so a session that did not open the lane could not poll its child, and
 // a hand-off had to drain the pool first: no new lane opened until every in-flight one had finished.
-// Recorded here, `pnpm josh run:liveness <N> --output "$(pnpm josh lane:output <N>)"` works from a
-// session that has never seen the child, and the drain goes away.
+// Recorded here,
+// `unit_output=$(pnpm josh lane:output <N>) && pnpm josh run:liveness <N> --output "$unit_output"`
+// works from a session that has never seen the child, and the drain goes away. **The `&&` is not
+// decoration**: a lane recording nothing prints `none` and exits non-zero, and a substitution written
+// inside the argument would discard that exit status and hand `run:liveness` a relative path.
 //
 // **Nothing here writes a `.env` that was not already there.** A lane whose file cannot be read is
 // refused rather than replaced: the same file carries the lane's port seat, and a fresh one holding

@@ -156,8 +156,8 @@ describe('a close that did not finish', () => {
 })
 
 // joshuafolkken/kit#1713: the path goes to standard output on both arms, so
-// `pnpm josh run:liveness <N> --output "$(pnpm josh lane:output <N>)"` is one line — in the session
-// that opened the lane and in one that never saw it alike.
+// `unit_output=$(pnpm josh lane:output <N>) && pnpm josh run:liveness <N> --output "$unit_output"`
+// works in the session that opened the lane and in one that never saw it alike.
 const UNIT_OUTPUT = '/w/.kit-lanes/1490/agent-7.jsonl'
 
 describe('lane:output', () => {
