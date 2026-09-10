@@ -47,8 +47,10 @@ describe('git_remote_branch.ask', () => {
 	})
 
 	// The defect this replaced passed a pattern to `git branch --list --remotes`, whose short names
-	// carry the remote; `ls-remote` takes the branch name as it stands, with no prefix.
-	it('asks origin about the branch name it was given, unprefixed', async () => {
+	// carry the remote — so what crosses this boundary is the bare branch name, never `origin/<name>`.
+	// **It is not the ref namespace**: `ls_remote_branch` anchors the query at `refs/heads/` on the
+	// far side (joshuafolkken/kit#1709), and this layer neither adds that prefix nor knows about it.
+	it('hands the remote read the bare branch name, without an origin/ prefix', async () => {
 		await git_remote_branch.ask(BRANCH)
 
 		expect(ls_remote_branch).toHaveBeenCalledWith(BRANCH)
