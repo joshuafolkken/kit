@@ -6,6 +6,7 @@ import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/ep
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
+import { PAGE_CEILING_CAUSE } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_label_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
@@ -48,7 +49,8 @@ const DRAFT_NUMBER = 0
 // this command reports its `limit` as a gap, because there the caller wanted the whole backlog and
 // got part of it; here the hundredth-most-recently-updated closed issue is where the question itself
 // stops. A warning printed on every invocation in any repository with a hundred closed issues would
-// carry no signal and would train a reader past the gap lines beside it that do.
+// carry no signal and would train a reader past the gap lines beside it that do. **The page ceiling
+// is still reported**, and `ClosedScan` below says why the two are not the same event.
 const CLOSED_LIMIT = 100
 
 // Read through `has_any_label` rather than compared directly, for the casing reason
@@ -88,19 +90,36 @@ function to_closed_rows(json: string): Array<ScoutIssue> | undefined {
 	return rows?.map((row) => to_closed_row(row))
 }
 
-async function read_recently_closed(): Promise<Array<ScoutIssue> | undefined> {
-	const { json } = await git_gh_command.issue_list_recently_closed(CLOSED_LIMIT)
-
-	return json === undefined ? undefined : to_closed_rows(json)
+// The rows, and whether the **page ceiling** stopped the paging short of the window. That is a
+// different thing from the `limit` above, which is the window itself: pull requests are filtered out
+// client-side, so a repository whose recent closures are mostly merged pull requests can select
+// fewer than `CLOSED_LIMIT` issue rows while the listing still has more to give. The scan then covers
+// less than it was asked for, which `git-gh-issue.ts`'s disposition table records as a warning.
+interface ClosedScan {
+	rows: Array<ScoutIssue> | undefined
+	is_capped: boolean
 }
 
-// The open half already ran, so this is a gap in the answer rather than a failure of it — the same
-// disposition every other truncated listing in this command takes.
+async function read_recently_closed(): Promise<ClosedScan> {
+	const { json, is_capped } = await git_gh_command.issue_list_recently_closed(CLOSED_LIMIT)
+
+	return { rows: json === undefined ? undefined : to_closed_rows(json), is_capped }
+}
+
+// The open half already ran, so both of these are gaps in the answer rather than failures of it —
+// the same disposition every other truncated listing in this command takes.
 const CLOSED_UNREADABLE_LINE =
 	'⚠ The recently closed issues could not be read, so the scan below covers open issues only — work that finished hours ago will not appear in it.'
+const CLOSED_CEILING_LINE = `⚠ The recently closed listing ${PAGE_CEILING_CAUSE}, so a duplicate that closed inside the window may not be below.`
 
-function warn_about_closed(rows: ReadonlyArray<ScoutIssue> | undefined): void {
-	if (rows === undefined) console.error(CLOSED_UNREADABLE_LINE)
+function warn_about_closed(scan: ClosedScan): void {
+	if (scan.rows === undefined) {
+		console.error(CLOSED_UNREADABLE_LINE)
+
+		return
+	}
+
+	if (scan.is_capped) console.error(CLOSED_CEILING_LINE)
 }
 
 interface ScoutArguments {
@@ -297,7 +316,7 @@ async function report(args: ScoutArguments, repo: string): Promise<number> {
 
 	epic_bundle_cli.warn_about_gaps(widened)
 	warn_about_closed(closed)
-	console.info(format_report(draft, widened.issues, closed ?? []))
+	console.info(format_report(draft, widened.issues, closed.rows ?? []))
 
 	return SUCCESS_EXIT_CODE
 }
@@ -338,7 +357,7 @@ const issue_scout_cli = {
 	NO_EPIC_LINE,
 	NO_REFERENCE_LINE,
 	CLOSED_UNREADABLE_LINE,
-	CLOSED_LIMIT,
+	CLOSED_CEILING_LINE,
 	DRAFT_NUMBER,
 	read_arguments,
 	draft_of,

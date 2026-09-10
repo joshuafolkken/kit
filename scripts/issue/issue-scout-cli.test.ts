@@ -1,5 +1,9 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { listing_of, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
+import {
+	capped_listing_outcome,
+	listing_of,
+	listing_outcome,
+} from '#scripts/git/git-gh-issue-list-fixture'
 import { EPIC_LABEL } from '#scripts/git/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -157,6 +161,37 @@ describe('issue_scout_cli.run — what the closed half will not report', () => {
 		)
 
 		expect(output).toContain(issue_scout_cli.NO_DUPLICATE_LINE)
+	})
+})
+
+describe('issue_scout_cli.run — what the closed half says about its own gaps', () => {
+	// The page ceiling is not the `limit`: pull requests are filtered out client-side, so a repository
+	// whose recent closures are mostly merged pull requests can select fewer than the window while the
+	// listing still has more to give — and the scan then covers less than it was asked for.
+	it('says so when the page ceiling cut the closed listing short', async () => {
+		stub_reads([row(UNRELATED_NUMBER, UNRELATED_TITLE)])
+		vi.spyOn(git_gh_command, 'issue_list_recently_closed').mockResolvedValue(
+			capped_listing_outcome('[]'),
+		)
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await issue_scout_cli.run([DRAFT_TITLE])).toBe(SUCCESS_EXIT_CODE)
+		expect(error.mock.calls.join('\n')).toContain(issue_scout_cli.CLOSED_CEILING_LINE)
+	})
+
+	// The ordinary run says nothing: a warning printed every time is one nobody reads, and it would
+	// train the reader past the gap lines beside it that do carry signal.
+	it('says nothing about the closed listing on an ordinary run', async () => {
+		stub_reads([row(UNRELATED_NUMBER, UNRELATED_TITLE)])
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		await issue_scout_cli.run([DRAFT_TITLE])
+
+		expect(error.mock.calls.join('\n')).not.toContain('recently closed')
 	})
 
 	// The open half ran, so this is a gap in the answer rather than a failure of it — and a run told
