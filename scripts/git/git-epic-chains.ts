@@ -179,15 +179,21 @@ function to_ambiguous_position_error(position: InsertPosition): string {
 // `#891` leaves one chain naming `#891`, and the insertion then splices into a place nobody
 // identified — recording `#890 -> #892`, an order the caller never asked for, and dropping
 // `#890 -> #891`, one they never asked to lose. So the plan asks this of the declaration as it stands
-// (joshuafolkken/kit#1701), and the same answer is used inside the insertion below.
+// (joshuafolkken/kit#1701).
+//
+// **`before` is the only kind that can do it, and asking it of `after` too refuses the very case this
+// Issue is about.** A `before` splices its child in *front* of the target, so the child inherits
+// whatever that target was waiting on in the chain that happened to survive — a predecessor out of a
+// chain nobody named. An `after` cannot: with a successor it branches into a line of its own, and
+// without one it extends a tail, and in both the only relation recorded is the one the position asked
+// for. So `--after #891` moving `#892` out of `#892 -> #891` correctly flips the pair to
+// `#890 -> #891 -> #892`, which is exactly the reorder this command was given a move for.
 function find_position_ambiguity(
 	chains: Chains,
 	position: InsertPosition | undefined,
 ): string | undefined {
-	if (position === undefined) return undefined
-	const indices = chains_containing(chains, position.target)
-	if (indices.length < AMBIGUOUS_MATCH_COUNT) return undefined
-	if (is_branching_after(chains, indices, position)) return undefined
+	if (position?.kind !== 'before') return undefined
+	if (chains_containing(chains, position.target).length < AMBIGUOUS_MATCH_COUNT) return undefined
 
 	return to_ambiguous_position_error(position)
 }

@@ -201,6 +201,22 @@ describe('git_epic_add_plan.build_plan — a position that identifies no one pla
 		expect(error).toContain(AMBIGUOUS)
 	})
 
+	// The counter-case, and the reorder joshuafolkken/kit#1701 exists for: `--after` cannot inherit an
+	// unasked predecessor, so flipping `#892` from in front of `#891` to behind it is allowed even
+	// though `#891` is named by two chains. Refusing it would refuse the Issue's headline case.
+	it('allows an after-flip on the same fan-in', () => {
+		const flipped = plan({
+			body: FAN_IN_BODY,
+			recorded: FAN_IN_CHILDREN,
+			children: [892],
+			position: { kind: 'after', target: 891 },
+		})
+
+		expect(declared_of(flipped)).toStrictEqual([ORDERED_CHAIN])
+		expect(links_of(plan_of(flipped).added)).toStrictEqual(['891->892'])
+		expect(links_of(plan_of(flipped).removed)).toStrictEqual(['892->891'])
+	})
+
 	// The removal a move starts with can **collapse** that ambiguity instead of resolving it: taking
 	// `#892` out of `#892 -> #891` leaves `#890 -> #891` as the only chain naming `#891`, and splicing
 	// there would record `#890 -> #892` — an order nobody asked for — while dropping `#890 -> #891`.
