@@ -48,6 +48,10 @@ words:
   # The process-listing command `epicrun.md` names among the traces a stopped delegated unit leaves
   # (joshuafolkken/kit#1212). Distributed, because the skill that names it is copied by `josh sync`.
   - pgrep
+  # The shell variable naming the parent process, which `josh run:carry --owner "$PPID"` passes so the
+  # record can name the long-lived session spending the budget (joshuafolkken/kit#1722). Distributed,
+  # because `backlogrun.md` types that command and `josh sync` copies that skill.
+  - PPID
   # The phase `josh time` reports for everything a run does once its pull request is open
   # (joshuafolkken/kit#1299). Distributed, because the `diag` skill `josh sync` copies names it.
   - wrapup

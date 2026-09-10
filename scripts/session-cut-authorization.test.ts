@@ -30,6 +30,12 @@ const COMMAND_DOC = 'docs/josh-commands.md'
 const CARRY_COMMAND = 'run:carry'
 const CARRY_ALIAS = 'rc'
 
+// joshuafolkken/kit#1722's two ownership answers. Both tables have to carry them — the reference so a
+// loop can branch on them, `backlogrun.md` so the run knows to stop — so the row prefixes are named
+// once here rather than written twice.
+const BUSY_ROW = '| `busy`'
+const STANDING_ROW = '| `standing`'
+
 // The scope clause both documents owe the reader. It is the same sentence in each on purpose: a copy
 // that softened it in one of them would license exactly the cut the decision does not cover.
 const SCOPE_MARKER = 'an `epicrun` or `fullrun` cut still waits for the keyword'
@@ -75,6 +81,12 @@ const BACKLOGRUN_MARKERS: ReadonlyArray<string> = [
 	'How many cuts the run crossed is named in the completion report',
 	'a resumed session is offered exactly the issues the first one was',
 	'and a lane never touches it',
+	// joshuafolkken/kit#1722: the branch table has to carry the two ownership answers, or a run that
+	// reads one has nothing telling it whether to stop, and the deciding falls back to a guess.
+	BUSY_ROW,
+	STANDING_ROW,
+	'`--cut` is also what hands the record off, and it is the only thing that does.',
+	'`--owner "$PPID"` is not decoration.',
 ]
 
 // The hand-off is `epicrun.md`'s, and the reading is scoped away from it on purpose. Without this the
@@ -91,6 +103,12 @@ const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
 	'### `josh run:carry`',
 	'A live record is never replaced, and never resumed into by something else.',
 	'Every counter is an increment, never a total.',
+	// joshuafolkken/kit#1722: the answer table and the two sentences that say what decides ownership.
+	// A rewrite that dropped either would leave the string comparison as the documented behavior.
+	BUSY_ROW,
+	STANDING_ROW,
+	'The record names the process spending the budget, and a second parent is refused against it.',
+	'A session cut declares itself, so only a cut the run took is carried without anyone deciding.',
 ]
 
 describe('the workflow skill states it beside the rule it qualifies', () => {

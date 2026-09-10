@@ -1,13 +1,18 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 
 // joshuafolkken/kit#1714. Two things are pinned here that prose alone would let a rewrite lose:
-// standard output is one token on every path, and `--begin` over a live record answers `resumed`
-// rather than starting a second budget over the first one's.
+// standard output is one token on every path, and `--begin` never starts a second budget over a
+// record that is already there.
+//
+// joshuafolkken/kit#1722 pins which answer each of the three standing-record cases gets: `busy` while
+// the owner runs, `standing` for the same invocation retyped over a record no cut handed off, and
+// `resumed` only for a cut the run itself declared or an adoption the reader asked for.
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
@@ -15,6 +20,8 @@ vi.mock('#scripts/git/git-command', () => ({
 
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
+
+const { DEAD_PID, has_start_probe } = process_identity_fixture
 
 const TEST_PREFIX = 'run-carry-cli-test-'
 const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
@@ -65,33 +72,109 @@ describe('beginning a run', () => {
 		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
 		expect(out).toStrictEqual([run_carry_cli.BEGAN_VERDICT])
 	})
+})
 
-	it('answers resumed over a live record and leaves its start time alone', async () => {
+describe('who a standing record belongs to', () => {
+	// The headline defect of joshuafolkken/kit#1722: the string matched, so the fresh session used to
+	// inherit the dead run's counters and a `started_at` hours old.
+	it('answers standing when the same invocation is typed again, leaving the record alone', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION])
 		const first = run_carry.read_carry(target())
 
 		out.length = 0
-		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
+		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(1)
 
-		expect(out).toStrictEqual([run_carry_cli.RESUMED_VERDICT])
+		expect(out).toStrictEqual([run_carry_cli.STANDING_VERDICT])
 		expect(run_carry.read_carry(target())).toStrictEqual(first)
 	})
 
+	it.skipIf(!has_start_probe)('answers busy while the owner is still running', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
+		out.length = 0
+
+		expect(await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(DEAD_PID)])).toBe(1)
+		expect(out).toStrictEqual([run_carry_cli.BUSY_VERDICT])
+	})
+
+	it('answers resumed once a cut has declared the hand-off', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		await run_carry_cli.run(['--merged', '2'])
+		await run_carry_cli.run(['--cut'])
+		out.length = 0
+
+		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
+		expect(out).toStrictEqual([run_carry_cli.RESUMED_VERDICT])
+	})
+})
+
+describe('beginning a run over a record that is already there', () => {
 	it('replaces a record whose whole-run bound is spent', async () => {
-		run_carry.begin_carry(target(), INVOCATION, LONG_AGO)
+		run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, LONG_AGO)
 
 		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
 		expect(out).toStrictEqual([run_carry_cli.BEGAN_VERDICT])
 		expect(run_carry.read_carry(target()).kind).toBe('carried')
 	})
 
+	// The bound ends *that* run. Replacing a spent record a live parent is still counting into would
+	// delete its budget and answer `began` — the two-parents defect, one branch over.
+	it.skipIf(!has_start_probe)('refuses a spent record whose owner is still running', async () => {
+		run_carry.begin_carry(target(), INVOCATION, run_carry.owner_of(process.pid), LONG_AGO)
+
+		expect(await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(DEAD_PID)])).toBe(1)
+		expect(out).toStrictEqual([run_carry_cli.BUSY_VERDICT])
+		expect(run_carry.read_carry(target()).kind).toBe('expired')
+	})
+
+	// A hand-off makes the resumption the same run, so its spent bound is this session's. Replaced
+	// here, `started_at` would come back as now and `backlog:budget --started` would never end the run.
+	it('answers expired for a spent record its own cut handed off, keeping its start time', async () => {
+		const spent = run_carry.fresh_carry(INVOCATION, run_carry.NO_OWNER, LONG_AGO)
+
+		run_carry.apply_change(target(), spent, { cuts: 1 })
+
+		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
+		expect(out).toStrictEqual([run_carry_cli.EXPIRED_VERDICT])
+		expect(run_carry.read_carry(target())).toMatchObject({
+			carry: { started_at: LONG_AGO.toISOString() },
+		})
+	})
+
 	// `--end` is only reached on the clean-finish path, so a crashed run leaves its record standing.
 	// Resuming into it would spend that run's `--max` and its hours, not this invocation's.
-	it('refuses a live record belonging to a different invocation', async () => {
+	it('refuses a standing record belonging to a different invocation', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION])
 		out.length = 0
 
 		expect(await run_carry_cli.run(['--begin', OTHER_INVOCATION])).toBe(1)
+		expect(out).toStrictEqual([run_carry_cli.MISMATCH_VERDICT])
+	})
+})
+
+describe('adopting a standing record', () => {
+	it('carries the budget the crashed run had spent', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		await run_carry_cli.run(['--merged', '2', '--filed', '1'])
+		out.length = 0
+
+		expect(await run_carry_cli.run(['--resume', INVOCATION])).toBe(0)
+		expect(out).toStrictEqual([run_carry_cli.RESUMED_VERDICT])
+		expect(run_carry.read_carry(target())).toMatchObject({
+			carry: { merged: 2, filed: 1 },
+		})
+	})
+
+	it('refuses when nothing is carried, rather than beginning one', async () => {
+		expect(await run_carry_cli.run(['--resume', INVOCATION])).toBe(1)
+		expect(out).toStrictEqual([run_carry_cli.NONE_VERDICT])
+		expect(run_carry.read_carry(target()).kind).toBe('none')
+	})
+
+	it('refuses a record belonging to a different invocation', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		out.length = 0
+
+		expect(await run_carry_cli.run(['--resume', OTHER_INVOCATION])).toBe(1)
 		expect(out).toStrictEqual([run_carry_cli.MISMATCH_VERDICT])
 	})
 })
@@ -124,7 +207,7 @@ describe('counting into a carried run', () => {
 	})
 
 	it('answers expired once the bound is spent, without losing the count', async () => {
-		run_carry.begin_carry(target(), INVOCATION, LONG_AGO)
+		run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, LONG_AGO)
 
 		expect(await run_carry_cli.run(['--merged', '1'])).toBe(0)
 		expect(out).toStrictEqual([run_carry_cli.EXPIRED_VERDICT])
@@ -163,6 +246,10 @@ describe('an invocation the command cannot act on', () => {
 		['a count that is not a number', ['--merged', 'lots']],
 		['an unknown flag', ['--nope']],
 		['a begin with no invocation text', ['--begin', '']],
+		['a resume with no invocation text', ['--resume', '']],
+		['a begin and a resume at once', ['--begin', INVOCATION, '--resume', INVOCATION]],
+		['an owner that is not a pid', ['--begin', INVOCATION, '--owner', 'me']],
+		['an owner that is a process group', ['--begin', INVOCATION, '--owner', '0']],
 	])('refuses %s', async (_name, argv) => {
 		expect(await run_carry_cli.run(argv)).toBe(1)
 		expect(errors).toContain(run_carry_cli.USAGE)

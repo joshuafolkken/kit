@@ -2391,34 +2391,43 @@ The entry points that ask it, and where in each procedure, are `.claude/skills/w
 Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` continues the run a person authorized instead of starting a second one over it ([#1714](https://github.com/joshuafolkken/kit/issues/1714)).
 
 ```bash
-pnpm josh run:carry --begin "backlogrun --max 5 --idle 30"   # alias: josh rc
-pnpm josh run:carry --json                                   # read the record back in a resumed session
-pnpm josh run:carry --merged 1                               # a child merged
-pnpm josh run:carry --filed 1                                # an issue was filed
-pnpm josh run:carry --cut                                    # a session cut was crossed
-pnpm josh run:carry --end                                    # the invocation is over
+pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"   # alias: josh rc
+pnpm josh run:carry --json                                        # read the record back in a resumed session
+pnpm josh run:carry --merged 1                                    # a child merged
+pnpm josh run:carry --filed 1                                     # an issue was filed
+pnpm josh run:carry --cut                                         # a cut is coming: hand the record off
+pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"  # adopt a record no cut handed off
+pnpm josh run:carry --end                                         # the invocation is over
 ```
 
 **A session cut is an execution detail of the same authorization, and the budget is what carries it.** Typing `backlogrun` once approves the declared budget — `--max`, `--idle` and the 8-hour whole-run bound — and the cut is internal to spending it, the way opening a lane or delegating a child is. What the explicit-invocation rule forbids is **inferring** a workflow from the shape of a request; it has never required the keystroke to land in every session's own transcript, which is the reading `.claude/skills/workflow-commands/epicrun.md` → "Each child runs in a delegated unit" already applies to a delegated child.
 
 **The unit is the repository, not the working tree.** `josh run:hold` keys on the work tree's own git directory because what it guards is one branch, one index and one uncommitted diff. What this record carries is one invocation's budget, and that invocation opens lanes — each a work tree of its own — so the key is the common git directory every lane of one repository shares.
 
-| Answer       | Meaning                                                                       | Exit code |
-| ------------ | ----------------------------------------------------------------------------- | --------- |
-| `began`      | Nothing was carried, so this invocation starts one                            | 0         |
-| `resumed`    | A live record is here — **this session is continuing a run that was cut**     | 0         |
-| `mismatch`   | A live record is here for a **different** invocation; nothing was established | 1         |
-| `carried`    | A read: the record is live, and `--json` puts it on standard output           | 0         |
-| `counted`    | A merge, a filing or a cut was added to the record                            | 0         |
-| `expired`    | The 8-hour whole-run bound is spent; the run ends whatever the counters say   | 0         |
-| `ended`      | The record was cleared                                                        | 0         |
-| `none`       | Nothing is carried — a count exits 1, a read and an end exit 0                | 0 or 1    |
-| `unreadable` | A record is here and could not be parsed; nothing was established             | 1         |
-| `unknown`    | The repository's git directory could not be read                              | 1         |
+| Answer       | Meaning                                                                                                       | Exit code |
+| ------------ | ------------------------------------------------------------------------------------------------------------- | --------- |
+| `began`      | Nothing was carried, so this invocation starts one                                                            | 0         |
+| `resumed`    | **This session is continuing a run that was cut** — a `--cut` handed the record off, or `--resume` adopted it | 0         |
+| `busy`       | The record's **owner process is still running**; this budget is being spent by something else                 | 1         |
+| `standing`   | A record is here that **no cut handed off** — carry it with `--resume`, or discard it with `--end`            | 1         |
+| `mismatch`   | A record is here for a **different** invocation; nothing was established                                      | 1         |
+| `carried`    | A read: the record is live, and `--json` puts it on standard output                                           | 0         |
+| `counted`    | A merge, a filing or a cut was added to the record                                                            | 0         |
+| `expired`    | The 8-hour whole-run bound is spent; the run ends whatever the counters say                                   | 0         |
+| `ended`      | The record was cleared                                                                                        | 0         |
+| `none`       | Nothing is carried — a count and a `--resume` exit 1, a read and an end exit 0                                | 0 or 1    |
+| `unreadable` | A record is here and could not be parsed; nothing was established                                             | 1         |
+| `unknown`    | The repository's git directory could not be read                                                              | 1         |
 
 Standard output carries exactly one token, so `answer=$(pnpm josh run:carry --begin "backlogrun")` captures something a loop can branch on. `--json` is the one exception and is still one line — the whole record has to reach the resumed session, and prose on standard error cannot be read back.
 
-**A live record is never replaced, and never resumed into by something else.** `--begin` naming the same invocation answers `resumed` and leaves the record exactly as it was, because replacing it would restart the budget the cut exists to carry. `--begin` naming a **different** one answers `mismatch` and exits 1 rather than resuming: `--end` is only reached on the clean-finish path, so a run that crashed or stopped on a guard leaves its record standing for up to the whole-run bound, and resuming into it would hand the new invocation the dead run's `--max`, its spent counts and a `started_at` already hours old. End the standing record deliberately once you know that run is over. An **expired** record is replaced whatever it names, because that run has spent the whole-run bound and a person typing the keyword again is starting a new run.
+**A live record is never replaced, and never resumed into by something else.** Whose record it is is decided by **ownership**, never by the invocation text ([#1722](https://github.com/joshuafolkken/kit/issues/1722)). Comparing the string was the first answer and it walked straight through the case that happens most: a run dies, a person retypes the same command, the string matches, and the fresh session inherits the dead run's counters and a `started_at` hours old. Two things replace it.
+
+**The record names the process spending the budget, and a second parent is refused against it.** `--owner <pid>` is that declaration: `--begin` records the pid together with the start time that tells a reissued pid apart, and any later `--begin` or `--resume` while that process is still running answers `busy` and exits 1 — **whatever either command line says**. Pass the parent loop's own long-lived process, which under a `backlogrun` is `--owner "$PPID"`. Without it the record simply declares no owner, and every standing record then reads as not provably live, which refuses rather than resumes. It is not `josh run:hold`'s pid, which is recorded for the reader and deliberately never read back: the process that claims a work tree is the short-lived `josh run:hold` itself, while the owner here is the session that outlives every command it issues.
+
+**A session cut declares itself, so only a cut the run took is carried without anyone deciding.** `--cut` marks the record as handed off and a crash never reaches it, so the next `--begin` naming the same invocation answers `resumed` — the record's counters and `started_at` intact, the ownership moved to this session, and the hand-off spent. Every other standing record answers `standing` and exits 1, which is the explicit carry-or-discard: `--resume "<invocation>" --owner "$PPID"` adopts that budget, `--end` discards it and `--begin` then starts a fresh one. `--begin` naming a **different** invocation still answers `mismatch`. An **expired** record is replaced whatever it names, because that run has spent the whole-run bound and a person typing the keyword again is starting a new run — with two exceptions, both of which answer without replacing. **Its owner is still running**: the answer is `busy`, since the bound ends _that_ run and replacing a record a live parent is still counting into would delete its budget and report `began`, the same two-parents defect one branch over. **A `--cut` handed it off**: the answer is `expired`, because a hand-off says the resumption _is_ that run — replaced there, the record would come back with `started_at` set to now, and `josh backlog:budget --started` reads that field, so the bound would restart at every cut and never end the run. A `--resume` over a spent record answers `expired` too, and adopts nothing.
+
+**The record is claimed exclusively, the way `josh run:hold` claims a work tree.** `--begin` creates the file with `wx` rather than writing it, so two sessions that both read "nothing carried" in the same instant cannot both be told they began a run — the loser answers `busy`. That single-writer claim is also what makes the counters safe: `--merged` and `--filed` trust the claim rather than re-checking it, and with one owner there is never a second writer for an increment to be lost to.
 
 **The whole-run bound is `josh backlog:budget`'s, imported rather than restated.** Two copies of the figure would drift, and the drift is silent in the direction that matters: raised there and not here, this record answers `expired`, `--begin` replaces it, and the budget restarts at zero — the defect the command exists to prevent.
 
