@@ -29,6 +29,32 @@ const WHITESPACE = /\s+/u
 const COMMAND_INDEX = 0
 const FIRST_ARGUMENT = 1
 const NO_PID_NOTE = 'the process started without a pid'
+const UNSAFE_NOTE =
+	'the wake command or its arguments contain characters that are not safe to execute'
+
+// **The inputs that reach `spawn` are validated rather than trusted, and that is a control rather than
+// a formality.** Two things already bound this — the argument vector never goes through a shell, so
+// there is no shell to inject into, and the invocation travels as exactly one argv element rather than
+// being interpolated into a command string — but neither is visible at the call site, and "it cannot be
+// exploited the way this is written today" is an argument, not a check. A later edit that added
+// `shell: true` would silently turn both into nothing.
+//
+// A NUL byte is what `execve` treats as the end of a string, so a value carrying one executes as a
+// prefix of itself; the other control characters have no business in a command line and their presence
+// means the value did not come from where it was supposed to.
+//
+// Scanned by code point rather than matched by a regular expression: a character class over this
+// range has to carry the control characters themselves, which puts unreadable bytes in a source file
+// for no gain.
+const FIRST_PRINTABLE_CODE = 0x20
+const DELETE_CODE = 0x7f
+const FIRST_CODE_POINT = 0
+// The command is one token by construction — it comes from splitting on whitespace — so it is held to
+// the shape an executable name or path actually has. The arguments are not: an invocation is a person's
+// sentence and legitimately contains spaces, quotes and dashes.
+const SAFE_COMMAND_TOKEN = /^[\w./@+-]+$/u
+const MAX_ARGUMENT_LENGTH = 4096
+const EMPTY_LENGTH = 0
 
 interface WakeArgv {
 	command: string
@@ -48,6 +74,36 @@ function configured_command(environment: NodeJS.ProcessEnv = process.env): strin
 	return configured === undefined || configured.trim() === '' ? DEFAULT_WAKE_COMMAND : configured
 }
 
+function is_control_character(character: string): boolean {
+	const code = character.codePointAt(FIRST_CODE_POINT) ?? FIRST_PRINTABLE_CODE
+
+	return code < FIRST_PRINTABLE_CODE || code === DELETE_CODE
+}
+
+// Iterated rather than spread into an array: spreading a string is flagged for decomposing rich
+// characters, and nothing here needs a copy of it.
+function has_control_character(value: string): boolean {
+	for (const character of value) {
+		if (is_control_character(character)) return true
+	}
+
+	return false
+}
+
+function is_safe_length(value: string): boolean {
+	return value.length > EMPTY_LENGTH && value.length <= MAX_ARGUMENT_LENGTH
+}
+
+function is_safe_value(value: string): boolean {
+	return is_safe_length(value) && !has_control_character(value)
+}
+
+// The single gate every argument vector passes before it reaches the operating system, whether it came
+// from configuration or from this module's own `supervisor_argv`.
+function is_safe_argv(argv: WakeArgv): boolean {
+	return is_safe_value(argv.command) && argv.args.every((value) => is_safe_value(value))
+}
+
 // The invocation goes last and as one argument, never interpolated into the command string: it is text
 // a person typed, and splitting it on whitespace here would turn `backlogrun --max 5` into arguments
 // of the CLI rather than the prompt it is.
@@ -55,7 +111,8 @@ function to_argv(configured: string, invocation: string): WakeArgv | undefined {
 	const words = configured.trim().split(WHITESPACE).filter(Boolean)
 	const command = words[COMMAND_INDEX]
 
-	if (command === undefined) return undefined
+	if (command === undefined || !SAFE_COMMAND_TOKEN.test(command)) return undefined
+	if (!is_safe_value(invocation)) return undefined
 
 	return { command, args: [...words.slice(FIRST_ARGUMENT), invocation] }
 }
@@ -95,6 +152,8 @@ function launched(pid: number): LaunchResult {
 // launch into a verdict, so that one detector covers a missing binary, a session that dies during boot
 // and a session that runs without ever picking the run up.
 function launch(request: LaunchRequest, on_error: (note: string) => void): LaunchResult {
+	if (!is_safe_argv(request.argv)) return { kind: 'failed', note: UNSAFE_NOTE }
+
 	try {
 		const child = spawn(request.argv.command, [...request.argv.args], {
 			cwd: request.cwd,
@@ -120,6 +179,7 @@ const run_wake_session = {
 	LOOP_FLAG,
 	WAKE_COMMAND_KEY,
 	configured_command,
+	is_safe_argv,
 	launch,
 	supervisor_argv,
 	to_argv,

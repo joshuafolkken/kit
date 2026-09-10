@@ -2,6 +2,11 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The system call that replaces a process image, which is what `spawn` reaches without a shell.
+  # `run-wake-session.ts` names it to say why a NUL byte in an argument is the one character that has
+  # to be rejected: it terminates the string there, so the argument that runs is a prefix of the one
+  # that was checked (joshuafolkken/kit#1719).
+  - execve
   # The C library call Node names in a name-resolution failure, and the error code it carries. The
   # `backlog:next` reference quotes one verbatim as the failure that used to be reported as an
   # unusable dependency graph (joshuafolkken/kit#1663) — the literal text a reader greps for.

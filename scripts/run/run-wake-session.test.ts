@@ -54,6 +54,47 @@ describe('run_wake_session.to_argv — what the woken session is asked to do', (
 	})
 })
 
+// Nothing here is exploitable as the code stands — `spawn` is given an argument vector and never a
+// shell — but "it cannot be exploited the way this is written today" is an argument rather than a
+// check, and an edit that added `shell: true` would silently turn it into nothing.
+describe('run_wake_session — what may reach the operating system', () => {
+	it('refuses a command that is not shaped like an executable name or path', () => {
+		expect(run_wake_session.to_argv('claude; rm -rf /', INVOCATION)).toBeUndefined()
+	})
+
+	// `execve` treats a NUL as the end of a string, so a value carrying one executes as a prefix of
+	// itself — the argument that runs is not the argument that was checked.
+	it('refuses a value carrying a NUL byte', () => {
+		expect(run_wake_session.to_argv('claude', `${INVOCATION}\u{0}--rm`)).toBeUndefined()
+		expect(run_wake_session.is_safe_argv({ command: 'claude\u{0}x', args: [] })).toBe(false)
+	})
+
+	it('refuses any other control character in an argument', () => {
+		expect(run_wake_session.is_safe_argv({ command: 'claude', args: ['a\nb'] })).toBe(false)
+	})
+
+	it('accepts an ordinary invocation, spaces and dashes and all', () => {
+		expect(run_wake_session.is_safe_argv({ command: 'claude', args: ['-p', INVOCATION] })).toBe(
+			true,
+		)
+	})
+
+	// The gate sits at the call itself, so it holds for what this module builds as well as for what
+	// configuration supplies.
+	it('accepts the supervisor’s own argument vector', () => {
+		expect(run_wake_session.is_safe_argv(run_wake_session.supervisor_argv(SCRIPT, '15'))).toBe(true)
+	})
+
+	it('refuses to launch an argument vector that does not pass', () => {
+		const result = run_wake_session.launch(
+			{ argv: { command: 'claude\u{0}', args: [] }, cwd: '.' },
+			() => undefined,
+		)
+
+		expect(result.kind).toBe('failed')
+	})
+})
+
 describe('run_wake_session.configured_command — the default and its override', () => {
 	it('uses the conservative default when nothing is configured', () => {
 		expect(run_wake_session.configured_command({})).toBe(run_wake_session.DEFAULT_WAKE_COMMAND)
