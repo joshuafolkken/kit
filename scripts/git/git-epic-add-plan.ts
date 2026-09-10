@@ -132,8 +132,10 @@ function to_relocations(input: PlanInput, tracked: ReadonlyArray<number>): Array
 }
 
 // The issues to place, in the order the caller gave them. Additions and relocations enter one chain
-// segment together, so which comes first is the caller's word rather than which bucket it fell into.
-function to_inserted(
+// segment together, so which comes first is the caller's word rather than which bucket it fell into
+// — and the task list is written from this same list, which is what keeps the two agreeing
+// (joshuafolkken/kit#1704).
+function to_placed(
 	children: ReadonlyArray<number>,
 	additions: ReadonlyArray<number>,
 	relocations: ReadonlyArray<number>,
@@ -219,6 +221,9 @@ interface PlanContext {
 	input: PlanInput
 	additions: ReadonlyArray<number>
 	relocations: ReadonlyArray<number>
+	// The two above as one list, in the order the caller named them — what both the chain segment and
+	// the task list are written from (joshuafolkken/kit#1704).
+	placed: ReadonlyArray<number>
 	chains_before: ReadonlyArray<ReadonlyArray<number>>
 	chains_after: ReadonlyArray<ReadonlyArray<number>>
 }
@@ -226,8 +231,7 @@ interface PlanContext {
 function to_rewrite_input(context: PlanContext): RewriteInput {
 	return {
 		body: context.input.body ?? '',
-		additions: context.additions,
-		relocations: context.relocations,
+		placed: context.placed,
 		position: context.input.position,
 		chains_after: context.chains_after,
 		decision: context.input.decision,
@@ -308,23 +312,30 @@ function build_plan(input: PlanInput): PlanOutcome {
 	const error = find_input_error(input, tracked, chains_before)
 	if (error !== undefined) return { error }
 
-	const declared = declared_numbers(chains_before)
-	const additions = to_additions(input, tracked, declared)
+	const additions = to_additions(input, tracked, declared_numbers(chains_before))
 	const relocations = to_relocations(input, tracked)
 	// A relocation is a removal followed by the ordinary insertion, so `--before` re-points the chain
 	// it lands in and the vacated chain closes around it — both by construction rather than by a second
 	// code path (joshuafolkken/kit#1701). `tracked` reaches the chain builder so it can tell a child
 	// with no order yet from a number that is not a child at all; `find_movement_error` has already
 	// refused the second (joshuafolkken/kit#949).
+	const placed = to_placed(input.children, additions, relocations)
 	const inserted = git_epic_chains.insert_children(
 		git_epic_chains.remove_children(chains_before, relocations),
-		to_inserted(input.children, additions, relocations),
+		placed,
 		input.position,
 		tracked,
 	)
 	if ('error' in inserted) return { error: inserted.error }
 
-	return to_plan({ input, additions, relocations, chains_before, chains_after: inserted.chains })
+	return to_plan({
+		input,
+		additions,
+		relocations,
+		placed,
+		chains_before,
+		chains_after: inserted.chains,
+	})
 }
 
 const git_epic_add_plan = {
