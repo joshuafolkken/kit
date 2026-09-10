@@ -286,6 +286,20 @@ describe('git_command.merge_branch', () => {
 	})
 })
 
+// joshuafolkken/kit#1683: the pull left behind when joshuafolkken/kit#1659 fixed `josh main:merge`.
+// A bare `git pull` with neither `pull.rebase` nor `pull.ff` set aborts on a diverged branch, so the
+// strategy is passed rather than inherited — and it is `--ff-only`, because every caller is on the
+// default branch bringing it up to date and none of them is asking to absorb divergence.
+describe('git_command.pull_fast_forward', () => {
+	it('names the reconcile strategy rather than inheriting it from the git configuration', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.pull_fast_forward()
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['pull', '--ff-only'])
+	})
+})
+
 // joshuafolkken/kit#926: `run:preflight` needs the branch an interrupted run left, not merely whether
 // one exists, so the boolean is expressed on top of the listing rather than beside it.
 describe('git_command.branch_names', () => {

@@ -75,7 +75,7 @@ function build_update_argv(overrides: Record<string, string>): Array<string> | u
 
 async function prepare_repository(): Promise<Record<string, string>> {
 	await git_command.checkout('main')
-	await git_command.pull()
+	await git_command.pull_fast_forward()
 
 	const snapshot = read_overrides()
 

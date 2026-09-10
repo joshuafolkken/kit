@@ -38,7 +38,7 @@ async function ensure_ready(is_dry_run: boolean): Promise<void> {
 	// **A dry run writes nothing, and a pull is a write.** It fast-forwards the local default branch
 	// and can fail outright on a conflict, so the rehearsal reports on the history the checkout
 	// already has rather than changing it first.
-	if (!is_dry_run) await git_command.pull()
+	if (!is_dry_run) await git_command.pull_fast_forward()
 }
 
 async function build_plan(): Promise<ReleasePlan> {

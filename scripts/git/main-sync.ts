@@ -50,7 +50,7 @@ async function synchronize(): Promise<number> {
 	const default_branch = await git_command.get_default_branch()
 
 	await git_command.checkout(default_branch)
-	await git_command.pull()
+	await git_command.pull_fast_forward()
 	console.info(default_branch)
 
 	return SUCCESS_EXIT_CODE

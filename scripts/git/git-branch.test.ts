@@ -19,7 +19,7 @@ vi.mock('./git-command', () => ({
 		checkout_b: vi.fn(),
 		checkout: vi.fn(),
 		branch_exists: vi.fn(),
-		pull: vi.fn(),
+		pull_fast_forward: vi.fn(),
 		get_default_branch: vi.fn(),
 	},
 }))
@@ -35,7 +35,7 @@ const { git_error } = await import('./git-error')
 const mocked_branch_exists = vi.mocked(git_command.branch_exists)
 const mocked_checkout = vi.mocked(git_command.checkout)
 const mocked_checkout_b = vi.mocked(git_command.checkout_b)
-const mocked_pull = vi.mocked(git_command.pull)
+const mocked_pull = vi.mocked(git_command.pull_fast_forward)
 const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
 const mocked_display_error = vi.mocked(git_error.display_branch_mismatch_error)
 
