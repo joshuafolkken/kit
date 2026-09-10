@@ -67,7 +67,7 @@ async function pull_latest(): Promise<void> {
 	await animation_helpers.execute_with_animation(
 		'Pulling latest from remote...',
 		async () => {
-			await git_command.pull()
+			await git_command.pull_fast_forward()
 
 			return 'Pulled latest from remote'
 		},

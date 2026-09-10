@@ -7,7 +7,7 @@ const { checkout_mock, pull_mock } = vi.hoisted(() => ({
 }))
 
 vi.mock('../scripts/git/git-command', () => ({
-	git_command: { checkout: checkout_mock, pull: pull_mock },
+	git_command: { checkout: checkout_mock, pull_fast_forward: pull_mock },
 }))
 
 vi.mock('execa', () => ({

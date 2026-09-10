@@ -9,7 +9,7 @@ vi.mock('./git-command', () => ({
 		checkout: vi.fn(),
 		get_default_branch: vi.fn(),
 		git_directories: vi.fn(),
-		pull: vi.fn(),
+		pull_fast_forward: vi.fn(),
 	},
 }))
 
@@ -26,7 +26,7 @@ const CHECKOUT_FAILURE = 'local changes would be overwritten'
 
 const git_directories = vi.mocked(git_command.git_directories)
 const checkout = vi.mocked(git_command.checkout)
-const pull = vi.mocked(git_command.pull)
+const pull = vi.mocked(git_command.pull_fast_forward)
 
 function in_main_work_tree(): void {
 	git_directories.mockResolvedValue([MAIN_GIT_DIRECTORY, MAIN_GIT_DIRECTORY])

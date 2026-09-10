@@ -149,7 +149,7 @@ The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries ba
 | `lefthook:uninstall` | `lefthook uninstall`                                                                   |
 | `lefthook:commit`    | `lefthook run pre-commit`                                                              |
 | `lefthook:push`      | `lefthook run pre-push`                                                                |
-| `main:sync`          | `git checkout <default> && git pull` (refuses inside a linked work tree)               |
+| `main:sync`          | `git checkout <default> && git pull --ff-only` (refuses inside a linked work tree)     |
 | `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                         |
 | `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                            |
 

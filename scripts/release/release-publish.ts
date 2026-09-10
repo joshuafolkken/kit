@@ -116,7 +116,7 @@ async function return_to_default_branch(): Promise<void> {
 	const default_branch = await git_command.get_default_branch()
 
 	await git_command.checkout(default_branch)
-	await git_command.pull()
+	await git_command.pull_fast_forward()
 }
 
 // The checkout goes back to the default branch whichever way the wait ended, so a failed tag watch
