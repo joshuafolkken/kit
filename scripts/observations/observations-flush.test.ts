@@ -101,10 +101,11 @@ describe('observations_flush — the refusals name what to do next', () => {
 		expect(message).toContain(TEST_PATH)
 	})
 
-	// A push or a `gh pr create` that fails after the commit is the one failure that leaves work
-	// nowhere the working tree can show it, so the message has to say where it went.
+	// Any failure after the commit — a push, a `gh pr create`, a red check — leaves work nowhere the
+	// working tree can show it, so the message has to say where it went and that the checkout is
+	// still sitting on it.
 	it('says where the lines are when a flush fails after committing', () => {
-		const message = observations_flush.stranded_commit_message(FLUSH_BRANCH, PUSH_FAILURE)
+		const message = observations_flush.stranded_branch_message(FLUSH_BRANCH, PUSH_FAILURE)
 
 		expect(message).toContain(FLUSH_BRANCH)
 		expect(message).toContain(PUSH_FAILURE)

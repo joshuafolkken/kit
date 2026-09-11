@@ -91,8 +91,11 @@ function other_changes_message(paths: ReadonlyArray<string>): string {
 	return `The working tree holds changes besides the ledger, so \`pnpm josh observations:flush\` stops rather than committing them: ${paths.join(', ')}`
 }
 
-function stranded_commit_message(branch_name: string, reason: string): string {
-	return `The ledger is committed on \`${branch_name}\` and the flush then failed: ${reason} — those lines now exist only on that branch. Push it and open its pull request by hand before running \`pnpm josh ms\` here.`
+// One message for every failure after the commit, because they all leave the same thing behind: the
+// appended lines committed on the flush branch and nowhere the working tree can show them. The
+// checkout is deliberately left on that branch, so the refusal above fires on the next attempt.
+function stranded_branch_message(branch_name: string, reason: string): string {
+	return `The ledger is committed on \`${branch_name}\` and the flush then failed: ${reason} — those lines now exist only on that branch, and this checkout is still on it. Finish that branch's pull request before running \`pnpm josh ms\` here.`
 }
 
 async function refuse_unsafe_flush(status_output: string): Promise<void> {
@@ -131,7 +134,7 @@ async function push_and_open(branch_name: string): Promise<string> {
 
 		return await git_gh_command.pr_create(COMMIT_MESSAGE, pull_request_body())
 	} catch (error) {
-		throw new Error(stranded_commit_message(branch_name, message_of(error)), { cause: error })
+		throw new Error(stranded_branch_message(branch_name, message_of(error)), { cause: error })
 	}
 }
 
@@ -143,33 +146,37 @@ async function open_pull_request(branch_name: string): Promise<string> {
 	return await push_and_open(branch_name)
 }
 
-// The checkout goes back to the default branch whichever way the wait ended, so a red check leaves
-// the tree where the next command expects it rather than parked on the flush branch.
+// **The checkout goes back to the default branch only on the way that merged.** A `finally` here
+// would check the default branch out after a red check too — and `docs/observations.md` would then
+// revert to main's content, leaving the appended lines on a branch nothing in this checkout points
+// at any more. The next flush would read `has_ledger_change` as false and report `clean`, which is
+// the silent loss the refusals above exist to prevent. Left on the branch, the refusal fires.
 async function land(branch_name: string): Promise<void> {
 	try {
 		await git_pr_checks.wait_for_pr_success(branch_name)
 		await git_gh_command.pr_merge(branch_name)
-	} finally {
-		await return_to_default_branch()
+	} catch (error) {
+		throw new Error(stranded_branch_message(branch_name, message_of(error)), { cause: error })
 	}
+
+	await return_to_default_branch()
 }
 
 function merged_message(branch_name: string): string {
 	return `merged \`${branch_name}\` — the appended observations are on the default branch`
 }
 
-// **The pull before the branch is not tidiness.** The ledger is append-only and every writer appends
-// at the same end, so a flush cut from a default branch that predates another merged flush opens a
-// pull request that can never merge — and the wait below has no conflict short-circuit, so it would
-// spend its whole budget discovering that.
+// **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
+// definition at this point, so `git pull --ff-only` aborts on it in exactly the case a pull would
+// have been for — an upstream flush that already advanced the ledger — and reports a failure about
+// the wrong thing. A flush cut from a default branch that predates another merged flush therefore
+// still opens a pull request that conflicts; joshuafolkken/kit#1768 carries that.
 async function flush(now: Date): Promise<string> {
 	const status_output = await git_command.status()
 
 	await refuse_unsafe_flush(status_output)
 
 	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
-
-	await return_to_default_branch()
 
 	const branch_name = branch_name_for(timestamp_for(now))
 
@@ -190,7 +197,7 @@ const observations_flush = {
 	other_changed_paths,
 	other_changes_message,
 	pull_request_body,
-	stranded_commit_message,
+	stranded_branch_message,
 	timestamp_for,
 }
 

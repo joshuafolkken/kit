@@ -1,4 +1,7 @@
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import {
+	observation_ledger,
+	OBSERVATION_LEDGER_PATH,
+} from '#scripts/observations/observation-ledger'
 import { git_command } from './git-command'
 import { git_prompt } from './git-prompt'
 import { git_status } from './git-status'
@@ -78,10 +81,16 @@ function is_stageable(file_path: string): boolean {
 // thing changed, `git_status.check_unstaged` still answers true, nothing is staged, and the commit
 // step dies on git's empty index with `Failed to commit changes` — a message naming nothing that
 // caused it. This line is what turns that into a diagnosis.
+//
+// **The paths are parsed rather than matched as substrings**: `docs/observations.md.bak` contains the
+// ledger's path, and a hint naming a file the exclusion never touched is a hint that teaches the
+// reader to ignore it.
 function report_excluded_paths(status_output: string): void {
-	const excluded = PATHS_EXCLUDED_FROM_STAGING.filter((file_path) =>
-		status_output.includes(file_path),
-	)
+	const excluded = status_output
+		.split('\n')
+		.filter((line) => line.trim().length > 0)
+		.map((line) => observation_ledger.status_path(line))
+		.filter((file_path) => !is_stageable(file_path))
 
 	for (const file_path of excluded) {
 		console.info(`💡 ${file_path} is not staged; commit it with \`pnpm josh observations:flush\`.`)
