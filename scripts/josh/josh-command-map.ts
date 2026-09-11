@@ -58,6 +58,7 @@ const ALIASES: Record<string, string> = {
 	gp: 'pr',
 	fu: 'followup',
 	nf: 'notify',
+	obf: 'observations:flush',
 	ms: 'main:sync',
 	mm: 'main:merge',
 	bp: 'bump',

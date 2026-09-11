@@ -952,6 +952,23 @@ Note: do not use `--task-type completion` manually — always use `josh followup
 
 `.env` is read with `--env-file-if-exists`, so the command runs on a machine that has none as long as both variables are in the environment.
 
+### `josh observations:flush`
+
+Commit the observation ledger (`docs/observations.md`) as a pull request of its own, wait for the required checks, and merge it.
+
+```bash
+pnpm josh observations:flush
+pnpm josh obf
+```
+
+**It is the ledger's only commit path** ([#1756](https://github.com/joshuafolkken/kit/issues/1756)). `pnpm josh git` excludes `docs/observations.md` from what it stages, so an append made in the primary checkout can never ride into a pull request about something else — and, with that exclusion in place, has no other route to the default branch either. This command stages that one path, commits it on a branch named `observations/<YYYY-MM-DD-HHmmss>`, opens a docs-only pull request with no `closes #N`, waits on the same required checks every other pull request waits on, merges it and returns the checkout to the default branch.
+
+**It refuses rather than guessing, on two conditions.** Off the default branch it stops and names `pnpm josh ms`; with the working tree holding any change besides the ledger it stops and lists those paths, because a flush that carried them would be committing somebody's work in progress into a docs pull request. With the ledger matching the commit it sits on, it prints `clean` and exits 0 — most cycles append nothing, and a command that failed there is one nobody runs.
+
+**The hooks' gate reuse skips the ledger, which is why an append waiting to be flushed costs nothing.** A modified-but-never-staged file would otherwise read as "this tree differs from the one the gate recorded" and send every commit and every push in that checkout back to the full gate until someone flushed. `scripts/hook-gate-reuse.ts` drops the ledger from that reading instead — sound because the staging exclusion means neither the index nor the push can carry it, and the ledger's own content is checked by the CI of the pull request this command opens.
+
+The rule it serves, including who appends and why a child never does, is `.claude/skills/workflow-commands/SKILL.md` → §2i.
+
 ### `josh main:sync`
 
 Checkout the default branch and pull the latest changes.

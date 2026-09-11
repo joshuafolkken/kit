@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_test_fixture } from './gate-test-fixture'
 import type { GateTree } from './gate-tree'
+import { OBSERVATION_LEDGER_PATH } from './observations/observation-ledger'
 import { review_stamps } from './review/review-stamps'
 
 // joshuafolkken/kit#1381: the pre-push hook (joshuafolkken/kit#1334) and the pre-commit type check read
@@ -32,6 +33,7 @@ const RENAMED = `R  old.ts -> ${PATH}`
 const UNSTAGED = ` M ${PATH}`
 const PARTIALLY_STAGED = `MM ${PATH}`
 const UNTRACKED = `?? ${PATH}`
+const UNSTAGED_LEDGER = ` M ${OBSERVATION_LEDGER_PATH}`
 const FORCE_ENV = 'JOSH_TEST_HOOK_FORCE'
 const BASE = 'a1b2c3d4'
 const TREE: GateTree = { files: { [PATH]: 'digest-one' }, base: BASE }
@@ -92,6 +94,23 @@ describe('hook_gate_reuse.read_status_lines', () => {
 		repository.unreadable = true
 
 		expect(await hook_gate_reuse.read_status_lines()).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#1756: `pnpm josh git` no longer stages the observation ledger, so a parent's
+	// appended line sits unstaged for the whole interval between the append and the next
+	// `pnpm josh observations:flush`. Read as a difference, one such line would send every commit and
+	// every push in the primary checkout back to the full gate for days — and nothing can carry it,
+	// since the exclusion keeps it out of both the index and the push.
+	it('drops the observation ledger, which no commit or push can carry', async () => {
+		repository.status = `${UNSTAGED_LEDGER}\n${STAGED_ONLY}\n`
+
+		expect(await hook_gate_reuse.read_status_lines()).toStrictEqual([STAGED_ONLY])
+	})
+
+	it('reads a tree holding only the ledger as clean', async () => {
+		repository.status = `${UNSTAGED_LEDGER}\n`
+
+		expect(hook_gate_reuse.is_worktree_clean(await hook_gate_reuse.read_status_lines())).toBe(true)
 	})
 })
 

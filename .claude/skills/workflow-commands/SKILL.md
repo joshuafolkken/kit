@@ -1241,6 +1241,8 @@ and it was filed anyway, because **discarding it was the only alternative on off
   dropping either side destroys exactly what the file is for.
 - **The completion report keeps its line too.** The ledger is what the next run can read; the report
   is what this run's reader sees. Neither replaces the other.
+- **The append is not the end of it** — a line only becomes readable to anyone else once it has
+  merged, and "The commit path" below is how it gets there.
 
 **One observation is one line: five fields, each separated from the next by a vertical bar with one
 space on either side.**
@@ -1289,6 +1291,42 @@ rather than by editing the one already written.
 the depth-0 work it stopped is filed exactly as it was before — this route is only for the ones that
 could not, and whose sole previous destination was nothing (joshuafolkken/kit#1698's gate stands
 unchanged).
+
+### The commit path — how an appended line reaches the default branch
+
+**An append nobody commits is an append nobody can count** (joshuafolkken/kit#1756). The ledger was
+given a destination and no route out of the working tree the line was written in, and **structurally
+nobody was going to commit one**: the parent session that appends never runs `pnpm josh git`, a child
+runs it inside a lane work tree that cannot see the parent's checkout, and in the primary checkout
+`git add -u` swept the line into whatever unrelated pull request that run was opening. Measured on
+the day the ledger shipped, `docs/observations.md` had exactly one commit — the one that created
+it — and seven lines had never left a working tree. **So the repeat count below was reading a file
+that is empty on every other machine**, and every sighting was a first one, which is the state
+joshuafolkken/kit#1728 created the ledger to end.
+
+- **An ordinary run never commits the ledger, and that is enforced rather than remembered.**
+  `pnpm josh git` stages with `docs/observations.md` excluded, in the one staging step every entry
+  point goes through (`scripts/git/git-staging.ts`), so a `fullrun` in the primary checkout **cannot**
+  carry a ledger line into an Issue that has nothing to do with it. It is not a rule a run has to
+  remember at the commit — a run that had to would be the run that forgets.
+- **The parent flushes the ledger as a pull request of its own** — `pnpm josh observations:flush`. It
+  stages that one path and nothing else, commits it on a branch of its own, opens a docs-only pull
+  request, waits on the same required checks every other pull request waits on, merges it and returns
+  the checkout to the default branch. **Nothing is committed to the default branch directly**, which
+  is the constraint this route had to satisfy.
+- **Mixing the lines into a child's pull request was considered and is refused.** That is the
+  contamination the exclusion above exists to end, and adopting it would turn the defect into the
+  specification: a ledger line in an unrelated diff is a line no reviewer of that diff has a reason
+  to question.
+- **Run it in the primary checkout, once per cycle rather than once per observation.** It refuses off
+  the default branch and refuses a working tree holding anything besides the ledger, so a run in
+  progress cannot be flushed out from under, and a lane's checkout is never the one it acts on.
+- **Nothing to flush is an answer, not a failure.** With the ledger matching the commit it sits on
+  the command prints `clean` and exits 0 — most cycles append nothing, and a command that errored
+  there would be one nobody runs.
+- **The count the promotion below reads is a count of the default branch**, which is what this route
+  buys: a ledger line that merged is one every later run, every other machine and every fresh clone
+  can see, and only then can a second sighting be recognized as one.
 
 ### The second sighting is what files it
 
