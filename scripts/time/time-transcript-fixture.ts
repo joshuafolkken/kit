@@ -20,6 +20,9 @@ const BRANCH = '1268-measure-a-run'
 // session only ever shells into.
 const DEFAULT_BRANCH = 'main'
 const CALL_ID = 'a'
+// The tool a fixture call names unless a case says otherwise. Reading is what most of these
+// transcripts are made of, and a case about writes names its own.
+const READ_TOOL = 'Read'
 const AGENT_CALL_ID = 'g'
 // The skill whose load `time-markers.ts` reads as the instant a run opens.
 const WORKFLOW_SKILL = 'workflow-commands'
@@ -72,7 +75,7 @@ function prompt_line(minute: number, branch: string): string {
 	})
 }
 
-function call_line(minute: number, branch: string, name = 'Read', id = CALL_ID): string {
+function call_line(minute: number, branch: string, name = READ_TOOL, id = CALL_ID): string {
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp: at(minute),
@@ -196,21 +199,33 @@ function concurrent_lines(branch: string = BRANCH): Array<string> {
 // Code writes one line per content block and repeats the message id on each, which is what lets a
 // turn's calls be counted exactly. `call_line` above stays untagged: every existing caller measures
 // spans, where the id plays no part, and giving each of them a distinct one would say nothing.
-// `input` rides along for the suites that need a call to name something (joshuafolkken/kit#1390): the
-// batching guard reads the target off the input, so a case about a call that depends on an earlier one
-// cannot be expressed without it. Defaulted, so every caller predating it writes exactly the line it
-// always did.
+// The call below rides along for the suites that need a turn's call to name something
+// (joshuafolkken/kit#1390): the batching guard reads the target off the input, so a case about a call
+// that depends on an earlier one cannot be expressed without it. Defaulted, so every caller predating
+// it writes exactly the line it always did.
+
+// What a fixture turn's call is, beyond its position on the grid. **The tool name is a field rather
+// than a fifth parameter** because a write-span sequence is what pins the batching guard's target test
+// (joshuafolkken/kit#1762): with `Read` spans alone, both the shipped test and the one it replaced
+// answer the same, so the case proves nothing.
+interface FixtureCall {
+	name?: string
+	input?: unknown
+}
+
 function turn_call_line(
 	minute: number,
 	message_id: string,
 	id: string,
-	input: unknown = {},
+	call: FixtureCall = {},
 ): string {
+	const content = { type: 'tool_use', name: call.name ?? READ_TOOL, id, input: call.input ?? {} }
+
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp: at(minute),
 		gitBranch: BRANCH,
-		message: { id: message_id, content: [{ type: 'tool_use', name: 'Read', id, input }] },
+		message: { id: message_id, content: [content] },
 	})
 }
 
@@ -237,20 +252,31 @@ function turn_lines(turn: number, calls: number): Array<string> {
 // A turn whose calls have gone out and none has come back — the shape a transcript has at the instant
 // a `PreToolUse` hook reads it (joshuafolkken/kit#1390). One call per target, so a case can say which
 // of them a later call would depend on.
-function open_turn_lines(turn: number, targets: ReadonlyArray<string>): Array<string> {
+function open_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
 	return call_ids(turn, targets.length).map((id, index) =>
-		turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id, { file_path: targets[index] }),
+		turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id, {
+			name,
+			input: { file_path: targets[index] },
+		}),
 	)
 }
 
 // The same turn, closed by the results that give its calls spans. A span exists only once its result
 // has come back, which is exactly why the open half above is a builder of its own.
-function target_turn_lines(turn: number, targets: ReadonlyArray<string>): Array<string> {
+function target_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
 	const results = call_ids(turn, targets.length).map((id) =>
 		result_line(turn_minute(turn) + 1, BRANCH, id),
 	)
 
-	return [...open_turn_lines(turn, targets), ...results]
+	return [...open_turn_lines(turn, targets, name), ...results]
 }
 
 // A whole stretch of identical turns, which is what the live-density reading is measured against: at

@@ -25,6 +25,8 @@ const NOW_MS = ms(LATER_MINUTE)
 // The shape Claude Code puts in a forked agent's payload: the id of the fork, beside the *parent*
 // session's transcript path (joshuafolkken/kit#1424).
 const AGENT_ID = 'a313eea340918b8a1'
+const READ_TOOL = 'Read'
+const EDIT_TOOL = 'Edit'
 
 // A transcript of its own per case, so one case's refusal record never silences another's — the record
 // is keyed on the transcript the payload names. Each is remembered rather than listed again in the
@@ -61,11 +63,15 @@ function write_transcript(name: string, text: string): string {
 	return target
 }
 
-function payload_of(name: string, text: string = unbatched_text()): string {
+function payload_of(
+	name: string,
+	text: string = unbatched_text(),
+	tool: string = READ_TOOL,
+): string {
 	return JSON.stringify({
 		hook_event_name: 'PreToolUse',
 		transcript_path: write_transcript(name, text),
-		tool_name: 'Read',
+		tool_name: tool,
 		tool_input: { file_path: FRESH_PATH },
 	})
 }
@@ -149,6 +155,27 @@ describe('batch_refusal', () => {
 		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
 
 		expect(batch_refusal(payload_of('switched-off'), NOW_MS)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1762. The matcher names the two edit tools beside `Bash`, so an `Edit` payload
+// reaches this shell at all — and the predicate it reaches now answers about one rather than skipping
+// it before the transcript is read. These two are the wiring's end of the change; which sequences the
+// rule refuses is pinned in `time/time-batch-guard.test.ts`.
+describe('batch_refusal — an edit payload', () => {
+	it('refuses the third consecutive single-call turn on an edit', () => {
+		const payload = payload_of('edit', unbatched_text(), EDIT_TOOL)
+
+		expect(batch_refusal(payload, NOW_MS)).toContain('batching')
+	})
+
+	// The off switch is read before the candidate test, so it covers a write for free — and this is what
+	// says so, since a switch that stopped covering the new half would be found only in a consumer's run.
+	it('says nothing on an edit when the switch is off', () => {
+		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
+		const payload = payload_of('edit-switched-off', unbatched_text(), EDIT_TOOL)
+
+		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
 	})
 })
 

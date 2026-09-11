@@ -490,16 +490,23 @@ SECURITY.md         tsconfig.sonar.json
 > those three tools, and why it never fails.
 >
 > **And it wires the batching guard, on the earlier side of the same event pair.** A `PreToolUse` hook
-> runs `pnpm josh batch:guard` before every `Bash` call, refusing the one that would make a third
+> runs `pnpm josh batch:guard` before every `Bash` and `Edit` call, refusing the one that would make a third
 > consecutive single-call turn (joshuafolkken/kit#1390). It is on the earlier event for the reason the
 > formatter is on the later one: by `PostToolUse` the round trip has already been spent, and describing
 > it there is what the density line above already does — measured at 1.10–1.12 calls per round trip
-> across the three runs after that line shipped, against a 1.50 floor. **It names `Bash` alone, unlike
-> the formatter**, because it must never refuse a write: Claude Code denies one call of a turn and runs
-> the rest, so a refused edit would leave its siblings applied and itself not. Within `Bash` the
-> mutation words already exclude every `pnpm josh` command, commit and Issue write, and the script
-> excludes the edit tools on top of the matcher, plus `sed`, `tee`, `dd` or a `>` anywhere in the line —
-> a matcher is settings a consumer can widen, and the guarantee has to hold whatever the wiring says.
+> across the three runs after that line shipped, against a 1.50 floor. **It names `Edit` beside `Bash`
+> since joshuafolkken/kit#1762**, where it named `Bash` alone before: `Edit` carries 164 of the 251
+> recoverable round trips measured over 20 runs, so excluding it put the largest contributor beyond
+> reach. Refusing one is safe because the guard **withholds the refusal whenever the call in hand names
+> a file the sequence behind it already touched** — the visible case where a reissued edit would meet
+> text that has moved, since Claude Code denies one call of a turn and runs the rest. It cannot see the
+> turn it interrupts, so a batched turn's first edit can still be refused while its siblings apply; the
+> bound is that a refusable write is content-addressed, so the reissue either applies where it was meant
+> to or fails to match and is reported, never lands wrongly. **`Write` is excluded for exactly that
+> reason** — a reissued whole-file write carries no match check, so it could overwrite a sibling's
+> applied edit in silence. Within `Bash` the
+> mutation words still exclude every `pnpm josh` command, commit and Issue write — a matcher is settings
+> a consumer can widen, and what a call is stays the script's answer whatever the wiring says.
 > `JOSH_BATCH_GUARD=off` in the environment or in `.env` switches it off without editing the settings
 > file. `docs/josh-commands.md` carries the conditions, what the guard
 > cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
@@ -509,8 +516,9 @@ SECURITY.md         tsconfig.sonar.json
 > worth of files it has not edited **since its last delegated unit** — the count taken off the
 > transcript rather than kept in an agent's head, which is what makes the threshold fire a second and
 > third time instead of once per run. It names `Read` as well as `Bash` because in these transcripts the
-> reading is split between the two, and on the `Bash` side it refuses only a line the batching guard
-> would also have refused, so the never-refuse-a-write guarantee above is one rule and not two. A
+> reading is split between the two, and on the `Bash` side it refuses only a line that **writes
+> nothing** — the test the batching guard itself asked until joshuafolkken/kit#1762 widened that one,
+> kept under a name of its own so the two guards cannot be moved together by accident. A
 > `sed -n` read is therefore counted and never refused. `JOSH_INVESTIGATION_GUARD=off` switches it off,
 > and `docs/josh-commands.md` carries which commands count as reading, the one-refusal-per-accumulation
 > bound and how to verify it.
