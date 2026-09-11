@@ -1,5 +1,6 @@
 import { git_epic_close } from './git-epic-close'
 import { git_followup_cleanup } from './git-followup-cleanup'
+import { git_followup_label } from './git-followup-label'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
@@ -12,6 +13,10 @@ const { STAGE, lap } = git_followup_stages
 const COMPLETION_COMMENT_RECOVERY =
 	'post the completion report by hand — `gh pr comment <branch>` for the pull request, ' +
 	'`gh api repos/{owner}/{repo}/issues/<N>/comments` for the issue'
+
+// This step **has** a command that finishes it by hand, so it names one — unlike the epic
+// auto-close, whose absence of one is stated rather than papered over.
+const IN_PROGRESS_RECOVERY = 'gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress'
 
 // Everything from the merge gate opening onwards. Split out of `git-pr-followup.ts` because that file
 // had eight code lines of headroom left, and cut here because this is where the run stops being able
@@ -135,28 +140,51 @@ async function epic_close_step(input: WrapupInput): Promise<void> {
 	})
 }
 
-// **The two steps after the merge are issued together** (joshuafolkken/kit#1446). The completion
-// comment writes to the issue or the pull request and the auto-close reads the open epics; neither
-// needs the other's answer, and measured serially they were 1.9 s and 3.1 s of `followup`'s own
-// clock. Past the merge neither can reject either — `run_guarded_step` reports the failure and
-// answers instead — so the two settle independently and the stage costs the longer of them rather
-// than their sum.
+// **The run's own mark, taken off at the end of the run that wrote it** (joshuafolkken/kit#1794).
+// `in-progress` is added by every entry point before it implements, and nothing took it off on the
+// ordinary ending: the pull request merged, the issue closed, and the mark stayed. Removed here
+// rather than by the workflow procedure because this is the one step that knows the merge landed.
+//
+// **A merged run only.** Without `should_merge` the issue is still open and a run may still be
+// holding it, so taking the mark off would say the opposite of what is true — and the step is not
+// issued at all there, rather than issued and self-skipping. The guard flag is `input.should_merge`
+// like both siblings', so the early return above stays the *only* thing deciding whether the step
+// runs: read as redundant and deleted, a hardcoded `true` would turn the step on for a `--no-merge`
+// run instead of leaving it off.
+async function in_progress_step(input: WrapupInput): Promise<void> {
+	if (!input.should_merge) return
+
+	await git_followup_cleanup.run_guarded_step(input.should_merge, {
+		label: 'The `in-progress` label removal',
+		recovery: IN_PROGRESS_RECOVERY,
+		run: async () => {
+			await git_followup_label.strip_in_progress(input.issue_number)
+		},
+	})
+}
+
+// **The steps after the merge are issued together** (joshuafolkken/kit#1446). The completion
+// comment writes to the issue or the pull request, the auto-close reads the open epics, and the
+// label removal reads and writes the issue's labels; none needs another's answer, and measured
+// serially the first two were 1.9 s and 3.1 s of `followup`'s own clock. Past the merge none can
+// reject another — `run_guarded_step` reports the failure and answers instead — so they settle
+// independently and the stage costs the longest of them rather than their sum.
 //
 // **A run that merged nothing keeps them in sequence, because there is nothing to overlap.**
-// `close_completed_epics` returns immediately without `is_merged`, so the second step is a no-op on
-// exactly the path that stays serial — and there the guard is off, so a failure still ends the run
-// and re-running the command is the whole recovery (`git-followup-cleanup.ts`), which is easier to
-// read as one sequence than as a settled pair.
+// `close_completed_epics` returns immediately without `is_merged`, and the label removal is not
+// issued on that path at all — so the serial branch is one real step and a no-op beside it. There
+// the guard is off, so a failure still ends the run and re-running the command is the whole recovery
+// (`git-followup-cleanup.ts`), which is easier to read as one sequence than as a settled set.
 //
-// **What the overlap costs, stated rather than glossed**: two mutating requests now go out at once
-// against one repository — a comment write beside an auto-close that comments on and closes epics —
-// which is what GitHub's secondary rate limit guidance is about. Past the merge both are guarded, so
-// the worst case is a cleanup reported as unfinished rather than a failed run, and the pair is two
-// requests rather than a fan-out. **Their console output can interleave too**: the guard's warning
-// and its recovery line are printed as they happen, so an auto-close progress line can land between
-// them. The recovery line names its own command and stands on its own, so it is still readable out
-// of order — and the alternative, buffering one step's output until the other settles, would hold
-// back a warning about work that has already failed.
+// **What the overlap costs, stated rather than glossed**: mutating requests now go out at once
+// against one repository — a comment write, an auto-close that comments on and closes epics, and a
+// label delete — which is what GitHub's secondary rate limit guidance is about. Past the merge all
+// of them are guarded, so the worst case is a cleanup reported as unfinished rather than a failed
+// run, and this is a handful of requests rather than a fan-out. **Their console output can
+// interleave too**: the guard's warning and its recovery line are printed as they happen, so an
+// auto-close progress line can land between them. The recovery line names its own command and stands
+// on its own, so it is still readable out of order — and the alternative, buffering one step's
+// output until the others settle, would hold back a warning about work that has already failed.
 async function run_tail_steps(input: WrapupInput): Promise<void> {
 	if (!input.should_merge) {
 		await notify_step(input)
@@ -165,7 +193,7 @@ async function run_tail_steps(input: WrapupInput): Promise<void> {
 		return
 	}
 
-	await Promise.all([notify_step(input), epic_close_step(input)])
+	await Promise.all([notify_step(input), epic_close_step(input), in_progress_step(input)])
 }
 
 async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {

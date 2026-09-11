@@ -190,15 +190,29 @@ function has_any_label(
 	return (labels ?? []).some((label) => wanted.has(label.name.toLowerCase()))
 }
 
+// **The spelling GitHub actually stored**, matched by the same case-insensitive comparison every
+// membership test above uses, or `undefined` where the issue does not carry the label at all.
+//
+// A membership test answers whether the label is there; a *removal* has to name it, and
+// `DELETE …/issues/<N>/labels/<name>` names it in the path. Lowercasing the wanted name and sending
+// that would be a second comparison — GitHub's, on a spelling we did not read — so the removal reads
+// the stored one and sends it back (joshuafolkken/kit#1794).
+function label_name_of(labels: ReadonlyArray<string>, wanted: string): string | undefined {
+	const target = wanted.toLowerCase()
+
+	return labels.find((label) => label.toLowerCase() === target)
+}
+
 // The same comparison for a caller holding label *names* rather than listing rows. `EpicChild.labels`
 // is an array of strings (`scripts/epic/epic-graph.ts`), which is the one shape `has_any_label` cannot
 // take — so `epic-classify.ts` and `git-epic-validate.ts` each grew a raw case-sensitive
 // `Array.includes` instead, and an `Epic`-cased label walked past both. Kept here beside the rule it
 // implements rather than at either call site, for the reason the comment above gives.
+//
+// Expressed through `label_name_of` rather than repeating its `.toLowerCase()` loop: one comparison,
+// so a membership test and a removal can never disagree about what counts as the same label.
 function has_label_name(labels: ReadonlyArray<string>, wanted: string): boolean {
-	const target = wanted.toLowerCase()
-
-	return labels.some((label) => label.toLowerCase() === target)
+	return label_name_of(labels, wanted) !== undefined
 }
 
 // The depth recorded on one listing row, or `undefined` where none is — the reading every share
@@ -225,6 +239,7 @@ export {
 	has_label_name,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
+	label_name_of,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,

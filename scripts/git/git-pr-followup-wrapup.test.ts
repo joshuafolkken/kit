@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred_answer, type DeferredAnswer } from './deferred-answer-fixture'
 import { git_epic_close } from './git-epic-close'
+import { git_followup_label } from './git-followup-label'
 import { git_followup_stages } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
@@ -18,6 +19,10 @@ vi.mock('./git-gh-command', () => ({
 		pr_comment: vi.fn(),
 		pr_merge: vi.fn(),
 	},
+}))
+
+vi.mock('./git-followup-label', () => ({
+	git_followup_label: { strip_in_progress: vi.fn() },
 }))
 
 vi.mock('./git-epic-close', () => ({
@@ -44,6 +49,7 @@ const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
 const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
 const mocked_comment = vi.mocked(git_gh_command.issue_comment)
 const mocked_close_epics = vi.mocked(git_epic_close.close_completed_epics)
+const mocked_strip_label = vi.mocked(git_followup_label.strip_in_progress)
 
 async function run_wrapup(input: Partial<WrapupInput>): Promise<void> {
 	await git_pr_followup_wrapup.run_wrapup(
@@ -52,12 +58,22 @@ async function run_wrapup(input: Partial<WrapupInput>): Promise<void> {
 	)
 }
 
+// The guard prints a failure and its recovery line as they happen, so what a caller can assert on is
+// everything that was warned rather than one call of it.
+function warned_text(): string {
+	return vi
+		.mocked(console.warn)
+		.mock.calls.map(([line]) => String(line))
+		.join('\n')
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	mocked_get_body.mockResolvedValue('existing content')
 	mocked_comment.mockResolvedValue('')
 	mocked_close_epics.mockResolvedValue()
+	mocked_strip_label.mockResolvedValue()
 	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
 })
 
@@ -126,9 +142,7 @@ describe('run_wrapup — a step that fails after the merge', () => {
 
 		await run_wrapup({})
 
-		const warned = vi.mocked(console.warn).mock.calls.map(([line]) => String(line))
-
-		expect(warned.join('\n')).toContain('The completion comment')
+		expect(warned_text()).toContain('The completion comment')
 	})
 
 	it('does not reject when the epic close fails', async () => {
@@ -138,11 +152,55 @@ describe('run_wrapup — a step that fails after the merge', () => {
 	})
 })
 
+// The same guard, on the step joshuafolkken/kit#1794 added: it is the last of the three to be
+// written, so a run that reported it as done because it threw would be the defect in reverse.
+describe('run_wrapup — a label removal that fails after the merge', () => {
+	const FAILURE = new Error(GATEWAY_ERROR)
+
+	beforeEach(() => {
+		mocked_strip_label.mockRejectedValue(FAILURE)
+	})
+
+	it('does not reject', async () => {
+		await expect(run_wrapup({})).resolves.toBeUndefined()
+	})
+
+	it('names the step and the command that finishes it by hand', async () => {
+		await run_wrapup({})
+
+		expect(warned_text()).toContain('The `in-progress` label removal')
+		expect(warned_text()).toContain('labels/in-progress')
+	})
+
+	it('still posts the completion comment', async () => {
+		await run_wrapup({})
+
+		expect(mocked_comment).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#1794: `in-progress` says a run is holding the issue, and a merged run is not.
+describe('run_wrapup — the in-progress label', () => {
+	it('strips it from the issue the run merged', async () => {
+		await run_wrapup({})
+
+		expect(mocked_strip_label).toHaveBeenCalledWith(BASE_INPUT.issue_number)
+	})
+
+	// Without a merge the issue is still open and a run may still be holding it, so taking the mark
+	// off would say the opposite of what is true.
+	it('leaves it alone on a run that merged nothing', async () => {
+		await run_wrapup({ should_merge: false })
+
+		expect(mocked_strip_label).not.toHaveBeenCalled()
+	})
+})
+
 // joshuafolkken/kit#1446: the completion comment and the epic auto-close need nothing from one
 // another, and measured serially they were 1.9 s and 3.1 s of `followup`'s own clock. Observed by
 // answering the comment last and asking whether the auto-close had already gone out — the property,
 // not a duration a mocked call cannot supply.
-describe('run_wrapup — the two steps after the merge', () => {
+describe('run_wrapup — the steps after the merge', () => {
 	let comment_post: DeferredAnswer<string>
 
 	beforeEach(() => {
@@ -155,6 +213,16 @@ describe('run_wrapup — the two steps after the merge', () => {
 
 		await vi.waitFor(() => {
 			expect(mocked_close_epics).toHaveBeenCalledOnce()
+		})
+		comment_post.answer('')
+		await run
+	})
+
+	it('issues the label removal while the completion comment is still outstanding', async () => {
+		const run = run_wrapup({})
+
+		await vi.waitFor(() => {
+			expect(mocked_strip_label).toHaveBeenCalledOnce()
 		})
 		comment_post.answer('')
 		await run
