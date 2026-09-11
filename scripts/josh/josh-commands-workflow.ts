@@ -41,6 +41,14 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Workflow',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
+	// The observation ledger's only commit path (joshuafolkken/kit#1756). `pnpm josh git` excludes the
+	// ledger from what it stages, so without this command a parent's appended line has no route to the
+	// default branch at all — and the recurrence count the promotion rule reads is a count of main.
+	'observations:flush': {
+		script: 'scripts/observations/observations-flush-cli.ts',
+		description: 'Commit the observation ledger as a pull request of its own, and merge it',
+		category: 'Workflow',
+	},
 	// A script rather than an `sh -c` chain, because it has a precondition to enforce: run inside a
 	// linked work tree it would hijack the default branch from every other one (joshuafolkken/kit#1535).
 	'main:sync': {

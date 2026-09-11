@@ -1,3 +1,4 @@
+import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
 import { git_command } from './git-command'
 import { git_prompt } from './git-prompt'
 import { git_status } from './git-status'
@@ -61,12 +62,41 @@ async function stage_untracked_files(files: ReadonlyArray<string>): Promise<void
 	for (const file of files) console.info(`   + ${file}`)
 }
 
+// **The observation ledger is never staged by an ordinary commit** (joshuafolkken/kit#1756). A
+// parent session appends to it in the primary checkout and nothing there commits it, so the next
+// `pnpm josh git` run in that checkout swept the line into a pull request about something else
+// entirely — a diff a reviewer has no reason to question. Excluding it here covers every entry
+// point, because this is the one staging step all of them go through;
+// `pnpm josh observations:flush` is what commits it, on a branch of its own.
+const PATHS_EXCLUDED_FROM_STAGING: ReadonlyArray<string> = [OBSERVATION_LEDGER_PATH]
+
+function is_stageable(file_path: string): boolean {
+	return !PATHS_EXCLUDED_FROM_STAGING.includes(file_path)
+}
+
+// **Said out loud, because the alternative is an unexplained failure.** With the ledger the only
+// thing changed, `git_status.check_unstaged` still answers true, nothing is staged, and the commit
+// step dies on git's empty index with `Failed to commit changes` — a message naming nothing that
+// caused it. This line is what turns that into a diagnosis.
+function report_excluded_paths(status_output: string): void {
+	const excluded = PATHS_EXCLUDED_FROM_STAGING.filter((file_path) =>
+		status_output.includes(file_path),
+	)
+
+	for (const file_path of excluded) {
+		console.info(`💡 ${file_path} is not staged; commit it with \`pnpm josh observations:flush\`.`)
+	}
+}
+
 async function stage_tracked_files(): Promise<void> {
 	const status_output = await git_command.status()
-	const untracked = git_status.list_untracked_files(status_output)
+	const untracked = git_status
+		.list_untracked_files(status_output)
+		.filter((file_path) => is_stageable(file_path))
 
-	await git_command.add_tracked()
+	await git_command.add_tracked(PATHS_EXCLUDED_FROM_STAGING)
 	console.info('💡 Auto-staged tracked modified files (git add -u).')
+	report_excluded_paths(status_output)
 	await stage_untracked_files(untracked)
 }
 

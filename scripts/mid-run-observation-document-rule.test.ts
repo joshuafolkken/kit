@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { read_repo_file, read_unwrapped } from './ai-document-fixture'
 import { INTERRUPT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './git/issue-labels'
+import { COMMAND_MAP } from './josh/josh-command-map'
 
 // joshuafolkken/kit#1649: the rules named three things a run can discover mid-run — an upstream
 // defect, a split, a prerequisite — and each of the three ends in a written procedure. A plain
@@ -23,6 +24,11 @@ import { INTERRUPT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './git/issue-labels'
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
 const OBSERVATION_LEDGER = 'docs/observations.md'
+const JOSH_COMMANDS_DOC = 'docs/josh-commands.md'
+// Written once and asserted against `COMMAND_MAP` below as well as against the prose, so a rename
+// that reaches only one of the two fails here instead of leaving a document naming a command the CLI
+// does not have.
+const LEDGER_FLUSH_COMMAND = 'observations:flush'
 
 // Read the documents themselves rather than the concatenated rule surface: the surface joins every
 // distributed skill, so a marker checked there would pass on some other file's copy — which is the
@@ -247,6 +253,28 @@ const LEDGER_FILE_MARKERS: ReadonlyArray<string> = [
 	'**A merge conflict here is resolved by keeping both sides.**',
 ]
 
+// joshuafolkken/kit#1756: the ledger had a destination and no route out of the working tree a line
+// was written in — the parent that appends never runs `pnpm josh git`, a child runs it in a lane
+// work tree that cannot see the parent's checkout, and in the primary checkout `git add -u` swept
+// the line into an unrelated pull request. So the count above was reading a file that is empty on
+// every other machine. These markers pin the two halves of the route: that an ordinary commit cannot
+// carry the ledger, and that one command does.
+const COMMIT_PATH_MARKERS: ReadonlyArray<string> = [
+	'### The commit path — how an appended line reaches the default branch',
+	'**An append nobody commits is an append nobody can count**',
+	'**structurally nobody was going to commit one**',
+	'**An ordinary run never commits the ledger, and that is enforced rather than remembered.**',
+	`**The parent flushes the ledger as a pull request of its own** — \`pnpm josh ${LEDGER_FLUSH_COMMAND}\``,
+	'**Nothing is committed to the default branch directly**',
+	// The rejected alternative, kept so the next reader proposes something else rather than reviving
+	// the contamination the exclusion exists to end.
+	"**Mixing the lines into a child's pull request was considered and is refused.**",
+	'**Nothing to flush is an answer, not a failure.**',
+	// Why the route matters at all: the repeat test is a count of what merged, never of what one
+	// machine happens to hold.
+	'**The count the promotion below reads is a count of the default branch**',
+]
+
 // The grammar, written once and asserted against both the documented sample and every real entry. A
 // format defined in prose that no entry is checked against drifts on the first hand-written line.
 const LEDGER_LINE_PATTERN =
@@ -402,5 +430,29 @@ describe(`${OBSERVATION_LEDGER} — the ledger is readable by the rule that name
 		)
 
 		expect(reserved).toEqual([])
+	})
+
+	// The ledger says how its own lines get committed, because whoever opens it after an append is
+	// the person about to reach for `git add`.
+	it('names the command that commits it', () => {
+		expect(ledger_unwrapped).toContain(
+			'**A line reaches `main` through `pnpm josh observations:flush`, never through an ordinary commit.**',
+		)
+	})
+})
+
+describe(`${WORKFLOW_SKILL} — an appended line has a route to the default branch`, () => {
+	it.each(COMMIT_PATH_MARKERS)('states the commit path: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+
+	// A documented command the CLI does not have is a procedure that stops at its first step, which
+	// is the failure this route was filed for arriving one layer down.
+	it('is a command the CLI actually dispatches', () => {
+		expect(Object.keys(COMMAND_MAP)).toContain(LEDGER_FLUSH_COMMAND)
+	})
+
+	it('is documented where the other josh commands are', () => {
+		expect(read_unwrapped(JOSH_COMMANDS_DOC)).toContain(`pnpm josh ${LEDGER_FLUSH_COMMAND}`)
 	})
 })

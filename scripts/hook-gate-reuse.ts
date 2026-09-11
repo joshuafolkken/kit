@@ -2,6 +2,7 @@ import { gate_skip } from './gate-skip'
 import type { GateTree } from './gate-tree'
 import { git_command } from './git/git-command'
 import type { FileMapStamp } from './josh/file-map-stamp'
+import { observation_ledger } from './observations/observation-ledger'
 
 // What the two git hooks share when they decline to re-run a check `pnpm josh gate` already passed on
 // this tree (joshuafolkken/kit#1381).
@@ -40,11 +41,24 @@ function is_force_requested(force_environment: string): boolean {
 
 // `undefined` rather than an empty list when the reading failed, so a caller cannot mistake "git said
 // nothing" for "git could not be asked". Every predicate below treats the two differently.
+//
+// **The observation ledger is dropped from the reading, and it is the one line that may be**
+// (joshuafolkken/kit#1756). Since that issue `pnpm josh git` excludes `docs/observations.md` from
+// what it stages, so a parent's appended line sits modified-but-never-staged for the whole interval
+// between the append and the next `pnpm josh observations:flush` — and every condition below reads a
+// non-empty status as "this operation carries a tree no check has read". Left in, one ledger line
+// would send every commit and every push in the primary checkout back to the full gate for days,
+// which is the reuse this module exists to grant. **Dropping it is sound because nothing can carry
+// it**: the exclusion means the index and the push are byte-for-byte the recorded tree whatever the
+// ledger says, and the ledger's own content is checked by the CI of the pull request the flush opens.
 async function read_status_lines(): Promise<ReadonlyArray<string> | undefined> {
 	try {
 		const status = await git_command.status()
 
-		return status.split('\n').filter((line) => line !== '')
+		return status
+			.split('\n')
+			.filter((line) => line !== '')
+			.filter((line) => !observation_ledger.is_ledger_line(line))
 	} catch {
 		return undefined
 	}

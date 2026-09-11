@@ -396,8 +396,23 @@ async function branch_exists(branch_name: string): Promise<boolean> {
 	return names.length > 0
 }
 
-async function add_tracked(): Promise<void> {
-	await git_spawn.read(['add', '-u'])
+// Everything `:/` matches is the repository root and everything under it, so this stages exactly what
+// the bare `git add -u` it replaced did — from any directory, since `:/` is anchored to the root
+// rather than to the process's working directory.
+const ALL_PATHS_PATHSPEC = ':/'
+
+function exclude_pathspec(file_path: string): string {
+	return `:(exclude,top)${file_path}`
+}
+
+// Every tracked modification, minus the paths the caller names (joshuafolkken/kit#1756). **The
+// positive pathspec is not decoration**: a pathspec list made only of exclusions matches nothing at
+// all, so `ALL_PATHS_PATHSPEC` is what the exclusions are subtracted from. The one caller is
+// `git-staging.ts`, which keeps the observation ledger out of every ordinary commit.
+async function add_tracked(excluded_paths: ReadonlyArray<string>): Promise<void> {
+	const exclusions = excluded_paths.map((file_path) => exclude_pathspec(file_path))
+
+	await git_spawn.read(['add', '-u', '--', ALL_PATHS_PATHSPEC, ...exclusions])
 }
 
 async function add_path(file_path: string): Promise<void> {
