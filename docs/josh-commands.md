@@ -2807,8 +2807,10 @@ Record — or read back — where the delegated unit running this lane's child w
 pnpm josh lane:output 1713 /abs/path/to/agent-7.jsonl   # record it; prints the path back
 pnpm josh lane:output 1713                              # read it; prints the path, or `none`
 unit_output=$(pnpm josh lane:output 1713) &&
-  pnpm josh run:liveness 1713 --output "$unit_output" --process none
+  pnpm josh run:liveness 1713 --output "$unit_output" --process alive
 ```
+
+**`--process alive` is the poll for a lane started by [`josh lane:dispatch`](#josh-lanedispatch)** ([#1749](https://github.com/joshuafolkken/kit/issues/1749)). The child is an operating-system process of its own, so it is `pgrep -laf` against the lane's directory that answers whether it is still working, and a log that is not moving is a session thinking rather than one that died. `--process none` is the older reading, for a child that was an in-process unit of the session that started it; a lane dispatched through the command below is never in that state.
 
 **This is the one fact about an in-flight lane that only the dispatching session held.** Claude Code names a unit's output file after that session's own id and the unit's, and neither is written anywhere on disk — so a session that did not open the lane could not poll its child, and [`josh epicrun`](#josh-epicnext)'s hand-off had to **drain** the pool first: no new lane opened until every in-flight one had finished, six seats decaying to zero over as long as the longest child still running. Recorded here, the next session polls a lane it never opened and the drain is gone.
 
@@ -2817,6 +2819,30 @@ unit_output=$(pnpm josh lane:output 1713) &&
 **A path that could not be polled is refused rather than recorded, by [`josh run:liveness`](#josh-runliveness)'s own containment test rather than a second copy of it.** That command reads only an absolute, normalized path under the home or temp directory and answers `undetermined` — "could not read" — for anything else, so a lane recorded with one would poll as indeterminate for ever instead of saying the record was wrong. A lane whose `.env` cannot be read is refused too, and deliberately not replaced: the same file carries the lane's port seat, and a fresh one holding only this record would put the lane back onto the main work tree's own ports.
 
 **`none` prints on standard output and exits non-zero**, unlike the `none` of `lane:list` and `lane:close`. The lane is open and its child simply has not been handed over yet — but the reader here is a command substitution, and `--output none` is a relative path `run:liveness` answers `undetermined` for, so a lane polled that way says "could not read" for ever instead of the missing record being reported. The non-zero exit is what stops the `&&` above before it gets there. `epicrun` reads that state exactly as it reads an `unreadable` lane — nothing to poll, so the session is not cut — and never as an idle lane.
+
+#### `josh lane:dispatch`
+
+Start a lane's child as a detached operating-system process, so cutting this session abandons nothing ([#1749](https://github.com/joshuafolkken/kit/issues/1749)). Alias: `josh lnd`.
+
+```bash
+pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
+```
+
+**A delegated child used to share the parent session's lifetime, which made the session cut a lie.** [`epicrun.md`](../.claude/skills/workflow-commands/epicrun.md) → "The hand-off" says the cut abandons nothing, and an in-process subagent died with the session that spawned it: the next session polled a file whose writer was gone, waited out the silent-unit window, booked each lane `stopped`, and the third one aborted the run under the consecutive-failure guard. Dispatched here, the child outlives the cut and the sentence holds as written.
+
+**It is the launcher [`josh run:wake`](#josh-runwake) already had, not a second one.** `scripts/run/detached-launch.ts` holds the spawn, the argument-vector validation, the per-launch log header and the removal of the parent session's environment; `run:wake` and this command import the same functions, so the sanitization that [#1760](https://github.com/joshuafolkken/kit/issues/1760) added — stripping a loopback proxy that dies with the invocation that exported it — cannot be present in one launcher and missing from the other.
+
+**The invocation is composed, never passed through.** What the child is given is `fullrun #<N>`, built from a constant and an issue number that matched `^[1-9]\d*$`; nothing a caller typed reaches the command line as text. The vector goes to `spawn` as an array with no shell, and the agent CLI is a constant rather than an environment variable.
+
+**It does not pass `--dangerously-skip-permissions`.** What the child may do is decided by the checkout's own `.claude/settings.json`, exactly as it is for a session a person starts. Measured on 2026-09-11, a headless child launched this way reaches `gh` and completes a merge through [`josh followup`](#josh-followup) without the flag; a checkout whose settings say otherwise is a decision for the person who owns it, never one this command takes for them.
+
+**The output path is recorded by the same call that starts the child**, so "this lane records no path" stops being a state a run can reach. **The dispatch owns that path rather than reusing whatever was recorded**: [`josh lane:output`](#josh-laneoutput) accepts any path under the home or temp directory, and what the older flow recorded there was the unit's own _transcript_ — a file to read — so appending a launch header and the child's raw output into one would corrupt exactly the file `run:liveness` then parses. The path is `<temp>/josh-lane-dispatch-<N>.log`, in the temp directory rather than in the lane so that it survives [`josh lane:close`](#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune): the question a failed child raises is asked after its lane is gone. It is the same path for every dispatch of one lane, so a re-dispatch appends a second header to the file it already owns.
+
+**Every refusal warns as well as exiting non-zero.** `no lane open`, a path that could not be recorded, and a launch that failed all send a `warning` Telegram, because the session that issued the dispatch may be the one about to be cut — and a lane that never started its child looks exactly like a lane whose child is still thinking. The message names the log path, so the next question has somewhere to go.
+
+**A child that started with nowhere to write warns too, and still exits zero.** The launcher treats a log it could not open as a reason to lose the diagnosis rather than a reason not to start the session, so the child is genuinely running and `dispatched` is the honest answer — exiting non-zero there would send the caller to dispatch a _second_ child into the same lane. What must not happen is silence: the message says the output is not being kept and names why, because an operator told only the path would poll a file that never grows and book a working child as stopped.
+
+**What this command does not decide** is how many children run at once — that is `JOSH_LANE_LIMIT` and [#1637](https://github.com/joshuafolkken/kit/issues/1637) — or which issue is dispatched, which is [`josh epic:next`](#josh-epicnext)'s.
 
 ### `josh cost`
 

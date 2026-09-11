@@ -235,7 +235,7 @@ describe(`${SKILL} — the detection can actually run`, () => {
 	// makes.
 	it('gives the detection somewhere to execute', () => {
 		expect(unwrapped).toContain(
-			'**Start the unit without blocking on it, record where it writes — `pnpm josh lane:output <N> <path>` when the child runs in a lane — and poll.**',
+			'**Start the unit without blocking on it — `pnpm josh lane:dispatch <N>` when the child runs in a lane, which records where it writes as it starts it — and poll.**',
 		)
 		expect(unwrapped).toContain(
 			'So the parent checks rather than waiting — which means it must not be waiting.',

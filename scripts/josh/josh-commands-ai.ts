@@ -211,6 +211,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		default_script_arguments: ['output'],
 	},
+	'lane:dispatch': {
+		...LANE_ARGUMENTS,
+		description: 'Start a lane’s child as a detached process that outlives this session',
+		category: 'AI tools',
+		default_script_arguments: ['dispatch'],
+	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
 		description:
