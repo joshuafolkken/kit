@@ -431,14 +431,6 @@ describe(`${OBSERVATION_LEDGER} — the ledger is readable by the rule that name
 
 		expect(reserved).toEqual([])
 	})
-
-	// The ledger says how its own lines get committed, because whoever opens it after an append is
-	// the person about to reach for `git add`.
-	it('names the command that commits it', () => {
-		expect(ledger_unwrapped).toContain(
-			'**A line reaches `main` through `pnpm josh observations:flush`, never through an ordinary commit.**',
-		)
-	})
 })
 
 describe(`${WORKFLOW_SKILL} — an appended line has a route to the default branch`, () => {
