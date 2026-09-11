@@ -1,3 +1,4 @@
+import { time_contributors } from './time-contributors'
 import { time_format } from './time-format'
 import { time_instant } from './time-instant'
 import type { SerialInterval } from './time-lanes'
@@ -170,6 +171,7 @@ function format_period_report(report: PeriodTimeReport): string {
 			DAY_HEADING,
 			report.by_day.map((day) => day_line(day)),
 		),
+		...time_contributors.contributor_lines(report.contributors),
 	].join('\n')
 }
 

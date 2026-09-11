@@ -36,6 +36,7 @@ function report_with(overrides: Partial<LastTimeReport>): LastTimeReport {
 		categories: [],
 		phases: [],
 		checks: [],
+		contributors: [],
 		notes: [EXCLUSION_NOTE],
 		...overrides,
 	}

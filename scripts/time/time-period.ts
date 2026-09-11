@@ -1,3 +1,5 @@
+import { time_contributors } from './time-contributors'
+import type { LabeledDistribution } from './time-distribution'
 import { time_history, type RunTimeRecord } from './time-history'
 import { time_instant } from './time-instant'
 import { time_lanes, type Lane, type LaneRun, type SerialInterval } from './time-lanes'
@@ -70,12 +72,21 @@ interface PeriodContention {
 }
 
 interface PeriodTimeReport extends PeriodWindow, PeriodThroughput, PeriodContention {
+	// What the period's runs spent their turns on, aggregated exactly as `--last` aggregates it
+	// (joshuafolkken/kit#1763) — the same module builds both, so the two scopes cannot come to answer
+	// the question differently. Records written before the breakdown was stored carry none and are
+	// excluded from each row's sample count, the rule an undated record already follows.
+	contributors: Array<LabeledDistribution>
 	notes: Array<string>
 }
 
 interface PeriodInput {
 	period_days: number
 	runs: ReadonlyArray<LaneRun>
+	// The same runs as `runs`, still as records — the lane types carry a window and nothing else, and
+	// the turn breakdown lives on the record. Kept beside them rather than widening `LaneRun`, which
+	// `time-lanes.ts` owns and which nothing about packing lanes needs.
+	records: ReadonlyArray<RunTimeRecord>
 	undated_count: number
 }
 
@@ -104,8 +115,13 @@ function cutoff_of(runs: ReadonlyArray<LaneRun>, days: number): number {
 	return Math.max(...runs.map((run) => run.ended_ms)) - days * DAY_MS
 }
 
-function within(runs: ReadonlyArray<LaneRun>, cutoff: number): Array<LaneRun> {
-	return runs.filter((run) => run.ended_ms >= cutoff)
+// **The window is decided on the record, so the lane table and the turn table select the same runs.**
+// Filtering runs and records through two predicates is how one report would come to aggregate turns
+// over a set its own lane table never held (joshuafolkken/kit#1763).
+function is_dated_within(record: RunTimeRecord, cutoff: number): boolean {
+	const run = to_run(record)
+
+	return run !== undefined && run.ended_ms >= cutoff
 }
 
 // **The excluded records are counted inside the period too, not across the whole file.** The history
@@ -173,11 +189,25 @@ function undated_note(count: number): string {
 	return `${String(count)} record(s) carry no wall-clock window and are excluded from the lane table — they were recorded before the window was stored.`
 }
 
-function notes_of(lane_count: number, undated_count: number): Array<string> {
+// The contributor table's counterpart to `undated_note` (joshuafolkken/kit#1763). A record the table
+// cannot sample is owed a reason, or a reader meeting eight `not measured` rows reads them as a
+// broken measurement. **Both causes are named, because a run recorded today with no transcript
+// attributed writes no breakdown either** — saying only that such a record predates the field would
+// be a false statement about a line written minutes earlier.
+function unturned_note(count: number): string {
+	return `${String(count)} record(s) carry no turn breakdown and are excluded from the contributor table — they were recorded before the breakdown was stored, or merged with no session transcript attributed.`
+}
+
+function notes_of(
+	lane_count: number,
+	undated_count: number,
+	unturned_count: number,
+): Array<string> {
 	const single = lane_count <= ONE ? [SINGLE_LANE_NOTE] : []
 	const undated = undated_count > NONE ? [undated_note(undated_count)] : []
+	const unturned = unturned_count > NONE ? [unturned_note(unturned_count)] : []
 
-	return [...single, ...undated]
+	return [...single, ...undated, ...unturned]
 }
 
 function frame_of(runs: ReadonlyArray<LaneRun>): Frame {
@@ -235,12 +265,20 @@ function contention_of(runs: ReadonlyArray<LaneRun>, lane_count: number): Period
 function to_report(input: PeriodInput): PeriodTimeReport {
 	const frame = frame_of(input.runs)
 	const throughput = throughput_of(input.runs, frame)
+	// Read once and used twice — by the table and by the note that says how much of it was withheld —
+	// so the two cannot come to disagree about which records carried a breakdown.
+	const totals = input.records.map((record) => time_history.parent_turns_of(record))
 
 	return {
 		...window_of(input, frame),
 		...throughput,
 		...contention_of(input.runs, throughput.lane_count),
-		notes: notes_of(throughput.lane_count, input.undated_count),
+		contributors: time_contributors.contributor_rows(totals),
+		notes: notes_of(
+			throughput.lane_count,
+			input.undated_count,
+			totals.filter((entry) => !entry.is_measured).length,
+		),
 	}
 }
 
@@ -260,13 +298,15 @@ function build_period_report(
 	if (dated.length === NONE) return undefined
 
 	const cutoff = cutoff_of(dated, days)
-	const runs = within(dated, cutoff)
+	const kept = records.filter((record) => is_dated_within(record, cutoff))
+	const runs = kept.map((record) => to_run(record)).filter(is_run)
 
 	if (runs.length === NONE) return undefined
 
 	return to_report({
 		period_days: days,
 		runs,
+		records: kept,
 		undated_count: records.filter((record) => is_undated_within(record, cutoff)).length,
 	})
 }
@@ -274,6 +314,7 @@ function build_period_report(
 const time_period = {
 	SINGLE_LANE_NOTE,
 	undated_note,
+	unturned_note,
 	build_period_report,
 }
 

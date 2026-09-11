@@ -1,4 +1,5 @@
 import { time_batch, type RunTiming } from './time-batch'
+import { time_contributors } from './time-contributors'
 import { time_distribution, type Distribution, type LabeledDistribution } from './time-distribution'
 import { time_format } from './time-format'
 import { time_github, type GhReader, type PullSearch } from './time-github'
@@ -52,6 +53,10 @@ interface LastTimeReport {
 	categories: Array<LabeledDistribution>
 	phases: Array<LabeledDistribution>
 	checks: Array<LabeledDistribution>
+	// What the runs spent their turns on, one row per contributor (joshuafolkken/kit#1763). Sampled
+	// from the runs whose transcript was read and from no others, so a run that merged with nothing
+	// attributed leaves the rows one sample shorter rather than pulling every one of them toward zero.
+	contributors: Array<LabeledDistribution>
 	notes: Array<string>
 }
 
@@ -278,6 +283,7 @@ function to_report(
 		categories: category_rows(runs),
 		phases: phase_rows(runs),
 		checks: check_rows(runs),
+		contributors: time_contributors.contributor_rows(runs.map((run) => run.report.parent_turns)),
 		notes: notes_of(requested_count, runs, selection),
 	}
 }

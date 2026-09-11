@@ -41,6 +41,16 @@ function undated(issue: number): RunTimeRecord {
 	return { ...record(issue, BASE_MS, HOUR_MS), started_at: undefined, ended_at: undefined }
 }
 
+// The same record with a turn breakdown attached (joshuafolkken/kit#1763). A separate helper rather
+// than a fourth parameter on `record`, so every existing case keeps reading as the pre-breakdown
+// line it is — which is the case the contributor rows have to exclude.
+function with_turns(
+	base: RunTimeRecord,
+	by_contributor: Readonly<Record<string, number>>,
+): RunTimeRecord {
+	return { ...base, by_contributor }
+}
+
 function reader_of(records: ReadonlyArray<RunTimeRecord>): (root: string) => Array<RunTimeRecord> {
 	function read(): Array<RunTimeRecord> {
 		return [...records]
@@ -81,6 +91,7 @@ const time_period_fixture = {
 	OVERLAPPING,
 	record,
 	undated,
+	with_turns,
 	build,
 	built,
 }

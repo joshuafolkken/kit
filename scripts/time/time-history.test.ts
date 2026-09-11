@@ -179,6 +179,7 @@ describe('time_history.to_record', () => {
 		expect(kept).toStrictEqual({
 			issue: CURRENT_ISSUE,
 			recorded_at: RECORDED_AT,
+			by_contributor: report.parent_turns.by_contributor,
 			started_at: report.started_at,
 			ended_at: report.ended_at,
 			elapsed_ms: report.elapsed_ms,
@@ -188,6 +189,31 @@ describe('time_history.to_record', () => {
 			ms_per_round_trip: report.ms_per_round_trip,
 			model_ms_per_round_trip: report.model_ms_per_round_trip,
 		})
+	})
+})
+
+describe('time_history — the turn breakdown a period report aggregates', () => {
+	// A run whose transcript was never read writes no breakdown at all, which is what lets the read
+	// side leave it out of the denominator rather than reading it as a row of zeroes.
+	it('writes no breakdown for a run nothing was read for', () => {
+		const report = time_report_fixture.run_report([], CI_MS)
+
+		expect(time_history.to_record(CURRENT_ISSUE, report, RECORDED_AT)).not.toHaveProperty(
+			'by_contributor',
+		)
+	})
+
+	it('reads a written breakdown back as measured totals', () => {
+		const report = time_report_fixture.run_report(time_report_fixture.MIXED, CI_MS)
+		const kept = time_history.to_record(CURRENT_ISSUE, report, RECORDED_AT)
+
+		// Against the report's own totals rather than against a named field: what has to survive the
+		// round trip is that the rows still add up to the total their shares are computed from.
+		expect(time_history.parent_turns_of(kept)).toStrictEqual(report.parent_turns)
+	})
+
+	it('reads a record written before the breakdown existed as unmeasured', () => {
+		expect(time_history.parent_turns_of(record(CURRENT_ISSUE, 30, 100)).is_measured).toBe(false)
 	})
 })
 

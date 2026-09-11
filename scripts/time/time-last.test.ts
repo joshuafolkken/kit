@@ -5,6 +5,7 @@ import { time_epic_fixture } from './time-epic-fixture'
 import { time_format } from './time-format'
 import { time_last, type LastTimeReport } from './time-last'
 import type { MergedRun, RunSelection } from './time-last-select'
+import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import type { PhaseTotal } from './time-phases'
 import { time_pull_fixture, type RawPull } from './time-pull-fixture'
 import { time_report, type TimeReport } from './time-report'
@@ -33,6 +34,7 @@ const MIDDLE_HOUR = 11
 const OLDEST_HOUR = 10
 const GATE = 'gate'
 const UNIT_CHECK = 'unit'
+const { IMPLEMENTATION } = time_parent_turns
 
 function at(hour: number): string {
 	return new Date(Date.UTC(FIXTURE_YEAR, 8, 5, hour)).toISOString()
@@ -119,6 +121,23 @@ function one_unread_reports(): Map<number, TimeReport> {
 		[SECOND, report_of({ issue_number: SECOND, model_ms: 4 * MINUTE_MS })],
 		[THIRD, report_of({ issue_number: THIRD, span_count: 0 })],
 	])
+}
+
+// A run's turn breakdown, or the withheld totals of one nothing was read for — the two answers the
+// contributor rows have to tell apart (joshuafolkken/kit#1763).
+function turns_of(count: number | undefined): ParentTurnTotals {
+	if (count === undefined) return { ...time_parent_turns.NO_PARENT_TURNS }
+
+	return { turn_count: count, by_contributor: { [IMPLEMENTATION]: count }, is_measured: true }
+}
+
+function turn_reports(counts: ReadonlyArray<number | undefined>): Map<number, TimeReport> {
+	const entries: Array<[number, TimeReport]> = ISSUES.map((issue_number, index) => [
+		issue_number,
+		report_of({ issue_number, parent_turns: turns_of(counts[index]) }),
+	])
+
+	return new Map(entries)
 }
 
 afterEach(() => {
@@ -305,6 +324,34 @@ describe('time_last.shortfall_notes', () => {
 
 	it('says nothing at all when the request was filled and the listing was read', () => {
 		expect(time_last.shortfall_notes(RUN_COUNT, selection_of(RUN_COUNT, 'settled'))).toEqual([])
+	})
+})
+
+describe('time_last.build_last_report — the turn breakdown across the runs', () => {
+	it('reports the smallest, middle and largest turn count per contributor', async () => {
+		const report = await measure(turn_reports([2, 4, 6]))
+
+		expect(row_of(report.contributors, IMPLEMENTATION)).toMatchObject({
+			distribution: { sample_count: RUN_COUNT, min_ms: 2, median_ms: 4, max_ms: 6 },
+		})
+	})
+
+	// The acceptance criterion the hand count could not meet: a run that merged with no transcript
+	// attributed is one fewer reading rather than a reading of zero.
+	it('leaves a run nothing was read for out of the sample', async () => {
+		const report = await measure(turn_reports([2, 4, undefined]))
+
+		expect(row_of(report.contributors, IMPLEMENTATION)).toMatchObject({
+			distribution: { sample_count: TWO, min_ms: 2, max_ms: 4 },
+		})
+	})
+
+	it('gives the same figures for two reads of the same runs', async () => {
+		const reports = turn_reports([2, 4, 6])
+		const first = await measure(reports)
+		const second = await measure(reports)
+
+		expect(second.contributors).toEqual(first.contributors)
 	})
 })
 

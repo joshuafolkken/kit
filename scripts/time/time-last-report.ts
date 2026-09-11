@@ -1,4 +1,5 @@
 import { time_batch, type RunTiming } from './time-batch'
+import { time_contributors } from './time-contributors'
 import { time_distribution, type LabeledDistribution } from './time-distribution'
 import { time_format } from './time-format'
 import type { LastTimeReport } from './time-last'
@@ -20,10 +21,9 @@ const ELAPSED_LABEL = 'elapsed'
 const CATEGORY_HEADING = 'Where the wall clock went (median, then min – max):'
 const PHASE_HEADING = 'By phase (in run order, median, then min – max):'
 const CHECK_HEADING = 'By CI check (descending by median, jobs overlap):'
-const RANGE_SEPARATOR = ' – '
-// The same separator every other third column in this command is punctuated with, taken from
-// `time-format.ts` rather than spelled out again.
-const { SUFFIX_SEPARATOR, note_lines } = time_format
+// The spread and its separators are `time-format.ts`'s, shared with the turn-count table both
+// aggregated scopes print (joshuafolkken/kit#1763).
+const { note_lines } = time_format
 
 // **The median goes in the numeric column and the range in the suffix**, so a reader scanning the
 // column is scanning one comparable figure per row rather than three. The sample count rides at the
@@ -31,11 +31,12 @@ const { SUFFIX_SEPARATOR, note_lines } = time_format
 // was read from five runs and the other from two.
 function spread_suffix(row: LabeledDistribution): string {
 	const { min_ms, max_ms, sample_count } = row.distribution
-	const range = [min_ms, max_ms]
-		.map((value) => time_format.format_minutes(value))
-		.join(RANGE_SEPARATOR)
 
-	return `${range}${SUFFIX_SEPARATOR}${String(sample_count)} run(s)`
+	return time_format.format_spread(
+		time_format.format_minutes(min_ms),
+		time_format.format_minutes(max_ms),
+		sample_count,
+	)
 }
 
 // **A row nobody could sample says `not measured`, never `0.0 min`.** It is the acceptance criterion
@@ -124,6 +125,7 @@ function format_last_report(report: LastTimeReport): string {
 		...table_lines(CATEGORY_HEADING, report.categories),
 		...table_lines(PHASE_HEADING, report.phases),
 		...check_lines(report),
+		...time_contributors.contributor_lines(report.contributors),
 	].join('\n')
 }
 

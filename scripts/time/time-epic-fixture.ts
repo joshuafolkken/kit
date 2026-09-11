@@ -7,7 +7,7 @@ import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
 import { time_gate_runs } from './time-gate-runs'
-import { time_parent_turns } from './time-parent-turns'
+import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import type { PhaseTotal } from './time-phases'
 import type { TimeReport } from './time-report'
 import { time_rework } from './time-rework'
@@ -45,6 +45,10 @@ interface ReportInput {
 	// epic case, which reads neither — so a report built without them is exactly what it always was.
 	phases?: ReadonlyArray<PhaseTotal>
 	by_check?: ReadonlyArray<CheckTotal>
+	// The turn breakdown the contributor distribution is taken across (joshuafolkken/kit#1763).
+	// Absent leaves the withheld totals `empty_breakdown` already supplies, which is exactly the
+	// unmeasured run every earlier case was built as.
+	parent_turns?: ParentTurnTotals
 }
 
 const DEFAULTS = { model_ms: MINUTE_MS, turn_count: 1, span_count: 2, has_ci_data: true }
@@ -103,10 +107,13 @@ function empty_breakdown(): Breakdown {
 }
 
 function breakdown_of(input: ReportInput): Breakdown {
+	const empty = empty_breakdown()
+
 	return {
-		...empty_breakdown(),
+		...empty,
 		phases: [...(input.phases ?? [])],
 		by_check: [...(input.by_check ?? [])],
+		parent_turns: input.parent_turns ?? empty.parent_turns,
 	}
 }
 
