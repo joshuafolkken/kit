@@ -258,7 +258,8 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   command — **the invocation as it was typed, in a fresh session**, so a `#N` entry resumes as
   `fullrun #<N>` / `halfrun #<N>` and a `new` entry resumes as `fullrun new` / `halfrun new`, since
   the stop happens before the Issue is filed and there is no number to name — then run
-  `pnpm josh run:release <N>`, and stop. Nothing has been filed, branched, edited or pushed yet, which is
+  `pnpm josh run:release <N>`, and stop — **bare where the entry is a `new` one**, whose claim
+  recorded no number ("Release what the claim recorded" in §2f). Nothing has been filed, branched, edited or pushed yet, which is
   what makes the entry the cheapest stop a run has and the reason the question is asked here rather
   than after the plan. **A fresh session is structurally `under`** — its first request carries the
   resident preamble alone, well below the 300,000 line (the measured median is in `epicrun.md` →
@@ -884,8 +885,8 @@ whole reason the bare form exists — so a `fullrun new` that stops on a split t
 run — the seam every `fullrun`, and every child of an `epicrun` or a `queue`, passes through — and a
 record abandoned by a crashed session expires after 8 hours rather than locking the tree for good.
 **A stop that leaves the tree clean releases it explicitly**: a `fullrun` / `halfrun` that stops on a
-split, a prerequisite or a third-party target ends with `pnpm josh run:release <N>`, because in each
-of those the tree carries nothing. **`halfrun`'s stop before
+split, a prerequisite or a third-party target ends with `pnpm josh run:release <N>` — bare where that
+run entered as `new`, per the paragraph above — because in each of those the tree carries nothing. **`halfrun`'s stop before
 commit keeps the hold**, and so does a `needs-human-review` stop: the uncommitted work still in the
 tree is exactly what a second run would trample, so the release command goes in the stop report and
 the Telegram for the person to type once they are done with it.
