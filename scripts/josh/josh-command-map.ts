@@ -106,6 +106,8 @@ const ALIASES: Record<string, string> = {
 	bb: 'backlog:budget',
 	dsh: 'depth:share',
 	co: 'cost',
+	ds: 'doc:section',
+	rs: 'read:set',
 	tm: 'time',
 	ly: 'layers',
 	bn: 'bench',

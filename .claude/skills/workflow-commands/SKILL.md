@@ -70,6 +70,41 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 | `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 | `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 
+### A section reference is read as a section
+
+**A pointer written `` `X.md` → "Heading" `` is read as that section, never by opening `X.md` whole**
+(joshuafolkken/kit#1776):
+
+```bash
+pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim ; alias: josh ds
+pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs ; alias: josh rs
+```
+
+**Reading the file was costing what the pointer never asked for, and it is the largest fixed cost a
+run has.** The parent session of 2026-09-11 measured **159,323 billed input tokens per request at 16
+requests** at exactly this point — the documents read, nothing implemented, and `pnpm josh cost`
+answering `over`. `epicrun.md` alone is 2,121 lines and is opened at a `queue` entry for **four**
+section references worth 699 of them. Reading those four as sections takes **37,184 tokens — about a
+quarter of the whole entry read** — off what is paid before any work starts. `pnpm josh read:set`
+prints both figures; the absolute ones are deliberately not quoted here, because this document is
+itself in the set it measures and a sentence naming them would move them.
+
+**Nothing is deferred and nothing is summarized, which is what separates this from the scheme that
+does not work.** The section is fetched in the same turn, by the main line that has to obey it, and
+printed verbatim with its subsections — what changes is the extent of the fetch, never whether it
+happens. joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each measured a rule moved to "read it
+later" firing exactly never; this moves nothing to later, so there is no path on which a run proceeds
+having only supposed it read something. **A heading that does not resolve is refused, with the file's
+own headings listed** — a renamed target fails loudly rather than printing nothing and reading as a
+section that had nothing in it — and **an ambiguous prefix is refused too**, rather than handing back
+whichever section came first.
+
+**The set is derived rather than transcribed.** `pnpm josh read:set` reads the table above for the
+files and the documents themselves for the references, so the enumeration cannot drift from this
+section; `scripts/document/entry-read-set.test.ts` pins the derivation and
+`scripts/entry-read-set-document-rule.test.ts` pins this rule. **No rule moved and no document was
+split to buy this** — every sentence is where it was, and every marker suite still pins it there.
+
 **`backlogrun` reads `epicrun.md` too, and that is the point rather than an omission.** It changes
 only which issues are offered and by what authorization; every procedure for *running* one of them —
 lanes, park-and-continue, the `needs-human-review` stop, a prerequisite discovered mid-run, the
