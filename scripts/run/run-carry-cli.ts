@@ -50,7 +50,16 @@ function report(
 	is_json: boolean,
 	code: number,
 ): number {
-	console.info(is_json ? JSON.stringify({ verdict, carry }) : verdict)
+	// **`remaining` rides along with the record rather than behind a flag of its own.** `--json` is
+	// already the one answer a resumed session reads back in full, and the question it has to answer
+	// there — which issues of a `queue` are still outstanding — is determined by two fields of the
+	// record it is already printing (joshuafolkken/kit#1774). A `backlogrun` record has no issue list,
+	// so the value is `undefined` and `JSON.stringify` drops the key entirely.
+	console.info(
+		is_json
+			? JSON.stringify({ verdict, carry, remaining: run_carry.remaining_of(carry) })
+			: verdict,
+	)
 
 	return code
 }

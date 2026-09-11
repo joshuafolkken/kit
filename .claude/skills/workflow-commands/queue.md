@@ -10,12 +10,12 @@ Each issue in the queue is a full `fullrun`, so read `fullrun.md`, `chain-rule.m
 
 **Steps:**
 
-1. If the working tree already has staged or modified files, stash them first: `git stash`. Run `git switch main && git pull`, then `pnpm josh latest:scope` once (before the first issue); on `required`, run `josh latest` and verify the overrides are unchanged in both `pnpm-workspace.yaml` and `package.json` and `devEngines` changed only by the expected `josh latest` pnpm bump, by loading the `dependency-update` skill and following its procedure. On `skip` neither runs. **The answer is the command's, never a judgement** — `latest-gate.md` is the single source. If you stashed changes, restore them: `git stash pop`. **Then start the progress step, once for the whole batch and never once per issue** — `pnpm josh run:progress --wait` in the background, what it printed presented in labelled form when it exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as every real report; the units that run the issues start none of their own, and step 2b's brief says so (joshuafolkken/kit#1546). `epicrun.md` → "Progress while the run is quiet" is the single source and is not repeated here.
-2. For each issue `#<N>` in the supplied order:
+1. If the working tree already has staged or modified files, stash them first: `git stash`. Run `git switch main && git pull`, then `pnpm josh latest:scope` once (before the first issue); on `required`, run `josh latest` and verify the overrides are unchanged in both `pnpm-workspace.yaml` and `package.json` and `devEngines` changed only by the expected `josh latest` pnpm bump, by loading the `dependency-update` skill and following its procedure. On `skip` neither runs. **The answer is the command's, never a judgement** — `latest-gate.md` is the single source. If you stashed changes, restore them: `git stash pop`. **Then start the progress step, once for the whole batch and never once per issue** — `pnpm josh run:progress --wait` in the background, what it printed presented in labelled form when it exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as every real report; the units that run the issues start none of their own, and step 2b's brief says so (joshuafolkken/kit#1546). `epicrun.md` → "Progress while the run is quiet" is the single source and is not repeated here. **Declare the budget in that same turn** — `pnpm josh run:carry --begin "<the invocation as it was typed>" --owner "$PPID"`, then `pnpm josh run:wake --start` — so the queue survives its own session cuts; the answers, and what a resumed session does with them, are "The session boundary" below.
+2. For each issue `#<N>` in the supplied order — **in a resumed session that is the `remaining` list `pnpm josh run:carry --json` answers, not the whole prompt**, since the prompt names the opening list and the issues already in `done` have merged ("The session boundary"):
    a. From the 2nd issue onward: run `pnpm josh ms` to incorporate the previous PR's merge. **When the previous issue ran in a delegated unit this step is not defensive — it is the only thing that brings that merge into the checkout the queue implements in** (this session's own, or the target repository's when the references carry a prefix — run it there), and without it the next issue starts on a stale default branch. Where the issue ran in this session's own context it stays what it always was: a `fullrun` always ends on the default branch, so the step also covers an iteration interrupted before its own `pnpm josh ms` ran.
    b. Execute the full `fullrun #<N>` flow **in a delegated unit where one is available** ("Each issue runs in a delegated unit" below), **and in this session's own context where none is**, **except that `josh latest` is not run and no progress watcher is started** — step 1 runs both once for the whole queue, and a unit following `fullrun.md` to the letter would bump dependencies again into every PR after the first and start a watcher whose lines land in the unit rather than in the session the person is watching, so the brief must say so: normalize title → add `in-progress` label → post plan if body is blank → implement → run the verification gate (refactor → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` with the brief `pnpm josh review:brief` prints (the level, what the gate has already proved on this exact tree, and the target) on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total** (`prompts/review.md` → "Review round cap"), **of which only the first runs here: the second runs after the commit, beside the CI it starts** (joshuafolkken/kit#1261) → `pnpm josh eval:scope`, and `pnpm josh eval` when it answers `required` (`eval-gate.md`)) → `pnpm josh gate` again and its join **where the tree was edited after the first gate started** (that edit is what made the first result stale; nothing follows the join before the commit, so round 2's brief still reads `Already verified`) → `pnpm josh git -y "<title> #<N>"` → the follow-up filing and `pnpm josh epic:bundle` for whatever the round cap routed to branch 2, placed here so it runs inside the CI wait (`prompts/review.md` → "Review round cap") → `pnpm josh followup "<title> #<N>" --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- ..."` (sends per-issue completion notification and merges, exactly as `fullrun` does) → `pnpm josh ms` (return to the default branch). **The second review round runs between `pnpm josh git -y` and `pnpm josh followup`**, beside the CI that commit started — the same window the follow-up filing sits in, and **before it**, since the round is what decides which findings the cap routes to branch 2 and there would otherwise be nothing to file. **It is due only where round 1 found High/Medium**, exactly as the round cap has always had it: a clean first round has no second one, no second gate, and this whole paragraph does not apply. **A finding it fixes in place is pushed before its gate** (joshuafolkken/kit#1326): the single check the fix reaches → `pnpm josh git -y "<title> #<N>"` again, a follow-up commit on the same branch → `pnpm josh gate` started beside the CI that commit re-runs and **joined before `pnpm josh followup`**, which is what the merge then waits for (`prompts/review.md` → "The pull request opens between the rounds, so CI runs beside round 2" and → "The round-2 fix commit is pushed before its gate"). **A clean second round is not a turn boundary either**: the turn that reads it issues `pnpm josh followup`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a turn of its own (`prompts/review.md` → "A clean second round issues the merge in the same turn", joshuafolkken/kit#1333).
    c. On failure: send a `failure` Telegram notification via `pnpm josh notify --task-type failure --issue-url "<issue-url>" --body="<reason>"` and **stop immediately** (do not proceed to the next issue).
-3. No extra batch summary notification — each issue's `pnpm josh followup` already sends the per-issue completion notification as usual. **Run `pnpm josh ms` once more here when the final issue ran in a delegated unit**, in that same checkout — step 2a only covers the issues that have a successor, so without it the last merge is never pulled in. `queue` always ends on the default branch, with every merge it produced pulled in.
+3. No extra batch summary notification — each issue's `pnpm josh followup` already sends the per-issue completion notification as usual. **Run `pnpm josh ms` once more here when the final issue ran in a delegated unit**, in that same checkout — step 2a only covers the issues that have a successor, so without it the last merge is never pulled in. `queue` always ends on the default branch, with every merge it produced pulled in. **End the budget in that same turn** — `pnpm josh run:carry --end` and `pnpm josh run:wake --stop` — so the supervisor stops and no record is left standing for the next invocation to be refused against.
 
 **The working-tree hold is claimed per child, never per batch.** This command does not call `pnpm josh run:hold` itself: each child runs the `fullrun` procedure, so it claims the tree on entry and `pnpm josh followup` releases it at that child's merge — the tree stays free for the next child and held against anything else for the whole time a child is in flight. `SKILL.md` → §2f is the single source.
 
@@ -143,12 +143,62 @@ Never advance the queue on the summary alone.
 
 **A queue accumulates in one session exactly as an epic does**, so the hand-off binds here too
 (joshuafolkken/kit#1567). Ask `pnpm josh cost --over 300000` after every issue's merge and
-`pnpm josh ms` — the same seam, one issue later — and stop there on `over`, asking the person to cut
-the session. **300,000 is a temporary experiment rather than a settled number**
-(joshuafolkken/kit#1775) — the figure it replaces, the retreat and its review point are all in
-`epicrun.md` → "The hand-off", the same single source this seam already cites.
-**The resume command is the rest of the queue**, `queue #<next> #<after> …` from the
-first issue that has not run, never the whole queue again.
+`pnpm josh ms` — the same seam, one issue later. **300,000 is a temporary experiment rather than a
+settled number** (joshuafolkken/kit#1775) — the figure it replaces, the retreat and its review point
+are all in `epicrun.md` → "The hand-off", the same single source this seam already cites.
+
+**On `over` the cut happens and the run carries on** (joshuafolkken/kit#1774). Typing `queue` once
+authorizes the whole declared list, and a cut is an execution detail of spending it — `SKILL.md` → §0
+is the single source of that reading, and the mechanism is `backlogrun`'s, used here rather than
+copied: `pnpm josh run:carry` holds the budget in a record beside the git directory, and
+`pnpm josh run:wake` starts the successor. Neither has a `queue` variant, and writing one would be
+the clone `CLAUDE.md` prohibits.
+
+**A queue's invocation is pinned to the list that was typed, and that is the whole of what differs
+here.** The obvious resumption — beginning again as `queue #<remaining>` — is the one that does not
+work: `run:carry` compares the invocation character for character, so a shrinking string answers
+`mismatch` and the run stops, and loosening that comparison would give up joshuafolkken/kit#1722's
+single-writer guarantee. So the record keeps the **opening** list at every cut, and what shrinks is
+the record's `done` field instead.
+
+| Step | Command |
+| --- | --- |
+| At the start, in the same turn as step 1's `git switch main && git pull` | `pnpm josh run:carry --begin "queue #<N1> #<N2> …" --owner "$PPID"`, then `pnpm josh run:wake --start` |
+| After each issue **finishes** — merged, or read back `CLOSED` without one | `pnpm josh run:carry --done <N>`, and `--merged 1` beside it where it actually merged |
+| At every filing, on any route | `pnpm josh run:carry --filed 1`, so §2d's ten-filings ceiling counts across the cut |
+| On `over`, as the session's **last** write | `pnpm josh run:carry --cut`, then the `confirmation` Telegram, then stop |
+| After the last issue | `pnpm josh run:carry --end` and `pnpm josh run:wake --stop`, in the same turn as the final report |
+
+- **The invocation written to `--begin` is the whole list as it was typed**, including the issues that
+  have already merged in an earlier session. It never changes.
+- **A repository-qualified queue is not carried, and the answer is to begin no record at all.** The
+  grammar the record and the waker share covers a bare `#<N>` reference only, so
+  `queue kit#1762 kit#1749` has no issue list either of them can read — `--begin` it anyway and the
+  supervisor refuses the wake at the cut, and `--json` answers with no `remaining` field for the
+  resumed session to act on. So for a queue whose references carry a `owner/repo#` prefix (`SKILL.md`
+  → §2c), **skip `--begin` and `run:wake --start` entirely** and keep the older behavior at the seam:
+  on `over`, send the `confirmation` Telegram naming `queue <the rest, prefixes and all>` as the
+  resume command, and stop for the person to retype it. Widening the grammar to carry a repository
+  alongside each number is deliberately not done here — the record's `done` holds numbers, and making
+  it hold references is a change to the record rather than to this entry point.
+- **`--cut` is the only thing that hands the record off**, and it is the session's last write: a later
+  `--merged`, `--done` or `--filed` spends the hand-off and the successor is answered `standing`.
+- **A crash stops the run, which is the specification.** Nothing reaches `--cut`, so the record stands
+  and a person decides between `pnpm josh run:carry --resume "<the opening list>" --owner "$PPID"` and
+  `--end` — exactly what `backlogrun` does, and for the same reason.
+
+**What the resumed session does, in order.** Its prompt is the opening list, so nothing is inferred:
+
+1. `pnpm josh run:carry --begin "<the prompt, verbatim>" --owner "$PPID"`. **`resumed` is the answer
+   that continues**; `standing`, `mismatch`, `busy` and `expired` each stop the run and are
+   `backlogrun.md`'s table, not repeated here.
+2. `pnpm josh run:carry --json`. Its **`remaining`** field is the issues still to run, in the order
+   the invocation declared them — **read it rather than subtracting two lists by hand**, which is the
+   arithmetic joshuafolkken/kit#1774 moved into the command.
+3. Run those, in that order, from step 2 above. The issues already in `done` are not started again.
+
+The 8-hour whole-run bound is the record's own expiry, so it counts **across** cuts and a queue that
+spends it is answered `expired` rather than beginning the eight hours over.
 
 **There is no lane hand-over here, and no lane reading either.** A queue runs one issue at a time, so the merge
 it has just read was the only thing it had in flight and the seam is idle already. And

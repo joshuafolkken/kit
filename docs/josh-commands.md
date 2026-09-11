@@ -2518,17 +2518,21 @@ The entry points that ask it, and where in each procedure, are `.claude/skills/w
 
 ### `josh run:carry`
 
-Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` continues the run a person authorized instead of starting a second one over it ([#1714](https://github.com/joshuafolkken/kit/issues/1714)).
+Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` or `queue` continues the run a person authorized instead of starting a second one over it ([#1714](https://github.com/joshuafolkken/kit/issues/1714), [#1774](https://github.com/joshuafolkken/kit/issues/1774)).
 
 ```bash
 pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"   # alias: josh rc
+pnpm josh run:carry --begin "queue #1762 #1749 #1759" --owner "$PPID"
 pnpm josh run:carry --json                                        # read the record back in a resumed session
 pnpm josh run:carry --merged 1                                    # a child merged
 pnpm josh run:carry --filed 1                                     # an issue was filed
+pnpm josh run:carry --done 1762                                   # a queue's issue is finished
 pnpm josh run:carry --cut                                         # a cut is coming: hand the record off
 pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"  # adopt a record no cut handed off
 pnpm josh run:carry --end                                         # the invocation is over
 ```
+
+**A `queue`'s invocation is pinned to the list that was typed, and `--done` is what shrinks instead** ([#1774](https://github.com/joshuafolkken/kit/issues/1774)). The obvious resumption — beginning again as `queue #<remaining>` — is the one that cannot work: the invocation is compared character for character, so a shrinking string answers `mismatch`, and loosening that comparison would give up the single-writer guarantee below. So `--begin` names the **opening** list at every cut, `--done <issue>` records each issue as it merges, and `--json` answers a **`remaining`** array — the issues still to run, in the order the invocation declared them — so a resumed session reads what is left rather than subtracting two lists by hand. `--done` names an issue rather than a count, refuses `0` and a leading zero under `run-issue-number.ts`'s own rule, and records the same issue only once, so a reissued call cannot shorten `remaining` twice. An invocation that declares no issue list — every `backlogrun` — carries no `remaining` key at all, which is a different answer from an empty one.
 
 **A session cut is an execution detail of the same authorization, and the budget is what carries it.** Typing `backlogrun` once approves the declared budget — `--max`, `--idle` and the 8-hour whole-run bound — and the cut is internal to spending it, the way opening a lane or delegating a child is. What the explicit-invocation rule forbids is **inferring** a workflow from the shape of a request; it has never required the keystroke to land in every session's own transcript, which is the reading `.claude/skills/workflow-commands/epicrun.md` → "Each child runs in a delegated unit" already applies to a delegated child.
 
@@ -2542,7 +2546,7 @@ pnpm josh run:carry --end                                         # the invocati
 | `standing`   | A record is here that **no cut handed off** — carry it with `--resume`, or discard it with `--end`            | 1         |
 | `mismatch`   | A record is here for a **different** invocation; nothing was established                                      | 1         |
 | `carried`    | A read: the record is live, and `--json` puts it on standard output                                           | 0         |
-| `counted`    | A merge, a filing or a cut was added to the record                                                            | 0         |
+| `counted`    | A merge, a filing, a finished issue or a cut was added to the record                                          | 0         |
 | `expired`    | The 8-hour whole-run bound is spent; the run ends whatever the counters say                                   | 0         |
 | `ended`      | The record was cleared                                                                                        | 0         |
 | `none`       | Nothing is carried — a count and a `--resume` exit 1, a read and an end exit 0                                | 0 or 1    |
@@ -2569,11 +2573,11 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:carry --be
 
 **What may be run is untouched.** This command carries a budget and nothing else: `auto-ok` is still applied only by a person, so a resumed session is offered by exactly the rules the first one was — a pool that grew across the seam is `backlogrun.md` → "What one invocation approves", never this command's doing.
 
-Where a `backlogrun` asks it, and what it does with each answer, is `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation".
+Where a `backlogrun` asks it, and what it does with each answer, is `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation" — the single source for both entry points. What a `queue` does differently, and only that, is `queue.md` → "The session boundary".
 
 ### `josh run:wake`
 
-Continue a cut `backlogrun` by waking the next session from outside the conversation, so one keystroke spends the whole declared budget instead of the first 50 minutes of it ([#1719](https://github.com/joshuafolkken/kit/issues/1719)).
+Continue a cut `backlogrun` or `queue` by waking the next session from outside the conversation, so one keystroke spends the whole declared budget instead of the first 50 minutes of it ([#1719](https://github.com/joshuafolkken/kit/issues/1719), [#1774](https://github.com/joshuafolkken/kit/issues/1774)).
 
 ```bash
 pnpm josh run:wake --start          # alias: josh rw
@@ -2595,7 +2599,7 @@ pnpm josh run:wake --loop --interval 30
 
 **What it launches is a constant, not configuration.** It runs `claude -p` with the recorded invocation as the prompt, resolved through `PATH` exactly as the `josh eval` harness resolves the same binary. It was an environment variable first, and that put the choice of _which binary runs unattended, overnight, with the person's own credentials_ in reach of anything that can set an environment; shape-checking the name does not address that, and removing the choice does. Supporting a second agent is its own decision with its own security thinking, and belongs in an Issue of its own.
 
-**And the invocation it wakes with is rebuilt rather than carried across.** A `backlogrun` is the one thing this supervisor exists to continue, so everything that may reach the operating system is enumerable — the command word, `--max`, `--idle`, and an integer for each — and the recorded text is read as tokens and thrown away: the string handed to the agent CLI is composed from those constants and the integers that passed, using the same `josh backlog:budget` check that will read the numbers at the other end. **An unknown flag is refused, never dropped**, because a silently dropped flag wakes a session running to a budget the person did not declare — and so is a record the rebuild would rewrite at all, such as odd spacing or a `--max` written `05`, since the woken session hands its prompt straight back to `run:carry --begin`, where it is compared to the record character for character. Without any of this the supervisor would launch a session with whatever text the carry record happened to hold, which is the record's integrity standing in for a check nobody performs — but inspecting that text and passing it on is not enough either, and three rounds of stricter inspection are what established it: composing the argument out of constants is the only shape in which the record's own text never reaches the call (joshuafolkken/kit#1719).
+**And the invocation it wakes with is rebuilt rather than carried across.** A `backlogrun` and a `queue` are the two things this supervisor exists to continue ([#1774](https://github.com/joshuafolkken/kit/issues/1774)), so everything that may reach the operating system is enumerable — two command words, `--max`, `--idle`, a `#`-prefixed issue reference, and an integer for each — and the recorded text is read as tokens and thrown away: the string handed to the agent CLI is composed from those constants and the integers that passed, using the same `josh backlog:budget` check that will read the numbers at the other end. **An unknown flag is refused, never dropped**, because a silently dropped flag wakes a session running to a budget the person did not declare — and so is a record the rebuild would rewrite at all, such as odd spacing or a `--max` written `05`, since the woken session hands its prompt straight back to `run:carry --begin`, where it is compared to the record character for character. Without any of this the supervisor would launch a session with whatever text the carry record happened to hold, which is the record's integrity standing in for a check nobody performs — but inspecting that text and passing it on is not enough either, and three rounds of stricter inspection are what established it: composing the argument out of constants is the only shape in which the record's own text never reaches the call (joshuafolkken/kit#1719).
 
 **It deliberately does not carry `--dangerously-skip-permissions`**, which the `josh eval` harness does pass — that suite runs in a throwaway checkout with its credentials taken away, while this wakes a session in the person's own repository with their own credentials.
 

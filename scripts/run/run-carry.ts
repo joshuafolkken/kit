@@ -3,6 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
+import { run_invocation } from './run-invocation'
 
 // joshuafolkken/kit#1714: a `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour
 // whole-run bound — and then loses all of it at the session cut, because the cut ends the session and
@@ -76,6 +77,16 @@ interface RunCarry {
 	// Set by `--cut`, and by nothing else. A crash never reaches `--cut`, which is what makes a
 	// declared cut the only standing record carried without a person deciding.
 	is_handed_off?: boolean | undefined
+	// The issues this invocation has already finished, as `--done <N>` recorded them
+	// (joshuafolkken/kit#1774). **It exists because a `queue`'s invocation must not shrink.** The
+	// obvious way to resume `queue #1762 #1749 #1759` after #1762 merged is to begin again as
+	// `queue #1749 #1759` — and `classify_claim` compares the invocation character for character, so
+	// that answers `mismatch` and the run stops. Pinning the string to the opening list and keeping the
+	// progress here leaves that comparison, and joshuafolkken/kit#1722's single-writer guarantee with
+	// it, exactly as it was. `merged` cannot serve: it is a count of merges rather than a set of
+	// issues, so a child that ended without one — `already-done`, or a park — would shift every
+	// remaining position by one.
+	done?: ReadonlyArray<number> | undefined
 }
 
 // The identity of a process, as `process-identity.ts` keeps it: the pid plus an opaque start-time
@@ -105,6 +116,9 @@ interface CarryChange {
 	merged?: number
 	filed?: number
 	cuts?: number
+	// One issue number to add to `done`, not a count. It is the one field of a change that names a
+	// thing rather than an amount, because what a resumed queue needs is *which* issues are finished.
+	done?: number
 }
 
 type CarryRead =
@@ -128,6 +142,7 @@ const run_carry_schema = z.object({
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
 	is_handed_off: z.boolean().optional(),
+	done: z.array(z.number()).optional(),
 })
 
 function carry_path(git_directory: string): string {
@@ -238,15 +253,17 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
-	const { invocation, started_at, merged, filed, cuts } = carry
-	// The five counted fields are named rather than spread from `carry`, so the previous owner cannot
-	// survive an adoption by a caller that declared none.
+	const { invocation, started_at, merged, filed, cuts, done } = carry
+	// The recorded fields are named rather than spread from `carry`, so the previous owner cannot
+	// survive an adoption by a caller that declared none. **`done` is carried across**: the whole point
+	// of the resumption is that the successor does not re-run what the cut session finished.
 	const next: RunCarry = {
 		invocation,
 		started_at,
 		merged,
 		filed,
 		cuts,
+		done,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 		is_handed_off: false,
@@ -257,6 +274,17 @@ function adopt_carry(
 	return stamp_file.create_stamp(target, next) ? next : undefined
 }
 
+// Recording the same issue twice leaves the record alone, so a `--done` reissued after a retry — or by
+// a resumed session repeating the merge it was cut on — cannot list an issue twice and cannot shorten
+// `remaining` by something already taken out of it.
+function next_done(carry: RunCarry, done: number | undefined): ReadonlyArray<number> | undefined {
+	if (done === undefined) return carry.done
+
+	const current = carry.done ?? []
+
+	return current.includes(done) ? current : [...current, done]
+}
+
 function apply_change(target: string, carry: RunCarry, change: CarryChange): RunCarry {
 	const cuts = change.cuts ?? NO_INCREMENT
 	const next: RunCarry = {
@@ -264,6 +292,7 @@ function apply_change(target: string, carry: RunCarry, change: CarryChange): Run
 		merged: carry.merged + (change.merged ?? NO_INCREMENT),
 		filed: carry.filed + (change.filed ?? NO_INCREMENT),
 		cuts: carry.cuts + cuts,
+		done: next_done(carry, change.done),
 		// A cut declares the hand-off; any other count is the run carrying on, which spends it.
 		is_handed_off: cuts > NO_INCREMENT,
 	}
@@ -317,8 +346,33 @@ function end_carry(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
+// **What the resumed session has to be told, computed rather than stored.** A stored remainder would
+// be a second copy of a subtraction the record already determines, free to disagree with it; computed
+// here, `--json` answers the successor's one question — which issues are left, in the order they were
+// declared — so nothing downstream has to subtract two lists by hand. Anything that is not a `queue`
+// answers `undefined`, which `JSON.stringify` drops: a `backlogrun` record is unchanged by this.
+function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | undefined {
+	if (carry === undefined) return undefined
+
+	const declared = run_invocation.issue_numbers(carry.invocation)
+
+	if (declared === undefined) return undefined
+
+	const done = carry.done ?? []
+
+	return declared.filter((issue) => !done.includes(issue))
+}
+
+// The finished issues are named rather than counted, because the reader of a `busy` or `standing`
+// message about a queue has to know which ones are already merged before deciding anything.
+function done_note(carry: RunCarry): string {
+	const done = carry.done ?? []
+
+	return done.length === 0 ? '' : `, issues ${done.join(', ')} done`
+}
+
 function describe_carry(carry: RunCarry): string {
-	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.cuts)} cut(s) crossed`
+	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
 }
 
 function expired_message(carry: RunCarry): string {
@@ -397,6 +451,7 @@ const run_carry = {
 	owner_of,
 	parse_carry,
 	read_carry,
+	remaining_of,
 	replace_carry,
 	repository_directory,
 	standing_message,

@@ -9,7 +9,10 @@ import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // `josh run:wake --start | --list | --stop | --loop` — the supervisor that continues a cut
-// `backlogrun` without a person retyping the keyword (joshuafolkken/kit#1719).
+// `backlogrun` or `queue` without a person retyping the keyword (joshuafolkken/kit#1719,
+// joshuafolkken/kit#1774). **Which invocations it may continue is `run-invocation.ts`'s answer**, not
+// this file's: nothing here reads the recorded text, it is handed to `wake_argv` and either rebuilt
+// from that module's own constants or refused.
 //
 // The stdout/stderr split is the contract every `run:*` command shares: exactly one verdict token on
 // stdout on every path, the reason and the advice on stderr, so a loop branches on one token.
@@ -45,9 +48,17 @@ const UNKNOWN_VERDICT = 'unknown'
 const FAILED_VERDICT = 'failed'
 
 const STOP_COMMAND = 'pnpm josh run:wake --stop'
+// **The note covers both ways `wake_argv` answers `undefined`**, because it cannot tell them apart and
+// a message that named only the first would accuse a legitimate invocation of carrying unsafe text
+// (joshuafolkken/kit#1774). The second is the one a person actually meets: a `queue` whose references
+// carry a `owner/repo#` prefix is a grammar this supervisor does not rebuild, and `queue.md` → "The
+// session boundary" is why such a queue begins no record in the first place.
 const UNSAFE_INVOCATION_NOTE =
-	'the carried invocation is not text that may be passed to a command line'
-const WARNING_TITLE = 'backlogrun supervisor'
+	'the carried invocation is not one this supervisor can continue — it is neither a backlogrun nor a queue it can rebuild, or it carries text that may not be passed to a command line'
+// The command rather than one entry point: since joshuafolkken/kit#1774 the supervisor continues a
+// `queue` as readily as a `backlogrun`, and a warning that named the wrong one would send the reader
+// looking at a run that is not the one that stopped.
+const WARNING_TITLE = 'run:wake supervisor'
 const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh run:wake --start\`.`
 // **The stop reasons that reach a person, and what each one tells them** (joshuafolkken/kit#1746). A
 // reason absent from this map is one where nothing went wrong: `ended` is the run finishing through
