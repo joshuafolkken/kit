@@ -23,3 +23,11 @@ dropping either side destroys exactly what it exists to record.
 ## Ledger
 
 <!-- Append only. Newest at the bottom. One observation per line; the format is SKILL.md → §2i. -->
+
+- k:investigation-guard-verification-log | d1 | 2026-09-11 | pnpm josh investigation:guard | Reading a background gate run's own output file was refused as investigating an unedited subject file, costing a round trip each time
+- k:scripts-cli-near-line-limit | d1 | 2026-09-11 | scripts/epic/epic-bundle-cli.ts | Two scripts CLI files sit past the near threshold at 277 and 259 of 300 code lines, so the next feature touching either owes a splitting plan
+- k:open-issue-listing-reader-duplicated | d1 | 2026-09-11 | scripts/issue/issue-depth-share-cli.ts | The fetch-then-undefined-check-then-read-json-listing shape now stands in four places, each returning a different type, so no single reader has been extracted
+- k:wake-worst-case-near-cut-interval | d1 | 2026-09-11 | pnpm josh run:wake | Worst case from a cut to the warning is about 40 minutes against a measured cut interval of about 50, so a lost wake costs most of a cycle
+- k:issue-labels-individual-exports | d1 | 2026-09-11 | scripts/git/issue-labels.ts | The module exports functions individually rather than through a namespace object, and a third one was added rather than converting the existing two
+- k:unit-tests-near-timeout-under-load | d1 | 2026-09-11 | pnpm josh test:unit | Four unit tests sit at 1.6-2.8 s against the 10 s budget and inflate about 12x under full-suite parallelism, so a heavier machine load puts them in the band that reddened an unrelated gate
+- k:vitest-worker-spawn-overhead | d1 | 2026-09-11 | pnpm josh test:unit | Vitest reports 687 workers spawned at about 101 ms each and estimates 6.81 s saved with isolation off, roughly a quarter of the unit stage
