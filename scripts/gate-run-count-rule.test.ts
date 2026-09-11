@@ -20,6 +20,12 @@ const DOCS = 'docs/josh-commands.md'
 // The heading the rule lives under, so a document that does not carry the table names where it is.
 const SECTION_POINTER = 'The gate runs beside this review, not in front of it'
 
+// The two halves that stop the count reading as a number to drive down: the floor is reached by
+// having nothing to fix, and a red gate is re-run whatever the count says. Named above the marker
+// list because both the prompt's own assertions and the per-entry ones below read them.
+const FLOOR_IS_NOT_A_TARGET = '**The floor is one and it is not a target**'
+const RED_GATE_ALLOWANCE = 'a red gate is re-run on top of that'
+
 // The rule's single source: the count, the mechanical criterion that decides which command to run,
 // and the sentence that keeps the join from being read as weakened. The third is load-bearing — a
 // reader who takes "fewer gates" as "the commit needs no gate" has inverted the change.
@@ -29,6 +35,15 @@ const REVIEW_PROMPT_MARKERS: ReadonlyArray<string> = [
 	'**The single check by name**',
 	'**The criterion is the review, not the tree.**',
 	'**Nothing here weakens the join**',
+	// joshuafolkken/kit#1786: the table was readable and the count it adds up to was not, so a run
+	// could keep the rule row by row and still pay a gate per batch of round-1 fixes. The sentence and
+	// the instruction that follows from it are both pinned — the first is what the count is measured
+	// against, the second is the only way a run lowers it without skipping a gate.
+	'**The table adds up to one sentence: one gate per commit, plus one wherever an edit landed after a gate.**',
+	'**So the count is cut by making fewer edits land after a gate, never by skipping one.**',
+	// The floor is a result, not a target. Without this a reader takes "one gate per commit" as
+	// something to drive the count to, and the way to drive it there is to skip one.
+	FLOOR_IS_NOT_A_TARGET,
 ]
 
 describe(`${REVIEW_PROMPT} — the count rule is defined`, () => {
@@ -43,6 +58,9 @@ describe(`${REVIEW_PROMPT} — the count rule is defined`, () => {
 // verification-gate bullet. Asserted per file for the reason above: each is read on its own.
 const ONCE_PER_RUN = 'once per run, not once per edit'
 const SINGLE_CHECK = 're-run the single check by name'
+// joshuafolkken/kit#1786: each entry file is read on its own, so the count the rule adds up to has to
+// be in each of them rather than only in the prompt they both point at.
+const ONE_PER_COMMIT = 'one gate per commit, plus one wherever an edit landed after a gate'
 
 const PROCEDURE_FILES: ReadonlyArray<string> = [FULLRUN, HALFRUN]
 
@@ -52,6 +70,18 @@ describe('every implementing entry says the gate is started once per run', () =>
 
 		expect(content).toContain(ONCE_PER_RUN)
 		expect(content).toContain(SINGLE_CHECK)
+	})
+
+	it.each(PROCEDURE_FILES)('%s names the count that rule adds up to', (path) => {
+		expect(read_unwrapped(path)).toContain(ONE_PER_COMMIT)
+	})
+
+	// Each entry file is read on its own, so an entry carrying the count without this sentence hands
+	// its reader the inversion the count invites: drive the number to one, and the way to do that is
+	// to skip a gate. Pinned per file rather than only in the prompt they both point at.
+	it.each(PROCEDURE_FILES)('%s says the floor is a result rather than a target', (path) => {
+		expect(read_unwrapped(path)).toContain(FLOOR_IS_NOT_A_TARGET)
+		expect(read_unwrapped(path)).toContain(RED_GATE_ALLOWANCE)
 	})
 })
 

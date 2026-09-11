@@ -20,6 +20,16 @@ import { observation_ledger } from './observations/observation-ledger'
 // git operation is about to carry. Where the two can differ, the hook runs the check. Any reading that
 // could not be taken fails the same way: "we could not tell" must never resolve to "no need to check".
 
+// The `josh` targets that decline a check on the strength of this record (joshuafolkken/kit#1786).
+//
+// **It is declared beside the mechanism rather than beside the reader.** `josh layers` reports which
+// checks run in more than one layer, and two of the rows it prints are not the repetition they look
+// like: the pre-commit type check and the pre-push unit run are skipped outright where a green gate
+// already covers the tree. A reader that carried its own copy of this list would go on printing a
+// retired name the day a hook is rewired, which is the drift `hook-gate-reuse.test.ts` pins by
+// comparing this list against the files that actually import this module.
+const GATE_REUSING_TARGETS: ReadonlyArray<string> = ['pre-commit-type-check', 'pre-push-unit']
+
 // `git status --porcelain` prints `XY PATH` per difference — `X` the index against HEAD, `Y` the
 // working tree against the index — so column 1 is the one that says whether the staged content is
 // what is on disk. An untracked file is `??`, which fails this test too.
@@ -108,6 +118,7 @@ function reusable_green_hook(input: HookReuse): FileMapStamp | undefined {
 }
 
 const hook_gate_reuse = {
+	GATE_REUSING_TARGETS,
 	is_force_requested,
 	is_index_matching_worktree,
 	is_worktree_clean,

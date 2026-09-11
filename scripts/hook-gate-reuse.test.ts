@@ -1,6 +1,10 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_test_fixture } from './gate-test-fixture'
 import type { GateTree } from './gate-tree'
+import { PROJECT_ROOT } from './init/init-paths'
+import { COMMAND_MAP } from './josh/josh-command-map'
 import { OBSERVATION_LEDGER_PATH } from './observations/observation-ledger'
 import { review_stamps } from './review/review-stamps'
 
@@ -28,6 +32,10 @@ vi.mock('./git/git-command', () => ({
 const { hook_gate_reuse } = await import('./hook-gate-reuse')
 
 const PATH = 'scripts/hook-gate-reuse.ts'
+// The call a `josh` target makes when it declines a check on the strength of the record. It names
+// the suite for that function below, and the drift guard at the end of this file greps the command
+// registry's scripts for it — one spelling, so the two cannot come to mean different things.
+const REUSE_CALL = 'hook_gate_reuse.reusable_green_hook'
 const STAGED_ONLY = `M  ${PATH}`
 const RENAMED = `R  old.ts -> ${PATH}`
 const UNSTAGED = ` M ${PATH}`
@@ -144,7 +152,7 @@ describe('hook_gate_reuse.is_index_matching_worktree — what a commit carries',
 
 // Every condition here only ever narrows: the gate's three are necessary and never sufficient for a
 // hook, so each of these refuses a record that the gate itself would have reused.
-describe('hook_gate_reuse.reusable_green_hook', () => {
+describe(REUSE_CALL, () => {
 	beforeEach(() => {
 		review_stamps.gate_stamp.write(TREE.files, stamp_path, BASE)
 	})
@@ -165,5 +173,49 @@ describe('hook_gate_reuse.reusable_green_hook', () => {
 		vi.stubEnv(FORCE_ENV, '1')
 
 		expect(reusable()).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1786: `josh layers` reports which of its rows a green gate lets a hook skip, and
+// it reads the list from here rather than keeping its own. A list kept by hand goes stale silently —
+// the report would go on printing a retired name, or stop printing a new one — so it is compared
+// against the directory instead of maintained against it.
+//
+// **The scan is the sibling spelling in the top-level `scripts/` directory, which is exactly the two
+// hook commands.** A reader elsewhere imports this module through `#scripts/hook-gate-reuse`, so it
+// is not swept in, and neither is a module this one imports.
+// **The scan reads the command registry, not the directory.** What `layer-checks.ts` matches on is
+// the `josh` *target name*, and a scan of file names compares those against something else that
+// happens to coincide today: renaming the target without renaming the file would leave this green
+// while `josh layers` silently dropped the note, and any script importing this module for an
+// unrelated helper would be swept in and asserted to skip a check it still runs.
+//
+// **And the test is the call, not the import.** A target reuses the record when it asks
+// `reusable_green_hook` for one; importing the module proves nothing about that. `REUSE_CALL` is
+// declared beside `PATH` at the top, because the suite for that function names itself with it.
+function calls_the_reuse(script: string | undefined): boolean {
+	if (script === undefined) return false
+
+	return fs.readFileSync(path.join(PROJECT_ROOT, script), 'utf8').includes(REUSE_CALL)
+}
+
+function reusing_targets(): Array<string> {
+	return Object.entries(COMMAND_MAP)
+		.filter(([, entry]) => calls_the_reuse(entry.script))
+		.map(([target]) => target)
+		.toSorted((left, right) => left.localeCompare(right))
+}
+
+describe(`${PATH} — the declared readers are the readers that exist`, () => {
+	it('names every hook command that imports this module, and nothing else', () => {
+		const declared = [...hook_gate_reuse.GATE_REUSING_TARGETS].toSorted((left, right) =>
+			left.localeCompare(right),
+		)
+
+		expect(declared).toStrictEqual(reusing_targets())
+	})
+
+	it('finds at least one, so an empty scan cannot pass as agreement', () => {
+		expect(reusing_targets().length).toBeGreaterThan(0)
 	})
 })

@@ -1,18 +1,20 @@
 import { time_bundles, type BundleTotals } from './time-bundles'
 import { time_category_table, type CategoryTotals } from './time-category-table'
-import { time_checks, type CheckTotal } from './time-checks'
+import type { CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_cycles, type CycleTotals } from './time-cycles'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_followup_stages, type FollowupStageTotals } from './time-followup-stages'
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
+import { time_gate_runs, type GateRunTotals } from './time-gate-runs'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_model_gaps } from './time-model-gaps'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import { time_phase_costs, type PhaseCostFacts } from './time-phase-costs'
 import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseTotal } from './time-phases'
+import { time_ranked_tables } from './time-ranked-tables'
 import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
 import { time_round_trips } from './time-round-trips'
 import { time_segments, type Segment } from './time-segments'
@@ -145,6 +147,12 @@ interface TimeReport extends TurnSplit {
 	// question whose answer the run already had. Built by `time-single-checks.ts`, which also renders
 	// the block — the shape `time-bundles.ts` and `time-failures.ts` already have.
 	single_checks: SingleCheckTotals
+	// How many times the run started the whole gate, against what the procedure allows
+	// (joshuafolkken/kit#1786). The block above counts the single checks the one-gate-per-run rule
+	// sends an implementation loop to; this counts the gates themselves, which is the half of
+	// joshuafolkken/kit#1246 nothing has ever measured. Built by `time-gate-runs.ts`, which also
+	// renders the block — the shape `time-single-checks.ts` and `time-failures.ts` already have.
+	gate_runs: GateRunTotals
 	// What the run's turns were spent *on*, rather than how long they took (joshuafolkken/kit#1715).
 	// The round-trip block says how often the run stopped and the bundling block how many of those
 	// stops were avoidable; only this says what the stops were for — which is the whole question about
@@ -348,6 +356,25 @@ function report_tables(input: ReportInput, turns: TurnTotals): ReportWalks {
 // day between them leave real time that belonged to nobody, and counting it as elapsed would report
 // a run as a day long. So the header states what was accounted for, and `started_at` / `ended_at`
 // still carry the wall window a reader can check it against.
+// The blocks built straight off the spans, gathered into one spread so the assembly below stays
+// inside its length limit as blocks are added (joshuafolkken/kit#1786 was the one that passed it).
+// It is the shape `report_tables` already has, and the grouping is the honest one: every member takes
+// the spans and nothing else.
+type SpanBlocks = Pick<
+	TimeReport,
+	'gaps' | 'bundles' | 'single_checks' | 'gate_runs' | 'followup_stages'
+>
+
+function span_blocks(spans: ReadonlyArray<Span>): SpanBlocks {
+	return {
+		gaps: time_gaps.build_gaps(spans),
+		bundles: time_bundles.build_bundles(spans),
+		single_checks: time_single_checks.build_single_checks(spans),
+		gate_runs: time_gate_runs.build_gate_runs(spans),
+		followup_stages: time_followup_stages.build_followup_stages(spans),
+	}
+}
+
 function build_from_spans(input: ReportInput): TimeReport {
 	const { spans, ci } = input
 	const categories = category_totals(spans, ci.ci_ms)
@@ -362,10 +389,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		...counts,
 		...turns.split,
 		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
-		gaps: time_gaps.build_gaps(spans),
-		bundles: time_bundles.build_bundles(spans),
-		single_checks: time_single_checks.build_single_checks(spans),
-		followup_stages: time_followup_stages.build_followup_stages(spans),
+		...span_blocks(spans),
 		rework: time_rework.build_rework(spans, input.diff),
 		categories,
 		has_ci_data: ci.has_ci_data,
@@ -402,37 +426,6 @@ function build_report(
 	})
 }
 
-// What the per-tool and per-`josh <cmd>` tables put in their third column: how many calls the row
-// totals. The check table answers something else entirely, which is why the column is a parameter.
-function call_suffix(row: LabelTotal): string {
-	return `${String(row.call_count)} call(s)`
-}
-
-// **What the per-tool table says that the per-`josh <cmd>` table does not** (joshuafolkken/kit#1385):
-// the round trips this tool consumed, and how many of its calls were the only call in their turn. A
-// row reading `40 call(s) · 40 round trip(s) · 40 alone` names the tool to batch, which is the sentence
-// the density one block above could never produce.
-function tool_suffix(row: ToolTotal): string {
-	const trips = `${String(row.round_trip_count)} round trip(s)`
-	const alone = `${String(row.alone_in_turn_count)} alone`
-
-	return [call_suffix(row), trips, alone].join(time_format.SUFFIX_SEPARATOR)
-}
-
-function total_lines<Row extends RowTotal>(
-	heading: string,
-	rows: ReadonlyArray<Row>,
-	suffix_of: (row: Row) => string,
-): Array<string> {
-	if (rows.length === 0) return []
-
-	const shown = rows
-		.slice(0, time_format.MAX_ROWS)
-		.map((row) => format_row(row.label, row.duration_ms, suffix_of(row)))
-
-	return ['', heading, ...shown, ...time_format.overflow_line(rows.length)]
-}
-
 // The sentence names no particular transcript, because a run scope reaches here when no transcript
 // was found at all — "this transcript has fewer" would then be about a file nobody located.
 // What sits under the scope line in every report: the notes that qualify the figures, then the three
@@ -451,21 +444,6 @@ function format_empty(report: TimeReport): string {
 		'A span needs two dated lines to sit between, and nothing read here has a pair. So there is',
 		'no elapsed time to divide up.',
 	].join('\n')
-}
-
-// The page's closing half: the tables that rank an open set of rows, largest first. Split out
-// because the budget the note below describes was spent by the tenth block, and the next one would
-// have had nowhere to go either (joshuafolkken/kit#1445). The split is along the seam the page
-// already has — every block above is about the run's own shape, every one here ranks a list — so the
-// order of the printed page is still the order of two lists read one after the other.
-function ranked_tables(report: TimeReport): Array<string> {
-	return [
-		...total_lines('By tool (descending):', report.by_tool, tool_suffix),
-		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
-		...time_invocations.invocation_lines(report.by_invocation),
-		...total_lines(time_checks.CHECK_HEADING, report.by_check, time_checks.check_suffix),
-		...time_checks.merge_wait_lines(report.by_check),
-	]
 }
 
 // **The failure block's three arguments are read off the report before the list rather than inside
@@ -490,11 +468,12 @@ function format_report(report: TimeReport): string {
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_single_checks.single_check_lines(report.single_checks, report),
+		...time_gate_runs.gate_run_lines(report.gate_runs),
 		...time_parent_turns.parent_turn_lines(report.parent_turns),
 		...time_followup_stages.followup_stage_lines(report.followup_stages),
 		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
 		...time_rework.rework_lines(report.rework),
-		...ranked_tables(report),
+		...time_ranked_tables.ranked_tables(report),
 	].join('\n')
 }
 
@@ -539,5 +518,5 @@ const time_report = {
 // Re-exported from where the category block now lives, so every caller keeps asking this module for
 // the type it always asked for (joshuafolkken/kit#1465).
 export type { CategoryTotals } from './time-category-table'
-export type { LabelTotal, ReportInput, TimeReport, ToolTotal }
+export type { LabelTotal, ReportInput, RowTotal, TimeReport, ToolTotal }
 export { time_report }
