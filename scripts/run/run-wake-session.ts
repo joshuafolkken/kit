@@ -269,23 +269,45 @@ function log_header(argv: WakeArgv): string {
 	return `\n=== ${stamp} · started by process ${String(process.pid)} · ${argv.command} ===\n`
 }
 
-function opened_log(
-	log_path: string,
-	argv: WakeArgv,
-	on_error: (note: string) => void,
-): number | undefined {
+function opened_log(log_path: string, on_error: (note: string) => void): number | undefined {
 	const descriptor = openSync(log_path, LOG_FLAGS, LOG_MODE)
 
 	if (!stamp_file.is_own_regular_file(log_path)) {
 		closeSync(descriptor)
-		on_error(`${log_path} is not this account's own file, so the session output is discarded`)
+		// Worded for both callers: `ensure_log` reaches this from `--list` and `--stop`, where nothing
+		// has been launched and "the session output is discarded" would describe an event that did not
+		// happen. What holds on every path is that nothing is kept there.
+		on_error(`${log_path} is not this account's own file, so nothing is kept there`)
 
 		return undefined
 	}
 
-	writeSync(descriptor, log_header(argv))
-
 	return descriptor
+}
+
+// **The header is written by the launch and by nothing else.** Opening the file and announcing a
+// launch into it were one function until joshuafolkken/kit#1759, which is what made the file's
+// existence a side effect of launching: there was no way to obtain the descriptor without also
+// claiming a session had started. Split, `ensure_log` below can create the file the moment its path
+// is named, and a log nothing has launched into stays empty rather than carrying a header for a
+// session that never ran.
+//
+// **It swallows its own failure, because a log failure is never a failed launch.** In `opened_log`
+// this write sat inside `open_log`'s `try`, so a full disk lost the header and started the session
+// anyway; reached from `launch`'s `try` it would answer `failed` instead and leave a cut
+// `backlogrun` asleep — the one outcome `open_log`'s comment below rules out.
+function stamped(
+	descriptor: number | undefined,
+	argv: WakeArgv,
+	on_error: (note: string) => void,
+): void {
+	if (descriptor === undefined) return
+
+	try {
+		writeSync(descriptor, log_header(argv))
+	} catch (error) {
+		on_error(`the session log could not be written: ${note_of(error)}`)
+	}
 }
 
 // **Opening the log is allowed to fail, and a failure is not a failed launch.** A temp directory that
@@ -299,18 +321,34 @@ function opened_log(
 // the other side.
 function open_log(
 	log_path: string | undefined,
-	argv: WakeArgv,
 	on_error: (note: string) => void,
 ): number | undefined {
 	if (log_path === undefined) return undefined
 
 	try {
-		return opened_log(log_path, argv, on_error)
+		return opened_log(log_path, on_error)
 	} catch (error) {
 		on_error(`the session log at ${log_path} could not be opened: ${note_of(error)}`)
 
 		return undefined
 	}
+}
+
+// **The file exists because its path was resolved, not because something launched into it**
+// (joshuafolkken/kit#1759). `--list`, the already-running branch of `--start` and every warning name
+// this path unconditionally, and until this existed none of the three created anything: the file was
+// written only by the process that launched, at the moment it launched. So a supervisor started
+// before the log existed — detached, and alive for the hours a `backlogrun` takes — left the path
+// named for the whole run with nothing ever at it, and the one report a failure could make went to
+// that same absent file. Creating it where it is named is what makes the name a promise the reader
+// can check: an empty log says "this supervisor started nothing", which is an answer, where a
+// missing one said nothing at all.
+//
+// **No header is written here**, because nothing has been launched — see `stamped` above.
+function ensure_log(log_path: string, on_error: (note: string) => void): void {
+	const descriptor = open_log(log_path, on_error)
+
+	if (descriptor !== undefined) closeSync(descriptor)
 }
 
 // **`detached` is what puts the child outside the conversation, and discarding its output was never
@@ -378,9 +416,11 @@ function spawned(
 function launch(request: LaunchRequest, on_error: (note: string) => void): LaunchResult {
 	if (!is_safe_argv(request.argv)) return { kind: 'failed', note: UNSAFE_NOTE }
 
-	const log = open_log(request.log_path, request.argv, on_error)
+	const log = open_log(request.log_path, on_error)
 
 	try {
+		stamped(log, request.argv, on_error)
+
 		return spawned(request, log, on_error)
 	} catch (error) {
 		return { kind: 'failed', note: note_of(error) }
@@ -394,6 +434,7 @@ const run_wake_session = {
 	LOOP_FLAG,
 	WAKE_COMMAND,
 	WAKE_FLAGS,
+	ensure_log,
 	is_safe_argv,
 	launch,
 	supervisor_argv,

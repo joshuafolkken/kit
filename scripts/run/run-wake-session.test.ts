@@ -275,6 +275,52 @@ describe('run_wake_session.launch — the child’s output is kept', () => {
 	})
 })
 
+// joshuafolkken/kit#1759. The regression these pin is not a wrong path — the displayed one and the
+// written one were always the same value — but a file whose existence depended on something having
+// launched into it, which left `--list` naming a path that was never created.
+describe('run_wake_session.ensure_log — the log exists before anything launches', () => {
+	it('creates the named log where nothing has been launched', () => {
+		run_wake_session.ensure_log(log_scratch.target, () => undefined)
+
+		expect(existsSync(log_scratch.target)).toBe(true)
+	})
+
+	// "Created even where the session exited immediately (empty is fine)" is the acceptance criterion,
+	// and an empty file is the honest answer: a header here would announce a session that never ran.
+	it('leaves a log nothing has launched into empty', () => {
+		run_wake_session.ensure_log(log_scratch.target, () => undefined)
+
+		expect(readFileSync(log_scratch.target, 'utf8')).toBe('')
+	})
+
+	it('reports a log it could not create rather than failing silently', () => {
+		const notes: Array<string> = []
+
+		run_wake_session.ensure_log(path.join(log_scratch.directory, 'absent', 'wake.log'), (note) => {
+			notes.push(note)
+		})
+
+		expect(notes.join('\n')).toContain('could not be opened')
+	})
+
+	// The file is opened for append, so the launch that follows adds to it rather than replacing it —
+	// which is what lets a supervisor's whole run accumulate in one file.
+	it('keeps what a later launch writes, appended rather than replacing it', async () => {
+		run_wake_session.ensure_log(log_scratch.target, () => undefined)
+		const argv = {
+			command: process.execPath,
+			args: ['-e', `console.log(${JSON.stringify(MARKER)})`],
+		}
+
+		run_wake_session.launch(
+			{ argv, cwd: log_scratch.directory, log_path: log_scratch.target },
+			() => undefined,
+		)
+
+		expect(await logged_text()).toContain(MARKER)
+	})
+})
+
 describe('run_wake_session.launch — where no log is named', () => {
 	// The log is an improvement on the diagnosis, never a precondition for starting a session: a caller
 	// with nowhere to write gets exactly the behavior every launch had before.

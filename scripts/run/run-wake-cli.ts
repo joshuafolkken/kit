@@ -152,10 +152,17 @@ async function resolve_context(): Promise<WakeContext | undefined> {
 
 	if (directory === undefined) return undefined
 
+	const log_target = run_wake.wake_log_path(directory)
+
+	// Every verb reaches this one function, so creating the log here is what makes the path each of
+	// them prints a path that exists — including `--list` and the already-running branch of `--start`,
+	// neither of which launches anything (joshuafolkken/kit#1759).
+	run_wake_session.ensure_log(log_target, note_to_stderr)
+
 	return {
 		carry_target: run_carry.carry_path(directory),
 		wake_target: run_wake.wake_path(directory),
-		log_target: run_wake.wake_log_path(directory),
+		log_target,
 		worktree: path.dirname(directory),
 	}
 }
