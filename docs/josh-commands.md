@@ -2918,6 +2918,46 @@ Context composition (blocks written to this session's transcript; estimated exce
 
 **Nothing is ever silently zero.** An absent transcript exits non-zero and says where it looked — for every scope, `--all` and `--issue` included; a scope with no requests attributed says so in words rather than printing a table of zeroes; a model the price table does not know is reported as unpriced and the total is labelled a floor; and lines that could not be read are counted and printed. Locally generated `<synthetic>` assistant messages are skipped — they were never sent to the API, so counting them would inflate the request count.
 
+### `josh doc:section`
+
+Print one section of a markdown document, so a `` `X.md` → "Heading" `` pointer costs a heading rather than a file ([#1776](https://github.com/joshuafolkken/kit/issues/1776)).
+
+```bash
+pnpm josh doc:section <file.md> "<heading>"   # alias: josh ds
+pnpm josh doc:section epicrun.md "The hand-off"
+```
+
+- **A bare name resolves inside `.claude/skills/workflow-commands/`**, because that is how every reference in those documents spells it; anything that resolves as a path is taken as one.
+- **The section is printed verbatim, with its subsections.** A `##` heading carries its `###` children, which is what a pointer at a `##` means. Nothing is summarized and nothing is deferred — the extent of the read changes, not its content.
+- **The heading is matched as a prefix, exact first.** A reference cites the name and the heading carries the name plus its gloss: `"The hand-off"` resolves `## The hand-off — one session does not have to run the whole epic`. Two headings that both start with the cited text is a refusal naming both, never the first of them.
+- **A heading that does not resolve exits non-zero and lists the document's own headings.** An empty answer would read as a section with nothing in it, which is worse than reading the whole file — the one failure a whole-file read does not have.
+- **Fenced blocks are skipped.** These documents quote shell, and a `# comment` in column one inside a fence would otherwise end the section above it early and hand back a short answer with no error.
+
+### `josh read:set`
+
+Say what a workflow entry point reads before it starts, and what that read costs ([#1776](https://github.com/joshuafolkken/kit/issues/1776)).
+
+```bash
+pnpm josh read:set              # every entry point ; alias: josh rs
+pnpm josh read:set queue        # one of them
+pnpm josh read:set queue --json
+```
+
+**Two figures under one definition, which is what makes a before and an after comparable:**
+
+| Figure   | What it counts                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `whole`  | Every file in the set read in full, the cross-referenced ones included — what a run pays with no way to fetch a heading |
+| `scoped` | The set's own files in full plus the referenced **sections** alone — what the same run pays with `josh doc:section`     |
+
+- **The set is derived, never transcribed.** The files come from [`SKILL.md`](https://github.com/joshuafolkken/kit/blob/main/.claude/skills/workflow-commands/SKILL.md) → "1. Which file to read" — the table a run reads first anyway — and the sections from the `` `X.md` → "Heading" `` references those files carry. A hand-written copy of either would drift the first time a row moved.
+- **`SKILL.md`'s own cross-references are not counted.** §2 states each shared rule in full and then names its single source, so following one at the entry re-reads text the run already holds; a command file's references are the other kind — `fullrun.md` says outright that a procedure "is not repeated here".
+- **A reference into a file the entry already reads whole is not counted either**, and neither is one into `CLAUDE.md` (resident on every request) or a `prompts/` topic (reached on its own step).
+- **An unresolvable reference is charged at its whole file.** Reporting it at zero would let a broken pointer read as a saving, which is the one direction this measurement must not be able to move on its own.
+- **A file cited more than once is charged once between its references.** Two references into one file — two unresolved headings, or a `##` section cited beside one of its own `###` children — are charged over the union of the lines they cover, so the per-reference rows in the listing can overlap while the total does not. Summed instead, `scoped` could exceed `whole` and the command would print a negative saving.
+- **An unrecognized keyword is refused, with the known ones listed.** Left to fall through it produced a complete, plausible report — the skill file, the gate documents, `whole` equal to `scoped`, a saving of zero — and exited 0, so a mistyped keyword answered "nothing to save" instead of "no such entry".
+- **Measured on 2026-09-11**, the `queue` entry reads 143,274 tokens whole against 106,090 as sections — a 26% difference paid before anything is implemented, against a session that measured `over` at exactly that point.
+
 ### `josh time`
 
 Report where a run's wall clock went, read from the same transcripts `josh cost` prices ([#1267](https://github.com/joshuafolkken/kit/issues/1267)) and, for the part no transcript records, from GitHub ([#1268](https://github.com/joshuafolkken/kit/issues/1268)).

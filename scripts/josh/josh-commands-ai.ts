@@ -99,6 +99,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",
 		category: 'AI tools',
 	},
+	'doc:section': {
+		script: 'scripts/document/document-section-cli.ts',
+		description: 'Print one section of a markdown document, for a `file.md` → "Heading" reference',
+		category: 'AI tools',
+	},
+	'read:set': {
+		script: 'scripts/document/read-set-cli.ts',
+		description: 'Print what an entry point reads before it starts, and what that read costs',
+		category: 'AI tools',
+	},
 	time: {
 		script: 'scripts/time/time-cli.ts',
 		description: "Report where a run's wall clock went: model wait, tool execution, human wait",
