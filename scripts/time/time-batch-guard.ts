@@ -104,17 +104,19 @@ interface GuardedCall {
 // **The half it cannot close is the turn it is interrupting** — for the reason stated above, no field
 // in the transcript says what else that turn issued. Three edits to one file batched into a single
 // turn can therefore have their first refused while the other two apply. **The bound is that this
-// surfaces rather than corrupts**: the reissued edit carries the `old_string` it was written with, so
-// it either matches the text it was written against or fails to match at all and is reported. So the
-// residual cost is one round trip in the ordinary case and a failed edit the run must redo in this
-// one — the same false-positive price joshuafolkken/kit#1390 named and accepted for reads, now paid
-// on the calls that carry most of the waste instead of only on the calls that carry the rest.
+// surfaces rather than corrupts**: a refusable write is content-addressed — an `Edit` carries the
+// `old_string` it was written against, an in-place `sed` a pattern — so a reissue either applies where
+// it was meant to or fails to match and is reported. So the residual cost is one round trip in the
+// ordinary case and a failed edit the run must redo in this one — the same false-positive price
+// joshuafolkken/kit#1390 named and accepted for reads, now paid on the calls that carry most of the
+// waste instead of only on the calls that carry the rest.
 //
 // **The dispatch it adds is measured, and it is not the figure the deleted text quoted.** One hook run
-// is **0.53 s** in this checkout and about 0.4 s in a consumer, essentially all of it process startup
-// (`docs/josh-commands.md` → "`josh batch:guard`"); the "about 2.4 s" above was a `pnpm josh` dispatch
-// measured before joshuafolkken/kit#1342 made this command eligible for the in-process path. Against
-// that, one recovered round trip is a whole model turn.
+// is **0.53 s** in this checkout and about 0.4 s in a consumer, essentially all of it process startup —
+// measured under `docs/josh-commands.md` → "`josh format:edited`", which is where that reading was
+// taken. The "about 2.4 s" above was a `pnpm josh` dispatch measured before joshuafolkken/kit#1342 made
+// this command eligible for the in-process path. Against that, one recovered round trip is a whole
+// model turn.
 //
 // **The matcher is settings a consumer can widen, so what a call is stays this module's answer.**
 // `is_guarded_call` is the guarantee and `.claude/settings.json` is the wiring; the two are kept apart
@@ -140,6 +142,20 @@ const REASON =
 	`genuinely has nothing to go beside it, reissue it as it was: this fires once per run of ` +
 	`single-call turns and cannot repeat on the call in hand.`
 
+// The one write that is never refused, because it is the one whose reissue is **unconditional**. Every
+// other refusable write is content-addressed and so fails loudly when its turn's siblings moved the
+// text under it; a `Write` carries the whole file, so reissuing it re-applies content composed before
+// those siblings ran and overwrites an applied edit with no error anywhere. **A turn holding a `Write`
+// and an `Edit` of one file is a shape a run actually produces** — create it, then adjust it — which is
+// what separates this from a truncating shell redirect, where the colliding turn would have to hold two
+// writers of one path and is not a shape that occurs.
+//
+// **It is not the blanket exclusion joshuafolkken/kit#1762 removed.** That one turned away every write
+// for being a write; this turns away one tool because a false positive on it cannot surface. `Edit` —
+// 164 of the 251 recoverable round trips against `Write`'s 37, read over 20 runs — is untouched, and
+// the matcher leaves `Write` out for the cost reason above rather than relying on this line alone.
+const WHOLE_FILE_WRITE_TOOL = 'Write'
+
 // Whether this call is one the guard could ever refuse, asked before any transcript is read. **The
 // caller uses it to skip that read**: a quarter-megabyte read inside a hook that holds every call is
 // not worth paying on a `pnpm josh` invocation the answer can never be about.
@@ -149,6 +165,8 @@ const REASON =
 // writes (joshuafolkken/kit#1762). What keeps a write that genuinely cannot be refused safe is
 // `depends_on_sequence`, which reads the targets, rather than a blanket exclusion here.
 function is_guarded_call(call: GuardedCall): boolean {
+	if (call.name === WHOLE_FILE_WRITE_TOOL) return false
+
 	return time_bundle_call.call_facts(call.name, call.input).is_bundleable
 }
 

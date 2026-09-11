@@ -1573,9 +1573,9 @@ restated count does; it is gone rather than corrected, because a number kept in 
 again (joshuafolkken/kit#1525).
 
 - **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
-  `Bash`, `Edit` or `Write` call that would make a third consecutive single-call turn, and states the
-  criterion there. **Writes joined reads in joshuafolkken/kit#1762**, because they carry most of the
-  recoverable round trips and the guard could not reach one of them.
+  `Bash` or `Edit` call that would make a third consecutive single-call turn, and states the criterion
+  there. **`Edit` joined `Bash` in joshuafolkken/kit#1762**, because edits carry most of the recoverable
+  round trips and the guard could not reach one of them.
   It was resident through every run the topic file measures, and moved none of them, so what the
   relocation gave up is prose that was not being obeyed
   (`prompts/collaboration-workflow/turn-batching.md`, `scripts/turn-batching-rule.test.ts`).

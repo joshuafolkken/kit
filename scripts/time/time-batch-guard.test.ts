@@ -30,6 +30,7 @@ const CHAINED_SED_CALL = {
 	input: { command: `cat notes.md && sed -i '' s/a/b/ ${FRESH_PATH}` },
 }
 const REDIRECTION_CALL = { name: 'Bash', input: { command: "jq '.x' a.json > b.json" } }
+const WRITE_CALL = { name: 'Write', input: { file_path: FRESH_PATH } }
 
 function transcript(...groups: Array<Array<string>>): string {
 	return groups.flat().join('\n')
@@ -131,7 +132,6 @@ describe('time_batch_guard.should_block — what it will not refuse', () => {
 describe('time_batch_guard.should_block — writes', () => {
 	it.each([
 		[EDIT_LABEL, EDIT_CALL],
-		['a write', { name: 'Write', input: { file_path: FRESH_PATH } }],
 		[SED_LABEL, IN_PLACE_SED_CALL],
 	])('refuses %s naming a file the run has not touched', (_label, call) => {
 		const text = transcript(
@@ -141,6 +141,23 @@ describe('time_batch_guard.should_block — writes', () => {
 		)
 
 		expect(time_batch_guard.should_block(text, call, NEVER_REFUSED)).toBe(true)
+	})
+
+	// **The one write that stays out, and it is a different exclusion from the one this Issue removed.**
+	// The bound on a false positive is that it surfaces: an `Edit` and an in-place `sed` are
+	// content-addressed, so a reissue after the turn's siblings ran either applies where it was meant to
+	// or fails and is reported. A `Write` carries the whole file, so reissuing it re-applies content
+	// composed before those siblings ran and overwrites an applied edit with nothing raised anywhere —
+	// and a turn holding a `Write` and an `Edit` of one file is a shape a run produces.
+	it('allows a whole-file write, whose reissue could not fail loudly', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts'], EDIT_TOOL),
+			target_turn_lines(1, ['b.ts'], EDIT_TOOL),
+			open_turn_lines(2, ['c.ts'], EDIT_TOOL),
+		)
+		const write = { name: 'Write', input: { file_path: FRESH_PATH } }
+
+		expect(time_batch_guard.should_block(text, write, NEVER_REFUSED)).toBe(false)
 	})
 
 	// **This case is what the target test buys, and it is the one that separates the two
@@ -176,6 +193,7 @@ describe('time_batch_guard — what each predicate admits', () => {
 		['a shell read', SHELL_READ_CALL, true, true],
 		['a file read', FRESH_CALL, true, true],
 		['a josh command', JOSH_CALL, false, false],
+		['a whole-file write', WRITE_CALL, false, false],
 		[EDIT_LABEL, EDIT_CALL, true, false],
 		[SED_LABEL, IN_PLACE_SED_CALL, true, false],
 		['a chained in-place sed', CHAINED_SED_CALL, true, false],
