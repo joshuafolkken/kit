@@ -13,6 +13,7 @@ const REORDERED_INVOCATION = 'backlogrun --idle 30 --max 5'
 const NO_WATCH_INVOCATION = 'backlogrun --idle 0'
 const ONE_FLAG_INVOCATION = 'backlogrun --max 5'
 const BARE_INVOCATION = 'backlogrun'
+const QUEUE_INVOCATION = 'queue #1762 #1749'
 const SCRIPT = '/somewhere/run-wake-cli.ts'
 const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
 const LOOPBACK_PROXY = 'http://localhost:52554'
@@ -74,10 +75,12 @@ describe('run_wake_session — what may reach the operating system', () => {
 		expect(run_wake_session.wake_argv('')).toBeUndefined()
 	})
 
-	// The supervisor exists to continue a `backlogrun` and nothing else, so anything else in the record
-	// is a record that has been tampered with or a bug — never something to launch a session with.
-	it('refuses an invocation that is not a backlogrun', () => {
+	// The supervisor continues a `backlogrun` or a `queue` and nothing else, so anything else in the
+	// record is a record that has been tampered with or a bug — never something to launch a session
+	// with. `epicrun` and `fullrun` are the two whose cut still waits for a keyword.
+	it('refuses an invocation that is neither', () => {
 		expect(run_wake_session.wake_argv('epicrun #1716')).toBeUndefined()
+		expect(run_wake_session.wake_argv('fullrun #1774')).toBeUndefined()
 		expect(run_wake_session.wake_argv('rm -rf /')).toBeUndefined()
 		expect(run_wake_session.wake_argv('backlogrun; rm -rf /')).toBeUndefined()
 	})
@@ -410,5 +413,21 @@ describe('run_wake_session.launch — each launch is delimited', () => {
 		)
 
 		expect(await logged_text()).toContain(`started by process ${String(process.pid)}`)
+	})
+})
+
+// joshuafolkken/kit#1774: `queue` is the second invocation the supervisor continues. The record holds
+// the queue's **opening** issue list at every cut, so the prompt the successor is handed round-trips
+// back to `run:carry --begin` character for character — which is what `safe_invocation` refuses a wake
+// on when it does not.
+describe('run_wake_session.wake_argv — a queue invocation', () => {
+	it('hands on the list the record holds, unchanged', () => {
+		expect(run_wake_session.wake_argv(QUEUE_INVOCATION)?.args.at(-1)).toBe(QUEUE_INVOCATION)
+	})
+
+	// A queue with no issue names nothing to do, and a repository-qualified reference is a grammar this
+	// supervisor does not carry — waking on either would launch a session that cannot claim the record.
+	it.each(['queue', 'queue kit#1749', 'queue #0'])('refuses %s', (invocation) => {
+		expect(run_wake_session.wake_argv(invocation)).toBeUndefined()
 	})
 })

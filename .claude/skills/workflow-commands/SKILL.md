@@ -36,9 +36,23 @@ a lane or delegating a child is. What this rule forbids is _inferring_ a workflo
 shape; it has never required the keystroke to land in every session's own transcript, which is the
 reading `epicrun.md` → "Each child runs in a delegated unit" already applies to a delegated child.
 The last bullet above is untouched, because it is about an _earlier turn's_ authorization: a run with
-no budget left, or none begun, has nothing to carry. **The reading is `backlogrun`'s alone** — an
-`epicrun` or `fullrun` cut still waits for the keyword, and `backlogrun.md` → "The session cut is
-inside the invocation" is its single source.
+no budget left, or none begun, has nothing to carry. **The reading covers `backlogrun` and `queue`,
+and those two only** (joshuafolkken/kit#1774) — an `epicrun` or `fullrun` cut still waits for the
+keyword.
+
+**`queue` qualifies on the same ground, and on firmer.** It names the issues it will run at the
+moment the keyword is typed, so what a resumed session continues is a finite list a person wrote down
+— less to infer than under `backlogrun`, whose pool is a set that moves while the run is going.
+`epicrun` and `fullrun` do not qualify, and for reasons of their own rather than for want of one: an
+`epicrun` holds lanes in flight across the seam, and a `fullrun` ends at one issue and has nothing to
+carry.
+
+**`backlogrun.md` → "The session cut is inside the invocation" is the single source of the
+mechanism** — the record, the two commands, and what each answer means. `queue.md` → "The session
+boundary" carries the one thing that differs and does not restate the rest: **a queue's invocation is
+pinned to the list that was typed**, and the issues it has finished live in the record's `done` field
+rather than shrinking the string. Shrinking it is what `run:carry` answers `mismatch` to, and
+loosening that comparison would give up joshuafolkken/kit#1722's single-writer guarantee.
 
 ## 1. Which file to read
 

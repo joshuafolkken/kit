@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util'
 import { run_carry, type CarryChange, type CarryClaimRequest, type CarryOwner } from './run-carry'
+import { run_issue_number } from './run-issue-number'
 
 // The argument half of `josh run:carry`. It sat inside `run-carry-cli.ts` until the ownership answers
 // joshuafolkken/kit#1722 added took that file to 96% of the 300-line limit, and the seam it split on
@@ -20,11 +21,12 @@ const MIN_PID = 1
 // those are the only two that read it: `--end` accepts it and ignores it, and a usage line that
 // offered it there would be promising an ownership check nothing performs.
 const USAGE =
-	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | --cut | --merged <count> | --filed <count> | --end'
+	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | --cut | --merged <count> | --filed <count> | --done <issue> | --end'
 
 const OPTIONS = {
 	begin: { type: 'string' },
 	cut: { type: 'boolean' },
+	done: { type: 'string' },
 	end: { type: 'boolean' },
 	filed: { type: 'string' },
 	json: { type: 'boolean' },
@@ -69,20 +71,46 @@ function to_count(value: OptionValue): number | undefined {
 	return COUNT_PATTERN.test(text) ? Number(text) : undefined
 }
 
+// **`--done` names an issue, so it is checked as one and not as a count.** The shape is
+// `run-issue-number.ts`'s, which already refuses `0` and a leading zero — the same rule the `run:*`
+// commands interpolate a number under, imported rather than restated. Absent is an empty object rather
+// than a zero: there is no issue to record, which is a different fact from recording issue zero. A
+// present-but-malformed value invalidates the whole invocation, exactly as a bad `--merged` does.
+function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
+	const text = text_of(value)
+
+	if (text === undefined) return {}
+
+	if (!run_issue_number.ISSUE_NUMBER_PATTERN.test(text)) return undefined
+
+	const issue = Number(text)
+
+	// The pattern is anchored on digits and bounds nothing, so the magnitude check is separate — the
+	// same shape `backlog_budget_cli.to_count` ends with. A number past the safe range would be
+	// recorded as a different number and never match anything in `remaining`.
+	return Number.isSafeInteger(issue) ? { done: issue } : undefined
+}
+
 function to_change(values: ParsedValues): CarryChange | undefined {
 	const merged = to_count(values.merged)
 	const filed = to_count(values.filed)
+	const done = to_done(values.done)
 
-	if (merged === undefined || filed === undefined) return undefined
+	if (merged === undefined || filed === undefined || done === undefined) return undefined
 
-	return { merged, filed, cuts: values.cut === true ? ONE_CUT : NO_INCREMENT }
+	return { merged, filed, cuts: values.cut === true ? ONE_CUT : NO_INCREMENT, ...done }
 }
 
 // **A counting flag is what makes a count, never the sum of one.** `--merged 0` is a run reporting
 // that a wave merged nothing, and reading it as a bare read would answer `none` with exit 0 against
 // a record that is not there — the silent zero `docs/josh-commands.md` says exits 1.
 function has_count(values: ParsedValues): boolean {
-	return values.cut === true || values.merged !== undefined || values.filed !== undefined
+	return (
+		values.cut === true ||
+		values.merged !== undefined ||
+		values.filed !== undefined ||
+		values.done !== undefined
+	)
 }
 
 // The four groups are mutually exclusive: `--begin` starts a run, `--resume` adopts one, `--end`

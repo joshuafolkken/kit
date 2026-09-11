@@ -23,6 +23,8 @@ const OTHER_REPOSITORY = path.join(scratch, 'other.git')
 
 const INVOCATION = 'backlogrun --max 5 --idle 30'
 const OTHER_INVOCATION = 'backlogrun --max 10'
+// The opening list, pinned: it is what the record holds across every cut of this queue.
+const QUEUE_INVOCATION = 'queue #1762 #1749 #1759'
 const START = new Date('2026-09-10T00:00:00.000Z')
 const WITHIN_BOUND = new Date('2026-09-10T07:59:00.000Z')
 const PAST_BOUND = new Date('2026-09-10T08:00:01.000Z')
@@ -269,9 +271,65 @@ describe('a cut declares the hand-off', () => {
 			merged: cut.merged,
 			filed: cut.filed,
 			cuts: cut.cuts,
+			done: undefined,
 			owner_pid: DEAD_PID,
 			owner_start: undefined,
 			is_handed_off: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#1774: a `queue`'s invocation is pinned to the list that was typed, so the
+// comparison `classify_claim` makes is untouched and what shrinks is this field instead. These pin the
+// two properties a resumed queue rests on — the finished issues survive the hand-off, and what is left
+// is derived from the record rather than from an arithmetic the successor does in its head.
+function queued(): RunCarry {
+	run_carry.end_carry(target())
+
+	const carry = run_carry.begin_carry(target(), QUEUE_INVOCATION, run_carry.NO_OWNER, START)
+
+	if (carry === undefined) throw new Error('the scratch record was not created')
+
+	return carry
+}
+
+describe('the issues a queue has finished', () => {
+	it('accumulates in the order they were recorded', () => {
+		const first = run_carry.apply_change(target(), queued(), { done: 1762 })
+
+		expect(run_carry.apply_change(target(), first, { done: 1749 }).done).toStrictEqual([1762, 1749])
+	})
+
+	// A `--done` reissued after a retry must not list an issue twice, or `remaining` would be short by
+	// something already taken out of it.
+	it('records the same issue only once', () => {
+		const first = run_carry.apply_change(target(), queued(), { done: 1762 })
+
+		expect(run_carry.apply_change(target(), first, { done: 1762 }).done).toStrictEqual([1762])
+	})
+
+	it('leaves what is left in the order the invocation declared it', () => {
+		const carry = run_carry.apply_change(target(), queued(), { done: 1749 })
+
+		expect(run_carry.remaining_of(carry)).toStrictEqual([1762, 1759])
+	})
+
+	// The whole point of the resumption: the successor does not re-run what the cut session finished.
+	it('survives the hand-off and the adoption that carries it', () => {
+		const started = run_carry.apply_change(target(), queued(), { done: 1762 })
+		const cut = run_carry.apply_change(target(), started, { cuts: 1 })
+
+		expect(run_carry.adopt_carry(target(), cut, dead_owner())?.done).toStrictEqual([1762])
+	})
+
+	// "This invocation has no issue list" and "this queue has no issues left" are different facts.
+	it('is not reported for an invocation that declared none', () => {
+		expect(run_carry.remaining_of(begun())).toBeUndefined()
+	})
+
+	it('is named in the description a refusal message carries', () => {
+		const carry = run_carry.apply_change(target(), queued(), { done: 1762 })
+
+		expect(run_carry.describe_carry(carry)).toContain('issues 1762 done')
 	})
 })

@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest'
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const BACKLOGRUN = '.claude/skills/workflow-commands/backlogrun.md'
+const QUEUE = '.claude/skills/workflow-commands/queue.md'
 const EPICRUN = '.claude/skills/workflow-commands/epicrun.md'
 const COMMAND_DOC = 'docs/josh-commands.md'
 
@@ -48,10 +49,32 @@ const BUDGET_MARKER = 'no budget left, or none begun, has nothing to carry'
 // §0 is where the explicit-invocation rule is single-sourced, so the reading has to sit beside it
 // rather than only downstream — and it has to say that the "earlier turn" bullet above it still
 // stands, since that bullet is what a reader would otherwise take the reading to have repealed.
+// joshuafolkken/kit#1774 widened the reading to `queue`. The sentence that names **which two** entry
+// points it covers is pinned because dropping it leaves `SCOPE_MARKER`'s exclusion standing with
+// nothing saying what is included — and a reader would then take the reading to be `backlogrun`'s
+// alone again, which is the state this issue changed.
+const QUEUE_ENTRY_MARKER = '**The reading covers `backlogrun` and `queue`, and those two only**'
+
 const SKILL_MARKERS: ReadonlyArray<string> = [
 	'A session cut inside a declared budget is not a new invocation** (joshuafolkken/kit#1714)',
 	BUDGET_MARKER,
 	SCOPE_MARKER,
+	QUEUE_ENTRY_MARKER,
+]
+
+// The queue-specific half. Four documents now point at this section as the single source of it, so
+// without markers a rewrite could delete the whole section and leave every one of those pointers
+// dangling with nothing failing — the failure this file's header says the markers exist to prevent.
+const QUEUE_MARKERS: ReadonlyArray<string> = [
+	'## The session boundary',
+	'On `over` the cut happens and the run carries on',
+	'invocation is pinned to the list that was typed',
+	'pnpm josh run:carry --begin "queue #<N1> #<N2> …"',
+	'--done <N>',
+	// The two ways a resumed session can go wrong if the procedure loses them: re-running a finished
+	// issue, and carrying a prefixed queue into a mechanism whose grammar cannot hold it.
+	'**`remaining`**',
+	'A repository-qualified queue is not carried',
 ]
 
 // The resident copy is a trigger plus a pointer and nothing else. The scope marker is not
@@ -61,7 +84,7 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'**A session cut inside a declared budget is not a new invocation**',
 	BUDGET_MARKER,
-	'**`backlogrun` alone**',
+	'**`backlogrun` and `queue` alone**',
 	SCOPE_MARKER,
 	'`.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation"',
 ]
@@ -134,6 +157,14 @@ describe('backlogrun.md carries the procedure the reading needs', () => {
 	const content = read_unwrapped(BACKLOGRUN)
 
 	it.each(BACKLOGRUN_MARKERS)('says %s', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+describe('queue.md carries the half that is only a queue’s', () => {
+	const content = read_unwrapped(QUEUE)
+
+	it.each(QUEUE_MARKERS)('says %s', (marker) => {
 		expect(content).toContain(marker)
 	})
 })

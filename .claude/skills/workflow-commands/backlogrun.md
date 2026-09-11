@@ -131,6 +131,13 @@ here is the promise written above and the brake written beside it.
 
 ## The session cut is inside the invocation
 
+**This section is the single source of the mechanism, and `queue` uses it too**
+(joshuafolkken/kit#1774). The record, the two commands, the answer table and what each one means are
+all here and are not restated anywhere else; `queue.md` → "The session boundary" carries the one thing
+that differs — a queue's invocation is pinned to the issue list that was typed, and its finished
+issues live in the record's `done` field rather than shrinking the string. `SKILL.md` → §0 is where
+the two entry points this reading covers are named.
+
 **Typing `backlogrun` once authorizes the declared budget, and a session cut is an execution detail of
 spending it** (joshuafolkken/kit#1714). `epicrun.md` → "The hand-off" stops the _session_ at the seam;
 under `backlogrun` that seam does not stop the _run_. The next session picks the same invocation up
