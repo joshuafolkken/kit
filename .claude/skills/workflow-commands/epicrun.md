@@ -192,6 +192,14 @@ Building a second is the clone `CLAUDE.md` prohibits. Ask the command rather tha
 pnpm josh delegate epic-child   # → delegate
 ```
 
+**In a lane, that unit is a detached operating-system process rather than a subagent of this session**
+(joshuafolkken/kit#1749). **What changed is the launch and nothing about the delegation**:
+`pnpm josh delegate epic-child` still answers `delegate`, the verifier is still
+`pnpm josh issue:state <N>` read from GitHub, and the summary is still bounded at 25 lines. What an
+in-process subagent could not do is survive the session cut the hand-off takes — it died with the
+parent, and the next session read its frozen log as a child that had stopped. `pnpm josh lane:dispatch`
+is where a lane's child is started; "Handing the child over" below carries the command.
+
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier, and it is the whole
 reason the unit may be delegated at all: a unit that reports a child finished without its PR merged
 leaves that child open, and `pnpm josh issue:state <N>` says so in one call. The child's own
@@ -655,16 +663,52 @@ pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, 
 
 ### Handing the child over
 
-The child runs as `fullrun #<N>` in a delegated unit, per "Each child runs in a delegated unit"
-above, with two additions to the brief: **the lane directory every command is to run in**, and that
-neither `josh latest` nor a progress watcher is to be started there. Everything else — the plan, the
-gate, `/code-review`, `pnpm josh git`, `pnpm josh followup` — is unchanged, and
-`pnpm josh followup` releases that lane's hold at the merge as it always has.
+The child runs as `fullrun #<N>` in that lane, per "Each child runs in a delegated unit" above, and
+neither `josh latest` nor a progress watcher is started there. Everything else — the plan, the gate,
+`/code-review`, `pnpm josh git`, `pnpm josh followup` — is unchanged, and `pnpm josh followup`
+releases that lane's hold at the merge as it always has.
 
-**Start each unit without blocking on it, and poll them all.** That is "A delegated unit that stopped
+**The child is started as a process of its own, not as a subagent of this session**
+(joshuafolkken/kit#1749). One command does it, in the lane that was just opened:
+
+```bash
+pid=$(pnpm josh lane:dispatch "$n") || exit 1   # the child's pid on stdout, nothing else; alias: josh lnd
+```
+
+- **It records where the child writes as it starts it**, so "this lane records no path" is no longer a
+  state the hand-off below has to have an exception for. The log is the dispatch's own
+  `<temp>/josh-lane-dispatch-<N>.log` rather than whatever the lane recorded before — a path recorded
+  by hand may be a transcript to *read*, and appending the child's output into one would corrupt it.
+- **A refusal is an empty capture beside a non-zero exit**, and every refusal also sends a `warning`
+  Telegram — no lane open, a path that could not be recorded, a launch that failed. The session that
+  issued the dispatch may be the one about to be cut, and a lane that never started its child looks
+  exactly like a lane whose child is still thinking. **Park that child and name the log the message
+  carries**; do not re-dispatch into the same lane without reading it.
+- **A child that started with nowhere to write exits zero and warns.** The launcher starts the session
+  even when it could not open the log, so the child really is running and a non-zero exit would send
+  you to dispatch a second one into the same lane. What the message says is that the output is not
+  being kept — **poll that lane on the process trace alone**, because its log will never grow and a
+  poll that read the file would book a working child as stopped.
+- **The brief the child used to be handed is now the invocation itself.** The child is started as
+  `fullrun #<N>` with the lane as its working directory, so the two additions this section used to
+  make by hand — which directory to run in, and that neither `josh latest` nor a progress watcher is
+  started there — are the lane's own `.env` and this file's rules rather than prose in a brief. What
+  the authorization rests on is unchanged: the batch a person approved by typing `epicrun` covers the
+  child, exactly as it covered the unit.
+- **It does not pass `--dangerously-skip-permissions`.** What the child may do is the checkout's own
+  `.claude/settings.json` to decide. Measured on 2026-09-11, a headless child launched this way
+  reaches `gh` and merges through `pnpm josh followup` without the flag; a checkout whose settings say
+  otherwise is a decision for the person who owns it, and the run reports what stopped rather than
+  loosening it.
+
+**Start each child without blocking on it, and poll them all.** That is "A delegated unit that stopped
 without reporting" above applied N times rather than once, and
-`pnpm josh run:liveness <N> --output <path>` is read **in that child's lane** — the case that section
-already names when it says the traces are read in the checkout the unit was given.
+`pnpm josh run:liveness <N> --output <path> --process alive` is read **in that child's lane** — the
+case that section already names when it says the traces are read in the checkout the unit was given.
+**Run `pgrep -laf "<the lane's directory>"` first and pass what it found** — `alive` where the child
+is there, `none` where it is not, and never `alive` merely because the child was dispatched. The
+writer is a real process now, so a log that stopped moving is a session thinking rather than one that
+died, and the trace is what tells the two apart.
 
 **`git switch main && git pull` is the parent's now, not the child's.** No lane can switch to the
 default branch, because it is checked out in the main work tree, so the refresh moves to the primary
@@ -1325,12 +1369,14 @@ per child, and treat a single non-numeric line as the verdict.
    receives that merge and the next child starts on a stale default branch. **In a lane the child
    cannot run it at all**, so it is the parent's, immediately before that lane's `lane:open`.
 
-   **Start the unit without blocking on it, record where it writes — `pnpm josh lane:output <N> <path>`
-   when the child runs in a lane — and poll.** Blocking on the return
+   **Start the unit without blocking on it — `pnpm josh lane:dispatch <N>` when the child runs in a
+   lane, which records where it writes as it starts it — and poll.** Blocking on the return
    leaves the parent with no turn in which to notice that the return is never coming, which is the
    whole of "A delegated unit that stopped without reporting" above. Poll at the polling interval; ask
-   `pnpm josh run:liveness <N> --output <path> --process none` (or `--process alive`) once that file has been unchanged
-   for the silent-unit window.
+   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "<the lane's directory>"`
+   found>` once that file has been unchanged for the silent-unit window. **The flag is what you saw,
+   never what kind of child it is**: passing `alive` without running `pgrep` answers `alive` for ever,
+   including for a child that died an hour ago.
 
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
@@ -1643,8 +1689,17 @@ never opened with two:
 
 ```bash
 unit_output=$(pnpm josh lane:output <N>) &&
-  pnpm josh run:liveness <N> --output "$unit_output" --process none
+  pnpm josh run:liveness <N> --output "$unit_output" --process alive
 ```
+
+**`--process` carries what `pgrep` found, and with a dispatched child that is the whole answer**
+(joshuafolkken/kit#1749). Run `pgrep -laf "<the lane's directory>"` first and pass `alive` where it
+found the child and `none` where it did not — **never `alive` because the child was dispatched.** The
+flag has always been what the caller *saw* (`docs/josh-commands.md` → "`josh run:liveness`"), and a
+parent that passed `alive` without looking would answer `alive` for a child that crashed an hour ago
+and poll it for ever. What changed is that the trace is now the deciding input rather than a
+supplement: the child is a real process, so a log that has stopped moving is a session thinking rather
+than one that died, and `--process none` on its own no longer distinguishes the two.
 
 **The `&&` is load-bearing.** A lane that records nothing prints `none` and exits non-zero, so the
 chain stops there; substituted straight into `--output`, that `none` is a relative path and
@@ -1657,6 +1712,15 @@ being reported.
   recording is made at dispatch, and one missing is filled in now with
   `pnpm josh lane:output <N> <path>` — then take one of the next two bullets in the same turn.
   **There is no waiting here at all**: nothing has to finish, because nothing is being abandoned.
+  **That sentence is true because the child is an operating-system process of its own, and it was not
+  before** (joshuafolkken/kit#1749). While a delegated child was an in-process subagent of this
+  session, the cut killed every lane still implementing: the next session polled files whose writers
+  were gone, waited out the silent-unit window, booked each one `stopped`, and the third aborted the
+  run under the consecutive-failure guard. **The fix was to make the premise hold rather than to add a
+  condition to it** — a drain that waited for the pool to empty would run up to 28 minutes at the most
+  expensive token rate the run reaches, against a cut reached about every 50 minutes, which is exactly
+  the cost joshuafolkken/kit#1713 removed. `pnpm josh lane:dispatch` is what makes it true, and
+  "Handing the child over" above is where it is started.
 - **A lane nobody could poll** — `unreadable`, or `open` with no recorded path and none that can be
   supplied — **and the cut does not happen.** Name that lane in the epic progress comment and go back
   to step 1 of the loop; the reading is asked again at the next merge. This is the `unreadable` lane's

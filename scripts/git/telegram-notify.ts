@@ -1,3 +1,4 @@
+import { gh_spawn } from '#scripts/gh-spawn'
 import { z } from 'zod'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org'
@@ -248,9 +249,44 @@ async function send_or_report(
 	}
 }
 
+// Long enough that a stalled `gh` never holds a warning back, short enough that the message still
+// names the repository it is about.
+const REPO_LOOKUP_TIMEOUT_MS = 5000
+
+interface WarningInput {
+	issue_title: string
+	body: string
+	recovery: string
+}
+
+/**
+ * Warn that something an unattended run depended on did not work.
+ *
+ * **One function rather than one per caller** (joshuafolkken/kit#1749). Every warning fills in the
+ * same four fields the same way — the task type, the repository looked up under the same bound, and
+ * two urls that are never known here — so a second caller composing its own would be free to drift
+ * on the one field that is not obvious: a repository lookup with no timeout hangs the warning behind
+ * the failure it is reporting.
+ */
+async function warn(input: WarningInput): Promise<boolean> {
+	return await send_or_report(
+		{
+			task_type: 'warning',
+			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
+			issue_title: input.issue_title,
+			body: input.body,
+			issue_url: undefined,
+			pr_url: undefined,
+		},
+		input.recovery,
+	)
+}
+
 const telegram_notify = {
+	REPO_LOOKUP_TIMEOUT_MS,
 	send,
 	send_or_report,
+	warn,
 }
 
 export { telegram_notify, build_text, TASK_DEFINITIONS, telegram_environment_schema }

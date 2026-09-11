@@ -55,17 +55,13 @@ function invalid_reason(output: string): string | undefined {
 		: undefined
 }
 
-async function find_lane(issue: string): Promise<LaneInfo | undefined> {
-	return lane_registry.find_lane(await lane_registry.list_lanes(), issue)
-}
-
 /** Record where this lane's unit writes, leaving everything else in its `.env` untouched. */
 async function record_output(issue: string, output: string): Promise<RecordOutcome> {
 	const reason = invalid_reason(output)
 
 	if (reason !== undefined) return { kind: 'invalid', reason }
 
-	const lane = await find_lane(issue)
+	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return { kind: 'no-lane' }
 
@@ -88,7 +84,7 @@ async function record_output(issue: string, output: string): Promise<RecordOutco
  * the answer comes from the lane's own `.env`, so it is the same answer in every session.
  */
 async function read_output(issue: string): Promise<ReadOutcome> {
-	const lane = await find_lane(issue)
+	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return { kind: 'no-lane' }
 

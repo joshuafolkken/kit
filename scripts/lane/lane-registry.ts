@@ -198,8 +198,21 @@ function find_lane(lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | un
 	return lanes.find((lane) => lane.issue === issue)
 }
 
+/**
+ * The open lane for one issue, read from the listing every other lane reading goes through.
+ *
+ * **The listing and the find are one call because every caller needs both** (joshuafolkken/kit#1749).
+ * Each one that wrote the pair itself is a place the listing could be read differently — from a cache,
+ * from a stale array — and the whole point of reading it live is that the answer is the same in every
+ * session, including one that never opened the lane.
+ */
+async function find_open_lane(issue: string): Promise<LaneInfo | undefined> {
+	return find_lane(await list_lanes(), issue)
+}
+
 const lane_registry = {
 	find_lane,
+	find_open_lane,
 	list_lanes,
 	main_repository_root,
 	parse_block,

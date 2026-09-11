@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
+import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_open, type OpenOutcome } from './lane-open'
 import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -30,6 +31,7 @@ const USAGE = [
 	'       josh lane:list',
 	'       josh lane:prune',
 	'       josh lane:output <issue-number> [<path>]',
+	'       josh lane:dispatch <issue-number>',
 ].join('\n')
 
 type Handler = (rest: ReadonlyArray<string>) => Promise<number>
@@ -210,12 +212,39 @@ async function output_command(rest: ReadonlyArray<string>): Promise<number> {
 	return report_record(await lane_output.record_output(issue, second), issue)
 }
 
+// The child's pid goes to standard output alone, so `pid=$(pnpm josh lane:dispatch <N>)` is what a
+// caller needs — and a refusal is an empty capture beside a non-zero exit, exactly as `lane:open`'s is.
+// **Every refusal also warns**, because the session that issued the dispatch may be the one about to be
+// cut: a lane that never started its child is indistinguishable from one whose child is still thinking,
+// and nothing else would ever say which it was. **So does a launch that started a child with nowhere to
+// write** — `is_worth_warning` is what decides, rather than this function reading the outcome's shape.
+async function report_dispatch(outcome: DispatchOutcome, issue: string): Promise<number> {
+	console.error(lane_dispatch.describe(outcome, issue))
+
+	if (lane_dispatch.is_worth_warning(outcome)) await lane_dispatch.warn_of_problem(outcome, issue)
+
+	if (outcome.kind !== 'dispatched') return FAILURE_EXIT_CODE
+
+	console.info(String(outcome.pid))
+
+	return SUCCESS_EXIT_CODE
+}
+
+async function dispatch_command(rest: ReadonlyArray<string>): Promise<number> {
+	const issue = parse_issue(rest)
+
+	if (issue === undefined) return report_usage()
+
+	return await report_dispatch(await lane_dispatch.dispatch_child(issue), issue)
+}
+
 const HANDLERS: Record<string, Handler> = {
 	open: open_command,
 	close: close_command,
 	list: list_command,
 	prune: prune_command,
 	output: output_command,
+	dispatch: dispatch_command,
 }
 
 async function dispatch(argv: ReadonlyArray<string>): Promise<number> {

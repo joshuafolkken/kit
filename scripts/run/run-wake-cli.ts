@@ -2,7 +2,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { gh_spawn } from '#scripts/gh-spawn'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
@@ -25,9 +24,6 @@ const ARGV_OFFSET = 2
 const ONE_GROUP = 1
 const MS_PER_SECOND = 1000
 const DEFAULT_INTERVAL_SECONDS = 60
-// Long enough that a stalled `gh` never holds the warning back, short enough that the message still
-// names the repository it is about.
-const REPO_LOOKUP_TIMEOUT_MS = 5000
 // Whole and positive. A zero interval is a busy loop against the temp directory, not a faster
 // supervisor.
 const INTERVAL_PATTERN = /^[1-9]\d*$/u
@@ -246,17 +242,11 @@ function log_hint(context: WakeContext): string {
 }
 
 async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext): Promise<void> {
-	await telegram_notify.send_or_report(
-		{
-			task_type: 'warning',
-			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
-			issue_title: WARNING_TITLE,
-			body: [body, stop.note, log_hint(context)].filter(Boolean).join('\n'),
-			issue_url: undefined,
-			pr_url: undefined,
-		},
-		WARNING_RECOVERY,
-	)
+	await telegram_notify.warn({
+		issue_title: WARNING_TITLE,
+		body: [body, stop.note, log_hint(context)].filter(Boolean).join('\n'),
+		recovery: WARNING_RECOVERY,
+	})
 }
 
 // **Only a failed wake exits non-zero, and the two reasons that newly warn do not**
