@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { OBSERVATION_LEDGER_PATH } from './observation-ledger'
 import { observations_flush } from './observations-flush'
+import {
+	DEFAULT_BRANCH,
+	FLUSH_BRANCH,
+	MODIFIED_LEDGER,
+	MORNING_INSTANT,
+	MS_COMMAND,
+	ONLY_COPY,
+} from './observations-flush-fixture'
 
 // joshuafolkken/kit#1756: the flush is the observation ledger's only commit path, so what it refuses
 // is the whole of its safety story. The refusals and the message a failed flush leaves behind are
@@ -11,12 +19,17 @@ import { observations_flush } from './observations-flush'
 
 const SOURCE_PATH = 'scripts/git/git-staging.ts'
 const TEST_PATH = 'scripts/new.test.ts'
-const MODIFIED_LEDGER = ` M ${OBSERVATION_LEDGER_PATH}`
 const MODIFIED_SOURCE = ` M ${SOURCE_PATH}`
 const UNTRACKED_TEST = `?? ${TEST_PATH}`
-const MORNING_INSTANT = '2026-09-11T02:14:42Z'
-const FLUSH_BRANCH = 'observations/2026-09-11-021442'
 const PUSH_FAILURE = 'remote hung up'
+const NO_COMMITS = 0
+const ONE_COMMIT = 1
+const FLUSH_COMMAND = 'pnpm josh observations:flush'
+const ROLL_BACK_FAILURE = 'permission denied'
+
+function roll_back_failure(): string {
+	return observations_flush.roll_back_failure_message(FLUSH_BRANCH, PUSH_FAILURE, ROLL_BACK_FAILURE)
+}
 
 describe('observations_flush — what a status output means', () => {
 	it('sees a ledger change in the porcelain output', () => {
@@ -68,7 +81,7 @@ describe('observations_flush — the pull request it opens', () => {
 		const body = observations_flush.pull_request_body()
 
 		expect(body).toContain(OBSERVATION_LEDGER_PATH)
-		expect(body).toContain('pnpm josh observations:flush')
+		expect(body).toContain(FLUSH_COMMAND)
 	})
 
 	it('says the ledger is append-only in the diff a reviewer reads', () => {
@@ -78,20 +91,70 @@ describe('observations_flush — the pull request it opens', () => {
 
 describe('observations_flush — the refusals name what to do next', () => {
 	it('names the command that returns the checkout to the default branch', () => {
-		const message = observations_flush.off_default_branch_message('1756-lane', 'main')
+		const message = observations_flush.off_default_message('1756-lane', DEFAULT_BRANCH)
 
 		expect(message).toContain('1756-lane')
-		expect(message).toContain('pnpm josh ms')
+		expect(message).toContain(MS_COMMAND)
 	})
 
 	// The opposite advice, on the one branch where `pnpm josh ms` would discard the only copy of an
 	// appended line: a flush branch holds its observations as a commit, so the working tree shows
 	// nothing and a silent checkout loses them.
 	it('does not send a stranded flush branch to pnpm josh ms', () => {
-		const message = observations_flush.off_default_branch_message(FLUSH_BRANCH, 'main')
+		const message = observations_flush.flush_branch_message(FLUSH_BRANCH, ONE_COMMIT)
 
 		expect(message).toContain(FLUSH_BRANCH)
-		expect(message).toContain('only copy')
+		expect(message).toContain(ONLY_COPY)
+	})
+
+	// joshuafolkken/kit#1785: the exits it used to name — finish the branch, or delete it — are both
+	// denied to an agent by the distributed `.claude/settings.json`, so the message has to name the
+	// one route that is open.
+	it('sends a committed flush branch to a push it is allowed to make', () => {
+		const message = observations_flush.flush_branch_message(FLUSH_BRANCH, ONE_COMMIT)
+
+		expect(message).toContain('git push -u origin')
+		expect(message).not.toContain('Finish or delete')
+	})
+
+	// The premise of the message above does not hold with no commit on the branch: the lines are still
+	// in the working tree, so nothing is stranded and `pnpm josh ms` is the correct exit.
+	it('does not call a zero-commit flush branch the only copy', () => {
+		const message = observations_flush.flush_branch_message(FLUSH_BRANCH, NO_COMMITS)
+
+		expect(message).toContain(FLUSH_BRANCH)
+		expect(message).not.toContain(ONLY_COPY)
+		expect(message).toContain(MS_COMMAND)
+	})
+})
+
+describe('observations_flush — what a rejected commit reports', () => {
+	// A rollback that could not finish must not be reported as one that did: the branch is still in
+	// the checkout, so the message carries both reasons and names the exit that is actually open.
+	it('carries both reasons when the rollback could not finish', () => {
+		const message = roll_back_failure()
+
+		expect(message).toContain(PUSH_FAILURE)
+		expect(message).toContain(ROLL_BACK_FAILURE)
+		expect(message).toContain(MS_COMMAND)
+	})
+
+	// Asserting a removal that did not happen is what sends somebody looking for a branch that is
+	// still sitting there, so this arm never claims one.
+	it('does not claim the branch was removed when the rollback failed', () => {
+		const message = roll_back_failure()
+
+		expect(message).not.toContain('was removed')
+		expect(message).not.toContain(ONLY_COPY)
+	})
+
+	// The message printed after a successful rollback describes what is already true, so it must not
+	// send anyone to a branch that no longer exists.
+	it('says the appended lines survived a rejected commit', () => {
+		const message = observations_flush.rejected_commit_message(FLUSH_BRANCH, PUSH_FAILURE)
+
+		expect(message).toContain('still in the working tree')
+		expect(message).toContain(FLUSH_COMMAND)
 	})
 
 	it('names every path it refused to commit', () => {

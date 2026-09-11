@@ -294,6 +294,32 @@ async function commit(message: string): Promise<void> {
 	await git_spawn.with_output('commit', ['-m', message])
 }
 
+// **`-d` rather than `-D`, and that is the safety rather than a preference** (joshuafolkken/kit#1785).
+// The one caller is a rollback that removes a branch it created moments earlier, so `-d`'s refusal to
+// delete a branch holding an unmerged commit is exactly the net it wants: a rollback can never be the
+// thing that destroys a commit.
+async function delete_branch(branch_name: string): Promise<void> {
+	await git_spawn.read(['branch', '-d', branch_name])
+}
+
+// How many commits `tip` holds that `base` does not. **`0` is the answer that distinguishes a flush
+// branch carrying the only copy of an appended line from one an aborted flush merely left behind**,
+// and the two get opposite advice (joshuafolkken/kit#1785).
+// **Output that is not a count throws rather than parsing to `0`.** `Number('')` is `0`, and `0` is
+// the answer that says a branch holds nothing — so a read that came back empty or unparseable would
+// report "nothing is stranded" about a branch nobody measured, which is the one wrong answer that
+// loses work. `count_merges` guards the same way and falls back to `0` instead, because there a
+// missing count means an empty range rather than a claim about somebody's commits.
+async function commit_count_beyond(base: string, tip: string): Promise<number> {
+	const range = `${base}..${tip}`
+	const output = await git_spawn.read(['rev-list', '--count', range])
+	const parsed = Number(output)
+
+	if (output.length > 0 && Number.isFinite(parsed)) return parsed
+
+	throw new Error(`\`git rev-list --count ${range}\` printed \`${output}\` rather than a count`)
+}
+
 function is_exit_code_128(cause: unknown): boolean {
 	return (
 		typeof cause === 'object' && cause !== null && 'exit_code' in cause && cause.exit_code === '128'
@@ -506,6 +532,8 @@ const git_command = {
 	checkout_b,
 	checkout,
 	commit,
+	commit_count_beyond,
+	delete_branch,
 	push,
 	pull_fast_forward,
 	branch_exists,
