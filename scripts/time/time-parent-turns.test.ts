@@ -3,6 +3,7 @@ import { time_format } from './time-format'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import { time_report } from './time-report'
 import { time_report_fixture } from './time-report-fixture'
+import { time_shell } from './time-shell'
 import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span } from './time-spans'
 
@@ -74,6 +75,15 @@ describe('time_parent_turns.build_parent_turns — the parent loop', () => {
 		const spans = turns([josh('josh backlog:next')], [josh('josh backlog:budget')])
 
 		expect(count_in(spans, time_parent_turns.LOOP_ASK)).toBe(2)
+	})
+
+	// The return to the default branch is typed `pnpm josh ms`, and the key carries the command that
+	// alias stands for (joshuafolkken/kit#1789) — matched against the alias, every one of those turns
+	// would fall to `other` and the parent's own loop would read as unclassifiable work.
+	it('reads the default-branch return as child confirmation, typed as an alias', () => {
+		const spans = [josh(time_shell.josh_command_of('pnpm josh ms'))]
+
+		expect(count_in(spans, time_parent_turns.CHILD_CONFIRMATION)).toBe(ONE)
 	})
 
 	it('reads a delegated child as dispatch', () => {

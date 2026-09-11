@@ -53,14 +53,13 @@ const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 	'test:unit',
 ])
 
-// Both spellings of each check, **derived from the alias table rather than restated beside it**: a
-// second copy of the aliases stops matching the first time one is renamed, and `pnpm josh ga | tail`
-// masks a gate exactly as the long spelling does. The derivation itself is `shell-segments.ts`, shared
-// with the watcher `early-heartbeat.ts` names (joshuafolkken/kit#1643).
-const VERIFICATION_NAMES: ReadonlySet<string> = shell_segments.josh_names(VERIFICATION_COMMANDS)
-
+// **The canonical name of each check, and both spellings still match**: `pnpm josh ga | tail` masks a
+// gate exactly as the long spelling does, and since joshuafolkken/kit#1789 the alias is expanded where
+// the command is read rather than by widening this set with every alias standing for one of its names
+// (joshuafolkken/kit#1643 for the reading). The suite names `pnpm josh ga` for that reason: an
+// expansion that regressed would show up here rather than as a guard that quietly stopped firing.
 function is_verification_command(segment: string): boolean {
-	return shell_segments.is_josh_command(segment, VERIFICATION_NAMES)
+	return shell_segments.is_josh_command(segment, VERIFICATION_COMMANDS)
 }
 
 // A pipeline reports its last command's status, so a check in any earlier segment has its verdict

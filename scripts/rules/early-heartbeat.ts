@@ -203,8 +203,9 @@ const EARLY_HEARTBEAT_REASON =
 // the interval out, and `--once` answers an explicit ask. `--mark` is neither: it records a report
 // that has already gone out rather than waiting for the next one, and crediting it would score every
 // run that reported at all as having kept a rule about waiting.
-// Both spellings, derived from the alias table by the same helper `piped-verification.ts` uses.
-const PROGRESS_NAMES: ReadonlySet<string> = shell_segments.josh_names(['run:progress'])
+// The canonical name; both spellings match, because the alias is expanded where the command is read
+// (joshuafolkken/kit#1789).
+const PROGRESS_NAMES: ReadonlySet<string> = new Set(['run:progress'])
 const WATCH_FLAG = /(?:^|\s)--(?:wait|once)(?=\s|$)/u
 
 function is_progress_watch_segment(segment: string): boolean {

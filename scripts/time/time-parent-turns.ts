@@ -91,7 +91,9 @@ const CONTRIBUTOR_KEYS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = 
 			'josh run:preflight',
 			'josh run:hold',
 			'josh run:release',
-			'josh ms',
+			// The canonical name, not the `josh ms` a run actually types: since
+			// joshuafolkken/kit#1789 the key carries the command an alias stands for.
+			'josh main:sync',
 		]),
 	],
 	[
