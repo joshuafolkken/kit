@@ -15,13 +15,27 @@ const SKILL = EPICRUN_SKILL
 const POINTER = 'prompts/collaboration-workflow/epicrun.md'
 const SINGLE_SOURCE: ReadonlyArray<string> = [SKILL]
 
-const COMMAND = 'pnpm josh cost --over 150000'
+const COMMAND = 'pnpm josh cost --over 300000'
+// joshuafolkken/kit#1775 raised the figure the documents pass to 300,000 as a time-boxed
+// experiment, and deliberately left the derivation below it at 150,000 — that is the number the
+// experiment retreats to. So the section instructs one figure while arguing another, and the only
+// thing that keeps those two readable together is a sentence saying the first is under test. A
+// temporary change with nothing pinning its temporariness is how a permanent one gets made by
+// default.
+const EXPERIMENT_MARKER = 'いま指示している 300,000 は一時的な実験値であり'
+const EXPERIMENT_ISSUE = 'joshuafolkken/kit#1775'
+// The retreat has to be readable here rather than only in the issue: a document that says the
+// figure is temporary and forwards every step of undoing it leaves an agent with a second pointer
+// and no procedure. The review point is an artifact rather than a date, because no date was set.
+const RETREAT_MARKER = '撤退はこの段落を消すだけでは終わらない'
+const REVIEW_POINT_MARKER = '畳む判断をする時点は日付ではなく成果物である'
 // joshuafolkken/kit#1567: a merge is only half the seam. Under parallel lanes another child is
 // still in flight, and cutting there loses the reference to it rather than pausing it.
 const LANE_COMMAND = 'pnpm josh lane:list'
 
 const QUEUE = '.claude/skills/workflow-commands/queue.md'
 const DOCS = 'docs/josh-commands.md'
+const BACKLOGRUN = '.claude/skills/workflow-commands/backlogrun.md'
 const CITATION = '`epicrun.md` → "The hand-off"'
 
 // The moment is the whole safety argument: this child's work is written down only after a merge,
@@ -153,6 +167,20 @@ describe('the threshold is not passed off as the measurement’s own answer', ()
 		expect(unwrapped).toContain('121,514')
 	})
 
+	it.each(SINGLE_SOURCE)('%s says the figure it instructs is under test', (document_path) => {
+		const unwrapped = read_unwrapped(document_path)
+
+		expect(unwrapped).toContain(EXPERIMENT_MARKER)
+		expect(unwrapped).toContain(EXPERIMENT_ISSUE)
+	})
+
+	it.each(SINGLE_SOURCE)('%s carries the retreat and its review point', (document_path) => {
+		const unwrapped = read_unwrapped(document_path)
+
+		expect(unwrapped).toContain(RETREAT_MARKER)
+		expect(unwrapped).toContain(REVIEW_POINT_MARKER)
+	})
+
 	// Both bounds, because either one alone reads as an arbitrary pick: too low stops a session
 	// with nothing to hand off, too high never fires at all.
 	it.each(SINGLE_SOURCE)('%s names both bounds it was squeezed between', (document_path) => {
@@ -267,8 +295,23 @@ describe(`${QUEUE} — cites the hand-off instead of copying it`, () => {
 		expect(unwrapped).toContain(CITATION)
 	})
 
+	// Every document that instructs the figure without carrying its derivation owes the reader that
+	// it is under test — a run reading only this one would otherwise take 300,000 as settled.
+	it('says the figure it instructs is under test', () => {
+		expect(unwrapped).toContain(EXPERIMENT_ISSUE)
+	})
+
 	it.each(BODY_ONLY)('does not copy %j', (marker) => {
 		expect(unwrapped).not.toContain(marker)
+	})
+})
+
+describe(`${BACKLOGRUN} — says the figure it instructs is under test`, () => {
+	it('names the experiment issue beside the command', () => {
+		const unwrapped = read_unwrapped(BACKLOGRUN)
+
+		expect(unwrapped).toContain(COMMAND)
+		expect(unwrapped).toContain(EXPERIMENT_ISSUE)
 	})
 })
 

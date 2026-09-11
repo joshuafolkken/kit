@@ -526,7 +526,7 @@ what `backlog:budget` printed rather than paraphrased.
 ### The hand-off check is not asked during a watch
 
 **A watch does not count towards the session cut** (joshuafolkken/kit#1676). The hand-off check —
-`pnpm josh cost --over 150000`, `epicrun.md` → "The hand-off" — is asked **at a child's merge**, and a
+`pnpm josh cost --over 300000`, `epicrun.md` → "The hand-off" — is asked **at a child's merge**, and a
 watch has no merges, so a run that is only watching never reaches one. That is a decision rather than
 an omission, and three things make it safe:
 
@@ -575,8 +575,10 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **A `needs-human-review` child stops the whole run** before its commit — `SKILL.md` → §2z, which is
   the single source, and `epicrun.md` → "`needs-human-review` — the one stop that is not a park" for
   what happens to its lane.
-- **The hand-off check** — `pnpm josh cost --over 150000` at every child's merge, and the lane hand-over
-  that follows an `over` — is `epicrun.md` → "The hand-off", unchanged. It is **not** asked during an
+- **The hand-off check** — `pnpm josh cost --over 300000` at every child's merge, and the lane hand-over
+  that follows an `over` — is `epicrun.md` → "The hand-off", unchanged. **300,000 is a temporary
+  experiment rather than a settled number** (joshuafolkken/kit#1775) — the figure it replaces, the
+  retreat and its review point are all in that same single source. It is **not** asked during an
   idle watch: "The hand-off check is not asked during a watch" above is why.
 
 ## What happens to a child that cannot finish

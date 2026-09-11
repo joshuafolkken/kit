@@ -18,7 +18,7 @@ const EPICRUN = '.claude/skills/workflow-commands/epicrun.md'
 
 const ENTRIES: ReadonlyArray<string> = [FULLRUN, HALFRUN]
 
-const COMMAND = 'pnpm josh cost --over 150000'
+const COMMAND = 'pnpm josh cost --over 300000'
 const RELEASE_COMMAND = 'pnpm josh run:release'
 const HOLD_COMMAND = 'pnpm josh run:hold'
 
@@ -33,10 +33,17 @@ const NOT_A_JUDGEMENT = 'never on a judgement about how long the session feels'
 
 const RESUME_TITLE = 'resumes as the invocation that was typed, number or not'
 const NO_DERIVATION_TITLE = 'does not copy the derivation %j'
+const EXPERIMENT_TITLE = 'says the figure it instructs is under test'
 
 // The threshold's derivation belongs to the single source. A document that restates it drifts, and
 // the next reader cannot tell which copy the number was actually drawn from.
 const DERIVATION_ONLY: ReadonlyArray<string> = ['223 セッションの実測', '54,974', '121,514']
+
+// joshuafolkken/kit#1775: the entries instruct the figure without carrying its derivation, so the
+// one thing they owe the reader is that it is under test rather than settled. Without it a run
+// reads a temporary number as the permanent one and nothing anywhere says otherwise.
+const EXPERIMENT_MARKER = '300,000 is a temporary experiment rather than a settled number'
+const EXPERIMENT_ISSUE = 'joshuafolkken/kit#1775'
 
 describe(`${SKILL} — the entry application is defined once`, () => {
 	const unwrapped = read_unwrapped(SKILL)
@@ -68,6 +75,11 @@ describe(`${SKILL} — the entry application is defined once`, () => {
 
 	it('routes the check itself to its single source instead of restating it', () => {
 		expect(unwrapped).toContain(HANDOFF_CITATION)
+	})
+
+	it(EXPERIMENT_TITLE, () => {
+		expect(unwrapped).toContain(EXPERIMENT_MARKER)
+		expect(unwrapped).toContain(EXPERIMENT_ISSUE)
 	})
 
 	it.each(DERIVATION_ONLY)(NO_DERIVATION_TITLE, (marker) => {
@@ -117,6 +129,11 @@ describe.each(ENTRIES)('%s — asks the boundary at its entry', (document_path) 
 	// Without this half the check fires inside a batch, where it stops the wrong run.
 	it('exempts a run a batch entry point dispatched', () => {
 		expect(unwrapped).toContain('Skip it when this run was dispatched by')
+	})
+
+	it(EXPERIMENT_TITLE, () => {
+		expect(unwrapped).toContain(EXPERIMENT_MARKER)
+		expect(unwrapped).toContain(EXPERIMENT_ISSUE)
 	})
 
 	it('cites the definition instead of holding its own', () => {

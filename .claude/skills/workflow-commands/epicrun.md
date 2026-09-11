@@ -1393,7 +1393,7 @@ per child, and treat a single non-numeric line as the verdict.
    conversation" below for why a session that carries on past a compaction loses them otherwise.
 
    Then **ask the hand-off check — at every child's merge, delegated or not**, immediately after the
-   merge and `pnpm josh ms`: `pnpm josh cost --over 150000`, beside `pnpm josh lane:list` in the same
+   merge and `pnpm josh ms`: `pnpm josh cost --over 300000`, beside `pnpm josh lane:list` in the same
    turn. Go back to step 1 on `under`; on `over` **the run hands its lanes over and stops in that same
    turn** — no new child is taken, the lanes already in flight keep running, and the next session picks
    them up from `lane:list` and `pnpm josh lane:output` (see "The hand-off" below). The one reading
@@ -1563,12 +1563,16 @@ measurement neither of them had. Both removals are argued in full below; a reade
 paragraph would otherwise leave with the rule as it stood before them.
 
 ```bash
-pnpm josh cost --over 150000
+pnpm josh cost --over 300000
 ```
 
 It prints `over` or `under` on standard output and the measured figure on standard error. `over`
 means the next turn of this session costs more than the threshold in billed input, and the number is
 passed explicitly so a run cannot drift it by remembering it wrong.
+
+**いま指示している 300,000 は一時的な実験値であり、撤退条件と、畳む判断をする時点を持つ（joshuafolkken/kit#1775）。** 下に続く導出は 150,000 のものであり、**実験だからこそ消していない** — 畳んだときに戻る先がそれだからである。300,000 がその導出のどこに位置するかを 3 点で言う。(1) 一度も区切りに到達しないセッションの割合は 150,000 の 33% に対して **81%** へ上がる。(2) 1 リクエストあたり課金入力の p95 は 336,569 なので、300,000 は **p95 のすぐ下**にあたる。(3) 下限（誤停止）の側には余裕が増えるだけで、危険は上限の側にしか無い。つまりこれは、下の段落が「発火しない閾値は引かれていないのと同じである」と退けた状態へ近づく方向であり、さらに下の費用計算が支持する向き（ほぼ即座に区切ること）とも逆である。**恒久の設定変更として読んではならない。**
+
+**畳む判断をする時点は日付ではなく成果物である — 根本原因の側である joshuafolkken/kit#1776（手順書の本流読み取りが入口で閾値を超えさせる）が入ったときに判断する。** それまでに `pnpm josh time` で、1 実行あたりのリクエスト数の中央値、1 リクエストあたり課金入力、1 セッションで完了した Issue 数、区切りに到達した回数を、変更前と同じ定義で比べる。**セッションあたりの総費用が悪化していたら撤退する** — リクエスト数は n²/2 で効くので、区切りが減れば 1 セッションが長くなり単価の高いリクエストが増えるからである。**撤退はこの段落を消すだけでは終わらない**: 閾値を指示している箇所は複数の文書とマーカーテストに散っているので、`grep -rn '300000\|300,000' --include='*.md' --include='*.ts'` で列挙し、下の導出が示す 150,000 へ戻し、マーカーテスト 3 本の定数を同じ値に直し、この段落と各文書の「一時的な実験である」の断り書きを削る。**出力上限の 150,000 と本流読み取りの文字数 150,000 は別系統なので、一括置換で巻き込まないこと。** 判断材料の背景は joshuafolkken/kit#1775 にある。
 
 **閾値 150,000 は 223 セッションの実測から引いた。** joshuafolkken/kit#1605 が、このリポジトリに記録された 223 本のセッションを `josh cost` と同じ定義（課金入力 ÷ リクエスト数、`message.id` で重複を除く）で測り直した。常駐だけを載せた最初のリクエストは中央値 **54,974**、1 リクエストあたりの課金入力は中央値 **121,514**、p90 が 256,106、p95 が 336,569 である。**旧閾値 400,000 を超えたのは 223 本中 4 本（2%）**にすぎず、`run:hold` を含む 21 本に限れば **95% が一度も区切りに到達しない**。発火しない閾値は引かれていないのと同じである。
 
@@ -1603,7 +1607,7 @@ conversation, so n requests in one session bill about n²/2 — 732 requests in 
 about 100 in each of seven is roughly **7x**. A condition that delays the first cut therefore does
 not defer a fixed cost; it multiplies it.
 
-**So there is no condition: `pnpm josh cost --over 150000` is asked after every child's merge**,
+**So there is no condition: `pnpm josh cost --over 300000` is asked after every child's merge**,
 delegated or not. It is one command against a merge that took tens of minutes, and the row it
 replaced was written to save that one command. **Never wire the question to
 `pnpm josh delegate epic-child`** — that is a static policy lookup answering `delegate` on every
@@ -2033,7 +2037,7 @@ never `skip`.
 3. `epic:next` reports `error` — a cyclic or contradictory graph.
 4. A guard above was reached.
 5. A timeout above elapsed.
-6. `pnpm josh cost --over 150000` answered `over` — or could not answer — just after a child merged,
+6. `pnpm josh cost --over 300000` answered `over` — or could not answer — just after a child merged,
    and every lane still in flight records the path the next session will poll it on. The run is then
    cheaper to continue in a fresh session, and the resume command is in the report. This is the one
    stopping condition that is not a problem: nothing is parked, nothing is filed, the epic is
