@@ -50,16 +50,21 @@ const TOOL_SEPARATORS = /[|,]/u
 // for the density line it also carries (joshuafolkken/kit#1337), which reaches the sessions that edit
 // through `sed` — seven of the ten most recent in this checkout, and the ones measured under the floor.
 const FORMAT_TOOLS = ['Edit', 'Write', 'Bash']
-// The guard names `Edit` beside `Bash` since joshuafolkken/kit#1762. It named `Bash` alone while
+// The guard names `Edit` beside `Bash` since joshuafolkken/kit#1762, and `Read` since
+// joshuafolkken/kit#1798. It named `Bash` alone while
 // `is_guarded_call` answered `false` for every write, which made a wider matcher a process that could
 // only ever answer "allow"; the predicate was widened first, so the matcher now reaches a question that
 // has an answer. It is worth the process start because `Edit` alone carries **164 of the 251
 // recoverable round trips** measured over 20 runs, which `Bash` cannot reach however large its share of
-// the calls. **`Write` is deliberately not here**, for that same cost reason: `is_guarded_call` answers
+// the calls. **`Read` is the one the predicate was already answering for**: it has been bundleable all
+// along, so the wiring was the only thing keeping the refusal off the shape a run spends most of its
+// investigation in — 35.9% of one measured run's turns — and the matcher is what
+// joshuafolkken/kit#1798 measured as the reason only 2 of 7 clusters were caught.
+// **`Write` is deliberately not here**, for that same cost reason: `is_guarded_call` answers
 // `false` for it — a reissued `Write` is unconditional, so a false positive on one overwrites a
 // sibling's applied edit in silence — and a matcher naming it would start a process that can only ever
 // answer "allow".
-const GUARD_TOOLS = ['Bash', 'Edit']
+const GUARD_TOOLS = ['Bash', 'Edit', 'Read']
 // The investigation guard names both, because in this repository the reading is split between them:
 // run #1441 issued 5 `Read` calls against 10 `cat`, 16 `sed` and 1 `tail`, so a `Read`-only wiring
 // would miss the idiom that carries most of the text. It is safe on `Bash` because it refuses only a
