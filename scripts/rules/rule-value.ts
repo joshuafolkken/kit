@@ -204,7 +204,10 @@ function place_turn(turns: Map<string, DatedLine>, entry: DatedLine, key: string
 
 // A turn is placed where it opened, so the timeline order the reading depends on is the order the
 // turns began in — a call hoisted to its own turn's first line was issued before whatever came back
-// in between, which is exactly what "kept before the refusal" is asking.
+// in between, which is exactly what "kept before the refusal" is asking. **Within one transcript.**
+// Across the transcripts of one run, a background unit's call landing between two blocks of a parent
+// message is reordered around the hoist; that is open as joshuafolkken/kit#1804, because which
+// instant anchors a folded turn is a decision rather than a slip.
 function fold_turns(entries: ReadonlyArray<DatedLine>): Array<DatedLine> {
 	const turns = new Map<string, DatedLine>()
 
