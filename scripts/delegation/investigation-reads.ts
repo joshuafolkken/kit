@@ -137,9 +137,17 @@ const SESSION_TEMP_SEGMENT = /^claude-\d+$/u
 // rule matches the session *tree*, which covers that file, the scratchpad and the transcript in one
 // test; matching the file name would need a second rule for each of the others.
 const SESSION_STATE_SEGMENTS = cost_transcript.TRANSCRIPT_ROOT.split(path.sep)
-// The directories the harness writes into a session's temp tree: a backgrounded call's
-// `tasks/<id>.output`, and the result of a call whose output was too large to return inline.
-const HARNESS_OUTPUT_DIRECTORIES: ReadonlySet<string> = new Set(['tasks', 'tool-results'])
+// What the harness writes into a session's temp tree has a fixed shape — `tasks/<id>.output`, a
+// backgrounded call's result — and **both halves are required**. The directory name alone is not
+// enough: `tasks/` is one of the commonest directory names a repository has, and a run may unpack or
+// clone one into its scratchpad, where matching the name would re-open the silent false negative one
+// level down. Persisted tool results and the transcript need no entry here at all — they live under
+// the state root above, which is exempt whole.
+const HARNESS_OUTPUT_DIRECTORY = 'tasks'
+const HARNESS_OUTPUT_EXTENSION = '.output'
+// `at()` counts from the end, so the file itself is -1 and the directory holding it is -2.
+const FILE_SEGMENT_INDEX = -1
+const PARENT_SEGMENT_INDEX = -2
 
 // The state root holds transcripts and persisted results and no subject code, so it is exempt whole.
 // It is not anchored to the home directory: `cost-transcript.ts` is this package's only file allowed
@@ -149,13 +157,13 @@ function has_state_root(segments: ReadonlyArray<string>, index: number): boolean
 	return SESSION_STATE_SEGMENTS.every((segment, offset) => segments[index + offset] === segment)
 }
 
-// The temp tree is exempt only *inside* a directory the harness wrote — the narrowing above. The
-// containing directories are tested rather than the file's own name, so `tasks/<id>.output` qualifies
-// and a sibling the run put there itself does not.
+// The file's **own parent** is tested rather than any directory above it, and the name has to match
+// as well — see the shape note above for why one without the other is not enough.
 function is_harness_output(segments: ReadonlyArray<string>): boolean {
 	return (
 		segments.some((segment) => SESSION_TEMP_SEGMENT.test(segment)) &&
-		segments.slice(0, -1).some((segment) => HARNESS_OUTPUT_DIRECTORIES.has(segment))
+		segments.at(PARENT_SEGMENT_INDEX) === HARNESS_OUTPUT_DIRECTORY &&
+		(segments.at(FILE_SEGMENT_INDEX) ?? '').endsWith(HARNESS_OUTPUT_EXTENSION)
 	)
 }
 

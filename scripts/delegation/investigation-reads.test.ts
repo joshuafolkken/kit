@@ -45,6 +45,8 @@ const SESSION_TEMP = '/var/folders/q7/claude-501/-Users-me-kit/9f2'
 const CLAUDE_STATE = '/Users/me/.claude/projects/-Users-me-kit'
 const TASK_OUTPUT = `${SESSION_TEMP}/tasks/bg.output`
 const SCRATCHPAD_FILE = `${SESSION_TEMP}/scratchpad/probe.ts`
+// `tasks/` is a common repository directory, so an unpacked one must not inherit the exemption.
+const NESTED_TASKS_FILE = `${SESSION_TEMP}/scratchpad/cloned-repo/tasks/runner.ts`
 const TOOL_RESULT = `${CLAUDE_STATE}/tool-results/big.txt`
 const TRANSCRIPT = `${CLAUDE_STATE}/9f2.jsonl`
 const SESSION_FILES = [TASK_OUTPUT, TOOL_RESULT, TRANSCRIPT]
@@ -280,12 +282,15 @@ describe('investigation_reads — the harness’s own session files are not the 
 	// **The exemption is the harness's own files, not the session tree.** Exempting the tree would
 	// silently uncount anything a run unpacks or clones into its scratchpad to investigate — real
 	// subject material — and a false negative here produces no output at all, so nothing would show it.
-	it('still counts subject material the run put in its own scratchpad', () => {
-		expect(investigation_reads.is_session_artifact(SCRATCHPAD_FILE)).toBe(false)
-		expect(investigation_reads.tally_of(bash_text(`cat ${SCRATCHPAD_FILE}`)).pending).toEqual([
-			resolve(SCRATCHPAD_FILE),
-		])
-	})
+	it.each([SCRATCHPAD_FILE, NESTED_TASKS_FILE])(
+		'still counts %s, which the run put there itself',
+		(target) => {
+			expect(investigation_reads.is_session_artifact(target)).toBe(false)
+			expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([
+				resolve(target),
+			])
+		},
+	)
 })
 
 // The second false-positive class of joshuafolkken/kit#1771, decided as **excluded**. It already was,
