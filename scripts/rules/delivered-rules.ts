@@ -34,6 +34,14 @@ import { shell_segments } from './shell-segments'
 // would leave this Issue where it started.
 const SWITCH_ENV_KEY = 'JOSH_RULE_GUARD'
 
+// **What a compliance test is asked of: the call, and the turn it went out in** — the calls the same
+// assistant message issued, this one included (joshuafolkken/kit#1792). Every row but the batching
+// one answers from the call alone and simply ignores the second parameter, which is why widening the
+// one signature costs the six nothing. **The batching rule cannot be written without it**: its
+// subject is *how many calls a turn carried*, and no field of a single call says that — so the
+// alternative was a second predicate slot beside this one, i.e. two ways to declare the same thing.
+type CallTest = (call: GuardedCall, turn: ReadonlyArray<GuardedCall>) => boolean
+
 // One rule delivered by trigger. `id` keys its own refusal record, so one rule firing never spends
 // another's budget.
 interface DeliveredRule {
@@ -58,7 +66,7 @@ interface DeliveredRule {
 	// none is reported unmeasured rather than scored, because "never kept" and "always kept" are both
 	// claims the absence of a predicate does not support. It lives here rather than in the
 	// measurement so a rule's trigger and its compliance test stay one definition.
-	keeps?: (call: GuardedCall) => boolean
+	keeps?: CallTest
 	// **The occasion the rule governs, read in either spelling** (joshuafolkken/kit#1643).
 	// `is_trigger` is the right denominator for a rule whose trigger is a *neutral* act — filing an
 	// Issue, reading one — because a run that keeps the rule makes that call too. It is the wrong one
@@ -67,7 +75,20 @@ interface DeliveredRule {
 	// the rule at least once. Such a row declares this instead, and `scripts/rules/rule-value.ts`
 	// counts a run that reached it whether or not the trigger fired. Absent, the denominator stays
 	// `is_trigger` and the row's reading is exactly what it was.
-	reaches?: (call: GuardedCall) => boolean
+	reaches?: CallTest
+}
+
+// **A rule the measurement scores, whether or not `pnpm josh rule:guard` is what delivers it**
+// (joshuafolkken/kit#1792). `DELIVERED_RULES` is the *delivery* registry — every row in it becomes a
+// live `PreToolUse` guard through `GUARDS` below — so a rule already delivered by a binary of its own
+// cannot join it without being refused twice for one violation, each refusal spending a record the
+// other cannot see. The batching guard is that rule: `pnpm josh batch:guard` has delivered it since
+// joshuafolkken/kit#1344, and until now it was the one delivered rule `pnpm josh rule:value` could
+// not read. So the two registries are separated rather than merged, and `is_trigger` — the field
+// that only a *delivered* row needs, because it is what `guard_of` makes the candidate test from —
+// becomes the one optional field here.
+type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
+	is_trigger?: DeliveredRule['is_trigger']
 }
 
 const STAMP_PREFIX = 'josh-rule-guard-'
@@ -303,6 +324,47 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	},
 ]
 
+// A turn that issued more than this many calls is a turn that batched. The guard counts turns that
+// issued a *single* tool call, so the boundary is the same one `SEQUENCE_BEFORE_LIMIT` is counted in.
+const ALONE_IN_TURN = 1
+
+// **Keeping the batching rule is a refusable call that went out beside siblings** — the one
+// compliance test of the seven that cannot be read off the call alone (joshuafolkken/kit#1792). The
+// guard's whole subject is the run of turns that each issued one call, so the act it asks for is a
+// turn carrying more than one, and `is_guarded_call` is what keeps the credit to calls the guard
+// could actually have refused: a turn of two `Write`s is not the rule being kept, because neither
+// call was ever at risk.
+function batches_the_turn(call: GuardedCall, turn: ReadonlyArray<GuardedCall>): boolean {
+	return time_batch_guard.is_guarded_call(call) && turn.length > ALONE_IN_TURN
+}
+
+// **The row `pnpm josh rule:value` scores the batching guard from** (joshuafolkken/kit#1792). It is
+// measured but not delivered, for the reason `MeasuredRule` states.
+//
+// **It declares no `is_trigger`, and that is the honest answer rather than a gap.** Whether a call
+// would be refused depends on the turns *behind* it — `time_batch_guard.should_block` reads the
+// transcript tail for exactly that — and `scripts/rules/rule-value.ts` hands a predicate one call at
+// a time, so a call-shaped trigger here could only ever be a guess. What the transcript does record
+// is the refusal itself, and the measurement takes that as the trigger: compliance credited after a
+// refusal is the delivery's contribution, which is the same line every other row is scored on.
+//
+// **The `reaches` half is what keeps the reading off zero**, the failure joshuafolkken/kit#1643
+// named. The batching guard fires only on the violation, so scored against its trigger the rate
+// would be taken over runs that broke the rule at least once and would read near zero by
+// construction — a manufactured retirement candidate for the most-cited resident rule there is. The
+// occasion it governs is issuing a call the guard could refuse, in *either* spelling: alone in its
+// turn, or beside the calls that did not need its result.
+const BATCHING_RULE: MeasuredRule = {
+	id: 'batching',
+	reason: time_batch_guard.REASON,
+	keeps: batches_the_turn,
+	reaches: time_batch_guard.is_guarded_call,
+}
+
+// Every rule the measurement can score, delivery registry first so a printed table reads in
+// enumeration order with the rows delivered from here at the top.
+const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [...DELIVERED_RULES, BATCHING_RULE]
+
 // **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
 // that had already obeyed it, which is the failure `hook_decision`'s stamp exists to prevent; the
 // reason text says so, so a reader knows reissuing is the expected next move.
@@ -436,6 +498,7 @@ const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
 	ISSUE_COMMENTS_REASON,
+	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
 	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
@@ -450,5 +513,5 @@ const delivered_rules = {
 	is_wait_timer: early_heartbeat.is_wait_timer,
 }
 
-export type { DeliveredRule }
+export type { DeliveredRule, MeasuredRule }
 export { delivered_rules }
