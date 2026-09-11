@@ -17,7 +17,6 @@ const ISSUE = '1749'
 const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`)
 // What the older flow recorded in a lane: the unit's own transcript, a file to read rather than write.
 const RECORDED_TRANSCRIPT = path.join(os.tmpdir(), 'josh-test-session.jsonl')
-const DERIVED_LOG = lane_dispatch.default_log_path(ISSUE)
 const ALIVE_PROCESS = '--process alive'
 const LAUNCH_FAILURE = 'spawn claude ENOENT'
 const LOG_REFUSED = 'the session log at /x could not be opened'
@@ -37,6 +36,8 @@ function lane(output: string | undefined): LaneInfo {
 		is_stranded: false,
 	}
 }
+
+const DERIVED_LOG = lane_dispatch.default_log_path(lane(undefined))
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -67,6 +68,16 @@ describe('lane_dispatch.default_log_path — the log the dispatch owns', () => {
 
 	it('is in the temp directory, so it survives `lane:close`', () => {
 		expect(DERIVED_LOG.startsWith(os.tmpdir())).toBe(true)
+	})
+
+	it('names the issue, so a person can find the file by eye', () => {
+		expect(DERIVED_LOG).toContain(ISSUE)
+	})
+
+	it('differs between two lanes sharing an issue number across repositories', () => {
+		const elsewhere = { ...lane(undefined), directory: `${LANE_DIRECTORY}-other-repository` }
+
+		expect(lane_dispatch.default_log_path(elsewhere)).not.toBe(DERIVED_LOG)
 	})
 })
 
@@ -175,11 +186,11 @@ describe('lane_dispatch.describe — what a reader is told to do next', () => {
 		expect(lane_dispatch.describe(no_lane, ISSUE)).toContain(`pnpm josh lane:open ${ISSUE}`)
 	})
 
-	it('names the poll that reads a live process, not the one that assumes none', async () => {
+	it('sends the caller to the process trace, because a frozen log no longer means dead', async () => {
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
+		expect(message).toContain(`pgrep -laf ${LANE_DIRECTORY}`)
 		expect(message).toContain(ALIVE_PROCESS)
-		expect(message).not.toContain('--process none')
 	})
 
 	it('never throws, so a warning cannot lose the message it exists to carry', async () => {

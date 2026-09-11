@@ -705,8 +705,10 @@ pid=$(pnpm josh lane:dispatch "$n") || exit 1   # the child's pid on stdout, not
 without reporting" above applied N times rather than once, and
 `pnpm josh run:liveness <N> --output <path> --process alive` is read **in that child's lane** — the
 case that section already names when it says the traces are read in the checkout the unit was given.
-**`--process alive` is the reading now**: the writer is a real process, so `pgrep -laf` against the
-lane's directory answers whether it is working, and a log that stopped moving is a session thinking.
+**Run `pgrep -laf "<the lane's directory>"` first and pass what it found** — `alive` where the child
+is there, `none` where it is not, and never `alive` merely because the child was dispatched. The
+writer is a real process now, so a log that stopped moving is a session thinking rather than one that
+died, and the trace is what tells the two apart.
 
 **`git switch main && git pull` is the parent's now, not the child's.** No lane can switch to the
 default branch, because it is checked out in the main work tree, so the refresh moves to the primary
@@ -1371,9 +1373,10 @@ per child, and treat a single non-numeric line as the verdict.
    lane, which records where it writes as it starts it — and poll.** Blocking on the return
    leaves the parent with no turn in which to notice that the return is never coming, which is the
    whole of "A delegated unit that stopped without reporting" above. Poll at the polling interval; ask
-   `pnpm josh run:liveness <N> --output <path> --process alive` for a dispatched child, and
-   `--process none` only for a unit that shares this session's lifetime, once that file has been
-   unchanged for the silent-unit window.
+   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "<the lane's directory>"`
+   found>` once that file has been unchanged for the silent-unit window. **The flag is what you saw,
+   never what kind of child it is**: passing `alive` without running `pgrep` answers `alive` for ever,
+   including for a child that died an hour ago.
 
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
@@ -1689,12 +1692,14 @@ unit_output=$(pnpm josh lane:output <N>) &&
   pnpm josh run:liveness <N> --output "$unit_output" --process alive
 ```
 
-**`--process alive` rather than `--process none`, because the child is now a process that exists**
-(joshuafolkken/kit#1749). `pnpm josh lane:dispatch` starts it detached, so `pgrep -laf` against the
-lane's directory is what answers whether it is still working — and a log that has stopped moving is a
-session thinking rather than one that died, which is the confusion `--process none` could not tell
-apart. The older reading was correct only while a child shared the parent session's lifetime, and
-under that reading a cut killed every child it then booked `stopped`.
+**`--process` carries what `pgrep` found, and with a dispatched child that is the whole answer**
+(joshuafolkken/kit#1749). Run `pgrep -laf "<the lane's directory>"` first and pass `alive` where it
+found the child and `none` where it did not — **never `alive` because the child was dispatched.** The
+flag has always been what the caller *saw* (`docs/josh-commands.md` → "`josh run:liveness`"), and a
+parent that passed `alive` without looking would answer `alive` for a child that crashed an hour ago
+and poll it for ever. What changed is that the trace is now the deciding input rather than a
+supplement: the child is a real process, so a log that has stopped moving is a session thinking rather
+than one that died, and `--process none` on its own no longer distinguishes the two.
 
 **The `&&` is load-bearing.** A lane that records nothing prints `none` and exits non-zero, so the
 chain stops there; substituted straight into `--output`, that `none` is a relative path and

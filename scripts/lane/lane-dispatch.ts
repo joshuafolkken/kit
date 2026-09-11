@@ -1,6 +1,5 @@
-import os from 'node:os'
-import path from 'node:path'
 import { telegram_notify } from '#scripts/git/telegram-notify'
+import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { lane_output } from './lane-output'
@@ -68,8 +67,15 @@ function child_invocation(issue: string): string {
 // **In the temp directory rather than in the lane**, so the log survives `pnpm josh lane:close` — the
 // question a failed child raises is asked after its lane is gone. `lane_output.record_output` refuses
 // anything `run:liveness` could not read, and the temp directory is one of the two trees it allows.
-function default_log_path(issue: string): string {
-	return path.join(os.tmpdir(), `${LOG_PREFIX}${issue}${LOG_SUFFIX}`)
+//
+// **Keyed to the lane's directory, not to the issue number alone.** Issue numbers are per repository
+// and an epic may span several, so `kit#12` and `app-kit#12` dispatched on one machine would otherwise
+// append to one file — their transcripts interleaved, and each child's writes keeping the other's log
+// growing, so a poll would read a dead child as alive. It is `run:wake`'s own log-naming rather than a
+// second scheme: `stamp_file.stamp_path` takes the prefix, the root the record is keyed to, and the
+// suffix. The issue number stays in the prefix so a person can still find the file by eye.
+function default_log_path(lane: LaneInfo): string {
+	return stamp_file.stamp_path(`${LOG_PREFIX}${lane.issue}-`, lane.directory, LOG_SUFFIX)
 }
 
 // **The dispatch owns the log, so it writes to its own path rather than to whatever was recorded.**
@@ -79,7 +85,7 @@ function default_log_path(issue: string): string {
 // derived path is the same for every dispatch of a lane, so re-dispatching appends a second header to
 // the file it already owns rather than starting a new one somewhere else.
 async function resolved_log(lane: LaneInfo): Promise<LogOutcome> {
-	const outcome = await lane_output.record_output(lane.issue, default_log_path(lane.issue))
+	const outcome = await lane_output.record_output(lane.issue, default_log_path(lane))
 
 	if (outcome.kind === 'recorded') return { kind: 'ready', path: outcome.output }
 
@@ -126,13 +132,17 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 // lane — but its output is going nowhere, so a message naming the path would point at a file that will
 // never grow, and a poll of that file would book a working child as stopped.
 function log_sentence(outcome: Dispatched, issue: string): string {
-	const poll = `\`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\``
+	// **The process trace is what a poll now turns on, so the message names the command that reads
+	// it.** `run:liveness` takes `--process` as what the caller *saw*, never as a property of the
+	// child's kind — told to pass `alive`, a parent that never ran `pgrep` would answer `alive` for a
+	// child that crashed an hour ago and poll it for ever.
+	const poll = `run \`pgrep -laf ${outcome.lane.directory}\` and pass what it found to \`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\` — or \`--process none\` where it found nothing`
 
 	if (outcome.notes.length > 0) {
-		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and only the process trace answers ${poll}.`
+		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`
 	}
 
-	return ` It writes to ${outcome.log_path}, so poll it with ${poll}.`
+	return ` It writes to ${outcome.log_path}. To poll it, ${poll}.`
 }
 
 // Never throws: it is reached from `warn_of_problem`, and a formatter that raised would lose the very
