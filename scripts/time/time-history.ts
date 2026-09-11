@@ -2,6 +2,7 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 import { time_format } from './time-format'
+import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
 
@@ -58,6 +59,12 @@ const record_schema = z.object({
 	round_trip_count: z.number(),
 	ms_per_round_trip: z.number(),
 	model_ms_per_round_trip: z.number(),
+	// What the run's turns were spent on, one count per contributor (joshuafolkken/kit#1763). It is
+	// **optional for the reason `started_at` is**: every line written before this field exists carries
+	// none, and a schema requiring it would drop them all as unparsable. Its absence is the record's
+	// whole `is_measured` answer — a run whose transcript was never read writes no breakdown, and a
+	// period report excludes it from the denominator rather than reading it as eight zeroes.
+	by_contributor: z.record(z.string(), z.number()).optional(),
 })
 
 type RunTimeRecord = z.infer<typeof record_schema>
@@ -149,10 +156,36 @@ function append_record(root: string, record: RunTimeRecord): Array<RunTimeRecord
 	return kept
 }
 
+// **Written only where the transcript was read.** `exactOptionalPropertyTypes` is on, so the field is
+// absent rather than `undefined` — which is what lets the read side tell an unmeasured run from one
+// that made no turn of a given kind.
+function contributor_field(report: TimeReport): Pick<RunTimeRecord, 'by_contributor'> {
+	if (!report.parent_turns.is_measured) return {}
+
+	return { by_contributor: report.parent_turns.by_contributor }
+}
+
+// The inverse of `contributor_field`, so the one place that writes the breakdown is beside the one
+// place that reads it back — and a record without one comes back as the same withheld totals every
+// other unmeasured scope prints.
+function parent_turns_of(record: RunTimeRecord): ParentTurnTotals {
+	const { by_contributor } = record
+
+	if (by_contributor === undefined) return { ...time_parent_turns.NO_PARENT_TURNS }
+
+	// **`round_trip_count`, not `turn_count`.** The breakdown is counted one per round trip — the
+	// grouping `build_parent_turns` walks — so its counts sum to that figure, while `turn_count` is a
+	// second walk that also counts a model span which issued no call. Reconstructing from the wrong
+	// one gives back a record whose rows do not add up to its own total, and `contributor_row`
+	// computes every share against that total.
+	return { turn_count: record.round_trip_count, by_contributor, is_measured: true }
+}
+
 function to_record(issue: number, report: TimeReport, recorded_at: string): RunTimeRecord {
 	return {
 		issue,
 		recorded_at,
+		...contributor_field(report),
 		started_at: report.started_at,
 		ended_at: report.ended_at,
 		elapsed_ms: report.elapsed_ms,
@@ -342,6 +375,7 @@ const time_history = {
 	read_records,
 	append_record,
 	to_record,
+	parent_turns_of,
 	format_block,
 	record_run,
 }

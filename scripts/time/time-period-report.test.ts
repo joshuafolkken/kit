@@ -8,8 +8,9 @@ import { time_period_report } from './time-period-report'
 // the run that held it, and the two kinds of wait told apart rather than summed.
 
 const { HOUR_MS, MINUTE_MS, BASE_MS, ISSUE_A, ISSUE_B, SERIAL, OVERLAPPING } = time_period_fixture
-const { record, build } = time_period_fixture
+const { record, build, with_turns } = time_period_fixture
 const EXPOSED_LABEL = 'exposed bare'
+const TURN_COUNT = 3
 
 // One run holding a lane for three hours while a one-minute run passes it — the shape that produces
 // a serialized stretch at all.
@@ -31,6 +32,21 @@ function line_of(records: ReadonlyArray<RunTimeRecord>, label: string): string {
 			.find((line) => line.includes(label)) ?? ''
 	)
 }
+
+describe('time_period_report.format_period_report — the turn breakdown', () => {
+	// The same block `--last` prints, from the same module: a period and a last-N reading of the same
+	// runs must not answer the question in different words (joshuafolkken/kit#1763).
+	it('prints the contributor table in the aggregated format', () => {
+		const turns = OVERLAPPING.map((entry) => with_turns(entry, { implementation: TURN_COUNT }))
+
+		expect(text_of(turns)).toContain('Turns by contributor (median, then min – max):')
+		expect(line_of(turns, 'implementation')).toContain('3 – 3 · 2 run(s)')
+	})
+
+	it('says not measured where no record carried a breakdown', () => {
+		expect(line_of(OVERLAPPING, 'implementation')).toContain('not measured')
+	})
+})
 
 describe('time_period_report.format_period_report heading', () => {
 	it('names the period, the runs it holds and the lanes they occupied', () => {

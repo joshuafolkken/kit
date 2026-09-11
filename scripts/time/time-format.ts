@@ -53,6 +53,13 @@ const MAX_ROWS = 15
 // note, a distribution's range from its sample count. Written once so two renderers of the same
 // report cannot come to punctuate their suffixes differently (joshuafolkken/kit#1312).
 const SUFFIX_SEPARATOR = ' · '
+// What joins the two ends of an aggregated row's range, and the unit the sample behind it is counted
+// in. They sit here rather than beside one renderer because two of them print a spread now — the
+// duration tables of `--last` and the turn-count table both scopes share — and a private copy beside
+// the second is how one report would come to punctuate its ranges two ways
+// (joshuafolkken/kit#1763).
+const RANGE_SEPARATOR = ' – '
+const RUN_UNIT = 'run(s)'
 // The `HH:MM:SS` slice of an ISO instant, and what joins two of them into a window. UTC rather than
 // local time, because the report's own `started_at` / `ended_at` already are — a table in one zone
 // beside a header in another is a report that cannot be read against itself.
@@ -111,6 +118,16 @@ function unmeasured_row(label: string): string {
 	return format_columns(label, '', NOT_MEASURED)
 }
 
+// **The ends are handed over already formatted**, so one aggregated table can spell its range in
+// minutes and another in turns while both are punctuated identically. The sample count rides at the
+// end because it is the qualifier: two rows with the same spread are not the same evidence when one
+// was read from nine runs and the other from two.
+function format_spread(min: string, max: string, sample_count: number): string {
+	const range = `${min}${RANGE_SEPARATOR}${max}`
+
+	return `${range}${SUFFIX_SEPARATOR}${String(sample_count)} ${RUN_UNIT}`
+}
+
 function format_clock(timestamp_ms: number): string {
 	return new Date(timestamp_ms).toISOString().slice(CLOCK_START, CLOCK_END)
 }
@@ -141,6 +158,7 @@ const time_format = {
 	format_share,
 	format_columns,
 	format_row,
+	format_spread,
 	// `format_clock` stays private: `format_window` is its only caller, and a namespace that offers
 	// both invites a second renderer to join the two with its own arrow.
 	format_window,

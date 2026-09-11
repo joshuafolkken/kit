@@ -64,6 +64,7 @@ const LAST_REPORT: LastTimeReport = {
 	categories: [time_distribution.labeled(time_report.MODEL_LABEL, [MINUTE_MS])],
 	phases: [],
 	checks: [],
+	contributors: [],
 	notes: [],
 }
 

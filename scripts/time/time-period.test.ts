@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import type { RunTimeRecord } from './time-history'
+import { time_parent_turns } from './time-parent-turns'
 import { time_period } from './time-period'
 import { time_period_fixture } from './time-period-fixture'
 
@@ -7,7 +9,20 @@ import { time_period_fixture } from './time-period-fixture'
 // one when nothing overlapped, and a record with no window excluded rather than placed at the epoch.
 
 const { HOUR_MS, DAY_MS, BASE_MS, ISSUE_A, ISSUE_B, SERIAL, OVERLAPPING } = time_period_fixture
-const { record, undated, build } = time_period_fixture
+const { record, undated, with_turns, build } = time_period_fixture
+const { IMPLEMENTATION } = time_parent_turns
+const TWO = 2
+const SIX = 6
+
+// A record carrying a turn breakdown, beside the plain `record` written before the field existed
+// (joshuafolkken/kit#1763).
+function turned(issue: number, start_ms: number, count: number): RunTimeRecord {
+	return with_turns(record(issue, start_ms, HOUR_MS), { [IMPLEMENTATION]: count })
+}
+
+function implementation_of(records: ReadonlyArray<RunTimeRecord>): unknown {
+	return build(records)?.contributors.find((row) => row.label === IMPLEMENTATION)?.distribution
+}
 
 describe('time_period.build_period_report', () => {
 	it('has no report at all when no record carries a wall-clock window', () => {
@@ -27,6 +42,31 @@ describe('time_period.build_period_report', () => {
 		expect(report?.lane_count).toBe(2)
 		expect(report?.effective_lanes).toBeCloseTo(2)
 		expect(report?.runs_per_hour).toBeCloseTo(2)
+	})
+})
+
+describe('time_period.build_period_report — the turn breakdown across the window', () => {
+	const both = [turned(ISSUE_A, BASE_MS, TWO), turned(ISSUE_B, BASE_MS + HOUR_MS, SIX)]
+	const one_old = [turned(ISSUE_A, BASE_MS, TWO), record(ISSUE_B, BASE_MS + HOUR_MS, HOUR_MS)]
+
+	it('reports the smallest, middle and largest turn count per contributor', () => {
+		expect(implementation_of(both)).toMatchObject({ sample_count: 2, min_ms: TWO, max_ms: SIX })
+	})
+
+	// The counterpart of the undated record: a line written before the breakdown existed carries no
+	// reading, so it leaves the sample one shorter rather than arriving as a zero.
+	it('leaves a record written before the breakdown existed out of the sample', () => {
+		expect(implementation_of(one_old)).toMatchObject({ sample_count: 1, median_ms: TWO })
+	})
+
+	it('gives the same figures for two reads of the same records', () => {
+		expect(build(both)?.contributors).toEqual(build(both)?.contributors)
+	})
+
+	// Eight `not measured` rows with no sentence beside them read as a broken measurement rather than
+	// as records that predate the field.
+	it('says how many records carried no breakdown at all', () => {
+		expect(build(one_old)?.notes).toContain(time_period.unturned_note(1))
 	})
 })
 
