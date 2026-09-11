@@ -1673,6 +1673,14 @@ five. So the resident copies are earning their place, and **nothing is retired o
 figures move as the corpus grows, so the next run of this question re-reads them rather than quoting
 these.
 
+**The third reading added the row the table had never carried, and it changed no verdict either**
+(joshuafolkken/kit#1792). The batching guard is delivered by a binary of its own, so it sat outside
+the registry `rule:value` reads and the most-cited resident rule in the repository had no continuous
+reading at all. Over 297 recorded runs it reads **86% unaided over 276 runs, with 47 refusals** — the
+top of the table, so it too is earning its place and nothing is retired on this reading. **The row is scored on its refusal rather than on a trigger**, because whether a call would
+be refused depends on the turns behind it; `docs/josh-commands.md` → "`josh rule:value`" carries that
+and the turn-is-a-message-id correction the first reading of the row exposed.
+
 **Measuring the four needed a distinction the first reading did not have, and it is the half worth
 carrying forward.** A rule's denominator is the situation it governs, and that is the trigger only
 where the trigger is a *neutral* act — filing an Issue, reading one — which a run keeping the rule

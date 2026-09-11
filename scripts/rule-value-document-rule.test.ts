@@ -11,6 +11,7 @@ import { COMMAND_MAP } from './josh/josh-command-map'
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
+const COMMANDS = 'docs/josh-commands.md'
 
 const RETIREMENT_MARKERS: ReadonlyArray<string> = [
 	'**Trimming is moving, and deleting is the exception that has to be earned.**',
@@ -27,6 +28,11 @@ const MEASUREMENT_MARKERS: ReadonlyArray<string> = [
 	"**That window is the rule's absence**",
 	'**The first reading refused the deletion it was built to justify, which is why the measurement runs first.**',
 	'**unmeasured, never zero**',
+	// The row the table had never carried, and the two facts that make it readable at all
+	// (joshuafolkken/kit#1792). Left unpinned, the reason the batching guard is measured without being
+	// delivered twice is exactly the sentence a later trim would take.
+	'**The third reading added the row the table had never carried, and it changed no verdict either**',
+	'**The row is scored on its refusal rather than on a trigger**',
 ]
 
 describe('the retirement route', () => {
@@ -71,5 +77,15 @@ describe('the candidates the route refused', () => {
 describe('the measurement command', () => {
 	it('is registered, so the criterion names a command that exists', () => {
 		expect(COMMAND_MAP['rule:value']?.script).toBe('scripts/rules/rule-value-cli.ts')
+	})
+
+	// The command reference is where the batching row's two design facts are written down, and both
+	// are the kind a reader would otherwise have to re-derive from the source (joshuafolkken/kit#1792).
+	it.each([
+		'**A rule delivered by a binary of its own is measured here too, and the batching guard was the one that was not**',
+		'**`keeps` is the one test of the seven that reads the turn rather than the call**',
+		'**Reading that row also settled what a turn is here: a message id, not a line**',
+	])('records how the batching row is scored: %s', (marker) => {
+		expect(read_unwrapped(COMMANDS)).toContain(marker)
 	})
 })

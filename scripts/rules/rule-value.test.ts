@@ -1,9 +1,12 @@
+import { time_batch_guard } from '#scripts/time/time-batch-guard'
 import { time_transcript_line } from '#scripts/time/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'
 
 const TIMESTAMP = '2026-09-09T00:00:00.000Z'
+const NEXT_TIMESTAMP = '2026-09-09T00:00:01.000Z'
+const LATER_TIMESTAMP = '2026-09-09T00:00:02.000Z'
 const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 
@@ -16,22 +19,61 @@ const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 const SHELL_BODY = 'shell-body'
 const BODY_BY_PATH = 'pnpm josh followup --notify-message-file /tmp/body.md'
 
-// One transcript line carrying one tool call, in the shape `time_transcript_line.parse_line` reads.
-function call_line(command: string, timestamp: string = TIMESTAMP): string {
+function tool_use_block(command: string, index: number): Record<string, unknown> {
+	return { type: 'tool_use', id: `toolu_${String(index)}`, name: 'Bash', input: { command } }
+}
+
+function assistant_line(
+	blocks: ReadonlyArray<unknown>,
+	timestamp: string,
+	message_id: string,
+): string {
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp,
-		message: {
-			id: 'msg_1',
-			content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command } }],
-		},
+		message: { id: message_id, content: blocks },
 	})
 }
 
-function result_line(content: string): string {
+// One transcript line carrying one tool call, in the shape `time_transcript_line.parse_line` reads.
+// **It carries no message id, so it is a turn of its own** — the id is what joins lines into one
+// turn, and a fixture sharing one across every call would make every session read as one batched
+// turn (joshuafolkken/kit#1792).
+function call_line(command: string, timestamp: string = TIMESTAMP): string {
+	const blocks = [tool_use_block(command, 0)]
+
+	return assistant_line(blocks, timestamp, time_transcript_line.NO_MESSAGE_ID)
+}
+
+// The rule delivered by a binary of its own, so `rule:value` reads it from `MEASURED_RULES` while
+// `rule:guard` never delivers it (joshuafolkken/kit#1792).
+const BATCHING = 'batching'
+const BATCHED_MESSAGE_ID = 'msg_batched'
+const READ_A = 'cat docs/josh-commands.md'
+const READ_B = 'cat CLAUDE.md'
+
+// One transcript line issuing several calls — the turn a run keeping the batching rule produces, and
+// the one shape `call_line` cannot express.
+function batched_line(commands: ReadonlyArray<string>, timestamp: string = TIMESTAMP): string {
+	const blocks = commands.map((command, index) => tool_use_block(command, index))
+
+	return assistant_line(blocks, timestamp, BATCHED_MESSAGE_ID)
+}
+
+// The shape Claude Code actually writes: one line per content block, the message id repeated on each.
+// One turn, spread across as many lines as it issued calls.
+function turn_lines(commands: ReadonlyArray<string>): string {
+	return commands
+		.map((command, index) =>
+			assistant_line([tool_use_block(command, index)], TIMESTAMP, BATCHED_MESSAGE_ID),
+		)
+		.join('\n')
+}
+
+function result_line(content: string, timestamp: string = TIMESTAMP): string {
 	return JSON.stringify({
 		type: 'user',
-		timestamp: TIMESTAMP,
+		timestamp,
 		message: { content: [{ type: 'tool_result', content, is_error: true }] },
 	})
 }
@@ -67,7 +109,7 @@ describe('rule_value.measure — what the carried text earns unaided', () => {
 		// that counted. Read back to back that scores "trigger reached, not kept"; read as one
 		// timeline it is a run that kept the rule.
 		const filed = call_line(FILING, '2026-09-09T00:00:09.000Z')
-		const counted = call_line(COUNT, '2026-09-09T00:00:01.000Z')
+		const counted = call_line(COUNT, NEXT_TIMESTAMP)
 		const reading = reading_for(WIP_CAP, [[filed, counted]])
 
 		expect(reading.unaided_kept).toBe(1)
@@ -130,7 +172,8 @@ describe('rule_value.measure — refusals and unmeasurable rules', () => {
 	})
 
 	it('does not read a session that merely opened the source file as a refusal', () => {
-		// Every signature exists verbatim in `delivered-rules.ts`, so a `Read` of it carries the text
+		// Every signature exists verbatim in the module its rule is written in, so a `Read` of it
+		// carries the text
 		// in a result whose `is_error` is false. Counting that would inflate the column with sessions
 		// that were editing the enumeration rather than being refused by it.
 		const read_result = JSON.stringify({
@@ -247,7 +290,7 @@ describe('rule_value.measure — the rates it reports', () => {
 		// `observe_refusal` identifies the speaker by the first REASON_SIGNATURE_LENGTH characters. If
 		// two reasons ever shared an opening that long, one rule's refusals would be credited to the
 		// other with nothing failing.
-		const signatures = delivered_rules.DELIVERED_RULES.map((rule) =>
+		const signatures = delivered_rules.MEASURED_RULES.map((rule) =>
 			rule.reason.slice(0, rule_value.REASON_SIGNATURE_LENGTH),
 		)
 
@@ -256,8 +299,79 @@ describe('rule_value.measure — the rates it reports', () => {
 
 	it('reads every enumerated rule, so a new row is measured rather than silently skipped', () => {
 		const ids = rule_value.measure([[session('ls')]]).map((reading) => reading.id)
-		const enumerated = delivered_rules.DELIVERED_RULES.map((rule) => rule.id)
+		const enumerated = delivered_rules.MEASURED_RULES.map((rule) => rule.id)
 
 		expect(ids).toStrictEqual(enumerated)
+	})
+})
+
+describe('rule_value.measure — the batching guard, which delivers itself', () => {
+	// **The regression this row exists to keep from being bought twice** (joshuafolkken/kit#1792).
+	// Every member of `DELIVERED_RULES` becomes a live `PreToolUse` guard, so a batching row added
+	// there would refuse a violation the batching guard is already refusing — two records written for
+	// one call, of which Claude Code surfaces one.
+	it('is measured without being delivered a second time', () => {
+		const delivered = delivered_rules.DELIVERED_RULES.map((rule) => rule.id)
+		const measured = delivered_rules.MEASURED_RULES.map((rule) => rule.id)
+
+		expect(delivered).not.toContain(BATCHING)
+		expect(measured).toContain(BATCHING)
+	})
+
+	it('credits a refusable call that went out beside the calls that did not need its result', () => {
+		const reading = reading_for(BATCHING, [[batched_line([READ_A, READ_B])]])
+
+		expect(reading.sessions).toBe(1)
+		expect(reading.unaided_kept).toBe(1)
+	})
+
+	it('counts a run that only ever issued lone calls as reached but never as kept', () => {
+		const reading = reading_for(BATCHING, [[session(READ_A, READ_B)]])
+
+		expect(reading.sessions).toBe(1)
+		expect(reading.unaided_kept).toBe(0)
+	})
+
+	it('counts the guard refusal, which is the reading the table had no row for', () => {
+		const run = [[`${session(READ_A)}\n${result_line(time_batch_guard.REASON)}`]]
+
+		expect(reading_for(BATCHING, run).refusals).toBe(1)
+	})
+
+	// The row declares no call-shaped trigger, so the refusal is what closes the unaided window. Read
+	// without that, a run made to batch by the hook would be scored as one the carried text convinced.
+	it('does not credit the batching the refusal itself produced', () => {
+		const refusal = result_line(time_batch_guard.REASON, NEXT_TIMESTAMP)
+		const reissued = batched_line([READ_A, READ_B], LATER_TIMESTAMP)
+		const reading = reading_for(BATCHING, [[`${call_line(READ_A)}\n${refusal}\n${reissued}`]])
+
+		expect(reading.refusals).toBe(1)
+		expect(reading.unaided_kept).toBe(0)
+	})
+})
+
+// **A turn is a message id, not a line** — the reading `batches_the_turn` rests on entirely.
+describe('rule_value.measure — what counts as one turn', () => {
+	// **The defect the first reading of this row exposed** (joshuafolkken/kit#1792). Read per line, a
+	// batched turn is two turns of one call: over 297 recorded runs the row scored 3 kept of 276
+	// against 47 refusals, which is the near-zero reading `reaches` exists to prevent, reached through
+	// the one door it does not cover.
+	it('reads one turn from the lines Claude Code splits it across', () => {
+		const reading = reading_for(BATCHING, [[turn_lines([READ_A, READ_B])]])
+
+		expect(reading.unaided_kept).toBe(1)
+	})
+
+	// **The lines a turn is split across are not adjacent**, which is why the fold is keyed by id
+	// rather than taken against the entry before it: the first call's result, and the attachments
+	// Claude Code writes beside it, all land between the two blocks of one message. Folded by
+	// adjacency, 520 multi-call messages in this checkout's last 8 sessions came back as 58 turns.
+	it('reads one turn across the records the transcript writes between its blocks', () => {
+		const opened = assistant_line([tool_use_block(READ_A, 0)], TIMESTAMP, BATCHED_MESSAGE_ID)
+		const between = result_line('ok', NEXT_TIMESTAMP)
+		const closed = assistant_line([tool_use_block(READ_B, 1)], LATER_TIMESTAMP, BATCHED_MESSAGE_ID)
+		const reading = reading_for(BATCHING, [[`${opened}\n${between}\n${closed}`]])
+
+		expect(reading.unaided_kept).toBe(1)
 	})
 })

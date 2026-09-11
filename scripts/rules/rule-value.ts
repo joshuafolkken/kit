@@ -1,6 +1,6 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { time_transcript_line, type TranscriptLine } from '#scripts/time/time-transcript-line'
-import { delivered_rules, type DeliveredRule } from './delivered-rules'
+import { delivered_rules, type MeasuredRule } from './delivered-rules'
 
 // What a rule is worth on the channel that carries it when its delivery has not fired
 // (joshuafolkken/kit#1525).
@@ -34,7 +34,9 @@ import { delivered_rules, type DeliveredRule } from './delivered-rules'
 const REASON_SIGNATURE_LENGTH = 48
 const PERCENT = 100
 // **A refusal is an errored result, which is what separates it from a read of the file it is written
-// in.** Every signature exists verbatim in `scripts/rules/delivered-rules.ts`, so a session that
+// in.** Every signature exists verbatim in the module its rule is written in — the six delivered
+// rules in `scripts/rules/delivered-rules.ts`, the batching row's in
+// `scripts/time/time-batch-guard.ts` — so a session that
 // merely opened that file carries the text too — and did so in a result whose `is_error` is false.
 //
 // **That fact is read off the parsed block, never off the raw line** (joshuafolkken/kit#1642). The
@@ -77,7 +79,7 @@ interface RuleState {
 }
 
 function blank_states(): Map<string, RuleState> {
-	const entries = delivered_rules.DELIVERED_RULES.map((rule): [string, RuleState] => [
+	const entries = delivered_rules.MEASURED_RULES.map((rule): [string, RuleState] => [
 		rule.id,
 		{ is_kept: false, is_reached: false, is_triggered: false, is_refused: false },
 	])
@@ -87,26 +89,54 @@ function blank_states(): Map<string, RuleState> {
 
 // **Keeping only counts before the trigger.** After the refusal the run complies because it was made
 // to, which is the delivery's contribution and not the carried text's.
-function observe_before_trigger(rule: DeliveredRule, state: RuleState, call: IssuedCall): void {
+//
+// **A row may declare no call-shaped trigger at all** (joshuafolkken/kit#1792). The batching guard
+// decides on the turns *behind* a call, so no predicate given one call could say whether it was
+// about to be refused; what the transcript records instead is the refusal, and `observe_error` below
+// is what closes the window for such a row.
+function keeps_the_rule(
+	rule: MeasuredRule,
+	call: IssuedCall,
+	turn: ReadonlyArray<IssuedCall>,
+): boolean {
+	return rule.keeps?.(call, turn) === true
+}
+
+function is_the_trigger(rule: MeasuredRule, call: IssuedCall): boolean {
+	return rule.is_trigger?.(call) === true
+}
+
+function observe_before_trigger(
+	rule: MeasuredRule,
+	state: RuleState,
+	call: IssuedCall,
+	turn: ReadonlyArray<IssuedCall>,
+): void {
 	if (state.is_triggered) return
 
-	if (rule.keeps?.(call) === true) state.is_kept = true
-	if (rule.is_trigger(call)) state.is_triggered = true
+	if (keeps_the_rule(rule, call, turn)) state.is_kept = true
+	if (is_the_trigger(rule, call)) state.is_triggered = true
 }
 
 // **Reaching the situation is recorded whenever it happens, before the trigger or after.** It is the
 // denominator, not the compliance: a run that pushed compliantly and then pushed again in the
 // foreground still reached the situation exactly once as far as the reading is concerned.
-function observe_call(rule: DeliveredRule, state: RuleState, call: IssuedCall): void {
-	if (rule.reaches?.(call) === true) state.is_reached = true
+function observe_call(
+	rule: MeasuredRule,
+	state: RuleState,
+	call: IssuedCall,
+	turn: ReadonlyArray<IssuedCall>,
+): void {
+	if (rule.reaches?.(call, turn) === true) state.is_reached = true
 
-	observe_before_trigger(rule, state, call)
+	observe_before_trigger(rule, state, call, turn)
 }
 
 // One transcript line, parsed once, as the two things a reading is taken from: the calls it issued
 // and the bodies of the results the harness wrote back as failures.
 interface DatedLine {
 	at_ms: number
+	message_id: string
 	calls: Array<IssuedCall>
 	errors: Array<string>
 }
@@ -131,7 +161,59 @@ function dated_line(line: string): DatedLine | undefined {
 
 	if (parsed === undefined) return undefined
 
-	return { at_ms: parsed.timestamp_ms, calls: calls_of(parsed), errors: errors_of(parsed) }
+	return {
+		at_ms: parsed.timestamp_ms,
+		message_id: parsed.message_id,
+		calls: calls_of(parsed),
+		errors: errors_of(parsed),
+	}
+}
+
+// **A turn is a message id, not a line** (joshuafolkken/kit#1792). Claude Code writes one line per
+// content block and repeats the message id on each, so a turn that thought and then issued two calls
+// is three lines carrying one id — the same reading `time-round-trips.ts` takes, for the same reason.
+// Read per line, a batched turn is indistinguishable from two turns of one call, which is the whole
+// subject of the batching rule scored exactly backwards: measured that way over 297 recorded runs it
+// read 3 kept of 276, against 47 refusals.
+//
+// **An absent id joins nothing, and the fold is by id rather than by adjacency.** The empty string is
+// shared by every line that carries none — a result, an attachment, a queue record — so folding on it
+// would merge unrelated turns; and those same lines sit *between* the blocks of one message, so a
+// fold that only compared each entry with the one before it would split most batched turns back into
+// single-call ones. Read that way over this checkout's last 8 sessions, 520 messages issued more than
+// one call and only 58 turns came back with more than one. `time-round-trips.ts` → `turn_key` takes
+// the same reading, and this is that function's shape: an id keys a turn, and a line without one is
+// its own.
+function turn_key(entry: DatedLine, index: number): string {
+	if (entry.message_id === time_transcript_line.NO_MESSAGE_ID) return `#${String(index)}`
+
+	return entry.message_id
+}
+
+function merge_turn(turn: DatedLine, entry: DatedLine): void {
+	turn.calls.push(...entry.calls)
+	turn.errors.push(...entry.errors)
+}
+
+function place_turn(turns: Map<string, DatedLine>, entry: DatedLine, key: string): void {
+	const opened = turns.get(key)
+
+	if (opened === undefined) turns.set(key, entry)
+	else merge_turn(opened, entry)
+}
+
+// A turn is placed where it opened, so the timeline order the reading depends on is the order the
+// turns began in — a call hoisted to its own turn's first line was issued before whatever came back
+// in between, which is exactly what "kept before the refusal" is asking. **Within one transcript.**
+// Across the transcripts of one run, a background unit's call landing between two blocks of a parent
+// message is reordered around the hoist; that is open as joshuafolkken/kit#1804, because which
+// instant anchors a folded turn is a decision rather than a slip.
+function fold_turns(entries: ReadonlyArray<DatedLine>): Array<DatedLine> {
+	const turns = new Map<string, DatedLine>()
+
+	for (const [index, entry] of entries.entries()) place_turn(turns, entry, turn_key(entry, index))
+
+	return [...turns.values()]
 }
 
 // **A refusal's body is the reason and nothing else, from its first character.** The hook denies a
@@ -146,7 +228,7 @@ function dated_line(line: string): DatedLine | undefined {
 // what separates the two, so no count of how many signatures appear is needed — and a body naming
 // several can no longer be attributed to any of them.
 function refused_id(text: string): string | undefined {
-	const found = delivered_rules.DELIVERED_RULES.find((rule) =>
+	const found = delivered_rules.MEASURED_RULES.find((rule) =>
 		text.trimStart().startsWith(rule.reason.slice(0, REASON_SIGNATURE_LENGTH)),
 	)
 
@@ -157,19 +239,28 @@ function observe_error(states: Map<string, RuleState>, text: string): void {
 	const id = refused_id(text)
 	const state = id === undefined ? undefined : states.get(id)
 
-	if (state !== undefined) state.is_refused = true
+	if (state === undefined) return
+
+	state.is_refused = true
+	// **A delivered refusal is the trigger, whatever a predicate said** (joshuafolkken/kit#1792). The
+	// hook refuses only where the rule bound, so the window in which compliance is the carried text's
+	// closes here — for the six rows this is already true by the time the result comes back, and for
+	// a row declaring no call-shaped trigger it is the only thing that can close it.
+	state.is_triggered = true
 }
 
 function observe_for_rule(
-	rule: DeliveredRule,
+	rule: MeasuredRule,
 	state: RuleState,
 	calls: ReadonlyArray<IssuedCall>,
 ): void {
-	for (const call of calls) observe_call(rule, state, call)
+	// The folded turn's calls, not the line's: `fold_turns` has already gathered every block written
+	// under one message id, so a call's siblings are the rest of the turn it went out in.
+	for (const call of calls) observe_call(rule, state, call, calls)
 }
 
 function observe_calls(states: Map<string, RuleState>, calls: ReadonlyArray<IssuedCall>): void {
-	for (const rule of delivered_rules.DELIVERED_RULES) {
+	for (const rule of delivered_rules.MEASURED_RULES) {
 		const state = states.get(rule.id)
 
 		if (state !== undefined) observe_for_rule(rule, state, calls)
@@ -197,7 +288,7 @@ function dated_lines_of(text: string): Array<DatedLine> {
 function timeline_of(texts: ReadonlyArray<string>): Array<DatedLine> {
 	const entries = texts.flatMap((text) => dated_lines_of(text))
 
-	return entries.toSorted((left, right) => left.at_ms - right.at_ms)
+	return fold_turns(entries.toSorted((left, right) => left.at_ms - right.at_ms))
 }
 
 // Every text belonging to one run — the session transcript and the transcripts of the units it
@@ -233,7 +324,7 @@ function apply_run(readings: Map<string, RuleReading>, states: Map<string, RuleS
 }
 
 function blank_readings(): Map<string, RuleReading> {
-	const entries = delivered_rules.DELIVERED_RULES.map((rule): [string, RuleReading] => [
+	const entries = delivered_rules.MEASURED_RULES.map((rule): [string, RuleReading] => [
 		rule.id,
 		{
 			id: rule.id,
@@ -263,7 +354,7 @@ function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReadi
 	for (const texts of runs) apply_run(readings, read_run(texts))
 
 	// Enumeration order, so a caller's table matches the registry rather than insertion order.
-	return delivered_rules.DELIVERED_RULES.map((rule) => readings.get(rule.id)).filter(
+	return delivered_rules.MEASURED_RULES.map((rule) => readings.get(rule.id)).filter(
 		(reading): reading is RuleReading => reading !== undefined,
 	)
 }
