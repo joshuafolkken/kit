@@ -314,6 +314,7 @@ function missing_message(directory: string, session_id: string | undefined): Arr
 
 const cost_transcript = {
 	TRANSCRIPT_EXTENSION,
+	TRANSCRIPT_ROOT,
 	project_slug,
 	transcript_directory,
 	session_cwd,

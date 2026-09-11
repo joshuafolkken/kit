@@ -34,6 +34,32 @@ const NEXT_FILE = 'scripts/next.ts'
 const SUBJECT_FILES = [FIRST_FILE, SECOND_FILE]
 const WORKFLOW_COMMAND = 'pnpm josh gate'
 
+// joshuafolkken/kit#1771: the four shapes a run's own session files take. Every one of them lives
+// outside the checkout by construction — that is what the exclusion is anchored on — and none can be
+// handed to a unit to read, because each belongs to this session's harness alone.
+//
+// **The temp root itself is not what is matched**, which is why this fixture uses the `/var/folders`
+// spelling `os.tmpdir()` returns on macOS rather than the `/private/tmp` one the observed path had: the
+// rule keys on the `claude-<uid>` segment, so both spellings answer alike and neither is load-bearing.
+const SESSION_TEMP = '/var/folders/q7/claude-501/-Users-me-kit/9f2'
+const CLAUDE_STATE = '/Users/me/.claude/projects/-Users-me-kit'
+const TASK_OUTPUT = `${SESSION_TEMP}/tasks/bg.output`
+const SCRATCHPAD_FILE = `${SESSION_TEMP}/scratchpad/probe.ts`
+// `tasks/` is a common repository directory, so an unpacked one must not inherit the exemption.
+const NESTED_TASKS_FILE = `${SESSION_TEMP}/scratchpad/cloned-repo/tasks/runner.ts`
+const TOOL_RESULT = `${CLAUDE_STATE}/tool-results/big.txt`
+const TRANSCRIPT = `${CLAUDE_STATE}/9f2.jsonl`
+const SESSION_FILES = [TASK_OUTPUT, TOOL_RESULT, TRANSCRIPT]
+// What `SKILL.md` → §1 specifies a `queue` entry to read. Obeying the procedure must not trip the guard.
+const WORKFLOW_SKILL = '.claude/skills/workflow-commands'
+const ENTRY_SET = [
+	...['SKILL', 'fullrun', 'chain-rule', 'followup', 'split-assessment', 'eval-gate'].map(
+		(name) => `${WORKFLOW_SKILL}/${name}.md`,
+	),
+	'prompts/review.md',
+]
+const NOT_COUNTED = 'does not count %s'
+
 interface ToolCall {
 	name: string
 	input: unknown
@@ -206,7 +232,7 @@ describe('investigation_reads — the run’s own instructions are not the subje
 		'prompts/collaboration-workflow/delegation.md',
 		'.claude/skills/workflow-commands/SKILL.md',
 		'CLAUDE.md',
-	])('does not count %s', (target) => {
+	])(NOT_COUNTED, (target) => {
 		expect(investigation_reads.is_instruction_document(target)).toBe(true)
 		expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([])
 	})
@@ -225,6 +251,70 @@ describe('investigation_reads — the run’s own instructions are not the subje
 	it('never refuses a call that names only instructions', () => {
 		expect(investigation_reads.is_refusable_call(read_call('CLAUDE.md'))).toBe(false)
 		expect(investigation_reads.is_refusable_call(bash_call('cat prompts/review.md'))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#1771. A backgrounded call's result reaches its run only as the harness's output
+// file, and a tool result too large for the transcript only as a file the harness wrote — so refusing
+// either refuses a run the answer to an instruction it issued itself, and the remedy the refusal names
+// does not exist for a file no unit can be sent to.
+describe('investigation_reads — the harness’s own session files are not the subject', () => {
+	it.each(SESSION_FILES)(NOT_COUNTED, (target) => {
+		expect(investigation_reads.is_session_artifact(target)).toBe(true)
+		expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([])
+	})
+
+	it('never refuses a call that names only session files', () => {
+		expect(investigation_reads.is_refusable_call(read_call(TASK_OUTPUT))).toBe(false)
+		expect(investigation_reads.is_refusable_call(bash_call(`cat ${TOOL_RESULT}`))).toBe(false)
+	})
+
+	// The anchor is inverted rather than borrowed: leaving the checkout is a precondition, so no
+	// repository file can be exempted here however its directories happen to be named.
+	it.each(['scripts/tasks/one.ts', '.claude/settings.json'])(
+		'still counts %s, which is inside the checkout',
+		(target) => {
+			expect(investigation_reads.is_session_artifact(target)).toBe(false)
+			expect(investigation_reads.is_subject_file(target)).toBe(true)
+		},
+	)
+
+	// **The exemption is the harness's own files, not the session tree.** Exempting the tree would
+	// silently uncount anything a run unpacks or clones into its scratchpad to investigate — real
+	// subject material — and a false negative here produces no output at all, so nothing would show it.
+	it.each([SCRATCHPAD_FILE, NESTED_TASKS_FILE])(
+		'still counts %s, which the run put there itself',
+		(target) => {
+			expect(investigation_reads.is_session_artifact(target)).toBe(false)
+			expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([
+				resolve(target),
+			])
+		},
+	)
+})
+
+// The second false-positive class of joshuafolkken/kit#1771, decided as **excluded**. It already was,
+// through the instruction-document paths above; what was missing is a case pinning the whole set, so a
+// run that obeys `SKILL.md` → §1 cannot be refused for obeying it.
+describe('investigation_reads — the entry set a queue is specified to read', () => {
+	it.each(ENTRY_SET)(NOT_COUNTED, (target) => {
+		expect(investigation_reads.is_subject_file(target)).toBe(false)
+		expect(investigation_reads.is_refusable_call(read_call(target))).toBe(false)
+	})
+})
+
+// The acceptance criterion that keeps the two exclusions from becoming a loosening.
+describe('investigation_reads.should_block — the threshold itself is unchanged', () => {
+	it('refuses a call that mixes exempt files with one subject file', () => {
+		const call = bash_call(`cat ${TASK_OUTPUT} CLAUDE.md ${NEXT_FILE}`)
+
+		expect(investigation_reads.should_block(AT_THRESHOLD_TEXT, call, NEVER_REFUSED_MS)).toBe(true)
+	})
+
+	it('allows that same call once its only subject file is gone', () => {
+		const call = bash_call(`cat ${TASK_OUTPUT} CLAUDE.md`)
+
+		expect(investigation_reads.should_block(AT_THRESHOLD_TEXT, call, NEVER_REFUSED_MS)).toBe(false)
 	})
 })
 
