@@ -15,11 +15,22 @@ import type { LayerScope, LayerStep } from './layer-step'
 const SINGLE_LAYER = 1
 const LAYER_COUNT_UNIT = 'layers'
 const SINGLE_LAYER_UNIT = 'layer'
+// Written as the condition rather than as a verdict: the skip holds for the tree the gate's record
+// covers, and a reader who has edited since is looking at a layer that will run the check after all.
+//
+// **"the gate record covers this tree" rather than "the gate is green"** — a green gate is one of
+// four conditions `hook-gate-reuse.ts` requires, alongside the file map matching, the base commit
+// matching and the escape hatch being unset. The record covering the tree is the umbrella all of them
+// narrow, so the note claims exactly what the hook checks rather than the loosest of its parts.
+const GATE_SKIP_NOTE = 'skipped where the gate record covers this tree'
 
 interface CheckLayerRow {
 	layer: string
 	scopes: ReadonlyArray<LayerScope>
 	steps: ReadonlyArray<string>
+	// Whether a green gate lets every step behind this row decline the check (joshuafolkken/kit#1786).
+	// A row carrying it is not the repetition the layer count makes it look like.
+	is_gate_skipped: boolean
 }
 
 interface CheckRow {
@@ -44,11 +55,16 @@ function unique<T>(values: ReadonlyArray<T>): Array<T> {
 	return [...new Set(values)]
 }
 
+// **`every` rather than `some`.** A row groups every step of one layer that reaches one check, so
+// the check is only skipped there when all of them are — one step still running it means the layer
+// still runs it, and a row that said otherwise would under-report the very duplication this report
+// exists to find.
 function group_layer(steps: ReadonlyArray<LayerStep>): CheckLayerRow {
 	return {
 		layer: steps[0]?.layer ?? '',
 		scopes: unique<LayerScope>(steps.map((step) => step.scope)),
 		steps: steps.map((step) => step.step),
+		is_gate_skipped: steps.every((step) => layer_checks.is_gate_skipped(step.command)),
 	}
 }
 
@@ -101,8 +117,13 @@ function build_report(steps: ReadonlyArray<LayerStep>): LayerReport {
 	}
 }
 
+// The note sits inside the same parentheses as the scope, because it qualifies the same thing: how
+// much of this layer's run is genuinely the repeated work the count above it claims.
 function format_layer(row: CheckLayerRow): string {
-	return `${row.layer} (${row.scopes.join(', ')})`
+	const qualifiers: Array<string> = [...row.scopes]
+	if (row.is_gate_skipped) qualifiers.push(GATE_SKIP_NOTE)
+
+	return `${row.layer} (${qualifiers.join(', ')})`
 }
 
 function count_label(layer_count: number): string {

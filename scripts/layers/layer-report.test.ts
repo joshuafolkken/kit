@@ -81,6 +81,41 @@ describe('layer_report — staged-only against whole-project', () => {
 	})
 })
 
+// joshuafolkken/kit#1786: two of the rows this report prints are not the repetition the layer count
+// makes them look like — a green gate lets the hook decline the check outright. The fixture carries
+// both sides on purpose: its pre-push unit run goes through the gate-reusing `josh` target, while its
+// pre-commit type check is a bare `tsc --noEmit`, so the note has to follow the command rather than
+// the layer.
+describe('layer_report — the layers a green gate lets a hook skip', () => {
+	it('marks the hook row whose command reads the gate record', () => {
+		expect(row_for(UNIT_TESTS)?.layers.map((entry) => entry.is_gate_skipped)).toStrictEqual([
+			false,
+			true,
+			false,
+		])
+	})
+
+	it('leaves a hook row alone when its command runs the check itself', () => {
+		expect(row_for(TYPE_CHECK)?.layers.map((entry) => entry.is_gate_skipped)).toStrictEqual([
+			false,
+			false,
+			false,
+		])
+	})
+
+	it('prints the condition beside the scope of the row it applies to', () => {
+		expect(layer_report.format_report(REPORT).join('\n')).toContain(
+			'pre-push (project, skipped where the gate record covers this tree)',
+		)
+	})
+
+	it('leaves the gate and CI rows of that same check unqualified', () => {
+		expect(layer_report.format_report(REPORT).join('\n')).toContain(
+			'gate (project) · pre-push (project, skipped where the gate record covers this tree) · ci (project)',
+		)
+	})
+})
+
 describe('layer_report — rendering', () => {
 	const LINES = layer_report.format_report(REPORT)
 

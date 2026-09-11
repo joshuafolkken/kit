@@ -1,4 +1,5 @@
 import { gate_plan } from '#scripts/gate-plan'
+import { hook_gate_reuse } from '#scripts/hook-gate-reuse'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 
@@ -71,6 +72,8 @@ const JOSH_TOOLS: Record<string, ReadonlyArray<string>> = {
 
 const JOSH_TOKEN = 'josh'
 const PREVIOUS_TOKEN_OFFSET = 1
+// A command line naming no `josh` target at all reuses nothing, so it is never marked skipped.
+const NO_TARGETS = 0
 
 // What one command was found to run, plus the `josh` sub-commands that could not be resolved to a
 // check. The second half is the staleness guard: a hook rewired to a new `josh` target shows up as
@@ -215,7 +218,33 @@ function resolve_command(command: string): CommandChecks {
 	return { checks: unique_sorted(found.checks), unresolved: unique_sorted(found.unresolved) }
 }
 
-const layer_checks = { JOSH_TOOLS, TOOL_SIGNATURES, resolve_command }
+// Whether a green gate lets this command line decline the check it names (joshuafolkken/kit#1786).
+//
+// **The list is `hook-gate-reuse.ts`'s, imported rather than restated.** That module implements the
+// reuse, so a hook rewired away from it stops being named there and stops being reported here on the
+// same day.
+//
+// **It reads the command's own `josh` targets and does not walk an expansion.** Both hooks name
+// their target directly, so a walk would buy nothing today — and a wrapper that reached one
+// indirectly would simply go unreported, leaving the row reading as the plain repetition it already
+// reads as.
+//
+// **Every target on the line has to be one, which is what keeps the error one-directional.** A
+// composite line — `pnpm josh pre-push-unit && pnpm josh cspell:dot` — reaches two checks through one
+// command string, and this answers for both at once; asking whether *any* target reuses the record
+// would mark the check that still runs as skipped, which is the one claim this report must never
+// make. Answering `false` there leaves the row reading as the plain repetition it already reads as,
+// so the error stays in the direction of under-reporting the skip.
+function is_gate_skipped(command: string): boolean {
+	const targets = josh_targets(command)
+
+	return (
+		targets.length > NO_TARGETS &&
+		targets.every((target) => hook_gate_reuse.GATE_REUSING_TARGETS.includes(target))
+	)
+}
+
+const layer_checks = { JOSH_TOOLS, TOOL_SIGNATURES, is_gate_skipped, resolve_command }
 
 export type { CommandChecks }
 export { layer_checks }
