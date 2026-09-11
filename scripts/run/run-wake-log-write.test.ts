@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -61,8 +61,10 @@ describe('run_wake_session.ensure_log — a log it cannot prepare', () => {
 	// and returns, which is what lets `--list` name a path that exists on a tree where a launch would
 	// lose its header.
 	it('creates the file without writing anything into it', () => {
+		rmSync(LOG_TARGET, { force: true })
+
 		run_wake_session.ensure_log(LOG_TARGET, () => undefined)
 
-		expect(launched_with_failing_header().kind).toBe('launched')
+		expect(readFileSync(LOG_TARGET, 'utf8')).toBe('')
 	})
 })
