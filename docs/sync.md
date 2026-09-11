@@ -494,8 +494,8 @@ SECURITY.md         tsconfig.sonar.json
 > consecutive single-call turn (joshuafolkken/kit#1390). It is on the earlier event for the reason the
 > formatter is on the later one: by `PostToolUse` the round trip has already been spent, and describing
 > it there is what the density line above already does — measured at 1.10–1.12 calls per round trip
-> across the three runs after that line shipped, against a 1.50 floor. **It names `Edit` beside `Bash` since joshuafolkken/kit#1762, where it named `Bash` alone before,
-> and `Read` since joshuafolkken/kit#1798**: `Edit` carries 164 of the 251
+> across the three runs after that line shipped, against a 1.50 floor. **It names `Edit` beside `Bash` since joshuafolkken/kit#1762
+> and `Read` since joshuafolkken/kit#1798**, where it named `Bash` alone before the first of those: `Edit` carries 164 of the 251
 > recoverable round trips measured over 20 runs, so excluding it put the largest contributor beyond
 > reach. Refusing one is safe because the guard **withholds the refusal whenever the call in hand names
 > a file the sequence behind it already touched** — the visible case where a reissued edit would meet
