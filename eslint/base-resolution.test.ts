@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { ESLint } from 'eslint'
+import { ESLint, type Linter } from 'eslint'
 import ts from 'typescript-eslint'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -108,6 +108,10 @@ const CANONICAL_PROBE_FILE = 'scripts/probe.test.ts'
 // filtering for one rule afterwards answers `[]` for a probe that asserted nothing. Every probe
 // goes through that check here, so a parse error fails the test that caused it instead of passing
 // quietly as an empty result.
+function expect_no_fatal(messages: ReadonlyArray<Linter.LintMessage>): void {
+	expect(messages.filter((message) => message.fatal).map((message) => message.message)).toEqual([])
+}
+
 async function restricted_syntax_messages(
 	file_path: string,
 	source = PROBE_SOURCE,
@@ -116,7 +120,7 @@ async function restricted_syntax_messages(
 	const [result] = await probe.lintText(source, { filePath: file_path })
 	const messages = result?.messages ?? []
 
-	expect(messages.filter((message) => message.fatal).map((message) => message.message)).toEqual([])
+	expect_no_fatal(messages)
 
 	return messages
 		.filter((message) => message.ruleId === RESTRICTED_SYNTAX_RULE)
@@ -270,6 +274,119 @@ describe('create_base_config — the test relaxation skips the banned name (issu
 	it('still raises it for the canonical *.test.ts name', async () => {
 		await expect(resolved_max_lines_per_function('src/lib/probe.test.ts')).resolves.toMatchObject({
 			max: TEST_LINES_PER_FUNCTION,
+		})
+	})
+})
+
+// joshuafolkken/kit#1783: an autofix whose output another enabled check rejects has no fixed point,
+// so every `--fix` moves the code between two red states and the run pays a cycle for nothing. Both
+// cases below were met in real work — the first ping-ponged between two unicorn rules, the second
+// produced code the compiler refuses under `noPropertyAccessFromIndexSignature`.
+//
+// Asserted the only way that settles it: run the repository's own config in fix mode, then lint the
+// output it just produced. A config-shape assertion cannot see this defect at all — each rule is
+// individually reasonable, and what is wrong is what they do to one another.
+//
+// The fix pass and the re-lint both run untyped, for this file's established reason (see the
+// `untyped_linter` comment above): a probe is a virtual file no tsconfig lists, and a typed run
+// answers it with a parse error before any rule fires. Every rule under test here is syntactic —
+// which is precisely why the pair reached the working tree, since the syntactic half applies its fix
+// with no idea what the type checker will say about it.
+const ITERATOR_PROBE_FILE = 'scripts/probe-iterator.ts'
+const DOT_NOTATION_PROBE_FILE = 'scripts/probe-dot-notation.ts'
+const ITERATOR_TO_ARRAY_RULE = 'unicorn/prefer-iterator-to-array'
+const DOT_NOTATION_RULE = 'dot-notation'
+const TYPED_DOT_NOTATION_RULE = '@typescript-eslint/dot-notation'
+const CONSTANT_NAME_PATTERN = '^[A-Z0-9_]+$'
+const SPREAD_FIX_OUTPUT = '[...text.matchAll(pattern)]'
+const BRACKET_ACCESS = "groups['name']"
+
+// `matchAll` returns an iterator, and that is load-bearing: over a plain array or Set the spread fix
+// is accepted and there is no contradiction to reproduce.
+const ITERATOR_SOURCE = `const module_x = {
+	all_matches(text: string, pattern: RegExp): Array<RegExpMatchArray> {
+		const found: Array<RegExpMatchArray> = []
+
+		for (const match of text.matchAll(pattern)) {
+			found.push(match)
+		}
+
+		return found
+	},
+}
+
+export { module_x }
+`
+
+const INDEX_SIGNATURE_SOURCE = `const module_y = {
+	group_of(match: RegExpExecArray, name: string): string {
+		const groups: Record<string, string> = match.groups ?? {}
+
+		return ${BRACKET_ACCESS} ?? name
+	},
+}
+
+export { module_y }
+`
+
+const fixing_linter = new ESLint({
+	cwd: REPO_ROOT,
+	fix: true,
+	overrideConfig: ts.configs.disableTypeChecked,
+})
+
+interface FixedPoint {
+	output: string
+	remaining: Array<string>
+}
+
+async function fix_then_lint(source: string, file_path: string): Promise<FixedPoint> {
+	const [fixed] = await fixing_linter.lintText(source, { filePath: file_path })
+	const output = fixed?.output ?? source
+	// The verification pass must *report*, not repair: re-linting through `fixing_linter` would
+	// silently apply a second fix and hand back an empty list, so a rule that had come back with a
+	// fixer of its own would read here as a fixed point.
+	const [rechecked] = await untyped_linter.lintText(output, { filePath: file_path })
+	const messages = rechecked?.messages ?? []
+
+	expect_no_fatal(messages)
+
+	return {
+		output,
+		remaining: messages.map((message) => `${message.ruleId ?? 'unknown'}: ${message.message}`),
+	}
+}
+
+describe('create_base_config — an autofix reaches a fixed point (issue #1783)', () => {
+	it('rewrites a for-of push loop to a spread, and the spread is then accepted', async () => {
+		const { output, remaining } = await fix_then_lint(ITERATOR_SOURCE, ITERATOR_PROBE_FILE)
+
+		expect(output).toContain(SPREAD_FIX_OUTPUT)
+		expect(remaining).toEqual([])
+	})
+
+	it('leaves an index-signature bracket access as it was, and accepts it', async () => {
+		const { output, remaining } = await fix_then_lint(
+			INDEX_SIGNATURE_SOURCE,
+			DOT_NOTATION_PROBE_FILE,
+		)
+
+		expect(output).toContain(BRACKET_ACCESS)
+		expect(remaining).toEqual([])
+	})
+
+	it('switches off the two rules that had no fixed point', async () => {
+		await expect(resolve_severity(SOURCE_FILE, ITERATOR_TO_ARRAY_RULE)).resolves.toBe(OFF)
+		await expect(resolve_severity(SOURCE_FILE, DOT_NOTATION_RULE)).resolves.toBe(OFF)
+	})
+
+	// The syntactic rule is replaced rather than dropped: the typed one reads
+	// `noPropertyAccessFromIndexSignature` off the compiler options itself and exempts exactly the
+	// access the syntactic one could not see, so what it does fix still compiles.
+	it('keeps dot notation enforced through the typed rule, exemption intact', async () => {
+		await expect(resolve_severity(SOURCE_FILE, TYPED_DOT_NOTATION_RULE)).resolves.toBe(ERROR)
+		await expect(resolve_options(SOURCE_FILE, TYPED_DOT_NOTATION_RULE)).resolves.toMatchObject({
+			allowPattern: CONSTANT_NAME_PATTERN,
 		})
 	})
 })

@@ -73,7 +73,6 @@ describe('transform_prompt_paths', () => {
 })
 
 describe('merge_package_scripts jf-* migration', () => {
-	/* eslint-disable dot-notation -- index signature requires bracket notation */
 	it('removes jf-git script since git is a retired alias', () => {
 		const content = '{"scripts":{"git":"jf-git"}}'
 		const parsed = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
@@ -114,13 +113,10 @@ describe('merge_package_scripts jf-* migration', () => {
 		expect(result.scripts['telegram:test']).toBeUndefined()
 		expect(result.scripts['test:unit']).toBeUndefined()
 	})
-
-	/* eslint-enable dot-notation */
 })
 
 describe('merge_package_scripts preinstall ordering', () => {
 	it('inserts preinstall as the first script key when merging into existing scripts', () => {
-		/* eslint-disable dot-notation -- index signature requires bracket notation */
 		const content = '{"scripts":{"build":"tsc","postinstall":"lefthook install"}}'
 		const result = JSON.parse(
 			init_logic.merge_package_scripts(content, { preinstall: SAFE_CHAIN_SCRIPT_VALUE }),
@@ -128,7 +124,6 @@ describe('merge_package_scripts preinstall ordering', () => {
 
 		expect(Object.keys(result.scripts)[0]).toBe('preinstall')
 		expect(result.scripts['preinstall']).toBe(SAFE_CHAIN_SCRIPT_VALUE)
-		/* eslint-enable dot-notation */
 	})
 })
 

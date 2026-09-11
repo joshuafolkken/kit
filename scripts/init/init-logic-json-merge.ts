@@ -42,7 +42,6 @@ function merge_tsconfig_extends(content: string, entry: string, base_directory: 
 
 function extract_compiler_options(content: string): Record<string, unknown> {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['compilerOptions']
 	if (raw === undefined) return {}
 
@@ -203,7 +202,6 @@ const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
@@ -223,7 +221,6 @@ function merge_development_dependencies(
 	additions: Record<string, string>,
 ): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['devDependencies']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const to_add = missing_entries(existing, additions)
@@ -252,7 +249,6 @@ function merge_development_engines(content: string, value: Record<string, unknow
 
 function has_package_scripts_marker(content: string, marker: string): boolean {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return false
 	const scripts = string_record_schema.parse(raw)
@@ -262,7 +258,6 @@ function has_package_scripts_marker(content: string, marker: string): boolean {
 
 function merge_package_script_suffix(content: string, key: string, cmd: string): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return content
 	const scripts = string_record_schema.parse(raw)
@@ -279,7 +274,6 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 // present returns the content untouched, which is what makes repeated `josh init` runs idempotent.
 function replace_in_package_script(content: string, key: string, from: string, to: string): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return content
 	const scripts = string_record_schema.parse(raw)
@@ -296,7 +290,6 @@ function replace_in_package_script(content: string, key: string, from: string, t
 
 function remove_script_with_marker(content: string, key: string, marker: string): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return content
 	const scripts = string_record_schema.parse(raw)

@@ -179,7 +179,6 @@ describe('package.json scripts', () => {
 	const scripts = manifest.scripts ?? {}
 
 	it('exposes josh as the unified CLI entry point', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		expect(scripts['josh']).toBe('tsx scripts/josh/josh.ts')
 	})
 
@@ -194,19 +193,16 @@ describe('package.json scripts', () => {
 	})
 
 	it('does not install a project-pinned bin shim on postinstall', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		expect(scripts['postinstall'] ?? '').not.toContain('install-bin')
 	})
 
 	it('installs lefthook git hooks via prepare for contributors', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		expect(scripts['prepare']).toContain('lefthook install')
 	})
 
 	it('does not run lefthook on postinstall so global and consumer installs do not abort', () => {
 		// lefthook requires a git repo; running it on postinstall fails (exit 128)
 		// during `pnpm add -g` and consumer installs, which run outside any git repo.
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		expect(scripts['postinstall'] ?? '').not.toContain('lefthook')
 	})
 })
@@ -215,7 +211,6 @@ const RANGE_GUARD_SCRIPT = 'publishable-range-check'
 const BIN_BUILD_SCRIPT = 'build-bin'
 
 describe('package.json prepack', () => {
-	// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 	const prepack = load_manifest().scripts?.['prepack'] ?? ''
 
 	it('builds the compiled bin before packing', () => {
@@ -237,7 +232,6 @@ describe('package.json bin', () => {
 	const manifest = load_manifest()
 
 	it('points josh at the compiled, project-independent bin', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		expect(manifest.bin?.['josh']).toBe('dist/josh.js')
 	})
 })

@@ -117,7 +117,6 @@ function read_vscode_recommendations(): ReadonlyArray<string> {
 	const parsed = vscode_settings_schema.parse(
 		read_kit_vscode_json(init_logic.VSCODE_EXTENSIONS_FILENAME),
 	)
-	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 	const raw = parsed['recommendations']
 
 	return string_array_schema.parse(raw)

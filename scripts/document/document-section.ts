@@ -42,7 +42,8 @@ function to_heading(line: string, index: number): Heading | undefined {
 	if (groups === undefined) return undefined
 
 	// Destructured rather than read as properties: `noPropertyAccessFromIndexSignature` refuses
-	// `groups.title`, and ESLint's `dot-notation` fix turns `groups['title']` straight back into it.
+	// `groups.title`. The bracket form was refused too, until joshuafolkken/kit#1783 switched off the
+	// `dot-notation` fix that rewrote it back — so this is a choice now rather than the only spelling.
 	const { hashes = '', title = '' } = groups
 
 	return { level: hashes.length, title: title.trim(), line: index }

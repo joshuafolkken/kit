@@ -235,14 +235,11 @@ describe('security_audit_logic.format_missing_binary_error', () => {
 
 describe('josh latest command audit wiring', () => {
 	const manifest = JSON.parse(load_file('package.json')) as { scripts?: Record<string, string> }
-	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature forbids dot access on Record values
 	const latest_command = (COMMAND_MAP['latest']?.shell ?? []).join(' ')
 
 	it('does not register audit:security or latest as standalone package.json scripts', () => {
-		/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
 		expect(manifest.scripts?.['audit:security']).toBeUndefined()
 		expect(manifest.scripts?.['latest']).toBeUndefined()
-		/* eslint-enable dot-notation */
 	})
 
 	it('delegates security audit to josh audit in the COMMAND_MAP latest shell', () => {

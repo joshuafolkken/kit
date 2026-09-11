@@ -58,7 +58,8 @@ function reader(pages: ReadonlyArray<ReadonlyArray<RawPull>>, asked: Array<strin
 		// Anchored on the separator: `per_page=100` sits in front of `page=` in the same query string,
 		// and an unanchored match reads the page size as the page number. A positional capture rather
 		// than a named one, because a named group is read through an index signature that the type
-		// check wants bracketed and the lint's dot-notation rule rewrites back.
+		// check wants bracketed and the lint's dot-notation rule used to rewrite back —
+		// joshuafolkken/kit#1783 ended that, so the positional form is a preference now.
 		const found = /[&?]page=(\d+)/u.exec(request_path)?.[1]
 		const index = found === undefined ? 0 : Number(found) - 1
 

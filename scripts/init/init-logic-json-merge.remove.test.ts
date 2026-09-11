@@ -16,7 +16,6 @@ describe('init_logic_json_merge.remove_script_with_marker', () => {
 		) as { scripts: Record<string, string> }
 
 		expect(result.scripts).not.toHaveProperty(POSTINSTALL_KEY)
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
 		expect(result.scripts['build']).toBe('tsc')
 	})
 

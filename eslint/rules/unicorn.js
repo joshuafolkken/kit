@@ -50,6 +50,12 @@ export const unicorn_rules = {
 	'unicorn/no-for-loop': 'error',
 	// Array.from()よりスプレッド演算子を優先
 	'unicorn/prefer-spread': 'error',
+	// joshuafolkken/kit#1783: prefer-spread の `--fix` は `for…of` + push を `[...iterator]` へ
+	// 書き換えるが、unicorn の recommended に入っている prefer-iterator-to-array がその
+	// スプレッドを拒否する。あちらは自動修正を持たないので `--fix` に次の手が無く、要求する
+	// `Iterator#toArray()` は ES2025 の機能で、配布している tsconfig が前提とする lib には
+	// 存在しない（TS2339）。自動修正できる側を残し、固定点を持たないこちらを止める。
+	'unicorn/prefer-iterator-to-array': 'off',
 	// Array#{indexOf,lastIndexOf}よりArray#{findIndex,findLastIndex}を優先
 	'unicorn/prefer-array-find': 'error',
 	// 配列の存在チェックにArray#someを優先

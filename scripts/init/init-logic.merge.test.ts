@@ -131,7 +131,6 @@ const SIZE_LIMIT_KEY = 'size-limit'
 const SIZE_LIMIT_VERSION = '^12.1.0'
 const DEV_DEPS_KEY = 'devDependencies'
 
-/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
 describe('merge_development_dependencies', () => {
 	it('adds missing devDependency', () => {
 		const result = JSON.parse(
@@ -213,8 +212,6 @@ describe('merge_package_manager', () => {
 		expect(init_logic.merge_package_manager(content, '')).toBe(content)
 	})
 })
-
-/* eslint-enable dot-notation */
 
 describe('merge_package_scripts', () => {
 	const SCRIPT_KEY = 'build'

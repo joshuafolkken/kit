@@ -92,11 +92,14 @@ function unique(names: ReadonlyArray<string>): Array<string> {
 	return [...new Set(names)]
 }
 
-// **Scanned with `exec` rather than collected from `matchAll`.** `Iterator#toArray` is outside this
-// project's lib, and both ways of materializing the iterator are refused —
-// `unicorn/prefer-iterator-to-array` rejects the spread, and the `--fix` that rewrites a `for…of`
-// push loop puts the spread straight back. A fresh `RegExp` rather than the shared one, so the
-// caller's `lastIndex` is never carried between two scans of different documents.
+// **Scanned with `exec` rather than collected from `matchAll`.** A fresh `RegExp` rather than the
+// shared one, so the caller's `lastIndex` is never carried between two scans of different documents.
+//
+// This spelling used to be forced rather than chosen: `unicorn/prefer-iterator-to-array` rejected
+// the spread while the `--fix` for a `for…of` push loop put the spread straight back, so neither
+// form was green. joshuafolkken/kit#1783 removed that contradiction — the spread is accepted now —
+// and rewriting this helper was left outside that Issue's scope, so the loop stands on the
+// `lastIndex` isolation above alone.
 function all_matches(text: string, pattern: RegExp): Array<RegExpExecArray> {
 	const scanner = new RegExp(pattern.source, pattern.flags)
 	const found: Array<RegExpExecArray> = []
@@ -124,7 +127,8 @@ function columns_of(line: string): { entry: string; files: string } | undefined 
 	if (groups === undefined) return undefined
 
 	// Destructured rather than read as properties: `noPropertyAccessFromIndexSignature` refuses
-	// `groups.entry`, and ESLint's `dot-notation` fix turns `groups['entry']` straight back into it.
+	// `groups.entry`. The bracket form was refused too, until joshuafolkken/kit#1783 switched off the
+	// `dot-notation` fix that rewrote it back — so this is a choice now rather than the only spelling.
 	const { entry = '', files = '' } = groups
 
 	return { entry, files }

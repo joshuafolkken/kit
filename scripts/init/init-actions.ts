@@ -30,7 +30,6 @@ function build_vscode_actions(): ReadonlyArray<FileAction> {
 	const extensions_path = path.join('.vscode', init_logic.VSCODE_EXTENSIONS_FILENAME)
 	const settings_path = path.join('.vscode', init_logic.get_vscode_settings_filename())
 	const extensions_raw = vscode_settings_schema.parse(read_package_json(extensions_path))
-	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 	const raw_recommendations = extensions_raw['recommendations']
 	const recommendations = string_array_schema.parse(raw_recommendations)
 	const settings_data = init_logic.strip_kit_only_vscode_settings(

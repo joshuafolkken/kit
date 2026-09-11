@@ -76,7 +76,6 @@ describe(`${GATE} — the single source`, () => {
 // A command that reads a record nothing writes answers `required` forever, which is the old
 // behavior wearing the new command's name.
 describe('the josh latest chain records the run it just made', () => {
-	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature forbids dot access on Record values
 	const latest_command = (COMMAND_MAP['latest']?.shell ?? []).join(' ')
 
 	it('ends the chain with the record step', () => {
