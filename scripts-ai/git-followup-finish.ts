@@ -177,7 +177,7 @@ async function release_worktree_hold(should_merge: boolean): Promise<void> {
 
 		if (directory !== undefined) run_hold.release_hold(run_hold.hold_path(directory))
 	} catch {
-		/* the record expires on its own, and `pnpm josh run:release` clears it early */
+		/* the record expires on its own, and `pnpm josh run:release --force` clears it early */
 	}
 }
 
@@ -222,7 +222,11 @@ function build_record_steps(should_merge: boolean): ReadonlyArray<CleanupStep> {
 		},
 		{
 			label: 'The working-tree hold release',
-			recovery: 'pnpm josh run:release',
+			// **The forced spelling, because the run that wrote the record is this one and it is
+			// ending** (joshuafolkken/kit#1799). A release names the run it belongs to, so a person
+			// finishing this step by hand is releasing a record they did not write — the plain form
+			// would answer `held` and remove nothing, which is a printed recovery that cannot recover.
+			recovery: 'pnpm josh run:release --force',
 			run: async () => {
 				await release_worktree_hold(should_merge)
 			},

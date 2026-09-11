@@ -143,7 +143,7 @@ describe('classify', () => {
 describe('the stop message', () => {
 	const hold = { issue: ISSUE, taken_at: RECORDED_AT, pid: WRITER_PID }
 
-	it.each([`#${ISSUE}`, hold.taken_at, String(hold.pid), run_hold.RELEASE_COMMAND])(
+	it.each([`#${ISSUE}`, hold.taken_at, String(hold.pid), run_hold.FORCE_RELEASE_COMMAND])(
 		'names %j',
 		(fragment) => {
 			expect(run_hold.held_message(hold)).toContain(fragment)
@@ -165,5 +165,44 @@ describe('the stop message', () => {
 
 	it('says why a stale record was replaced', () => {
 		expect(run_hold.stale_message(hold)).toContain(String(run_hold.HOLD_MAX_AGE_HOURS))
+	})
+})
+
+// joshuafolkken/kit#1799: which command a message names is the whole of the friction. A reader who is
+// not the record's run is sent to the forced spelling; the run that wrote it is sent to its own.
+describe('the ownership of a record', () => {
+	const hold = { issue: ISSUE, taken_at: RECORDED_AT, pid: WRITER_PID }
+
+	it('matches the run whose issue the record names', () => {
+		expect(run_hold.is_own_hold(hold, ISSUE)).toBe(true)
+	})
+
+	it.each([OTHER_ISSUE, run_hold.UNNUMBERED_ISSUE])('does not match %j', (claimant) => {
+		expect(run_hold.is_own_hold(hold, claimant)).toBe(false)
+	})
+
+	it("mirrors the claim's own spelling for a numbered run", () => {
+		expect(run_hold.own_release_command(ISSUE)).toBe(`${run_hold.RELEASE_COMMAND} ${ISSUE}`)
+	})
+
+	it('leaves the bare spelling to the unnumbered run', () => {
+		expect(run_hold.own_release_command(run_hold.UNNUMBERED_ISSUE)).toBe(run_hold.RELEASE_COMMAND)
+	})
+
+	it.each([run_hold.own_release_command(ISSUE), run_hold.FORCE_RELEASE_COMMAND])(
+		'names %j when a release did not claim the tree',
+		(command) => {
+			expect(run_hold.foreign_release_message(hold)).toContain(command)
+		},
+	)
+
+	// The reader here is the person whose own `halfrun` stop left the work in the tree, so the command
+	// to hand them is that run's own — not the forced one, which teaches the wrong habit.
+	it('sends the owner of an expired record over a dirty tree to its own release', () => {
+		expect(run_hold.uncommitted_message(hold)).toContain(run_hold.own_release_command(ISSUE))
+	})
+
+	it('says whose record a forced release removed', () => {
+		expect(run_hold.forced_release_message(hold)).toContain(`#${ISSUE}`)
 	})
 })

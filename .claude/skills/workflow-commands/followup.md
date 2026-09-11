@@ -45,7 +45,7 @@ What one invocation does, in order:
 - **Nothing after the merge can end the run** (joshuafolkken/kit#1539). Once the pull request has
   merged, every remaining step — the Issue comment, the epic close, the run report, the review
   records and the working-tree hold release — runs on its own: one that fails is **reported by name,
-  with the command that finishes it by hand where one exists** — `pnpm josh run:release` for the
+  with the command that finishes it by hand where one exists** — `pnpm josh run:release --force` for the
   hold, `gh pr comment` or `gh api … /comments` for the completion report, whichever the notify target
   named. The epic auto-close and the run report have
   no command of their own and name none, rather than pointing at one that only reports. The steps

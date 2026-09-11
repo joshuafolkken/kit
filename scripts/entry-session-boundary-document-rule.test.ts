@@ -19,7 +19,10 @@ const EPICRUN = '.claude/skills/workflow-commands/epicrun.md'
 const ENTRIES: ReadonlyArray<string> = [FULLRUN, HALFRUN]
 
 const COMMAND = 'pnpm josh cost --over 300000'
-const RELEASE_COMMAND = 'pnpm josh run:release'
+// joshuafolkken/kit#1799: a release names the run it belongs to, so the instruction carries `<N>`.
+// The bare form is the unnumbered run's own, and which of the two a stop types is decided in
+// `SKILL.md` → §2f, "Release what the claim recorded".
+const RELEASE_COMMAND = 'pnpm josh run:release <N>'
 const HOLD_COMMAND = 'pnpm josh run:hold'
 
 // The one sentence that names this application point. Both entries cite it, and it exists once.
