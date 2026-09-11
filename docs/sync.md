@@ -490,12 +490,12 @@ SECURITY.md         tsconfig.sonar.json
 > those three tools, and why it never fails.
 >
 > **And it wires the batching guard, on the earlier side of the same event pair.** A `PreToolUse` hook
-> runs `pnpm josh batch:guard` before every `Bash` and `Edit` call, refusing the one that would make a third
+> runs `pnpm josh batch:guard` before every `Bash`, `Edit` and `Read` call, refusing the one that would make a third
 > consecutive single-call turn (joshuafolkken/kit#1390). It is on the earlier event for the reason the
 > formatter is on the later one: by `PostToolUse` the round trip has already been spent, and describing
 > it there is what the density line above already does — measured at 1.10–1.12 calls per round trip
-> across the three runs after that line shipped, against a 1.50 floor. **It names `Edit` beside `Bash`
-> since joshuafolkken/kit#1762**, where it named `Bash` alone before: `Edit` carries 164 of the 251
+> across the three runs after that line shipped, against a 1.50 floor. **It names `Edit` beside `Bash` since joshuafolkken/kit#1762, where it named `Bash` alone before,
+> and `Read` since joshuafolkken/kit#1798**: `Edit` carries 164 of the 251
 > recoverable round trips measured over 20 runs, so excluding it put the largest contributor beyond
 > reach. Refusing one is safe because the guard **withholds the refusal whenever the call in hand names
 > a file the sequence behind it already touched** — the visible case where a reissued edit would meet

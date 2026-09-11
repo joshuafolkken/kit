@@ -285,13 +285,17 @@ Refuse a tool call that would make a third consecutive single-call turn. Like `j
 ```json
 "PreToolUse": [
 	{
-		"matcher": "Bash|Edit",
+		"matcher": "Bash|Edit|Read",
 		"hooks": [{ "type": "command", "command": "pnpm josh batch:guard", "timeout": 20 }]
 	}
 ]
 ```
 
 **The matcher names `Edit` beside `Bash` since [#1762](https://github.com/joshuafolkken/kit/issues/1762).** It named `Bash` alone for as long as the script answered "not a candidate" to every write, which made a wider matcher a process that could only ever say "allow" — that cost argument was about _widening the matcher and nothing else_, and it still holds in that form. What changed is the predicate underneath it: an edit is refusable now, so the matcher reaches a question that has an answer. **The reason to pay for it is reach.** Read over 20 runs, 251 of 1,734 round trips were recoverable by batching and **`Edit` alone carried 164 of them (65.3%)**, which `Bash` cannot reach however large its share of the calls.
+
+**The matcher names `Read` as well since [#1798](https://github.com/joshuafolkken/kit/issues/1798), and there the predicate never had to move.** `Read` has answered "candidate" for as long as the test has been whether a call could have gone out beside another, so the wiring alone was keeping the refusal off it. Measured on `fullrun #1783`, **46 of the main line's 76 requests issued a single call**, in **7 runs of three or more** — and only **2** refusals fired, because 4 of those 7 held a `Read`, a `Write` or an `Agent` the matcher never handed over. **The counting was never the part that was wrong**: a single-call turn extends the run whenever its call is bundleable, which `Read`, `Glob`, `Grep` and `Write` all are, so what breaks a run is a call that could not have been batched at all — a delegation, whose result the next call needs. `Write` stays out of the matcher for the reason given further below.
+
+**`Read` is now claimed by two refusing hooks, and that overlap is accepted rather than mediated.** `josh investigation:guard` matches `Read|Bash`, so since [#1798](https://github.com/joshuafolkken/kit/issues/1798) both guards can deny the same `Read`. **The overlap is not new** — it has held on `Bash` for as long as the investigation guard has existed — and it is left alone deliberately: Claude Code delivers **both** refusals to the caller, so neither rule goes unsaid, and the two ask for actions that agree rather than conflict (reissue the call beside its siblings; send the reading to a unit of its own). The stand-aside `delivered-rules.ts` carries is for a different problem: its rows deliver **once per run**, so a delivery lost to another hook is lost for good, while this guard's record is per accumulation and rebuilds after the next three unedited reads. Making the investigation guard stand aside would trade a harmless double message for a silenced threshold, which is the wrong direction.
 
 **Refusing an edit is safe because of the target test, not because of a blanket exclusion.** Claude Code denies one call of a turn and runs the rest, so a refused `Edit` leaves its siblings applied and itself not. The case where that costs something is an edit naming a file the run is already rewriting — there the reissue meets text that has moved. The guard therefore **withholds the refusal whenever the call in hand shares a target with the sequence behind it**, writes included, which is where it departs from the sequence builder: that one exempts a write following a write on purpose, so such a stretch forms a sequence at all ([#1509](https://github.com/joshuafolkken/kit/issues/1509)). What is left refusable is an edit to a file nothing in the sequence touches, whose reissue lands on exactly the text it was written against.
 

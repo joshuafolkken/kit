@@ -21,6 +21,11 @@ const FRESH_CALL = { name: 'Read', input: { file_path: FRESH_PATH } }
 const EDIT_LABEL = 'an edit'
 const SED_LABEL = 'an in-place sed'
 const EDIT_TOOL = 'Edit'
+// Named the way this harness names it. Neither spelling of the delegation tool is in the bundleable
+// set, so the case below would read the same under `Task`.
+const DELEGATION_TOOL = 'Agent'
+const WRITE_TOOL = 'Write'
+const WRITE_LABEL = 'a whole-file write'
 const EDIT_CALL = { name: EDIT_TOOL, input: { file_path: FRESH_PATH } }
 const IN_PLACE_SED_CALL = { name: 'Bash', input: { command: `sed -i '' s/a/b/ ${FRESH_PATH}` } }
 const SHELL_READ_CALL = { name: 'Bash', input: { command: `cat ${FRESH_PATH}` } }
@@ -30,7 +35,7 @@ const CHAINED_SED_CALL = {
 	input: { command: `cat notes.md && sed -i '' s/a/b/ ${FRESH_PATH}` },
 }
 const REDIRECTION_CALL = { name: 'Bash', input: { command: "jq '.x' a.json > b.json" } }
-const WRITE_CALL = { name: 'Write', input: { file_path: FRESH_PATH } }
+const WRITE_CALL = { name: WRITE_TOOL, input: { file_path: FRESH_PATH } }
 
 function transcript(...groups: Array<Array<string>>): string {
 	return groups.flat().join('\n')
@@ -86,6 +91,40 @@ describe('time_batch_guard.should_block — the run of single-call turns', () =>
 			target_turn_lines(1, ['b.ts', 'e.ts']),
 			target_turn_lines(2, ['f.ts']),
 			open_turn_lines(3, ['c.ts']),
+		)
+
+		expect(time_batch_guard.should_block(text, FRESH_CALL, NEVER_REFUSED)).toBe(false)
+	})
+})
+
+// **The matcher is not the counter, and joshuafolkken/kit#1798 is what separates them.** A turn
+// issuing one `Write` or one `Glob` is a turn `.claude/settings.json` never hands this guard, so no
+// refusal can land on it — and it still extends the run, because what the counter reads is
+// `is_bundleable` and every one of those tools is in that set. Pinned because the Issue's own premise
+// was that an unmatched tool breaks the count: it does not, and a change made on that reading would
+// have widened the counter as well as the wiring.
+describe('time_batch_guard.should_block — a turn the matcher never reaches', () => {
+	it.each([
+		[WRITE_LABEL, WRITE_TOOL],
+		['a glob', 'Glob'],
+	])('counts %s turn toward the run it sits inside', (_label, name) => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts']),
+			target_turn_lines(1, ['b.ts'], name),
+			open_turn_lines(2, ['c.ts']),
+		)
+
+		expect(time_batch_guard.should_block(text, FRESH_CALL, NEVER_REFUSED)).toBe(true)
+	})
+
+	// The other half of the same line, and the boundary the widening must not cross: a delegation is not
+	// bundleable, so it breaks the run rather than extending it — its result is what the next call needs,
+	// which is the one reason a single-call turn was never recoverable in the first place.
+	it('allows where a delegation breaks the run', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts']),
+			target_turn_lines(1, ['b.ts'], DELEGATION_TOOL),
+			open_turn_lines(2, ['c.ts']),
 		)
 
 		expect(time_batch_guard.should_block(text, FRESH_CALL, NEVER_REFUSED)).toBe(false)
@@ -155,9 +194,8 @@ describe('time_batch_guard.should_block — writes', () => {
 			target_turn_lines(1, ['b.ts'], EDIT_TOOL),
 			open_turn_lines(2, ['c.ts'], EDIT_TOOL),
 		)
-		const write = { name: 'Write', input: { file_path: FRESH_PATH } }
 
-		expect(time_batch_guard.should_block(text, write, NEVER_REFUSED)).toBe(false)
+		expect(time_batch_guard.should_block(text, WRITE_CALL, NEVER_REFUSED)).toBe(false)
 	})
 
 	// **This case is what the target test buys, and it is the one that separates the two
@@ -193,7 +231,7 @@ describe('time_batch_guard — what each predicate admits', () => {
 		['a shell read', SHELL_READ_CALL, true, true],
 		['a file read', FRESH_CALL, true, true],
 		['a josh command', JOSH_CALL, false, false],
-		['a whole-file write', WRITE_CALL, false, false],
+		[WRITE_LABEL, WRITE_CALL, false, false],
 		[EDIT_LABEL, EDIT_CALL, true, false],
 		[SED_LABEL, IN_PLACE_SED_CALL, true, false],
 		['a chained in-place sed', CHAINED_SED_CALL, true, false],

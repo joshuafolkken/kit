@@ -112,6 +112,10 @@ afterAll(() => {
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
+// **Every case here that names no tool is a `Read` payload**, which is what `payload_of` defaults to —
+// so the shell's end of joshuafolkken/kit#1798 was already pinned, and what that Issue moved is the
+// matcher in `.claude/settings.json` (pinned in `claude-settings-hooks.test.ts`). The rule this shell
+// asks is `time/time-batch-guard.test.ts`'s.
 describe('batch_refusal', () => {
 	it('refuses the third consecutive single-call turn', () => {
 		const reason = batch_refusal(payload_of('unbatched'), NOW_MS)
