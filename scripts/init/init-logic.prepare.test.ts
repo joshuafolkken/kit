@@ -25,7 +25,6 @@ function get_prepare_after_merge(existing_prepare: string): string {
 		scripts: Record<string, string>
 	}
 
-	// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
 	return merged.scripts['prepare'] ?? ''
 }
 
@@ -269,7 +268,6 @@ describe("kit's own prepare", () => {
 			scripts: Record<string, string>
 		}
 
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
 		expect(own.scripts['prepare']).toContain(init_logic.GUARDED_LEFTHOOK_CMD)
 	})
 })
@@ -287,7 +285,6 @@ describe('strip_managed_postinstall', () => {
 		}
 
 		expect(result.scripts).not.toHaveProperty(POSTINSTALL)
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
 		expect(result.scripts['build']).toBe('tsc')
 	})
 

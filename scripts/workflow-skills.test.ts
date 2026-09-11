@@ -434,8 +434,9 @@ interface ResidentRule {
 // the rules in `## Git Rules` and `## Collaboration Workflow` free to grow a second copy of their
 // procedure beside the pointer — which is the regression the cap exists to stop, so the cap has to
 // see them. Each rule is a single line: prettier runs with `proseWrap: preserve` here, so the line
-// is the rule, and matching line by line also avoids materializing a match iterator, which
-// `prefer-spread` and `prefer-iterator-to-array` disagree about how to spell.
+// is the rule. Matching line by line also avoided materializing a match iterator, which
+// `prefer-spread` and `prefer-iterator-to-array` used to disagree about how to spell —
+// joshuafolkken/kit#1783 settled that, so only the first reason is load-bearing now.
 function resident_rules(content: string): ReadonlyArray<ResidentRule> {
 	return content
 		.split('\n')

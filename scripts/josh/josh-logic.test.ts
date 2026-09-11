@@ -225,7 +225,6 @@ describe('resolve_alias', () => {
 // A regression back to `--env-file=.env` is not a missing flag — it is a flag that kills both
 // commands before node starts on any machine with no `.env`, credentials in the environment or not.
 describe('COMMAND_MAP env-file commands', () => {
-	/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
 	it('followup reads .env only when it exists', () => {
 		expect(COMMAND_MAP['followup']?.tsx_arguments).toContain(ENV_FILE_FLAG)
 		expect(COMMAND_MAP['followup']?.tsx_arguments).not.toContain(MANDATORY_ENV_FILE_FLAG)
@@ -235,7 +234,6 @@ describe('COMMAND_MAP env-file commands', () => {
 		expect(COMMAND_MAP['notify']?.tsx_arguments).toContain(ENV_FILE_FLAG)
 		expect(COMMAND_MAP['notify']?.tsx_arguments).not.toContain(MANDATORY_ENV_FILE_FLAG)
 	})
-	/* eslint-enable dot-notation */
 })
 
 const SKIP_COMMIT_FLAG = '--skip-commit'
@@ -243,7 +241,6 @@ const SKIP_PUSH_FLAG = '--skip-push'
 const YES_FLAG = '-y'
 
 describe('COMMAND_MAP pr command', () => {
-	/* eslint-disable dot-notation */
 	it('pr command has default_script_arguments with -y --skip-commit --skip-push', () => {
 		const default_arguments = COMMAND_MAP['pr']?.default_script_arguments ?? []
 
@@ -255,7 +252,6 @@ describe('COMMAND_MAP pr command', () => {
 	it('pr command shares the git workflow script', () => {
 		expect(COMMAND_MAP['pr']?.script).toBe(COMMAND_MAP['git']?.script)
 	})
-	/* eslint-enable dot-notation */
 })
 
 describe('josh_logic.spawn_script — default_script_arguments injection', () => {
@@ -297,7 +293,6 @@ describe('josh_logic.run_command', () => {
 })
 
 describe('COMMAND_MAP shell commands', () => {
-	/* eslint-disable dot-notation */
 	it('lint uses a script for parallel execution', () => {
 		expect(COMMAND_MAP['lint']?.script).toBeDefined()
 		expect(COMMAND_MAP['lint']?.shell).toBeUndefined()
@@ -338,7 +333,6 @@ describe('COMMAND_MAP shell commands', () => {
 		expect(shell[2]).toContain('test:unit')
 		expect(shell[2]).toContain('test:e2e')
 	})
-	/* eslint-enable dot-notation */
 })
 
 describe('resolve_tsx_executable', () => {

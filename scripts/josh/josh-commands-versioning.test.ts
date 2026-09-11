@@ -23,7 +23,6 @@ const RANGES_NOT_DEFINED = 'ranges command not defined'
 
 describe('VERSIONING_COMMANDS ranges', () => {
 	it('runs the guard that checks every published dependency range', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['ranges']
 		if (!cmd) throw new Error(RANGES_NOT_DEFINED)
 
@@ -31,7 +30,6 @@ describe('VERSIONING_COMMANDS ranges', () => {
 	})
 
 	it('is listed under Versioning so it appears beside bump in the command help', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['ranges']
 		if (!cmd) throw new Error(RANGES_NOT_DEFINED)
 
@@ -43,7 +41,6 @@ const RELEASE_NOT_DEFINED = 'release command not defined'
 
 describe('VERSIONING_COMMANDS release', () => {
 	it('runs the one command that decides a version from main history', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['release']
 		if (!cmd) throw new Error(RELEASE_NOT_DEFINED)
 
@@ -54,7 +51,6 @@ describe('VERSIONING_COMMANDS release', () => {
 	// against the kit package root, so it keeps working from a consumer checkout where the file lives
 	// under node_modules.
 	it('is a script entry listed under Versioning', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['release']
 		if (!cmd) throw new Error(RELEASE_NOT_DEFINED)
 

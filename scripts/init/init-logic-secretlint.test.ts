@@ -70,7 +70,6 @@ describe('init_logic_secretlint.merge_secretlint_development_deps', () => {
 	})
 
 	it('keeps unrelated devDependencies intact', () => {
-		// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 		expect(parse_merged_deps('{"devDependencies":{"vitest":"^4.0.0"}}')['vitest']).toBe('^4.0.0')
 	})
 })

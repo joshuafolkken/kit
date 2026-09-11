@@ -18,8 +18,9 @@ import { epic_bundle_gaps } from './epic-bundle-gaps'
 // forbids (joshuafolkken/kit#943).
 
 const REPO = 'joshuafolkken/kit'
-// Read through a variable key, as the command itself does: a literal one would be rewritten to dot
-// notation by `dot-notation` and then rejected by `noPropertyAccessFromIndexSignature`.
+// Read through a variable key, as the command itself does. A literal one used to be rewritten to dot
+// notation by `dot-notation` and then rejected by `noPropertyAccessFromIndexSignature`;
+// joshuafolkken/kit#1783 switched that fix off, so matching the command is the whole reason now.
 const CREATE_EPIC: BundleAction = 'create_epic'
 const ADD_TO_EPIC: BundleAction = 'add_to_epic'
 const CREATE_EPIC_LINE = epic_bundle_cli.ACTION_LINES[CREATE_EPIC] ?? ''

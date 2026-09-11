@@ -64,8 +64,9 @@ const LINE_SCHEMA = z.object({
 
 const UNKNOWN_BRANCH = ''
 // The field an attachment line carries the notice in. Named rather than written as a literal for the
-// reason `time-background.ts`'s `BASH_ID_KEY` is: `dot-notation` rewrites `record['prompt']` into
-// `record.prompt`, which a value read as an index-signature record does not have.
+// reason `time-background.ts`'s `BASH_ID_KEY` is: `dot-notation` rewrote `record['prompt']` into
+// `record.prompt`, which a value read as an index-signature record does not have — until
+// joshuafolkken/kit#1783 switched that fix off. The name is kept for its own sake.
 const PROMPT_KEY = 'prompt'
 const NO_MESSAGE_ID = ''
 // How much of an errored body is kept (joshuafolkken/kit#1642). A refusal's body *is* the reason the

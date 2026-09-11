@@ -121,7 +121,6 @@ describe('apply_package_json_merges', () => {
 	it('adds the secretlint CLI and rule preset', () => {
 		const deps = merge_development_dependencies('{}\n')
 
-		// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 		expect(deps['secretlint']).toBeDefined()
 		expect(deps['@secretlint/secretlint-rule-preset-recommend']).toBeDefined()
 	})

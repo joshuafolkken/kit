@@ -48,7 +48,7 @@ describe('rollup_item_schema', () => {
 		expect(result.success).toBe(true)
 
 		if (result.success) {
-			// eslint-disable-next-line dot-notation, @typescript-eslint/dot-notation -- bracket notation prevents naming-convention violation on __typename
+			// eslint-disable-next-line @typescript-eslint/dot-notation -- bracket notation prevents naming-convention violation on __typename
 			expect(result.data['__typename']).toBe(STATUS_CONTEXT)
 			expect(result.data.state).toBe('SUCCESS')
 		}
@@ -69,7 +69,6 @@ describe('rollup_item_schema', () => {
 		const result = rollup_item_schema.safeParse({ name: 'CI', extra_field: 'preserved' })
 
 		expect(result.success).toBe(true)
-		// eslint-disable-next-line dot-notation -- index signature field requires bracket notation
 		if (result.success) expect(result.data['extra_field']).toBe('preserved')
 	})
 
