@@ -191,14 +191,18 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 - **The working-tree hold is claimed before anything else** — `pnpm josh run:hold`, at every typed
   entry point, ahead of the split assessment and ahead of a `new` entry's filing. §2f.
 - **The session boundary is asked at the entry as well, not only after a merge** —
-  `pnpm josh cost --over 150000`, in the same turn as `pnpm josh run:hold` and before anything else
+  `pnpm josh cost --over 300000`, in the same turn as `pnpm josh run:hold` and before anything else
   is started, so a session already carrying an earlier Issue's whole conversation is cut before it
   pays for one more (joshuafolkken/kit#1605 measured 88,481 tokens of carried conversation riding on
   all 49 requests of one `fullrun`, 24% of that run's cost). **It is the same one rule at a second
   application point, and not a second rule**: what the check measures, why the number is passed
-  explicitly, what an exit 1 with empty standard output means, and where 150,000 comes from are all
+  explicitly, what an exit 1 with empty standard output means, and where 300,000 comes from are all
   `epicrun.md` → "The hand-off", the single source — nothing about the post-merge application
-  changes. **Only the seam and the branch differ.** `under`, and the run continues. `over` — or a
+  changes. **300,000 is a temporary experiment rather than a settled number**
+  (joshuafolkken/kit#1775): the figure it replaces, where it sits in that measured distribution and
+  the procedure for retreating to the previous one are all named in the same single source, so a run
+  that reads the threshold here also reads that it is under test. **Only the seam and the branch
+  differ.** `under`, and the run continues. `over` — or a
   run the check could not answer for — and the run **stops before the work starts**: send a
   `confirmation` Telegram carrying the figure the command printed on standard error and the resume
   command — **the invocation as it was typed, in a fresh session**, so a `#N` entry resumes as
@@ -207,7 +211,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   `pnpm josh run:release`, and stop. Nothing has been filed, branched, edited or pushed yet, which is
   what makes the entry the cheapest stop a run has and the reason the question is asked here rather
   than after the plan. **A fresh session is structurally `under`** — its first request carries the
-  resident preamble alone, well below the 150,000 line (the measured median is in `epicrun.md` →
+  resident preamble alone, well below the 300,000 line (the measured median is in `epicrun.md` →
   "The hand-off", with the rest of the derivation) — so this never stops a run that had nothing to
   hand off. **A dispatched child does not ask it, and that is a
   prohibition rather than an omission.** `epicrun`, `queue` and `backlogrun` already own this
@@ -1021,7 +1025,7 @@ merge result?**
   comment exists because a compaction takes the counters at a moment nobody chooses (`epicrun.md` →
   "The counters live in the conversation"), so composing the values earlier moves no write and loses
   no counter.
-- **`pnpm josh cost --over 150000` stays after the merge, and reads nothing from it.** It measures
+- **`pnpm josh cost --over 300000` stays after the merge, and reads nothing from it.** It measures
   this session's own transcript, so the question above would bring it forward — but its answer grows
   with the session, and asking it a call early under-reads the very number the hand-off is decided
   on. It is seconds of tail against a guard on session size, so it keeps its documented seam
@@ -1037,7 +1041,7 @@ the three waits a run actually has:
 | `pnpm josh gate` | `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
 | CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
-| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 150000` |
+| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 300000` |
 
 **The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
 resumes the run, and the turn that reads it goes straight through any branch-2 filing and

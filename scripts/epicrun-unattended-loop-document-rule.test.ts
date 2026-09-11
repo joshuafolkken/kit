@@ -24,7 +24,7 @@ const SKILL = EPICRUN_SKILL
 const POINTER = 'prompts/collaboration-workflow/epicrun.md'
 const FORMAT = 'prompts/collaboration-workflow/report-format.md'
 
-const COST_COMMAND = 'pnpm josh cost --over 150000'
+const COST_COMMAND = 'pnpm josh cost --over 300000'
 const DELEGATE_COMMAND = 'pnpm josh delegate epic-child'
 
 // The two halves of the detection, each asserted twice — present in the skill, absent from the
