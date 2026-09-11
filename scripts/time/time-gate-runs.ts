@@ -1,7 +1,9 @@
+import { ALIASES } from '#scripts/josh/josh-command-map'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { time_command_key } from './time-command-key'
 import { time_format } from './time-format'
 import { time_round_trips } from './time-round-trips'
+import { time_shell } from './time-shell'
 import { time_spans, type Span, type SpanOutcome } from './time-spans'
 
 // How many times a run started the verification gate, and how many of those the procedure accounts
@@ -41,8 +43,8 @@ const FIRST = 0
 const PREVIOUS = 1
 
 // The key `time-command-key.ts` produces for `pnpm josh gate`, built from the gate's own command name
-// rather than spelled out here, so a rename moves both at once.
-const GATE_KEY = `josh ${GATE_COMMAND}`
+// and `time-shell.ts`'s own prefix rather than spelled out here, so a rename moves all of them at once.
+const GATE_KEY = `${time_shell.JOSH_PREFIX}${GATE_COMMAND}`
 
 interface GateRunTotals {
 	run_count: number
@@ -65,11 +67,25 @@ const NO_GATE_RUNS: GateRunTotals = {
 	is_measured: false,
 }
 
+// **A span's key carries the spelling the command line used, and an alias is not expanded into it.**
+// `time_shell.josh_command_of` reads the word after `josh` and prefixes it, so `pnpm josh ga` keys as
+// `josh ga` — and matched raw, a run that used the alias would report `0` gates as a *measurement*,
+// which is the one claim every withheld state in this file exists to avoid. `layer-checks.ts` expands
+// the same table before matching the same target names, so this is what keeps the two readers from
+// disagreeing about whether a command was the gate.
+function canonical_key(key: string): string {
+	if (!key.startsWith(time_shell.JOSH_PREFIX)) return key
+
+	const name = key.slice(time_shell.JOSH_PREFIX.length)
+
+	return `${time_shell.JOSH_PREFIX}${ALIASES[name] ?? name}`
+}
+
 // **A continuation is not a call.** One call bracketing a delegated unit comes back from
 // `time_overlap.trim` as a head and a tail, and counting the tail would report a gate the run never
 // started — the same reading `time-failures.ts` takes of the same split.
 function is_gate(span: Span): boolean {
-	return !span.is_continuation && time_command_key.command_key(span) === GATE_KEY
+	return !span.is_continuation && canonical_key(time_command_key.command_key(span)) === GATE_KEY
 }
 
 // **Ordered before it is walked, not assumed ordered.** A run's spans arrive per session and a

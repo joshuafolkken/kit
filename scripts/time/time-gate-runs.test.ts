@@ -25,6 +25,14 @@ describe('time_gate_runs — the key it matches a gate span on', () => {
 	it('is the same spelling a gate span actually carries', () => {
 		expect(time_gate_runs.GATE_KEY).toBe(GATE_COMMAND)
 	})
+
+	// A span records the spelling the command line used, and nothing expands an alias into it — so a
+	// run that typed `pnpm josh ga` would otherwise report a measured zero gates.
+	it('counts a gate the run started through its alias', () => {
+		const aliased = span(0, 1, { josh_command: 'josh ga', outcome: time_spans.OK_OUTCOME })
+
+		expect(time_gate_runs.build_gate_runs([aliased]).run_count).toBe(1)
+	})
 })
 
 describe('time_gate_runs — how many gates a run started', () => {
