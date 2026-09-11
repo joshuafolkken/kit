@@ -8,6 +8,7 @@ import {
 	has_label_name,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
+	label_name_of,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
@@ -26,6 +27,7 @@ const EPIC_SPELLING = 'epic'
 const EPIC_CREATED_CASING = 'Epic'
 const UNRELATED_SPELLING = 'bug'
 const IN_PROGRESS_SPELLING = 'in-progress'
+const IN_PROGRESS_CREATED_CASING = 'In-Progress'
 const NEEDS_DECISION_SPELLING = 'needs-decision'
 const AUTO_OK_SPELLING = 'auto-ok'
 const NEEDS_HUMAN_REVIEW_SPELLING = 'needs-human-review'
@@ -158,5 +160,27 @@ describe('has_label_name', () => {
 
 	it('treats an empty label list as no labels', () => {
 		expect(has_label_name([], EPIC_LABEL)).toBe(false)
+	})
+})
+
+// A removal names the label in the request path, so the stored spelling is what it has to send —
+// not the lowercase constant it matched against (joshuafolkken/kit#1794).
+describe('label_name_of', () => {
+	it('answers the stored spelling rather than the name it was asked for', () => {
+		expect(label_name_of([IN_PROGRESS_CREATED_CASING], IN_PROGRESS_LABEL)).toBe(
+			IN_PROGRESS_CREATED_CASING,
+		)
+	})
+
+	it('answers the exact name when the casing already matches', () => {
+		expect(label_name_of([IN_PROGRESS_SPELLING], IN_PROGRESS_LABEL)).toBe(IN_PROGRESS_SPELLING)
+	})
+
+	it('answers undefined when the label is not there', () => {
+		expect(label_name_of([UNRELATED_SPELLING], IN_PROGRESS_LABEL)).toBeUndefined()
+	})
+
+	it('answers undefined for an empty label list', () => {
+		expect(label_name_of([], IN_PROGRESS_LABEL)).toBeUndefined()
 	})
 })

@@ -42,6 +42,16 @@ What one invocation does, in order:
   request. A run that stopped at the merge therefore has no Issue comment, and the missing comment —
   not a missing Telegram — is what a failed merge looks like from GitHub.
 - **Closes the epics the Issue completes**, on a merged run only.
+- **Takes the `in-progress` label back off the Issue**, on a merged run only
+  (joshuafolkken/kit#1794). Every entry point writes that label before it implements, and nothing
+  took it off on the ordinary ending — the pull request merged, the Issue closed, and the mark saying
+  "a run is holding this" stayed on. **A run that merged nothing keeps it**, because the Issue is
+  still open and a run may still be holding it. The removal reads the Issue's labels and sends back
+  the spelling GitHub stored, so an `In-Progress` repository is not missed (joshuafolkken/kit#1132),
+  and an Issue that never carried the label is never written to — the read is one call either way.
+  Nothing today reads the label on a closed Issue — `epic:next`, `epic:busy`, `run:progress` and the
+  `auto-ok` pickup all filter to open ones — which is the argument for fixing it rather than against: the day one of them loses that
+  filter, the label is already on every Issue the repository has run.
 - **Nothing after the merge can end the run** (joshuafolkken/kit#1539). Once the pull request has
   merged, every remaining step — the Issue comment, the epic close, the run report, the review
   records and the working-tree hold release — runs on its own: one that fails is **reported by name,
