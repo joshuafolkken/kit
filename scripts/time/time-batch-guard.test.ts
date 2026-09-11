@@ -20,8 +20,16 @@ const FRESH_CALL = { name: 'Read', input: { file_path: FRESH_PATH } }
 // written twice.
 const EDIT_LABEL = 'an edit'
 const SED_LABEL = 'an in-place sed'
-const EDIT_CALL = { name: 'Edit', input: { file_path: FRESH_PATH } }
+const EDIT_TOOL = 'Edit'
+const EDIT_CALL = { name: EDIT_TOOL, input: { file_path: FRESH_PATH } }
 const IN_PLACE_SED_CALL = { name: 'Bash', input: { command: `sed -i '' s/a/b/ ${FRESH_PATH}` } }
+const SHELL_READ_CALL = { name: 'Bash', input: { command: `cat ${FRESH_PATH}` } }
+const JOSH_CALL = { name: 'Bash', input: { command: 'pnpm josh gate' } }
+const CHAINED_SED_CALL = {
+	name: 'Bash',
+	input: { command: `cat notes.md && sed -i '' s/a/b/ ${FRESH_PATH}` },
+}
+const REDIRECTION_CALL = { name: 'Bash', input: { command: "jq '.x' a.json > b.json" } }
 
 function transcript(...groups: Array<Array<string>>): string {
 	return groups.flat().join('\n')
@@ -97,8 +105,9 @@ describe('time_batch_guard.should_block — what it will not refuse', () => {
 		expect(time_batch_guard.should_block(text, dependent, NEVER_REFUSED)).toBe(false)
 	})
 
-	// Every write is outside the bundleable set, which is what keeps `pnpm josh`, `git` and the `gh`
-	// write flags structurally unreachable from here.
+	// The bundleable set is what keeps `pnpm josh`, `git` and the `gh` write flags structurally
+	// unreachable from here — a command that mutates the repository is not a call that could have gone
+	// out beside another, whatever the run of single-call turns behind it looks like.
 	it('allows a call that is not bundleable in the first place', () => {
 		const text = transcript(
 			target_turn_lines(0, ['a.ts']),
@@ -110,48 +119,70 @@ describe('time_batch_guard.should_block — what it will not refuse', () => {
 		expect(time_batch_guard.should_block(text, merge, NEVER_REFUSED)).toBe(false)
 	})
 
-	// **Refusing a write would leave a turn half applied**: Claude Code denies one call and runs the
-	// turn's others, so the siblings of a refused edit land while it does not. `time-bundle-call.ts`
-	// calls an edit bundleable — correctly, since the harness applies a turn's edits in order — which
-	// is exactly why the guard has to ask a second question of its own.
-	it.each([
-		[EDIT_LABEL, EDIT_CALL],
-		['a write', { name: 'Write', input: { file_path: FRESH_PATH } }],
-		[SED_LABEL, IN_PLACE_SED_CALL],
-	])('allows %s, which it must never refuse', (_label, call) => {
-		const text = transcript(
-			target_turn_lines(0, ['a.ts']),
-			target_turn_lines(1, ['b.ts']),
-			open_turn_lines(2, ['c.ts']),
-		)
-
-		expect(time_batch_guard.should_block(text, call, NEVER_REFUSED)).toBe(false)
-	})
-
 	it('allows where the transcript holds nothing to read', () => {
 		expect(time_batch_guard.should_block('', FRESH_CALL, NEVER_REFUSED)).toBe(false)
 	})
 })
 
-// The same two tests the caller asks before reading a quarter-megabyte of transcript, so a write and a
-// `pnpm josh` invocation cost nothing but the hook's own start.
-describe('time_batch_guard.is_guarded_call', () => {
+// joshuafolkken/kit#1762. Writes are **70.5% of the recoverable round trips** measured over 19 runs —
+// 158 `Edit` of 261 — and the guard's own refusal text has always said the rule covers them. The
+// exclusion that kept it from reaching any of them is gone, and what makes refusing one safe is the
+// target test below rather than a blanket answer about the kind of call.
+describe('time_batch_guard.should_block — writes', () => {
 	it.each([
-		['a shell read', { name: 'Bash', input: { command: `cat ${FRESH_PATH}` } }, true],
-		['a file read', FRESH_CALL, true],
-		['a josh command', { name: 'Bash', input: { command: 'pnpm josh gate' } }, false],
-		[EDIT_LABEL, EDIT_CALL, false],
-		[SED_LABEL, IN_PLACE_SED_CALL, false],
-		// A chain is labelled by its first segment, so the leading word alone reads both of these as
-		// reads. Scanning the whole line is what keeps a write out of the set that can be refused.
-		[
-			'a chained in-place sed',
-			{ name: 'Bash', input: { command: `cat notes.md && sed -i '' s/a/b/ ${FRESH_PATH}` } },
-			false,
-		],
-		['a redirection', { name: 'Bash', input: { command: "jq '.x' a.json > b.json" } }, false],
-	])('answers %s with %s', (_label, call, expected) => {
-		expect(time_batch_guard.is_guarded_call(call)).toBe(expected)
+		[EDIT_LABEL, EDIT_CALL],
+		['a write', { name: 'Write', input: { file_path: FRESH_PATH } }],
+		[SED_LABEL, IN_PLACE_SED_CALL],
+	])('refuses %s naming a file the run has not touched', (_label, call) => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts'], EDIT_TOOL),
+			target_turn_lines(1, ['b.ts'], EDIT_TOOL),
+			open_turn_lines(2, ['c.ts'], EDIT_TOOL),
+		)
+
+		expect(time_batch_guard.should_block(text, call, NEVER_REFUSED)).toBe(true)
+	})
+
+	// **This case is what the target test buys, and it is the one that separates the two
+	// implementations.** `time_bundles.is_dependent` answers `false` for a write following a write —
+	// deliberately, so a stretch of edits to one file forms a sequence at all (joshuafolkken/kit#1509) —
+	// so a guard reading it here would refuse exactly the edit whose reissue is least safe: the siblings
+	// of a refused call still run, and an edit to a file the run is already rewriting comes back to text
+	// that has moved under it. `depends_on_sequence` asks `shares_target` instead, and with
+	// `is_dependent` in its place this expectation flips to `true`.
+	it('allows an edit naming a file the run has already been editing', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts'], EDIT_TOOL),
+			target_turn_lines(1, [FRESH_PATH], EDIT_TOOL),
+			open_turn_lines(2, ['c.ts'], EDIT_TOOL),
+		)
+
+		expect(time_batch_guard.should_block(text, EDIT_CALL, NEVER_REFUSED)).toBe(false)
+	})
+})
+
+// The two tests the caller asks before reading a quarter-megabyte of transcript, so a `pnpm josh`
+// invocation costs nothing but the hook's own start. **They are one table because the pair is the
+// content of joshuafolkken/kit#1762**: `is_guarded_call` widened to "could this have gone out beside
+// another call" and admits every write, while `is_read_only_call` is what it used to be and admits
+// none. `scripts/delegation/investigation-reads.ts` asks the second — that guard counts *reading*, so
+// an in-place `sed` stays outside its reach even now that the batching guard can refuse one, and
+// widening the single predicate in place would have moved it silently.
+//
+// A chain is labelled by its first segment, so the leading word alone reads two of these as reads —
+// scanning the whole line is what tells the two columns apart.
+describe('time_batch_guard — what each predicate admits', () => {
+	it.each([
+		['a shell read', SHELL_READ_CALL, true, true],
+		['a file read', FRESH_CALL, true, true],
+		['a josh command', JOSH_CALL, false, false],
+		[EDIT_LABEL, EDIT_CALL, true, false],
+		[SED_LABEL, IN_PLACE_SED_CALL, true, false],
+		['a chained in-place sed', CHAINED_SED_CALL, true, false],
+		['a redirection', REDIRECTION_CALL, true, false],
+	])('answers %s with %s as guarded and %s as read-only', (_label, call, guarded, read_only) => {
+		expect(time_batch_guard.is_guarded_call(call)).toBe(guarded)
+		expect(time_batch_guard.is_read_only_call(call)).toBe(read_only)
 	})
 })
 

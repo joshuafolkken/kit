@@ -80,29 +80,50 @@ interface GuardedCall {
 	input: unknown
 }
 
-// **Refusing a write leaves a turn half applied, so no write is ever refused.** Claude Code denies one
-// call and runs the turn's others, so the siblings of a refused edit land while it does not — and the
-// reissued edit may no longer match the file they have since changed. "Could this have gone out beside
-// another call" is `time-bundle-call.ts`'s question and is answered `true` for an edit deliberately,
-// because the harness applies a turn's edits in order; "is this safe to refuse" is a different question
-// and only this file needs it.
+// **A write is refusable, and the exclusion that said otherwise is gone** (joshuafolkken/kit#1762).
+// Read over 19 recorded runs, 261 of 1,737 round trips (15.0%) were recoverable by batching and **184
+// of them (70.5%) were writes** — 158 `Edit` alone. The refusal's own text has always said the rule
+// covers them ("edits are covered exactly as reads are"); the implementation had not caught up, so the
+// largest single contributor to the waste was the one party the guard could never reach.
 //
-// **It is held here rather than at the hook's matcher, which names `Bash` alone.** A matcher is
-// settings a consumer can widen; this is the guarantee, and it has to hold whatever the wiring says.
+// **Two different things were rejected before this, and separating them is what unblocked it.** What
+// was rejected on measured cost is *widening the hook's matcher and nothing else*: a matcher naming
+// `Edit` in front of an `is_guarded_call` that answers `false` for every write starts a process that
+// can only ever answer "allow". That reasoning is sound and is untouched — the predicate is widened
+// first, so the matcher now reaches a question that has an answer. What was **not** rejected, because
+// nobody had proposed it, is making a write refusable at all; "buy nothing a refusal could use" was a
+// consequence of the exclusion below it rather than a ground of its own.
 //
-// **The set itself lives in `time-bundle-call.ts`** since joshuafolkken/kit#1509, beside the rest of
-// what a call is, because the sequence builder needs the same answer and a second copy here is what
-// let the two disagree — the builder had no way to ask at all, so it read a run of edits to one file
-// as a chain of dependent calls and no sequence ever formed.
+// **The safety objection was real, and it is narrowed rather than dismissed.** Claude Code denies one
+// call of a turn and runs the rest, so a refused edit leaves its siblings applied and itself not, and
+// the reissue can meet text that has moved under it. `depends_on_sequence` below closes the half that
+// is visible: it withholds the refusal whenever the call in hand shares a target with the sequence
+// behind it, writes included, so an edit to a file the run has already been rewriting is never
+// refused.
 //
-// **Widening the matcher to `Edit` was considered and rejected there, on measured cost.** A run of
-// edits reaches the guard through the transcript it reads, not through being matched: the spans are
-// already in the window, and joshuafolkken/kit#1509's fix is what lets them accumulate into a sequence
-// the next guarded call is refused against. Matching `Edit` as well would add a `pnpm josh` dispatch —
-// about 2.4 s measured on this checkout — to every edit a run makes, and buy nothing a refusal could
-// use, because `is_guarded_call` answers `false` for every write and always will. The only thing left
-// for it to emit is an advisory, and that is the `PostToolUse` mechanism joshuafolkken/kit#1344 already
-// measured at 38 notices and no change in the number.
+// **The half it cannot close is the turn it is interrupting** — for the reason stated above, no field
+// in the transcript says what else that turn issued. Three edits to one file batched into a single
+// turn can therefore have their first refused while the other two apply. **The bound is that this
+// surfaces rather than corrupts**: the reissued edit carries the `old_string` it was written with, so
+// it either matches the text it was written against or fails to match at all and is reported. So the
+// residual cost is one round trip in the ordinary case and a failed edit the run must redo in this
+// one — the same false-positive price joshuafolkken/kit#1390 named and accepted for reads, now paid
+// on the calls that carry most of the waste instead of only on the calls that carry the rest.
+//
+// **The dispatch it adds is measured, and it is not the figure the deleted text quoted.** One hook run
+// is **0.53 s** in this checkout and about 0.4 s in a consumer, essentially all of it process startup
+// (`docs/josh-commands.md` → "`josh batch:guard`"); the "about 2.4 s" above was a `pnpm josh` dispatch
+// measured before joshuafolkken/kit#1342 made this command eligible for the in-process path. Against
+// that, one recovered round trip is a whole model turn.
+//
+// **The matcher is settings a consumer can widen, so what a call is stays this module's answer.**
+// `is_guarded_call` is the guarantee and `.claude/settings.json` is the wiring; the two are kept apart
+// so a consumer editing the second cannot change the first.
+//
+// **What a call *is* lives in `time-bundle-call.ts`** since joshuafolkken/kit#1509, beside the rest of
+// it, because the sequence builder needs the same answer and a second copy here is what let the two
+// disagree — the builder had no way to ask at all, so it read a run of edits to one file as a chain of
+// dependent calls and no sequence ever formed.
 
 // One line, and it says four things: what happened, what to do instead, where the rule is written, and
 // what to do when the turn was already batching or the call really is alone. **The last of those is not
@@ -122,11 +143,27 @@ const REASON =
 // Whether this call is one the guard could ever refuse, asked before any transcript is read. **The
 // caller uses it to skip that read**: a quarter-megabyte read inside a hook that holds every call is
 // not worth paying on a `pnpm josh` invocation the answer can never be about.
+//
+// **Bundleable is the whole test, because the criterion is dependency and not the kind of call.** The
+// `may_write` term that used to sit beside it excluded the 70.5% of recoverable round trips that are
+// writes (joshuafolkken/kit#1762). What keeps a write that genuinely cannot be refused safe is
+// `depends_on_sequence`, which reads the targets, rather than a blanket exclusion here.
 function is_guarded_call(call: GuardedCall): boolean {
+	return time_bundle_call.call_facts(call.name, call.input).is_bundleable
+}
+
+// The same question narrowed to calls that write nothing — the test `is_guarded_call` used to be, kept
+// under a name that says what it asks rather than deleted. **`scripts/delegation/investigation-reads.ts`
+// is its caller**, and it needs this answer rather than the one above: it refuses a `Bash` line only
+// where that line is unambiguously a read, so an in-place `sed` stays outside its reach even now that
+// the batching guard can refuse one. Widening the single predicate in place would have loosened that
+// guard silently, which is the one way this change could have gone wrong without a test noticing.
+//
+// **`may_write`, not `is_writing`** — this is a refusal test, and it is the one that has to over-call.
+// The dependency test reads the other field, which may not (joshuafolkken/kit#1509).
+function is_read_only_call(call: GuardedCall): boolean {
 	const facts = time_bundle_call.call_facts(call.name, call.input)
 
-	// **`may_write`, not `is_writing`** — this is the refusal test, and it is the one that has to
-	// over-call. The dependency test reads the other field, which may not (joshuafolkken/kit#1509).
 	return facts.is_bundleable && !facts.may_write
 }
 
@@ -134,8 +171,17 @@ function is_guarded_call(call: GuardedCall): boolean {
 // `time-bundles.ts` treats two calls naming the same path — or one naming a directory the other reads
 // inside of — as ordered, and reuses that test here so a call the report would never have counted as
 // recoverable is never refused either.
+//
+// **It asks for the shared target alone, where `time_bundles.is_dependent` exempts a write following a
+// write, because the two are answering different questions** (joshuafolkken/kit#1762). The builder asks
+// "could these two have gone out together", and for two edits to one file the answer is yes — that
+// exemption is what lets such a stretch form a sequence at all (joshuafolkken/kit#1509). This asks "is
+// refusing this one safe", and there the same pair is the one case where it is not: the siblings of a
+// refused edit still run, so an edit naming a file the run is already rewriting comes back to text that
+// has moved under it. Both sides read `shares_target`, so there is one definition of what sharing a
+// target means and two uses of it rather than a second copy.
 function depends_on_sequence(sequence: ReadonlyArray<Span>, facts: BundleFacts): boolean {
-	return sequence.some((span) => time_bundles.is_dependent(span, facts))
+	return sequence.some((span) => time_bundles.shares_target(span.targets, facts.targets))
 }
 
 // The instant the open sequence began, as far as the window shows. An empty sequence answers `NONE`,
@@ -189,6 +235,7 @@ const time_batch_guard = {
 	SEQUENCE_BEFORE_LIMIT,
 	STAMP_PREFIX,
 	is_guarded_call,
+	is_read_only_call,
 	should_block,
 }
 

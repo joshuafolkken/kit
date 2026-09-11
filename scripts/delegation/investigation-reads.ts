@@ -227,14 +227,21 @@ function is_rearmed(tally: ReadTally, refused_at_ms: number): boolean {
 function is_refusable_command(call: GuardedCall): boolean {
 	const label = time_shell.bash_label(time_shell.bash_command(call.input))
 
-	return CONTENT_READ_LABELS.has(label) && time_batch_guard.is_guarded_call(call)
+	return CONTENT_READ_LABELS.has(label) && time_batch_guard.is_read_only_call(call)
 }
 
-// **A `Read` is always safe to refuse; a `Bash` line is refused only where the batching guard would
-// also have been willing to.** Claude Code denies one call of a turn and runs the rest, so a refused
-// write leaves its siblings applied and itself not — which is why `is_guarded_call` treats `sed`,
-// `tee`, `dd` and any `>` as writing and this defers to it. A `sed -n` read is therefore **counted and
-// never refused**; the refusal lands on the next call that is unambiguously a read.
+// **A `Read` is always safe to refuse; a `Bash` line is refused only where it writes nothing.** This
+// guard counts *reading*, so a line that also writes is one it has no business stopping — a `sed -i`
+// is work rather than investigation, and refusing one would leave the siblings of its turn applied and
+// itself not for no gain in what this guard measures.
+//
+// **It asks `is_read_only_call`, which is what `is_guarded_call` used to mean**
+// (joshuafolkken/kit#1762). The batching guard can now refuse a write, and the two guards ask
+// different questions of the same call: that one asks whether the call could have gone out beside
+// another, this one whether the call is reading. A single shared predicate would have moved this one
+// silently when that one widened, so the read-only test kept its semantics under a name that states
+// them. A `sed -n` read is therefore still **counted and never refused**; the refusal lands on the
+// next call that is unambiguously a read.
 //
 // **A call naming no subject file is never refused either**, which covers two cases in one rule: a
 // call that names only instruction documents — refusing `CLAUDE.md` would stop a run reading the very

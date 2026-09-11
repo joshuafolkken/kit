@@ -50,24 +50,26 @@ const TOOL_SEPARATORS = /[|,]/u
 // for the density line it also carries (joshuafolkken/kit#1337), which reaches the sessions that edit
 // through `sed` — seven of the ten most recent in this checkout, and the ones measured under the floor.
 const FORMAT_TOOLS = ['Edit', 'Write', 'Bash']
-// The guard names `Bash` alone, and the omission is the point (joshuafolkken/kit#1390): it must never
-// refuse a write, because Claude Code denies one call of a turn and runs the rest — so a refused edit
-// leaves its siblings applied and itself not. Wiring it to `Edit` and `Write` would start a process
-// that can only ever answer "allow". `Bash` is 88–100% of the calls in every session under the floor,
-// so the reach is unaffected.
-const GUARD_TOOLS = ['Bash']
+// The guard names the two edit tools beside `Bash` since joshuafolkken/kit#1762. It named `Bash` alone
+// while `is_guarded_call` answered `false` for every write, which made a wider matcher a process that
+// could only ever answer "allow"; the predicate was widened first, so the matcher now reaches a
+// question that has an answer. It is worth the process start because writes are **70.5% of the
+// recoverable round trips** measured over 19 runs — 158 `Edit` of 261 — which `Bash` could not reach
+// however large its share of the calls.
+const GUARD_TOOLS = ['Bash', 'Edit', 'Write']
 // The investigation guard names both, because in this repository the reading is split between them:
 // run #1441 issued 5 `Read` calls against 10 `cat`, 16 `sed` and 1 `tail`, so a `Read`-only wiring
-// would miss the idiom that carries most of the text. It is safe on `Bash` where the batching guard is
-// — it refuses only a line that guard would also have refused, which excludes every possible write.
+// would miss the idiom that carries most of the text. It is safe on `Bash` because it refuses only a
+// line that writes nothing — `is_read_only_call`, which is the test the batching guard used to share
+// with it and kept under that name when it widened (joshuafolkken/kit#1762).
 const READ_GUARD_TOOLS = ['Read', 'Bash']
 // The rule guard (joshuafolkken/kit#1524): the one dispatcher for rules whose trigger can be named as
 // a tool call, so the next rule to leave `CLAUDE.md` costs a row in `delivered-rules.ts` rather than a
 // fourth process in front of every call.
 const RULE_GUARD_HOOK_COMMAND = 'pnpm josh rule:guard'
-// `Bash` alone, for the reason the batching guard names it alone: a refused `Edit` leaves the
-// siblings of its turn applied and itself not, so every rule this dispatcher carries is one whose
-// binding moment is a shell call.
+// `Bash` alone, and for a reason of its own rather than the batching guard's: every rule this
+// dispatcher carries names its binding moment as a shell call — filing an Issue, reading one, pushing
+// — so an `Edit` payload would start a process with no row to match it against.
 const RULE_GUARD_TOOLS = ['Bash']
 // The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
