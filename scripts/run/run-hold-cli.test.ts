@@ -22,6 +22,7 @@ const OTHER_WORKTREE = path.join(scratch, '.git', 'worktrees', 'second')
 const COMMON = path.join(scratch, '.git')
 const ISSUE = '1091'
 const OTHER_ISSUE = '1090'
+const NOT_A_NUMBER = 'not-a-number'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
@@ -60,11 +61,13 @@ describe('parse_request', () => {
 		[[], 'claim'],
 		[[ISSUE], 'claim'],
 		[['--release'], 'release'],
+		[['--release', ISSUE], 'release'],
+		[['--release', '--force'], 'force-release'],
 	])('reads %j as %s', (argv, kind) => {
 		expect(run_hold_cli.parse_request(argv)?.kind).toBe(kind)
 	})
 
-	it.each([[['not-a-number']], [['--release', ISSUE]], [[ISSUE, '12']], [['0']]])(
+	it.each([[[NOT_A_NUMBER]], [['--release', NOT_A_NUMBER]], [[ISSUE, '12']], [['0']]])(
 		'refuses %j',
 		(argv) => {
 			expect(run_hold_cli.parse_request(argv)).toBeUndefined()
@@ -111,7 +114,7 @@ describe('claiming a work tree another run holds', () => {
 		await run_hold_cli.run([OTHER_ISSUE])
 
 		expect(errors.join('\n')).toContain(`#${ISSUE}`)
-		expect(errors.join('\n')).toContain(run_hold.RELEASE_COMMAND)
+		expect(errors.join('\n')).toContain(run_hold.FORCE_RELEASE_COMMAND)
 	})
 
 	it('leaves the existing record in place', async () => {
@@ -133,7 +136,7 @@ describe('claiming a work tree another run holds', () => {
 describe('releasing', () => {
 	it('frees the tree for the next run', async () => {
 		await run_hold_cli.run([ISSUE])
-		await run_hold_cli.run(['--release'])
+		await run_hold_cli.run(['--release', ISSUE])
 		reset_output()
 
 		await run_hold_cli.run([OTHER_ISSUE])
@@ -143,6 +146,92 @@ describe('releasing', () => {
 
 	it('answers none when nothing held it', async () => {
 		await run_hold_cli.run(['--release'])
+
+		expect(out).toEqual([run_hold_cli.NONE_VERDICT])
+	})
+
+	it('releases the unnumbered run the bare claim recorded', async () => {
+		await run_hold_cli.run([])
+		reset_output()
+
+		expect(await run_hold_cli.run(['--release'])).toBe(SUCCESS_EXIT_CODE)
+		expect(out).toEqual([run_hold_cli.RELEASED_VERDICT])
+	})
+})
+
+// joshuafolkken/kit#1799: the record carried no owner, so this command removed whatever was there —
+// and the `busy` stop message is what sends a person here to clear a record they judged stale from
+// outside the run that wrote it.
+describe('releasing a record another run wrote', () => {
+	beforeEach(async () => {
+		await run_hold_cli.run([ISSUE])
+		reset_output()
+	})
+
+	it('answers held and exits non-zero', async () => {
+		expect(await run_hold_cli.run(['--release', OTHER_ISSUE])).toBe(FAILURE_EXIT_CODE)
+		expect(out).toEqual([run_hold_cli.HELD_VERDICT])
+	})
+
+	it('leaves the record in place', async () => {
+		await run_hold_cli.run(['--release', OTHER_ISSUE])
+
+		const read = run_hold.read_hold(run_hold.hold_path(WORKTREE))
+
+		expect(read.kind === 'held' ? read.hold.issue : undefined).toBe(ISSUE)
+	})
+
+	it('names both ways forward on standard error', async () => {
+		await run_hold_cli.run(['--release', OTHER_ISSUE])
+
+		expect(errors.join('\n')).toContain(run_hold.own_release_command(ISSUE))
+		expect(errors.join('\n')).toContain(run_hold.FORCE_RELEASE_COMMAND)
+	})
+
+	// The bare spelling is the unnumbered run's own release, so it is a claimant like any other.
+	it('refuses a bare release while a numbered run holds the tree', async () => {
+		await run_hold_cli.run(['--release'])
+
+		expect(out).toEqual([run_hold_cli.HELD_VERDICT])
+	})
+})
+
+// A record nothing can parse names no run, so no claimant matches it — and removing it anyway is the
+// one thing this path exists to refuse.
+describe('releasing a record that cannot be read', () => {
+	it('answers unknown and removes nothing', async () => {
+		vi.spyOn(run_hold, 'read_hold').mockReturnValue({ kind: 'unreadable' })
+		const removed = vi.spyOn(run_hold, 'release_hold')
+
+		expect(await run_hold_cli.run(['--release', ISSUE])).toBe(FAILURE_EXIT_CODE)
+		expect(out).toEqual([run_hold_cli.UNKNOWN_VERDICT])
+		expect(removed).not.toHaveBeenCalled()
+	})
+})
+
+// The one path that removes a record without matching it: a session that crashed leaves no run
+// behind to release its own record, and an expired one over a dirty tree never frees itself.
+describe('a forced release', () => {
+	it('removes a record another run wrote', async () => {
+		await run_hold_cli.run([ISSUE])
+		reset_output()
+
+		expect(await run_hold_cli.run(['--release', '--force'])).toBe(SUCCESS_EXIT_CODE)
+		expect(out).toEqual([run_hold_cli.RELEASED_VERDICT])
+		expect(run_hold.read_hold(run_hold.hold_path(WORKTREE)).kind).toBe('free')
+	})
+
+	it('says whose record it removed', async () => {
+		await run_hold_cli.run([ISSUE])
+		reset_output()
+
+		await run_hold_cli.run(['--release', '--force'])
+
+		expect(errors.join('\n')).toContain(`#${ISSUE}`)
+	})
+
+	it('answers none when nothing held the tree', async () => {
+		await run_hold_cli.run(['--release', '--force'])
 
 		expect(out).toEqual([run_hold_cli.NONE_VERDICT])
 	})

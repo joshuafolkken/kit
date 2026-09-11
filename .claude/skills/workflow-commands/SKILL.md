@@ -238,7 +238,8 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   (`backlogrun.md`). It is a separate keyword rather than an argument to `epicrun` **because the two
   declare different authorizations**, and membership stays a person's to decide.
 - **The working-tree hold is claimed before anything else** — `pnpm josh run:hold`, at every typed
-  entry point, ahead of the split assessment and ahead of a `new` entry's filing. §2f.
+  entry point that edits the tree, ahead of the split assessment and ahead of a `new` entry's filing.
+  **`kickoff` is exempt**: it edits nothing, so it neither claims nor releases. §2f.
 - **The session boundary is asked at the entry as well, not only after a merge** —
   `pnpm josh cost --over 300000`, in the same turn as `pnpm josh run:hold` and before anything else
   is started, so a session already carrying an earlier Issue's whole conversation is cut before it
@@ -257,7 +258,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   command — **the invocation as it was typed, in a fresh session**, so a `#N` entry resumes as
   `fullrun #<N>` / `halfrun #<N>` and a `new` entry resumes as `fullrun new` / `halfrun new`, since
   the stop happens before the Issue is filed and there is no number to name — then run
-  `pnpm josh run:release`, and stop. Nothing has been filed, branched, edited or pushed yet, which is
+  `pnpm josh run:release <N>`, and stop. Nothing has been filed, branched, edited or pushed yet, which is
   what makes the entry the cheapest stop a run has and the reason the question is asked here rather
   than after the plan. **A fresh session is structurally `under`** — its first request carries the
   resident preamble alone, well below the 300,000 line (the measured median is in `epicrun.md` →
@@ -823,14 +824,16 @@ Full behavior, the thresholds and why the duplicate half compares titles rather 
 ## 2f. The working-tree hold — one run per tree
 
 **Ask `pnpm josh run:hold` before anything else, and obey what it answers.** It is the first call of
-`fullrun`, `halfrun` and `kickoff` alike — before the title is normalized, before `git switch main`,
+`fullrun` and `halfrun` alike — before the title is normalized, before `git switch main`,
 and **before a `new` entry files its Issue**, because a run stopped after the filing has already left
 behind the artifact it should not have created.
 
 ```bash
-pnpm josh run:hold <N>     # a `#N` entry point ; alias: josh rh
-pnpm josh run:hold         # a `new` entry point, before the issue exists
-pnpm josh run:release      # alias: josh rr
+pnpm josh run:hold <N>        # a `#N` entry point ; alias: josh rh
+pnpm josh run:hold            # a `new` entry point, before the issue exists
+pnpm josh run:release <N>     # that same run releasing its own record ; alias: josh rr
+pnpm josh run:release         # the bare form releases the unnumbered run's own record
+pnpm josh run:release --force # a record left behind by a run that has ended
 ```
 
 - **`hold` — this run now holds the tree. Continue.**
@@ -847,18 +850,42 @@ legitimate run. **`epicrun`'s own guard is unchanged** — the two layers guard 
 neither replaces the other. An `epicrun`'s children run this one as any `fullrun` does, one after
 another in the same tree.
 
+**`kickoff` does not claim it, and that is an exemption rather than an omission**
+(joshuafolkken/kit#1799). What these entry points contend for is one branch, one index and one
+uncommitted diff, and `kickoff` touches none of the three: it reads the Issue, normalizes the title,
+posts the plan, notifies and stops, every one of those against GitHub. Claiming for it stopped
+planning work for the length of an unrelated run, over a resource that run was never going to
+disturb. **It is a fact about the command rather than a judgement made at the entry** — "this one is
+small, it will be fine" is still the judgement the paragraph below refuses — and it changes nothing
+for `fullrun` or `halfrun`, which do edit the tree and claim exactly as before.
+
 **Claim it in the checkout the run will edit.** The record is keyed to the work tree the command runs
 in, so a cross-repository `fullrun owner/repo#N` resolves that repository's checkout from
 `pnpm josh doctor` **first** — that resolution is a read and writes nothing — and claims there;
-claiming in the session's own tree would guard the one tree the run never touches. `kickoff` needs no
-checkout at all and claims the session's own tree, which is the only one it can disturb.
+claiming in the session's own tree would guard the one tree the run never touches.
+
+**A release names the run it belongs to** (joshuafolkken/kit#1799). `pnpm josh run:release <N>`
+removes the record only where the record names `<N>`, the bare form only the unnumbered run's, and a
+record belonging to anything else answers **`held`** and is left standing. Until then the command
+removed whatever was there — and the `busy` stop below is what sends a person to type it, on a
+judgement about staleness made from outside the run that wrote the record, so the guard's own
+recovery instruction was a way to free a live run's tree. **`pnpm josh run:release --force` is the
+one spelling that removes a record this run did not write**, and the stop message names it rather
+than the ordinary one.
+
+**Release what the claim recorded, which is not always the Issue number.** A `#N` entry claimed `<N>`
+and releases `<N>`; a **`new` entry claimed before its Issue existed**, so its record carries the
+unnumbered run and it releases with the **bare** form however many numbers the run has acquired
+since. Nothing re-keys a record after the filing — the claim has to come before it, which is the
+whole reason the bare form exists — so a `fullrun new` that stops on a split types
+`pnpm josh run:release`, not `pnpm josh run:release <N>`.
 
 **Releasing is the run's, not a person's memory.** `pnpm josh followup` releases the hold on a merged
 run — the seam every `fullrun`, and every child of an `epicrun` or a `queue`, passes through — and a
 record abandoned by a crashed session expires after 8 hours rather than locking the tree for good.
-**A stop that leaves the tree clean releases it explicitly**: `kickoff` ends with
-`pnpm josh run:release`, and so does a `fullrun` / `halfrun` that stops on a split, a prerequisite or a
-third-party target, because in each of those the tree carries nothing. **`halfrun`'s stop before
+**A stop that leaves the tree clean releases it explicitly**: a `fullrun` / `halfrun` that stops on a
+split, a prerequisite or a third-party target ends with `pnpm josh run:release <N>`, because in each
+of those the tree carries nothing. **`halfrun`'s stop before
 commit keeps the hold**, and so does a `needs-human-review` stop: the uncommitted work still in the
 tree is exactly what a second run would trample, so the release command goes in the stop report and
 the Telegram for the person to type once they are done with it.
@@ -987,7 +1014,7 @@ The procedure, in order:
    on holds a lane against an Issue nothing will ever run.
 3. **Commit nothing, push nothing, open no pull request.** There is no change to gate, no review to
    run and no `pnpm josh followup` to reach; the tree is clean, so release the hold with
-   `pnpm josh run:release`.
+   `pnpm josh run:release <N>`.
 4. **Then behave as the entry point does for a parked child.** A `fullrun` / `halfrun` a person typed
    sends a `confirmation` Telegram naming the Issue and the merge that already covers it, and stops.
    An `epicrun` / `queue` / `backlogrun` child is park-and-continue: no Telegram of its own, the

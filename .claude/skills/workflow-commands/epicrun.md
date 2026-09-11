@@ -853,7 +853,9 @@ is the failure here, not the holding.
 
 **Release the hold on either parked arm, and leave the lane before closing it.**
 `pnpm josh followup` releases the working-tree hold at the **merge**, so a parked child's is still
-held: run `pnpm josh run:release` in the lane, whether that lane is then closed or kept. **A
+held: run `pnpm josh run:release <N>` in the lane — **a release names the run it belongs to**
+(joshuafolkken/kit#1799), and the child's own number is what that record carries — whether that lane
+is then closed or kept. **A
 `needs-human-review` stop is not a park and keeps its hold** — the uncommitted work still in that
 tree is exactly what a second run would trample, which is the rule `halfrun`'s stop before commit
 already carries. `lane:close` does not do it for you — the record is a
@@ -1895,7 +1897,7 @@ nothing to stash, and closing would delete the local branch the resume needs wit
 put it back. **A lost merge race is not one of these rows** — it resolves in its lane rather than
 parking at all ("Conflicts are not predicted" above), and parks only under that section's four
 conditions, which take the after-commit row unchanged. Both rows, the seat a kept lane costs and the
-`pnpm josh run:release` every parked ending owes are "What happens to a lane" above, which is the
+`pnpm josh run:release <N>` every parked ending owes are "What happens to a lane" above, which is the
 single source.
 
 **Parking replaces stopping the session, not the rule that produced the stop.** An upstream defect

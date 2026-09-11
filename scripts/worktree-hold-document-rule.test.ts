@@ -17,8 +17,16 @@ const OPERATING_RULES = 'prompts/collaboration-workflow/operating-rules.md'
 const ENTRY_FILES: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/kickoff.md',
 ]
+// joshuafolkken/kit#1799: the one typed entry that does *not* claim, because it edits nothing. Its
+// own file has to say so — a run following only its own file would otherwise claim a tree it never
+// touches, and then release a record it never wrote.
+const KICKOFF = '.claude/skills/workflow-commands/kickoff.md'
+const KICKOFF_EXEMPTION =
+	'**`kickoff` does not claim the working-tree hold, and does not release one**'
+const OWNED_RELEASE = '**A release names the run it belongs to**'
+const FORCED_RELEASE =
+	'**`pnpm josh run:release --force` is the one spelling that removes a record this run did not write**'
 
 const HOLD_COMMAND = 'run:hold'
 const RELEASE_COMMAND = 'run:release'
@@ -42,6 +50,10 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'**An expired record over a tree that still has uncommitted changes does not free it**',
 	'**The batch entry points claim per child, not per batch.**',
 	'**It answers, so the entry point does not judge.**',
+	'**`kickoff` does not claim it, and that is an exemption rather than an omission**',
+	OWNED_RELEASE,
+	FORCED_RELEASE,
+	'**Release what the claim recorded, which is not always the Issue number.**',
 ]
 
 // The two batch keywords never call it themselves, and a reader of either file has to be told that
@@ -62,12 +74,22 @@ describe(`${SKILL} — the procedure is defined`, () => {
 // Every implementing entry reads the shared bullet list before it starts, so the claim is named there
 // too — ahead of the split assessment, which is the step it has to precede.
 describe(`${SKILL} — the shared bullet names the claim`, () => {
-	it.each(['**The working-tree hold is claimed before anything else**', SECTION_POINTER])(
-		'states %j',
-		(marker) => {
-			expect(read_unwrapped(SKILL)).toContain(marker)
-		},
-	)
+	it.each([
+		'**The working-tree hold is claimed before anything else**',
+		'**`kickoff` is exempt**',
+		SECTION_POINTER,
+	])('states %j', (marker) => {
+		expect(read_unwrapped(SKILL)).toContain(marker)
+	})
+})
+
+// The exemption is read from this file by a `kickoff` that opens nothing else, so it states both
+// halves: that it does not claim, and — the half that keeps it safe — that it therefore releases
+// nothing either.
+describe(`${KICKOFF} — the exempt entry says it does not claim`, () => {
+	it.each([KICKOFF_EXEMPTION, SECTION_CITATION])('states %j', (marker) => {
+		expect(read_unwrapped(KICKOFF)).toContain(marker)
+	})
 })
 
 // Per entry file rather than over their concatenation: each is read alone, so a sentence that landed
@@ -104,6 +126,9 @@ describe(`${DOCS} — the command reference documents the behavior`, () => {
 		'**The pid is recorded for the person reading the stop, never as the liveness test**',
 		"**Age alone never frees a tree, because some holds are held across a person's latency.**",
 		CHECKOUT_RULE,
+		OWNED_RELEASE,
+		FORCED_RELEASE,
+		'**`kickoff` does not ask it**',
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
@@ -116,6 +141,8 @@ describe(`${OPERATING_RULES} — the canonical topic carries the trigger`, () =>
 		'### 作業ツリーは 1 本のランが保持する（`josh run:hold`）',
 		'**判定の単位は作業ツリーであり、リポジトリではない。**',
 		'**`epicrun` 側の既存ガードは変更しない**',
+		'**`kickoff` は対象外である**',
+		'**解除は、どのランのものかを名乗る**',
 		SECTION_POINTER,
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)

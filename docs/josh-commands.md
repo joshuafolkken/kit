@@ -2501,7 +2501,9 @@ Say whether another run already holds this working tree, and claim it when it do
 ```bash
 pnpm josh run:hold 1091                            # alias: josh rh
 pnpm josh run:hold                                 # a `new` entry point, before the issue exists
-pnpm josh run:release                              # alias: josh rr
+pnpm josh run:release 1091                         # that same run releasing its own record ; alias: josh rr
+pnpm josh run:release                              # the bare form releases the unnumbered run's own record
+pnpm josh run:release --force                      # a record left behind by a run that has ended
 ```
 
 **The unit is the working tree, not the repository.** `epicrun` already asks `epic-busy.ts` whether a _repository_ has a child in flight, and that read must not be reused here: what these entry points contend for is one branch, one index and one uncommitted diff, and a linked work tree has its own three — so a repository-scoped answer would stop a second work tree's legitimate run, which is exactly the parallelism a later epic is meant to buy. The record is keyed to `git rev-parse --absolute-git-dir`, which is `.git` in the main work tree and `.git/worktrees/<name>` in a linked one, so two work trees of one repository key differently and two commands in the same work tree key alike.
@@ -2515,12 +2517,19 @@ pnpm josh run:release                              # alias: josh rr
 | `unknown`  | The work tree's git directory could not be read; nothing was established | 1         |
 | `released` | `run:release` cleared a record that was there                            | 0         |
 | `none`     | `run:release` found nothing to clear                                     | 0         |
+| `held`     | `run:release` found a record **another** run wrote — nothing was removed | 1         |
 
-Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)` captures something a loop can branch on. Every explanation goes to standard error, and it names the holder, the time the record was written, the pid that wrote it, and `pnpm josh run:release` as the way to clear a stale one.
+Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)` captures something a loop can branch on. Every explanation goes to standard error, and it names the holder, the time the record was written, the pid that wrote it, and `pnpm josh run:release --force` as the way to clear a stale one.
+
+**A release names the run it belongs to** ([#1799](https://github.com/joshuafolkken/kit/issues/1799)). `pnpm josh run:release 1091` removes the record only where the record names `1091`; the bare form is the unnumbered run's own release, mirroring the bare claim that records `new`; and a record belonging to anything else answers `held` and is left exactly where it was. Until then the command removed whatever was there — and the `busy` message above is what sends a person to type it, on a judgement about staleness made from outside the run that wrote the record, so **the guard's own recovery instruction was a way to free a live run's tree**: the incident of 2026-08-30, reached through the guard written to prevent it. The identity is the issue rather than the pid for the reason the pid is never read back at all: the process that claims a tree is a short-lived `josh run:hold` that has already exited, while the issue identifies a run across every command it issues. `josh run:carry` compares a recorded owner against a declared one for the same reason; what differs is only who the owner is.
+
+**`pnpm josh run:release --force` is the one spelling that removes a record this run did not write**, and it says on standard error whose record it removed. It exists because a record genuinely abandoned by a crashed session has no run left to release it, and because an expired record over a tree that still has uncommitted changes never frees itself. **A record that cannot be parsed is refused rather than forced through**: it names no run, so no claimant can match it, and the plain release answers `unknown` and removes nothing.
+
+**`pnpm josh followup` is unaffected**, because it releases the hold in process rather than through this command — the run whose pull request just merged is the run that claimed the tree, so there is nothing for it to name.
 
 **An unreadable record answers `busy`, never `hold`.** A present record that cannot be parsed is the state a guard must not fall open on, because the run that wrote it is the one whose uncommitted work would be trampled — the same reason `epic-busy.ts` refuses to report an unreadable listing as an idle repository.
 
-**A claim never overwrites a record that is already there.** Overwriting is the thing being prevented; the person who knows the other run has ended clears it with `pnpm josh run:release`.
+**A claim never overwrites a record that is already there.** Overwriting is the thing being prevented; the person who knows the other run has ended clears it with `pnpm josh run:release --force`, which is the one spelling that removes a record this run did not write.
 
 **Two claims racing for one tree cannot both win.** The claim on a tree that read as free is an exclusive create rather than a write, so of two sessions typing an entry point in the same second exactly one is told `hold` and the other is told `busy` — a plain write would tell both of them they won, which is the incident reproduced by the guard meant to stop it.
 
@@ -2529,6 +2538,8 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)
 **Age alone never frees a tree, because some holds are held across a person's latency.** `halfrun`'s stop before commit and a `needs-human-review` stop both leave uncommitted work in the tree deliberately, and no age can be chosen that covers a person going home for the night. **An expired record over a tree that still has uncommitted changes answers `busy`** and says to commit, stash, or release once the work is done; only an expired record over a clean tree is replaced. A tree state that could not be read counts as dirty, for the reason every other unreadable state here blocks.
 
 **Claim it in the checkout the run will edit.** The record is keyed to the work tree the command runs in, so a cross-repository entry point resolves the target repository's checkout from `pnpm josh doctor` before claiming; claiming in the session's own tree would guard the one tree that run never touches.
+
+**`kickoff` does not ask it** ([#1799](https://github.com/joshuafolkken/kit/issues/1799)). What this guard protects is one branch, one index and one uncommitted diff, and that command touches none of the three — it reads the Issue, normalizes the title, posts the plan, notifies and stops, every one of those against GitHub. Claiming for it stopped planning work for the length of an unrelated run, over a resource that run was never going to disturb. It is a fact about the command rather than a judgement made at the entry, and nothing changes for `fullrun` or `halfrun`, which do edit the tree.
 
 The entry points that ask it, and where in each procedure, are `.claude/skills/workflow-commands/SKILL.md` → "2f. The working-tree hold — one run per tree".
 

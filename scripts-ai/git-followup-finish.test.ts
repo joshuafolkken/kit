@@ -324,6 +324,17 @@ describe('the working-tree hold is released only by a merged run', () => {
 		await expect(git_followup_finish.release_worktree_hold(true)).resolves.toBeUndefined()
 		expect(release_hold_mock).not.toHaveBeenCalled()
 	})
+
+	// joshuafolkken/kit#1799: a release names the run it belongs to, so a person finishing this step
+	// by hand is releasing a record they did not write. The plain spelling answers `held` and removes
+	// nothing there — a printed recovery that cannot recover, which is the failure this step's whole
+	// `recovery` field exists to avoid.
+	it('offers a recovery a person other than the run can actually run', () => {
+		const steps = git_followup_finish.build_finish_steps('#42', true)
+		const hold = steps.find((step) => step.label === 'The working-tree hold release')
+
+		expect(hold?.recovery).toBe('pnpm josh run:release --force')
+	})
 })
 
 // joshuafolkken/kit#1539. The tail used to be four bare statements, so whichever of them threw first
