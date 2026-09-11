@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -29,6 +29,7 @@ const SUCCESS = 0
 const FAILURE = 1
 const LOOP_FLAG = '--loop'
 const INTERVAL_FLAG = '--interval'
+const OUTPUT_LABEL = 'output: '
 
 const out: Array<string> = []
 const errors: Array<string> = []
@@ -39,6 +40,12 @@ function wake_target(): string {
 
 function carry_target(): string {
 	return run_carry.carry_path(REPOSITORY)
+}
+
+// It is keyed on the scratch repository but written into the real temp directory, so it is removed
+// with the records rather than by the scratch tree's own teardown.
+function log_target(): string {
+	return run_wake.wake_log_path(REPOSITORY)
 }
 
 // Written as a stamp rather than through `begin_carry`, because what these cases turn on is a record
@@ -67,10 +74,12 @@ beforeEach(() => {
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])
 	run_wake.remove_wake(wake_target())
 	run_carry.end_carry(carry_target())
+	rmSync(log_target(), { force: true })
 })
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
+	rmSync(log_target(), { force: true })
 })
 
 describe('josh run:wake — the stdout contract', () => {
@@ -188,7 +197,7 @@ describe('josh run:wake --list — what a stalled cut looks like', () => {
 
 		await run_wake_cli.run(['--list'])
 
-		expect(errors.join('\n')).toContain(run_wake.wake_log_path(REPOSITORY))
+		expect(errors.join('\n')).toContain(log_target())
 	})
 
 	// Nothing is outstanding before the first launch, and a line saying "0 outstanding" on every listing
@@ -248,5 +257,41 @@ describe('josh run:wake — no repository', () => {
 
 		expect(await run_wake_cli.run(['--list'])).toBe(FAILURE)
 		expect(out).toStrictEqual([run_wake_cli.UNKNOWN_VERDICT])
+	})
+})
+
+// joshuafolkken/kit#1759. The path was never wrong — `--list` and the launch read the same value from
+// the same function. What was missing is the file: it was created only by the process that launched,
+// at the moment it launched, so every verb that names the path without launching named one that need
+// not exist.
+describe('josh run:wake — the log exists at the path it names', () => {
+	it('names a path that exists, so the listing can be acted on', async () => {
+		write_carry(false)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
+
+		await run_wake_cli.run(['--list'])
+
+		const named = errors.join('\n').split(OUTPUT_LABEL, 2)[1]?.split('\n', 1)[0]
+
+		expect(named).toBe(log_target())
+		expect(existsSync(log_target())).toBe(true)
+	})
+
+	// The already-running branch of `--start` prints the same listing and launches nothing, so it is
+	// the path on which the file used to be named without anything ever creating it.
+	it('leaves the log in place for a `--start` that found a supervisor already running', async () => {
+		write_carry(true)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, new Date()))
+
+		expect(await run_wake_cli.run(['--start'])).toBe(SUCCESS)
+		expect(existsSync(log_target())).toBe(true)
+	})
+
+	// Nothing to supervise is still a repository whose log path is resolvable, and an empty file there
+	// is the honest answer rather than an absent one.
+	it('creates the log even where there is no supervisor to list', async () => {
+		await run_wake_cli.run(['--list'])
+
+		expect(readFileSync(log_target(), 'utf8')).toBe('')
 	})
 })
