@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { cost_blocks } from '#scripts/cost/cost-blocks'
+import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_bundle_call } from '#scripts/time/time-bundle-call'
@@ -57,7 +58,7 @@ const CONTENT_READ_LABELS: ReadonlySet<string> = new Set(
 // What the refusal tells the model. It has to name the count, the command and the return shape,
 // because the deny reason is the only text that reaches the model — a run that is refused and told
 // nothing reads it as a broken tool.
-const REASON = `${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited since the last delegated unit, so the reading from here goes to a unit of its own. Ask \`pnpm josh delegate investigation\`, then brief a unit with what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. The rule is \`.claude/skills/workflow-commands/SKILL.md\` → §2b, "The pre-implementation reading".`
+const REASON = `${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited since the last delegated unit, so the reading from here goes to a unit of its own. Ask \`pnpm josh delegate investigation\`, then brief a unit with what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file — an \`Edit\` cannot be issued against text you do not hold. This run's own instructions and the harness's own session files — a backgrounded call's output, a persisted tool result, this session's scratchpad — are never counted, so they are not what took the count here. The rule is \`.claude/skills/workflow-commands/SKILL.md\` → §2b, "The pre-implementation reading".`
 
 interface ReadTally {
 	// The files read and not since edited, resolved so the two ways a target reaches here compare.
@@ -96,14 +97,94 @@ function resolved(target: string): string {
 // **Anchored at the repository root, not matched anywhere in the absolute path.** Testing the
 // absolute string made every file in the repository an instruction document for anyone whose checkout
 // sits under a directory called `prompts` — which disarmed the guard entirely, in silence.
+// Both path predicates below ask the same question of the repository root, so the expression is named
+// once rather than written twice — they differ only in what they do with the answer.
+function repository_relative(absolute: string): string {
+	return path.relative(REPOSITORY_ROOT, absolute)
+}
+
 function is_instruction_document(target: string): boolean {
-	const relative = path.relative(REPOSITORY_ROOT, resolved(target))
+	const relative = repository_relative(resolved(target))
 	const segments = relative.split(path.sep)
 
 	return (
 		INSTRUCTION_FILES.has(segments.at(-1) ?? '') ||
 		INSTRUCTION_PATHS.some((prefix) => relative.startsWith(`${prefix}${path.sep}`))
 	)
+}
+
+// **The harness's own session files are not the subject either, and it is the same test that excludes
+// them** (joshuafolkken/kit#1771): no unit can be sent to read one on the main line's behalf. A
+// backgrounded call's result reaches its run *only* as `tasks/<id>.output` under this session's temp
+// tree, and a tool result too large for the transcript reaches it *only* as a file the harness wrote
+// under `.claude/projects/`. Refusing either refuses a run the answer to an instruction it issued
+// itself — and the remedy the refusal names does not exist for a file that belongs to this session
+// alone, so the round trip buys nothing and the read is simply reissued.
+//
+// **Anchored on a directory the harness *writes*, never on the session tree as a whole.** Exempting
+// the whole tree would have disarmed the guard in silence for anything a run unpacks or clones into
+// its scratchpad to investigate — real subject material, read to find out how something works, that
+// would never have reached the count. That is the failure the instruction-document half's own anchor
+// note describes, and it is why the scratchpad is deliberately **not** exempt: what stays exempt is
+// what the harness itself wrote.
+const SESSION_TEMP_SEGMENT = /^claude-\d+$/u
+// **Single-sourced from `cost-transcript.ts`**, which already owns where the harness keeps a session's
+// state and builds the transcript directory out of it — spelling `.claude/projects` a second time here
+// is the clone `CLAUDE.md` prohibits. That module joins the value onto a home directory and this one
+// matches it as a run of segments, so what the two share is the fact rather than the use.
+//
+// **The `tasks/<id>.output` spelling is deliberately *not* borrowed from `time-background.ts`.** This
+// rule matches the session *tree*, which covers that file, the scratchpad and the transcript in one
+// test; matching the file name would need a second rule for each of the others.
+const SESSION_STATE_SEGMENTS = cost_transcript.TRANSCRIPT_ROOT.split(path.sep)
+// The directories the harness writes into a session's temp tree: a backgrounded call's
+// `tasks/<id>.output`, and the result of a call whose output was too large to return inline.
+const HARNESS_OUTPUT_DIRECTORIES: ReadonlySet<string> = new Set(['tasks', 'tool-results'])
+
+// The state root holds transcripts and persisted results and no subject code, so it is exempt whole.
+// It is not anchored to the home directory: `cost-transcript.ts` is this package's only file allowed
+// to look that up at all (`scripts/no-global-shim-write.test.ts`), and two adjacent segments outside
+// the checkout are specific enough without it.
+function has_state_root(segments: ReadonlyArray<string>, index: number): boolean {
+	return SESSION_STATE_SEGMENTS.every((segment, offset) => segments[index + offset] === segment)
+}
+
+// The temp tree is exempt only *inside* a directory the harness wrote — the narrowing above. The
+// containing directories are tested rather than the file's own name, so `tasks/<id>.output` qualifies
+// and a sibling the run put there itself does not.
+function is_harness_output(segments: ReadonlyArray<string>): boolean {
+	return (
+		segments.some((segment) => SESSION_TEMP_SEGMENT.test(segment)) &&
+		segments.slice(0, -1).some((segment) => HARNESS_OUTPUT_DIRECTORIES.has(segment))
+	)
+}
+
+// **A path inside the checkout is never one of these, whatever its directories are called.** The
+// instruction-document test above is anchored at the repository root because matching the absolute
+// string made every file an instruction document for a checkout sitting under a directory called
+// `prompts`; this test cannot borrow that anchor, since the files it names live outside the checkout by
+// construction. So the anchor is inverted — leaving the repository is a precondition — and a
+// repository file can therefore never be exempted here, whatever it is named.
+function is_outside_repository(absolute: string): boolean {
+	return repository_relative(absolute).startsWith('..')
+}
+
+function is_session_artifact(target: string): boolean {
+	const absolute = resolved(target)
+	const segments = absolute.split(path.sep)
+
+	if (!is_outside_repository(absolute)) return false
+
+	return (
+		segments.some((_segment, index) => has_state_root(segments, index)) ||
+		is_harness_output(segments)
+	)
+}
+
+// The two exclusions answer one question — could a unit be sent to read this instead? — so a target
+// failing either is not the Issue's subject and never reaches the count.
+function is_subject_file(target: string): boolean {
+	return !is_instruction_document(target) && !is_session_artifact(target)
 }
 
 // A shell glob resolves to a literal path with a `*` in it, which no edit can ever name — so left in,
@@ -118,7 +199,7 @@ function is_content_read(label: string): boolean {
 
 function subject_targets(targets: ReadonlyArray<string>): ReadonlyArray<string> {
 	return targets
-		.filter((target) => is_nameable_file(target) && !is_instruction_document(target))
+		.filter((target) => is_nameable_file(target) && is_subject_file(target))
 		.map((target) => resolved(target))
 }
 
@@ -274,6 +355,8 @@ const investigation_reads = {
 	is_instruction_document,
 	is_rearmed,
 	is_refusable_call,
+	is_session_artifact,
+	is_subject_file,
 	projected_count,
 	resolved,
 	should_block,
