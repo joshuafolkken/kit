@@ -31,12 +31,19 @@ const USAGE = 'Usage: josh doc:section <file.md> "<heading>"'
 
 // A bare `epicrun.md` means the workflow skill's own copy, because that is how every reference in
 // those documents spells it; anything that resolves as a path is taken as one.
+//
+// **Every branch resolves against `root`, including the first.** Left relative to the process's own
+// directory, a bare name that happened to exist beside the caller would beat the document under
+// `root` and print a section of the wrong file — silently, which is the failure this command exists
+// to refuse (joshuafolkken/kit#1776 review round 2).
 function resolve_document(name: string, root: string = process.cwd()): string {
-	if (existsSync(name)) return name
+	const named = path.resolve(root, name)
+
+	if (existsSync(named)) return named
 
 	const in_skill = entry_read_set.document_path(root, name)
 
-	return existsSync(in_skill) ? in_skill : path.resolve(root, name)
+	return existsSync(in_skill) ? in_skill : named
 }
 
 function report_missing(markdown: string, heading: string): number {
