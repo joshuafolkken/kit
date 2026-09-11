@@ -136,5 +136,23 @@ const ALIASES: Record<string, string> = {
 	es: 'eval:scope',
 }
 
+// The canonical name of a `josh` subcommand: an alias expands, and anything else passes through
+// unchanged (joshuafolkken/kit#1789).
+//
+// **The expansion is one rule, so it lives beside the table it reads.** Two readers had each written
+// their own `ALIASES[name] ?? name` — the layer report and the gate-run count — and a third, the run
+// measurement's command key, had not, so `pnpm josh ga` and `pnpm josh gate` were measured as two
+// different commands. A lookup is small enough to copy and exactly the kind of copy that drifts: the
+// two that had it disagreed with the one that did not about whether a call was the gate.
+//
+// **`Object.hasOwn` rather than a bare lookup**, because a subcommand spelled like a member of
+// `Object.prototype` — `constructor`, `toString` — would otherwise come back as that member instead
+// of as itself, and the caller would key a call by something that is not a command name at all.
+function canonical_command(name: string): string {
+	if (!Object.hasOwn(ALIASES, name)) return name
+
+	return ALIASES[name] ?? name
+}
+
 export type { CommandCategory, CommandEntry } from './josh-command-types'
-export { ALIASES, CATEGORY_ORDER, COMMAND_MAP }
+export { ALIASES, CATEGORY_ORDER, COMMAND_MAP, canonical_command }

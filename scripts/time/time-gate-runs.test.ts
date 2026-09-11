@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { time_format } from './time-format'
 import { time_gate_runs } from './time-gate-runs'
 import { time_phase_fixture } from './time-phase-fixture'
+import { time_shell } from './time-shell'
 import { time_spans, type Span, type SpanOutcome } from './time-spans'
 
 // joshuafolkken/kit#1786: `prompts/review.md` allows one gate per commit plus one wherever an edit
@@ -26,10 +27,14 @@ describe('time_gate_runs — the key it matches a gate span on', () => {
 		expect(time_gate_runs.GATE_KEY).toBe(GATE_COMMAND)
 	})
 
-	// A span records the spelling the command line used, and nothing expands an alias into it — so a
-	// run that typed `pnpm josh ga` would otherwise report a measured zero gates.
+	// A span records the command the line named, and since joshuafolkken/kit#1789 an alias is expanded
+	// into that name — so a run that typed `pnpm josh ga` is the same gate as one that typed it in
+	// full, rather than a measured zero gates.
 	it('counts a gate the run started through its alias', () => {
-		const aliased = span(0, 1, { josh_command: 'josh ga', outcome: time_spans.OK_OUTCOME })
+		const aliased = span(0, 1, {
+			josh_command: time_shell.josh_command_of('pnpm josh ga'),
+			outcome: time_spans.OK_OUTCOME,
+		})
 
 		expect(time_gate_runs.build_gate_runs([aliased]).run_count).toBe(1)
 	})

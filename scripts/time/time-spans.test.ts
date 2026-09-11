@@ -186,6 +186,12 @@ describe('time_spans.josh_command_of', () => {
 		expect(time_spans.josh_command_of('pnpm josh lint && pnpm josh gate')).toBe('josh lint')
 	})
 
+	// One command typed two ways used to key as two (joshuafolkken/kit#1789): the per-command table
+	// printed a row each, and the failure chain did not see the alias as a re-run of the full name.
+	it('expands an alias to the command it stands for', () => {
+		expect(time_spans.josh_command_of('pnpm josh ga')).toBe('josh gate')
+	})
+
 	it('answers empty for a command that names none', () => {
 		expect(time_spans.josh_command_of('git status')).toBe('')
 	})

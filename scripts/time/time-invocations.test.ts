@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { time_invocations, type InvocationTotal } from './time-invocations'
+import { time_shell } from './time-shell'
 import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span } from './time-spans'
 
@@ -158,5 +159,20 @@ describe('time_invocations.invocation_lines', () => {
 		const lines = time_invocations.invocation_lines(time_invocations.build_invocations(many))
 
 		expect(lines[3]).toContain(`+${String(14 - time_invocations.MAX_DURATIONS)} more`)
+	})
+})
+
+// `pnpm josh ga` and `pnpm josh gate` are one command typed two ways (joshuafolkken/kit#1789), and
+// two rows of one call each is worse than a wrong row here: a command called once is left out of the
+// listing, so splitting the two made both of them disappear from it.
+describe('time_invocations.build_invocations — an alias and the command it stands for', () => {
+	it('puts both on one row', () => {
+		const aliased = time_shell.josh_command_of('pnpm josh ga')
+		const rows = time_invocations.build_invocations([
+			call(2, 1, PNPM_LABEL, GATE_COMMAND),
+			call(5, 2, PNPM_LABEL, aliased),
+		])
+
+		expect(shaped(rows)).toEqual([[GATE_COMMAND, 2, [1, 2]]])
 	})
 })

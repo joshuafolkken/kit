@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
+import { canonical_command } from '#scripts/josh/josh-command-map'
 import { json_value } from '#scripts/json-value'
 
 // Reading a shell command well enough to name what it ran (joshuafolkken/kit#1344).
@@ -173,11 +174,20 @@ function bash_label(command: string): string {
 	return word === '' ? cost_blocks.BASH_TOOL : `${cost_blocks.BASH_TOOL}${BASH_SEPARATOR}${word}`
 }
 
+// **An alias is expanded here, so one command is one name** (joshuafolkken/kit#1789). Every reading
+// built on this field keyed `pnpm josh ga` and `pnpm josh gate` as two different commands: the
+// per-command table printed them as two rows, the per-invocation table dropped both for having one
+// call each, and — the one with real cost — the failure chain did not see the second as answering the
+// first, so the time a red gate made the run pay again went unreported.
+//
+// **The expansion belongs at the name, not at each reader.** `time-gate-runs.ts` had already patched
+// its own copy of this reading, which left the gate count and the per-invocation table answering
+// differently about the same run; `canonical_command` is the one rule both now go through.
 function josh_command_of(command: string): string {
 	const words = command_words(command_segment(command))
 	const name = JOSH_PATTERN.exec(words.join(' '))?.[1]
 
-	return name === undefined ? '' : `${JOSH_PREFIX}${name}`
+	return name === undefined ? '' : `${JOSH_PREFIX}${canonical_command(name)}`
 }
 
 // A redirection is not an argument, and keeping one splits a single check into two signatures

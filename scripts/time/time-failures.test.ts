@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { time_failures } from './time-failures'
+import { time_shell } from './time-shell'
 import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span } from './time-spans'
 
@@ -168,6 +169,21 @@ describe('time_failures.build_failures — an outcome nobody could read', () => 
 
 	it('reports an empty span list as unmeasured', () => {
 		expect(time_failures.build_failures([])).toEqual(time_failures.NO_FAILURES)
+	})
+})
+
+// `pnpm josh ga` and `pnpm josh gate` are one command typed two ways (joshuafolkken/kit#1789). Keyed
+// apart, the alias did not answer the red gate before it, and the minutes the failure made the run
+// pay again were left out of the rework figure entirely.
+describe('time_failures.build_failures — a command re-run through its alias', () => {
+	it('charges the alias call to the command that failed', () => {
+		const aliased = time_shell.josh_command_of('pnpm josh ga')
+		const totals = time_failures.build_failures([
+			gate(1, FAILED_OUTCOME),
+			outcome_span(2, OK_OUTCOME, PNPM_LABEL, aliased),
+		])
+
+		expect(totals.rerun_ms).toBe(MINUTE_MS)
 	})
 })
 
