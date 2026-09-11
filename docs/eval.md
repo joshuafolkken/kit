@@ -259,6 +259,16 @@ made it worse. Removing that variable and the three beside it from the child's e
 5/5 held in 54 seconds (joshuafolkken/kit#1158, carried into joshuafolkken/kit#1197). The harness now
 does that itself, in `session_environment`, so nothing has to be set by hand.
 
+**A proxy on this machine's own interface is removed with them** (joshuafolkken/kit#1760). Whatever
+wraps this machine's package manager may stand a scanning proxy up on a loopback port and write
+`HTTPS_PROXY` into everything the invocation spawns — and a session that inherits it dials that port
+instead of the API. `josh run:wake` is where it was found, because a detached supervisor outlives the
+invocation and the port is gone by the time it wakes anything; the eval suite spawns its sessions
+while that proxy is still listening, so it was never the one failing. It is removed here all the
+same: neither launcher starts a package install, and a proxy that exists to inspect package downloads
+has no business carrying a session's API traffic. **A proxy naming a real host is left exactly as it
+was**, so a machine that reaches the API through its network's proxy is untouched.
+
 **That fix does not retire the defense built beside it.** A connection can fail again for reasons
 that have nothing to do with an inherited socket, and the failure mode being closed here is the one
 where the suite pays for five sessions and returns `unmeasured` — so a refused connection is now

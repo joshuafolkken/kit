@@ -15,6 +15,7 @@ const ONE_FLAG_INVOCATION = 'backlogrun --max 5'
 const BARE_INVOCATION = 'backlogrun'
 const SCRIPT = '/somewhere/run-wake-cli.ts'
 const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
+const LOOPBACK_PROXY = 'http://localhost:52554'
 
 describe('run_wake_session.wake_argv — what the woken session is asked to do', () => {
 	it('runs the agent CLI headless with the recorded invocation as its prompt', () => {
@@ -190,19 +191,16 @@ describe('run_wake_session.supervisor_argv — the detached self', () => {
 	})
 })
 
-describe('the parent-session environment is single-sourced', () => {
-	// Two copies of this list is the clone that fails silently: the child dials the parent's private
-	// socket and the session dies with nothing naming the cause (joshuafolkken/kit#1158).
-	it('removes each parent-session variable rather than blanking it', () => {
-		const removed = agent_session_environment.removed_environment()
+// What `removed_environment` takes out is pinned beside the module itself, in
+// `scripts/josh/agent-session-environment.test.ts`. What belongs here is that this launcher spreads
+// it over the inherited environment at all — the half a reader of this file can check.
+describe('the launched session does not inherit what the launcher must not pass on', () => {
+	it('hands the spawn every key that module removes, set to undefined', () => {
+		const removed = agent_session_environment.removed_environment({ HTTPS_PROXY: LOOPBACK_PROXY })
 
-		expect(Object.keys(removed)).toStrictEqual([...agent_session_environment.PARENT_SESSION_KEYS])
+		expect(Object.keys(removed)).toContain('CLAUDE_CODE_MESSAGING_SOCKET')
+		expect(Object.keys(removed)).toContain('HTTPS_PROXY')
 		expect(JSON.stringify(removed)).toBe('{}')
-	})
-
-	it('names the messaging socket and token, which are the two that kill a child session', () => {
-		expect(agent_session_environment.PARENT_SESSION_KEYS).toContain('CLAUDE_CODE_MESSAGING_SOCKET')
-		expect(agent_session_environment.PARENT_SESSION_KEYS).toContain('CLAUDE_CODE_MESSAGING_TOKEN')
 	})
 })
 
