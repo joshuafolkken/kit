@@ -60,11 +60,12 @@ const FORMAT_TOOLS = ['Edit', 'Write', 'Bash']
 // along, so the wiring was the only thing keeping the refusal off the shape a run spends most of its
 // investigation in — 35.9% of one measured run's turns — and the matcher is what
 // joshuafolkken/kit#1798 measured as the reason only 2 of 7 clusters were caught.
-// **`Write` is deliberately not here**, for that same cost reason: `is_guarded_call` answers
-// `false` for it — a reissued `Write` is unconditional, so a false positive on one overwrites a
-// sibling's applied edit in silence — and a matcher naming it would start a process that can only ever
-// answer "allow".
-const GUARD_TOOLS = ['Bash', 'Edit', 'Read']
+// **`Write` names it too since joshuafolkken/kit#1848**, but for the notice rather than the refusal:
+// `is_guarded_call` still answers `false` for it — a reissued `Write` is unconditional, so a false
+// positive on one would overwrite a sibling's applied edit in silence — so it is never refused. What
+// the matcher now reaches is `is_notice_call`, which has an answer: a run of single-call `Write` turns
+// earns a non-blocking notice, the largest recoverable contributor the refusal could never touch.
+const GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write']
 // The investigation guard names both, because in this repository the reading is split between them:
 // run #1441 issued 5 `Read` calls against 10 `cat`, 16 `sed` and 1 `tail`, so a `Read`-only wiring
 // would miss the idiom that carries most of the text. It is safe on `Bash` because it refuses only a

@@ -142,6 +142,22 @@ const REASON =
 	`genuinely has nothing to go beside it, reissue it as it was: this fires once per run of ` +
 	`single-call turns and cannot repeat on the call in hand.`
 
+// The notice a whole-file write earns instead of the refusal above (joshuafolkken/kit#1848). It says
+// the same thing REASON does — reissue the calls that do not need each other in one turn — but as a
+// **notice, not a refusal**: the write proceeds, because a `Write` cannot be refused safely (see
+// `WHOLE_FILE_WRITE_TOOL` below). The honest half is here for the same reason it is on REASON — the
+// guard cannot see the turn it is interrupting, so a reader told only to batch would batch a turn that
+// already was. It carries no ⛔, so a person watching reads it as advice rather than a stop.
+const NOTICE =
+	`💡 batching: the last ${String(SEQUENCE_BEFORE_LIMIT)} turns each issued a single tool call, so ` +
+	`this Write makes ${String(CONSECUTIVE_LIMIT)} in a row. This is a notice, not a refusal — the ` +
+	`write proceeds. Where the writes meant to follow it do not need its result, issue them in one turn ` +
+	`together. **The criterion is whether a call's input needs another call's result, not what kind of ` +
+	`call it is** — it never authorizes weakening a verification gate or a review: fewer turns, never ` +
+	`less work. The measured cost and the rejected mechanisms are in ` +
+	`\`prompts/collaboration-workflow/turn-batching.md\`. If this run was already batching, or the write ` +
+	`genuinely has nothing to go beside it, carry on: this fires once per run of single-call turns.`
+
 // The one write that is never refused, because it is the one whose reissue is **unconditional**. Every
 // other refusable write is content-addressed and so fails loudly when its turn's siblings moved the
 // text under it; a `Write` carries the whole file, so reissuing it re-applies content composed before
@@ -168,6 +184,16 @@ function is_guarded_call(call: GuardedCall): boolean {
 	if (call.name === WHOLE_FILE_WRITE_TOOL) return false
 
 	return time_bundle_call.call_facts(call.name, call.input).is_bundleable
+}
+
+// The counterpart to `is_guarded_call` for the one tool it turns away: the whole-file write is the
+// call the guard **notifies** about rather than refuses (joshuafolkken/kit#1848). It cannot be refused
+// safely — its reissue overwrites an applied sibling in silence — yet a run of single-call `Write`
+// turns was the largest recoverable contributor the refusal could never reach, so the notice carries
+// the rule to it without the false-positive cost. `.claude/settings.json` names `Write` in the matcher
+// so the hook is even reached, exactly as the predicate is what makes the matcher's answer non-empty.
+function is_notice_call(call: GuardedCall): boolean {
+	return call.name === WHOLE_FILE_WRITE_TOOL
 }
 
 // The same question narrowed to calls that write nothing — the test `is_guarded_call` used to be, kept
@@ -231,14 +257,30 @@ function is_sequence_at_limit(
 // **Nothing here reads the turn the call belongs to**, because nothing can: see "What it cannot know"
 // above. The two call-shaped tests are asked of the call in hand, and everything else of the turns
 // behind it.
-function should_block(text: string, call: GuardedCall, refused_at_ms: number): boolean {
-	if (!is_guarded_call(call)) return false
-
+// The sequence test both dispositions share: is the open run of single-call turns at the limit, for a
+// call that began after the last time this disposition fired. Shared so the refusal and the notice
+// cannot drift apart on what "three in a row" means (joshuafolkken/kit#1848).
+function is_at_limit(text: string, call: GuardedCall, last_fired_ms: number): boolean {
 	return is_sequence_at_limit(
 		time_bundles.open_sequence(time_spans.parse_timeline(text).spans),
 		time_bundle_call.call_facts(call.name, call.input),
-		refused_at_ms,
+		last_fired_ms,
 	)
+}
+
+function should_block(text: string, call: GuardedCall, refused_at_ms: number): boolean {
+	if (!is_guarded_call(call)) return false
+
+	return is_at_limit(text, call, refused_at_ms)
+}
+
+// The notice's rule: the same sequence test, gated on the whole-file write rather than on a refusable
+// call. `notified_at_ms` is read from the notice's **own** record, so a notice never spends the
+// refusal's stamp and cannot silence a genuine refusal of a later read or edit on the same run.
+function should_notify(text: string, call: GuardedCall, notified_at_ms: number): boolean {
+	if (!is_notice_call(call)) return false
+
+	return is_at_limit(text, call, notified_at_ms)
 }
 
 // **This guard's own name for its once-per-run record.** It lives beside the rule rather than in
@@ -247,14 +289,23 @@ function should_block(text: string, call: GuardedCall, refused_at_ms: number): b
 // the string is the clone that would let the two disagree about which file they are reading.
 const STAMP_PREFIX = 'josh-batch-guard-'
 
+// The notice's own record, distinct from `STAMP_PREFIX` so a notice fired on a Write cannot move the
+// instant the refusal reads — the two dispositions dedupe independently, once each per run of
+// single-call turns (joshuafolkken/kit#1848).
+const NOTICE_STAMP_PREFIX = 'josh-batch-guard-notice-'
+
 const time_batch_guard = {
 	CONSECUTIVE_LIMIT,
+	NOTICE,
+	NOTICE_STAMP_PREFIX,
 	REASON,
 	SEQUENCE_BEFORE_LIMIT,
 	STAMP_PREFIX,
 	is_guarded_call,
+	is_notice_call,
 	is_read_only_call,
 	should_block,
+	should_notify,
 }
 
 export type { GuardedCall }

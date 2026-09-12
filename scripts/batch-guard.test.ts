@@ -3,11 +3,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+	batch_outcome,
 	batch_refusal,
 	deny_envelope,
 	DISABLED_VALUES,
 	is_enabled,
 	load_environment_file,
+	notice_refusal_path,
 	refusal_path,
 	SWITCH_ENV_KEY,
 } from './batch-guard'
@@ -27,6 +29,7 @@ const NOW_MS = ms(LATER_MINUTE)
 const AGENT_ID = 'a313eea340918b8a1'
 const READ_TOOL = 'Read'
 const EDIT_TOOL = 'Edit'
+const WRITE_TOOL = 'Write'
 
 // A transcript of its own per case, so one case's refusal record never silences another's — the record
 // is keyed on the transcript the payload names. Each is remembered rather than listed again in the
@@ -107,7 +110,10 @@ beforeEach(() => {
 })
 
 afterAll(() => {
-	for (const transcript of WRITTEN_TRANSCRIPTS) rmSync(refusal_path(transcript), { force: true })
+	for (const transcript of WRITTEN_TRANSCRIPTS) {
+		rmSync(refusal_path(transcript), { force: true })
+		rmSync(notice_refusal_path(transcript), { force: true })
+	}
 
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
@@ -178,6 +184,39 @@ describe('batch_refusal — an edit payload', () => {
 	it('says nothing on an edit when the switch is off', () => {
 		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
 		const payload = payload_of('edit-switched-off', unbatched_text(), EDIT_TOOL)
+
+		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1848. The matcher now names `Write`, so a run of single-call write turns reaches
+// the guard — which cannot refuse a write but can notify about it. This is the wiring's end of that
+// change; which sequences earn a notice is pinned in `time/time-batch-guard.test.ts`.
+describe('batch_outcome — the whole-file write is notified, not refused', () => {
+	// The third consecutive single-call turn, with the current call a write: the guard cannot refuse it,
+	// so it returns a notice instead and the write still proceeds.
+	it('returns a notice on the third consecutive single-call turn for a write', () => {
+		const { reason, notice } = batch_outcome(
+			payload_of('write-notice', unbatched_text(), WRITE_TOOL),
+			NOW_MS,
+		)
+
+		expect(reason).toBeUndefined()
+		expect(notice).toContain('batching')
+	})
+
+	// The record makes it fire once, exactly as the refusal does.
+	it('notifies the same sequence only once', () => {
+		const payload = payload_of('write-notice-twice', unbatched_text(), WRITE_TOOL)
+
+		expect(batch_outcome(payload, NOW_MS).notice).toBeDefined()
+		expect(batch_outcome(payload, NOW_MS).notice).toBeUndefined()
+	})
+
+	// A write is never refused, whatever the run of single-call turns behind it — where a read in its
+	// place would have been refused, the write's reason stays undefined.
+	it('never sets a reason for a write', () => {
+		const payload = payload_of('write-never-refused', unbatched_text(), WRITE_TOOL)
 
 		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
 	})

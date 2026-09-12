@@ -188,6 +188,20 @@ interface GuardRun {
 	now_ms: number
 }
 
+// The notice half of a guard's rule, kept optional so a guard that only refuses supplies nothing and is
+// untouched (joshuafolkken/kit#1848). The investigation guard omits it; the batching guard supplies one
+// for the whole-file write, which it cannot refuse but can advise.
+interface NotifySpec {
+	// This disposition's record prefix, distinct from the refusal's so the two dedupe independently and
+	// a notice can never move the instant the refusal reads.
+	prefix: string
+	// The same shape as `should_block`, asked of the tail for a notify-only call. `notified_at_ms` is
+	// this disposition's own last-fired instant, never the refusal's.
+	should_notify: (tail: string, call: GuardedCall, notified_at_ms: number, run: GuardRun) => boolean
+	// The non-blocking text handed to `notice_envelope`.
+	text: string
+}
+
 interface TranscriptGuardSpec {
 	// Keeps one hook's refusal record out of the other's.
 	prefix: string
@@ -205,6 +219,9 @@ interface TranscriptGuardSpec {
 	should_block: (tail: string, call: GuardedCall, refused_at_ms: number, run: GuardRun) => boolean
 	// What the model is told. The deny reason is the only text that reaches it.
 	reason: string
+	// **The optional notice disposition** (joshuafolkken/kit#1848). Supplied, it lets a guard emit a
+	// non-blocking notice for a call it does not refuse. Its record lives under a prefix of its own.
+	notify?: NotifySpec
 }
 
 // What one hook invocation decided. **`fault` is the half that did not exist** (joshuafolkken/kit#1509):
@@ -213,10 +230,15 @@ interface TranscriptGuardSpec {
 // `reason` refuses; `fault` allows and says so.
 interface GuardOutcome {
 	reason: string | undefined
+	// **A notice, not a refusal** (joshuafolkken/kit#1848). Set where a notify-only call — a whole-file
+	// write — reached the limit; the call still proceeds, and `notice_envelope` carries this to the
+	// model and the person with no `permissionDecision`. Never set together with `reason`: the block
+	// path decides first and returns before the notice path is asked.
+	notice: string | undefined
 	fault: string | undefined
 }
 
-const NO_OUTCOME: GuardOutcome = { reason: undefined, fault: undefined }
+const NO_OUTCOME: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
 
 interface TranscriptGuard {
 	is_enabled: () => boolean
@@ -225,50 +247,122 @@ interface TranscriptGuard {
 	outcome: (raw_payload: string, now_ms?: number) => GuardOutcome
 }
 
-function guard_reason_for_payload(
-	spec: TranscriptGuardSpec,
+interface FireResult {
+	fired: boolean
+	fault: string | undefined
+}
+
+// The three the guard closes over: the spec, and one record per disposition. Bundled so the functions
+// below stay within the parameter limit, and so a further disposition adds a field rather than a
+// parameter to every one of them (joshuafolkken/kit#1848).
+interface GuardParts {
+	spec: TranscriptGuardSpec
+	stamp: RefusalStamp
+	notify_stamp: RefusalStamp | undefined
+}
+
+// `GuardParts` plus what this one call is: the tail read for it, the call itself, and the run it sits
+// in. Built once per payload and handed to whichever disposition asks.
+interface GuardContext extends GuardParts {
+	tail: string
+	call: GuardedCall
+	run: GuardRun
+}
+
+// Ask one disposition's rule against its own record, and if the rule fires, arm the record so it
+// cannot repeat on the call in hand. **Recording before firing is what makes a refusal unrepeatable**,
+// so a disposition that cannot record does not fire — it reports the fault instead of risking the
+// wedge, which is the half `scripts/batch-guard.ts` names. Shared by the refusal and the notice so the
+// arm-then-fire order is written once (joshuafolkken/kit#1848).
+function fire_once(
 	stamp: RefusalStamp,
+	run: GuardRun,
+	should_fire: (last_fired_ms: number) => boolean,
+	switch_key: string,
+): FireResult {
+	const target = stamp.path(run.transcript)
+
+	if (!should_fire(stamp.last_ms(target))) return { fired: false, fault: undefined }
+	if (!stamp.record(target, run.now_ms)) return { fired: false, fault: stamp_fault(switch_key) }
+
+	return { fired: true, fault: undefined }
+}
+
+function block_outcome(context: GuardContext): GuardOutcome {
+	const { spec, stamp, tail, call, run } = context
+	const result = fire_once(
+		stamp,
+		run,
+		(last_fired_ms) => spec.should_block(tail, call, last_fired_ms, run),
+		spec.switch_key,
+	)
+
+	if (result.fired) return { reason: spec.reason, notice: undefined, fault: undefined }
+
+	return { reason: undefined, notice: undefined, fault: result.fault }
+}
+
+function notify_outcome(context: GuardContext): GuardOutcome {
+	const { spec, notify_stamp, tail, call, run } = context
+
+	if (notify_stamp === undefined || spec.notify === undefined) return NO_OUTCOME
+
+	const { notify } = spec
+	const result = fire_once(
+		notify_stamp,
+		run,
+		(last_fired_ms) => notify.should_notify(tail, call, last_fired_ms, run),
+		spec.switch_key,
+	)
+
+	if (result.fired) return { reason: undefined, notice: notify.text, fault: undefined }
+
+	return { reason: undefined, notice: undefined, fault: result.fault }
+}
+
+function is_clear(outcome: GuardOutcome): boolean {
+	return outcome.reason === undefined && outcome.notice === undefined && outcome.fault === undefined
+}
+
+function guard_reason_for_payload(
+	parts: GuardParts,
 	payload: HookPayload,
 	now_ms: number,
 ): GuardOutcome {
 	const call = { name: payload.tool_name, input: payload.tool_input }
 
-	if (!spec.is_candidate(call)) return NO_OUTCOME
+	if (!parts.spec.is_candidate(call)) return NO_OUTCOME
 
 	// A hook firing inside a delegated unit is handed the *parent's* path, so the fork's own file is
 	// derived here rather than judged from the parent's frozen timeline (joshuafolkken/kit#1424).
 	const transcript = time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id)
-	const target = stamp.path(transcript)
 	const tail = time_density_hook.read_tail(transcript)
+	const context = { ...parts, tail, call, run: { transcript, now_ms } }
 
-	const run = { transcript, now_ms }
+	// The block path decides first, and the notice is asked only where it stayed clear. The two never
+	// both fire — a refusable call never notifies and a whole-file write never blocks — so this ordering
+	// only keeps a block fault from arming the notice record over a fault the run already has to see.
+	const blocked = block_outcome(context)
 
-	if (!spec.should_block(tail, call, stamp.last_ms(target), run)) return NO_OUTCOME
+	if (!is_clear(blocked)) return blocked
 
-	// A refusal that cannot be recorded is not made — the argument that a refusal cannot repeat rests
-	// on the stamp, so refusing without one risks the wedge. It is reported instead of being swallowed.
-	if (!stamp.record(target, now_ms)) {
-		return { reason: undefined, fault: stamp_fault(spec.switch_key) }
-	}
-
-	return { reason: spec.reason, fault: undefined }
+	return notify_outcome(context)
 }
 
-function guard_outcome(
-	spec: TranscriptGuardSpec,
-	stamp: RefusalStamp,
-	raw_payload: string,
-	now_ms: number,
-): GuardOutcome {
+function guard_outcome(parts: GuardParts, raw_payload: string, now_ms: number): GuardOutcome {
 	const payload = parse_hook_payload(raw_payload)
 
-	if (payload === undefined || !is_switch_enabled(spec.switch_key)) return NO_OUTCOME
+	if (payload === undefined || !is_switch_enabled(parts.spec.switch_key)) return NO_OUTCOME
 
-	return guard_reason_for_payload(spec, stamp, payload, now_ms)
+	return guard_reason_for_payload(parts, payload, now_ms)
 }
 
 function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	const stamp = create_refusal_stamp(spec.prefix)
+	// A record of its own for the notice, only where a notify spec is supplied. Keyed on its own prefix
+	// so a notice never spends the refusal's stamp (joshuafolkken/kit#1848).
+	const notify_stamp = spec.notify ? create_refusal_stamp(spec.notify.prefix) : undefined
+	const parts = { spec, stamp, notify_stamp }
 
 	function is_enabled(): boolean {
 		return is_switch_enabled(spec.switch_key)
@@ -289,9 +383,9 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	// being the same observation.
 	function outcome(raw_payload: string, now_ms: number = Date.now()): GuardOutcome {
 		try {
-			return guard_outcome(spec, stamp, raw_payload, now_ms)
+			return guard_outcome(parts, raw_payload, now_ms)
 		} catch (error) {
-			return { reason: undefined, fault: fault_notice(spec.switch_key, error) }
+			return { reason: undefined, notice: undefined, fault: fault_notice(spec.switch_key, error) }
 		}
 	}
 
@@ -307,9 +401,10 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutcome): void {
 	load_environment_file()
 
-	const { reason, fault } = outcome(raw_payload)
+	const { reason, notice, fault } = outcome(raw_payload)
 
 	if (reason !== undefined) process.stdout.write(`${deny_envelope(reason)}\n`)
+	else if (notice !== undefined) process.stdout.write(`${notice_envelope(notice)}\n`)
 	else if (fault !== undefined) process.stdout.write(`${notice_envelope(fault)}\n`)
 }
 
@@ -321,7 +416,11 @@ function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutco
 // joshuafolkken/kit#1509 closed for the batching guard, left standing deliberately: this Issue's
 // subject is the batching guard, and moving another hook across belongs with its own test.
 function write_decision(raw_payload: string, refusal: (raw: string) => string | undefined): void {
-	write_outcome(raw_payload, (raw) => ({ reason: refusal(raw), fault: undefined }))
+	write_outcome(raw_payload, (raw) => ({
+		reason: refusal(raw),
+		notice: undefined,
+		fault: undefined,
+	}))
 }
 
 // Run from a terminal there is no payload coming, and waiting for one looks like a hang.
@@ -352,6 +451,7 @@ export type {
 	GuardOutcome,
 	GuardRun,
 	HookPayload,
+	NotifySpec,
 	RefusalStamp,
 	TranscriptGuard,
 	TranscriptGuardSpec,
