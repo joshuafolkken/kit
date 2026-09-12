@@ -1,9 +1,9 @@
-import { cost_attribute } from '#scripts/cost/cost-attribute'
 import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
 import { time_issue_window } from './time-issue-window'
+import { time_last_select } from './time-last-select'
 import type { Interval } from './time-overlap'
 import { time_phase_costs, type PricedRequest } from './time-phase-costs'
 import { time_phases } from './time-phases'
@@ -30,6 +30,11 @@ import { time_windows, type RunWindows, type TimeWindow } from './time-windows'
 
 const MS_PER_MINUTE = 60_000
 const NO_SESSIONS = 0
+// The no-argument default is the last run — `--last` narrowed to one (joshuafolkken/kit#1831). Going
+// through the same selector is what gives the default `--last`'s rule for free: a merge whose head
+// branch names no issue is not a run, so the newest such merge is skipped and the report says how
+// many were.
+const LATEST_RUN_COUNT = 1
 
 // The subtraction both halves of this file need — the CI wait below and the delegated units above —
 // is `time-overlap.ts`'s, so the same arithmetic answers both rather than being written twice.
@@ -501,14 +506,6 @@ async function build_run_report(
 	return to_report(await gather({ issue_number, found, read, search, cwd, priced }))
 }
 
-function issue_of(pull: PullSummary | undefined): number | undefined {
-	if (pull === undefined) return undefined
-
-	const issue_number = cost_attribute.issue_from_branch(pull.branch)
-
-	return issue_number === cost_attribute.UNATTRIBUTED_KEY ? undefined : issue_number
-}
-
 // What `pnpm josh time` with no argument reports on: the most recently merged pull request's issue,
 // read from its head branch by the same rule the transcript side uses. `undefined` means no merged
 // run could be resolved at all — reported in words by the caller, never as a zero.
@@ -520,15 +517,21 @@ async function build_latest_run_report(
 	read: GhReader = time_github.read_gh,
 	sources: RunSources = NO_SOURCES,
 ): Promise<TimeReport | undefined> {
-	const search = await time_github.latest_merged_pull(read)
-	const issue_number = issue_of(search.pull)
+	const selection = await time_last_select.select_last_runs(LATEST_RUN_COUNT, read)
+	const [run] = selection.runs
 
-	if (issue_number === undefined) return undefined
+	if (run === undefined) return undefined
 
+	const { issue_number } = run
 	const found = time_corpus.collect_issue_spans(cwd, issue_number)
 	const priced = time_request_costs.priced_for(sources, cwd, issue_number)
+	const search = time_github.to_found(run.pull)
+	const report = to_report(await gather({ issue_number, found, read, search, cwd, priced }))
 
-	return to_report(await gather({ issue_number, found, read, search, cwd, priced }))
+	return {
+		...report,
+		notes: [...report.notes, ...time_last_select.skipped_note(selection.skipped_count)],
+	}
 }
 
 const time_run = {
@@ -537,7 +540,6 @@ const time_run = {
 	is_diff_read_note,
 	is_unread_note,
 	unread_lines,
-	issue_of,
 	build_run_report,
 	build_latest_run_report,
 }

@@ -244,10 +244,27 @@ async function select_last_runs(
 	}
 }
 
+// The exclusion note the `--last` scope and the no-argument default both report, single-sourced here
+// beside the `skipped_count` it describes so the two scopes phrase it in one voice
+// (joshuafolkken/kit#1831). It is built inline rather than through `time_batch.count_note`: that
+// helper lives in `time-batch.ts`, which imports `time-run.ts`, so the default path — which reaches
+// this file to resolve its scope — would close a cycle by importing it. What `count_note` adds over
+// the line below is one empty-guard, which is the whole of what is restated.
+const PULL_UNIT = 'merged pull request(s)'
+const SKIPPED_TAIL = 'name no issue in their head branch, so they are not runs and are left out'
+
+function skipped_note(count: number): Array<string> {
+	if (count === NONE) return []
+
+	return [`${String(count)} ${PULL_UNIT} ${SKIPPED_TAIL}`]
+}
+
 const time_last_select = {
+	PULL_UNIT,
 	page_runs,
 	newest_per_issue,
 	skipped_within,
+	skipped_note,
 	collapsed_within,
 	cutoff_of,
 	pick_folder,

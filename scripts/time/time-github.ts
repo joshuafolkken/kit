@@ -244,10 +244,6 @@ type PullFolder<Candidate> = (
 	best: Candidate,
 ) => PullFold<Candidate>
 
-// The single-pull instantiation, named because it is what the merge lookup below folds with.
-type PullChoice = PullFold<PullSummary | undefined>
-type PullChooser = PullFolder<PullSummary | undefined>
-
 // How the walk ended, carried out rather than turned into an answer inside it. **The three "not
 // found" reasons are properties of the walk, not of a candidate**, and a batch needs them after the
 // fact: one walk answers many issues, and each issue that went unresolved inherits the same ending.
@@ -311,29 +307,6 @@ function absent_search(end: WalkEnd): PullSearch {
 	return NOT_FOUND
 }
 
-function to_search(walk: PullWalk<PullSummary | undefined>): PullSearch {
-	if (walk.best === undefined || walk.end === WALK_FAILED || walk.end === WALK_CAPPED) {
-		return absent_search(walk.end)
-	}
-
-	return to_found(walk.best)
-}
-
-async function find_pull(choose: PullChooser, read: GhReader): Promise<PullSearch> {
-	return to_search(await walk_pulls(choose, read, undefined))
-}
-
-// The latest merge on a page, not the first merged row on it. **The listing is sorted by update
-// time, and "most recently updated that happens to be merged" is not "most recently merged"**: one
-// comment on a pull request merged yesterday lifts it above the one merged an hour ago, and
-// `pnpm josh time` with no argument would then report yesterday's run. GitHub offers no
-// merged-time sort, so the ordering is imposed here over the rows already fetched.
-function newest_merged(pulls: ReadonlyArray<PullSummary>): PullSummary | undefined {
-	return pulls
-		.filter((pull) => pull.merged_ms !== undefined)
-		.toSorted((left, right) => (right.merged_ms ?? 0) - (left.merged_ms ?? 0))[0]
-}
-
 // The oldest update on a page. The listing is sorted by update time descending, so this is the
 // boundary every later page sits below. A row whose `updated_at` could not be read is left out,
 // which can only raise the boundary and so can only make the walk read one more page.
@@ -353,9 +326,9 @@ function oldest_update(pulls: ReadonlyArray<PullSummary>): number | undefined {
 // the global maximum is the other correct answer, and it costs five requests every time to fix a
 // case that arises when more than a page of pull requests were updated after the newest merge.
 //
-// **The merge instant is the parameter rather than a candidate**, because the two callers hold
-// different candidates: the lookup below settles on one pull request, while `--last N` settles on the
-// *oldest* of the N it is keeping — a later page cannot beat that one either (joshuafolkken/kit#1312).
+// **The merge instant is the parameter rather than a candidate**, because `--last N` holds not one
+// pull request but the *oldest* of the N it is keeping — a later page cannot beat that one either
+// (joshuafolkken/kit#1312). The no-argument default is `--last 1`, so it comes through the same fold.
 function is_past_merge_boundary(
 	pulls: ReadonlyArray<PullSummary>,
 	merged_ms: number | undefined,
@@ -365,31 +338,6 @@ function is_past_merge_boundary(
 	if (merged_ms === undefined || oldest_ms === undefined) return false
 
 	return oldest_ms <= merged_ms
-}
-
-function is_merge_certain(
-	pulls: ReadonlyArray<PullSummary>,
-	best: PullSummary | undefined,
-): boolean {
-	return is_past_merge_boundary(pulls, best?.merged_ms)
-}
-
-// The newest merge across this page and every page before it, and whether that is settled. The
-// candidate from earlier pages is folded in as one more row so the comparison stays
-// `newest_merged`'s alone rather than being written a second time here.
-function newest_merged_choice(
-	pulls: ReadonlyArray<PullSummary>,
-	best: PullSummary | undefined,
-): PullChoice {
-	const merged = newest_merged(best === undefined ? pulls : [...pulls, best])
-
-	return { best: merged, is_certain: is_merge_certain(pulls, merged) }
-}
-
-// The most recently merged pull request — "the run that just finished", which is what
-// `pnpm josh time` with no argument reports on.
-async function latest_merged_pull(read: GhReader = read_gh): Promise<PullSearch> {
-	return await find_pull(newest_merged_choice, read)
 }
 
 function to_check_run(raw: z.infer<typeof CHECK_RUN_SCHEMA>): CheckRun | undefined {
@@ -520,15 +468,11 @@ const time_github = {
 	parse_pulls,
 	parse_check_runs,
 	pulls_page_path,
-	newest_merged,
-	newest_merged_choice,
 	is_past_merge_boundary,
 	FAILED_SEARCH: FAILED,
 	absent_search,
 	to_found,
 	walk_pulls,
-	find_pull,
-	latest_merged_pull,
 	list_check_runs,
 	parse_commits,
 	list_pull_commits,
@@ -539,7 +483,6 @@ export type {
 	CheckRunList,
 	CommitList,
 	GhReader,
-	PullChoice,
 	PullFold,
 	PullFolder,
 	PullSearch,
