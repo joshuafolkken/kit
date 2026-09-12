@@ -67,3 +67,47 @@ describe('what a lane is called', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#1864: the pre-gate guard has to know whether the checkout it runs in is a lane,
+// and it has to know synchronously — so the question is answered off the path rather than by
+// `lane_registry`, which parses `git worktree list` asynchronously. **The direction that matters is
+// the negative one**: a false positive here refuses the gate of an ordinary run.
+describe('lane_issue_of', () => {
+	const DEFAULT_ROOT = lane_paths.lane_root(REPOSITORY_ROOT, {})
+	const OVERRIDE_ROOT = '/Volumes/work/lanes'
+
+	it('reads the issue number back out of the directory it built', () => {
+		const directory = lane_paths.lane_directory(DEFAULT_ROOT, ISSUE)
+
+		expect(lane_paths.lane_issue_of(directory, {})).toBe(ISSUE)
+	})
+
+	it('reads it back under an overridden root too', () => {
+		const environment = { [lane_paths.LANE_ROOT_KEY]: OVERRIDE_ROOT }
+		const directory = lane_paths.lane_directory(lane_paths.lane_root('', environment), ISSUE)
+
+		expect(lane_paths.lane_issue_of(directory, environment)).toBe(ISSUE)
+	})
+
+	// **The override is exact, so a lane root elsewhere is not this project's.** Read loosely, a
+	// machine with the override set would have every `.<name>-lanes` directory answer as a lane.
+	it('says nothing about the default root once an override names somewhere else', () => {
+		const directory = lane_paths.lane_directory(DEFAULT_ROOT, ISSUE)
+		const environment = { [lane_paths.LANE_ROOT_KEY]: OVERRIDE_ROOT }
+
+		expect(lane_paths.lane_issue_of(directory, environment)).toBeUndefined()
+	})
+
+	it.each([
+		// The repository itself, which is where an ordinary run's gate is issued.
+		[REPOSITORY_ROOT],
+		// The lane root, which holds lanes but is not one.
+		[DEFAULT_ROOT],
+		// A sibling directory whose name is not an issue number.
+		[path.join(DEFAULT_ROOT, 'main')],
+		// A numbered directory that is not under a lane root at all.
+		[path.join(REPOSITORY_ROOT, ISSUE)],
+	])('says nothing about %j', (directory) => {
+		expect(lane_paths.lane_issue_of(directory, {})).toBeUndefined()
+	})
+})

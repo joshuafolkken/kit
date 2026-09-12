@@ -47,6 +47,42 @@ pnpm josh run:cut <N>          # alias: josh rct
 **`cut` is the only verdict that ends the turn.** Every other one leaves the current process to carry
 the run on itself, which is why a `not-a-lane` or a `failed` is not a stop.
 
+### The gate refuses until the cut has been taken (joshuafolkken/kit#1864)
+
+**This step was carried as prose and fired exactly never.** joshuafolkken/kit#1850 measured six lane
+children — #1853, #1849, #1855, #1854, #1856 and #1847 — and the cut was taken **0 times**. Four of
+the six issued the *entry* check `pnpm josh run:cut --resume <N>` and were answered `fresh`; not one
+issued the call above. The document was read three to five times per run and the step stayed one
+sentence in the middle of it, so joshuafolkken/kit#1839's fourth acceptance condition — the drop in
+context per request — could not be judged at all.
+
+So `pnpm josh rule:guard` **refuses `pnpm josh gate`** while this checkout is a lane and no cut record
+is carried, and hands back the command above with what each verdict obliges. It is the same
+conclusion joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each reached after measuring prose that
+moved the number not at all: a step a run is free to skip is the step that gets skipped under time
+pressure, and `run:hold` — the one boundary step that never gets missed — is the one that refuses.
+
+- **It fires in a lane and nowhere else.** An interactive `fullrun` in the main checkout runs its gate
+  untouched. **The line it draws is not the same one `run:cut` draws**, and the difference matters: a
+  `PreToolUse` hook answers synchronously, so the guard reads the working directory's shape —
+  `<lane root>/<issue number>` — where `run:cut` asks `git worktree list` whether an **open lane**
+  exists. The path test is the looser of the two, and a **person** working inside a lane checkout is
+  on its firing side. That costs them one round trip rather than a wrong action: the refusal tells
+  them not to take the cut — it would launch a detached run behind them — and the row is delivered
+  once per run, so reissuing the gate passes.
+- **It is silent once the cut is carried**, so the resumed process goes straight to the gate as this
+  file says it should. `adopt_cut` leaves the record in place, and that record is what says the cut
+  already happened.
+- **It fires once per run.** Four of the five verdicts above leave this process holding the run, and
+  each of them needs the reissued gate call to pass — a refusal that repeated would wedge exactly the
+  runs that obeyed.
+- **`--resume`, `--end` and `--json` do not count as taking the cut**, because they ask about one
+  rather than take it. Counting them would have credited four of the six measured children.
+
+The row, its trigger and the enumeration it joins are
+`prompts/collaboration-workflow/rule-delivery.md`; `scripts/rules/pre-gate-cut.test.ts` pins that it
+fires in a lane that has not cut and stays silent everywhere else.
+
 ## Resuming — the fresh process's entry check
 
 A fresh `fullrun #<N>` runs this **at its entry, before `run:hold` and before the session-boundary

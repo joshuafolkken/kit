@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { git_command } from '#scripts/git/git-command'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_cut, type CutResumeRequest, type RunCut } from './run-cut'
 
@@ -161,5 +162,43 @@ describe('the adoption that carries a cut', () => {
 		const carried = read.kind === 'carried' ? read.cut : begun()
 
 		expect(run_cut.classify_resume(carried, resume_request())).toBe('stale')
+	})
+})
+
+// joshuafolkken/kit#1864: the pre-gate cut is enforced from a `PreToolUse` guard, and a guard answers
+// synchronously or not at all. What is pinned here is that the synchronous path reaches the **same**
+// record the asynchronous one does — a reader keyed to a different tree would answer "no cut" on the
+// resumed process and refuse a run that had already obeyed.
+describe('the synchronous read the pre-gate guard makes', () => {
+	// **Read against the fixture repository, never this checkout's own record.** Keyed to the work
+	// tree, that record is what tells the guard a resumed lane child has already cut — and the unit
+	// suite runs inside `pnpm josh gate`, the very call the guard stands in front of. A case that
+	// wrote there would erase it mid-run and cost the lane a spurious relaunch on the next gate.
+	it('names the same git directory the asynchronous reader names', async () => {
+		const [asynchronous] = await git_command.git_directories()
+
+		expect(run_cut.worktree_git_directory_sync()).toBe(asynchronous)
+	})
+
+	it('reads no cut while the tree has no record', () => {
+		rmSync(target(), { force: true })
+
+		expect(run_cut.carried_cut_sync(WITHIN_BOUND, REPOSITORY)).toBeUndefined()
+	})
+
+	it('reads back a record written for that tree', () => {
+		const record = JSON.stringify({ ...begun(), is_handed_off: false })
+
+		writeFileSync(target(), record)
+
+		expect(run_cut.carried_cut_sync(WITHIN_BOUND, REPOSITORY)).toMatchObject({ issue: ISSUE })
+	})
+
+	// An expired record is the crashed process the bound exists for, and it reads as no cut rather
+	// than as one — so the guard speaks again instead of staying silent forever.
+	it('reads an expired record as no cut', () => {
+		writeFileSync(target(), JSON.stringify(begun()))
+
+		expect(run_cut.carried_cut_sync(PAST_BOUND, REPOSITORY)).toBeUndefined()
 	})
 })
