@@ -675,6 +675,42 @@ named rather than judged — **read the files this run is about to edit**, which
 by definition and are needed before the first `Edit` either way. Start the unit, read those, then read
 what it returned.
 
+**And when the investigation needs more than one unit, they go out in a single fan-out turn — not one
+after another** (joshuafolkken/kit#1847). Measured on `fullrun #1839` (run body 54.8 min), the `setup`
+phase — run start to first edit — was **16.6 min, 30.3% of the run**, and three of the five longest
+gaps in the whole run fell inside it (170.1 / 144.1 / 106.3 s, **7.0 min, 12.8% of the run body**).
+Each of the three sat in front of a *serially* launched investigation unit — the lane-machinery map at
+t+1.7 min, the API signatures at t+7.3 min, the registry and log paths at t+11.4 min — and the long
+think was not a read but the composing of the *next* brief once the previous unit had returned. **The
+three questions needed nothing from one another**, so composing them one at a time is the whole cost:
+issued together in one turn, the way §2h already issues every call that needs no other's result, the
+three serial thinks collapse to one. This is the turn-batching principle (§2h) reaching the `Agent`
+launches the round-trip batcher never sees — the launches are spread across `setup` with reads between
+them, so they are never the consecutive single-call turns `pnpm josh batch:guard` fires on.
+
+**The condition is independence, and it is read from the questions rather than assumed.** Before
+dispatching, ask of each brief whether it could have been written at the *start* of the investigation:
+the ones that could go out together, and only a brief that genuinely cannot be written until an earlier
+unit has answered waits for that answer — fanning such a pair out would merely launch a unit asking the
+wrong question. So the collapse is claimed only where the questions are actually independent, which on
+`fullrun #1839` the three were (a lane-machinery map, API signatures, and a registry-and-log-path read
+are three separable questions).
+
+**Enforcement was investigated and is not implemented, for the same reason the round-trip batcher
+misses the pattern.** A guard would have to see an earlier solo `Agent` launch at the moment a later
+one fires, but the two are minutes and many turns apart and the earlier one falls outside the
+transcript tail the hooks read (the 256 KB window in `time-density-hook.ts`); and independence between
+two free-text `Agent` briefs exposes no mechanical target to compare, the way `pnpm josh batch:guard`
+compares file paths and commands — so a guard would either refuse every second investigation unit,
+genuinely serial chains included, or need a test it cannot make. This rule is therefore carried in
+prose here rather than as a `PreToolUse` refusal, the same conclusion the chain rule records for its
+own step that no tooling can enforce. **What measures whether it held is not a guard but `pnpm josh time`**:
+joshuafolkken/kit#1854 added a second recoverable-round-trip series that counts exactly these
+spread-apart independent launches — turning on the same independence test this rule does, where a
+write or a prior-finding reference between two launches marks the later one dependent and keeps it out
+of the group — so the `setup` phase, its `gaps.longest` block and that bundle count together say
+whether the fan-out happened.
+
 **Where the Issue already names the location, the reading is not delegated at all.** The same run
 measured this from the other side: #1783's body had already identified the defect as two rules in the
 distributed eslint configuration, the unit added almost nothing to that, and the main line then
