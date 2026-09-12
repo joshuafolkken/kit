@@ -74,6 +74,11 @@ interface ReadTally {
 	// The first instant the window covers. A refusal recorded before it cannot be checked against a
 	// delegation any more, because the delegation that would re-arm it has scrolled out.
 	window_start_ms: number
+	// The files this run has successfully edited within the window, resolved (joshuafolkken/kit#1840).
+	// A re-read of one of them is a read of a file the run edited, which §2b keeps in the main line — so
+	// it is excluded from the count and from a call's projected growth rather than counted as fresh
+	// investigation.
+	edited: ReadonlySet<string>
 }
 
 // **The run's own instructions are not the Issue's subject, so reading them is not what §2b delegates.**
@@ -228,18 +233,30 @@ function delegation_instant(span: Span | undefined): number {
 	return span === undefined ? hook_decision.NEVER_MS : span.ended_ms
 }
 
-// **A read that failed carried no text into the prompt, so it is not what this rule counts**
-// (joshuafolkken/kit#1764). The case that matters is the guard's own refusal: Claude Code writes a
-// denied call to the transcript as a `tool_use` block with an errored `tool_result`, and the stamp is
-// written *before* the reason is returned — so counting the denied read's targets put them into the
-// set at an instant after the refusal, pre-loading `pending_since` with the very read the refusal
-// stopped. A refused `cat a.ts b.ts c.ts` — the batched read `CLAUDE.md` mandates — took
-// `pending_since` straight to the threshold and re-armed the guard on the next call, which is the
-// wedge "climb a whole threshold again" exists to prevent. Every other failed read is excluded by the
-// same test and for the same reason: nothing arrived. An **unknown** outcome still counts, because a
-// result nobody recorded is not a failure.
-function is_failed_read(span: Span): boolean {
+// **A span whose outcome was failure changed nothing, so it is not what this rule acts on**
+// (joshuafolkken/kit#1764, joshuafolkken/kit#1840). A failed **read** carried no text into the
+// prompt — the case that matters is the guard's own refusal: Claude Code writes a denied call to the
+// transcript as a `tool_use` block with an errored `tool_result`, and the stamp is written *before*
+// the reason is returned, so counting the denied read's targets would pre-load `pending_since` with
+// the very read the refusal stopped. A failed **edit** wrote nothing, so it does not exempt a later
+// read of its target either — `edited_files` below asks the same question for that reason. An
+// **unknown** outcome still counts, because a result nobody recorded is not a failure.
+function is_failed_outcome(span: Span): boolean {
 	return span.outcome === time_spans.FAILED_OUTCOME
+}
+
+// **Every file the run successfully wrote within the window, resolved** (joshuafolkken/kit#1840). It
+// is the one source of "this run edited that file", shared by the live tally and the replay: a read of
+// a file the run edits is reading §2b keeps in the main line, so it is never counted — whether the read
+// came before the edit or after it. A failed edit wrote nothing and so exempts nothing, and a file
+// edited outside the window is unknown rather than assumed: the set is only ever as wide as the tail
+// the hook read, which is the bound joshuafolkken/kit#1764 already holds the accumulation to.
+function edited_files(spans: ReadonlyArray<Span>): Set<string> {
+	const written = spans
+		.filter((span) => !is_failed_outcome(span))
+		.flatMap((span) => subject_targets(span.writes))
+
+	return new Set(written)
 }
 
 // **The set records *when* each file entered it, which is the whole of the second re-arm**
@@ -255,33 +272,25 @@ function add_all(
 	for (const target of targets) if (!pending.has(target)) pending.set(target, at_ms)
 }
 
-function delete_all(pending: Map<string, number>, targets: ReadonlyArray<string>): void {
-	for (const target of targets) pending.delete(target)
-}
-
-// **An edit takes its file out of the set rather than never letting it in.** At read time nothing can
-// say whether a file will be edited, and #1426 keeps an edit target's read in the main line on
-// purpose. Subtracting afterwards is what makes the set mean "read and not edited" without asking the
-// run to declare its intentions.
-//
-// **What was written is subtracted after what was read is added, and from the same span**
-// (joshuafolkken/kit#1472). One `sed -i` both reads a file and writes it back, and it labels as
-// `Bash: sed` exactly as a `sed -n` read does — so the two branches cannot be exclusive, and the
-// write has to be the one that stands. Reading `span.writes` rather than `span.marker` and
-// `span.targets` is also what makes `MultiEdit` and `NotebookEdit` subtract at all: they carry the
-// edit marker but, being outside `BUNDLEABLE_TOOLS`, arrive naming nothing.
-function apply_span(pending: Map<string, number>, span: Span): void {
+// **A file the run edited is never added to the set in the first place** (joshuafolkken/kit#1840).
+// `edited_files` has already gathered every successful write in the window, so a read of one of them —
+// before the edit or after it — is filtered here rather than added and then subtracted. This closes
+// the re-read-after-edit gap the old subtract-on-the-edit-span could not: a subtraction runs only on
+// the edit's own span, so a read issued *after* the edit was added and stayed. `sed -i`, `MultiEdit`
+// and `NotebookEdit` need no special case any more — each is a write, so its target is in `edited` and
+// never enters the read count.
+function apply_span(pending: Map<string, number>, span: Span, edited: ReadonlySet<string>): void {
 	if (DELEGATION_TOOLS.has(span.label)) {
 		pending.clear()
 
 		return
 	}
 
-	if (is_content_read(span.label) && !is_failed_read(span)) {
-		add_all(pending, subject_targets(span.targets), span.ended_ms)
-	}
+	if (is_content_read(span.label) && !is_failed_outcome(span)) {
+		const fresh = subject_targets(span.targets).filter((target) => !edited.has(target))
 
-	delete_all(pending, subject_targets(span.writes))
+		add_all(pending, fresh, span.ended_ms)
+	}
 }
 
 function last_delegation_ms(spans: ReadonlyArray<Span>): number {
@@ -297,27 +306,33 @@ function pending_after(pending: ReadonlyMap<string, number>, since_ms: number): 
 
 function tally_of(text: string, since_ms: number = hook_decision.NEVER_MS): ReadTally {
 	const { spans, started_ms } = time_spans.parse_timeline(text)
+	const edited = edited_files(spans)
 	const pending = new Map<string, number>()
 
-	for (const span of spans) apply_span(pending, span)
+	for (const span of spans) apply_span(pending, span, edited)
 
 	return {
 		pending: [...pending.keys()],
 		pending_since: pending_after(pending, since_ms),
 		reset_ms: last_delegation_ms(spans),
 		window_start_ms: started_ms,
+		edited,
 	}
 }
 
-function projected_count(pending: ReadonlyArray<string>, call: GuardedCall): number {
-	return new Set([...pending, ...call_targets(call)]).size
-}
-
-// **The call has to actually add a file.** A blind `+ 1` refused a *re-read* of something already
-// pending — a second `sed -n` window of the same file, or a `Read` with a new `offset` — when the set
-// would not have grown at all.
-function adds_a_subject_file(pending: ReadonlyArray<string>, call: GuardedCall): boolean {
-	return projected_count(pending, call) > pending.length
+// **The call has to actually add a file the count does not already hold.** Its targets are filtered
+// against `edited` first, so a re-read of a file the run edited is not the `+ 1` that trips the
+// threshold — the same exclusion `apply_span` makes for the pending set this is compared against
+// (joshuafolkken/kit#1840). The `Set` union still absorbs a re-read of something already pending — a
+// second `sed -n` window of the same file, or a `Read` with a new `offset` — which would not have
+// grown the count either. The default empty set is for the exported callers that ask about
+// accumulation alone — a test, or any reader with no edited set in hand.
+function projected_count(
+	pending: ReadonlyArray<string>,
+	call: GuardedCall,
+	edited: ReadonlySet<string> = new Set<string>(),
+): number {
+	return new Set([...pending, ...call_targets(call).filter((target) => !edited.has(target))]).size
 }
 
 // **The read that takes the count *up to* the threshold is the boundary.** The ones below it stay in
@@ -356,22 +371,21 @@ function is_at_threshold(pending_count: number): boolean {
 // false positive still costs one round trip; what it cannot do any more is buy silence for the rest
 // of the run.
 //
-// **And it does not apply inside a delegated unit, which is the one place the remedy does not exist.**
+// **A delegated unit is not re-armed here because it is not refused at all** (joshuafolkken/kit#1840).
 // The hook counts a unit's reading against the unit (joshuafolkken/kit#1424), and the refusal asks for
 // a dispatch — but a unit is already where §2b sends the reading, and a read-only one (`Explore`,
-// `Plan`) has no `Agent` tool to dispatch with. Re-armed there, the arm would toll the very execution
-// tier this rule exists to move work to, one round trip per threshold's worth of files, for an
-// instruction the unit cannot carry out. So a unit keeps the behavior it had: one refusal, which
-// states the norm, and no repetition.
+// `Plan`) has no `Agent` tool to dispatch with. It was formerly degraded to a single first refusal,
+// which still asked for an action the unit could not take; now the unit short circuit in `should_block`
+// turns it off entirely, so this function is the parent's alone and needs no delegation condition.
 function has_cleared_the_disarm(tally: ReadTally, refused_at_ms: number): boolean {
 	return tally.reset_ms > refused_at_ms || refused_at_ms < tally.window_start_ms
 }
 
-function is_rearmed(tally: ReadTally, refused_at_ms: number, can_delegate = true): boolean {
+function is_rearmed(tally: ReadTally, refused_at_ms: number): boolean {
 	if (refused_at_ms === hook_decision.NEVER_MS) return true
 	if (has_cleared_the_disarm(tally, refused_at_ms)) return true
 
-	return can_delegate && is_at_threshold(tally.pending_since)
+	return is_at_threshold(tally.pending_since)
 }
 
 // A transcript under a session's `subagents/` directory is a delegated unit's. The segment is
@@ -380,6 +394,12 @@ function is_rearmed(tally: ReadTally, refused_at_ms: number, can_delegate = true
 // (`hook-decision.ts` → `guard_reason_for_payload`).
 function is_unit_transcript(transcript: string): boolean {
 	return transcript.split(path.sep).includes(cost_transcript.UNIT_DIRECTORY)
+}
+
+// The run-level question `should_block` asks of the payload: is this a delegated unit's transcript?
+// `run` is absent in the pure-tally tests, which are the parent's context by construction.
+function is_unit_run(run: GuardRun | undefined): boolean {
+	return run !== undefined && is_unit_transcript(run.transcript)
 }
 
 function is_refusable_command(call: GuardedCall): boolean {
@@ -419,14 +439,19 @@ function should_block(
 	run?: GuardRun,
 ): boolean {
 	if (!is_refusable_call(call)) return false
+	// A delegated unit is never refused (joshuafolkken/kit#1840): the remedy the refusal names — send
+	// the reading to a unit — does not exist inside one. Asked before the tail is parsed, since the
+	// answer needs none of it.
+	if (is_unit_run(run)) return false
 
 	const tally = tally_of(text, refused_at_ms)
 
 	if (!is_at_threshold(tally.pending.length)) return false
 
-	const can_delegate = run === undefined || !is_unit_transcript(run.transcript)
-
-	return adds_a_subject_file(tally.pending, call) && is_rearmed(tally, refused_at_ms, can_delegate)
+	return (
+		projected_count(tally.pending, call, tally.edited) > tally.pending.length &&
+		is_rearmed(tally, refused_at_ms)
+	)
 }
 
 // What a read this rule saw was, in the four answers the rule itself can give
@@ -469,18 +494,9 @@ interface Replay {
 	reset_ms: number
 	window_start_ms: number
 	refused_at_ms: number
-}
-
-// **Every file the run ever wrote, gathered before the walk rather than during it.** The pending set
-// subtracts an edit when it happens, which is right for the live guard and wrong for this question: a
-// read made twenty turns before its edit is still a read of a file the run edited, and §2b keeps
-// exactly that one in the main line.
-function edited_files(spans: ReadonlyArray<Span>): Set<string> {
-	const edited = new Set<string>()
-
-	for (const span of spans) for (const target of subject_targets(span.writes)) edited.add(target)
-
-	return edited
+	// The whole run's successful writes, gathered once by `classify_reads` and carried so `tally_now`
+	// can hand them to the same exclusion the live guard makes (joshuafolkken/kit#1840).
+	edited: ReadonlySet<string>
 }
 
 // The tally the live guard would have held at this instant, so the re-arm is asked of the one
@@ -491,6 +507,7 @@ function tally_now(replay: Replay): ReadTally {
 		pending_since: pending_after(replay.pending, replay.refused_at_ms),
 		reset_ms: replay.reset_ms,
 		window_start_ms: replay.window_start_ms,
+		edited: replay.edited,
 	}
 }
 
@@ -511,10 +528,13 @@ function would_refuse(replay: Replay, span: Span): boolean {
 }
 
 function class_of(replay: Replay, span: Span, edited: ReadonlySet<string>): string {
-	const targets = subject_targets(span.targets)
+	// Exclude the edited files first, so the threshold is judged on the same set `should_block` judges
+	// it on: an all-edited read is an edit target, and a mixed read reaches the threshold only on its
+	// genuinely new files, never on a file the run edited (joshuafolkken/kit#1840).
+	const fresh = subject_targets(span.targets).filter((target) => !edited.has(target))
 
-	if (targets.every((target) => edited.has(target))) return EDIT_TARGET_CLASS
-	if (!reaches_threshold(replay, targets)) return UNDER_THRESHOLD_CLASS
+	if (fresh.length === 0) return EDIT_TARGET_CLASS
+	if (!reaches_threshold(replay, fresh)) return UNDER_THRESHOLD_CLASS
 
 	return would_refuse(replay, span) ? REFUSED_CLASS : LET_THROUGH_CLASS
 }
@@ -532,14 +552,14 @@ function read_class(replay: Replay, span: Span, edited: ReadonlySet<string>): st
 function step(replay: Replay, span: Span, edited: ReadonlySet<string>): string | undefined {
 	if (DELEGATION_TOOLS.has(span.label)) {
 		replay.reset_ms = span.ended_ms
-		apply_span(replay.pending, span)
+		apply_span(replay.pending, span, edited)
 
 		return undefined
 	}
 
 	const found = read_class(replay, span, edited)
 
-	apply_span(replay.pending, span)
+	apply_span(replay.pending, span, edited)
 
 	return found
 }
@@ -560,12 +580,13 @@ function record(
 
 const FIRST_SPAN = 0
 
-function fresh_replay(spans: ReadonlyArray<Span>): Replay {
+function fresh_replay(spans: ReadonlyArray<Span>, edited: ReadonlySet<string>): Replay {
 	return {
 		pending: new Map<string, number>(),
 		reset_ms: hook_decision.NEVER_MS,
 		window_start_ms: spans[FIRST_SPAN]?.ended_ms ?? hook_decision.NEVER_MS,
 		refused_at_ms: hook_decision.NEVER_MS,
+		edited,
 	}
 }
 
@@ -575,7 +596,7 @@ function fresh_replay(spans: ReadonlyArray<Span>): Replay {
 // that merely resembled the guard would answer about a rule nobody ships.
 function classify_reads(spans: ReadonlyArray<Span>): Array<string> {
 	const edited = edited_files(spans)
-	const replay = fresh_replay(spans)
+	const replay = fresh_replay(spans, edited)
 	const classes: Array<string> = []
 
 	for (const span of spans) record(replay, classes, step(replay, span, edited), span.ended_ms)

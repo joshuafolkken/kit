@@ -637,11 +637,14 @@ fell silent on. Measured over 296 recorded sessions and 3,064 main-line reads, *
 — reached the threshold and were let through**; with the arm in place that falls to 920 and the
 refusals rise from 184 to 396. Reads of a file the run itself edits (827) and reads below the
 threshold (921) are untouched by the change, which is the check that it moved only what it was meant
-to. **The arm does not apply inside a delegated unit**: a unit is already where this rule sends the
-reading, and a read-only one has no `Agent` tool to dispatch with, so repeating the refusal there
-would toll that tier for an instruction it cannot carry out. `pnpm josh time`'s `Investigation reads:` block prints those four figures for one run, from
-this guard's own predicates rather than from a second reading of the rule. An **edit takes its file back out of the set**, so reading something this run will edit is
-still the main line's, exactly as this section already says. `docs/josh-commands.md` →
+to. **The guard refuses nothing inside a delegated unit** (joshuafolkken/kit#1840): a unit is already
+where this rule sends the reading, and a read-only one has no `Agent` tool to dispatch with, so a
+refusal there — even the single first one it was formerly degraded to — asked for an action the unit
+could not take. `pnpm josh time`'s `Investigation reads:` block prints those four figures for one run,
+from this guard's own predicates rather than from a second reading of the rule. A file this run
+**edits is never counted, before the edit or after it** (joshuafolkken/kit#1840): reading something
+this run will edit is the main line's, so a re-read of a file it has already edited is not counted as
+fresh investigation either. `docs/josh-commands.md` →
 "`josh investigation:guard`" carries which shell commands count as reading, why it is wired to `Read`
 and `Bash`, and the `JOSH_INVESTIGATION_GUARD` off-switch.
 
