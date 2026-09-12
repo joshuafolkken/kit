@@ -152,6 +152,19 @@ Read from the JSON, in this order:
   spent nothing** — only `--issue` and the no-argument latest-run scope read it, because pricing walks
   the whole transcript directory and `--epic` / `--last` would pay that walk once per child. A phase
   with minutes and no row here had no billed request of its own inside it, which is a real answer.
+- **`delegated_cost` — what launching each subagent cost, and the run's total**
+  ([#1882](https://github.com/joshuafolkken/kit/issues/1882)). A delegated unit starts from an empty
+  context and writes the whole resident prefix into cache on its first request, so every launch
+  carries a fixed cost the run report was blind to. `units[]` names each one with its
+  `baseline_tokens` — that context construction — and its `cost_usd`; `unit_count`, `baseline_tokens`,
+  `cost_usd` and `per_unit_cost_usd` are the run's totals and its per-launch average, read on the same
+  `--issue` and latest-run scopes `phase_costs` is. **Read it before crediting a delegation with a
+  saving**: a step handed to a unit whose own work is cheaper than `per_unit_cost_usd` cost more to
+  delegate than to run in the main line, which is the finding this block exists to make visible.
+  **`is_measured: false` means the cost corpus was not read for this scope, not that no subagent ran**
+  — a measured run with `unit_count: 0` did its work in the main line, which is a real answer. **A
+  unit on a model the price table does not carry contributes tokens and no dollars** —
+  `unpriced_unit_count` makes `cost_usd` a floor, said in words beside the launch total.
 - **the two review rounds against each other** — `segments`, read as one pair rather than as two rows
   ([#1412](https://github.com/joshuafolkken/kit/issues/1412)). The listing already carries both rounds
   of a two-round run, and a report that prints them as two numbers converts nothing into a reading: on
@@ -492,6 +505,8 @@ in the report itself — say so and do not rank off the table beneath it.
 **Order by whichever unit the report was asked for, and say which at the head of the table.** "Why is `fullrun` slow" orders by minutes; "what is the backlog costing" orders by dollars. Neither ordering hides the other column, so a row that ranks second on the chosen axis is still visible on the one it wins.
 
 **A row against one stage takes its dollars from that stage's own `phase_costs` row, not from the run total** ([#1606](https://github.com/joshuafolkken/kit/issues/1606)). A proposal that cuts work out of `review` is worth what `review` cost, exactly as it is ranked on what `review` took in minutes; taking a share of `cost_usd` instead re-imports the error the next paragraph names. **A stage carrying no row was not free** — it had no billed request of its own inside it — and a scope whose `phase_costs.is_measured` is `false` was never priced at all, so both take `not measured` rather than a zero. **The unattributed bucket is never spread across the rows to make them add up**: it is quoted as its own figure where it is large enough to matter, and no row is ranked off it.
+
+**A proposal to stop delegating a step is ranked on `delegated_cost`, not on wall clock** ([#1882](https://github.com/joshuafolkken/kit/issues/1882)). The launch's fixed cost is `per_unit_cost_usd` in dollars, and a step whose own work is cheaper than that saves money by staying in the main line — so the row states its saving in dollars with `—` in the minutes column, since folding one subagent back moves the wall clock by an amount no run can resolve. Where `delegated_cost.is_measured` is `false` the block was not read for this scope, so say so rather than ranking off a zero.
 
 **Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.** Dollars per request multiplied by the requests a change removes is a saving; a percentage of the total is not, because the total covers work the change leaves exactly where it is — the same error as ranking a phase off a run's `elapsed_ms`. A change that removes carried tokens rather than requests is ranked on the resident and history shares instead, which is the arithmetic the round-trip price above already does for minutes. **Where `missing` was non-zero, a row that has a dollar saving still prints one and is never blanked.** Withholding it there would be the wrong reading of the same rule: on an `--issue` scope those counters are the whole corpus's, so a single malformed line in any unrelated session would empty the dollar column of every row and reproduce exactly the missing cost row this reading was added to end. **Label such a figure approximate rather than as a bound.** The run total `cost_usd` is a floor because it can only fall short of the true figure, but the dollars per request derived from it is an average over the priced subset alone and can sit either side of the true one — so a `≥` on a per-row saving claims more than the arithmetic gives. `not measured` is kept for the case that earns it, a scope with no priced record at all, and **a row that saves no money keeps the `—` the rule above gives it** — none of this reaches a cell that was empty by design.
 

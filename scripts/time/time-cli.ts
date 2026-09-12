@@ -323,7 +323,7 @@ function run_session(session_id: string, cwd: string, output: Output): number {
 // other scope's figures — and it resolves the pull request and the report in one pass, so the pulls
 // listing is paged once rather than twice.
 async function build(issue: number | undefined, cwd: string): Promise<TimeReport | undefined> {
-	const sources = time_request_costs.PRICED_SOURCES
+	const sources = time_request_costs.RUN_COST_SOURCES
 
 	if (issue === undefined) return await time_run.build_latest_run_report(cwd, undefined, sources)
 
