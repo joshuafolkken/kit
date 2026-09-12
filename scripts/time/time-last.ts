@@ -27,9 +27,6 @@ import { time_spans } from './time-spans'
 // than pulling every one of them toward zero.
 
 const NONE = 0
-// The unit both pull-request exclusions count in — the branchless merges and the collapsed
-// duplicates. Named once so the two notes cannot come to say it differently.
-const PULL_UNIT = 'merged pull request(s)'
 
 interface LastTimeReport {
 	scope: string
@@ -202,12 +199,6 @@ function shortfall_notes(requested: number, selection: RunSelection): Array<stri
 	return shortfall_note(requested, selection)
 }
 
-function skipped_note(count: number): Array<string> {
-	const tail = 'name no issue in their head branch, so they are not runs and are left out'
-
-	return time_batch.count_note(count, PULL_UNIT, tail)
-}
-
 // **The numbers are in the sentence because the rows are labelled by issue.** A reader who sees only
 // a count cannot find either end of the pair; the pull request number reaches both.
 //
@@ -232,7 +223,7 @@ function listed_pulls(pulls: ReadonlyArray<number>): string {
 function collapsed_note(pulls: ReadonlyArray<number>): Array<string> {
 	const tail = `name the same issue as a run already kept and were collapsed into it (${listed_pulls(pulls)})`
 
-	return time_batch.count_note(pulls.length, PULL_UNIT, tail)
+	return time_batch.count_note(pulls.length, time_last_select.PULL_UNIT, tail)
 }
 
 // **The two exclusions are named separately, and neither reads as a zero.** A run that merged with no
@@ -245,7 +236,7 @@ function notes_of(
 ): Array<string> {
 	return [
 		...shortfall_notes(requested, selection),
-		...skipped_note(selection.skipped_count),
+		...time_last_select.skipped_note(selection.skipped_count),
 		...collapsed_note(selection.collapsed_pulls),
 		...count_note(
 			time_batch.count_status(runs, time_batch.NO_TRANSCRIPT),

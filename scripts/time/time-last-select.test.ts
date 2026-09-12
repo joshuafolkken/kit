@@ -207,3 +207,17 @@ describe('time_last_select.select_last_runs — how far it reads', () => {
 		expect(pulls_asked(asked).length).toBeGreaterThan(0)
 	})
 })
+
+describe('time_last_select.skipped_note', () => {
+	it('says nothing when nothing was skipped', () => {
+		expect(time_last_select.skipped_note(NONE)).toEqual([])
+	})
+
+	// The wording is the one `--last` prints, single-sourced here so the no-argument default cannot
+	// phrase the same exclusion differently (joshuafolkken/kit#1831).
+	it('names the count and the reason when merges named no issue', () => {
+		expect(time_last_select.skipped_note(TWO)).toEqual([
+			'2 merged pull request(s) name no issue in their head branch, so they are not runs and are left out',
+		])
+	})
+})

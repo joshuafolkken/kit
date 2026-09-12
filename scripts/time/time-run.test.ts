@@ -351,6 +351,13 @@ describe('time_run.build_run_report — sessions that only shared the checkout',
 // other run's figures under its number.
 const NON_ISSUE_PULL = `[{"number":1,"created_at":"${at(0)}","merged_at":"${at(1)}","head":{"ref":"renovate/x","sha":"${SHA}"}}]`
 
+// #1831: the newest merge is an observations-flush pull request naming no issue, and the run that
+// just finished merged before it on an issue branch. `at(10)` is newer than the run's `at(8)`, so the
+// default scope used to stop on the flush; it must skip it and resolve the run behind it.
+const FLUSH_ROW = `{"number":1829,"created_at":"${at(5)}","merged_at":"${at(10)}","updated_at":"${at(10)}","head":{"ref":"observations/2026-09-12-055620","sha":"${SHA}"}}`
+const RUN_ROW = `{"number":${String(ISSUE)},"created_at":"${at(2)}","merged_at":"${at(8)}","updated_at":"${at(8)}","head":{"ref":"${String(ISSUE)}-run","sha":"${SHA}"}}`
+const NEWER_FLUSH_THEN_RUN = `[${FLUSH_ROW},${RUN_ROW}]`
+
 describe('time_run.build_latest_run_report', () => {
 	it('reports the run of the most recently merged branch, paging the listing once', async () => {
 		write_session('one', issue_lines(0))
@@ -370,6 +377,21 @@ describe('time_run.build_latest_run_report', () => {
 		)
 
 		expect(report).toBeUndefined()
+	})
+
+	// #1831: a newer observations-flush merge on a branchless branch used to stop resolution here, so
+	// the default `pnpm josh time` failed outright with NO_MERGED_RUN.
+	it('skips a newer branchless merge and reports the run behind it', async () => {
+		write_session('one', issue_lines(0))
+		const report = await time_run.build_latest_run_report(
+			CWD,
+			reader({ pull_body: NEWER_FLUSH_THEN_RUN }),
+		)
+
+		expect(report?.scope).toBe(`issue #${String(ISSUE)}`)
+		expect(report?.notes.join(NOTE_SEPARATOR)).toContain(
+			'1 merged pull request(s) name no issue in their head branch',
+		)
 	})
 })
 
