@@ -1213,6 +1213,12 @@ is the absence of a call and no `PreToolUse` hook can see one, so the last call 
 where the rule can be put; the push reissued detached is not refused again, so a run that obeys pays
 nothing.
 
+**One turn does end before the push, and only one: a dispatched lane child's pre-gate cut**
+(joshuafolkken/kit#1839). It ends the turn before the gate and relaunches a fresh process in the same
+act, so the run continues rather than stalling — the sanctioned boundary distinct from the push
+turn-end this section forbids. The boundary, its two commands and the resume verification are the
+`pre-gate-cut.md` skill document, its single source.
+
 This section is the single source of the rule. `followup.md`, `eval-gate.md`, `chain-rule.md` and
 `epicrun.md` → "Progress while the run is quiet" route here for it rather than restating it.
 

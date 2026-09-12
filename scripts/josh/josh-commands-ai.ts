@@ -176,6 +176,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Continue a cut backlogrun by waking the next session from outside the conversation',
 		category: 'AI tools',
 	},
+	'run:cut': {
+		script: 'scripts/run/run-cut-cli.ts',
+		description:
+			'Cut a lane child before the gate and resume a fresh process from the persisted state',
+		category: 'AI tools',
+	},
 	'run:preflight': {
 		script: 'scripts/run/run-preflight-cli.ts',
 		description: 'Say what an interrupted run left in this tree, and what to do about it',
