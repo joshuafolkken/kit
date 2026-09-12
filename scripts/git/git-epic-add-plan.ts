@@ -52,7 +52,10 @@ interface AddPlan {
 	replaced: ReadonlyArray<DependencyLink>
 	// The placed children an order-only move puts on the wrong side of an order the declaration already
 	// states — ahead of an issue declared to block them, or behind one they are declared to block
-	// (joshuafolkken/kit#1738). `epic:next` filters by `blocked_by` **before** it applies task-list
+	// (joshuafolkken/kit#1738). **The wrong side is judged against the whole resulting row order, not
+	// against the move target alone** (joshuafolkken/kit#1753): a relocation can seat a row on the wrong
+	// side of a *third* child the target never named, and a check that only compared the target missed
+	// it. `epic:next` filters by `blocked_by` **before** it applies task-list
 	// order, so such a row cannot take effect until the declaration itself changes, and a run that only
 	// printed `📋 Placed …` would report a reordering that nothing can observe.
 	//
@@ -233,19 +236,39 @@ function does_declare_order(
 	})
 }
 
-// The placed children this move puts on the wrong side of a declared order — see `contradicted` above.
-// Asked only of an order-only move: every other insertion rewrites the declaration to match the row it
-// placed, so there is nothing left for the row to contradict.
-function to_contradicted(context: PlanContext): ReadonlyArray<number> {
-	const { position } = context.input
-	if (position === undefined || context.input.is_order_only !== true) return []
+// Whether the resulting row order puts `child` on the wrong side of any issue the declaration orders
+// it against — ahead of one declared to block it, or behind one it is declared to block. The move
+// target is not privileged: a relocation can seat a row on the wrong side of a *third* child the
+// target never named, so the whole resulting order is cross-checked rather than the target alone
+// (joshuafolkken/kit#1753).
+function does_row_contradict_order(
+	chains: ReadonlyArray<ReadonlyArray<number>>,
+	rows: ReadonlyArray<number>,
+	child: number,
+): boolean {
+	const child_at = rows.indexOf(child)
 
-	const chains = context.chains_before
+	return rows.some((other, other_at) => {
+		if (other === child) return false
+		if (other_at < child_at) return does_declare_order(chains, child, other)
+
+		return does_declare_order(chains, other, child)
+	})
+}
+
+// The placed children the resulting row order puts on the wrong side of a declared order — see
+// `contradicted` above. Asked only of an order-only move: every other insertion rewrites the
+// declaration to match the row it placed, so there is nothing left for the row to contradict. The
+// rows are the ones the body rewrite produced, so the check reads the order that will actually be
+// written rather than reconstructing it.
+function to_contradicted(
+	context: PlanContext,
+	result_rows: ReadonlyArray<number>,
+): ReadonlyArray<number> {
+	if (context.input.position === undefined || context.input.is_order_only !== true) return []
 
 	return context.placed.filter((child) =>
-		position.kind === 'before'
-			? does_declare_order(chains, position.target, child)
-			: does_declare_order(chains, child, position.target),
+		does_row_contradict_order(context.chains_before, result_rows, child),
 	)
 }
 
@@ -259,6 +282,7 @@ function to_plan(context: PlanContext): PlanOutcome {
 	if ('error' in rewritten) return { error: rewritten.error }
 
 	const links_after = git_epic_chains.links_of(context.chains_after)
+	const result_rows = git_epic_parse.parse_task_list_issue_numbers(rewritten.body)
 
 	return {
 		plan: {
@@ -270,7 +294,7 @@ function to_plan(context: PlanContext): PlanOutcome {
 			// recorded is reported as a failure the user cannot act on.
 			removed: epic_graph.recorded_relations(replaced, context.input.recorded, context.input.repo),
 			replaced,
-			contradicted: to_contradicted(context),
+			contradicted: to_contradicted(context, result_rows),
 			decision,
 		},
 	}

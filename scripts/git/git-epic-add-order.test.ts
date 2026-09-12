@@ -32,6 +32,14 @@ const FAN_IN_BODY = body_of([FIRST_CHAIN, FAN_IN_CHAIN], [890, 891, 892])
 const ORDERED_CHILDREN = [child(890), child(891, [890]), child(892, [891])]
 const FAN_IN_CHILDREN = [child(890), child(891, [890, 892]), child(892)]
 
+// A partly-ordered epic: `#890 -> #892` is declared, `#891` is free. The order-only warning must fire
+// where a move contradicts this declaration through a child the move target never named, and stay
+// silent where the unconstrained `#891` is reordered (joshuafolkken/kit#1753).
+const PARTIAL_CHAIN = '#890 -> #892'
+const PARTIAL_BODY = body_of([PARTIAL_CHAIN], [890, 891, 892])
+const REORDERED_BODY = body_of([PARTIAL_CHAIN], [891, 890, 892])
+const PARTIAL_CHILDREN = [child(890), child(891), child(892, [890])]
+
 function plan(overrides: Partial<PlanInput>): PlanOutcome {
 	return git_epic_add_plan.build_plan({
 		epic_number: EPIC_NUMBER,
@@ -92,12 +100,19 @@ describe('git_epic_add_plan.build_plan — an order-only move of a tracked child
 })
 
 describe('git_epic_add_plan.build_plan — an order-only move the declaration does not contradict', () => {
-	// The transitive case, in the direction that agrees: `#890` is declared to run before `#892`, and
-	// this asks for its row before `#892`'s, which is what the declaration already says.
-	it('says nothing about a move that agrees with the declared order', () => {
-		const agreeing = plan({ children: [890], position: { kind: 'before', target: 892 } })
+	// A child no chain names, reordered inside a partly-ordered epic: seating `#891`'s row anywhere
+	// leaves the declared `#890 -> #892` intact, so no warning fires — the legitimate reorder the
+	// exhaustive check must not block (joshuafolkken/kit#1753).
+	it('says nothing about reordering a child the declaration never constrains', () => {
+		const free = plan({
+			body: PARTIAL_BODY,
+			children: [891],
+			recorded: PARTIAL_CHILDREN,
+			position: { kind: 'after', target: 892 },
+		})
 
-		expect(plan_of(agreeing).contradicted).toStrictEqual([])
+		expect(tracked_of(free)).toStrictEqual([890, 892, 891])
+		expect(plan_of(free).contradicted).toStrictEqual([])
 	})
 
 	it('says nothing where no chain names both issues', () => {
@@ -117,6 +132,37 @@ describe('git_epic_add_plan.build_plan — an order-only move the declaration do
 		const declared = plan({ is_order_only: false, position: { kind: 'before', target: 891 } })
 
 		expect(plan_of(declared).contradicted).toStrictEqual([])
+	})
+})
+
+describe('git_epic_add_plan.build_plan — an order-only move that contradicts a child other than the target', () => {
+	// The reproduction from joshuafolkken/kit#1753: `#890 -> #892` is declared, the rows are
+	// `[891, 890, 892]`, and `#892` is moved before `#891`. The result seats `#892` ahead of `#890`,
+	// contradicting the declaration — but the target `#891` is named by no chain, so a check that
+	// compared only the target stayed silent.
+	const moved = plan({
+		body: REORDERED_BODY,
+		children: [892],
+		recorded: PARTIAL_CHILDREN,
+		position: { kind: 'before', target: 891 },
+	})
+
+	it('moves the row ahead of the target', () => {
+		expect(tracked_of(moved)).toStrictEqual([892, 891, 890])
+	})
+
+	it('names the moved child even though the contradiction is not with the target', () => {
+		expect(plan_of(moved).contradicted).toStrictEqual([892])
+	})
+
+	// The fully-ordered mirror: `#890 -> #891 -> #892`, move `#890` before `#892`. The row lands after
+	// `#891`, so the contradiction is with the third child `#891`, not the target `#892` — which the
+	// move agrees with. A target-only check read this as clean.
+	it('names a child seated behind an issue it is declared to block', () => {
+		const behind = plan({ children: [890], position: { kind: 'before', target: 892 } })
+
+		expect(tracked_of(behind)).toStrictEqual([891, 890, 892])
+		expect(plan_of(behind).contradicted).toStrictEqual([890])
 	})
 })
 
