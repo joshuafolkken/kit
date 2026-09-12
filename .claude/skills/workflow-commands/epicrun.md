@@ -527,6 +527,11 @@ work tree with its own branch, its own `.env` and its own dev and preview ports
 parallel; the merges stay serial** — not because this procedure serializes them, but because each one
 lands on the `main` the next one is then measured against.
 
+**A lane child may cut its own turn before the gate.** Implementation done, it ends its process and a
+fresh one resumes the same lane from the gate onward, so the thinking it built up while implementing
+is dropped rather than carried on every later call — the boundary, the two commands and the resume
+verification are `pre-gate-cut.md`, the single source (joshuafolkken/kit#1839).
+
 **One kind of child takes no lane beside anything: an interrupt whose subject is a defect in the
 verification path itself.** It runs alone, and the batch resumes only once it has merged. **Decide it
 from the enumeration, never from how serious it looks** — does the defect reach the verification gate

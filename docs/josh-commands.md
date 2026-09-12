@@ -2701,6 +2701,19 @@ pnpm josh run:wake --loop --interval 30
 
 Standard output carries exactly one token on every path; the reason and the advice go to standard error. Where a `backlogrun` starts and ends it is `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation".
 
+### `josh run:cut`
+
+Cut a dispatched lane child before the verification gate and resume a fresh process from the persisted state, so the thinking accumulated while implementing is dropped from every later call ([#1839](https://github.com/joshuafolkken/kit/issues/1839)).
+
+```bash
+pnpm josh run:cut 1839            # take the cut and relaunch a fresh process ; alias: josh rct
+pnpm josh run:cut --resume 1839   # a fresh process's entry check: fresh | resume | stale | busy
+pnpm josh run:cut --json          # print the record as one line
+pnpm josh run:cut --end           # clear the record
+```
+
+Standard output carries exactly one token on every acted path (`--json` prints the record as one line); a malformed command line prints usage to standard error. `run:cut <N>` answers `cut` only after the record is written and a fresh `fullrun #<N>` is relaunched, `not-a-lane` where there is no open lane, `unready` on a clean or default-branch tree, `busy` when a cut is already in flight, and `failed` — with the record cleared — when the relaunch could not start. The boundary, the verdicts and the resume verification are `.claude/skills/workflow-commands/pre-gate-cut.md`.
+
 ### `josh run:preflight`
 
 Say what an interrupted run left in this working tree, and what the rule says to do about it before the next child starts ([#926](https://github.com/joshuafolkken/kit/issues/926)).
