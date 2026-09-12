@@ -36,13 +36,20 @@ import { shell_segments } from './shell-segments'
 // would leave this Issue where it started.
 const SWITCH_ENV_KEY = 'JOSH_RULE_GUARD'
 
-// **What a compliance test is asked of: the call, and the turn it went out in** — the calls the same
-// assistant message issued, this one included (joshuafolkken/kit#1792). Every row but the batching
-// one answers from the call alone and simply ignores the second parameter, which is why widening the
-// one signature costs the six nothing. **The batching rule cannot be written without it**: its
-// subject is *how many calls a turn carried*, and no field of a single call says that — so the
+// **What a compliance test is asked of: the call, the turn it went out in, and the run it belongs
+// to** — the calls the same assistant message issued, and every call the run made
+// (joshuafolkken/kit#1792 for the turn, joshuafolkken/kit#1867 for the run). Every row but two answers
+// from the call alone and simply ignores the rest, which is why widening the one signature costs them
+// nothing. **The batching rule cannot be written without the turn**: its subject is *how many calls a
+// turn carried*, and no field of a single call says that. **The pre-gate cut cannot be written without
+// the run**: a cut relaunches a second process that issues the identical entry check, so the two
+// halves are separable only by a call one of them makes elsewhere in the run. In both cases the
 // alternative was a second predicate slot beside this one, i.e. two ways to declare the same thing.
-type CallTest = (call: GuardedCall, turn: ReadonlyArray<GuardedCall>) => boolean
+type CallTest = (
+	call: GuardedCall,
+	turn: ReadonlyArray<GuardedCall>,
+	run: ReadonlyArray<GuardedCall>,
+) => boolean
 
 // One rule delivered by trigger. `id` keys its own refusal record, so one rule firing never spends
 // another's budget.
@@ -276,6 +283,25 @@ function reads_issue_comments(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => fetches_issue_comments(segment))
 }
 
+const ASKS_ABOUT_THE_CUT = on_bash_command(pre_gate_cut.asks_about_the_cut)
+const CLAIMS_THE_HOLD = on_bash_command(pre_gate_cut.claims_the_hold)
+
+// **The occasion the pre-gate cut governs, in the one shape that separates a cut run's two halves**
+// (joshuafolkken/kit#1867). Asking about the cut is what a lane child does whatever it goes on to do;
+// claiming the working tree is what only the process on the near side of the boundary does, because
+// the `resume` verdict tells its counterpart to skip that claim. A run doing both reached the
+// boundary; a run that asked without claiming is the session the cut produced, which had no cut of
+// its own to take and belongs in no denominator.
+function reaches_the_pre_gate_boundary(
+	call: GuardedCall,
+	_turn: ReadonlyArray<GuardedCall>,
+	run: ReadonlyArray<GuardedCall>,
+): boolean {
+	if (!ASKS_ABOUT_THE_CUT(call)) return false
+
+	return run.some((issued) => CLAIMS_THE_HOLD(issued))
+}
+
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	{
 		id: 'wip-cap',
@@ -331,19 +357,23 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	//
 	// **Once per run rather than `decide`, and the direction of the error is why.** Taking the cut ends
 	// the process, so this is not the recurring act joshuafolkken/kit#1570 wrote `decide` for — and the
-	// four verdicts that legitimately leave a run at the gate (`not-a-lane`, `unready`, `busy`,
-	// `failed`) all need the reissue to go through. A row that refused every time would wedge exactly
+	// five verdicts that legitimately leave a run at the gate (`not-a-lane`, `unready`, `busy`,
+	// `failed`, `unknown`) all need the reissue to go through. A row that refused every time would wedge exactly
 	// those runs; a row that refuses once cannot.
 	//
-	// **`pnpm josh rule:value` reads this row with a ceiling of about 50%, and that is recorded rather
-	// than hidden** (joshuafolkken/kit#1864 review round 2). A cut relaunches a *new session*, which
-	// the measurement groups as a run of its own, and that resumed run issues the entry check — so it
-	// is counted by `reaches` while never being able to satisfy `keeps`, which only the cutting run
-	// can. Ten perfectly obedient children therefore read as ten kept out of twenty. **No predicate
-	// here can separate the two**: `CallTest` sees one call and its turn, never the run, and both
-	// processes issue byte-identical `--resume` strings. Dropping `reaches` is strictly worse — the
-	// trigger evaluates against the *measuring* process's working directory, so it is always false
-	// from the main checkout and the row would read as no runs at all. Read this row's rate as a floor.
+	// **`pnpm josh rule:value` read this row with a ceiling of about 50%, and joshuafolkken/kit#1867 is
+	// what removed it** (the ceiling was recorded here by joshuafolkken/kit#1864's review round 2). A
+	// cut relaunches a *new session*, which the measurement groups as a run of its own, and that
+	// resumed run issues the entry check — so scored on the asking alone it joined the denominator
+	// while never being able to satisfy `keeps`, which only the cutting run can, and ten perfectly
+	// obedient children read as ten kept out of twenty. **The two halves are separable, just not from
+	// one call**: both processes issue byte-identical `--resume` strings, but the `fresh` verdict sends
+	// a run on to claim the working-tree hold while the `resume` verdict tells its counterpart to skip
+	// that claim. `reaches_the_pre_gate_boundary` is that conjunction, and it is why `CallTest` is
+	// handed the run's calls beside the turn's rather than a second predicate slot of its own.
+	// Dropping `reaches` altogether is still strictly worse — the trigger evaluates against the
+	// *measuring* process's working directory, so it is always false from the main checkout and the row
+	// would read as no runs at all.
 	//
 	// **It overlaps `piped-verification` on a piped gate call, and the order is safe in both
 	// directions.** `pnpm josh gate | tail` in an uncut lane is a real instance of both defects; the
@@ -355,7 +385,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate),
 		reason: pre_gate_cut.PRE_GATE_CUT_REASON,
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
-		reaches: on_bash_command(pre_gate_cut.asks_about_the_cut),
+		reaches: reaches_the_pre_gate_boundary,
 	},
 ]
 

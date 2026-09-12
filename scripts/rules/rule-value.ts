@@ -71,6 +71,23 @@ interface IssuedCall {
 	input: unknown
 }
 
+// **What a predicate is asked against beside the call: the turn it went out in, and the run it belongs
+// to** (joshuafolkken/kit#1867). The two travel as one parameter because every observer below takes
+// both, and passing them separately would put each one over the four-parameter limit. `run` is every
+// call the run issued, in timeline order, so a predicate reading it sees the whole run whatever point
+// of it the walk has reached — which is right for `reaches`, a question about *whether* the situation
+// arose rather than about when.
+//
+// **The two predicates are not symmetric about it, and a `keeps` reading `run` would be wrong.**
+// Keeping is deliberately gated on "before the trigger" — `observe_before_trigger` stops crediting
+// once the refusal has landed, because compliance after it is the delivery's contribution rather than
+// the carried text's. A `keeps` answering from the whole run would see straight past that gate and
+// credit exactly the compliance this measurement exists to exclude.
+interface CallContext {
+	turn: ReadonlyArray<IssuedCall>
+	run: ReadonlyArray<IssuedCall>
+}
+
 interface RuleState {
 	is_kept: boolean
 	is_reached: boolean
@@ -94,12 +111,8 @@ function blank_states(): Map<string, RuleState> {
 // decides on the turns *behind* a call, so no predicate given one call could say whether it was
 // about to be refused; what the transcript records instead is the refusal, and `observe_error` below
 // is what closes the window for such a row.
-function keeps_the_rule(
-	rule: MeasuredRule,
-	call: IssuedCall,
-	turn: ReadonlyArray<IssuedCall>,
-): boolean {
-	return rule.keeps?.(call, turn) === true
+function keeps_the_rule(rule: MeasuredRule, call: IssuedCall, context: CallContext): boolean {
+	return rule.keeps?.(call, context.turn, context.run) === true
 }
 
 function is_the_trigger(rule: MeasuredRule, call: IssuedCall): boolean {
@@ -110,11 +123,11 @@ function observe_before_trigger(
 	rule: MeasuredRule,
 	state: RuleState,
 	call: IssuedCall,
-	turn: ReadonlyArray<IssuedCall>,
+	context: CallContext,
 ): void {
 	if (state.is_triggered) return
 
-	if (keeps_the_rule(rule, call, turn)) state.is_kept = true
+	if (keeps_the_rule(rule, call, context)) state.is_kept = true
 	if (is_the_trigger(rule, call)) state.is_triggered = true
 }
 
@@ -125,11 +138,11 @@ function observe_call(
 	rule: MeasuredRule,
 	state: RuleState,
 	call: IssuedCall,
-	turn: ReadonlyArray<IssuedCall>,
+	context: CallContext,
 ): void {
-	if (rule.reaches?.(call, turn) === true) state.is_reached = true
+	if (rule.reaches?.(call, context.turn, context.run) === true) state.is_reached = true
 
-	observe_before_trigger(rule, state, call, turn)
+	observe_before_trigger(rule, state, call, context)
 }
 
 // One transcript line, parsed once, as the two things a reading is taken from: the calls it issued
@@ -248,32 +261,33 @@ function observe_for_rule(
 	rule: MeasuredRule,
 	state: RuleState,
 	calls: ReadonlyArray<IssuedCall>,
-	turn: ReadonlyArray<IssuedCall>,
+	context: CallContext,
 ): void {
-	// This line's own calls, read in order; `turn` is every call the message issued, so a call's
-	// siblings are the rest of the turn it went out in even where the transcript split them across
-	// lines. The two coincide except when a message spans several lines (joshuafolkken/kit#1804).
-	for (const call of calls) observe_call(rule, state, call, turn)
+	// This line's own calls, read in order; `context.turn` is every call the message issued, so a
+	// call's siblings are the rest of the turn it went out in even where the transcript split them
+	// across lines. The two coincide except when a message spans several lines
+	// (joshuafolkken/kit#1804).
+	for (const call of calls) observe_call(rule, state, call, context)
 }
 
 function observe_calls(
 	states: Map<string, RuleState>,
 	calls: ReadonlyArray<IssuedCall>,
-	turn: ReadonlyArray<IssuedCall>,
+	context: CallContext,
 ): void {
 	for (const rule of delivered_rules.MEASURED_RULES) {
 		const state = states.get(rule.id)
 
-		if (state !== undefined) observe_for_rule(rule, state, calls, turn)
+		if (state !== undefined) observe_for_rule(rule, state, calls, context)
 	}
 }
 
 function observe_line(
 	states: Map<string, RuleState>,
 	entry: DatedLine,
-	turn: ReadonlyArray<IssuedCall>,
+	context: CallContext,
 ): void {
-	observe_calls(states, entry.calls, turn)
+	observe_calls(states, entry.calls, context)
 
 	for (const text of entry.errors) observe_error(states, text)
 }
@@ -299,14 +313,18 @@ function timeline_of(texts: ReadonlyArray<string>): Array<DatedLine> {
 // Every text belonging to one run — the session transcript and the transcripts of the units it
 // delegated — read as one timeline. The lines are walked in timestamp order; `turns_by_key` supplies
 // each call the rest of its message as context, so grouping no longer reorders the reading
-// (joshuafolkken/kit#1804).
+// (joshuafolkken/kit#1804), and the run's own calls ride beside it for the one predicate that has to
+// ask about the run rather than the turn (joshuafolkken/kit#1867).
 function read_run(texts: ReadonlyArray<string>): Map<string, RuleState> {
 	const states = blank_states()
 	const entries = timeline_of(texts)
 	const turns = turns_by_key(entries)
+	const run = entries.flatMap((entry) => entry.calls)
 
 	for (const [index, entry] of entries.entries()) {
-		observe_line(states, entry, turns.get(turn_key(entry, index)) ?? entry.calls)
+		const turn = turns.get(turn_key(entry, index)) ?? entry.calls
+
+		observe_line(states, entry, { turn, run })
 	}
 
 	return states
