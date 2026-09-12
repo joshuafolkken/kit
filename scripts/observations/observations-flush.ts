@@ -112,6 +112,15 @@ function off_default_message(current: string, default_branch: string): string {
 	return `\`pnpm josh observations:flush\` opens a branch of its own, so it starts from \`${default_branch}\` — this checkout is on \`${current}\`. Run \`pnpm josh ms\` first.`
 }
 
+// **A branch cut from a default branch that predates another merged flush conflicts by
+// construction** (joshuafolkken/kit#1768). The ledger is append-only and every writer adds at the
+// same tail, so a stale start point opens a pull request `wait_for_pr_success` waits on until it
+// exhausts its budget rather than merging. This says to bring the default branch up to date first,
+// which is the one exit that leaves the appended lines where they are.
+function behind_default_message(default_branch: string): string {
+	return `\`pnpm josh observations:flush\` cuts its branch from \`${default_branch}\`, which is behind \`origin/${default_branch}\` — a branch cut here would open a pull request that cannot merge. Run \`pnpm josh ms\` first.`
+}
+
 function is_flush_branch(current: string): boolean {
 	return current.startsWith(BRANCH_PREFIX)
 }
@@ -164,6 +173,22 @@ async function refuse_off_default(current: string, default_branch: string): Prom
 	if (!is_flush_branch(current)) throw new Error(off_default_message(current, default_branch))
 
 	throw new Error(flush_branch_message(current, await commits_beyond(default_branch, current)))
+}
+
+// **The start point's freshness is judged without moving the working tree**, which is the whole
+// point of doing it here rather than pulling (joshuafolkken/kit#1768). `git fetch` updates the
+// remote-tracking ref and `git rev-list --count HEAD..origin/<default>` reads it — neither writes a
+// file, so the ledger, dirty by definition when this runs, is left exactly as it is.
+async function commits_behind_default(default_branch: string): Promise<number> {
+	await git_command.fetch_branch(default_branch)
+
+	return await git_command.commit_count_beyond('HEAD', `origin/${default_branch}`)
+}
+
+async function refuse_stale_default(default_branch: string): Promise<void> {
+	if ((await commits_behind_default(default_branch)) > NO_COMMITS) {
+		throw new Error(behind_default_message(default_branch))
+	}
 }
 
 // Returns the default branch, which is what the rollback below checks out again.
@@ -282,13 +307,17 @@ function merged_message(branch_name: string): string {
 // **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
 // definition at this point, so `git pull --ff-only` aborts on it in exactly the case a pull would
 // have been for — an upstream flush that already advanced the ledger — and reports a failure about
-// the wrong thing. A flush cut from a default branch that predates another merged flush therefore
-// still opens a pull request that conflicts; joshuafolkken/kit#1768 carries that.
+// the wrong thing (joshuafolkken/kit#1756's second review round). So the freshness of the start
+// point is a *refusal* rather than a pull (joshuafolkken/kit#1768): `refuse_stale_default` reads the
+// remote without moving the working tree, and a default branch that predates another merged flush
+// stops here — before a branch is cut — rather than opening a pull request that cannot merge.
 async function flush(now: Date): Promise<string> {
 	const status_output = await git_command.status()
 	const default_branch = await refuse_unsafe_flush(status_output)
 
 	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
+
+	await refuse_stale_default(default_branch)
 
 	const branch_name = branch_name_for(timestamp_for(now))
 
@@ -299,6 +328,7 @@ async function flush(now: Date): Promise<string> {
 }
 
 const observations_flush = {
+	behind_default_message,
 	branch_name_for,
 	CLEAN_MESSAGE,
 	COMMIT_MESSAGE,

@@ -30,6 +30,7 @@ vi.mock('#scripts/git/git-command', () => ({
 		commit: vi.fn(),
 		commit_count_beyond: vi.fn(),
 		delete_branch: vi.fn(),
+		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
 		push: vi.fn(),
 		status: vi.fn(),
@@ -53,6 +54,9 @@ function on_default_branch(): void {
 	vi.mocked(git_command.status).mockResolvedValue(MODIFIED_LEDGER)
 	vi.mocked(git_command.branch).mockResolvedValue(DEFAULT_BRANCH)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue(DEFAULT_BRANCH)
+	// The default branch is up to date, so the freshness gate passes and a branch is cut.
+	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
+	vi.mocked(git_command.commit_count_beyond).mockResolvedValue(NO_COMMITS)
 	vi.mocked(git_command.checkout_b).mockResolvedValue('')
 	vi.mocked(git_command.checkout).mockResolvedValue('')
 	vi.mocked(git_gh_command.pr_create).mockResolvedValue(PULL_REQUEST_URL)
@@ -138,6 +142,36 @@ describe('observations_flush — a rollback that cannot finish', () => {
 		expect(message).toContain(HOOK_REJECTION)
 		expect(message).toContain(CHECKOUT_FAILURE)
 		expect(message).not.toContain('was removed')
+	})
+})
+
+describe('observations_flush — a default branch behind origin', () => {
+	const COMMITS_BEHIND = 3
+
+	beforeEach(() => {
+		vi.clearAllMocks()
+		on_default_branch()
+		vi.mocked(git_command.commit_count_beyond).mockResolvedValue(COMMITS_BEHIND)
+	})
+
+	// joshuafolkken/kit#1768: the branch cut from a stale default branch conflicts by construction, so
+	// the flush refuses before cutting one and names the command that brings the start point current.
+	it('refuses before cutting a branch and names pnpm josh ms', async () => {
+		const message = await flush_message()
+
+		expect(message).toContain(MS_COMMAND)
+		expect(message).not.toContain(ONLY_COPY)
+		expect(git_command.checkout_b).not.toHaveBeenCalled()
+	})
+
+	// The acceptance criterion the fix turns on: the ledger is dirty when this runs, so the refusal
+	// must read the remote and write nothing — no commit, no staging, no push.
+	it('does not touch the working tree while the ledger is dirty', async () => {
+		await flush_message()
+
+		expect(git_command.commit).not.toHaveBeenCalled()
+		expect(git_command.add_path).not.toHaveBeenCalled()
+		expect(git_command.push).not.toHaveBeenCalled()
 	})
 })
 
