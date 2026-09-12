@@ -10,7 +10,7 @@ import { time_spans, type Span, type SpanOutcome } from './time-spans'
 // with no way to tell an allowed re-run of a red gate from a wasted one. These are the two the block
 // has to separate, plus the third state it must refuse to guess at.
 
-const { span, GATE_COMMAND } = time_phase_fixture
+const { span, GATE_COMMAND, MINUTE_MS } = time_phase_fixture
 
 function gate(start_minute: number, outcome: SpanOutcome): Span {
 	return span(start_minute, 1, { josh_command: GATE_COMMAND, outcome })
@@ -135,5 +135,83 @@ describe('time_gate_runs — the printed block', () => {
 		const lines = time_gate_runs.gate_run_lines(time_gate_runs.build_gate_runs([]))
 
 		expect(lines.join('\n')).toContain(time_format.NOT_MEASURED)
+	})
+})
+
+// joshuafolkken/kit#1812: the gate is launched into the background (§2h), so `by_invocation` sees only
+// the two-second dispatch and the `gate` phase only the launch's own seconds. Its real runtime is in
+// the background run — the launch to the call that read the output back — and this reads it in the
+// shape `ci_cycles` uses: the real length, and the naked part the run spent on it alone.
+const GATE_ID = 'gate-bg'
+
+function bg_gate(start_minute: number, minutes: number, extra: Partial<Span> = {}): Span {
+	return span(start_minute, minutes, {
+		josh_command: GATE_COMMAND,
+		outcome: time_spans.OK_OUTCOME,
+		background_id: GATE_ID,
+		background_ended_ms: (start_minute + minutes) * MINUTE_MS,
+		...extra,
+	})
+}
+
+function gate_join(start_minute: number, minutes: number): Span {
+	return span(start_minute, minutes, { reads_background: GATE_ID })
+}
+
+describe('time_gate_runs — the backgrounded gate runtime read back', () => {
+	// The gate is launched, a review runs beside it for six minutes, and the output is read back only
+	// afterwards — so its real runtime is eight minutes and the part it ran alone is two.
+	it('reads the gate real duration and the naked part it ran alone', () => {
+		const totals = time_gate_runs.build_gate_runs([
+			bg_gate(0, 1),
+			span(1, 6, { label: 'Skill' }),
+			gate_join(7, 1),
+		])
+		const [window] = totals.windows
+
+		expect(totals.is_runtime_measured).toBe(true)
+		expect([window?.duration_ms, window?.naked_ms]).toEqual([8 * MINUTE_MS, 2 * MINUTE_MS])
+	})
+
+	it('prints the naked seconds beside the gate window when it was read back', () => {
+		const lines = time_gate_runs.gate_run_lines(
+			time_gate_runs.build_gate_runs([
+				bg_gate(0, 1),
+				span(1, 6, { label: 'Skill' }),
+				gate_join(7, 1),
+			]),
+		)
+
+		expect(lines.join('\n')).toContain(time_format.NAKED_PREFIX)
+	})
+})
+
+describe('time_gate_runs — when the gate runtime is withheld', () => {
+	// A gate launched into the background but never read back has no runtime in the transcript, so the
+	// block says so rather than reporting the launch's own dispatch seconds as the gate's length.
+	it('reports the runtime as not measured when the backgrounded gate was never read back', () => {
+		const totals = time_gate_runs.build_gate_runs([bg_gate(0, 1), span(1, 5)])
+
+		expect(totals.run_count).toBe(1)
+		expect(totals.is_runtime_measured).toBe(false)
+	})
+
+	it('prints not measured rather than a zero for an unread backgrounded gate', () => {
+		const lines = time_gate_runs.gate_run_lines(
+			time_gate_runs.build_gate_runs([bg_gate(0, 1), span(1, 5)]),
+		)
+
+		expect(lines.join('\n')).toContain(time_gate_runs.RUNTIME_HEADING)
+		expect(lines.join('\n')).toContain(time_format.NOT_MEASURED)
+	})
+
+	// A gate that ran in the foreground carries no background id, so its length is already in the
+	// per-invocation table — the block withholds itself rather than reporting a knowable length as
+	// unmeasured.
+	it('shows no runtime block for a gate that ran only in the foreground', () => {
+		const foreground = span(0, 8, { josh_command: GATE_COMMAND, outcome: time_spans.OK_OUTCOME })
+		const lines = time_gate_runs.gate_run_lines(time_gate_runs.build_gate_runs([foreground]))
+
+		expect(lines.join('\n')).not.toContain(time_gate_runs.RUNTIME_HEADING)
 	})
 })

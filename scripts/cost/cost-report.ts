@@ -55,6 +55,13 @@ interface MissingData {
 	no_usage_lines: number
 	malformed_lines: number
 	unreadable_sessions: number
+	// Delegated units whose owning session's issue could not be determined, so their cost is charged
+	// to no issue at all (joshuafolkken/kit#1812). Non-zero makes an issue scope's `cost_usd` a floor,
+	// the same reading `unpriced_models` gets one field over. **Zero in the three counters above is not
+	// evidence of a complete read**: a run reported `missing` as three zeros while dropping a quarter
+	// of its cost, because a unit that attributed to nothing was silence rather than a count — this is
+	// the fourth counter that makes that drop visible.
+	unattributed_sessions: number
 }
 
 // The two decompositions joshuafolkken/kit#1151 added, carried together because they answer the two
@@ -151,18 +158,35 @@ function model_lines(by_model: ReadonlyArray<ModelCost>): Array<string> {
 	)
 }
 
+// The counters and how each one reads, in the order they print. Data-driven so a fifth counter is a
+// row here rather than another branch in the formatter.
+const MISSING_LABELS: ReadonlyArray<readonly [keyof MissingData, string]> = [
+	['malformed_lines', 'unparseable lines'],
+	['no_usage_lines', 'assistant lines without usage'],
+	['unreadable_sessions', 'unreadable sessions'],
+	['unattributed_sessions', 'delegated units not attributed to an issue'],
+]
+
+// The one counter whose presence makes a scope's cost incomplete: an unattributed delegated unit's
+// cost is charged to no issue, so an issue scope reporting one is a floor (joshuafolkken/kit#1812).
+const FLOOR_KEY: keyof MissingData = 'unattributed_sessions'
+
+function missing_row(key: keyof MissingData, label: string, missing: MissingData): string {
+	const count = missing[key]
+
+	if (count === 0) return ''
+
+	const floor = key === FLOOR_KEY ? ' (the cost above is a floor)' : ''
+
+	return `  ${label}: ${String(count)}${floor}`
+}
+
 // Only ever printed when there is something to say. A silent report is the failure mode this
 // command exists to remove, but a "0 malformed lines" row on every clean run is noise.
 function missing_lines(missing: MissingData): Array<string> {
-	const rows = [
-		missing.malformed_lines > 0 ? `  unparseable lines: ${String(missing.malformed_lines)}` : '',
-		missing.no_usage_lines > 0
-			? `  assistant lines without usage: ${String(missing.no_usage_lines)}`
-			: '',
-		missing.unreadable_sessions > 0
-			? `  unreadable sessions: ${String(missing.unreadable_sessions)}`
-			: '',
-	].filter((row) => row !== '')
+	const rows = MISSING_LABELS.map(([key, label]) => missing_row(key, label, missing)).filter(
+		(row) => row !== '',
+	)
 
 	return rows.length === 0 ? [] : ['', 'Missing data (not counted above):', ...rows]
 }
