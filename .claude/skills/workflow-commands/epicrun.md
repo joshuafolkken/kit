@@ -719,6 +719,8 @@ the ref the lane is cut from.
 
 ### Conflicts are not predicted
 
+**The child merges `origin/main` into its lane before its gate now, so this path is the fallback rather than the first line** (joshuafolkken/kit#1837). Every `fullrun` runs `pnpm josh main:merge` ahead of the gate (`prompts/review.md` → "origin/main is merged in before the gate", the single source), so an overlap that has already landed on `main` is resolved before the gate reads the tree — the gate then verifies the tree that will merge, and the conflict window shrinks from implementation-start-to-`followup` down to gate-to-`followup`. What this section covers is the case that earlier merge cannot close: an overlap that lands on `main` *after* it, which `followup` still reports as a conflict, resolved by the same steps below.
+
 **Nothing here forecasts which children will overlap.** A forecast is wrong often, and when it is
 wrong it is wrong silently. The overlap surfaces where GitHub already reports it: a pull request that
 conflicts with its base comes back `mergeStateStatus: DIRTY`, which `git-pr-checks-eval.ts` reads as
