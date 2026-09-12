@@ -25,6 +25,10 @@ function edit(target: string): Span {
 	return call([target], true, true)
 }
 
+// A subagent launch, single-sourced from the fixture so both bundle suites build it one way
+// (joshuafolkken/kit#1854).
+const launch = time_span_fixture.launch_span
+
 // The same call, tagged with the turn that issued it (joshuafolkken/kit#1406).
 function call_of(message_id: string, target: string): Span {
 	return { ...call([target]), message_id }
@@ -378,6 +382,37 @@ describe('time_bundles.bundle_lines — the per-tool breakdown', () => {
 
 		expect(text).toContain(time_bundles.BY_TOOL_LABEL)
 		expect(text).not.toContain('attributed')
+	})
+})
+
+// The spread-apart launch series folded into the same totals (joshuafolkken/kit#1854). A launch is
+// never bundleable, so it enters no consecutive sequence above — the fan-out is counted apart and
+// surfaces as an `Agent` row. The detector's own edge cases and run #1839 end to end live in
+// `time-agent-bundles.test.ts`; these pin how the series reaches `build_bundles`.
+describe('time_bundles.build_bundles — the spread-apart launch series', () => {
+	// The Agent row takes its place among the consecutive rows by weight, and the residue still sums to
+	// zero across both series — four serial independent launches beside a two-turn Edit sequence.
+	it('ranks the Agent fan-out beside the consecutive rows and stays balanced', () => {
+		const consecutive = named_turns([
+			[EDIT, 'a.ts'],
+			[EDIT, 'b.ts'],
+		])
+		const launches = [launch('m1'), MODEL, launch('m2'), MODEL, launch('m3'), MODEL, launch('m4')]
+		const totals = time_bundles.build_bundles([...consecutive, HUMAN, MODEL, ...launches])
+
+		expect(totals.by_tool).toEqual([
+			{ label: 'Agent', sequence_count: 1, recoverable_round_trips: 3 },
+			{ label: EDIT, sequence_count: 1, recoverable_round_trips: 1 },
+		])
+		expect(totals.unattributed_round_trips).toBe(0)
+	})
+
+	// The acceptance condition of joshuafolkken/kit#1854: a launch whose prompt references the prior
+	// finding is the read-only chain a write cannot mark, and it is not counted.
+	it('does not count a launch whose prompt references a prior finding', () => {
+		const spans = [MODEL, launch('m1'), MODEL, launch('m2', true)]
+
+		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(0)
 	})
 })
 

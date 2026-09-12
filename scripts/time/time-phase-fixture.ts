@@ -53,6 +53,7 @@ function base_span(start_minute: number, minutes: number, extra: Partial<Span>):
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		is_writing: false,
+		has_prior_reference: false,
 		targets: [],
 		writes: [],
 		message_id: time_spans.NO_MESSAGE_ID,

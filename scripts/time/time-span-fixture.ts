@@ -13,6 +13,8 @@ import { time_spans, type Span, type SpanOutcome } from './time-spans'
 
 const MINUTE_MS = 60_000
 const DEFAULT_MINUTES = 1
+// The tool name a subagent launch carries (joshuafolkken/kit#1854), matching `time-bundle-call.ts`.
+const LAUNCH_LABEL = 'Agent'
 
 // The fields no case in either suite varies. Written once so a new `Span` field lands in one literal
 // rather than in each of them, and so the builder below stays inside the per-function line limit.
@@ -25,6 +27,7 @@ const UNVARIED = {
 	marker: time_markers.NO_MARKER,
 	is_bundleable: false,
 	is_writing: false,
+	has_prior_reference: false,
 	targets: [],
 	writes: [],
 	message_id: time_spans.NO_MESSAGE_ID,
@@ -81,6 +84,18 @@ function edit_span(label: string, target: string): Span {
 	return { ...span(time_spans.TOOL_CATEGORY, DEFAULT_MINUTES, label), targets: [target] }
 }
 
-const time_span_fixture = { MINUTE_MS, span, outcome_span, edit_span }
+// A subagent launch: a tool call that is never bundleable, carrying the turn that issued it and
+// whether its prompt builds on a prior finding (joshuafolkken/kit#1854). Single-sourced here so both
+// bundle suites build one the same way.
+function launch_span(message_id: string, has_prior_reference = false): Span {
+	return {
+		...span(time_spans.TOOL_CATEGORY),
+		label: LAUNCH_LABEL,
+		message_id,
+		has_prior_reference,
+	}
+}
+
+const time_span_fixture = { MINUTE_MS, span, outcome_span, edit_span, launch_span }
 
 export { time_span_fixture }

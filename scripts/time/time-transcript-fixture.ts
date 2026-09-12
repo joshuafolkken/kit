@@ -372,6 +372,7 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		is_writing: false,
+		has_prior_reference: false,
 		targets: [],
 		writes: [],
 		message_id: time_spans.NO_MESSAGE_ID,

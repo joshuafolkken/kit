@@ -35,6 +35,38 @@ const { BASH_TOOL } = cost_blocks
 // or a stop for a person.
 const BUNDLEABLE_TOOLS = new Set(['Edit', 'Glob', 'Grep', 'Read', 'WebFetch', 'WebSearch', 'Write'])
 
+// The tools that launch a *fresh* subagent (joshuafolkken/kit#1854). Both spellings occur across
+// harnesses — this one names it `Agent`, others `Task` — and `time-batch-guard.ts` already treats the
+// two the same. They are deliberately not `time-parent-turns.ts`'s wider dispatch set: `SendMessage`
+// continues an existing agent and is dependent by nature, so a fan-out could never have included it.
+// **A launch is not bundleable** (it is absent from the set above), so it never enters the consecutive
+// sequences; the spread-apart series in `time-agent-bundles.ts` is what reads this.
+const LAUNCH_TOOLS = new Set(['Agent', 'Task'])
+
+// A launch whose prompt builds on an earlier agent's *finding* rather than on the codebase as it
+// stands — the one dependency `time-agent-bundles.ts` cannot see from an intervening write, because a
+// read-only investigation chain writes nothing between its links (joshuafolkken/kit#1847). It is a
+// marker scan and therefore a floor: a prompt that quotes the prior finding without any of these
+// phrases reads as independent, which is the same output-only blind spot this module documents beside
+// `targets`. It never over-calls — a marker present is treated as dependent, which drops the launch
+// from the count.
+const PRIOR_REFERENCE_MARKERS = [
+	'previous finding',
+	'prior finding',
+	'earlier finding',
+	'previous result',
+	'prior result',
+	'earlier result',
+	'based on the previous',
+	'based on the earlier',
+	'from the previous agent',
+	'from the prior agent',
+	'the finding above',
+	'as found earlier',
+	'as found above',
+	'building on the previous',
+]
+
 // The shell commands that inspect. A `Bash` call is bundleable only when its leading command — the
 // word `time-spans.ts` already reads to label the row — is one of these.
 //
@@ -204,6 +236,12 @@ interface BundleFacts {
 	// dependency *removed*, so `sed -n '1,200p' x.ts` twice would read as a bundleable pair when the
 	// second may well have needed the first. Same bias, opposite consequences, so they are two fields.
 	may_write: boolean
+	// Whether this is a subagent launch whose prompt builds on an earlier launch's finding
+	// (joshuafolkken/kit#1854). `false` for every call that is not a launch, and for a launch whose
+	// prompt names no back-reference marker. `time-agent-bundles.ts` reads it to break a fan-out group
+	// that a read-only investigation chain would otherwise slip through, since such a chain writes
+	// nothing between its links for the intervening-write test to catch.
+	has_prior_reference: boolean
 }
 
 // A function rather than a shared constant, so no two calls end up holding one `targets` array —
@@ -211,7 +249,19 @@ interface BundleFacts {
 // span constants in `time-spans.ts` are module-level and would otherwise share one array between
 // every model and human span of a run.
 function not_bundleable(): BundleFacts {
-	return { is_bundleable: false, targets: [], is_writing: false, may_write: false }
+	return {
+		is_bundleable: false,
+		targets: [],
+		is_writing: false,
+		may_write: false,
+		has_prior_reference: false,
+	}
+}
+
+// Whether a tool name is a fresh subagent launch. Exported so `time-agent-bundles.ts` reads the one
+// set rather than keeping a second copy of it (joshuafolkken/kit#1854).
+function is_launch_tool(name: string): boolean {
+	return LAUNCH_TOOLS.has(name)
 }
 
 function words_of(command: string): Array<string> {
@@ -318,15 +368,27 @@ function tool_targets(input: unknown): Array<string> {
 		.slice(0, MAX_TARGETS)
 }
 
+// Whether a subagent launch's prompt builds on an earlier launch's finding. The prompt is the input
+// field the launch carries, read here while the input is in hand for the reason the whole module is —
+// a span keeps none. Lower-cased once so the markers stay a plain substring test.
+function prompt_references_prior(input: unknown): boolean {
+	const prompt = field_text(input, 'prompt').toLowerCase()
+
+	return PRIOR_REFERENCE_MARKERS.some((marker) => prompt.includes(marker))
+}
+
 // The facts for a call that is not `Bash`. The tool name decides the kind; the input decides the
 // targets, and a tool that is not bundleable still has none read — nothing ever asks.
 function tool_facts(name: string, input: unknown): BundleFacts {
 	// A tool names what it does, so here the two questions have the same answer.
 	const writes = { is_writing: WRITING_TOOLS.has(name), may_write: WRITING_TOOLS.has(name) }
+	// Only a launch is asked, and only a launch can answer `true` — a non-launch tool has no prompt to
+	// build on a prior finding (joshuafolkken/kit#1854).
+	const has_prior_reference = LAUNCH_TOOLS.has(name) && prompt_references_prior(input)
 
-	if (!BUNDLEABLE_TOOLS.has(name)) return { ...not_bundleable(), ...writes }
+	if (!BUNDLEABLE_TOOLS.has(name)) return { ...not_bundleable(), ...writes, has_prior_reference }
 
-	return { is_bundleable: true, targets: tool_targets(input), ...writes }
+	return { is_bundleable: true, targets: tool_targets(input), ...writes, has_prior_reference }
 }
 
 // The facts for a `Bash` call. The leading command comes from `time-shell.ts` rather than from a
@@ -358,7 +420,13 @@ function bash_facts(command: string): BundleFacts {
 		return { ...not_bundleable(), ...writes }
 	}
 
-	return { is_bundleable: true, targets: targets_in(time_shell.unquoted(command)), ...writes }
+	// A `Bash` call is never a subagent launch, so it never builds on a prior finding.
+	return {
+		is_bundleable: true,
+		targets: targets_in(time_shell.unquoted(command)),
+		...writes,
+		has_prior_reference: false,
+	}
 }
 
 // The facts for one call named the way a caller holding a raw tool invocation names it — a tool and
@@ -381,6 +449,9 @@ const time_bundle_call = {
 	bash_facts,
 	call_facts,
 	tool_facts,
+	// Exported for `time-agent-bundles.ts` (joshuafolkken/kit#1854), which asks the launch question of a
+	// span's `label` — the tool name for a non-Bash call — so the set lives in one place.
+	is_launch_tool,
 	// Exported for `time-writes.ts` (joshuafolkken/kit#1472), which asks what a call *wrote* rather
 	// than what it named. The extraction is the same one either way — a second copy of it would let a
 	// path be recognized as a target when read and missed when written.

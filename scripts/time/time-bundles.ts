@@ -1,3 +1,4 @@
+import { time_agent_bundles } from './time-agent-bundles'
 import { time_format } from './time-format'
 import { time_round_trips } from './time-round-trips'
 import { time_spans, type Span } from './time-spans'
@@ -41,6 +42,9 @@ const SAVING_LABEL = 'recoverable wait'
 // transcript has no per-tool answer either, and a table printed under a `not measured` heading would
 // be the empty-means-nothing-to-recover reading this block refuses everywhere else.
 const BY_TOOL_LABEL = 'recoverable by tool'
+// The one label the spread-apart series contributes (joshuafolkken/kit#1854). Both launch spellings —
+// `Agent` here, `Task` elsewhere — collapse into this one row, so the reconciliation stays balanced.
+const AGENT_ROW_LABEL = 'Agent'
 // The per-tool rows sit one level under that row. Two spaces rather than a separate column, because
 // `format_columns` lays out one label column and a sub-table with its own would not line up with it.
 const ROW_INDENT = '  '
@@ -333,6 +337,27 @@ function attributed_of(rows: ReadonlyArray<BundleToolRow>): number {
 // arrive in time order: a delegated unit's are appended after the parent's, and `time_corpus`
 // concatenates one session after another. Walked in array order, two turns from different sessions
 // would read as consecutive and be counted as a sequence nobody could have batched.
+// The spread-apart launch series folded in as one row (joshuafolkken/kit#1854). Appended and re-sorted
+// rather than pushed in place, so the heaviest-first order still holds; omitted entirely when it
+// recovered nothing, so a run that fanned out its launches shows no empty `Agent` row. Its whole count
+// enters the total below beside it, which is what keeps `unattributed_round_trips` at zero.
+function with_agent_row(
+	rows: ReadonlyArray<BundleToolRow>,
+	agent_sizes: ReadonlyArray<number>,
+): Array<BundleToolRow> {
+	const recoverable_round_trips = recoverable_of(agent_sizes)
+
+	if (recoverable_round_trips === NONE) return [...rows]
+
+	const row = {
+		label: AGENT_ROW_LABEL,
+		sequence_count: agent_sizes.length,
+		recoverable_round_trips,
+	}
+
+	return [...rows, row].toSorted(by_weight)
+}
+
 function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 	const walk = new_walk()
 
@@ -343,13 +368,16 @@ function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 	close_trip(walk)
 	flush(walk)
 
+	// The consecutive series and the spread-apart launch series are disjoint by construction — a launch
+	// is never bundleable, so it cannot have entered a sequence above — so their counts simply add.
 	const sizes = sizes_of(walk.closed)
-	const by_tool = tool_rows(walk.closed)
-	const recoverable_round_trips = recoverable_of(sizes)
+	const agent_sizes = time_agent_bundles.agent_bundles(spans)
+	const by_tool = with_agent_row(tool_rows(walk.closed), agent_sizes)
+	const recoverable_round_trips = recoverable_of(sizes) + recoverable_of(agent_sizes)
 
 	return {
-		sequence_count: sizes.length,
-		longest_sequence: longest_of(sizes),
+		sequence_count: sizes.length + agent_sizes.length,
+		longest_sequence: Math.max(longest_of(sizes), longest_of(agent_sizes)),
 		recoverable_round_trips,
 		by_tool,
 		unattributed_round_trips: recoverable_round_trips - attributed_of(by_tool),
