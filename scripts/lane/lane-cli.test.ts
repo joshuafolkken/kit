@@ -34,7 +34,9 @@ const SUCCESS = 0
 const FAILURE = 1
 const LANE: LaneInfo = {
 	issue: ISSUE,
-	seed: 6,
+	seat: 6,
+	development_port: undefined,
+	preview_port: undefined,
 	output: undefined,
 	branch: '1490-lane',
 	directory: '/w/.kit-lanes/1490',

@@ -4,7 +4,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
 // One script answers all four `lane:*` commands; the verb below is what tells them apart.
 const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
-// `JOSH_LANE_ROOT` and `JOSH_LANE_SEED_BASE` are personal, non-committed settings, so every lane
+// `JOSH_LANE_ROOT` and `JOSH_LANE_LIMIT` are personal, non-committed settings, so every lane
 // command has to read `.env` to see them — without this the two are documented and unreachable.
 const LANE_ARGUMENTS = { script: LANE_SCRIPT, tsx_arguments: OPTIONAL_ENV_FILE_FLAGS } as const
 

@@ -20,7 +20,12 @@ interface LaneInfo {
 	issue: string
 	branch: string
 	directory: string
-	seed: number | undefined
+	// The lane's seat (`JOSH_LANE_SEAT`, 1..9), and the dev/preview ports it resolves to through
+	// `ports/index.js` — all `undefined` when the lane's `.env` cannot be read. The seat is what a new
+	// lane's allocation has to avoid; the ports are what the report shows (joshuafolkken/kit#1494).
+	seat: number | undefined
+	development_port: number | undefined
+	preview_port: number | undefined
 	// Where the delegated unit running this lane's child writes (joshuafolkken/kit#1713), or
 	// `undefined` where the lane records none. It is the one thing about a lane that a session which
 	// did not open it cannot derive: the harness names a unit's file after the dispatching session
@@ -43,22 +48,50 @@ function line_value(lines: ReadonlyArray<string>, prefix: string): string | unde
 	return lines.find((line) => line.startsWith(prefix))?.slice(prefix.length)
 }
 
+interface LaneSeat {
+	seat: number
+	development_port: number
+	preview_port: number
+}
+
 /**
- * The seed a lane holds, or `undefined` when its `.env` cannot be read.
+ * The seat and ports a lane holds, or `undefined` when its `.env` records no seat.
  *
  * **Unreadable is reported, never treated as free.** A seat read as free is handed to the next lane
  * while the ports it actually holds are still bound, and the collision then surfaces as an E2E
  * failure in a different work tree — the kind of silent failure `playwright.config.ts` refuses to
  * add by dying on a busy port instead of retrying on another.
+ *
+ * **A file with no `JOSH_LANE_SEAT` line is not seat 0.** Seat 0 is the main work tree's own, so a
+ * lane whose seat line was lost would be booked as sharing it while it in fact still runs on
+ * whatever ports it was started with, and `lane:open` would allocate straight over them.
  */
-function seed_from_content(content: string): number | undefined {
-	// **A file with no `PORT_SEED` line at all is not seat 0.** `read_root_seed` answers with the
-	// documented default of 0 for one, and 0 is the main work tree's own seat — so a lane whose seed
-	// line was lost would be booked as sharing it while the lane in fact still runs on whatever ports
-	// it was started with, and `lane:open` would allocate straight over them.
-	const has_seed = content.split('\n').some((line) => lane_environment.is_seed_line(line))
+function seat_from_content(content: string): LaneSeat | undefined {
+	const seat = lane_environment.read_lane_seat(content)
+	if (seat === undefined) return undefined
 
-	return has_seed ? lane_environment.read_root_seed(content) : undefined
+	const port_pair = lane_environment.read_lane_ports(content)
+
+	return { seat, development_port: port_pair.development, preview_port: port_pair.preview }
+}
+
+interface SeatPorts {
+	seat: number | undefined
+	development_port: number | undefined
+	preview_port: number | undefined
+}
+
+const EMPTY_SEAT: SeatPorts = {
+	seat: undefined,
+	development_port: undefined,
+	preview_port: undefined,
+}
+
+// A stranded or unreadable lane holds no seat and binds no ports, so all three fields read undefined.
+function held_seat(content: string | undefined): SeatPorts {
+	if (content === undefined) return EMPTY_SEAT
+
+	return seat_from_content(content) ?? EMPTY_SEAT
 }
 
 /**
@@ -104,13 +137,17 @@ function build_lane(
 	// A stranded lane binds no ports and runs nothing, so its seat is free and there is nothing to
 	// read — its work tree is gone from disk along with the `.env` that held both records.
 	const content = is_stranded ? undefined : read_environment(directory)
+	const held = held_seat(content)
+	const output = content === undefined ? undefined : lane_environment.read_lane_output(content)
 
 	return {
 		issue,
 		branch,
 		directory,
-		seed: content === undefined ? undefined : seed_from_content(content),
-		output: content === undefined ? undefined : lane_environment.read_lane_output(content),
+		seat: held.seat,
+		development_port: held.development_port,
+		preview_port: held.preview_port,
+		output,
 		is_stranded,
 	}
 }
@@ -184,14 +221,14 @@ async function list_lanes(): Promise<Array<LaneInfo>> {
 	return lanes.toSorted((left, right) => Number(left.issue) - Number(right.issue))
 }
 
-/** The seeds live lanes hold — what a new lane's seat has to avoid. */
-function used_seeds(lanes: ReadonlyArray<LaneInfo>): Array<number> {
-	return lanes.map((lane) => lane.seed).filter((seed): seed is number => seed !== undefined)
+/** The seats live lanes hold — what a new lane's seat has to avoid. */
+function used_seats(lanes: ReadonlyArray<LaneInfo>): Array<number> {
+	return lanes.map((lane) => lane.seat).filter((seat): seat is number => seat !== undefined)
 }
 
 /** The live lanes whose seat could not be read, which is what stops an allocation. */
 function unreadable_lanes(lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> {
-	return lanes.filter((lane) => !lane.is_stranded && lane.seed === undefined)
+	return lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined)
 }
 
 function find_lane(lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined {
@@ -218,7 +255,7 @@ const lane_registry = {
 	parse_block,
 	read_environment,
 	unreadable_lanes,
-	used_seeds,
+	used_seats,
 }
 
 export type { LaneInfo }
