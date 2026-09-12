@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { line_budget, type FileBudget } from './line-budget'
+import { line_budget, type FileBudget, type LineBudget } from './line-budget'
+import { line_targets } from './line-targets'
 
 // `josh lines` — the ask-before-writing half of joshuafolkken/kit#1425. `pnpm josh lint` reports the
 // file line limit only once it has been broken, and by then the writing is finished and the splitting
@@ -14,9 +15,10 @@ import { line_budget, type FileBudget } from './line-budget'
 // unusable, never that a file is large.
 
 const ARGV_START = 2
-const USAGE = 'usage: pnpm josh lines <path> [<path>...]'
-const EXIT_USAGE = 1
 const ROW_GAP = '  '
+// The no-argument scan's answer when nothing is near the limit — a defined "none" rather than a
+// failure, so an empty result reads as "the repository is clear" instead of "the command broke".
+const NONE_NEAR = 'no files near the limit'
 
 // Why a path carries no number, said in the row rather than left blank — a blank would read as zero
 // code lines, which is the one answer this command must never appear to give.
@@ -82,22 +84,73 @@ function rows_for(budgets: ReadonlyArray<FileBudget>, project_root: string): Rea
 	return budgets.map((entry) => row(path.relative(project_root, entry.file_path), entry))
 }
 
+// A budget that reached the "near the limit" threshold, narrowed so the sort below can read
+// `headroom` without a non-null assertion — the filter is what proves `budget` is present.
+function is_near(entry: FileBudget): entry is FileBudget & { budget: LineBudget } {
+	return entry.budget?.is_near_limit === true
+}
+
+// The no-argument scan reports only what is near the limit, least headroom first, so an over-limit
+// file — negative headroom — sorts ahead of one that merely has little room left.
+function near_limit_budgets(budgets: ReadonlyArray<FileBudget>): ReadonlyArray<FileBudget> {
+	return budgets
+		.filter(is_near)
+		.toSorted((left, right) => left.budget.headroom - right.budget.headroom)
+}
+
+async function scan_budgets(root: string): Promise<ReadonlyArray<FileBudget>> {
+	const targets = await line_targets.lint_target_files(root)
+	const budgets = await line_budget.budgets_for(targets, root)
+
+	return near_limit_budgets(budgets)
+}
+
+async function argument_budgets(
+	command_arguments: ReadonlyArray<string>,
+	project_root: string,
+): Promise<ReadonlyArray<FileBudget>> {
+	const targets = command_arguments.map((argument) => path.resolve(project_root, argument))
+
+	return await line_budget.budgets_for(targets, project_root)
+}
+
+// Only the scan can be empty — a path argument always yields a row, even a "not counted" one — so the
+// none-line is the scan's defined answer and never a path run's.
+function render(budgets: ReadonlyArray<FileBudget>, project_root: string): string {
+	if (budgets.length === 0) return NONE_NEAR
+
+	return [header(budgets), ...rows_for(budgets, project_root)].join('\n')
+}
+
+// The scan resolves the repository root first — `budgets_for` and the row display both key off it — so
+// a run started from a subdirectory reports the same files as one started from the root.
+async function run_scan(): Promise<number> {
+	const root = await line_targets.repo_root()
+	const budgets = await scan_budgets(root)
+
+	process.stdout.write(`${render(budgets, root)}\n`)
+
+	return 0
+}
+
+async function run_arguments(
+	command_arguments: ReadonlyArray<string>,
+	project_root: string,
+): Promise<number> {
+	const budgets = await argument_budgets(command_arguments, project_root)
+
+	process.stdout.write(`${render(budgets, project_root)}\n`)
+
+	return 0
+}
+
 async function run_lines(
 	command_arguments: ReadonlyArray<string>,
 	project_root: string,
 ): Promise<number> {
-	if (command_arguments.length === 0) {
-		process.stdout.write(`${USAGE}\n`)
-
-		return EXIT_USAGE
-	}
-
-	const targets = command_arguments.map((argument) => path.resolve(project_root, argument))
-	const budgets = await line_budget.budgets_for(targets, project_root)
-
-	process.stdout.write(`${[header(budgets), ...rows_for(budgets, project_root)].join('\n')}\n`)
-
-	return 0
+	return command_arguments.length === 0
+		? await run_scan()
+		: await run_arguments(command_arguments, project_root)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -106,14 +159,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const lines_command = {
 	header,
+	near_limit_budgets,
 	not_counted_reason,
+	render,
 	row,
 	rows_for,
 	run_lines,
+	NONE_NEAR,
 	NOT_A_FILE,
 	NO_LIMIT,
 	NOT_COUNTED,
-	USAGE,
 }
 
 export { lines_command }
