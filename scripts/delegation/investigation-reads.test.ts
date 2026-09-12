@@ -417,11 +417,20 @@ describe('investigation_reads.should_block — and its second firing', () => {
 	// scrolled out of the window there is no reset instant left to beat, and one stale stamp disarmed
 	// the rest of the session — on exactly the run lengths the Issue was filed about.
 	it('refuses again once the recorded refusal is older than the window', () => {
-		const tally = investigation_reads.tally_of(AT_THRESHOLD_TEXT)
-		const before_window = tally.window_start_ms - 1
+		const before = investigation_reads.tally_of(AT_THRESHOLD_TEXT).window_start_ms - 1
+		const tally = investigation_reads.tally_of(AT_THRESHOLD_TEXT, before)
 
-		expect(investigation_reads.is_rearmed(tally, before_window)).toBe(true)
-		expect(investigation_reads.is_rearmed(tally, tally.window_start_ms + 1)).toBe(false)
+		expect(investigation_reads.is_rearmed(tally, before)).toBe(true)
+	})
+
+	// joshuafolkken/kit#1764: the disarm is per *accumulation*, and a run that ignores its one refusal
+	// goes on accumulating. Until this arm existed only a delegation could clear the disarm, so the one
+	// run the threshold exists for — one that reads on and never delegates — was the one run the guard
+	// never spoke to twice. The case above is its other half: nothing read since, and still disarmed.
+	it('refuses again once another accumulation has piled up without a delegation', () => {
+		const text = [AT_THRESHOLD_TEXT, reads_text(BELOW_THRESHOLD, LATE_TURN, 'late')].join('\n')
+
+		expect(investigation_reads.should_block(text, NEXT_READ, ms(READ_MINUTE))).toBe(true)
 	})
 
 	it('names the count, the command and the return shape in the reason', () => {

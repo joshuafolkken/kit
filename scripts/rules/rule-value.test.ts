@@ -1,3 +1,4 @@
+import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { time_batch_guard } from '#scripts/time/time-batch-guard'
 import { time_transcript_line } from '#scripts/time/time-transcript-line'
 import { describe, expect, it } from 'vitest'
@@ -48,9 +49,19 @@ function call_line(command: string, timestamp: string = TIMESTAMP): string {
 // The rule delivered by a binary of its own, so `rule:value` reads it from `MEASURED_RULES` while
 // `rule:guard` never delivers it (joshuafolkken/kit#1792).
 const BATCHING = 'batching'
+// The second rule delivered by a binary of its own (joshuafolkken/kit#1764).
+const INVESTIGATION = 'investigation'
 const BATCHED_MESSAGE_ID = 'msg_batched'
 const READ_A = 'cat docs/josh-commands.md'
 const READ_B = 'cat CLAUDE.md'
+
+// A subagent dispatch, which is what keeping the investigation rule looks like — there is no shell
+// command to match, so the row reads the tool name instead (joshuafolkken/kit#1764).
+function delegation_line(timestamp: string = TIMESTAMP): string {
+	const block = { type: 'tool_use', id: 'toolu_agent', name: 'Agent', input: {} }
+
+	return assistant_line([block], timestamp, time_transcript_line.NO_MESSAGE_ID)
+}
 
 // One transcript line issuing several calls — the turn a run keeping the batching rule produces, and
 // the one shape `call_line` cannot express.
@@ -262,10 +273,18 @@ describe('rule_value.measure — rules nothing can score', () => {
 		expect(rule_value.unaided_rate(unmeasured)).toBeUndefined()
 	})
 
-	it('declares a compliance test on every enumerated rule, so none of them reads as unmeasured', () => {
-		const readings = rule_value.measure([[session(FILING)]])
+	// **Every rule but the one that cannot have a compliance test** (joshuafolkken/kit#1764). The
+	// investigation row declares none on purpose — no call-shaped test can tell a delegation of the
+	// reading from any other dispatch — and the module's doctrine is that such a rule reads unmeasured
+	// rather than as compliant. Naming it exactly keeps the guard over every other row, the batching
+	// one included, rather than exempting a whole registry to make room for one exception.
+	it('declares a compliance test on every rule but the one that cannot have one', () => {
+		const unmeasured = rule_value
+			.measure([[session(FILING)]])
+			.filter((reading) => !reading.is_measurable)
+			.map((reading) => reading.id)
 
-		expect(readings.filter((reading) => !reading.is_measurable)).toStrictEqual([])
+		expect(unmeasured).toStrictEqual([INVESTIGATION])
 	})
 })
 
@@ -373,5 +392,38 @@ describe('rule_value.measure — what counts as one turn', () => {
 		const reading = reading_for(BATCHING, [[`${opened}\n${between}\n${closed}`]])
 
 		expect(reading.unaided_kept).toBe(1)
+	})
+})
+
+// The second rule delivered by a binary of its own, and the one whose subject is the largest
+// contributor any mechanism here addresses (joshuafolkken/kit#1764).
+describe('rule_value.measure — the investigation guard, which delivers itself', () => {
+	// A row in `DELIVERED_RULES` would refuse a violation `josh investigation:guard` is already
+	// refusing — two records written for one call, of which Claude Code surfaces one.
+	it('is scored from the measured registry and delivered from neither', () => {
+		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).not.toContain(INVESTIGATION)
+		expect(delivered_rules.MEASURED_RULES.map((rule) => rule.id)).toContain(INVESTIGATION)
+	})
+
+	it('counts a run that read a subject file in the main line as having reached the rule', () => {
+		expect(reading_for(INVESTIGATION, [[session(READ_A)]]).sessions).toBe(1)
+	})
+
+	it('counts the guard refusal, which is the delivery the table had no row for', () => {
+		const refusal = result_line(investigation_reads.REASON, NEXT_TIMESTAMP)
+		const run = [[`${call_line(READ_A)}\n${refusal}\n${delegation_line(LATER_TIMESTAMP)}`]]
+
+		expect(reading_for(INVESTIGATION, run).refusals).toBe(1)
+	})
+
+	// **A dispatch is not evidence the reading was delegated**, because the guard's own reset credits
+	// any subagent call — so a row scored on one would read near 100% for a rule this Issue measures as
+	// let through on a third of all reads. Unmeasured is the module's answer to a rule nothing can
+	// score, and `josh time`'s `Investigation reads:` block is where the compliance reading lives.
+	it('reports no unaided rate, because no call-shaped test can say the rule was kept', () => {
+		const reading = reading_for(INVESTIGATION, [[`${call_line(READ_A)}\n${delegation_line()}`]])
+
+		expect(reading.is_measurable).toBe(false)
+		expect(rule_value.unaided_rate(reading)).toBeUndefined()
 	})
 })

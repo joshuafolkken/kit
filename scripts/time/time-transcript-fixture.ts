@@ -96,6 +96,23 @@ function result_line(minute: number, branch: string, id = CALL_ID, content = 'ok
 	})
 }
 
+// The same result the harness writes back for a call it denied, or one that threw: a `tool_result`
+// carrying `is_error` (joshuafolkken/kit#1764). A refused read is written to the transcript exactly
+// like any other call, so a suite about what a guard counts needs to be able to say one failed.
+function error_result_line(
+	minute: number,
+	branch: string,
+	id = CALL_ID,
+	content = 'denied',
+): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_result', tool_use_id: id, content, is_error: true }] },
+	})
+}
+
 // Minutes 0→1 model wait, 1→3 tool execution, all on the given branch.
 function issue_lines(offset: number, branch: string = BRANCH): Array<string> {
 	return [
@@ -383,6 +400,7 @@ const time_transcript_fixture = {
 	call_line,
 	edit_call_line,
 	josh_call_line,
+	error_result_line,
 	result_line,
 	skill_call_line,
 	tool_call_line,

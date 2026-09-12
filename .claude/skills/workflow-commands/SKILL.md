@@ -629,10 +629,40 @@ rather than commented on — the conclusion joshuafolkken/kit#1390 reached after
 measured three consecutive runs in which prose and a live notice moved the number not at all. A
 delegation clears the pending set, three more unedited files rebuild it, and the refusal fires again;
 **one refusal per accumulation** keeps a false positive costing a single round trip instead of wedging
-the run. An **edit takes its file back out of the set**, so reading something this run will edit is
+the run. **The other way a refusal re-arms is another accumulation, and until
+joshuafolkken/kit#1764 the code did not do it**: only a delegation cleared the disarm, so a run that
+*ignored* its one refusal — read on and never delegated — was never spoken to again however many
+unedited files it went on to open. The one run this threshold exists for was the one run the guard
+fell silent on. Measured over 296 recorded sessions and 3,064 main-line reads, **1,132 of them — 36.9%
+— reached the threshold and were let through**; with the arm in place that falls to 920 and the
+refusals rise from 184 to 396. Reads of a file the run itself edits (827) and reads below the
+threshold (921) are untouched by the change, which is the check that it moved only what it was meant
+to. **The arm does not apply inside a delegated unit**: a unit is already where this rule sends the
+reading, and a read-only one has no `Agent` tool to dispatch with, so repeating the refusal there
+would toll that tier for an instruction it cannot carry out. `pnpm josh time`'s `Investigation reads:` block prints those four figures for one run, from
+this guard's own predicates rather than from a second reading of the rule. An **edit takes its file back out of the set**, so reading something this run will edit is
 still the main line's, exactly as this section already says. `docs/josh-commands.md` →
 "`josh investigation:guard`" carries which shell commands count as reading, why it is wired to `Read`
 and `Bash`, and the `JOSH_INVESTIGATION_GUARD` off-switch.
+
+**The main line does not idle while the unit reads** (joshuafolkken/kit#1764). Measured on
+`fullrun #1783`, the unit cost $1.71 and 6m30s and the main line spent **4m42s of it waiting on
+`pnpm josh run:progress --wait`** — so the delegation did not replace any reading, it added six and a
+half minutes in front of it. A delegated unit is a command that takes minutes, and §2h already says
+what runs beside one: the work that writes nothing the unit's result depends on. Here that work is
+named rather than judged — **read the files this run is about to edit**, which stay in the main line
+by definition and are needed before the first `Edit` either way. Start the unit, read those, then read
+what it returned.
+
+**Where the Issue already names the location, the reading is not delegated at all.** The same run
+measured this from the other side: #1783's body had already identified the defect as two rules in the
+distributed eslint configuration, the unit added almost nothing to that, and the main line then
+re-opened the very files it had cited. **The condition is what the Issue says, not how big the subject
+looks** — a body or a comment that names the file, the function or the rule has done the unit's job,
+and the reading that follows it is reading of a file the run is about to edit. **The threshold is
+unchanged and so is the verification path**: what comes back from a unit is still the conclusion plus
+its `file:line` citations, and the parent still opens those lines. What this removes is a delegation
+whose whole output was a location the run already had.
 
 **One trigger, deliberately.** A second arm on characters read would need a tie-break against the file
 count, and neither number is measured more precisely than the other — so the character figures above

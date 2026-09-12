@@ -8,6 +8,7 @@ import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
 import { time_gate_runs } from './time-gate-runs'
+import { time_investigation } from './time-investigation'
 import { time_parent_turns } from './time-parent-turns'
 import type { TimeReport } from './time-report'
 import { time_rework } from './time-rework'
@@ -70,6 +71,7 @@ function empty_blocks(): Pick<TimeReport, EmptyBlock> {
 		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
 		gate_runs: { ...time_gate_runs.NO_GATE_RUNS },
 		parent_turns: { ...time_parent_turns.NO_PARENT_TURNS },
+		investigation: { ...time_investigation.NO_INVESTIGATION },
 		followup_stages: { ...time_followup_stages.NO_FOLLOWUP_STAGES },
 		rework: { ...time_rework.NO_REWORK },
 		failures: { ...time_failures.NO_FAILURES },
@@ -89,6 +91,7 @@ type EmptyBlock =
 	| 'bundles'
 	| 'single_checks'
 	| 'gate_runs'
+	| 'investigation'
 	| 'parent_turns'
 	| 'followup_stages'
 	| 'rework'

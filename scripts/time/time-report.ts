@@ -8,6 +8,7 @@ import { time_followup_stages, type FollowupStageTotals } from './time-followup-
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_gate_runs, type GateRunTotals } from './time-gate-runs'
+import { time_investigation, type InvestigationTotals } from './time-investigation'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_model_gaps } from './time-model-gaps'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
@@ -159,6 +160,12 @@ interface TimeReport extends TurnSplit {
 	// a `backlogrun` parent, since it barely implements anything. Built by `time-parent-turns.ts`,
 	// which also renders the block — the shape `time-bundles.ts` and `time-single-checks.ts` have.
 	parent_turns: ParentTurnTotals
+	// What the largest of those contributors was actually reading (joshuafolkken/kit#1764). The block
+	// above measured `investigation` at 35.9% of nineteen runs' turns and could not say how much of it
+	// is the reading §2b keeps in the main line on purpose; only this separates that from the reading
+	// the delegation threshold was meant to catch and did not. Built by `time-investigation.ts`, which
+	// also renders the block and takes its classification from the guard itself.
+	investigation: InvestigationTotals
 	// How long each of `followup`'s own stages took (joshuafolkken/kit#1445). The command prints the
 	// rows itself; only this keeps them past the run that printed them, which is what lets two runs be
 	// compared stage by stage. Built by `time-followup-stages.ts`, which also renders the block.
@@ -362,12 +369,13 @@ function report_tables(input: ReportInput, turns: TurnTotals): ReportWalks {
 // the spans and nothing else.
 type SpanBlocks = Pick<
 	TimeReport,
-	'gaps' | 'bundles' | 'single_checks' | 'gate_runs' | 'followup_stages'
+	'gaps' | 'bundles' | 'single_checks' | 'gate_runs' | 'investigation' | 'followup_stages'
 >
 
 function span_blocks(spans: ReadonlyArray<Span>): SpanBlocks {
 	return {
 		gaps: time_gaps.build_gaps(spans),
+		investigation: time_investigation.build_investigation(spans),
 		bundles: time_bundles.build_bundles(spans),
 		single_checks: time_single_checks.build_single_checks(spans),
 		gate_runs: time_gate_runs.build_gate_runs(spans),
@@ -446,13 +454,26 @@ function format_empty(report: TimeReport): string {
 	].join('\n')
 }
 
-// **The failure block's three arguments are read off the report before the list rather than inside
-// it**, which is what keeps this function inside its length limit as blocks are added
-// (joshuafolkken/kit#1387). Each block below is one line, and the page is the order of those lines.
+// **The blocks that say what the run did with its turns, gathered into one function** so the page
+// below stays inside its length limit as blocks are added (joshuafolkken/kit#1764 was the one that
+// passed it). It is the seam `span_blocks` was cut along, applied to the rendering: the order is
+// unchanged, and the failure block's three arguments are still read off the report before the list
+// rather than inside it (joshuafolkken/kit#1387).
+function turn_blocks(report: TimeReport): Array<string> {
+	const { failures, tool_call_count, categories } = report
+
+	return [
+		...time_parent_turns.parent_turn_lines(report.parent_turns),
+		...time_investigation.investigation_lines(report.investigation),
+		...time_followup_stages.followup_stage_lines(report.followup_stages),
+		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
+		...time_rework.rework_lines(report.rework),
+	]
+}
+
+// Each block below is one line, and the page is the order of those lines.
 function format_report(report: TimeReport): string {
 	if (report.span_count === 0 && report.categories.ci_ms === 0) return format_empty(report)
-
-	const { failures, tool_call_count, categories } = report
 
 	return [
 		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
@@ -469,10 +490,7 @@ function format_report(report: TimeReport): string {
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_single_checks.single_check_lines(report.single_checks, report),
 		...time_gate_runs.gate_run_lines(report.gate_runs),
-		...time_parent_turns.parent_turn_lines(report.parent_turns),
-		...time_followup_stages.followup_stage_lines(report.followup_stages),
-		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
-		...time_rework.rework_lines(report.rework),
+		...turn_blocks(report),
 		...time_ranked_tables.ranked_tables(report),
 	].join('\n')
 }
