@@ -239,6 +239,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   `pnpm josh review:brief` refuses to compose a brief on a tree neither has been green on — and no
   brief means no attestable round — so the enforcement is the command's rather than a judgement.
   `prompts/review.md` → "The scoped checks answer on the last edit" is the single source.
+  **And `origin/main` is merged into the branch before the gate** (joshuafolkken/kit#1837): `pnpm josh main:merge`, ahead of that scoped pair, so the gate verifies the tree that will merge rather than a lane cut from a stale `origin/main` — merge not rebase, and a no-op when nothing advanced. `prompts/review.md` → "origin/main is merged in before the gate" is the single source, and `epicrun.md` → "Conflicts are not predicted" is the fallback for a conflict that lands after it.
   **The rule-compliance measurement is read after the review and before `pnpm josh followup`,
   never inside `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval`
   is five real Claude sessions. The anchor is the merge rather than the commit because the commit now
