@@ -112,6 +112,13 @@ describe('classify', () => {
 		expect(run_hold.classify(raw, now).kind).toBe('stale')
 	})
 
+	// joshuafolkken/kit#1802 cut run:progress's watcher bound to one hour; this expiry shares the
+	// number but guards a different thing — an uncommitted tree held across a person's latency — so a
+	// bulk replace of the eight must not have swept it along.
+	it('keeps the run-record expiry at eight hours, distinct from the watcher bound', () => {
+		expect(run_hold.HOLD_MAX_AGE_HOURS).toBe(8)
+	})
+
 	// It passes the schema — it is a string — so reading it as current would leave the tree held with
 	// nothing left to expire it, which is the one state the expiry exists to make impossible.
 	it('reads a record whose time is not a date as stale rather than current', () => {

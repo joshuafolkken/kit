@@ -37,17 +37,22 @@ const TICK_SECONDS = 30
 //
 // **A decline deliberately does not move the report clock** — the first child to appear is reported at
 // once rather than waiting out an interval the repository spent idle. Without a cooldown, though, that
-// same property re-reads GitHub every 30 seconds for the watcher's whole life: roughly 960 listings
-// over eight idle hours, which is secondary-rate-limit territory and would itself start producing the
-// unreadable listings this branch exists to handle. Two minutes keeps "reported at once" true to
-// within a fraction of the twenty-minute interval and takes the call count down with it.
+// same property re-reads GitHub every 30 seconds for the watcher's whole life, and a batch stacks one
+// fresh watcher per child, so the listings accumulate into secondary-rate-limit territory and would
+// themselves start producing the unreadable listings this branch exists to handle. Two minutes keeps
+// "reported at once" true to within a fraction of the twenty-minute interval and takes the call count
+// down with it.
 const DECLINE_RETRY_SECONDS = 120
 // The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
 const NO_RETRY = 0
-// A watcher outlives the turn that started it, so something has to end it. Eight hours is `run:hold`'s
-// own expiry: longer than any run, short enough that one abandoned by a crashed session is gone by
-// the next working day.
-const DEFAULT_MAX_HOURS = 8
+// A watcher outlives the turn that started it, so something has to end it. One hour is three of the
+// default twenty-minute intervals: long enough that the bound never truncates a report, short enough
+// that a watcher left waiting on a run that has already merged is gone within the hour. It is
+// deliberately **not** `run:hold`'s eight-hour expiry — that holds an uncommitted working tree across
+// a person's latency and is trampled by being short (joshuafolkken/kit#1091), while a watcher holds
+// only a heartbeat the caller restarts on the next interval, so the two guard different things and
+// only one has anything to lose by being short.
+const DEFAULT_MAX_HOURS = 1
 const MS_PER_HOUR = 3_600_000
 const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
 const DISABLED_VALUE = '0'
@@ -63,8 +68,7 @@ const UNREADABLE_NOTICE =
 	'The `in-progress` listing could not be read, so nothing is reported. That is not "nothing is running" — check `gh auth status` and ask again.'
 const FAILED_TICK_PREFIX =
 	'A progress reading failed, so nothing is reported for it. The watcher is still running, and will read again after the cooldown:'
-const WAIT_EXPIRED_NOTICE =
-	'The watch bound (`--hours`, 8 by default) ran out before the run had been quiet for a whole interval, so there is nothing to report. Starting another `--wait` resumes the same clock.'
+const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_MAX_HOURS)} by default) ran out before the run had been quiet for a whole interval, so there is nothing to report. Starting another \`--wait\` resumes the same clock.`
 // The repository name is only ever printed, never written against, so the bounded lookup is the right
 // one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
 // watcher neither running nor saying so.

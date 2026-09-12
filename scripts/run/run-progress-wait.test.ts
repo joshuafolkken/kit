@@ -133,6 +133,11 @@ describe('--wait — nothing to report is not something to exit on', () => {
 		await expect(wait_bounded()).resolves.toBe(SUCCESS)
 		expect(output.printed).toHaveLength(NOTHING)
 		expect(mark).not.toHaveBeenCalled()
+		// It ran to the bound rather than returning on the idle decline: the expiry notice is printed
+		// only when the loop exhausts, so its presence is what rules out the last watcher's twin — the
+		// first, started before any `in-progress` label, dying the instant the repository reads idle
+		// (joshuafolkken/kit#1802).
+		expect(output.warned).toContain(run_progress_cli.WAIT_EXPIRED_NOTICE)
 	})
 
 	it('ends on the watch bound when the run never goes quiet for a whole interval', async () => {
