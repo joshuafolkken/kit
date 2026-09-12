@@ -436,6 +436,21 @@ function run_notes(facts: RunFacts): Array<string> {
 	]
 }
 
+// One input, keyed two ways: `phase_costs` by stage, `contributor_costs` by purpose. Neither
+// re-walks the corpus — both place the same priced requests against the same spans. Lifted out of
+// `to_report` so that function stays an assembly rather than an assembly plus the cost build.
+function cost_blocks(
+	facts: RunFacts,
+	round_trip_count: number,
+): Pick<TimeReport, 'phase_costs' | 'contributor_costs'> {
+	const cost_input = { spans: facts.found.spans, requests: facts.priced, round_trip_count }
+
+	return {
+		phase_costs: time_phase_costs.build(cost_input),
+		contributor_costs: time_contributor_costs.build(cost_input),
+	}
+}
+
 function to_report(facts: RunFacts): TimeReport {
 	const { found, search } = facts
 	const window = window_of(found.spans, search.pull)
@@ -452,17 +467,9 @@ function to_report(facts: RunFacts): TimeReport {
 		by_check: facts.checks,
 	})
 	const found_notes = [...window_note(window, report.elapsed_ms), ...serial_note(report)]
-	// One input, keyed two ways: `phase_costs` by stage, `contributor_costs` by purpose. Neither
-	// re-walks the corpus — both place the same priced requests against the same spans.
-	const cost_input = {
-		spans: found.spans,
-		requests: facts.priced,
-		round_trip_count: report.round_trip_count,
-	}
-	const phase_costs = time_phase_costs.build(cost_input)
-	const contributor_costs = time_contributor_costs.build(cost_input)
+	const costs = cost_blocks(facts, report.round_trip_count)
 
-	return { ...report, notes: [...notes, ...found_notes], phase_costs, contributor_costs }
+	return { ...report, notes: [...notes, ...found_notes], ...costs }
 }
 
 // What a batch caller has already read for this child, so neither source is read once per child
