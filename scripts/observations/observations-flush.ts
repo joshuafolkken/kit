@@ -65,8 +65,10 @@ function status_paths(status_output: string): ReadonlyArray<string> {
 		.map((line) => observation_ledger.status_path(line))
 }
 
+// **Single-sourced with `pnpm josh followup`'s pre-flush short-circuit** (joshuafolkken/kit#1810):
+// the ledger-change test lives in `observation-ledger.ts`, so the two callers cannot drift.
 function has_ledger_change(status_output: string): boolean {
-	return status_paths(status_output).includes(OBSERVATION_LEDGER_PATH)
+	return observation_ledger.has_pending_append(status_output)
 }
 
 function other_changed_paths(status_output: string): ReadonlyArray<string> {

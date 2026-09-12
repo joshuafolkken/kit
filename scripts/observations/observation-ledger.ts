@@ -17,7 +17,17 @@ function is_ledger_line(line: string): boolean {
 	return status_path(line) === OBSERVATION_LEDGER_PATH
 }
 
+// **The one place that answers "does this working tree hold a pending observation append?"**
+// `observations-flush.ts`'s `has_ledger_change` and `pnpm josh followup`'s pre-flush short-circuit
+// both ask it (joshuafolkken/kit#1810), so a literal in each would be the clone the header above
+// warns against. A blank porcelain line carries no ledger path, so `is_ledger_line` answers false for
+// it and no filtering is needed.
+function has_pending_append(status_output: string): boolean {
+	return status_output.split('\n').some((line) => is_ledger_line(line))
+}
+
 const observation_ledger = {
+	has_pending_append,
 	is_ledger_line,
 	status_path,
 }

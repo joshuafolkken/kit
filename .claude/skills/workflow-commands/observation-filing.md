@@ -224,13 +224,27 @@ joshuafolkken/kit#1728 created the ledger to end.
   request, waits on the same required checks every other pull request waits on, merges it and returns
   the checkout to the default branch. **Nothing is committed to the default branch directly**, which
   is the constraint this route had to satisfy.
+- **`pnpm josh followup` runs the flush itself, so no run has to remember to** (joshuafolkken/kit#1810).
+  The flush is the ledger's only commit path, and until it was wired into `followup` nothing called
+  it — an appended line stayed in the working tree until a person ran the command by hand, the same
+  "a run that had to remember is the run that forgets" defect the staging exclusion above was built to
+  avoid, left standing on the commit side. After the merge and before it releases the working-tree
+  hold, `followup` reads the tree, and **only when the ledger holds a pending append** returns the
+  checkout to the default branch (`pnpm josh ms`) and flushes. A run that appended nothing pays
+  nothing, and a lane/worktree child never appends (below), so its checkout is always clean and the
+  step is an immediate no-op there. A flush that fails is reported and does not take the merge, the
+  epic close or the hold release down with it. **A side effect: on a run that did flush, `followup`
+  ends on the default branch** — the procedure's own `pnpm josh ms` is idempotent, so nothing
+  downstream changes.
 - **Mixing the lines into a child's pull request was considered and is refused.** That is the
   contamination the exclusion above exists to end, and adopting it would turn the defect into the
   specification: a ledger line in an unrelated diff is a line no reviewer of that diff has a reason
   to question.
-- **Run it in the primary checkout, once per cycle rather than once per observation.** It refuses off
-  the default branch and refuses a working tree holding anything besides the ledger, so a run in
-  progress cannot be flushed out from under, and a lane's checkout is never the one it acts on.
+- **Run by hand it goes in the primary checkout, once per cycle rather than once per observation** —
+  but with `pnpm josh followup` now flushing automatically (above), a hand run is the exception rather
+  than the rule. It refuses off the default branch and refuses a working tree holding anything besides
+  the ledger, so a run in progress cannot be flushed out from under, and a lane's checkout is never
+  the one it acts on.
 - **Nothing to flush is an answer, not a failure.** With the ledger matching the commit it sits on
   the command prints `clean` and exits 0 — most cycles append nothing, and a command that errored
   there would be one nobody runs.

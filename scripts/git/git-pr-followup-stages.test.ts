@@ -69,6 +69,12 @@ vi.mock('./git-epic-close', () => ({
 // the same way (joshuafolkken/kit#1077), and since joshuafolkken/kit#1515 the network guard in
 // `scripts/test-network-guard.ts` covers `git` as well as `gh`, so either mock going missing fails the
 // suite outright instead of quietly slowing it down.
+// The post-merge tail reaches the observation-ledger flush (joshuafolkken/kit#1810); its behavior is
+// `git-followup-flush.test.ts`, so it is a no-op here.
+vi.mock('./git-followup-flush', () => ({
+	git_followup_flush: { flush_ledger_step: vi.fn() },
+}))
+
 vi.mock('./git-followup-pending', () => ({
 	git_followup_pending: {
 		MERGE_PENDING_NOTE: '',
