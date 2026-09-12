@@ -587,6 +587,21 @@ the batch differs. **A batch entry point that does not delegate is the defect**,
 `queue` accumulated every issue's history in one context until it was wired to this same row, and
 the per-issue procedure is `queue.md` → "Each issue runs in a delegated unit".
 
+**`followup-filing` is a third unit — one whole sub-procedure of a run** (joshuafolkken/kit#1892).
+The late-run follow-up filing chain — `issue:scout` → file the Issue → `epic:bundle` → `epic --add`
+— is a dependency chain `batch:guard` correctly keeps one call per step, so what makes it expensive
+is the ~340k context it runs in at a run's tail, not the step count: run #1864 measured eight round
+trips there. A fresh unit runs the same chain at a small context, handed the finding text the review
+round cap already composed, so its work is the mechanical execution and nothing else. Its verifier is
+`epic-child`'s exactly — the parent reads the filed Issue from GitHub with
+`pnpm josh issue:state <new>`, not the unit's summary, so a follow-up reported filed but not created
+is still absent. **Deferring the chain earlier instead was structurally blocked, which is why the
+answer is delegation**: the finding is only known after the review, so it cannot move earlier, and
+`epic:bundle` must run before the current Issue closes (`prompts/review.md` → "Review round cap"), so
+it cannot move to a later session either. The point of use is that branch-2 filing, and
+`batch:guard`'s one-call-per-step verdict is untouched — delegation only moves the chain to a cheaper
+context.
+
 **`epic-child`'s verifier is not the child's own completion report.** The parent reads the child's
 state from GitHub — `pnpm josh issue:state <N>`, the moment the unit returns — because a child
 reported done whose pull request never merged is still open, and a loop advancing on the summary has
