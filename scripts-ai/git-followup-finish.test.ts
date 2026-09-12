@@ -14,6 +14,7 @@ const WORKTREE_DIRECTORY = vi.hoisted(() => '/scratch/.git')
 const NEXT_ISSUES_HEADER = '🗒 Next issues (newest first):'
 
 const release_hold_mock = vi.hoisted(() => vi.fn())
+const end_life_mock = vi.hoisted(() => vi.fn())
 const worktree_directory_mock = vi.hoisted(() =>
 	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(WORKTREE_DIRECTORY),
 )
@@ -65,6 +66,13 @@ vi.mock('../scripts/run/run-hold', () => ({
 		hold_path: (directory: string) => `${directory}/hold.json`,
 		release_hold: release_hold_mock,
 		worktree_directory: worktree_directory_mock,
+	},
+}))
+
+vi.mock('../scripts/run/run-progress-clock', () => ({
+	run_progress_clock: {
+		life_target_of: (directory: string) => `${directory}/life.json`,
+		end_life: end_life_mock,
 	},
 }))
 
@@ -334,6 +342,46 @@ describe('the working-tree hold is released only by a merged run', () => {
 		const hold = steps.find((step) => step.label === 'The working-tree hold release')
 
 		expect(hold?.recovery).toBe('pnpm josh run:release --force')
+	})
+})
+
+// joshuafolkken/kit#1821: a `run:progress` watcher, left alone, waits out its whole bound after the
+// run has merged. `josh followup` removes its liveness record on the same merge seam that releases the
+// hold, so the watcher reads it gone and stops at once.
+describe('the progress watcher is ended only by a merged run', () => {
+	it('removes the liveness record on the work tree the run used', async () => {
+		await git_followup_finish.end_progress_watcher(true)
+
+		expect(end_life_mock).toHaveBeenCalledWith(`${WORKTREE_DIRECTORY}/life.json`)
+	})
+
+	it('leaves the watcher alone on a --no-merge run', async () => {
+		await git_followup_finish.end_progress_watcher(false)
+
+		expect(end_life_mock).not.toHaveBeenCalled()
+	})
+
+	it('reports success when the watcher work tree could not be read', async () => {
+		worktree_directory_mock.mockRejectedValueOnce(new Error('watcher git dir unreadable'))
+
+		await expect(git_followup_finish.end_progress_watcher(true)).resolves.toBeUndefined()
+		expect(end_life_mock).not.toHaveBeenCalled()
+	})
+
+	it('ends the watcher as part of the finished tail', async () => {
+		await git_followup_finish.finish('#42', true)
+
+		expect(end_life_mock).toHaveBeenCalledWith(`${WORKTREE_DIRECTORY}/life.json`)
+	})
+
+	// The steps are independent: an earlier one throwing must not skip the watcher end, the same
+	// guarantee joshuafolkken/kit#1539 gives the hold release beside it.
+	it('ends the watcher even when an earlier step threw', async () => {
+		record_run_mock.mockRejectedValueOnce(new Error('run report step failed'))
+
+		await git_followup_finish.finish('#42', true)
+
+		expect(end_life_mock).toHaveBeenCalledWith(`${WORKTREE_DIRECTORY}/life.json`)
 	})
 })
 

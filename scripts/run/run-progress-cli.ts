@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { run_progress, type ProgressState } from './run-progress'
+import { run_progress_clock } from './run-progress-clock'
 import { run_progress_config } from './run-progress-config'
 import { run_progress_read, type ObservationRead } from './run-progress-read'
 
@@ -276,19 +277,56 @@ function has_reported(loop: WatchLoop, should_stop_on_report: boolean): boolean 
 	return should_stop_on_report && loop.state !== undefined
 }
 
-async function drive(options: WatchOptions, should_stop_on_report: boolean): Promise<number> {
-	const target = await run_progress_read.stamp_target()
+// Why the loop stopped, so `drive` prints the bound-expired notice only when the bound is what
+// expired — not when `josh followup` ended the watcher, which is a clean stop with nothing to report.
+type WatchExit = 'reported' | 'ended' | 'bound'
+
+// The record the watcher writes to say it is alive, resolved once at the start. `begin_life` refreshes
+// it, so a `--wait` the caller restarts cleanly replaces a record an earlier one left behind.
+async function begin_watch(): Promise<string> {
+	const life = await run_progress_read.live_target()
+
+	run_progress_clock.begin_life(life)
+
+	return life
+}
+
+// Which non-reporting exit the loop took: its liveness record removed by `josh followup`, or the
+// `--hours` bound running out. Kept out of `run_ticks` so its loop carries one branch rather than two.
+function final_exit(life: string): WatchExit {
+	return run_progress_clock.is_life_ended(life) ? 'ended' : 'bound'
+}
+
+// The loop both reporting forms share, reading its own liveness record at the top of each pass — the
+// `run-wake-loop.ts` `run_loop` shape (joshuafolkken/kit#1727). A record gone means `josh followup`
+// removed it at the merge, so the watcher stops at once instead of waiting out its bound
+// (joshuafolkken/kit#1821); `--wait` also stops at the first line it prints, and otherwise the loop
+// runs until `--hours` expires.
+async function run_ticks(
+	options: WatchOptions,
+	target: string,
+	life: string,
+	should_stop_on_report: boolean,
+): Promise<WatchExit> {
 	const started_ms = Date.now()
 	let loop = seed_loop(target, started_ms)
 
-	while (Date.now() - started_ms < options.max_ms) {
+	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
 		await sleep(options.tick_ms)
 		loop = await step(options, target, loop)
 
-		if (has_reported(loop, should_stop_on_report)) return SUCCESS_EXIT_CODE
+		if (has_reported(loop, should_stop_on_report)) return 'reported'
 	}
 
-	if (should_stop_on_report) console.error(WAIT_EXPIRED_NOTICE)
+	return final_exit(life)
+}
+
+async function drive(options: WatchOptions, should_stop_on_report: boolean): Promise<number> {
+	const target = await run_progress_read.stamp_target()
+	const life = await begin_watch()
+	const exit = await run_ticks(options, target, life, should_stop_on_report)
+
+	if (exit === 'bound' && should_stop_on_report) console.error(WAIT_EXPIRED_NOTICE)
 
 	return SUCCESS_EXIT_CODE
 }

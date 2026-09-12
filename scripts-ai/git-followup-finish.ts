@@ -5,6 +5,7 @@ import { telegram_notify } from '../scripts/git/telegram-notify'
 import { review_attest } from '../scripts/review/review-attest'
 import { review_stamps } from '../scripts/review/review-stamps'
 import { run_hold } from '../scripts/run/run-hold'
+import { run_progress_clock } from '../scripts/run/run-progress-clock'
 import { time_history, type RunRecordOutcome } from '../scripts/time/time-history'
 import { parse_completed_issue_number } from './followup-issue-number'
 
@@ -181,6 +182,38 @@ async function release_worktree_hold(should_merge: boolean): Promise<void> {
 	}
 }
 
+// joshuafolkken/kit#1821: a `run:progress` watcher outlives the turn that started it and, left alone,
+// waits out its whole bound — up to an hour — after the run it was watching has already merged.
+// Removing its liveness record here, on the same merge seam that releases the working-tree hold, lets
+// the watcher read the record gone on its next tick and stop at once. **Keyed like the hold, on the
+// work tree's own git directory** (`worktree_directory` is `directories[0]`), which is exactly the key
+// the watcher resolved through `run_progress_read.stamp_target`, so the file removed is the file it
+// wrote.
+//
+// It swallows its own failure like the hold release beside it, and needs no recovery command: the
+// record is presence-only and the watcher's own bound ends it regardless, so it must never decide
+// whether a merged run reports success.
+//
+// **A no-op in an `epicrun` / `queue` batch, and deliberately so.** A batch child starts no watcher
+// of its own — the batch watcher is the parent's and outlives the child, which is still running the
+// rest of the batch — so a child keyed on its own lane worktree finds no record here and removes
+// nothing. The parent ends its own watcher on its stop, exactly as it starts it. This ends the
+// watcher of a run whose followup merges and which owns one on the same work tree: a standalone
+// `fullrun`.
+async function end_progress_watcher(should_merge: boolean): Promise<void> {
+	if (!should_merge) return
+
+	try {
+		const directory = await run_hold.worktree_directory()
+
+		if (directory === undefined) return
+
+		run_progress_clock.end_life(run_progress_clock.life_target_of(directory))
+	} catch {
+		/* the watcher's own bound ends it, so a record left behind costs at most one idle watcher */
+	}
+}
+
 // **The steps are independent, and one of them failing must not discard the rest**
 // (joshuafolkken/kit#1539). They used to be four bare statements, so whichever threw first ended the
 // process — and the hold release is the last of them, which is how three merged runs left their
@@ -231,6 +264,15 @@ function build_record_steps(should_merge: boolean): ReadonlyArray<CleanupStep> {
 				await release_worktree_hold(should_merge)
 			},
 		},
+		{
+			label: 'The progress watcher',
+			// No recovery: the record is presence-only and the watcher's own bound ends it regardless,
+			// so there is nothing a person types to finish this step by hand.
+			recovery: undefined,
+			run: async () => {
+				await end_progress_watcher(should_merge)
+			},
+		},
 	]
 }
 
@@ -266,6 +308,7 @@ const git_followup_finish = {
 	clear_round_one_snapshot,
 	clear_review_target,
 	release_worktree_hold,
+	end_progress_watcher,
 }
 
 export { git_followup_finish }

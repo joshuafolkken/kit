@@ -16,16 +16,26 @@ vi.mock('#scripts/gh-spawn', () => ({
 }))
 vi.mock('./run-progress-read', () => ({
 	run_progress_read: {
+		live_target: vi.fn(),
 		mark: vi.fn(),
 		read_last_report: vi.fn(),
 		read_observations: vi.fn(),
 		stamp_target: vi.fn(),
 	},
 }))
+// The watcher's liveness record is driven through a mock here so a test can decide when `josh followup`
+// has removed it; the record itself is exercised for real in `run-progress-clock.test.ts`.
+vi.mock('./run-progress-clock', () => ({
+	run_progress_clock: {
+		begin_life: vi.fn(),
+		is_life_ended: vi.fn(),
+	},
+}))
 
 const { gh_spawn } = await import('#scripts/gh-spawn')
 const { PROJECT_ROOT: REPO_ROOT } = await import('#scripts/init/init-paths')
 const { run_progress_read } = await import('./run-progress-read')
+const { run_progress_clock } = await import('./run-progress-clock')
 const { run_progress } = await import('./run-progress')
 const { run_progress_cli } = await import('./run-progress-cli')
 
@@ -34,12 +44,16 @@ const mark = vi.mocked(run_progress_read.mark)
 const read_last_report = vi.mocked(run_progress_read.read_last_report)
 const read_observations = vi.mocked(run_progress_read.read_observations)
 const stamp_target = vi.mocked(run_progress_read.stamp_target)
+const live_target = vi.mocked(run_progress_read.live_target)
+const begin_life = vi.mocked(run_progress_clock.begin_life)
+const is_life_ended = vi.mocked(run_progress_clock.is_life_ended)
 
 const REPO = 'joshuafolkken/kit'
 // A directory of this suite's own. A fixed name under the temp directory is shared by every suite
 // running at once, which `scripts/shared-temporary-path.test.ts` refuses for exactly that reason.
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-cli-'))
 const STAMP = path.join(TEMPORARY, 'stamp.json')
+const LIFE_STAMP = path.join(TEMPORARY, 'life.json')
 const TRANSCRIPT = path.join(TEMPORARY, 'unit.jsonl')
 const MINUTE = run_progress.MS_PER_MINUTE
 const HOUR = 3_600_000
@@ -50,6 +64,14 @@ const DISABLE_KEY = 'JOSH_PROGRESS'
 
 const output: { printed: Array<string>; warned: Array<string> } = { printed: [], warned: [] }
 
+function seed_mocks(): void {
+	repo_name.mockReturnValue(REPO)
+	stamp_target.mockResolvedValue(STAMP)
+	live_target.mockResolvedValue(LIFE_STAMP)
+	is_life_ended.mockReturnValue(false)
+	read_last_report.mockReturnValue(undefined)
+}
+
 beforeEach(() => {
 	output.printed = []
 	output.warned = []
@@ -59,9 +81,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation((...args) => {
 		output.warned.push(args.join(' '))
 	})
-	repo_name.mockReturnValue(REPO)
-	stamp_target.mockResolvedValue(STAMP)
-	read_last_report.mockReturnValue(undefined)
+	seed_mocks()
 	vi.stubEnv(DISABLE_KEY, '')
 	vi.stubEnv(INTERVAL_KEY, '')
 })
@@ -322,6 +342,37 @@ describe('the watch loop — the decline streak and its cooldown', () => {
 		expect(output.warned[0]).toContain(run_progress_cli.FAILED_TICK_PREFIX)
 		expect(output.warned[0]).toContain(SPAWN_FAILURE)
 		expect(next.retry_at_ms).toBeGreaterThan(Date.now())
+	})
+})
+
+describe('the watch loop — josh followup ends it at the merge', () => {
+	// joshuafolkken/kit#1821: `josh followup` removes the liveness record at the merge, and the watcher
+	// reads it gone on its next tick and stops — instead of waiting out its whole bound on a run that
+	// has already merged.
+	it('stops at once when the liveness record is gone, and says nothing', async () => {
+		is_life_ended.mockReturnValue(true)
+		read_observations.mockResolvedValue(OBSERVED)
+
+		await expect(run_progress_cli.wait_once(OPTIONS)).resolves.toBe(0)
+		expect(read_observations).not.toHaveBeenCalled()
+		expect(output.printed).toEqual([])
+		expect(output.warned).toEqual([])
+	})
+
+	it('writes its own liveness record when it begins watching', async () => {
+		is_life_ended.mockReturnValue(true)
+
+		await run_progress_cli.wait_once(OPTIONS)
+
+		expect(begin_life).toHaveBeenCalledWith(LIFE_STAMP)
+	})
+
+	// The bound running out is a different exit from the watcher being ended, and only it prints the
+	// expiry notice — an ended watcher is a clean stop with nothing to report.
+	it('still prints the bound-expired notice when the bound is what ran out', async () => {
+		await expect(run_progress_cli.wait_once({ ...OPTIONS, max_ms: 0 })).resolves.toBe(0)
+
+		expect(output.warned).toEqual([run_progress_cli.WAIT_EXPIRED_NOTICE])
 	})
 })
 
