@@ -1,14 +1,12 @@
 import { cost_composition, type Composition } from './cost-composition'
+import { cost_curve, type CapSimulation, type Curve } from './cost-curve'
+import { cost_format } from './cost-format'
 import { cost_pricing, type ModelCost } from './cost-pricing'
 import { cost_resident, type ResidentBreakdown } from './cost-resident'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 
 // Turning per-request usage into the report a person reads and joshuafolkken/kit#921 cites
 // (joshuafolkken/kit#962).
-
-const USD_DECIMALS = 4
-const PERCENT_SCALE = 100
-const PERCENT_DECIMALS = 1
 
 // Where the billed input went. A session's resident baseline is its first request's whole input —
 // system prompt, tool schemas, `CLAUDE.md`, the skills index — because that is what was in context
@@ -84,6 +82,10 @@ interface CostReport {
 	breakdown: InputBreakdown
 	missing: MissingData
 	measurement?: Measurement
+	// The cost curve across request position, and — only when a cap was requested — the share of the
+	// run's cost that fell at or under it (joshuafolkken/kit#1838). Both absent on an empty scope.
+	curve?: Curve
+	cap_simulation?: CapSimulation
 }
 
 interface ReportInput {
@@ -92,12 +94,28 @@ interface ReportInput {
 	missing: MissingData
 	resident_billed_tokens: number
 	measurement?: Measurement
+	cap_tokens?: number
 }
 
 // `exactOptionalPropertyTypes` rejects `{ measurement: undefined }`, so an absent measurement
 // contributes no key at all — the same idiom the CLI's optional flags use.
 function optional_measurement(measurement: Measurement | undefined): { measurement?: Measurement } {
 	return measurement === undefined ? {} : { measurement }
+}
+
+// `curve` is computed for every non-empty scope; `cap_simulation` only when a cap was requested.
+// Both follow the same absent-key idiom so a scope with no data carries neither.
+function optional_curve(records: ReadonlyArray<UsageRecord>): { curve?: Curve } {
+	return records.length === 0 ? {} : { curve: cost_curve.build_curve(records) }
+}
+
+function optional_cap(
+	records: ReadonlyArray<UsageRecord>,
+	cap_tokens: number | undefined,
+): { cap_simulation?: CapSimulation } {
+	if (cap_tokens === undefined || records.length === 0) return {}
+
+	return { cap_simulation: cost_curve.simulate_cap(records, cap_tokens) }
 }
 
 function build_report(input: ReportInput): CostReport {
@@ -114,30 +132,18 @@ function build_report(input: ReportInput): CostReport {
 		breakdown: build_breakdown(input.records, input.resident_billed_tokens),
 		missing: input.missing,
 		...optional_measurement(input.measurement),
+		...optional_curve(input.records),
+		...optional_cap(input.records, input.cap_tokens),
 	}
-}
-
-function format_usd(usd: number): string {
-	return `$${usd.toFixed(USD_DECIMALS)}`
-}
-
-function format_share(part: number, whole: number): string {
-	if (whole === 0) return 'n/a'
-
-	return `${((part / whole) * PERCENT_SCALE).toFixed(PERCENT_DECIMALS)}%`
-}
-
-function format_tokens(count: number): string {
-	return count.toLocaleString('en-US')
 }
 
 function token_lines(totals: UsageTotals): Array<string> {
 	return [
-		`  uncached input   ${format_tokens(totals.input_tokens)}`,
-		`  cache write 5m   ${format_tokens(totals.cache_write_5m_tokens)}  (x${String(cost_pricing.CACHE_WRITE_5M_MULTIPLIER)})`,
-		`  cache write 1h   ${format_tokens(totals.cache_write_1h_tokens)}  (x${String(cost_pricing.CACHE_WRITE_1H_MULTIPLIER)})`,
-		`  cache read       ${format_tokens(totals.cache_read_tokens)}  (x${String(cost_pricing.CACHE_READ_MULTIPLIER)})`,
-		`  output           ${format_tokens(totals.output_tokens)}  (of which thinking ${format_tokens(totals.thinking_tokens)})`,
+		`  uncached input   ${cost_format.format_tokens(totals.input_tokens)}`,
+		`  cache write 5m   ${cost_format.format_tokens(totals.cache_write_5m_tokens)}  (x${String(cost_pricing.CACHE_WRITE_5M_MULTIPLIER)})`,
+		`  cache write 1h   ${cost_format.format_tokens(totals.cache_write_1h_tokens)}  (x${String(cost_pricing.CACHE_WRITE_1H_MULTIPLIER)})`,
+		`  cache read       ${cost_format.format_tokens(totals.cache_read_tokens)}  (x${String(cost_pricing.CACHE_READ_MULTIPLIER)})`,
+		`  output           ${cost_format.format_tokens(totals.output_tokens)}  (of which thinking ${cost_format.format_tokens(totals.thinking_tokens)})`,
 	]
 }
 
@@ -145,16 +151,16 @@ function breakdown_lines(breakdown: InputBreakdown): Array<string> {
 	const billed = breakdown.billed_input_tokens
 
 	return [
-		`  resident (system prompt + CLAUDE.md, re-read every request)  ${format_tokens(breakdown.resident_billed_tokens)}  ${format_share(breakdown.resident_billed_tokens, billed)}`,
-		`  conversation history                                        ${format_tokens(breakdown.history_billed_tokens)}  ${format_share(breakdown.history_billed_tokens, billed)}`,
-		`  resident baseline, per request                              ${format_tokens(breakdown.resident_baseline_tokens)}`,
+		`  resident (system prompt + CLAUDE.md, re-read every request)  ${cost_format.format_tokens(breakdown.resident_billed_tokens)}  ${cost_format.format_share(breakdown.resident_billed_tokens, billed)}`,
+		`  conversation history                                        ${cost_format.format_tokens(breakdown.history_billed_tokens)}  ${cost_format.format_share(breakdown.history_billed_tokens, billed)}`,
+		`  resident baseline, per request                              ${cost_format.format_tokens(breakdown.resident_baseline_tokens)}`,
 	]
 }
 
 function model_lines(by_model: ReadonlyArray<ModelCost>): Array<string> {
 	return by_model.map(
 		(entry) =>
-			`  ${entry.model}  ${entry.cost_usd === undefined ? 'unpriced (unknown model)' : format_usd(entry.cost_usd)}`,
+			`  ${entry.model}  ${entry.cost_usd === undefined ? 'unpriced (unknown model)' : cost_format.format_usd(entry.cost_usd)}`,
 	)
 }
 
@@ -205,6 +211,14 @@ function measurement_lines(measurement: Measurement | undefined): Array<string> 
 	]
 }
 
+function curve_lines(curve: Curve | undefined): Array<string> {
+	return curve === undefined ? [] : cost_curve.format_curve_lines(curve)
+}
+
+function cap_lines(cap: CapSimulation | undefined): Array<string> {
+	return cap === undefined ? [] : cost_curve.format_cap_lines(cap)
+}
+
 function unpriced_lines(models: ReadonlyArray<string>): Array<string> {
 	if (models.length === 0) return []
 
@@ -218,7 +232,7 @@ function format_totals_line(reports: ReadonlyArray<CostReport>): string {
 	const requests = reports.reduce((sum, report) => sum + report.request_count, 0)
 	const usd = reports.reduce((sum, report) => sum + report.cost_usd, 0)
 
-	return `Total across ${String(reports.length)} scope(s): ${String(requests)} request(s), ${format_usd(usd)}`
+	return `Total across ${String(reports.length)} scope(s): ${String(requests)} request(s), ${cost_format.format_usd(usd)}`
 }
 
 const NOTHING_ATTRIBUTED = [
@@ -239,7 +253,7 @@ function format_report(report: CostReport): string {
 	if (report.request_count === 0) return format_empty(report)
 
 	return [
-		`${report.scope} — ${String(report.request_count)} request(s), ${format_usd(report.cost_usd)}`,
+		`${report.scope} — ${String(report.request_count)} request(s), ${cost_format.format_usd(report.cost_usd)}`,
 		'',
 		'Tokens:',
 		...token_lines(report.totals),
@@ -250,6 +264,8 @@ function format_report(report: CostReport): string {
 		'Cost by model:',
 		...model_lines(report.by_model),
 		...measurement_lines(report.measurement),
+		...curve_lines(report.curve),
+		...cap_lines(report.cap_simulation),
 		...unpriced_lines(report.unpriced_models),
 		...missing_lines(report.missing),
 	].join('\n')
@@ -258,8 +274,8 @@ function format_report(report: CostReport): string {
 const cost_report = {
 	build_breakdown,
 	build_report,
-	format_usd,
-	format_share,
+	format_usd: cost_format.format_usd,
+	format_share: cost_format.format_share,
 	format_totals_line,
 	format_empty,
 	format_report,

@@ -9,6 +9,7 @@ import { cost_report, type CostReport, type Measurement, type MissingData } from
 import { cost_resident } from './cost-resident'
 import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
 import { cost_usage } from './cost-usage'
+import { cost_verdict } from './cost-verdict'
 
 // `josh cost` — what a run actually spent, read from Claude Code's own session transcripts
 // (joshuafolkken/kit#962).
@@ -17,17 +18,7 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
 const USAGE =
-	'Usage: josh cost [--session <id>] [--issue <number>] [--all] [--json] [--over <tokens-per-request>]'
-
-// What a turn costs is decided by the accumulated preamble, not by what the turn does, so the
-// marginal cost of a session is its billed input divided by the requests that paid for it. Measured
-// across one `epicrun` that ran six children in one context: 222k per request during the first
-// child, 645k during the sixth — the same work at 2.9x the price (joshuafolkken/kit#968).
-//
-// Per request rather than in total, because the total only says the session was long. The ratio
-// says what the *next* turn will cost, which is the thing a hand-off decision turns on.
-const OVER_VERDICT = 'over'
-const UNDER_VERDICT = 'under'
+	'Usage: josh cost [--session <id>] [--issue <number>] [--all] [--json] [--over <tokens-per-request>] [--cap <tokens-per-request>]'
 
 interface Options {
 	session?: string
@@ -35,6 +26,7 @@ interface Options {
 	is_all: boolean
 	is_json: boolean
 	over?: number
+	cap?: number
 }
 
 interface RawValues {
@@ -43,6 +35,7 @@ interface RawValues {
 	all?: boolean | undefined
 	json?: boolean | undefined
 	over?: string | undefined
+	cap?: string | undefined
 }
 
 // `exactOptionalPropertyTypes` rejects `{ issue: undefined }`, so an absent flag contributes no key
@@ -87,6 +80,16 @@ function optional_over(over: number | undefined): { over?: number } {
 	return over === undefined ? {} : { over }
 }
 
+function optional_cap(cap: number | undefined): { cap?: number } {
+	return cap === undefined ? {} : { cap }
+}
+
+// The token cap threaded into a report so the simulation is computed where the records are. Kept
+// apart from `optional_cap`: that one carries the parsed CLI flag, this one the report-input field.
+function optional_cap_tokens(cap: number | undefined): { cap_tokens?: number } {
+	return cap === undefined ? {} : { cap_tokens: cap }
+}
+
 // A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
 // silently become "no issue".
 function is_unparsed(raw: string | undefined, parsed: number | undefined): boolean {
@@ -101,26 +104,54 @@ function is_scoped(values: RawValues, issue: number | undefined): boolean {
 	return issue !== undefined || values.all === true || values.json === true
 }
 
+function has_unparsed(
+	values: RawValues,
+	issue: number | undefined,
+	over: number | undefined,
+	cap: number | undefined,
+): boolean {
+	return (
+		is_unparsed(values.issue, issue) ||
+		is_unparsed(values.over, over) ||
+		is_unparsed(values.cap, cap)
+	)
+}
+
+// `--cap` is a whole-run counterfactual, so it may narrow to `--issue` and may print as `--json`;
+// what it may not do is share an invocation with `--all` (which report's ratio?) or with `--over`
+// (two different verdicts on one run).
+function is_cap_conflict(
+	values: RawValues,
+	over: number | undefined,
+	cap: number | undefined,
+): boolean {
+	return cap !== undefined && (values.all === true || over !== undefined)
+}
+
 function is_refused(
 	values: RawValues,
 	issue: number | undefined,
 	over: number | undefined,
+	cap: number | undefined,
 ): boolean {
-	if (is_unparsed(values.issue, issue) || is_unparsed(values.over, over)) return true
+	if (has_unparsed(values, issue, over, cap)) return true
+	if (over !== undefined && is_scoped(values, issue)) return true
 
-	return over !== undefined && is_scoped(values, issue)
+	return is_cap_conflict(values, over, cap)
 }
 
 function to_options(values: RawValues): Options | undefined {
 	const issue = to_issue(values.issue)
 	const over = to_threshold(values.over)
+	const cap = to_threshold(values.cap)
 
-	if (is_refused(values, issue, over)) return undefined
+	if (is_refused(values, issue, over, cap)) return undefined
 
 	return {
 		...optional_session(values.session),
 		...optional_issue(issue),
 		...optional_over(over),
+		...optional_cap(cap),
 		is_all: values.all ?? false,
 		is_json: values.json ?? false,
 	}
@@ -132,6 +163,7 @@ const PARSE_ARGS_OPTIONS = {
 	all: { type: 'boolean', default: false },
 	json: { type: 'boolean', default: false },
 	over: { type: 'string' },
+	cap: { type: 'string' },
 } as const
 
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
@@ -183,7 +215,11 @@ function optional_measurement(
 // Its missing counts are the session's own, never the corpus's. A malformed line in some unrelated
 // session is not missing data about *this* one, and reporting it as such attributes a defect to the
 // wrong run — the same misreading, one level up, that this command exists to stop.
-function report_session(corpus: Corpus, cwd: string): CostReport | undefined {
+function report_session(
+	corpus: Corpus,
+	cwd: string,
+	cap: number | undefined,
+): CostReport | undefined {
 	const index = cost_transcript.latest_own_index(corpus.files)
 	const session = corpus.sessions[index]
 	const file = corpus.files[index]
@@ -196,6 +232,7 @@ function report_session(corpus: Corpus, cwd: string): CostReport | undefined {
 		missing: cost_corpus.accumulate_missing([session]),
 		resident_billed_tokens: session.baseline_tokens * session.records.length,
 		...optional_measurement(cwd, file, session),
+		...optional_cap_tokens(cap),
 	})
 }
 
@@ -211,12 +248,14 @@ function to_scope_report(
 	label: string,
 	pairs: ReadonlyArray<AttributedRecord>,
 	missing: MissingData,
+	cap: number | undefined,
 ): CostReport {
 	return cost_report.build_report({
 		scope: label,
 		records: pairs.map((pair) => pair.record),
 		missing,
 		resident_billed_tokens: pairs.reduce((sum, pair) => sum + pair.baseline_tokens, 0),
+		...optional_cap_tokens(cap),
 	})
 }
 
@@ -227,7 +266,7 @@ function with_unattributed(missing: MissingData, unattributed_units: number): Mi
 	return { ...missing, unattributed_sessions: unattributed_units }
 }
 
-function report_issue(corpus: Corpus, issue_number: number): CostReport {
+function report_issue(corpus: Corpus, issue_number: number, cap: number | undefined): CostReport {
 	const attribution = cost_corpus.attribute_corpus(corpus)
 	const pairs = cost_corpus
 		.dedupe_across_sessions(attribution.pairs)
@@ -235,7 +274,7 @@ function report_issue(corpus: Corpus, issue_number: number): CostReport {
 	const floor = cost_corpus.floor_for_issue(attribution.unattributed, issue_number)
 	const missing = with_unattributed(corpus.missing, floor)
 
-	return to_scope_report(scope_label(issue_number), pairs, missing)
+	return to_scope_report(scope_label(issue_number), pairs, missing, cap)
 }
 
 function report_all(corpus: Corpus): Array<CostReport> {
@@ -247,7 +286,7 @@ function report_all(corpus: Corpus): Array<CostReport> {
 
 	return [...merged]
 		.toSorted(([left], [right]) => left - right)
-		.map(([key, pairs]) => to_scope_report(scope_label(key), pairs, corpus.missing))
+		.map(([key, pairs]) => to_scope_report(scope_label(key), pairs, corpus.missing, undefined))
 }
 
 // The empty check is made once, for every scope. `--all` and `--issue` used to answer an absent
@@ -260,9 +299,9 @@ function build_reports(
 ): Array<CostReport> | undefined {
 	if (corpus.sessions.length === 0) return undefined
 	if (options.is_all) return report_all(corpus)
-	if (options.issue !== undefined) return [report_issue(corpus, options.issue)]
+	if (options.issue !== undefined) return [report_issue(corpus, options.issue, options.cap)]
 
-	const single = report_session(corpus, cwd)
+	const single = report_session(corpus, cwd, options.cap)
 
 	return single === undefined ? undefined : [single]
 }
@@ -289,34 +328,17 @@ function report_empty(cwd: string, session_id: string | undefined): number {
 	return FAILURE_EXIT_CODE
 }
 
-// The marginal cost of the next turn, in billed input tokens. Zero requests answers 0 rather than
-// dividing by none — a session that has not asked anything yet has nothing to hand off.
-function per_request_cost(report: CostReport): number {
-	if (report.request_count === 0) return 0
+// The verdict flags share one dispatch: `--over` and `--cap` each short-circuit to a one-line
+// answer, and everything else prints the full report(s). Kept out of `run` so that function stays
+// under the complexity limit.
+function dispatch_reports(options: Options, reports: ReadonlyArray<CostReport>): number {
+	if (options.over !== undefined) return cost_verdict.report_over(reports, options.over)
 
-	return Math.round(report.breakdown.billed_input_tokens / report.request_count)
-}
-
-// A verdict, not a table: the point of the flag is that the hand-off is decided by a number rather
-// than by whether the run feels long, which is a judgement made under exactly the pressure that
-// resolves it the wrong way.
-function report_over(reports: ReadonlyArray<CostReport>, limit: number): number {
-	const [report] = reports
-
-	if (report === undefined) return FAILURE_EXIT_CODE
-
-	if (report.request_count === 0) {
-		console.error('No requests in this session; there is nothing to hand off.')
-
-		return FAILURE_EXIT_CODE
+	if (options.cap !== undefined && !options.is_json) {
+		return cost_verdict.report_cap(reports, options.cap)
 	}
 
-	const cost = per_request_cost(report)
-
-	console.info(cost > limit ? OVER_VERDICT : UNDER_VERDICT)
-	console.error(
-		`${String(cost)} billed input tokens per request over ${String(report.request_count)} request(s); limit ${String(limit)}`,
-	)
+	print_reports(reports, options.is_json)
 
 	return 0
 }
@@ -337,11 +359,8 @@ function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 	const reports = build_reports(options, cost_corpus.load_corpus(cwd, options.session), cwd)
 
 	if (reports === undefined) return report_empty(cwd, options.session)
-	if (options.over !== undefined) return report_over(reports, options.over)
 
-	print_reports(reports, options.is_json)
-
-	return 0
+	return dispatch_reports(options, reports)
 }
 
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and
@@ -361,8 +380,9 @@ const cost_cli = {
 	report_all,
 	attributed: cost_corpus.attributed,
 	to_threshold,
-	per_request_cost,
-	report_over,
+	per_request_cost: cost_verdict.per_request_cost,
+	report_over: cost_verdict.report_over,
+	report_cap: cost_verdict.report_cap,
 	build_reports,
 	run,
 	main,

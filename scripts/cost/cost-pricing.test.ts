@@ -24,6 +24,15 @@ describe('cost_pricing.resolve_price', () => {
 		expect(cost_pricing.resolve_price(`${OPUS}[1m]`)).toStrictEqual(OPUS_PRICE)
 	})
 
+	// joshuafolkken/kit#1838: the 1M-context marker carries no surcharge band for any priced model
+	// (platform.claude.com "Long context pricing", read 2026-09), so a large request on a `[1m]` id is
+	// billed at the base per-token rate rather than a premium — the reason the marker is stripped.
+	it('bills a large 1m-context request at the base rate, with no long-context surcharge', () => {
+		const price = cost_pricing.resolve_price(`${OPUS}[1m]`) ?? OPUS_PRICE
+
+		expect(cost_pricing.estimate_cost(totals({ input_tokens: MILLION }), price)).toBe(5)
+	})
+
 	it('prices an id carrying a date suffix', () => {
 		expect(cost_pricing.resolve_price('claude-haiku-4-5-20251001')?.input).toBe(1)
 	})
