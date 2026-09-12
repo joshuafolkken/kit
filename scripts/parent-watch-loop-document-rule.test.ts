@@ -130,10 +130,12 @@ describe(`${BACKLOGRUN} — the loop cites the rule`, () => {
 		expect(content).toContain('Sleep the polling interval and **ask the command again**')
 	})
 
-	it('decides the watch row by the same in-flight test', () => {
-		expect(content).toContain(
-			'**Which of the two the parent keeps as a clock is decided by the same in-flight test**',
-		)
+	// Which interval applies and whether the parent keeps it as a clock are two tests, not one.
+	// Collapsing them put a blocked backlog with nothing in flight on the 5-minute idle poll instead
+	// of the 60-second interval, stretching the three-`retry` outage cap from ~3 minutes to ~15.
+	it('keeps the interval choice and the clock question apart', () => {
+		expect(content).toContain('**Two questions, and they are not the same test.**')
+		expect(content).toContain('a blocked backlog with nothing in flight included')
 	})
 })
 
