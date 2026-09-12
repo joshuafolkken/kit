@@ -448,6 +448,7 @@ function to_report(facts: RunFacts): TimeReport {
 		diff: facts.diff,
 		windows: run_windows(facts),
 		notes,
+		delegated_wait: found.delegated_wait,
 		by_check: facts.checks,
 	})
 	const found_notes = [...window_note(window, report.elapsed_ms), ...serial_note(report)]

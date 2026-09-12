@@ -4,6 +4,7 @@ import path from 'node:path'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_corpus, type IssueSpans } from './time-corpus'
+import { time_delegated_wait } from './time-delegated-wait'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 const { CWD, ISSUE, BRANCH, THREE_MINUTES_MS } = fixture
@@ -221,6 +222,23 @@ describe('time_corpus.collect_issue_spans on a delegated run', () => {
 	})
 })
 
+// An unread delegated unit has an unknown wait, not an empty one — so the issue scope reports it as
+// `not measured`, the same answer the session scope gives, rather than withholding the block as if the
+// run never delegated (joshuafolkken/kit#1881). `resolve_delegated` sees only units whose spans were
+// read, so an unread one has to be recognized from the family listing instead.
+describe('time_corpus.collect_issue_spans on an unread delegated unit', () => {
+	it('reports the delegation as not measured rather than as a run that never delegated', () => {
+		write_session('parent', fixture.delegating_lines())
+		write_unit('parent', 'agent-a1', fixture.issue_lines(0, ELSEWHERE_BRANCH))
+		vi.spyOn(cost_transcript, 'read_optional').mockReturnValue(undefined)
+
+		const found = collect()
+
+		expect(found.delegated_wait.has_delegation).toBe(true)
+		expect(found.delegated_wait.is_measured).toBe(false)
+	})
+})
+
 // The two overlaps that have no parent-unit relation to resolve them (joshuafolkken/kit#1287). Both
 // break the guarantee the arithmetic exists for: the shares stop reconstructing the elapsed time.
 describe('time_corpus.collect_issue_spans on transcripts that overlap without a parent-unit relation', () => {
@@ -343,6 +361,7 @@ describe('time_corpus.collect_for_issues — one pass, however many issues', () 
 			has_other_run_markers: false,
 			attributed_count: 0,
 			unread_count: 0,
+			delegated_wait: time_delegated_wait.build_totals([], true, false),
 		})
 	})
 

@@ -258,6 +258,7 @@ function build_session_report(cwd: string, file: SessionFile): TimeReport {
 		file.session_id,
 		to_timeline(found.spans),
 		time_run.unread_lines(found.unread.length),
+		found.delegated_wait,
 	)
 }
 
