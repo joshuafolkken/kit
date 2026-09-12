@@ -341,7 +341,7 @@ function collect_for_issues(
 
 	if (collectors.size === NO_ISSUES) return to_results(collectors)
 
-	const files = cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd))
+	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
 
 	for (const file of files) absorb_file(collectors, file)
 

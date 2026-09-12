@@ -1,5 +1,6 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { z } from 'zod'
 import { time_format } from './time-format'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
@@ -324,7 +325,7 @@ function is_measured(report: TimeReport): boolean {
 // this for real needs cancellation inside the walk or a worker of its own, which is not this change.
 function measured_lines(
 	issue_number: number,
-	cwd: string,
+	history_root: string,
 	report: TimeReport,
 	now: Clock,
 ): RunRecordOutcome {
@@ -337,7 +338,7 @@ function measured_lines(
 		return not_recorded(issue_number, reason.length > 0 ? reason : NO_REASON_GIVEN)
 	}
 
-	const kept = append_record(cwd, to_record(issue_number, report, now()))
+	const kept = append_record(history_root, to_record(issue_number, report, now()))
 
 	return { is_recorded: true, lines: format_block(kept) }
 }
@@ -361,7 +362,15 @@ async function record_run(
 	if (is_disabled()) return { is_recorded: false, lines: [] }
 
 	try {
-		return measured_lines(issue_number, cwd, await build(issue_number, cwd), now)
+		// **Measured from where the run happened, recorded in the durable checkout.** A dispatched lane
+		// child's transcript is filed under the lane's own slug (joshuafolkken/kit#1749), so the raw `cwd`
+		// is what `build` must look it up from — `list_sessions_across` searches both that slug and the main
+		// checkout's. The appended line, though, goes to `session_cwd(cwd)`: a line written into a lane's
+		// own `.time-history.jsonl` is deleted with the lane by `pnpm josh lane:close`
+		// (joshuafolkken/kit#1825).
+		const report = await build(issue_number, cwd)
+
+		return measured_lines(issue_number, cost_transcript.session_cwd(cwd), report, now)
 	} catch (error) {
 		return not_recorded(issue_number, reason_of(error))
 	}

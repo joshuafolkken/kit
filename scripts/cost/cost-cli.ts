@@ -168,7 +168,7 @@ function accumulate_missing(sessions: ReadonlyArray<SessionUsage>): MissingData 
 // Every session for this project, newest first. A `--session` narrows it here rather than in each
 // caller, so "that session does not exist" is one answer instead of three.
 function load_corpus(cwd: string, session_id?: string): Corpus {
-	const files = cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd))
+	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
 	const wanted =
 		session_id === undefined ? files : files.filter((file) => file.session_id === session_id)
 	const sessions = wanted.map((file) => cost_transcript.read_session(file))
@@ -361,9 +361,9 @@ function print_reports(reports: ReadonlyArray<CostReport>, is_json: boolean): vo
 // free" are different answers, and only one of them is ever true. The wording is
 // `cost_transcript`'s, so `josh time` says the same thing about the same directory.
 function report_empty(cwd: string, session_id: string | undefined): number {
-	const directory = cost_transcript.transcript_directory(cwd)
+	const searched = cost_transcript.searched_directories(cost_transcript.transcript_directories(cwd))
 
-	for (const line of cost_transcript.missing_message(directory, session_id)) console.error(line)
+	for (const line of cost_transcript.missing_message(searched, session_id)) console.error(line)
 
 	return FAILURE_EXIT_CODE
 }
@@ -400,12 +400,11 @@ function report_over(reports: ReadonlyArray<CostReport>, limit: number): number 
 	return 0
 }
 
-// The session's checkout rather than this process's, for the reason `time-cli.ts` gives: a lane's
-// commands run in a work tree no session ever wrote a transcript from (joshuafolkken/kit#1617).
-function run(
-	argv: ReadonlyArray<string>,
-	cwd: string = cost_transcript.session_cwd(process.cwd()),
-): number {
+// This process's own working directory, kept as-is: the transcript search now covers both a lane's
+// own slug and the main checkout that slug resolves to (joshuafolkken/kit#1825), so pre-rewriting the
+// cwd here would drop the lane's own slug and hide a dispatched child's transcript
+// (joshuafolkken/kit#1749). `time-cli.ts` gives the same reason.
+function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 	const options = parse_options(argv)
 
 	if (options === undefined) {

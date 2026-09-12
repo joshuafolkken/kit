@@ -21,9 +21,9 @@ const state = { home: '' }
 
 beforeEach(() => {
 	state.home = mkdtempSync(path.join(tmpdir(), 'time-family-'))
-	vi.spyOn(cost_transcript, 'transcript_directory').mockImplementation((cwd: string) =>
+	vi.spyOn(cost_transcript, 'transcript_directories').mockImplementation((cwd: string) => [
 		path.join(state.home, cost_transcript.project_slug(cwd)),
-	)
+	])
 })
 
 afterEach(() => {
@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 function listing(): Array<SessionFile> {
-	return cost_transcript.list_sessions(cost_transcript.transcript_directory(CWD))
+	return cost_transcript.list_sessions_across(cost_transcript.transcript_directories(CWD))
 }
 
 function named(session_id: string): SessionFile {
