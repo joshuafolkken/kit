@@ -257,7 +257,7 @@ describe('time_cli.run — one run', () => {
 		expect(await time_cli.run([], CWD)).toBe(0)
 		// The third argument is what opts the single-run paths into the cost read that the phase
 		// attribution needs (joshuafolkken/kit#1606); the batch paths pass nothing.
-		expect(build).toHaveBeenCalledWith(CWD, undefined, time_request_costs.PRICED_SOURCES)
+		expect(build).toHaveBeenCalledWith(CWD, undefined, time_request_costs.RUN_COST_SOURCES)
 		expect(output()).toContain(RUN_SCOPE)
 	})
 

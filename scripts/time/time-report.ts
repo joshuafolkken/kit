@@ -3,6 +3,7 @@ import { time_category_table, type CategoryTotals } from './time-category-table'
 import type { CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_cycles, type CycleTotals } from './time-cycles'
+import { time_delegated_cost, type DelegatedCostFacts } from './time-delegated-cost'
 import { time_delegated_wait, type DelegatedWaitTotals } from './time-delegated-wait'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_followup_stages, type FollowupStageTotals } from './time-followup-stages'
@@ -135,6 +136,11 @@ interface TimeReport extends TurnSplit {
 	// absent here means the question was never asked, while a present record with `is_measured: false`
 	// means it was asked and the corpus could not answer.
 	phase_costs?: PhaseCostFacts
+	// What launching each delegated subagent cost, and the run's total (joshuafolkken/kit#1882). **An
+	// optional key like `phase_costs`**, and for the same reason: only the run scopes read the cost
+	// corpus, so absent means the question was never asked and a present record with `is_measured:
+	// false` means it was asked and the corpus could not answer.
+	delegated_cost?: DelegatedCostFacts
 	// The same model wait as `model_ms_per_round_trip`, as the spread it was a mean of
 	// (joshuafolkken/kit#1386). The mean above says what a trip cost typically; only this says whether
 	// a run was slow everywhere or slow once — and the two need opposite fixes, since batching removes
@@ -484,6 +490,7 @@ function format_report(report: TimeReport): string {
 		...time_category_table.category_lines(report),
 		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
 		...time_phase_costs.cost_lines(report.phase_costs),
+		...time_delegated_cost.cost_lines(report.delegated_cost),
 		...time_cycles.cycle_lines(report.ci_cycles),
 		...time_delegated_wait.wait_lines(report.delegated_wait),
 		...time_segments.segment_lines(report.segments),
