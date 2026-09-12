@@ -1,11 +1,19 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { time_batch_guard } from '#scripts/time/time-batch-guard'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import {
+	BODY_READ_API_COMMAND,
+	BODY_READ_COMMAND,
+	COMMENTED_READ_COMMAND,
+	FILING_API_COMMAND,
+	FILING_COMMAND,
+} from './delivered-rules-fixture'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#1524: a rule that left residency has to *fire*, or the relocation deleted it. The
@@ -13,6 +21,12 @@ import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 // rule — so this suite asserts the delivery on the call that binds it, and the silence on every call
 // that does not.
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'rule-guard-'))
+// The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
+// working directory to the non-lane WORK_DIRECTORY per test to stay hermetic wherever it was launched: rule_delivery
+// and rules_claiming invoke each rule's real trigger, and the pre-gate-cut trigger reads the live
+// process.cwd() to decide whether a checkout is a lane, so a run started inside a lane worktree would
+// otherwise see the gate cases fire that rule and the silence assertions break (joshuafolkken/kit#1884).
+const ENTRY_DIRECTORY = process.cwd()
 const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const NOW_MS = 1_700_000_000_000
@@ -23,31 +37,14 @@ const BATCH_REFUSED_AT_MS = 9_000_000_000_000
 // Far enough past that record to be a different call: the stand-aside treats a *fresh* stamp as the
 // batching guard speaking about the call in hand.
 const A_LATER_CALL_MS = BATCH_REFUSED_AT_MS + 60_000
-// The shortest body-only Issue read, and the `gh api` spelling of the same. Reused wherever a case
-// needs the second row's trigger to match.
-const BODY_READ_COMMAND = 'gh issue view 1319'
-const BODY_READ_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues/1319'
-// The read the second row's refusal asks for. It has to pass both rows, or obeying would wedge the
-// run — so it serves as a non-trigger fixture for each of them.
-const COMMENTED_READ_COMMAND = 'gh issue view 1319 --comments'
-// Two reads of the same endpoints that create nothing and open no Issue body: each is a non-trigger
-// for **both** rows, and is asserted as one in each row's own block.
-const ISSUES_LISTING_COMMAND = 'gh api repos/joshuafolkken/kit/issues --jq length'
-const ISSUE_LIST_COMMAND = 'gh issue list --state open --limit 100'
-// Test titles shared by the two rows' blocks, so a row cannot pass under a title the other does not
-// use.
-const LEAVES_ALONE = 'leaves %j alone'
+// A test title shared by the delivery blocks' reason-marker assertions, so a row cannot pass under a
+// title another does not use.
 const CARRIES_MARKER = 'carries %j'
 const PIPED_VERIFICATION = 'piped-verification'
 // The shape joshuafolkken/kit#1556 was filed on: a gate whose failure the pipeline reports as a
 // success. Reused wherever a case needs the third row's trigger to match.
 const PIPED_GATE_COMMAND = 'pnpm josh gate 2>&1 | tail -40'
 const ONCE_PER_RUN = 'delivers once per run rather than once per call'
-// The shortest command that really files an Issue, reused wherever a case needs the trigger to match
-// so that no case can pass on a spelling the others do not use.
-const FILING_COMMAND = 'gh issue create --title "x"'
-// The `gh api` spelling of the same filing, used both as a trigger case and as a collision case.
-const FILING_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues -f title="x" -f body="y"'
 const RUN_TAIL = 'run-tail'
 // The commit-push-PR step as a run issues it, reused wherever a case needs the sixth row's trigger to
 // match so that no case can pass on a spelling the others do not use.
@@ -116,12 +113,15 @@ const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PR
 // the disabled list recognizes, so the guard reads as on exactly as it does on a fresh machine.
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
+	process.chdir(WORK_DIRECTORY)
 })
 
 // **Every id, not just the first.** A stamp left behind silences the next case exactly as it
 // silences the next call, so the cleanup is driven off the enumeration rather than off a literal —
 // a row added without a matching line here would leak its records into the following run.
 afterAll(() => {
+	process.chdir(ENTRY_DIRECTORY)
+
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		for (const rule of delivered_rules.DELIVERED_RULES) {
 			rmSync(delivered_rules.delivery_path(rule.id, transcript), { force: true })
@@ -133,79 +133,16 @@ afterAll(() => {
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
-// The trigger, judged from the command alone. Both spellings a run reaches for file an Issue; the two
-// below them read the same endpoint without creating anything.
-describe('is_issue_filing', () => {
-	it.each([
-		'gh issue create --title "x" --body "y"',
-		'gh issue create --repo joshuafolkken/kit -t x',
-		FILING_API_COMMAND,
-		'gh api repos/{owner}/{repo}/issues -f \'labels[]=epic\' -f title="x"',
-	])('reads %j as a filing', (command) => {
-		expect(delivered_rules.is_issue_filing(command)).toBe(true)
-	})
-
-	// **A comment endpoint is the case that decides whether this hook is worth having.** Comments are
-	// far more frequent than filings, and a guard that refused them would fire on the wrong turns —
-	// which `CLAUDE.md` treats as worse than no hook at all.
-	it.each([
-		'gh api repos/joshuafolkken/kit/issues/1524/comments --field body=@/tmp/body.md',
-		COMMENTED_READ_COMMAND,
-		ISSUES_LISTING_COMMAND,
-		ISSUE_LIST_COMMAND,
-		'gh pr create --title "x"',
-	])(LEAVES_ALONE, (command) => {
-		expect(delivered_rules.is_issue_filing(command)).toBe(false)
-	})
-})
-
-// The second row's trigger, judged from the command alone. **The read that already carries the
-// comments is the case that decides whether this row is worth having**: firing on it would refuse
-// the very call the rule asks for, and the run would have no move left that satisfies the guard.
-describe('is_body_only_issue_read', () => {
-	it.each([
-		BODY_READ_COMMAND,
-		'gh issue view 1319 --repo joshuafolkken/kit',
-		'gh issue view https://github.com/joshuafolkken/kit/issues/1319',
-		'gh issue view 1319 --json title,body',
-		BODY_READ_API_COMMAND,
-		'gh api repos/{owner}/{repo}/issues/1319 --jq .body',
-		'gh api -X GET repos/joshuafolkken/kit/issues/1319',
-		// A `-c` belonging to another command, and a trailing pipe, used to silence the rule for the
-		// whole line. **`gh issue view <N> -c` is refused too, and that is the deliberate side of the
-		// trade**: `-c` is `wc`'s and `grep`'s far more often than `gh`'s, and a run that used the
-		// short flag pays one round trip while every compound line stays guarded.
-		'gh issue view 1319 --json body --jq .body | wc -c',
-		'gh issue view 1319 && grep -c foo x.ts',
-		'gh issue view 1319 -c',
-		// Batching puts the read second as often as first, so a segment is judged wherever it sits.
-		'pnpm josh gate && gh issue view 1319',
-		// Another command's `--json comments` says nothing about whether *this* Issue was read whole.
-		'gh pr view 42 --json comments && gh issue view 1319',
-	])('reads %j as a body-only read', (command) => {
-		expect(delivered_rules.is_body_only_issue_read(command)).toBe(true)
-	})
-
-	it.each([
-		COMMENTED_READ_COMMAND,
-		'gh issue view 1319 --json title,body,comments',
-		`gh issue view 1319 && ${COMMENTED_READ_COMMAND}`,
-		'gh api repos/joshuafolkken/kit/issues/1319/comments',
-		ISSUES_LISTING_COMMAND,
-		ISSUE_LIST_COMMAND,
-		FILING_COMMAND,
-		'gh pr view 1543',
-		// **The writes `kickoff` runs against the very same path.** Refusing one would spend the
-		// once-per-run delivery on a write and leave the genuine body read unguarded.
-		'gh api -X PATCH repos/joshuafolkken/kit/issues/1319 -f title="x"',
-		'gh api --method PATCH repos/joshuafolkken/kit/issues/1319 --input /tmp/body.json',
-		'gh api repos/joshuafolkken/kit/issues/1319 -f body="plan"',
-		// A read quoted inside a write is not a read.
-		'gh issue comment 1319 -b "reissue it as gh issue view 1319"',
-		// The body and the comments fetched on one line — the shape batching asks for.
-		'gh issue view 1319 && gh api repos/joshuafolkken/kit/issues/1319/comments',
-	])(LEAVES_ALONE, (command) => {
-		expect(delivered_rules.is_body_only_issue_read(command)).toBe(false)
+describe('cwd isolation', () => {
+	// **The suite pins its own working directory** (joshuafolkken/kit#1884). Removing the beforeEach
+	// chdir leaves cwd at wherever vitest was launched, so this fails everywhere; launched from a lane
+	// worktree it would additionally read as a lane and fire the pre-gate-cut refusal on every gate
+	// case below.
+	it('runs the silence assertions from the non-lane work directory', () => {
+		// realpathSync so the assertion holds on macOS, where process.cwd() resolves the /tmp symlink
+		// to /private/tmp while WORK_DIRECTORY keeps the tmpdir() spelling.
+		expect(process.cwd()).toBe(realpathSync(WORK_DIRECTORY))
+		expect(lane_paths.lane_issue_of(process.cwd())).toBeUndefined()
 	})
 })
 
