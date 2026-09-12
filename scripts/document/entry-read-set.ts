@@ -22,18 +22,23 @@ const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
 const ONE_LINE = 1
 
-// **Three documents left the entry read because their first use is a named command, not the entry**
-// (joshuafolkken/kit#1797). `latest-gate.md` is read when `pnpm josh latest:scope` answers
-// `required`, `eval-gate.md` when `pnpm josh eval:scope` does, and `followup.md` in the turn that
-// issues `pnpm josh followup`. **They are not deferred and not summarized** — each is fetched whole,
-// in the same turn, by the step that has to obey it; what changed is only that a run which never
-// reaches the step never pays for it. Measured on `fullrun #1783`, `eval:scope` answered `skip` and
-// `eval-gate.md` was a total loss, while `followup.md` rode 55 requests before its first use.
-// `SKILL.md` → §1, "Three documents are read at the point of use", is the single source.
+// **Four documents leave the entry read because their first use is a named command, not the entry**
+// (joshuafolkken/kit#1797, joshuafolkken/kit#1856). `latest-gate.md` is read when
+// `pnpm josh latest:scope` answers `required`, `eval-gate.md` when `pnpm josh eval:scope` does,
+// `followup.md` in the turn that issues `pnpm josh followup`, and `chain-rule.md` before the
+// `/code-review` step it governs. **They are not deferred and not summarized** — each is fetched
+// whole, in the same turn, by the step that has to obey it; what changed is only that a run which
+// never reaches the step never pays for it. Measured on `fullrun #1783`, `eval:scope` answered
+// `skip` and `eval-gate.md` was a total loss, while `followup.md` rode 55 requests before its first
+// use. **`chain-rule.md` is joshuafolkken/kit#1856's addition**: it governs the `/code-review` →
+// `followup` chain, which in `fullrun` / `queue` / `epicrun` / `backlogrun` runs *after* the first
+// edit, so its 7,396 tokens were resident from the entry for no run that had yet reached a review.
+// `SKILL.md` → §1, "Four documents are read at the point of use", is the single source.
 const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'latest-gate.md',
 	'eval-gate.md',
 	'followup.md',
+	'chain-rule.md',
 ])
 
 // **The fetch cap is read from the settings file rather than restated here.** Every document in the

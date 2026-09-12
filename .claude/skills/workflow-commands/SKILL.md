@@ -57,16 +57,19 @@ loosening that comparison would give up joshuafolkken/kit#1722's single-writer g
 ## 1. Which file to read
 
 Read this file, then the one for the command that was typed. `fullrun`, `queue`, `epicrun` and
-`backlogrun` also need `chain-rule.md`; `halfrun` does not, because it stops before the commit.
+`backlogrun` also obey `chain-rule.md`, but at a point of use rather than at the entry: it governs
+the `/code-review` → `followup` chain, which runs *after* the first edit, so it is read then and not
+here (see "Four documents are read at the point of use" below). `halfrun` and `kickoff` never reach
+it — `halfrun` stops before the commit, and `kickoff` never implements.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
 | `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md` + `split-assessment.md`        |
-| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md` + `chain-rule.md` |
+| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md`        |
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
-| `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md` + `chain-rule.md` |
-| `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` |
-| `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` |
+| `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md`                   |
+| `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` |
+| `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` |
 
 ### The fetch is one `Read` call per file
 
@@ -86,17 +89,19 @@ cannot truncate, never a judgement about whether enough of it came back.
 `pnpm josh read:set [<keyword>]` prints the cap, marks every file that exceeds it, and states this
 instruction beneath the report, so the rule arrives with the figures rather than only here.
 
-### Three documents are read at the point of use, not at the entry
+### Four documents are read at the point of use, not at the entry
 
-**`followup.md`, `eval-gate.md` and `latest-gate.md` are not entry reads** (joshuafolkken/kit#1797).
-Each is fetched **in full, in the same turn, by the step that has to obey it** — and that step is a
-named command, so there is no judgement about when:
+**`followup.md`, `eval-gate.md`, `latest-gate.md` and `chain-rule.md` are not entry reads**
+(joshuafolkken/kit#1797, joshuafolkken/kit#1856). Each is fetched **in full, in the same turn, by
+the step that has to obey it** — and that step is a named command, so there is no judgement about
+when:
 
 | Document         | Read it when                                                                   |
 | ---------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md` | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
 | `eval-gate.md`   | `pnpm josh eval:scope` answers `required` — before `pnpm josh eval` runs        |
 | `followup.md`    | Before issuing `pnpm josh followup`, in that same turn                          |
+| `chain-rule.md`  | Before running the `/code-review` step (`fullrun` / `queue` / `epicrun` / `backlogrun`) |
 
 **This is "read it at the point of use", not "read it later", and the difference is what makes it
 safe.** joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each measured a rule demoted to "read it
@@ -104,11 +109,18 @@ later" firing exactly never; nothing here is demoted, deferred past its own call
 the fetch is whole and it happens before the command it governs. What changes is only that a run
 which never reaches the step never pays for it: measured on `fullrun #1783`, `pnpm josh eval:scope`
 answered `skip` and `eval-gate.md`'s 6,420 tokens were a total loss, while `followup.md`'s 10,326
-rode 55 requests before their first use.
+rode 55 requests before their first use. **`chain-rule.md` is that same waste seen from the entry
+(joshuafolkken/kit#1856)**: its 7,396 tokens rode every request from the entry of a `fullrun` /
+`queue` / `epicrun` / `backlogrun`, though the `/code-review` → `followup` chain it governs does not
+bind until after the first edit — so at the moment this measurement is taken, the first edit, the
+run carried it for nothing.
 
-**A `skip` answer is the whole answer, and it reads nothing.** The trigger sentence for each of the
-three is resident in §2 and in the command's own file, so a run that never opens these documents
-still calls the right command at the right moment.
+**A `skip` answer is the whole answer, and it reads nothing** — that arm is `latest-gate.md` and
+`eval-gate.md`, whose `:scope` command can say the step is not due. `followup.md` and `chain-rule.md`
+have no such skip: their step always comes for an implementing run, so they are read when it arrives
+rather than conditionally. Either way **the trigger sentence for each of the four is resident in §2
+and in the command's own file**, so a run that never opens these documents still calls the right
+command at the right moment.
 
 ### A section reference is read as a section
 
@@ -152,6 +164,11 @@ left this file for a document of their own — §2i's procedure to `observation-
 documents left the table above for the command that has to obey them. **Not one sentence was deleted
 or summarized, and not one assertion was dropped**: each marker suite was re-pointed at the file its
 sentence now lives in, which is the same requirement §3 puts on any rule that is trimmed.
+**joshuafolkken/kit#1856 moved a fourth, `chain-rule.md`**, on the same ground: it governs the
+`/code-review` → `followup` chain, which does not bind until after the first edit, so it left the
+table above for the point-of-use list. Nothing in `chain-rule.md` itself changed — it is read whole
+at `/code-review` exactly as before — only the turn it is read on, so no sentence moved with it and
+no assertion was lost.
 
 **`backlogrun` reads `epicrun.md` too, and that is the point rather than an omission.** It changes
 only which issues are offered and by what authorization; every procedure for *running* one of them —
@@ -166,7 +183,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   trigger is elapsed time since the last update in this checkout, never a judgement, and the
   `dependency-update` skill is loaded afterwards exactly as before whenever the update actually ran.
   `latest-gate.md` is the single source, **read in full in the turn `latest:scope` answers
-  `required` and not before** (§1, "Three documents are read at the point of use"); `kickoff` never
+  `required` and not before** (§1, "Four documents are read at the point of use"); `kickoff` never
   reaches it, because it never implements.
 - **The verification gate**, in this order: refactor per `prompts/refactoring.md` → **`pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) is *started* when the review starts, and *joined* before the commit** — the same treatment `josh eval` already gets below, and for the same reason: neither the gate nor the review writes to the working tree, so paying for them one after the other is pure waiting (joshuafolkken/kit#1242, measured at 187 seconds of a 1623-second run) → a subagent running `/code-review` with the brief `pnpm josh review:brief` prints
   (the level, what the gate has already proved **or is still proving** on this exact tree, and the target)
@@ -178,7 +195,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   (`prompts/review.md` → "Review round cap" and "The second round is a verification pass, not a second
   full review") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
   answers `required` (`eval-gate.md`, **read in full in that same turn and not at the entry** — §1,
-  "Three documents are read at the point of use"). `kickoff` is the exception —
+  "Four documents are read at the point of use"). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
   **Whether that second round is due at all is `pnpm josh review:round2 --round-1-closed`'s answer,
   never a judgement** (joshuafolkken/kit#1433): `skip` on the two arms it names — round 1 wrote no fix

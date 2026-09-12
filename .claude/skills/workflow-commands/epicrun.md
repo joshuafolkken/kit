@@ -1,10 +1,11 @@
 # `epicrun` — Unattended execution of an epic's children
 
 `epicrun #<E>` runs an epic to completion without a person watching it, and `epicrun #<E1> #<E2> …`
-runs several of them through one lane pool ("Several epics in one run" below). Read `fullrun.md` and
-`chain-rule.md` as well — each child is a `fullrun` — and read this file for what running many of
-them unattended changes. **`followup.md` is not an entry read**: it is fetched in full in the turn
-that issues `pnpm josh followup`, per `SKILL.md` → §1, "Three documents are read at the point of
+runs several of them through one lane pool ("Several epics in one run" below). Read `fullrun.md` as
+well — each child is a `fullrun` — and read this file for what running many of them unattended
+changes. **`chain-rule.md` and `followup.md` are not entry reads**: each is fetched in full in the
+turn that reaches it — `chain-rule.md` before the `/code-review` step, `followup.md` in the turn
+that issues `pnpm josh followup` — per `SKILL.md` → §1, "Four documents are read at the point of
 use".
 
 **What it changes about `queue` is the blast radius of a stop.** `queue` makes each issue's explicit

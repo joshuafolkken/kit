@@ -48,7 +48,7 @@ const FETCH_MARKERS: ReadonlyArray<string> = [
 ]
 
 const POINT_OF_USE_MARKERS: ReadonlyArray<string> = [
-	'### Three documents are read at the point of use, not at the entry',
+	'### Four documents are read at the point of use, not at the entry',
 	'Each is fetched **in full, in the same turn, by the step that has to obey it**',
 	// The half that separates this from a demotion, kept verbatim because it is the half a reword loses.
 	'This is "read it at the point of use", not "read it later", and the difference is what makes it safe',
@@ -59,6 +59,8 @@ const POINT_OF_USE_TRIGGERS: ReadonlyArray<[string, string]> = [
 	['latest-gate.md', '`pnpm josh latest:scope` answers `required`'],
 	['eval-gate.md', '`pnpm josh eval:scope` answers `required`'],
 	['followup.md', 'Before issuing `pnpm josh followup`'],
+	// joshuafolkken/kit#1856: governed by a named step — `/code-review` — not a `:scope` command.
+	['chain-rule.md', 'Before running the `/code-review` step'],
 ]
 
 // **The subsection table's rows parse as entry rows, and one edit is all it takes.** Its first column
@@ -139,7 +141,7 @@ describe(`${SKILL} names the documents read at the point of use`, () => {
 		expect(skill_text()).toContain(trigger)
 	})
 
-	it('leaves all three out of the read set of every entry point', () => {
+	it('leaves every point-of-use document out of the read set of every entry point', () => {
 		const root = process.cwd()
 
 		for (const entry of entry_read_set.entries(root)) {
