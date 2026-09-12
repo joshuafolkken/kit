@@ -1,5 +1,6 @@
 import { git_epic_close } from './git-epic-close'
 import { git_followup_cleanup } from './git-followup-cleanup'
+import { git_followup_flush } from './git-followup-flush'
 import { git_followup_label } from './git-followup-label'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
@@ -203,6 +204,9 @@ async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {
 	}
 
 	await run_tail_steps(input)
+	// After the merge tail and before the hold is released (`git-followup-finish.ts`): the ledger
+	// flush switches branches, so it must land while this run still holds the tree (kit#1810).
+	await git_followup_flush.flush_ledger_step(input.should_merge)
 
 	lap(log, STAGE.completion_and_epic_close)
 }

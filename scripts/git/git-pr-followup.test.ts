@@ -74,6 +74,12 @@ vi.mock('./telegram-notify', () => ({
 // joshuafolkken/kit#1515 extended the shim to `git`, so this mock going missing now fails the whole
 // suite rather than costing it four seconds a test. Nothing here asserts on the
 // line — `git-followup-pending.test.ts` covers it, passing `tip` so it fetches nothing.
+// The post-merge tail reaches the observation-ledger flush (joshuafolkken/kit#1810); its behavior is
+// `git-followup-flush.test.ts`, so it is a no-op here.
+vi.mock('./git-followup-flush', () => ({
+	git_followup_flush: { flush_ledger_step: vi.fn() },
+}))
+
 vi.mock('./git-followup-pending', () => ({
 	git_followup_pending: {
 		MERGE_PENDING_NOTE: '',

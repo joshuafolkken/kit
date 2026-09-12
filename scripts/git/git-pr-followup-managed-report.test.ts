@@ -60,6 +60,12 @@ vi.mock('./git-epic-close', () => ({
 	git_epic_close: { close_completed_epics: vi.fn() },
 }))
 
+// This suite drives the whole `run()`, which now reaches the observation-ledger flush in the
+// post-merge tail (joshuafolkken/kit#1810); its own behavior is `git-followup-flush.test.ts`.
+vi.mock('./git-followup-flush', () => ({
+	git_followup_flush: { flush_ledger_step: vi.fn() },
+}))
+
 // The real one resolves the tip with `git fetch origin main`, which the network guard refuses and
 // which nothing here asserts on.
 vi.mock('./git-followup-pending', () => ({
