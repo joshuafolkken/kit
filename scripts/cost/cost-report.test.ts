@@ -289,3 +289,54 @@ describe('cost_report.build_report cap simulation', () => {
 		expect(cost_report.format_report(capped(two, 500_000))).toContain('Cap simulation')
 	})
 })
+
+function with_curve_sessions(
+	records: ReadonlyArray<UsageRecord>,
+	curve_sessions: ReadonlyArray<ReadonlyArray<UsageRecord>>,
+): CostReport {
+	return cost_report.build_report({
+		scope: ISSUE_SCOPE,
+		records,
+		missing: NO_MISSING,
+		resident_billed_tokens: 0,
+		curve_sessions,
+	})
+}
+
+describe('cost_report.build_report cost curve — session aware', () => {
+	it('builds the curve from a single grouped main-line session', () => {
+		const report = with_curve_sessions(climbing(), [climbing()])
+
+		expect(report.curve?.measured).toBe(true)
+		expect(report.curve?.last_context_tokens).toBe(800_000)
+	})
+
+	// Regression (joshuafolkken/kit#1853): more than one main-line session in scope cannot be read as
+	// one run, so the curve is withheld rather than mixed into a broken quartile split.
+	it('withholds the curve when the caller groups more than one main-line session', () => {
+		const records = climbing()
+		const report = with_curve_sessions(records, [records.slice(0, 4), records.slice(4)])
+
+		expect(report.curve?.measured).toBe(false)
+		expect(report.curve?.session_count).toBe(2)
+	})
+})
+
+describe('cost_report.build_report outliers', () => {
+	it('carries the largest requests by cache write, largest first', () => {
+		const records = [
+			record('small', { cache_write_1h_tokens: 100 }),
+			record('big', { cache_write_1h_tokens: 900 }),
+		]
+
+		expect(report_of(records).outliers?.requests[0]?.cache_creation_tokens).toBe(900)
+	})
+
+	it('omits outliers for an empty scope', () => {
+		expect(report_of([], ISSUE_SCOPE).outliers).toBeUndefined()
+	})
+
+	it('renders the largest requests in the text report', () => {
+		expect(formatted([record('a', { cache_write_1h_tokens: 500 })])).toContain('Largest requests')
+	})
+})

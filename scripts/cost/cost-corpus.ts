@@ -47,6 +47,11 @@ interface AttributedRecord {
 	// a warm mid-session request rather than a preamble — reading it as one reported an issue as
 	// 86.5% resident against a real session's 27.7%.
 	baseline_tokens: number
+	// The session this record was read from, and whether that session is a delegated unit. The cost
+	// curve is built from the non-delegated (main-line) sessions' records alone, so it needs both to
+	// group an issue's records back by session and drop the units (joshuafolkken/kit#1853).
+	session_id: string
+	is_delegated: boolean
 }
 
 interface SessionMeta {
@@ -106,12 +111,18 @@ function owner_sets(
 // by its own records; only a sub-step that never commits — a review, a survey — carries `main`
 // throughout and falls to the inherited issue. `inherited` is `UNATTRIBUTED_KEY` for a non-delegated
 // session, which makes the substitution a no-op and leaves its branch-driven grouping exactly as before.
-function pairs_with_inherited(session: SessionUsage, inherited: number): Array<AttributedRecord> {
+function pairs_with_inherited(
+	session: SessionUsage,
+	inherited: number,
+	is_delegated: boolean,
+): Array<AttributedRecord> {
 	return cost_attribute.group_by_issue(session.records).flatMap((group) =>
 		group.records.map((record) => ({
 			record,
 			issue: group.issue === cost_attribute.UNATTRIBUTED_KEY ? inherited : group.issue,
 			baseline_tokens: session.baseline_tokens,
+			session_id: session.session_id,
+			is_delegated,
 		})),
 	)
 }
@@ -148,7 +159,7 @@ function pairs_of_session(
 	const is_delegated = meta.get(session.session_id)?.is_delegated === true
 	const candidates = parent_issues(session, meta, owners)
 	const inherited = is_delegated ? sole_of(candidates) : cost_attribute.UNATTRIBUTED_KEY
-	const pairs = pairs_with_inherited(session, inherited)
+	const pairs = pairs_with_inherited(session, inherited, is_delegated)
 	const has_unattributed = pairs.some((pair) => pair.issue === cost_attribute.UNATTRIBUTED_KEY)
 
 	if (!is_delegated || !has_unattributed) return { pairs }
@@ -226,6 +237,23 @@ function attributed(corpus: Corpus): Array<AttributedRecord> {
 	return dedupe_across_sessions(attribute_corpus(corpus).pairs)
 }
 
+// The in-scope records of each non-delegated (main-line) session, grouped and kept in the order they
+// were read. The curve is built from these: a delegated unit starts from low context, so mixing its
+// records into the positional quartiles breaks the growth curve a hand-off decision reads
+// (joshuafolkken/kit#1853). A single-issue run on one session yields one group; a run resumed in a
+// second session yields two, which the curve then withholds rather than mixing.
+function mainline_records(pairs: ReadonlyArray<AttributedRecord>): Array<Array<UsageRecord>> {
+	const groups = new Map<string, Array<UsageRecord>>()
+
+	for (const pair of pairs) {
+		if (pair.is_delegated) continue
+
+		groups.set(pair.session_id, [...(groups.get(pair.session_id) ?? []), pair.record])
+	}
+
+	return [...groups.values()]
+}
+
 const cost_corpus = {
 	accumulate_missing,
 	load_corpus,
@@ -233,6 +261,7 @@ const cost_corpus = {
 	floor_for_issue,
 	dedupe_across_sessions,
 	attributed,
+	mainline_records,
 }
 
 export type { AttributedRecord, Corpus }

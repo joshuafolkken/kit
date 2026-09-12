@@ -13,6 +13,7 @@ import { cost_usage, type UsageRecord } from './cost-usage'
 
 const POSITION_BUCKETS = 4
 const NOT_MEASURED = 'not measured'
+const CURVE_HEADING = 'Cost curve (by request position):'
 
 interface CurveBucket {
 	label: string
@@ -26,9 +27,17 @@ interface CurveBucket {
 }
 
 interface Curve {
+	// False when the scope mixes sessions and no single main-line session could be isolated — a
+	// delegated unit starts from low context, so mixing its records into the positional quartiles
+	// breaks the growth curve a hand-off decision reads (joshuafolkken/kit#1853). Withheld rather than
+	// reported as a flat or downward curve, the same convention the buckets and the cap ratio use.
+	measured: boolean
 	buckets: Array<CurveBucket>
 	first_context_tokens: number
 	last_context_tokens: number
+	// Only on a withheld curve: how many main-line sessions the scope had (0 = none found, ≥2 =
+	// ambiguous, e.g. a run resumed in a second session).
+	session_count?: number
 }
 
 interface CapSimulation {
@@ -114,10 +123,36 @@ function endpoint(records: ReadonlyArray<UsageRecord>, index: number): number {
 
 function build_curve(records: ReadonlyArray<UsageRecord>): Curve {
 	return {
+		measured: true,
 		buckets: partition(records).map((bucket, index) => to_bucket(bucket, index)),
 		first_context_tokens: endpoint(records, 0),
 		last_context_tokens: endpoint(records, records.length - 1),
 	}
+}
+
+// A withheld curve: the scope had no single main-line session to read the growth from. `session_count`
+// says why — 0 that none was in scope, ≥2 that several were and the run could not be isolated.
+function mixed_curve(session_count: number): Curve {
+	return {
+		measured: false,
+		buckets: [],
+		first_context_tokens: 0,
+		last_context_tokens: 0,
+		session_count,
+	}
+}
+
+// The curve is built from the main-line session's records alone. The caller passes the in-scope
+// records of each non-delegated session grouped by session: exactly one non-empty group builds the
+// positional curve, and zero or several withhold it. A single-session scope is one group and behaves
+// exactly as before (joshuafolkken/kit#1853).
+function curve_for_sessions(sessions: ReadonlyArray<ReadonlyArray<UsageRecord>>): Curve {
+	const non_empty = sessions.filter((session) => session.length > 0)
+	const [only] = non_empty
+
+	if (only !== undefined && non_empty.length === 1) return build_curve(only)
+
+	return mixed_curve(non_empty.length)
 }
 
 function optional_ratio(within: number, total: number): { cost_ratio?: number } {
@@ -157,10 +192,20 @@ function bucket_line(bucket: CurveBucket): string {
 	return `  ${bucket.label}  ${String(bucket.request_count)} req   avg context ${bucket_context_text(bucket)}   cost ${bucket_cost_text(bucket)}`
 }
 
+function mixed_reason(session_count: number | undefined): string {
+	if (session_count === undefined || session_count === 0) return 'no main-line session in scope'
+
+	return `scope spans ${String(session_count)} main-line sessions — cannot isolate the run`
+}
+
 function format_curve_lines(curve: Curve): Array<string> {
+	if (!curve.measured) {
+		return ['', CURVE_HEADING, `  ${NOT_MEASURED} — ${mixed_reason(curve.session_count)}`]
+	}
+
 	return [
 		'',
-		'Cost curve (by request position):',
+		CURVE_HEADING,
 		`  first request context ${cost_format.format_tokens(curve.first_context_tokens)} → last ${cost_format.format_tokens(curve.last_context_tokens)}`,
 		...curve.buckets.map((bucket) => bucket_line(bucket)),
 	]
@@ -180,6 +225,7 @@ const cost_curve = {
 	context_of,
 	price_of,
 	build_curve,
+	curve_for_sessions,
 	simulate_cap,
 	ratio_text,
 	format_curve_lines,
