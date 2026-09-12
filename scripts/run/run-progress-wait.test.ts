@@ -16,23 +16,36 @@ vi.mock('#scripts/gh-spawn', () => ({
 }))
 vi.mock('./run-progress-read', () => ({
 	run_progress_read: {
+		live_target: vi.fn(),
 		mark: vi.fn(),
 		read_last_report: vi.fn(),
 		read_observations: vi.fn(),
 		stamp_target: vi.fn(),
 	},
 }))
+// The liveness record is mocked to stay present, so the bound is what ends these `--wait` cases rather
+// than a `josh followup` that never ran; the record itself is exercised in `run-progress-clock.test.ts`.
+vi.mock('./run-progress-clock', () => ({
+	run_progress_clock: {
+		begin_life: vi.fn(),
+		is_life_ended: vi.fn(),
+	},
+}))
 
 const { run_progress_read } = await import('./run-progress-read')
+const { run_progress_clock } = await import('./run-progress-clock')
 const { run_progress_cli } = await import('./run-progress-cli')
 
 const mark = vi.mocked(run_progress_read.mark)
 const read_last_report = vi.mocked(run_progress_read.read_last_report)
 const read_observations = vi.mocked(run_progress_read.read_observations)
 const stamp_target = vi.mocked(run_progress_read.stamp_target)
+const live_target = vi.mocked(run_progress_read.live_target)
+const is_life_ended = vi.mocked(run_progress_clock.is_life_ended)
 
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-wait-'))
 const STAMP = path.join(TEMPORARY, 'stamp.json')
+const LIFE_STAMP = path.join(TEMPORARY, 'life.json')
 const MINUTE_MS = 60_000
 const INTERVAL_MS = 20
 const TICK_MS = 1
@@ -81,6 +94,8 @@ beforeEach(() => {
 		output.warned.push(args.join(' '))
 	})
 	stamp_target.mockResolvedValue(STAMP)
+	live_target.mockResolvedValue(LIFE_STAMP)
+	is_life_ended.mockReturnValue(false)
 	read_last_report.mockReturnValue(undefined)
 	read_observations.mockResolvedValue(OBSERVED)
 })

@@ -21,6 +21,20 @@ import { z } from 'zod'
 // spellings cannot name different files.
 
 const PROGRESS_PREFIX = 'josh-run-progress-'
+// The watcher's own liveness record, kept apart from the report clock above: that one says *when* the
+// run last reported and is written on every heartbeat, so it can never double as "should this watcher
+// still be running". This one is presence-only — the watcher writes it once when it begins, reads it
+// every tick, and ends the moment it is gone, which is how `josh followup` stops a watcher at the
+// merge instead of leaving it to wait out its whole bound (joshuafolkken/kit#1821). It reuses the same
+// key as the report clock — the work tree's own git directory — so both name one file per run.
+//
+// **The loop that reads its own record and exits when it is gone is `run-wake-loop.ts`'s `run_loop`
+// pattern (joshuafolkken/kit#1727), and the read/write is `stamp_file`.** Neither is re-implemented
+// here: this module only names the record, exactly as it names the report clock. Unlike `run-hold`'s
+// and `run-carry`'s records it needs no expiry, because it is read only by the one watcher that wrote
+// it — never by another run deciding whether a resource is free — so a fresh watcher always overwrites
+// a stale one and there is no cross-run read to fall open.
+const LIFE_PREFIX = 'josh-run-progress-life-'
 // The lookup only ever decides whether a rule speaks, so a git call that hangs must not hold the hook
 // that is holding the user's call. A timeout answers `undefined`, which reads as "no clock here" and
 // lets the call through — the direction every other failure in this path already takes.
@@ -72,6 +86,34 @@ function stamp_target_of(git_directory: string | undefined): string {
 	return stamp_file.stamp_path(PROGRESS_PREFIX, git_directory)
 }
 
+// The liveness record's path, keyed the same way as the report clock so the watcher and `josh followup`
+// name one file per work tree. A different prefix keeps it a separate file: removing it must not
+// disturb the report clock the early-heartbeat guard reads.
+function life_target_of(git_directory: string | undefined): string {
+	return stamp_file.stamp_path(LIFE_PREFIX, git_directory)
+}
+
+// The watcher declares itself alive. `write_stamp` unlinks first, so a fresh `--wait` cleanly replaces
+// a record an earlier one left behind. The payload is presence only — nothing reads its contents; the
+// existence of the file is the whole signal.
+function begin_life(target: string): void {
+	stamp_file.write_stamp(target, { alive: true })
+}
+
+// **Gone means ended.** `read_stamp_text` answers `undefined` for an absent or unowned record, and the
+// only writer is the watcher itself, so absence means `josh followup` removed it — or nobody began
+// one. Either way the watcher stops, which is the fail-quiet direction: a watcher that kept running on
+// a missing record would be the lingering process joshuafolkken/kit#1821 exists to end.
+function is_life_ended(target: string): boolean {
+	return stamp_file.read_stamp_text(target) === undefined
+}
+
+// What `josh followup` calls at the merge seam, and what the watcher calls when its own bound ends.
+// Removing an absent record is a no-op, so it is safe on either side.
+function end_life(target: string): void {
+	stamp_file.remove_stamp(target)
+}
+
 // execa runs the binary directly with an argument array and no `shell` option, so CLI args cannot
 // break out of a shell sandbox; the git command and args are internally controlled, never untrusted
 // input. tssecurity:S8705 is a false positive here.
@@ -109,7 +151,12 @@ function read_last_report_sync(): number | undefined {
 }
 
 const run_progress_clock = {
+	LIFE_PREFIX,
 	PROGRESS_PREFIX,
+	begin_life,
+	end_life,
+	is_life_ended,
+	life_target_of,
 	mark,
 	parse_stamp,
 	read_last_report,

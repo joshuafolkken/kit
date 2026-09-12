@@ -40,12 +40,24 @@ type ObservationRead =
 const IDLE_READ: ObservationRead = { kind: 'idle' }
 const UNREADABLE_READ: ObservationRead = { kind: 'unreadable' }
 
-// The first of the two paths git prints is this work tree's own; the second is the common directory
-// every work tree shares, which is exactly what must not be the key.
-async function stamp_target(): Promise<string> {
+// The one place the record key is resolved: the first of the two paths git prints is this work tree's
+// own git directory; the second is the common directory every work tree shares, which is exactly what
+// must not be the key. Both the report clock and the liveness record key on it, so a single resolver
+// is what keeps the file the watcher writes and the file `josh followup` removes the same one.
+async function worktree_git_directory(): Promise<string | undefined> {
 	const [git_directory] = await git_command.git_directories()
 
-	return run_progress_clock.stamp_target_of(git_directory)
+	return git_directory
+}
+
+async function stamp_target(): Promise<string> {
+	return run_progress_clock.stamp_target_of(await worktree_git_directory())
+}
+
+// The watcher's liveness record, resolved through the same resolver as `stamp_target`, so the file the
+// watcher begins is the file `josh followup` removes at the merge (joshuafolkken/kit#1821).
+async function live_target(): Promise<string> {
+	return run_progress_clock.life_target_of(await worktree_git_directory())
 }
 
 function to_labels(issue: OpenIssueData): Array<string> {
@@ -120,6 +132,7 @@ async function read_observations(request: ObservationRequest): Promise<Observati
 
 const run_progress_read = {
 	PROGRESS_PREFIX,
+	live_target,
 	mark,
 	parse_stamp,
 	read_children,
