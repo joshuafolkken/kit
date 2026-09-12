@@ -30,6 +30,10 @@ const DEPENDENCY_SKILL = '.claude/skills/dependency-update'
 // `WORKFLOW_PROMPT`, which answers with the whole concatenated corpus: an assertion about where the
 // ceiling policy is argued has to fail when it is argued somewhere else.
 const RESIDENCY_TOPIC = 'prompts/collaboration-workflow/residency.md'
+// §3's body left the entry file in joshuafolkken/kit#1797: how much of a resident rule is resident
+// binds on a turn spent moving a sentence, never on one spent executing an Issue, so a workflow
+// entry no longer pays for it. The two questions that decide *whether* stay in `SKILL.md` §3.
+const RESIDENCY_SKILL = `${WORKFLOW_SKILL}/rule-residency.md`
 
 // Long enough that it says when to read the skill rather than merely naming it — the description is
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
@@ -217,15 +221,13 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 describe('the residency criterion — which rules may stay in the always-loaded documents', () => {
 	// Enumerated, because a criterion with no worked examples is re-derived differently each time, and
 	// the set has to match what the suite below asserts resident.
+	// Only the two questions that decide *whether* a rule is resident stay in the entry file: a run
+	// about to move a sentence reads them before anything else (joshuafolkken/kit#1797). The worked
+	// examples went with the rest of §3's body to `rule-residency.md`, and are asserted in the suite
+	// below — moved, not dropped.
 	it.each([
 		'## 3. What stays resident, and what is read from here',
 		'**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**',
-		'**Explicit invocation required**',
-		'**The mid-workflow stop notification**',
-		'**The `overrides` prohibition**',
-		'**The UI-verification gate**',
-		'**The three `josh epic:*` rules that bind outside those commands**',
-		'**The criterion is not advisory.**',
 	])('is documented in the workflow skill: %j', (marker) => {
 		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).toContain(marker)
 	})
@@ -246,14 +248,22 @@ describe('the residency list says what it covers', () => {
 		'`scripts/verify-ui-skill.test.ts` for the UI gate',
 		'**None of that belongs on this list**',
 		'their absence here is correct rather than an omission',
+		// The six worked examples §3 used to carry, re-pointed here with the body they moved with
+		// (joshuafolkken/kit#1797). Every one is the marker that was asserted before.
+		'**Explicit invocation required**',
+		'**The mid-workflow stop notification**',
+		'**The `overrides` prohibition**',
+		'**The UI-verification gate**',
+		'**The three `josh epic:*` rules that bind outside those commands**',
+		'**The criterion is not advisory.**',
 	])('scopes the claim in the workflow skill: %j', (marker) => {
-		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).toContain(marker)
+		expect(read_unwrapped(RESIDENCY_SKILL)).toContain(marker)
 	})
 
 	// Asserted absent, not merely replaced: the unscoped sentence beside the scoped one leaves two
 	// claims about the same list, and a reader applying the first one still grows it without end.
 	it('no longer claims the list covers every resident rule', () => {
-		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).not.toContain(
+		expect(read_unwrapped(RESIDENCY_SKILL)).not.toContain(
 			'The list is exhaustive — a rule added to the documents',
 		)
 		expect(read_unwrapped(WORKFLOW_PROMPT)).not.toContain('**この一覧は網羅的である**')
@@ -497,7 +507,7 @@ describe('the resident budget reads the same in both units', () => {
 })
 
 describe('the workflow skill defines how much of a resident rule is resident', () => {
-	const skill = read_unwrapped(`${WORKFLOW_SKILL}/SKILL.md`)
+	const skill = read_unwrapped(RESIDENCY_SKILL)
 
 	it.each([
 		'**A resident rule is written as its trigger plus a pointer.**',

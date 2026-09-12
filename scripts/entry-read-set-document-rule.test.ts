@@ -39,7 +39,11 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'this document is itself in the set it measures',
 	// The derivation, which is what keeps the enumeration from becoming a second copy of the table.
 	'The set is derived rather than transcribed',
-	'No rule moved and no document was split to buy this',
+	'The section-reference mechanism moved no rule and split no document to buy its 27%',
+	// joshuafolkken/kit#1797 did split two bodies out, so the claim above is scoped to the mechanism
+	// it was written about and the move states its own constraint — nothing deleted, nothing
+	// summarized, every assertion re-pointed rather than dropped.
+	'Not one sentence was deleted or summarized, and not one assertion was dropped',
 ]
 
 const DOC_MARKERS: ReadonlyArray<string> = [

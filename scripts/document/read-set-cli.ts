@@ -30,6 +30,11 @@ const USAGE = 'Usage: josh read:set [<entry>] [--json]'
 const WHOLE_LABEL = 'whole — every referenced file read in full'
 const SCOPED_LABEL = 'scoped — referenced sections only'
 const SECTION_LABEL = '-- sections referenced out of the set --'
+const POINT_OF_USE_LABEL = '-- read at the point of use, not at the entry --'
+const FETCH_RULE =
+	'fetch: one `Read` call per file — never `cat`, and never two files in one command.'
+const OVER_CAP_NOTE = '   Read (over the Bash cap)'
+const UNDER_CAP_NOTE = '   Read'
 
 function to_number(value: number): string {
 	return value.toLocaleString('en-US').padStart(NUMBER_WIDTH)
@@ -38,8 +43,24 @@ function to_number(value: number): string {
 // The column is sized from the longest label in this report rather than from a constant: the section
 // labels carry a file name *and* a heading, so a fixed width pushed them past it and the `tok` / `B`
 // columns stopped lining up with the file rows above (joshuafolkken/kit#1776 review round 1).
-function row(label: string, cost: { tokens: number; bytes: number }, width: number): string {
-	return `  ${label.padEnd(width)}${to_number(cost.tokens)} tok ${to_number(cost.bytes)} B`
+function row(
+	label: string,
+	cost: { tokens: number; bytes: number },
+	width: number,
+	note = '',
+): string {
+	return `  ${label.padEnd(width)}${to_number(cost.tokens)} tok ${to_number(cost.bytes)} B${note}`
+}
+
+// **The tool is printed per file rather than left to be judged, and it is `Read` on every row.** A
+// file larger than the Bash output cap cannot be delivered by `cat` at all — what comes back is a
+// middle-truncated preview, which is how one measured entry paid for the same five files twice
+// (joshuafolkken/kit#1797) — and a file under the cap is still fetched with `Read`, because the rule
+// beneath the report is one `Read` per file rather than a size judgement made row by row. Printing
+// `cat` as an option for the small rows would have the report contradict its own closing line the
+// first time anyone raised `BASH_MAX_OUTPUT_LENGTH` past the smallest document in the set.
+function fetch_note(bytes: number, cap: number): string {
+	return bytes > cap ? OVER_CAP_NOTE : UNDER_CAP_NOTE
 }
 
 function section_label(section: SectionCost): string {
@@ -58,6 +79,7 @@ function labels_of(report: ReadSetCost): Array<string> {
 	return [
 		...report.files.map((entry) => entry.file),
 		...report.sections.map((section) => section_label(section)),
+		...report.point_of_use.map((entry) => entry.file),
 		WHOLE_LABEL,
 		SCOPED_LABEL,
 	]
@@ -68,7 +90,35 @@ function label_width(report: ReadSetCost): number {
 }
 
 function file_lines(report: ReadSetCost, width: number): Array<string> {
-	return report.files.map((entry) => row(entry.file, entry.cost, width))
+	return report.files.map((entry) =>
+		row(entry.file, entry.cost, width, fetch_note(entry.cost.bytes, report.bash_output_cap)),
+	)
+}
+
+// **What left the entry read is listed, never dropped.** A report that simply stopped naming these
+// three would show a saving with nowhere for the cost to have gone; each is still fetched whole, by
+// the command whose turn reaches it (joshuafolkken/kit#1797).
+function point_of_use_lines(report: ReadSetCost, width: number): Array<string> {
+	if (report.point_of_use.length === NOTHING) return []
+
+	return [
+		`  ${POINT_OF_USE_LABEL}`,
+		...report.point_of_use.map((entry) => row(entry.file, entry.cost, width)),
+	]
+}
+
+function fetch_lines(report: ReadSetCost): Array<string> {
+	const cap = report.bash_output_cap.toLocaleString('en-US')
+
+	// **Scoped to the rows that carry the marker, not to every row.** Every row is marked `Read`, so a
+	// sentence keyed on the word `Read` would claim a `cat` truncates files that are well under the
+	// cap — the contradiction round 1 found on the row, relocated to the closing line.
+	return [
+		`  ${FETCH_RULE}`,
+		`  A Bash result is truncated past ${cap} characters, so a \`cat\` of any file marked`,
+		`  \`${OVER_CAP_NOTE.trim()}\` returns a preview rather than the file, and it is then read a second time.`,
+		'',
+	]
 }
 
 // **The per-reference rows can overlap, and the total below does not.** Two references into one file
@@ -102,7 +152,9 @@ function report_lines(report: ReadSetCost): Array<string> {
 		`entry: ${report.entry}`,
 		...file_lines(report, width),
 		...section_lines(report, width),
+		...point_of_use_lines(report, width),
 		...total_lines(report, width),
+		...fetch_lines(report),
 	]
 }
 
@@ -150,7 +202,17 @@ function main(argv: ReadonlyArray<string>): void {
 	process.exitCode = run(argv)
 }
 
-const read_set_cli = { JSON_FLAG, SCOPED_LABEL, USAGE, WHOLE_LABEL, main, run, saved_percent }
+const read_set_cli = {
+	FETCH_RULE,
+	JSON_FLAG,
+	POINT_OF_USE_LABEL,
+	SCOPED_LABEL,
+	USAGE,
+	WHOLE_LABEL,
+	main,
+	run,
+	saved_percent,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 

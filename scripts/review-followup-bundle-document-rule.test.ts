@@ -16,7 +16,9 @@ import { AI_DOCS, read_repo_file, read_unwrapped, WORKFLOW_PROMPT } from './ai-d
 
 const REVIEW_PROMPT = 'prompts/review.md'
 const SKILL_ROOT = '.claude/skills/workflow-commands'
-const ENTRY_SKILL = `${SKILL_ROOT}/SKILL.md`
+// The residency list moved out of `SKILL.md` §3 into `rule-residency.md` (joshuafolkken/kit#1797):
+// it binds when a rule is being placed or moved, which is never a turn a run reaches.
+const ENTRY_SKILL = `${SKILL_ROOT}/rule-residency.md`
 const BUNDLE_COMMAND = 'pnpm josh epic:bundle <new>'
 const BUNDLE_COMMAND_QUOTED = `\`${BUNDLE_COMMAND}\``
 // The one-line form the resident documents and the two skill files share, so a reword that drops the

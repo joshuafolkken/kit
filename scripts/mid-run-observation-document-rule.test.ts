@@ -22,6 +22,11 @@ import { COMMAND_MAP } from './josh/josh-command-map'
 // occupying the place a real finding would be read in.
 
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
+// joshuafolkken/kit#1797 moved §2i's procedure — the depth test, the ledger, the commit path, the
+// promotion on a second sighting — into a file of its own, fetched when a run finds something worth
+// filing rather than at every entry. §2i keeps the rule; the markers split the same way, so both
+// halves are still pinned and neither was dropped.
+const OBSERVATION_SKILL = '.claude/skills/workflow-commands/observation-filing.md'
 const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
 const OBSERVATION_LEDGER = 'docs/observations.md'
 const JOSH_COMMANDS_DOC = 'docs/josh-commands.md'
@@ -34,6 +39,7 @@ const LEDGER_FLUSH_COMMAND = 'observations:flush'
 // distributed skill, so a marker checked there would pass on some other file's copy — which is the
 // drift these suites exist to catch.
 const skill_text = read_unwrapped(WORKFLOW_SKILL)
+const observation_text = read_unwrapped(OBSERVATION_SKILL)
 const epicrun_text = read_unwrapped(EPICRUN_SKILL)
 const ledger_unwrapped = read_unwrapped(OBSERVATION_LEDGER)
 // The ledger's line grammar is the one thing here that whitespace carries meaning in, so it is read
@@ -332,19 +338,19 @@ describe(`${WORKFLOW_SKILL} — the ceilings that replace the confirmation`, () 
 	})
 })
 
-describe(`${WORKFLOW_SKILL} — a discretionary filing cites the product work it blocked`, () => {
+describe(`${OBSERVATION_SKILL} — a discretionary filing cites the product work it blocked`, () => {
 	it.each(DEPTH_TEST_MARKERS)('states the depth test: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 
 	it.each(DEPTH_EXCLUSION_MARKERS)('keeps the exclusions explicit: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 })
 
-describe(`${WORKFLOW_SKILL} — a delegated child returns the observation instead`, () => {
+describe(`${OBSERVATION_SKILL} — a delegated child returns the observation instead`, () => {
 	it.each(DELEGATED_CHILD_MARKERS)('withholds the route from a child: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 })
 
@@ -382,27 +388,27 @@ describe(`${EPICRUN_SKILL} — a closed issue's labels are not a finding`, () =>
 	})
 })
 
-describe(`${WORKFLOW_SKILL} — an observation with no blockage to cite is recorded, not dropped`, () => {
+describe(`${OBSERVATION_SKILL} — an observation with no blockage to cite is recorded, not dropped`, () => {
 	it.each(LEDGER_MARKERS)('states the ledger destination: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 
 	it.each(LEDGER_GRAMMAR_MARKERS)('defines the line grammar where it ships: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 
 	it.each(SECOND_SIGHTING_MARKERS)('promotes a repeat to a filing: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 
 	it.each(CHILD_LEDGER_MARKERS)('withholds the ledger from a child: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 
 	// The sample is what makes the grammar bite while the ledger is still empty: a pattern nothing is
 	// ever matched against is a pattern that can be wrong without failing.
 	it('carries a sample line that matches the grammar it documents', () => {
-		expect(skill_text).toContain(LEDGER_SAMPLE)
+		expect(observation_text).toContain(LEDGER_SAMPLE)
 		expect(LEDGER_SAMPLE).toMatch(LEDGER_LINE_PATTERN)
 	})
 })
@@ -433,9 +439,9 @@ describe(`${OBSERVATION_LEDGER} — the ledger is readable by the rule that name
 	})
 })
 
-describe(`${WORKFLOW_SKILL} — an appended line has a route to the default branch`, () => {
+describe(`${OBSERVATION_SKILL} — an appended line has a route to the default branch`, () => {
 	it.each(COMMIT_PATH_MARKERS)('states the commit path: %j', (marker) => {
-		expect(skill_text).toContain(marker)
+		expect(observation_text).toContain(marker)
 	})
 
 	// A documented command the CLI does not have is a procedure that stops at its first step, which

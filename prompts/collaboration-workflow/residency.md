@@ -76,3 +76,4 @@ no になり skill 側に本体を置くものの例:
 **引き上げは Tier C として扱う。** `scripts/workflow-skills.test.ts` で常駐予算を決めている定数——`RESIDENT_CEILING_BYTES`、`RESIDENT_HEADROOM_BYTES`、および書き戻しを検知する下限 `RE_INLINE_GUARD_HEADROOM_BYTES`——の**緩和**は、上の 3 条件を示した上でユーザーの明示指示を得てから行う。条件が揃っていること自体は、変更してよいという指示ではない。**どれか 1 つだけを名指しすると、そのとき実際に効いている限界が対象外になる** — 上限に余裕があっても下限に張り付いていれば、緩めたくなるのは下限のほうであり、そこが素通しなら禁止は形だけになる。締める向きの変更（上限を下げる、下限を上げる）はこの禁止の対象外である。
 
 - このルールは横断ドキュメント（CLAUDE.md「Shorthand Commands」）および `.claude/skills/workflow-commands/SKILL.md`「What stays resident, and what is read from here」のカノニカル参照
+- **常駐ルールを「どこまで常駐させるか」の本体は `.claude/skills/workflow-commands/rule-residency.md` にある**（joshuafolkken/kit#1797）。常駐可否を決める 2 つの問いは `SKILL.md` §3 に残り、トリガ＋ポインタの形・常駐ルールの列挙・引退経路とその 3 条件・`pnpm josh rule:value` の測定結果はそちらへ移した。**発火するのはこれらの文書を編集するターンだけで、Issue を実行するターンでは一度も読まれない**ので、ワークフローの起動読み取りから外してある

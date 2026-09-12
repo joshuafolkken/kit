@@ -1,8 +1,10 @@
 # `fullrun` — Full execution (plan → implement → PR → completion notify)
 
 This command implements, commits, opens the PR and merges it. Read `chain-rule.md` before
-running the `/code-review` step and `followup.md` before the merge — the two rules a `fullrun`
-most often breaks live there, not here.
+running the `/code-review` step, and **fetch `followup.md` in full in the turn that issues
+`pnpm josh followup`** — it is not an entry read, because its first use is some thirty minutes and
+fifty-odd requests after the entry (`SKILL.md` → §1, "Three documents are read at the point of
+use"). The two rules a `fullrun` most often breaks live in those two files, not here.
 
 
 **Claim the working tree before anything else — `pnpm josh run:hold <N>`, or bare `pnpm josh run:hold` for `fullrun new`.** It is this command's first call: ahead of the title normalization, ahead of `git switch main && git pull`, and — on the `new` path — **ahead of the `gh api … issues` call that files the Issue**, since a run stopped after the filing leaves behind the artifact it should not have created. **For a cross-repository target, resolve that repository's checkout from `pnpm josh doctor` first and claim there** — that resolution is a read and writes nothing, and a claim made in the session's own tree would guard the one tree this run never edits. On `busy` or `unknown`, send a `confirmation` Telegram carrying what the command printed on stderr and stop: file nothing, branch nothing, edit nothing. `pnpm josh followup` releases the hold on the merge, so a completed `fullrun` needs no release step; a `fullrun` that stops on a split, a prerequisite or a third-party target ends with `pnpm josh run:release <N>` — **a release names the run it belongs to** (joshuafolkken/kit#1799), and a `fullrun new` claimed before its Issue existed, so that one releases with the **bare** form however many numbers it has acquired since (`SKILL.md` → §2f, "Release what the claim recorded") — because its tree carries nothing — and a `needs-human-review` stop keeps the hold, because its tree does. `SKILL.md` → §2f is the single source.

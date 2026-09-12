@@ -17,7 +17,10 @@ import { read_repo_file } from './ai-document-fixture'
 // by reading every open Issue by eye — and two such counts a day apart took different denominators.
 // This suite pins the three halves of the repair to each other: the labels that record a depth, the
 // documented instruction to apply one at filing time, and the command that reads the share back.
-const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
+// §2i's procedure moved to its own file in joshuafolkken/kit#1797, so a run fetches it when it finds
+// something worth filing rather than at every entry. The depth labels, the provisioning commands and
+// the denominator rule all went with it; `SKILL.md` → §2i keeps the rule they carry out.
+const WORKFLOW_SKILL = '.claude/skills/workflow-commands/observation-filing.md'
 const COMMAND_DOC = 'docs/josh-commands.md'
 const LABEL_MODULE = 'scripts/git/issue-labels.ts'
 const SHARE_MODULE = 'scripts/issue/issue-depth-share.ts'
@@ -101,7 +104,8 @@ describe('the filing-time rule in SKILL.md §2i', () => {
 		'.claude/skills/workflow-commands/kickoff.md',
 		'.claude/skills/workflow-commands/fullrun.md',
 		'.claude/skills/workflow-commands/halfrun.md',
-		WORKFLOW_SKILL,
+		// §2d's prerequisite filing command, which stayed in the entry file when §2i's procedure moved.
+		'.claude/skills/workflow-commands/SKILL.md',
 		'prompts/review.md',
 		'prompts/collaboration-workflow/wip-cap.md',
 		'prompts/collaboration-workflow/upstream-interrupt.md',

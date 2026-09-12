@@ -9,7 +9,10 @@ import { COMMAND_MAP } from './josh/josh-command-map'
 // than by which sentence a marker happened to protect. Left unpinned, that criterion is itself the
 // least-defended text in the section it governs — the exact selection bias it was written to end.
 
-const SKILL = '.claude/skills/workflow-commands/SKILL.md'
+// The residency doctrine's body moved out of `SKILL.md` §3 in joshuafolkken/kit#1797 — it binds on a
+// turn spent editing these documents, never on one spent executing an Issue, so a workflow entry no
+// longer reads it. The sentences below are the ones it took with it.
+const SKILL = '.claude/skills/workflow-commands/rule-residency.md'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 const COMMANDS = 'docs/josh-commands.md'
 

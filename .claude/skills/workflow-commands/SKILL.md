@@ -56,19 +56,59 @@ loosening that comparison would give up joshuafolkken/kit#1722's single-writer g
 
 ## 1. Which file to read
 
-Read this file, then the one for the command that was typed. `fullrun` and `queue` also need
-`chain-rule.md` and `followup.md`; `halfrun` needs neither, because it stops before the commit.
-`eval-gate.md` is read from the verification gate below, by whichever command reached it, and
-`latest-gate.md` from the dependency-update step every implementing entry reaches before it.
+Read this file, then the one for the command that was typed. `fullrun`, `queue`, `epicrun` and
+`backlogrun` also need `chain-rule.md`; `halfrun` does not, because it stops before the commit.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
 | `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md` + `split-assessment.md`        |
-| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md` + `chain-rule.md` + `followup.md` |
+| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md` + `chain-rule.md` |
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
-| `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
-| `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
-| `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
+| `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md` + `chain-rule.md` |
+| `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` |
+| `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` |
+
+### The fetch is one `Read` call per file
+
+**Fetch each file above with one `Read` call of its own — never `cat`, and never two of them in one
+command** (joshuafolkken/kit#1797). The distributed `.claude/settings.json` caps a Bash result at
+`BASH_MAX_OUTPUT_LENGTH` characters, and **every document in this set is larger than that cap**, so a
+`cat` hands back a middle-truncated preview rather than the file. Measured on `fullrun #1783`, the
+entry issued two such `cat` calls, got 1,725 and 2,034 characters of preview, and then read five of
+the files again individually: two wasted requests, and about 3.7k tokens of dead preview resident for
+the rest of the run.
+
+**Reading the preview and carrying on is refused, and that is the point rather than a precaution.**
+A truncated fetch produces a run that has read its instructions only partly and cannot tell which
+part, which is the one failure this whole set exists to prevent — so the answer is a fetch that
+cannot truncate, never a judgement about whether enough of it came back.
+
+`pnpm josh read:set [<keyword>]` prints the cap, marks every file that exceeds it, and states this
+instruction beneath the report, so the rule arrives with the figures rather than only here.
+
+### Three documents are read at the point of use, not at the entry
+
+**`followup.md`, `eval-gate.md` and `latest-gate.md` are not entry reads** (joshuafolkken/kit#1797).
+Each is fetched **in full, in the same turn, by the step that has to obey it** — and that step is a
+named command, so there is no judgement about when:
+
+| Document         | Read it when                                                                   |
+| ---------------- | ------------------------------------------------------------------------------ |
+| `latest-gate.md` | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
+| `eval-gate.md`   | `pnpm josh eval:scope` answers `required` — before `pnpm josh eval` runs        |
+| `followup.md`    | Before issuing `pnpm josh followup`, in that same turn                          |
+
+**This is "read it at the point of use", not "read it later", and the difference is what makes it
+safe.** joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each measured a rule demoted to "read it
+later" firing exactly never; nothing here is demoted, deferred past its own call, or summarized —
+the fetch is whole and it happens before the command it governs. What changes is only that a run
+which never reaches the step never pays for it: measured on `fullrun #1783`, `pnpm josh eval:scope`
+answered `skip` and `eval-gate.md`'s 6,420 tokens were a total loss, while `followup.md`'s 10,326
+rode 55 requests before their first use.
+
+**A `skip` answer is the whole answer, and it reads nothing.** The trigger sentence for each of the
+three is resident in §2 and in the command's own file, so a run that never opens these documents
+still calls the right command at the right moment.
 
 ### A section reference is read as a section
 
@@ -102,8 +142,16 @@ whichever section came first.
 **The set is derived rather than transcribed.** `pnpm josh read:set` reads the table above for the
 files and the documents themselves for the references, so the enumeration cannot drift from this
 section; `scripts/document/entry-read-set.test.ts` pins the derivation and
-`scripts/entry-read-set-document-rule.test.ts` pins this rule. **No rule moved and no document was
-split to buy this** — every sentence is where it was, and every marker suite still pins it there.
+`scripts/entry-read-set-document-rule.test.ts` pins this rule. **The section-reference mechanism
+moved no rule and split no document to buy its 27%** — every sentence stayed where it was, and every
+marker suite still pinned it there.
+
+**joshuafolkken/kit#1797 did move text, and the same constraint held over the move.** Two bodies
+left this file for a document of their own — §2i's procedure to `observation-filing.md` and §3's to
+`rule-residency.md` — because neither binds until long after a command has started, and three more
+documents left the table above for the command that has to obey them. **Not one sentence was deleted
+or summarized, and not one assertion was dropped**: each marker suite was re-pointed at the file its
+sentence now lives in, which is the same requirement §3 puts on any rule that is trimmed.
 
 **`backlogrun` reads `epicrun.md` too, and that is the point rather than an omission.** It changes
 only which issues are offered and by what authorization; every procedure for *running* one of them —
@@ -117,7 +165,9 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   `pnpm josh latest:scope` before it implements and runs `josh latest` only on `required` — the
   trigger is elapsed time since the last update in this checkout, never a judgement, and the
   `dependency-update` skill is loaded afterwards exactly as before whenever the update actually ran.
-  `latest-gate.md` is the single source; `kickoff` never reaches it, because it never implements.
+  `latest-gate.md` is the single source, **read in full in the turn `latest:scope` answers
+  `required` and not before** (§1, "Three documents are read at the point of use"); `kickoff` never
+  reaches it, because it never implements.
 - **The verification gate**, in this order: refactor per `prompts/refactoring.md` → **`pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) is *started* when the review starts, and *joined* before the commit** — the same treatment `josh eval` already gets below, and for the same reason: neither the gate nor the review writes to the working tree, so paying for them one after the other is pure waiting (joshuafolkken/kit#1242, measured at 187 seconds of a 1623-second run) → `/code-review` with the brief `pnpm josh review:brief` prints
   (the level, what the gate has already proved **or is still proving** on this exact tree, and the target)
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**,
@@ -127,7 +177,8 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   this repository's documents, so a round narrowed only in prose stays as expensive as the first
   (`prompts/review.md` → "Review round cap" and "The second round is a verification pass, not a second
   full review") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
-  answers `required` (`eval-gate.md`). `kickoff` is the exception —
+  answers `required` (`eval-gate.md`, **read in full in that same turn and not at the entry** — §1,
+  "Three documents are read at the point of use"). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
   **Whether that second round is due at all is `pnpm josh review:round2 --round-1-closed`'s answer,
   never a judgement** (joshuafolkken/kit#1433): `skip` on the two arms it names — round 1 wrote no fix
@@ -1071,7 +1122,9 @@ completion *delivered* rather than something to remember to poll for.
   (`eval-gate.md`).
 - **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nearly
   every step after it reads its result — the one that does not is named below — so detaching it
-  would move the reading rather than overlap anything, and would buy an empty turn. `followup.md` →
+  would move the reading rather than overlap anything, and would buy an empty turn. **`followup.md`
+  is read in full in the turn that issues the call, and not at the entry** (§1, "Three documents are
+  read at the point of use"); `followup.md` →
   "Always run `pnpm josh followup` in the foreground" stays exactly as it is, and shell `&`
   backgrounding is a different thing again — it never works at all.
 
@@ -1179,278 +1232,18 @@ those commands' park-and-continue rule exists to avoid.
 **What stays a judgement is whether it is worth filing, not whether to ask.** An observation nobody
 would act on is not filed at all — dropping it costs nothing, and the WIP cap is what makes dropping
 the default at the margin. What this section removes is only the confirmation stop between deciding
-to file and filing. **The two subsections below take most of that judgement back out**, because left
+to file and filing. **The two mechanisms below take most of that judgement back out**, because left
 whole it resolved one way every time.
 
-### The depth test — a discretionary filing cites the product work it blocked
-
-**A run that has just spent an hour inside the workflow tooling files findings about the workflow
-tooling** (joshuafolkken/kit#1698). Measured on the `backlogrun` of 2026-09-09: 5 Issues shipped and
-15 filed, of which 13 were discretionary — and all 20 were about this package's own run
-orchestration or the tools that measure it, with not one change a consumer of the package would see.
-**A listing that measures itself has no natural stopping condition**, because every measurement
-creates something new to measure. So the condition comes from outside, and **depth is what supplies
-it — read off the subject rather than judged**:
-
-| Depth | The subject | Where it lives |
-| --- | --- | --- |
-| **0** | What a consumer of this package touches | A `josh` command's behavior, a distributed document or config, the published package |
-| **1** | The run orchestration that executes an Issue | `fullrun` / `epicrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
-| **2** | What measures a run | `diag`, `josh time`, `josh eval`, `josh cost`, `josh rule:value` |
-
-**The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed**
-(joshuafolkken/kit#1729). `depth:0`, `depth:1` and `depth:2` are the three, defined once in
-`scripts/git/issue-labels.ts` and carrying no definition of their own — **the table above is the
-single source**, and a label description that paraphrased it would be a second copy of the rule.
-**Every filing route applies one**, this route and the other three of §2d's table alike: a `new`
-entry point, a `route:tier-a` prerequisite, a `route:interrupt`, a split child and a review round
-cap's branch-2 filing all pass through a `gh api … issues` call, and the depth label goes in it
-beside whatever `route:` label that call already carries.
-
-```bash
-gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:1' -f body="<body>"
-gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue already filed
-```
-
-**Create the three once per repository**, before the first filing that applies one — REST auto-creates
-a missing label with a generated color and no description, and the three lines below are what give
-each a stable color a reader can scan a listing by. `DEPTH_LABELS` in `scripts/git/issue-labels.ts`
-is the single source of the colors and descriptions, and `scripts/issue-depth-label.test.ts` keys
-these lines to it so the two cannot drift.
-
-```bash
-gh api repos/{owner}/{repo}/labels -f name=depth:0 -f color=0e8a16 -f description="Depth 0 — what a consumer of this package touches (SKILL.md §2i)" --silent 2>/dev/null || true
-gh api repos/{owner}/{repo}/labels -f name=depth:1 -f color=fbc02d -f description="Depth 1 — the run orchestration that executes an Issue (SKILL.md §2i)" --silent 2>/dev/null || true
-gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f description="Depth 2 — what measures a run (SKILL.md §2i)" --silent 2>/dev/null || true
-```
-
-- **It is read off the subject, exactly as the table is** — so applying it is not a judgement and not
-  a person's to make, which is what separates it from `auto-ok` and `needs-human-review`. Those two
-  decide what a run may do; this one records what an Issue is about and withholds nothing.
-- **Applied at filing, not at completion.** A depth assigned when the work finishes is assigned by
-  whoever happens to close it, and the share below is a question about the *open* backlog — an Issue
-  that never carried the label was never in the numerator's reach.
-- **An Issue carrying more than one counts as the lowest depth present**, the one closest to the
-  consumer. It is a fixed tie-break rather than a preference: without one the same backlog measured
-  twice can answer twice, which is the whole defect joshuafolkken/kit#1729 was filed for.
-- **An `epic` takes no depth label**, because it has no subject of its own to read one off — its
-  children carry the subjects, and the share below excludes it from the denominator for that same
-  reason. A depth label present on an Issue the count skips is exactly the ambiguity this section
-  exists to remove.
-
-- **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
-  it stopped or delayed** — named as an Issue number or a run, never as "this would slow runs down".
-  **Cannot cite one, it is not filed**: it goes to the ledger below, and what files it later is
-  either the blockage arriving or a second sighting of the same thing. Pull rather than push — the
-  fix follows the jam or the repeat, never the lone sighting.
-- **A depth-0 observation does not take this test.** That is the product, and the two ceilings above
-  stay its only limits.
-- **`route:tier-a` and `route:interrupt` do not take it either**, at any depth: a filing the run
-  cannot proceed without is already citing its own blockage.
-
-**It governs this route only — the fourth row of §2d's table.** A review finding routed to branch 2
-of `prompts/review.md` → "Review round cap" is filed under that section's own bar — a confirmed
-defect reaching a runtime path, with a written failure scenario — and **does not take the depth
-test**: it has already cleared a bar this route has not, so gating it on a citation as well would
-drop the one kind of finding both documents agree is never dropped. **That bar is the reason, and the
-subject's depth is not** — the sentence here used to say that a defect in a `josh` command's behavior
-is depth 0 by construction, and joshuafolkken/kit#1694 and joshuafolkken/kit#1703 are both branch-2
-filings whose subject is the epic tooling, which the table above puts at depth 1
-(joshuafolkken/kit#1675).
-
-**This is not the count cap that was rejected.** A cap is rationing — past the number the finding is
-lost, and nothing about it says which findings were worth having. This changes what counts as a
-finding at all, so what it excludes is excluded for a reason a reader can check.
-
-### The depth-0 share — what is counted, and the command that counts it
-
-**joshuafolkken/kit#1698 set a measurable target and left nothing that measures it**
-(joshuafolkken/kit#1729). Its acceptance criteria named the share of open Issues at depth 0 — 3/23
-≈ 13% on 2026-09-09 — and no Issue recorded a depth, so the only way to obtain the number was to open
-every open Issue and classify it by eye. Done again on 2026-09-10 that produced 3/14 ≈ 21%, and the
-two figures **are not comparable**: they took different denominators, and neither said which.
-
-```bash
-pnpm josh depth:share          # → <depth-0>/<denominator> = <n>% ; alias: josh dsh
-pnpm josh depth:share --json   # the same figures as one JSON object
-```
-
-**The denominator is a rule, not a choice, and this is it:**
-
-- **Counted: every open Issue that does not carry `epic`.** An epic is a container for other Issues
-  rather than a deliverable of its own — counting one counts its children twice, and an epic has no
-  subject of its own to read a depth off.
-- **`route:tier-a` and `route:interrupt` are counted like anything else.** The depth test above
-  exempts them from its *citation* requirement; it never said they are not work. Excluded, a run
-  could improve the share by choosing a filing route.
-- **An Issue with no depth label is in the denominator**, and the command reports it separately as
-  `unlabelled`. Left out, the share would improve every time a filing skipped the label — the one
-  direction a measurement must never be able to move on its own.
-- **The numerator is what is left**: open, non-epic Issues carrying `depth:0`.
-
-**Two readings of the same backlog give the same number**, which is what the hand counts could not
-do: nothing in the path is sampled or judged, and `scripts/issue/issue-depth-share.test.ts` pins it.
-**A listing that hit the scan ceiling is reported as capped** rather than presented as the whole, and
-a listing that could not be read at all answers `unknown` — never a share of zero, which would be a
-measurement invented out of a failed fetch.
-
-**What the number is for is not decided here.** Changing what `backlog:next` offers on the strength
-of it, and setting a target value, are both deliberately out of scope until the current value has
-been measured the same way more than once (joshuafolkken/kit#1729 → 範囲外).
-
-### The ledger — where an observation that cannot cite a blockage goes
-
-**"Not filed" used to mean "gone", and that is what walked the depth test past itself.** The
-completion report was the only place such an observation could land, and a completion report is
-read once and then scrolls away — so the next run met the same thing as a first sighting, forever.
-joshuafolkken/kit#1726 is the worked case: its own body says the depth test would not have filed it,
-and it was filed anyway, because **discarding it was the only alternative on offer**
-(joshuafolkken/kit#1728).
-
-- **The destination is `docs/observations.md` in the repository the observation is about** — the same
-  repository the Issue would have been filed into. **The count and the append are both run in that
-  repository's checkout**, resolved the way §2c resolves any cross-repository target, and the file is
-  created on the first append where that repository has none. **The subject decides, never the
-  working directory**: an observation about this package's own orchestration, seen while a run is
-  inside a repository that consumes it, is recorded here rather than there — the append follows the
-  subject, never the working directory. **A third-party target gets no line either** — Tier C covers
-  the ledger exactly as it covers the Issue that would otherwise have been filed there.
-- **It is append-only.** A line is never edited and never deleted, because the count of lines
-  carrying one key is what says whether an observation has recurred; a second sighting is a second
-  line, not a rewrite of the first. **A merge conflict in it is resolved by keeping both sides** —
-  two lanes appending at once is the ordinary case, and a repeated key is the whole signal, so
-  dropping either side destroys exactly what the file is for.
-- **The completion report keeps its line too.** The ledger is what the next run can read; the report
-  is what this run's reader sees. Neither replaces the other.
-- **The append is not the end of it** — a line only becomes readable to anyone else once it has
-  merged, and "The commit path" below is how it gets there.
-
-**One observation is one line: five fields, each separated from the next by a vertical bar with one
-space on either side.**
-
-```
-- k:<slug> | d<n> | <YYYY-MM-DD> | <where> | <what>
-```
-
-| Field          | What it holds                                                                                                             |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `k:<slug>`     | The identity key — lowercase letters and digits, in words joined by `-`. This is what makes a repeat machine-readable      |
-| `d<n>`         | The depth of the subject — `d1`, `d2`, or whatever deeper depth the table above may one day name. **There is no `d0` line**: a depth-0 observation is filed outright and never reaches the ledger |
-| `<YYYY-MM-DD>` | The date of **this** sighting                                                                                             |
-| `<where>`      | One file path or one command — where the thing was seen                                                                   |
-| `<what>`       | The phenomenon, one sentence, carrying no vertical bar of its own                                                         |
-
-A sample, in the shape a real entry takes:
-
-```
-- k:example | d1 | 2026-09-10 | pnpm josh run:progress | The report printed a fill-in placeholder where a clock time belonged
-```
-
-**`k:example` is reserved for this sample and is never used by a real observation**, so the count
-below can be run over the whole file without the sample answering for one. **The grammar is defined
-here rather than in the ledger** because this skill is distributed to every repository that consumes
-the package and `docs/` is not — a rule that named a definition the reader never received would
-leave every consumer's ledger shaped by hand.
-
-**The identity key is the whole of the repeat test — never a similarity judgement about the prose.**
-Choose the key from the phenomenon rather than from the run, then count what the ledger already holds
-for it, in that repository's checkout rather than the working directory. **The `|| true` is not
-decoration**: `grep -c` exits non-zero on a count of zero, which is the first-sighting branch and the
-common one, so without it the step reads as a failed command wherever an exit status is being
-watched. **A missing file is not a count of zero, though** — there `grep` exits 2 and prints no
-number at all, so an empty answer means create the ledger, never that this is a first sighting.
-
-```bash
-grep -c '^- k:<slug> |' <that repository's checkout>/docs/observations.md || true
-```
-
-Free-text comparison is what the key exists to replace, so two lines that read alike under different
-keys are two observations, and a mis-keyed entry is corrected by appending a correctly-keyed line
-rather than by editing the one already written.
-
-**The depth gate is not withdrawn, and this is not a way around it.** An observation that *can* cite
-the depth-0 work it stopped is filed exactly as it was before — this route is only for the ones that
-could not, and whose sole previous destination was nothing (joshuafolkken/kit#1698's gate stands
-unchanged).
-
-### The commit path — how an appended line reaches the default branch
-
-**An append nobody commits is an append nobody can count** (joshuafolkken/kit#1756). The ledger was
-given a destination and no route out of the working tree the line was written in, and **structurally
-nobody was going to commit one**: the parent session that appends never runs `pnpm josh git`, a child
-runs it inside a lane work tree that cannot see the parent's checkout, and in the primary checkout
-`git add -u` swept the line into whatever unrelated pull request that run was opening. Measured on
-the day the ledger shipped, `docs/observations.md` had exactly one commit — the one that created
-it — and seven lines had never left a working tree. **So the repeat count below was reading a file
-that is empty on every other machine**, and every sighting was a first one, which is the state
-joshuafolkken/kit#1728 created the ledger to end.
-
-- **An ordinary run never commits the ledger, and that is enforced rather than remembered.**
-  `pnpm josh git` stages with `docs/observations.md` excluded, in the one staging step every entry
-  point goes through (`scripts/git/git-staging.ts`), so a `fullrun` in the primary checkout **cannot**
-  carry a ledger line into an Issue that has nothing to do with it. It is not a rule a run has to
-  remember at the commit — a run that had to would be the run that forgets.
-- **The parent flushes the ledger as a pull request of its own** — `pnpm josh observations:flush`. It
-  stages that one path and nothing else, commits it on a branch of its own, opens a docs-only pull
-  request, waits on the same required checks every other pull request waits on, merges it and returns
-  the checkout to the default branch. **Nothing is committed to the default branch directly**, which
-  is the constraint this route had to satisfy.
-- **Mixing the lines into a child's pull request was considered and is refused.** That is the
-  contamination the exclusion above exists to end, and adopting it would turn the defect into the
-  specification: a ledger line in an unrelated diff is a line no reviewer of that diff has a reason
-  to question.
-- **Run it in the primary checkout, once per cycle rather than once per observation.** It refuses off
-  the default branch and refuses a working tree holding anything besides the ledger, so a run in
-  progress cannot be flushed out from under, and a lane's checkout is never the one it acts on.
-- **Nothing to flush is an answer, not a failure.** With the ledger matching the commit it sits on
-  the command prints `clean` and exits 0 — most cycles append nothing, and a command that errored
-  there would be one nobody runs.
-- **The count the promotion below reads is a count of the default branch**, which is what this route
-  buys: a ledger line that merged is one every later run, every other machine and every fresh clone
-  can see, and only then can a second sighting be recognized as one.
-
-### The second sighting is what files it
-
-**A repeat is the citation.** joshuafolkken/kit#1698 asked a discretionary filing to be pulled by a
-blockage rather than pushed by a sighting; an observation recorded twice has been pulled — it came
-back on its own, which no single sighting can demonstrate. So the gate has a second way through, and
-it is counted rather than judged:
-
-- **On the count answering exactly `1`, the observation is filed**, at depth 1 or deeper, with no
-  depth-0 citation — `1` and not "1 or more", because a higher count means the Issue was already
-  opened by the sighting that answered `1`. The ledger line is appended as well, because the ledger
-  stays append-only.
-- **The Issue quotes the ledger's own dates — the first sighting's and this one's** — so the reader
-  can check the promotion against the file instead of taking the run's word for it.
-- **Both ceilings still apply**, exactly as they do above: the 10-per-run cap counts a promoted
-  filing, and the WIP cap still bites, since a promoted observation blocks nothing and is therefore
-  still discretionary.
-
-**A third and later sighting appends a line and files nothing more.** The Issue from the second one
-is already open, and `pnpm josh issue:scout` is what finds it; the extra lines are evidence for that
-Issue, not new ones.
-
-### A delegated child does not take this route
-
-**A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary
-observations are not filed by the child at all: they go back in the summary's "Observations that
-could bite later" line (`epicrun.md` → "What the summary carries, and how long it may be"), and the
-parent files what survives — under the depth test above, and inside the run's ceiling.
-
-**A delegated child does not append to the ledger either — the parent collapses the duplicates and
-appends what is left.** The ledger's whole value is that one key means one phenomenon, and a child
-holding one Issue's worth of context cannot tell its observation from the sibling lane's: eight
-children appending in parallel would write the same thing under eight keys, and every one of them
-would then read as a first sighting. The child's route is unchanged and is the only one it has —
-the summary's "Observations that could bite later" line — and the parent chooses the key, checks the
-count and writes the line.
-
-**Two reasons, and a child can solve neither for itself.** It holds one Issue's worth of context, so
-**it cannot tell its observation from the one a sibling filed twenty minutes earlier** — the 15
-filings of 2026-09-09 were collapsed to 12 within that same day, which means they were collapsible
-at the moment they were made. And **the 10-per-run ceiling for this route is the parent's to
-count**: six children counting two or three filings each never reach it, which is why it did not
-fire once on the run that filed fifteen.
+**The procedure is `observation-filing.md`, and it is read the moment you judge something worth
+filing — in full, in the same turn, before the `gh api … issues` call** (joshuafolkken/kit#1797). It
+carries the depth test and its table, the depth labels and their provisioning commands, the depth-0
+share, the ledger's five-field grammar and its commit path, the promotion on a second sighting, and
+what a delegated child does instead. **It is not "read it later"**: nothing here is summarized and
+nothing is deferred past the call it governs — what changed is only that a run which never finds an
+observation never pays for it, which is the entry cost joshuafolkken/kit#1797 measured. The four
+things above are the rule; that file is how each one is carried out, and it is the single source of
+every one of them.
 
 This section is the single source of the rule; nothing under `prompts/collaboration-workflow/`
 restates it (joshuafolkken/kit#1649).
@@ -1489,217 +1282,12 @@ routed to from `CLAUDE.md`, never restated there.
 `CLAUDE.md` is the only document this section is about. `AGENTS.md` and `GEMINI.md` hold no rules at
 all since joshuafolkken/kit#963 — they are pointers to it, so nothing can be resident in them.
 
-### The second question: how much of a resident rule is resident
+**How much of a resident rule is resident is `rule-residency.md`, and it is read when a rule is
+actually being placed, moved or retired** (joshuafolkken/kit#1797). The two questions above decide
+*whether*; that file decides *how much*, and carries the trigger-plus-pointer shape a resident rule
+takes, the enumeration of every resident rule that has an on-demand counterpart, the retirement route
+and its three tests, and the readings of `pnpm josh rule:value` that have refused every candidate so
+far. **No run reaches it** — the moment it binds is a turn spent editing these documents, never a
+turn spent executing an Issue — which is why leaving it there costs a workflow entry nothing. It is
+the single source of everything it carries.
 
-The criterion above decides **whether** a rule stays. It says nothing about **how much of it** stays,
-and for a long time nothing did — so a rule that passed arrived with its whole procedure attached,
-and `CLAUDE.md` grew back to within 585 bytes of its ceiling with the procedures already moved out
-(joshuafolkken/kit#964).
-
-**A resident rule is written as its trigger plus a pointer.** Two things and no third:
-
-1. **The trigger** — the situation that fires it, and the one instruction that must be obeyed before
-   anything else is read. Written so an agent that reads nothing further still does the safe thing:
-   stops, files, refuses, asks.
-2. **The pointer** — the topic file under `prompts/collaboration-workflow/` or the skill file that holds
-   the procedure, named exactly enough to open without searching.
-
-Everything else — the steps, the worked examples, the rationale, the failure it was written after —
-belongs at the pointer. **The test is whether the resident text still produces correct behavior on a
-turn where the pointer is never opened.** If dropping a sentence would let an agent proceed wrongly
-rather than merely proceed less well informed, that sentence is part of the trigger. If dropping it
-only costs context, it belongs at the pointer.
-
-**Trimming is moving, and deleting is the exception that has to be earned.** Before a sentence leaves
-`CLAUDE.md` it has to exist at the pointer, and the marker suite that pinned it has to be re-pointed
-there rather than dropped. A canonical section that is thinner than the resident copy is the normal
-case, not a reason to delete — the resident text is then the fuller version, and it is moved in
-before it is cut out.
-
-**A system that can only move eventually jams, so one route out exists — and it is narrow**
-(joshuafolkken/kit#1525). A rule is *retired* rather than moved only where deleting it cannot change
-what any agent does, and that has to be shown rather than argued:
-
-1. **It is a clone of text that has a declared single source**, and the source is named in the same
-   document. Where the two differ the copy is the wrong one, so nothing can correctly depend on it.
-2. **It carries no sentence that exists nowhere else** — checked against the source it duplicates,
-   not against a memory of it.
-3. **No marker suite pins it**, so no assertion is being dropped along with it.
-
-**"It looks redundant" satisfies none of the three, and a rule with a firing test, a marker, or a
-measured effect is not a candidate at all.** Every rule in these documents was written after a
-specific failure; one that changes nothing today may simply be one whose failure has not recurred
-*because it is there*. When the three do not all hold, the finding is recorded as a candidate with
-its evidence and left standing — a listed candidate costs nothing and can be taken up later, while a
-wrongly deleted rule fails silently, months later, in a run nobody is watching.
-
-**The scope of this list is every resident rule that has an on-demand counterpart** — a skill or an
-on-demand prompt carrying the procedure the resident text routes to. Those are the rules the
-criterion is *about*: each one could have moved, and stayed for a reason worth naming. Within that
-scope the list is exhaustive, and a rule with a counterpart that is resident without appearing here
-has not been checked.
-
-Counting by skill would draw the line in the wrong place — `verify-ui` is routed to as readily as
-this skill is, and one entry below routes to `prompts/review.md`, which is not a skill at all.
-
-Outside the scope the documents carry a great deal more — the naming conventions, the quality
-limits, the code-change rules, Package-First. **None of that belongs on this list**: there is no
-on-demand copy for them to have moved to, so the question the criterion asks does not arise, and
-their absence here is correct rather than an omission (joshuafolkken/kit#955).
-
-Within that scope, every rule that passes the test is resident in full, and a marker suite asserts
-each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most of them,
-`scripts/verify-ui-skill.test.ts` for the UI gate,
-`scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step, and
-`scripts/inline-edit-rule.test.ts` for the file-editing prohibition. **A trigger-delivered rule
-is pinned differently** — by what its refusal says and by the trigger firing, in
-`scripts/turn-batching-rule.test.ts`, `scripts/backlog-manufacturing-rule.test.ts` and
-`scripts/rules/delivered-rules.test.ts`, with only its one-line trigger asserted resident:
-
-- **Explicit invocation required** — it decides whether a workflow starts at all, so it binds on the
-  turn the user types the keyword, which is before anything here has been read.
-- **The mid-workflow stop notification** — most pauses that need it (an upstream-Issue interrupt, a
-  Tier C confirmation) happen on turns carrying no workflow keyword at all.
-- **The `overrides` prohibition** and **the `devEngines` prohibition** — a dependency command can be
-  run on any turn, including one that never loads `dependency-update`, and by the time the skill
-  would be read the pin has already been rewritten.
-- **The follow-up filing step after the review round cap** — filing the Issue and bundling it into an
-  epic. A pre-commit self-review runs outside any workflow as readily as inside one, and the Issue it
-  files is orphaned just the same; the step has to be readable on a turn that never typed a keyword.
-  Its full form is in `prompts/review.md` → "Review round cap" (joshuafolkken/kit#946).
-- **The rule-compliance measurement's trigger** — `pnpm josh eval:scope`, and `pnpm josh eval` when
-  it answers `required`. A change to a distributed document is reported finished on turns that typed
-  no workflow keyword at all — "fix this wording in `CLAUDE.md`" is the common one — so the trigger
-  has to be readable there. The procedure it routes to is `eval-gate.md`.
-- **The UI-verification gate** — a rendered change is not done until the screen has been looked at,
-  and the procedure for capturing it is `verify-ui`. The gate binds whenever a UI change is reported
-  finished, which is routinely a turn with no workflow keyword typed and no skill loaded.
-- **The three `josh epic:*` rules that bind outside those commands** — recording a decision removes
-  that child's `needs-decision` label, fixing what `epic:audit` finds is Tier A, and an epic in
-  another repository is referenced as `owner/repo#N`. Each fires on a turn where no `epic:*` command
-  was run: the moment an issue is filed, or a decision written. The commands' own procedures are in
-  `.claude/skills/epic-commands/`, which is where everything else about them lives.
-- **The prohibition on carrying a file's new text inside a shell command** — an edit happens on any
-  turn at all, and there is no skill that a run loads *before* editing. Placed on demand, this one
-  rule would never fire once, which reads exactly like having deleted it. The measured cost, the
-  allowed/prohibited table and the reasoning are at
-  `prompts/collaboration-workflow/file-edits.md`; what stays resident is the instruction and the
-  criterion that decides it — whether the command carries the replacement wholesale, not which tool
-  was used (joshuafolkken/kit#1150). **The same criterion binds the Edit itself**: rewriting a whole
-  file to fix the three lines a review named carries the replacement wholesale exactly as a heredoc
-  does, so the resident instruction covers it in one clause and the three cases that justify writing
-  a file whole stay at the pointer (joshuafolkken/kit#1260).
-
-**These left this list at the first question, and are delivered by a hook instead**
-(joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside it
-rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
-enumeration and the single source of what a turn where the trigger does not fire means. **The four
-described below are not the whole set** — the enumeration has grown to eight rows, of which
-`scripts/rules/delivered-rules.ts` carries six and two are their own binaries. The count that used to
-open this paragraph said `Four` and had been wrong since the fifth row landed, which is what a
-restated count does; it is gone rather than corrected, because a number kept in two places drifts
-again (joshuafolkken/kit#1525).
-
-- **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
-  `Bash`, `Edit` or `Read` call that would make a third consecutive single-call turn, and states the criterion
-  there. **`Edit` joined `Bash` in joshuafolkken/kit#1762, and `Read` in joshuafolkken/kit#1798**, because edits carry most of the recoverable
-  round trips and the guard could not reach one of them, and because a cluster holding one `Read` was breaking the wiring rather than the count.
-  It was resident through every run the topic file measures, and moved none of them, so what the
-  relocation gave up is prose that was not being obeyed
-  (`prompts/collaboration-workflow/turn-batching.md`, `scripts/turn-batching-rule.test.ts`).
-- **The backlog WIP cap** — `pnpm josh rule:guard` refuses the `Bash` call that files an Issue
-  (`gh issue create`, or a `title`-bearing POST to `…/issues`) and delivers the count, the refusal,
-  both exemptions and the three tests that decide the interrupt one — the three kept whole, because a
-  delivery saying only "an interrupt is exempt" hands the deciding back to judgement
-  (joshuafolkken/kit#1518). A comment endpoint is not a filing and is left alone
-  (`prompts/collaboration-workflow/wip-cap.md`, `scripts/backlog-manufacturing-rule.test.ts`).
-- **The Issue's comments** — `pnpm josh rule:guard` refuses the `Bash` call that reads an Issue's
-  body without them (`gh issue view <N>`, or a `GET` of a path ending `…/issues/<N>`) and hands over
-  the reissue that carries them plus the rule for a comment that contradicts the body. It is the one
-  row whose trigger `batch:guard` also considers, so it stands aside on that guard's turn and fires
-  on the reissue. §2g is the procedure and stays here, because a session that runs no hooks still
-  owes the read (`prompts/collaboration-workflow/rule-delivery.md`,
-  `scripts/rules/delivered-rules.test.ts`).
-- **The prohibition on putting a body inside shell double quotes** — `pnpm josh rule:guard` refuses
-  the `Bash` call whose inline body value carries a backtick or a `$`, the two characters this
-  harness's zsh was measured to evaluate there, and hands back the path-shaped spellings
-  (`--body-file`, `--field body=@<path>`, `--notify-message-file`). **The trigger reads the body, not
-  the flag**: every worked example in these documents passes a placeholder, which is inert, so keying
-  on the flag would refuse the turns where the rule is already kept. It is also the one row whose
-  trigger deliberately overlaps another — a filing whose body carries a backtick is `wip-cap`'s
-  first, and this one's on the reissue. A one-line trigger stays resident because a hook reaches
-  Claude Code alone (`prompts/collaboration-workflow/shell-body.md`,
-  `scripts/shell-body-rule.test.ts`, joshuafolkken/kit#1198).
-
-These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
-prerequisite discovered mid-run (§2d, with each entry's branch in
-`fullrun.md` / `halfrun.md` / `epicrun.md`), `epicrun`'s acceptance
-of an Issue that is not an epic and its park-and-continue behavior (`epicrun.md`), the whole
-verification gate and merge chain (`chain-rule.md` / `followup.md`), and the post-update verification
-procedure (`.claude/skills/dependency-update/`) that the two prohibitions above route to.
-
-The `auto-ok` pickup and its "only a person applies the label" rule (`epicrun.md`) are the borderline
-case worth naming, because a prohibition on writing usually *is* resident. It is not, and the reason
-is that `auto-ok` exists nowhere but the documents that also forbid an agent applying it: a turn that
-opens none of them is a turn on which the label is never reached, so residency would buy nothing.
-
-**The criterion is not advisory.** `scripts/workflow-skills.test.ts` caps each document at
-`RESIDENT_CEILING_BYTES` and requires headroom under it, so a procedure restated resident costs
-budget that the next genuinely-resident rule then has to take back out of existing prose.
-
-**What leaves when the budget binds is decided by measurement, not by which sentence a marker
-happened to pin** (joshuafolkken/kit#1525). The old order was the reverse: a rule edited to keep a
-byte count lost whichever neighboring sentence was not pinned by a marker, so the least-defended
-text went rather than the least-useful one, and the bias grew with every rule added
-(joshuafolkken/kit#951). `pnpm josh rule:value` replaces that with a reading — over this checkout's
-recorded sessions it reports, per trigger-delivered rule, how often the run had already kept the rule
-at the moment the trigger fired. **That window is the rule's absence**, because the hook has said
-nothing yet and only the carried text is asking; the ratio is what the carried text earns unaided.
-
-**The first reading refused the deletion it was built to justify, which is why the measurement runs
-first.** Over 220 recorded runs the WIP cap — which keeps a resident copy — was kept unaided in 55% of
-the runs that reached it, while the Issue-comments rule, which has **no** resident copy, managed
-15%. The resident text was the obvious candidate on a reading of the prose, since the refusal repeats
-it almost word for word; the number says it is doing a great deal of work and must stay.
-
-**The second reading covers every rule, and it found no candidate either** (joshuafolkken/kit#1643).
-The first reading could score only two rows, so nobody could tell whether the candidates were
-exhausted or merely unmeasured. All six now declare a compliance test, and over 225 recorded runs they
-read: `shell-body` 81%, `early-heartbeat` 67%, `wip-cap` 57%, `issue-comments` 15%,
-`piped-verification` 13%, `run-tail` 4%. **The two rules that keep a resident copy are the two at the
-top** — `shell-body` at 81% and `wip-cap` at 57% — and exactly one rule without a copy sits between
-them: `early-heartbeat`, at 67% over **18 runs**, the smallest denominator in the table by a factor of
-five. So the resident copies are earning their place, and **nothing is retired on this reading**. The
-figures move as the corpus grows, so the next run of this question re-reads them rather than quoting
-these.
-
-**The third reading added the row the table had never carried, and it changed no verdict either**
-(joshuafolkken/kit#1792). The batching guard is delivered by a binary of its own, so it sat outside
-the registry `rule:value` reads and the most-cited resident rule in the repository had no continuous
-reading at all. Over 297 recorded runs it reads **86% unaided over 276 runs, with 47 refusals** — the
-top of the table, so it too is earning its place and nothing is retired on this reading. **The row is scored on its refusal rather than on a trigger**, because whether a call would
-be refused depends on the turns behind it; `docs/josh-commands.md` → "`josh rule:value`" carries that
-and the turn-is-a-message-id correction the first reading of the row exposed.
-
-**Measuring the four needed a distinction the first reading did not have, and it is the half worth
-carrying forward.** A rule's denominator is the situation it governs, and that is the trigger only
-where the trigger is a *neutral* act — filing an Issue, reading one — which a run keeping the rule
-performs anyway. The other four fire only on the violation: a run that backgrounded every push never
-trips `run-tail`. Scored against the trigger they would all have read near zero, and near zero reads
-as "the carried text earns nothing" — **a manufactured retirement candidate, which is the one outcome
-this measurement exists to prevent**. Such a row declares `reaches` instead, the governed act in
-either spelling; `docs/josh-commands.md` → "`josh rule:value`" carries the column meanings.
-
-**The three tests then refused every remaining candidate, and that is the route working rather than
-failing.** The four resident one-liners left behind by trigger delivery all fail test 2: the
-paragraph above records why a line stays behind when the hook reaches one harness, so each carries a
-sentence that exists nowhere else. The duplicate list of delivered rules in
-`prompts/collaboration-workflow/residency.md` looked like a clean test-1 case — a stale summary
-sitting directly beneath a pointer to its own single source — and fails test 3, because
-`scripts/shell-body-rule.test.ts` and `scripts/turn-batching-rule.test.ts` each assert that a
-delivered rule is listed there. **Being pinned is what test 3 is for**: that assertion is the design
-requirement it looks like an accident of. Only the restated count above was retired. **A run that
-finds nothing retirable records the candidates with their evidence and stops there**, rather than
-lowering the bar until a deletion appears. A rule
-scoring `-` has declared no compliance test and is **unmeasured, never zero** — it is not thereby a
-candidate.
