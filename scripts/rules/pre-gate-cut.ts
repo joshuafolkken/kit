@@ -43,37 +43,31 @@ const HOLD_MODE_FLAG = /(?:^|\s)--release(?:[=\s]|$)/u
 // calls as their canonical spellings. Segment-wise for the reason every other row here is: one shell
 // line carries several commands, and a name quoted inside a body is not the command being invoked.
 //
-// **One reading of that question rather than one per name set.** Three predicates here differ only in
-// which subcommands they look for, and a second copy of the walk is the clone `CLAUDE.md` prohibits —
-// the copy nobody corrected would be the one that stops seeing an alias.
-function invokes_josh(command: string, names: ReadonlySet<string>): boolean {
+// **One reading of that question rather than one per name set.** Four predicates here differ only in
+// which subcommands they look for and which mode flag turns the call into a different one, and a
+// second copy of the walk is the clone `CLAUDE.md` prohibits — the copy nobody corrected would be the
+// one that stops seeing an alias. `mode_flag` is optional because two of the four ask about the
+// subcommand whatever mode it was invoked in.
+function invokes_josh(command: string, names: ReadonlySet<string>, mode_flag?: RegExp): boolean {
 	return shell_segments
 		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, names))
+		.some(
+			(segment) =>
+				shell_segments.is_josh_command(segment, names) && mode_flag?.test(segment) !== true,
+		)
 }
 
 function runs_the_gate(command: string): boolean {
 	return invokes_josh(command, GATE_COMMANDS)
 }
 
-function is_cut_segment(segment: string): boolean {
-	return shell_segments.is_josh_command(segment, CUT_COMMANDS)
-}
-
 function takes_the_cut(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => is_cut_segment(segment) && !CUT_MODE_FLAG.test(segment))
+	return invokes_josh(command, CUT_COMMANDS, CUT_MODE_FLAG)
 }
 
 // Whether this command claims the working tree, in either spelling and in neither release spelling.
 function claims_the_hold(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some(
-			(segment) =>
-				shell_segments.is_josh_command(segment, HOLD_COMMANDS) && !HOLD_MODE_FLAG.test(segment),
-		)
+	return invokes_josh(command, HOLD_COMMANDS, HOLD_MODE_FLAG)
 }
 
 // **One half of the occasion, never the whole of it** (joshuafolkken/kit#1867). Taken alone this
@@ -129,7 +123,7 @@ function is_uncut_gate(command: string, state: LaneCutState = current_state()): 
 // The instruction in the shape a refusal can carry: what the cut is for, what each verdict means, and
 // the reissue sentence every delivery needs. **The verdicts are spelled out rather than pointed at**,
 // because `cut` is the only one that ends the turn and a run told merely to "take the cut" would have
-// to go and read which of the other four leave it holding the run — the same reason the WIP cap's
+// to go and read which of the other five leave it holding the run — the same reason the WIP cap's
 // delivery names its three interrupt tests instead of naming the file they live in.
 const PRE_GATE_CUT_REASON =
 	'⛔ pre-gate cut: this checkout is a lane and the gate is the boundary to cut at, so take the cut ' +
