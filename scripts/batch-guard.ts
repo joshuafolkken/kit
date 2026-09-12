@@ -2,7 +2,7 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { time_batch_guard } from './time/time-batch-guard'
+import { time_batch_guard, type GuardedCall } from './time/time-batch-guard'
 
 // The disk half of the batching guard (joshuafolkken/kit#1390): find the transcript, read enough of
 // its end, remember when a call was last refused, and write the refusal Claude Code understands.
@@ -34,17 +34,36 @@ const SWITCH_ENV_KEY = 'JOSH_BATCH_GUARD'
 // **The judgement is `time-batch-guard.ts`'s, not a second one.** Whether a call is one this guard may
 // refuse and whether the run has stopped batching are both its, so a refusal here can never disagree
 // with the report the Issue's own verification step reads.
+// The transcript is read for a call the guard could act on either way: one it may refuse, or the one
+// whole-file write it may only notify about (joshuafolkken/kit#1848). The read is skipped for the rest
+// exactly as before — most of a run's calls are neither.
+function is_batch_candidate(call: GuardedCall): boolean {
+	return time_batch_guard.is_guarded_call(call) || time_batch_guard.is_notice_call(call)
+}
+
 const GUARD = hook_decision.create_transcript_guard({
 	prefix: time_batch_guard.STAMP_PREFIX,
 	switch_key: SWITCH_ENV_KEY,
-	is_candidate: time_batch_guard.is_guarded_call,
+	is_candidate: is_batch_candidate,
 	should_block: time_batch_guard.should_block,
 	reason: time_batch_guard.REASON,
+	// The whole-file write is notified rather than refused, on a record of its own so it never spends
+	// the refusal's stamp (joshuafolkken/kit#1848).
+	notify: {
+		prefix: time_batch_guard.NOTICE_STAMP_PREFIX,
+		should_notify: time_batch_guard.should_notify,
+		text: time_batch_guard.NOTICE,
+	},
 })
 
 const batch_refusal = GUARD.refusal
 const batch_outcome = GUARD.outcome
 const { is_enabled, refusal_path } = GUARD
+// The notice's stamp path, exposed the way `refusal_path` is so a test can clean it apart from the
+// refusal's record (joshuafolkken/kit#1848).
+const notice_refusal_path = hook_decision.create_refusal_stamp(
+	time_batch_guard.NOTICE_STAMP_PREFIX,
+).path
 const { deny_envelope, load_environment_file, DISABLED_VALUES } = hook_decision
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -58,6 +77,7 @@ export {
 	deny_envelope,
 	is_enabled,
 	load_environment_file,
+	notice_refusal_path,
 	refusal_path,
 	DISABLED_VALUES,
 	SWITCH_ENV_KEY,

@@ -27,6 +27,12 @@ const MISSING_TRANSCRIPT = path.join(WORK_DIRECTORY, 'absent.jsonl')
 // A path that exists but cannot be read as a file, which is a real fault (joshuafolkken/kit#1509).
 const UNREADABLE_TRANSCRIPT = path.join(WORK_DIRECTORY, 'unreadable.jsonl')
 const BLOCKED_STAMP_PREFIX = 'josh-hook-decision-blocked-'
+// The notice disposition's fixtures (joshuafolkken/kit#1848): its own transcript and two record
+// prefixes, so a notice's record is cleaned apart from the refusal's.
+const NOTICE_TEXT = 'so this write makes three in a row'
+const NOTIFY_STAMP_PREFIX = 'josh-hook-decision-notify-'
+const NOTIFY_BLOCK_PREFIX = 'josh-hook-decision-notify-block-'
+const NOTIFY_TRANSCRIPT = path.join(WORK_DIRECTORY, 'notify.jsonl')
 
 const STAMP = hook_decision.create_refusal_stamp(STAMP_PREFIX)
 
@@ -48,6 +54,10 @@ afterAll(() => {
 		force: true,
 		recursive: true,
 	})
+
+	for (const prefix of [NOTIFY_STAMP_PREFIX, NOTIFY_BLOCK_PREFIX]) {
+		rmSync(hook_decision.create_refusal_stamp(prefix).path(NOTIFY_TRANSCRIPT), { force: true })
+	}
 
 	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
@@ -210,6 +220,92 @@ describe('hook_decision.notice_envelope', () => {
 			systemMessage: REASON,
 			hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: REASON },
 		})
+	})
+})
+
+// A guard that supplies a notify spec (joshuafolkken/kit#1848): for a call it does not refuse, it can
+// emit a non-blocking notice instead, on a record of its own so a notice never spends the refusal's
+// stamp. The batching guard supplies one for the whole-file write.
+function notify_guard(will_block: boolean, will_notify: boolean): TranscriptGuard {
+	return hook_decision.create_transcript_guard({
+		prefix: NOTIFY_BLOCK_PREFIX,
+		switch_key: OTHER_SWITCH_KEY,
+		is_candidate: () => true,
+		should_block: () => will_block,
+		reason: REASON,
+		notify: {
+			prefix: NOTIFY_STAMP_PREFIX,
+			// Sensitive to the last-fired instant, like the real rule: it fires only where the notice has
+			// not fired on this sequence, so the record the shell arms is what stops the second look.
+			should_notify: (_tail, _call, notified_at_ms) =>
+				will_notify && notified_at_ms === hook_decision.NEVER_MS,
+			text: NOTICE_TEXT,
+		},
+	})
+}
+
+// Cleared before each case so one case's record never silences another's, and the switch set on so a
+// shell that left it off cannot turn the suite green on a guard that never fired.
+function clear_notify_records(): void {
+	process.env[OTHER_SWITCH_KEY] = UNSET
+	writeFileSync(NOTIFY_TRANSCRIPT, '')
+
+	for (const prefix of [NOTIFY_STAMP_PREFIX, NOTIFY_BLOCK_PREFIX]) {
+		rmSync(hook_decision.create_refusal_stamp(prefix).path(NOTIFY_TRANSCRIPT), { force: true })
+	}
+}
+
+describe('hook_decision — the optional notice disposition emits a notice', () => {
+	beforeEach(clear_notify_records)
+
+	it('returns a notice, not a reason, where the notify rule fires and the block rule does not', () => {
+		const { reason, notice } = notify_guard(false, true).outcome(
+			payload_text(NOTIFY_TRANSCRIPT),
+			NOW_MS,
+		)
+
+		expect(reason).toBeUndefined()
+		expect(notice).toBe(NOTICE_TEXT)
+	})
+
+	// The record makes it fire once — a second look at the same sequence says nothing.
+	it('notifies the same sequence only once', () => {
+		const guard = notify_guard(false, true)
+		const raw = payload_text(NOTIFY_TRANSCRIPT)
+
+		expect(guard.outcome(raw, NOW_MS).notice).toBe(NOTICE_TEXT)
+		expect(guard.outcome(raw, NOW_MS).notice).toBeUndefined()
+	})
+
+	// The block path decides first, so a call both rules would fire on is refused, not merely noticed.
+	it('prefers the refusal where both rules would fire', () => {
+		const { reason, notice } = notify_guard(true, true).outcome(
+			payload_text(NOTIFY_TRANSCRIPT),
+			NOW_MS,
+		)
+
+		expect(reason).toBe(REASON)
+		expect(notice).toBeUndefined()
+	})
+})
+
+describe('hook_decision — the notice does not disturb the refusal', () => {
+	beforeEach(clear_notify_records)
+
+	// **The notice never spends the refusal's stamp.** After a notice has armed its own record, a
+	// genuine refusal on the same transcript still fires — the two dispositions dedupe apart.
+	it('leaves the refusal free to fire after a notice has fired', () => {
+		const raw = payload_text(NOTIFY_TRANSCRIPT)
+
+		expect(notify_guard(false, true).outcome(raw, NOW_MS).notice).toBe(NOTICE_TEXT)
+		expect(notify_guard(true, false).outcome(raw, NOW_MS).reason).toBe(REASON)
+	})
+
+	// A guard that supplies no notify spec is unchanged: the notice is simply never set.
+	it('never sets a notice for a guard with no notify spec', () => {
+		expect(
+			guard_over(STAMP_PREFIX, false).outcome(payload_text(NOTIFY_TRANSCRIPT), NOW_MS).notice,
+		).toBeUndefined()
 	})
 })
 

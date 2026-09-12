@@ -20,6 +20,7 @@ const FRESH_CALL = { name: 'Read', input: { file_path: FRESH_PATH } }
 // written twice.
 const EDIT_LABEL = 'an edit'
 const SED_LABEL = 'an in-place sed'
+const FILE_READ_LABEL = 'a file read'
 const EDIT_TOOL = 'Edit'
 // Named the way this harness names it. Neither spelling of the delegation tool is in the bundleable
 // set, so the case below would read the same under `Task`.
@@ -229,7 +230,7 @@ describe('time_batch_guard.should_block — writes', () => {
 describe('time_batch_guard — what each predicate admits', () => {
 	it.each([
 		['a shell read', SHELL_READ_CALL, true, true],
-		['a file read', FRESH_CALL, true, true],
+		[FILE_READ_LABEL, FRESH_CALL, true, true],
 		['a josh command', JOSH_CALL, false, false],
 		[WRITE_LABEL, WRITE_CALL, false, false],
 		[EDIT_LABEL, EDIT_CALL, true, false],
@@ -239,6 +240,20 @@ describe('time_batch_guard — what each predicate admits', () => {
 	])('answers %s with %s as guarded and %s as read-only', (_label, call, guarded, read_only) => {
 		expect(time_batch_guard.is_guarded_call(call)).toBe(guarded)
 		expect(time_batch_guard.is_read_only_call(call)).toBe(read_only)
+	})
+})
+
+// The predicate that routes the whole-file write to a notice rather than a refusal
+// (joshuafolkken/kit#1848). It admits that one tool and nothing else — the calls `is_guarded_call`
+// already refuses stay its, so the two never overlap and no call is both refused and notified.
+describe('time_batch_guard.is_notice_call — the whole-file write alone', () => {
+	it.each([
+		[WRITE_LABEL, WRITE_CALL, true],
+		[EDIT_LABEL, EDIT_CALL, false],
+		[FILE_READ_LABEL, FRESH_CALL, false],
+		[SED_LABEL, IN_PLACE_SED_CALL, false],
+	])('answers %s with %s', (_label, call, expected) => {
+		expect(time_batch_guard.is_notice_call(call)).toBe(expected)
 	})
 })
 
@@ -290,5 +305,73 @@ describe('time_batch_guard.should_block — one refusal per sequence', () => {
 		const before_the_new_sequence = ms(3)
 
 		expect(time_batch_guard.should_block(text, FRESH_CALL, before_the_new_sequence)).toBe(true)
+	})
+})
+
+// The notice's rule mirrors should_block's, gated on the whole-file write instead of on a refusable
+// call and reading its own last-fired instant (joshuafolkken/kit#1848). A `Write` cannot be refused
+// safely, so this is the only thing the guard says about a run of single-call write turns.
+describe('time_batch_guard.should_notify — the whole-file write', () => {
+	it('notifies the write that would make a third consecutive single-call turn', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts'], WRITE_TOOL),
+			target_turn_lines(1, ['b.ts'], WRITE_TOOL),
+			open_turn_lines(2, ['c.ts'], WRITE_TOOL),
+		)
+
+		expect(time_batch_guard.should_notify(text, WRITE_CALL, NEVER_REFUSED)).toBe(true)
+	})
+
+	// Two is the ordinary pair, and the limit is three — the same threshold the refusal uses.
+	it('says nothing where the write would make only a second', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts'], WRITE_TOOL),
+			open_turn_lines(1, ['c.ts'], WRITE_TOOL),
+		)
+
+		expect(time_batch_guard.should_notify(text, WRITE_CALL, NEVER_REFUSED)).toBe(false)
+	})
+
+	// A write naming a file the run is already writing could not have gone out beside the earlier ones,
+	// so the notice is withheld — the same target veto the refusal applies.
+	it('says nothing about a write naming a file the run has already written', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts'], WRITE_TOOL),
+			target_turn_lines(1, [FRESH_PATH], WRITE_TOOL),
+			open_turn_lines(2, ['c.ts'], WRITE_TOOL),
+		)
+
+		expect(time_batch_guard.should_notify(text, WRITE_CALL, NEVER_REFUSED)).toBe(false)
+	})
+})
+
+describe('time_batch_guard.should_notify — what it will not notify', () => {
+	// A refusable call is never notified: it is refused instead, and letting both fire would speak twice
+	// about one call.
+	it.each([
+		[FILE_READ_LABEL, FRESH_CALL],
+		[EDIT_LABEL, EDIT_CALL],
+	])('says nothing about %s, which the refusal owns', (_label, call) => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts']),
+			target_turn_lines(1, ['b.ts']),
+			open_turn_lines(2, ['c.ts']),
+		)
+
+		expect(time_batch_guard.should_notify(text, call, NEVER_REFUSED)).toBe(false)
+	})
+
+	// One notice per sequence: a run of single-call turns that began before the last notice is not
+	// notified again, exactly as a refusal is not repeated.
+	it('says nothing where the sequence began before the last notice', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts'], WRITE_TOOL),
+			target_turn_lines(1, ['b.ts'], WRITE_TOOL),
+			target_turn_lines(2, ['c.ts'], WRITE_TOOL),
+			open_turn_lines(3, ['d.ts'], WRITE_TOOL),
+		)
+		const after_the_sequence_began = ms(3)
+
+		expect(time_batch_guard.should_notify(text, WRITE_CALL, after_the_sequence_began)).toBe(false)
 	})
 })
