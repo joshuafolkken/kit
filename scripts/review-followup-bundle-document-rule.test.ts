@@ -131,11 +131,11 @@ const WORKFLOW_PROMPT_PLACEMENT_MARKERS: ReadonlyArray<string> = [
 const PIPELINE_CHAINS: ReadonlyArray<readonly [string, string]> = [
 	[
 		`${SKILL_ROOT}/chain-rule.md`,
-		'`pnpm josh git -y` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup`',
+		'`pnpm josh git -y "<title> #<N>"` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup`',
 	],
 	[
 		`${SKILL_ROOT}/fullrun.md`,
-		'`pnpm josh git -y` → **the follow-up filing and `pnpm josh epic:bundle`, run here so they sit inside the CI wait** → `pnpm josh followup`',
+		'`pnpm josh git -y "<title> #<N>"` → **the follow-up filing and `pnpm josh epic:bundle`, run here so they sit inside the CI wait** → `pnpm josh followup`',
 	],
 	[
 		`${SKILL_ROOT}/queue.md`,
