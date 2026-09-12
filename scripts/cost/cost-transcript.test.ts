@@ -1,7 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { lane_paths } from '#scripts/lane/lane-paths'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cost_transcript } from './cost-transcript'
 
 const CWD = '/Users/someone/Development/kit'
@@ -388,5 +389,66 @@ describe('cost_transcript.session_cwd', () => {
 		const submodule = make_worktree(`${CWD}/.git/modules/vendor`)
 
 		expect(cost_transcript.session_cwd(submodule)).toBe(submodule)
+	})
+})
+
+// Derived from `lane_paths` so the fixture stays honest to the default-root shape the code derives.
+const LANE = lane_paths.lane_directory(lane_paths.default_lane_root(MAIN), '1832')
+
+// A fresh, empty home a from-main test writes lane transcripts into.
+function empty_home(): string {
+	return mkdtempSync(path.join(tmpdir(), 'cost-main-'))
+}
+
+// The reverse of `session_cwd`: a report run from the main checkout must also search the lane
+// checkouts filed under its lane root, or a lane run — the default execution form — reads
+// `no transcript` (joshuafolkken/kit#1832).
+describe('cost_transcript.transcript_directories from the main checkout', () => {
+	// `lane_paths.lane_root` honors `JOSH_LANE_ROOT`; a blank value pins the default derivation these
+	// fixtures assume, and `vi.unstubAllEnvs` restores whatever the machine had.
+	beforeAll(() => {
+		vi.stubEnv(lane_paths.LANE_ROOT_KEY, '')
+	})
+
+	afterAll(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('finds a lane run transcript filed under the lane root', () => {
+		const home = empty_home()
+
+		write_transcript(home, LANE, 'lane-run', usage_line('r1', 5))
+
+		const directories = cost_transcript.transcript_directories(MAIN, home)
+		const ids = cost_transcript.list_sessions_across(directories).map((file) => file.session_id)
+
+		expect(directories).toContain(cost_transcript.transcript_directory(LANE, home))
+		expect(ids).toStrictEqual(['lane-run'])
+	})
+
+	// A merged lane whose work tree `lane:close` pruned still resolves: the transcripts outlive the
+	// checkout, so the scan is of the transcript store, not of a directory that may be gone.
+	it('finds a lane whose checkout no longer exists', () => {
+		const home = empty_home()
+		const pruned = lane_paths.lane_directory(lane_paths.default_lane_root(MAIN), '1812')
+
+		write_transcript(home, pruned, 'pruned-run', usage_line('r1', 5))
+
+		expect(cost_transcript.transcript_directories(MAIN, home)).toContain(
+			cost_transcript.transcript_directory(pruned, home),
+		)
+	})
+
+	// A coincidental sibling like `.kit-lanes-backup` shares the lane-root prefix but its slug
+	// remainder is not a lane issue number, so it must not be pulled into a main checkout's search.
+	it('ignores a directory whose name only shares the lane-root prefix', () => {
+		const home = empty_home()
+		const sibling = '/Users/someone/Development/.kit-lanes-backup/1'
+
+		write_transcript(home, sibling, 'foreign', usage_line('r1', 5))
+
+		expect(cost_transcript.transcript_directories(MAIN, home)).not.toContain(
+			cost_transcript.transcript_directory(sibling, home),
+		)
 	})
 })

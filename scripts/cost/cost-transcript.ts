@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { cost_usage, type UsageRecord } from './cost-usage'
 
 // Finding and reading Claude Code's session transcripts (joshuafolkken/kit#962).
@@ -88,26 +89,75 @@ function session_cwd(cwd: string): string {
 	return segment === NOT_FOUND ? cwd : absolute.slice(0, segment)
 }
 
+// An unreadable directory yields nothing; the caller reports that as a missing transcript rather
+// than as a run that cost zero.
+function read_directory(directory: string): Array<string> {
+	try {
+		return readdirSync(directory)
+	} catch {
+		return []
+	}
+}
+
+// The lane transcript directories filed under a main checkout's lane root (joshuafolkken/kit#1832).
+//
+// **`session_cwd` resolved a lane to its main checkout, but nothing resolved a main checkout to its
+// lanes.** From the main checkout `own === rewritten`, so the search collapsed to one directory and a
+// lane run — the default execution form — went unmeasured: eleven of twenty recent merges read `no
+// transcript`, every one of them a lane run.
+//
+// **The search is of the transcript store, not of the lane checkouts.** `lane:close` prunes a merged
+// lane's work tree, so `<lane-root>/<issue>` is gone while `pnpm josh time --issue <that>` must still
+// resolve — and it can, because the transcripts outlive the checkout: the project directory
+// `~/.claude/projects/…--kit-lanes-<issue>` is present long after the tree. So this lists the project
+// store by the slug prefix every lane of this repository shares — `lane_paths.lane_root` slugged, which
+// honors `JOSH_LANE_ROOT` — rather than any directory that may no longer exist.
+//
+// **A lane's directory is its issue number**, so a lane project slug is exactly `<root-slug>-<digits>`:
+// `lane_paths.lane_directory` joins the root with the issue and the registry sorts lanes by
+// `Number(issue)`. Matching the digits rather than the bare prefix keeps out a coincidental sibling
+// such as `.kit-lanes-backup` and a slug filed under a nested cwd — both share the prefix but are not a
+// lane.
+const LANE_ISSUE_SLUG = /^\d+$/u
+
+function lane_transcript_directories(main_cwd: string, home: string): Array<string> {
+	const projects = path.join(home, TRANSCRIPT_ROOT)
+	const prefix = `${project_slug(lane_paths.lane_root(main_cwd))}-`
+
+	return read_directory(projects)
+		.filter((name) => name.startsWith(prefix) && LANE_ISSUE_SLUG.test(name.slice(prefix.length)))
+		.map((name) => path.join(projects, name))
+}
+
 // The directories a run's transcripts might be filed under, given the working directory a command ran
-// in (joshuafolkken/kit#1825). Two are legitimate, so both are searched and `list_sessions_across`
-// merges what it finds:
+// in. Three sources are legitimate, so all are searched and `list_sessions_across` merges what they
+// hold:
 //   - the cwd's own slug — where a *dispatched* lane child writes, because `lane:dispatch` launches it
 //     as a `claude -p fullrun #N` process whose working directory is the lane (joshuafolkken/kit#1749);
 //   - the session-checkout's slug — where a session that stayed in the main checkout and only prefixed
 //     its commands with the lane path writes, the case `session_cwd` was added for
-//     (joshuafolkken/kit#1617).
+//     (joshuafolkken/kit#1617);
+//   - every lane transcript directory under the main checkout's lane root — so a report run *from the
+//     main checkout* reaches the lane runs it dispatched, the reverse of the second
+//     (joshuafolkken/kit#1832).
 //
-// Deduped when the two coincide: a main checkout, a submodule, or a `.git` this cannot parse resolves
-// to itself, so the common case searches exactly one directory as before.
+// **Only a checkout that resolves to itself reads the lane root**, which is what keeps the other cases
+// unchanged: a lane already resolves to its main through `session_cwd`, so it never picks up its
+// siblings, and a submodule or non-repository cwd has a lane root nothing was ever filed under.
+//
+// Deduped, so a main checkout with no lanes, a submodule, or a `.git` this cannot parse searches
+// exactly one directory as before.
 //
 // **The caller invokes this and hands the result to the two readers**, rather than either reader
 // resolving the cwd itself. It is the single point a test redirects the walk into a temporary home,
 // and a reader that re-resolved could name a directory the report never searched.
 function transcript_directories(cwd: string, home: string = homedir()): Array<string> {
+	const session = session_cwd(cwd)
 	const own = transcript_directory(cwd, home)
-	const rewritten = transcript_directory(session_cwd(cwd), home)
+	const rewritten = transcript_directory(session, home)
+	const lanes = session === cwd ? lane_transcript_directories(cwd, home) : []
 
-	return own === rewritten ? [own] : [own, rewritten]
+	return [...new Set([own, rewritten, ...lanes])]
 }
 
 interface SessionFile {
@@ -131,16 +181,6 @@ function to_session_file(
 		return { session_id, path: full_path, modified_ms: statSync(full_path).mtimeMs, is_delegated }
 	} catch {
 		return undefined
-	}
-}
-
-// An unreadable directory yields nothing; the caller reports that as a missing transcript rather
-// than as a run that cost zero.
-function read_directory(directory: string): Array<string> {
-	try {
-		return readdirSync(directory)
-	} catch {
-		return []
 	}
 }
 
