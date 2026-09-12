@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
+import { canonical_command } from '#scripts/josh/josh-command-map'
 import { json_value } from '#scripts/json-value'
 import { time_shell } from './time-shell'
 
@@ -169,6 +170,52 @@ const MUTATION_WORDS = new Set([
 	'wget',
 ])
 
+// The read-only `pnpm josh` bookkeeping subcommands (joshuafolkken/kit#1875). Every `pnpm josh …`
+// leads with `pnpm`, which is a mutation word above so the writing josh commands — `gate`, `followup`,
+// `git` — are turned away; that same leading word turned the read-only ones away too, so the batching
+// guard never saw the bookkeeping calls the Issue measured going out one per turn, and `Bundling:`
+// never counted them recoverable. This is the read-only half, named canonically — an alias is resolved
+// to its canonical name before the test. **A missed entry under-reports, which is a floor**, exactly
+// as `READ_COMMANDS` does. **A subcommand that writes state or sends anything external is deliberately
+// absent**: `run:progress --mark` writes a marker, `notify` sends a message, `main:sync` / `epic` /
+// `run:hold` write — a wrong inclusion over-reports, which is a claim.
+const READ_JOSH_SUBCOMMANDS: ReadonlySet<string> = new Set([
+	'backlog:budget',
+	'backlog:next',
+	'cost',
+	'delegate',
+	'epic:audit',
+	'epic:bundle',
+	'epic:check',
+	'epic:next',
+	'eval:scope',
+	'issue:read',
+	'issue:scout',
+	'issue:state',
+	'lane:list',
+	'latest:scope',
+	'release:scope',
+	'review:brief',
+	'review:round2',
+	'run:liveness',
+])
+
+// The launchers that put a `josh` subcommand on the line, and the word that names it. `pnpm josh`,
+// `npx josh` and the bare `josh` name it as the word `josh`; `tsx scripts/josh/josh.ts` names it as a
+// path ending in `josh.ts`. The subcommand is the token after whichever the scan finds first.
+const JOSH_WORD = 'josh'
+const JOSH_SCRIPT_SUFFIX = 'josh.ts'
+
+// A shell operator that chains, pipes, redirects or substitutes. A `josh` read followed by one of
+// these is not the simple bookkeeping call the allow-list is about, so it falls through to the ordinary
+// read/mutation test rather than being trusted as a read — the same conservatism `has_mutation`
+// applies to a `cat … && rm …` chain, which the launcher word `pnpm` would otherwise hide.
+const COMMAND_CHAIN = /[|;&`>]|\$\(/u
+
+// The subcommand token is split on whitespace alone, never `words_of`: the latter's separators include
+// `:`, which would break `issue:state` into two tokens and lose the name.
+const WHITESPACE_PATTERN = /\s+/u
+
 // The input fields whose value *is* a target. Deliberately not every string field: `old_string`,
 // `new_string` and `content` carry file bodies, and tokenizing those would pull every path the file
 // happens to mention into the call's target set — where it would make unrelated calls look ordered.
@@ -274,6 +321,32 @@ function words_of(command: string): Array<string> {
 // call under-counted, which is the direction this module leans everywhere.
 function has_mutation(command: string): boolean {
 	return words_of(command).some((word) => MUTATION_WORDS.has(word))
+}
+
+// The word after `josh` in a shell line, or `undefined` when the line invokes no `josh`. The launchers
+// put `josh` at different offsets — `pnpm josh <sub>`, `npx josh <sub>`, the bare `josh <sub>`, and
+// `tsx …/josh.ts <sub>` — so the subcommand is the token that follows the first of them the scan finds.
+function josh_subcommand(command: string): string | undefined {
+	const tokens = command.split(WHITESPACE_PATTERN).filter((token) => token !== '')
+	const josh_index = tokens.findIndex(
+		(token) => token === JOSH_WORD || token.endsWith(JOSH_SCRIPT_SUFFIX),
+	)
+
+	return josh_index < FIRST_INDEX ? undefined : tokens[josh_index + 1]
+}
+
+// Whether a shell line is one of the read-only `josh` bookkeeping commands, and nothing else. A chained
+// line falls through. An alias is resolved to its canonical name first — a run may type `josh ist` for
+// `issue:state` — so the allow-list holds canonical names alone. Everything not on the list falls
+// through to the read/mutation test, which is what keeps `josh gate` / `followup` / `git`
+// non-bundleable (joshuafolkken/kit#1875).
+function is_read_josh(command: string): boolean {
+	if (COMMAND_CHAIN.test(command)) return false
+
+	const subcommand = josh_subcommand(command)
+	if (subcommand === undefined) return false
+
+	return READ_JOSH_SUBCOMMANDS.has(canonical_command(subcommand))
 }
 
 // **The conservative half.** A redirection writes whatever follows it, and the three words above
@@ -416,6 +489,19 @@ function bash_facts(command: string): BundleFacts {
 		may_write: may_write_command(command),
 	}
 
+	// A read-only `josh` bookkeeping command is bundleable even though `pnpm` leads it and is a mutation
+	// word: the allow-list above is the read-only half the leading-word test could not reach
+	// (joshuafolkken/kit#1875). Its writes are already `false` — no `>`, no in-place `sed` — so the guard
+	// can refuse a run of them and `Bundling:` can count them recoverable.
+	if (is_read_josh(command)) {
+		return {
+			is_bundleable: true,
+			targets: targets_in(time_shell.unquoted(command)),
+			...writes,
+			has_prior_reference: false,
+		}
+	}
+
 	if (!READ_COMMANDS.has(time_shell.leading_word(command)) || has_mutation(command)) {
 		return { ...not_bundleable(), ...writes }
 	}
@@ -465,6 +551,9 @@ const time_bundle_call = {
 	// once — one called a piped `grep -i` a write, the other missed a bundled `sed -ni`.
 	write_segment,
 	is_in_place_sed,
+	// Exported for the drift test in `time-bundle-call.test.ts` (joshuafolkken/kit#1875), which pins that
+	// every name here is a real `josh` command and none of them writes.
+	READ_JOSH_SUBCOMMANDS,
 }
 
 export type { BundleFacts }

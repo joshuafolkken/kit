@@ -32,6 +32,15 @@ const PER_ROUND_TRIP = 'calls per round trip'
 // number, because the number is already in the row above it.
 const BATCHING_WARNING = 'independent calls are going out one per turn'
 const NO_DENSITY = 0
+// The turns that issued no tool call at all (joshuafolkken/kit#1875). `turn_count` is every assistant
+// message and `round_trip_count` the ones that issued a call, so the difference is the pure-utterance
+// turns — the ones `Bundling:` cannot see, because a turn with nothing to batch never enters a
+// sequence. They are shown rather than enforced: a `PreToolUse` guard can never refuse a turn that
+// calls no tool, so the after-the-fact reading is the only lever, the same one `turn-batching.md` uses
+// for the batching itself.
+const TOOLLESS_TURNS_LABEL = 'tool-less turns'
+const TOOLLESS_NOTE = 'issued no tool call'
+const NO_TOOLLESS = 0
 
 // What the block reads off the report, and nothing else.
 interface TripFacts {
@@ -91,6 +100,15 @@ function batched_turns_line(facts: TripFacts): string {
 	return format_columns(BATCHED_TURNS_LABEL, String(facts.batched_turn_count), single)
 }
 
+// **Clamped at zero, though the invariant never needs it.** Round trips are the turns that issued a
+// call, a subset of every turn, so `turn_count` is never below `round_trip_count`; the clamp keeps a
+// malformed transcript from printing a negative rather than a real count.
+function toolless_turns_line(facts: TripFacts): string {
+	const count = Math.max(facts.turn_count - facts.round_trip_count, NO_TOOLLESS)
+
+	return format_columns(TOOLLESS_TURNS_LABEL, String(count), TOOLLESS_NOTE)
+}
+
 function measured_lines(facts: TripFacts): Array<string> {
 	const { tool_call_count, round_trip_count, turn_count } = facts
 	const density = time_round_trips.per_round_trip(tool_call_count, round_trip_count)
@@ -99,12 +117,13 @@ function measured_lines(facts: TripFacts): Array<string> {
 		format_columns(CALLS_LABEL, String(tool_call_count), `over ${String(turn_count)} turn(s)`),
 		format_columns(TRIPS_LABEL, String(round_trip_count), density_text(density)),
 		batched_turns_line(facts),
+		toolless_turns_line(facts),
 		cost_line(facts, density),
 		...batching_warning_lines(density),
 	]
 }
 
-const LABELS = [CALLS_LABEL, TRIPS_LABEL, BATCHED_TURNS_LABEL, COST_LABEL]
+const LABELS = [CALLS_LABEL, TRIPS_LABEL, BATCHED_TURNS_LABEL, TOOLLESS_TURNS_LABEL, COST_LABEL]
 
 // **A run whose transcript was not read has no round trips to report, and says so** — the same
 // answer, on the same criterion, that the three category shares already give. A count of `0` here
@@ -124,6 +143,7 @@ const time_trips = {
 	CALLS_LABEL,
 	TRIPS_LABEL,
 	BATCHED_TURNS_LABEL,
+	TOOLLESS_TURNS_LABEL,
 	COST_LABEL,
 	PER_ROUND_TRIP,
 	BATCHING_WARNING,
