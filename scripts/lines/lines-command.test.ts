@@ -1,6 +1,7 @@
 import path from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { line_budget, type FileBudget } from './line-budget'
+import { line_targets } from './line-targets'
 import { lines_command } from './lines-command'
 
 // joshuafolkken/kit#1425: the report a Step 0 declaration reads before it names a target file. What is
@@ -116,25 +117,81 @@ describe('lines_command.not_counted_reason', () => {
 	})
 })
 
-describe('lines_command.run_lines', () => {
-	// A report never fails on a large file — the limit is lint's to enforce, and a second command
-	// exiting non-zero on the same condition would be a second enforcement point for it. An unusable
-	// argument list is the one thing that does.
-	it('prints the usage line and fails when no path was given', async () => {
-		const written: Array<string> = []
-		const write = vi
-			.spyOn(process.stdout, 'write')
-			.mockImplementation((chunk: string | Uint8Array) => {
-				written.push(String(chunk))
+const OVER_PATH = 'scripts/over.ts'
+const NEAR_PATH = 'scripts/near.ts'
+const FAR_PATH = 'scripts/far.ts'
+const OVER = entry(path.join(PROJECT_ROOT, OVER_PATH), LIMIT + 1, LIMIT)
+const NEAR = entry(path.join(PROJECT_ROOT, NEAR_PATH), THRESHOLD, LIMIT)
+const FAR = entry(path.join(PROJECT_ROOT, FAR_PATH), THRESHOLD - 1, LIMIT)
 
-				return true
-			})
+function captured_output(): Array<string> {
+	const written: Array<string> = []
+
+	vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+		written.push(String(chunk))
+
+		return true
+	})
+
+	return written
+}
+
+describe('lines_command.near_limit_budgets', () => {
+	// Near and over-limit files are kept and ordered least headroom first, so the file with the least
+	// room to write into — negative, once it is already over — leads the report.
+	it('keeps near and over-limit files, least headroom first', () => {
+		const kept = lines_command.near_limit_budgets([FAR, NEAR, OVER])
+
+		expect(kept.map((budget) => budget.file_path)).toEqual([OVER.file_path, NEAR.file_path])
+	})
+})
+
+describe('lines_command.run_lines', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	// No argument scans the repository and reports only what is near the limit, least headroom first:
+	// the far file is left out and the over-limit file leads.
+	it('scans and lists near-limit files least headroom first when no path is given', async () => {
+		vi.spyOn(line_targets, 'repo_root').mockResolvedValue(PROJECT_ROOT)
+		vi.spyOn(line_targets, 'lint_target_files').mockResolvedValue([])
+		vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([FAR, NEAR, OVER])
+		const written = captured_output()
+
+		const code = await lines_command.run_lines([], PROJECT_ROOT)
+		const output = written.join('')
+
+		expect(code).toBe(0)
+		expect(output).not.toContain(FAR_PATH)
+		expect(output.indexOf(OVER_PATH)).toBeLessThan(output.indexOf(NEAR_PATH))
+	})
+
+	// The defined answer when nothing is near the limit is a "none" line and a clean exit, never a
+	// usage failure.
+	it('reports none and succeeds when the scan finds nothing near the limit', async () => {
+		vi.spyOn(line_targets, 'repo_root').mockResolvedValue(PROJECT_ROOT)
+		vi.spyOn(line_targets, 'lint_target_files').mockResolvedValue([])
+		vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([FAR])
+		const written = captured_output()
 
 		const code = await lines_command.run_lines([], PROJECT_ROOT)
 
-		write.mockRestore()
+		expect(code).toBe(0)
+		expect(written.join('')).toContain(lines_command.NONE_NEAR)
+	})
 
-		expect(code).not.toBe(0)
-		expect(written.join('')).toContain(lines_command.USAGE)
+	// A named path is still reported whether or not it is near the limit — the near-only narrowing is
+	// the scan's, not the path run's.
+	it('reports a named path even when it is not near the limit', async () => {
+		vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([FAR])
+		const written = captured_output()
+
+		const code = await lines_command.run_lines([FAR.file_path], PROJECT_ROOT)
+		const output = written.join('')
+
+		expect(code).toBe(0)
+		expect(output).toContain(FAR_PATH)
+		expect(output).not.toContain(lines_command.NONE_NEAR)
 	})
 })
