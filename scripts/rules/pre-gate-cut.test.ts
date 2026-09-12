@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { RunCut } from '#scripts/run/run-cut'
@@ -31,6 +31,12 @@ const CLAIM_THE_HOLD = `pnpm josh run:hold ${ISSUE}`
 const NOW_MS = 1_700_000_000_000
 const SAYS_NOTHING = 'says nothing about %j'
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'pre-gate-cut-'))
+// The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
+// working directory to the non-lane WORK_DIRECTORY per test to stay hermetic wherever it was launched: the delivery
+// and measurement paths read the live process.cwd() to decide whether a checkout is a lane, so a run
+// started inside a lane worktree (`.kit-lanes/<N>`) would otherwise see every silence-expecting case
+// fire the pre-gate-cut refusal (joshuafolkken/kit#1884).
+const ENTRY_DIRECTORY = process.cwd()
 const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
 const LANE_DIRECTORY = path.join(LANE_ROOT, ISSUE)
 const WRITTEN_TRANSCRIPTS = new Set<string>()
@@ -83,14 +89,31 @@ function payload_of(name: string, command: string, tool_name = BASH): string {
 
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
+	process.chdir(WORK_DIRECTORY)
 })
 
 afterAll(() => {
+	process.chdir(ENTRY_DIRECTORY)
+
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
 
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
+})
+
+describe('cwd isolation', () => {
+	// **The suite pins its own working directory** (joshuafolkken/kit#1884). Removing the beforeEach
+	// chdir leaves cwd at wherever vitest was launched, so this fails everywhere; launched from a lane
+	// worktree it would additionally read as a lane and fire the refusal on every gate case below.
+	it('runs the silence assertions from the non-lane work directory', () => {
+		const here = process.cwd()
+
+		// realpathSync so the assertion holds on macOS, where process.cwd() resolves the /tmp symlink
+		// to /private/tmp while WORK_DIRECTORY keeps the tmpdir() spelling.
+		expect(here).toBe(realpathSync(WORK_DIRECTORY))
+		expect(pre_gate_cut.uncut_lane_issue(state_of(here))).toBeUndefined()
+	})
 })
 
 describe('runs_the_gate', () => {
