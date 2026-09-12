@@ -21,7 +21,7 @@ import { investigation_reads } from './investigation-reads'
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigation-guard-'))
 const WRITTEN_TRANSCRIPTS: Array<string> = []
-const { BRANCH, call_line, error_result_line, result_line, ms, target_turn_lines } =
+const { BRANCH, call_line, edit_call_line, error_result_line, result_line, ms, target_turn_lines } =
 	time_transcript_fixture
 
 const BELOW_THRESHOLD = delegation_policy.INVESTIGATION_FILE_THRESHOLD - 1
@@ -37,6 +37,9 @@ const LONE_FILE = 'scripts/only.ts'
 const READ_TOOL = 'Read'
 const DENIED_ID = 'denied-call'
 const UNIT_NAME = 'unit-2'
+const EDITED_FILE = 'scripts/edited.ts'
+const EDIT_MINUTE = 5
+const EDIT_CALL_ID = 'edit-call'
 // "Unset" is spelled as the empty string rather than by deleting the key, exactly as
 // `batch-guard.test.ts` does: a dynamic `delete` is banned here, and an empty value takes the
 // identical path through the switch — it is not one of the recognized disabling spellings.
@@ -87,6 +90,22 @@ function payload_of(transcript_path: string, overrides: Record<string, unknown> 
 		tool_input: { file_path: NEXT_FILE },
 		...overrides,
 	})
+}
+
+// A run that reaches the threshold on unedited files, then edits EDITED_FILE — the write succeeding or
+// failing — which is the shape joshuafolkken/kit#1840's re-read cases turn on.
+function threshold_then_edit(name: string, is_edit_ok: boolean): string {
+	const close = is_edit_ok ? result_line : error_result_line
+
+	return write_transcript(name, [
+		...at_threshold_lines(),
+		edit_call_line(EDIT_MINUTE, BRANCH, EDITED_FILE, EDIT_CALL_ID),
+		close(EDIT_MINUTE + 1, BRANCH, EDIT_CALL_ID),
+	])
+}
+
+function refusal_for(transcript: string, file_path: string): string | undefined {
+	return investigation_refusal(payload_of(transcript, { tool_input: { file_path } }), NOW_MS)
 }
 
 // The switch is assigned rather than deleted, so a value left in the real environment cannot decide
@@ -185,11 +204,12 @@ describe('investigation_refusal — every failure allows the call', () => {
 	})
 })
 
-describe('investigation_refusal — a delegated unit is judged on its own history', () => {
-	// A hook firing inside a unit is handed the *parent's* transcript path, so a guard that judged that
-	// file would count the parent's frozen history and never the unit's own reading
-	// (joshuafolkken/kit#1424).
-	it('judges the fork history, and records against the fork path', () => {
+describe('investigation_refusal — a delegated unit is never refused', () => {
+	// joshuafolkken/kit#1840: a unit is already where §2b sends the reading, and a read-only one has no
+	// `Agent` tool to dispatch with, so the refusal asked for an action the unit could not take. The
+	// hook still derives the fork path (joshuafolkken/kit#1424); it simply has nothing to record there,
+	// and the parent's own refusal record stays separate.
+	it('refuses nothing at the threshold, and writes no stamp at the fork path', () => {
 		const parent = write_transcript('parent', target_turn_lines(0, [LONE_FILE]))
 		const fork = time_hook_transcript.fork_path(parent, AGENT_NAME)
 
@@ -199,16 +219,13 @@ describe('investigation_refusal — a delegated unit is judged on its own histor
 
 		expect(
 			investigation_refusal(payload_of(parent, { agent_id: AGENT_NAME }), NOW_MS),
-		).toBeDefined()
-		expect(existsSync(refusal_path(fork))).toBe(true)
-		expect(existsSync(refusal_path(parent))).toBe(false)
+		).toBeUndefined()
+		expect(existsSync(refusal_path(fork))).toBe(false)
 	})
 
-	// joshuafolkken/kit#1764: a unit is already where the reading is sent, and a read-only one has no
-	// `Agent` tool to dispatch with — so the accumulation arm would toll that tier one round trip per
-	// threshold's worth of files for an instruction it cannot carry out. Its one refusal stands; the
-	// repetition does not.
-	it('does not re-arm on a second accumulation inside a unit', () => {
+	// joshuafolkken/kit#1840: not even the first accumulation is refused. The degraded single refusal was
+	// removed because it still asked for a dispatch the unit could not make.
+	it('refuses neither a first nor a later accumulation inside a unit', () => {
 		const parent = write_transcript('unit-parent', target_turn_lines(0, [LONE_FILE]))
 		const fork = time_hook_transcript.fork_path(parent, UNIT_NAME)
 
@@ -221,8 +238,29 @@ describe('investigation_refusal — a delegated unit is judged on its own histor
 
 		const unit_payload = payload_of(parent, { agent_id: UNIT_NAME })
 
-		expect(investigation_refusal(unit_payload, EARLIER_REFUSAL_MS)).toBeDefined()
+		expect(investigation_refusal(unit_payload, EARLIER_REFUSAL_MS)).toBeUndefined()
 		expect(investigation_refusal(unit_payload, NOW_MS)).toBeUndefined()
+	})
+})
+
+describe('investigation_refusal — a file the run has edited is not re-counted', () => {
+	// joshuafolkken/kit#1840: the scenario the Issue measured. The run reaches the threshold on unedited
+	// files, then edits EDITED_FILE; a read of EDITED_FILE afterwards is a read of a file the run edited,
+	// which §2b keeps in the main line, so it is not the `+ 1` that trips the count — whereas a read of a
+	// genuinely new file still is, and a read after an edit that *failed* is investigation like any other.
+	it.each([
+		['relative', EDITED_FILE],
+		['absolute', investigation_reads.resolved(EDITED_FILE)],
+	])('does not refuse a re-read of the edited file by its %s path', (key, file_path) => {
+		expect(refusal_for(threshold_then_edit(`edited-${key}`, true), file_path)).toBeUndefined()
+	})
+
+	it('still refuses a genuinely new file at the same threshold', () => {
+		expect(refusal_for(threshold_then_edit('edited-new', true), NEXT_FILE)).toBeDefined()
+	})
+
+	it('refuses a re-read of a file whose edit failed', () => {
+		expect(refusal_for(threshold_then_edit('edited-failed', false), EDITED_FILE)).toBeDefined()
 	})
 })
 
