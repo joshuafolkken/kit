@@ -335,6 +335,16 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// `failed`) all need the reissue to go through. A row that refused every time would wedge exactly
 	// those runs; a row that refuses once cannot.
 	//
+	// **`pnpm josh rule:value` reads this row with a ceiling of about 50%, and that is recorded rather
+	// than hidden** (joshuafolkken/kit#1864 review round 2). A cut relaunches a *new session*, which
+	// the measurement groups as a run of its own, and that resumed run issues the entry check — so it
+	// is counted by `reaches` while never being able to satisfy `keeps`, which only the cutting run
+	// can. Ten perfectly obedient children therefore read as ten kept out of twenty. **No predicate
+	// here can separate the two**: `CallTest` sees one call and its turn, never the run, and both
+	// processes issue byte-identical `--resume` strings. Dropping `reaches` is strictly worse — the
+	// trigger evaluates against the *measuring* process's working directory, so it is always false
+	// from the main checkout and the row would read as no runs at all. Read this row's rate as a floor.
+	//
 	// **It overlaps `piped-verification` on a piped gate call, and the order is safe in both
 	// directions.** `pnpm josh gate | tail` in an uncut lane is a real instance of both defects; the
 	// earlier row speaks, its own reason says to reissue, and this one delivers on the reissue — the

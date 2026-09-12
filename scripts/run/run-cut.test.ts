@@ -201,4 +201,15 @@ describe('the synchronous read the pre-gate guard makes', () => {
 
 		expect(run_cut.carried_cut_sync(PAST_BOUND, REPOSITORY)).toBeUndefined()
 	})
+
+	// **The no-argument form is the only one the guard calls**, and every case above passes a directory
+	// — so without this the default-argument wiring could regress and the suite would still pass. It
+	// stays read-only, which is what keeps the hazard the injected directory removed from returning.
+	it('derives the same answer with no directory as with this tree, explicitly', () => {
+		const derived = run_cut.worktree_git_directory_sync() ?? REPOSITORY
+
+		expect(run_cut.carried_cut_sync(WITHIN_BOUND)).toStrictEqual(
+			run_cut.carried_cut_sync(WITHIN_BOUND, derived),
+		)
+	})
 })

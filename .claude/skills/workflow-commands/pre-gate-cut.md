@@ -43,6 +43,7 @@ pnpm josh run:cut <N>          # alias: josh rct
 | `unready`    | 1    | The tree is clean or on the default branch, so there is nothing to carry. Continue to the gate in this process                  |
 | `busy`       | 1    | A cut is already in flight for this tree — the double-cut guard. Do not relaunch a second one                                    |
 | `failed`     | 1    | The relaunch could not be started; **the record was cleared**, so continue to the gate in this process. The run is never lost to a failed hand-off |
+| `unknown`    | 1    | This work tree's git directory could not be read, so no record was acted on. Continue to the gate in this process |
 
 **`cut` is the only verdict that ends the turn.** Every other one leaves the current process to carry
 the run on itself, which is why a `not-a-lane` or a `failed` is not a stop.
@@ -73,7 +74,7 @@ pressure, and `run:hold` — the one boundary step that never gets missed — is
 - **It is silent once the cut is carried**, so the resumed process goes straight to the gate as this
   file says it should. `adopt_cut` leaves the record in place, and that record is what says the cut
   already happened.
-- **It fires once per run.** Four of the five verdicts above leave this process holding the run, and
+- **It fires once per run.** Five of the six verdicts above leave this process holding the run, and
   each of them needs the reissued gate call to pass — a refusal that repeated would wedge exactly the
   runs that obeyed.
 - **`--resume`, `--end` and `--json` do not count as taking the cut**, because they ask about one
