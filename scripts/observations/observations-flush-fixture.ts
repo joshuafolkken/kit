@@ -2,7 +2,7 @@ import { OBSERVATION_LEDGER_PATH } from './observation-ledger'
 
 // The fixtures both flush test suites assert against, named once rather than in each
 // (joshuafolkken/kit#1785). `observations-flush.test.ts` reads the message builders and
-// `observations-flush-rollback.test.ts` drives the command against a mocked git, so the stamp and the
+// `observations-flush-command.test.ts` drives the command against a mocked git, so the stamp and the
 // branch name it produces are asserted from two files — and a copy that drifted would leave one of
 // them asserting a branch name the other's clock never generates.
 const DEFAULT_BRANCH = 'main'

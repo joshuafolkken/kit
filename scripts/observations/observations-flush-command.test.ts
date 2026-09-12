@@ -1,7 +1,9 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { main_sync } from '#scripts/git/main-sync'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { OBSERVATION_LEDGER_PATH } from './observation-ledger'
 import { observations_flush } from './observations-flush'
 import {
 	DEFAULT_BRANCH,
@@ -12,14 +14,21 @@ import {
 	ONLY_COPY,
 } from './observations-flush-fixture'
 
-// joshuafolkken/kit#1785: a commit rejected by the pre-commit hook used to leave the flush branch
-// behind with no commit on it, and the refusal the next run printed named two exits — finish that
-// branch, or delete it — that the distributed `.claude/settings.json` denies outright. What is pinned
-// here is the rollback, which is the half the messages cannot pin: the side that created the branch
-// removes it, the checkout goes back, and the appended lines stay in the working tree.
+// This file drives `observations_flush.flush()` against a mocked git — the whole command, both the
+// success path (joshuafolkken/kit#1795) and the rollbacks (joshuafolkken/kit#1785). `git_command` and
+// the gh / checks / main-sync collaborators are mocked because the assertions are about the order this
+// module drives them in, not about git or GitHub themselves — the flags of each call belong to those
+// modules' own tests.
 //
-// `git_command` is mocked because the assertions are about the order this module drives git in, not
-// about git itself — the flags of each call belong to `git-command`'s own tests.
+// **Why a mocked-git unit test rather than an integration test** (joshuafolkken/kit#1795). The issue
+// asks the success path to be exercised without writing to real GitHub or the default branch. A unit
+// test against mocked git pins the exact command sequence, runs offline and deterministically, and
+// reuses the harness #1785 already built. The integration alternative — a temporary repository with a
+// local bare remote — was rejected: the success path's middle is `pr_create` -> `wait_for_pr_success`
+// -> `pr_merge`, which run through the `gh` CLI against the GitHub API, and a local remote can neither
+// open a pull request nor report its checks. Covering those steps in an integration test would
+// therefore require the real GitHub the acceptance criteria forbid, so it could exercise only the
+// branch/commit/push prefix — strictly less than this test, at more cost.
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
@@ -49,6 +58,27 @@ const PULL_REQUEST_URL = 'https://github.com/joshuafolkken/kit/pull/1'
 const NO_COMMITS = 0
 const SUCCESS_EXIT_CODE = 0
 
+// The collaborators the success path drives, listed in the order `flush` is expected to call them:
+// branch -> stage -> commit -> push -> open -> wait -> merge -> return. Pinning their first-call
+// order as a strictly increasing sequence is one assertion for the whole path.
+type MockedCommand = (...args: Array<never>) => unknown
+const SUCCESS_SEQUENCE: ReadonlyArray<MockedCommand> = [
+	git_command.checkout_b,
+	git_command.add_path,
+	git_command.commit,
+	git_command.push,
+	git_gh_command.pr_create,
+	git_pr_checks.wait_for_pr_success,
+	git_gh_command.pr_merge,
+	main_sync.run,
+]
+
+function first_call_order(command: MockedCommand): number {
+	const [order] = vi.mocked(command).mock.invocationCallOrder
+
+	return order ?? NaN
+}
+
 function on_default_branch(): void {
 	vi.mocked(git_command.status).mockResolvedValue(MODIFIED_LEDGER)
 	vi.mocked(git_command.branch).mockResolvedValue(DEFAULT_BRANCH)
@@ -74,6 +104,68 @@ async function rejected_flush(): Promise<string> {
 
 	return await flush_message()
 }
+
+// The push -> PR -> merge path that had never run under a test before joshuafolkken/kit#1795.
+describe('observations_flush — the success path command sequence', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		on_default_branch()
+	})
+
+	it('drives its steps in a strictly increasing call order', async () => {
+		await observations_flush.flush(new Date(MORNING_INSTANT))
+
+		const orders = SUCCESS_SEQUENCE.map((command) => first_call_order(command))
+
+		expect(orders.every((order) => Number.isSafeInteger(order))).toBe(true)
+		expect(orders).toEqual(orders.toSorted((left, right) => left - right))
+	})
+
+	it('cuts a fresh branch, commits the ledger, pushes, and opens the pull request', async () => {
+		await observations_flush.flush(new Date(MORNING_INSTANT))
+
+		expect(git_command.checkout_b).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_command.add_path).toHaveBeenCalledWith(OBSERVATION_LEDGER_PATH)
+		expect(git_command.commit).toHaveBeenCalledWith(observations_flush.COMMIT_MESSAGE)
+		expect(git_command.push).toHaveBeenCalled()
+		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
+			observations_flush.COMMIT_MESSAGE,
+			observations_flush.pull_request_body(),
+		)
+	})
+})
+
+describe('observations_flush — a merged flush', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		on_default_branch()
+	})
+
+	it('waits for checks, merges the branch, returns to default, and reports the merge', async () => {
+		const message = await observations_flush.flush(new Date(MORNING_INSTANT))
+
+		expect(git_pr_checks.wait_for_pr_success).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(main_sync.run).toHaveBeenCalledWith([])
+		expect(message).toContain(FLUSH_BRANCH)
+		expect(message).toContain('default branch')
+	})
+
+	// The rollback path is what deletes a branch or checks the default branch back out; a merged flush
+	// must do neither, so their absence is what separates a success from a silent rollback.
+	it('never rolls the branch back', async () => {
+		await observations_flush.flush(new Date(MORNING_INSTANT))
+
+		expect(git_command.delete_branch).not.toHaveBeenCalled()
+		expect(git_command.checkout).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#1785: a commit rejected by the pre-commit hook used to leave the flush branch
+// behind with no commit on it, and the refusal the next run printed named two exits — finish that
+// branch, or delete it — that the distributed `.claude/settings.json` denies outright. What is pinned
+// here is the rollback, which is the half the messages cannot pin: the side that created the branch
+// removes it, the checkout goes back, and the appended lines stay in the working tree.
 
 describe('observations_flush — a commit the pre-commit hook rejects', () => {
 	beforeEach(() => {
@@ -108,7 +200,7 @@ describe('observations_flush — a commit the pre-commit hook rejects', () => {
 
 		expect(message).toContain('still in the working tree')
 		expect(message).toContain(HOOK_REJECTION)
-		expect(message).not.toContain('only copy')
+		expect(message).not.toContain(ONLY_COPY)
 	})
 
 	// The acceptance criterion the refusal used to break: with the branch gone and the checkout back
