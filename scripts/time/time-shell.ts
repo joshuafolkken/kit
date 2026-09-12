@@ -183,11 +183,32 @@ function bash_label(command: string): string {
 // **The expansion belongs at the name, not at each reader.** `time-gate-runs.ts` had already patched
 // its own copy of this reading, which left the gate count and the per-invocation table answering
 // differently about the same run; `canonical_command` is the one rule both now go through.
-function josh_command_of(command: string): string {
-	const words = command_words(command_segment(command))
-	const name = JOSH_PATTERN.exec(words.join(' '))?.[1]
+// The josh subcommand one segment runs, alias-expanded, or `''` for a segment that runs none. Shared
+// by the two readers below so what counts as a segment's josh command is one rule, not two.
+function josh_command_of_segment(segment: string): string {
+	const name = JOSH_PATTERN.exec(command_words(segment).join(' '))?.[1]
 
 	return name === undefined ? '' : `${JOSH_PREFIX}${canonical_command(name)}`
+}
+
+function josh_command_of(command: string): string {
+	return josh_command_of_segment(command_segment(command))
+}
+
+// Every josh subcommand a chained call ran, not just the first (joshuafolkken/kit#1883). The standard
+// verification form `pnpm josh lint:related && pnpm josh test:related` is two commands in one call, and
+// `josh_command_of` reads only the first segment's — so a table built on that field never counted
+// `test:related`. This reads every segment instead.
+//
+// **Quoted text is removed first, which `josh_command_of` did not need.** That reader tolerates a
+// quote-cut fragment because it only looks at the first segment that runs something; this one walks the
+// whole chain, where a quoted `… && pnpm josh lint` inside a `gh` body would otherwise synthesize a
+// josh command the shell never ran — the same removal `discarded_commands` makes for the same reason.
+function josh_commands_of(command: string): Array<string> {
+	return unquoted(command)
+		.split(SEGMENT_PATTERN)
+		.map((segment) => josh_command_of_segment(segment))
+		.filter((name) => name !== '')
 }
 
 // A redirection is not an argument, and keeping one splits a single check into two signatures
@@ -257,6 +278,7 @@ const time_shell = {
 	discarded_commands,
 	josh_arguments,
 	josh_command_of,
+	josh_commands_of,
 	leading_word,
 	unquoted,
 }

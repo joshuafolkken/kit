@@ -1,8 +1,8 @@
 import type { CiFacts } from './time-ci'
 import { time_format } from './time-format'
+import { time_lead, type Cover } from './time-lead'
 import { time_overlap, type Interval } from './time-overlap'
-import { time_phases, type PhaseName } from './time-phases'
-import { time_segments } from './time-segments'
+import { time_phases } from './time-phases'
 import { time_spans, type Span } from './time-spans'
 
 // Whether each CI cycle was hidden behind other work or ran naked (joshuafolkken/kit#1465).
@@ -31,15 +31,13 @@ import { time_spans, type Span } from './time-spans'
 // `time-overlap.ts` exists to prevent. Their naked seconds then sum to a figure that double counts
 // nothing, and `MAX_COMMITS` bounds the row count below the table cap without one being applied.
 
-const NO_DURATION = 0
 const HEADING = 'CI cycles (in run order):'
 const CYCLE_LABEL = 'CI cycles'
 const NO_CYCLE = 'no CI cycle ran on this pull request'
 const BEHIND_PREFIX = 'behind '
 // A phase or a label nothing was found for. Model and human spans carry no label at all, so a cycle
-// hidden behind thinking alone is named by its phase rather than by a blank row — the rule
-// `time-segments.ts` states, read from there rather than copied.
-const { NO_LEAD, heaviest } = time_segments
+// hidden behind thinking alone is named by its phase rather than by a blank row.
+const { NO_LEAD } = time_lead
 
 // One CI cycle, and what it actually cost.
 interface CiCycle {
@@ -78,72 +76,25 @@ interface CycleTotals {
 const NO_CYCLES: CycleTotals = { cycles: [], is_measured: false, has_pull: false }
 const UNREAD_CYCLES: CycleTotals = { cycles: [], is_measured: false, has_pull: true }
 
-// One span positioned on the clock, with the phase it was classified into. The phase comes from
-// `time_phases.classify`, so which spans count as the merge command is decided in one place rather
-// than restated here — two rules for that is where the naked seconds and the `ci` phase come to
-// disagree about the same cycle.
-interface Cover {
-	interval: Interval
-	phase: PhaseName
-	label: string
-}
-
 // Every span except the merge command's: `followup` waiting on the checks is not something a cycle
-// hid behind, it *is* the wait. Everything else counts, human wait included — see the header.
+// hid behind, it *is* the wait. Everything else counts, human wait included — see the header. The
+// interval/phase/label triple and the weighting are `time-lead.ts`'s, so this and the delegated-wait
+// block name their lead through one walk rather than two that could disagree (joshuafolkken/kit#1881).
 function covers_of(spans: ReadonlyArray<Span>): Array<Cover> {
-	const phases = time_phases.classify(spans)
-
-	return spans
-		.map((span, index) => ({
-			interval: time_overlap.to_interval(span),
-			phase: phases[index] ?? time_phases.OTHER_PHASE,
-			label: span.label,
-		}))
-		.filter((cover) => cover.phase !== time_phases.MERGE_PHASE)
-}
-
-// How long each key overlapped the cycle. Keyed by whatever `key_of` reads, so the phase and the
-// label are the same walk asked twice rather than two walks that could come to disagree about which
-// spans overlapped at all.
-//
-// **Weighted by the overlap rather than by the span's own length**, which is what separates this from
-// the segment table's lead: a span is named here only for the part of it that ran while the cycle
-// did.
-function weighted(
-	cycle: Interval,
-	covers: ReadonlyArray<Cover>,
-	key_of: (cover: Cover) => string,
-): Map<string, number> {
-	const totals = new Map<string, number>()
-
-	for (const cover of covers) {
-		const shared = time_overlap.shared_ms(cycle, cover.interval)
-		const key = key_of(cover)
-
-		if (key !== NO_LEAD && shared > NO_DURATION) {
-			totals.set(key, (totals.get(key) ?? NO_DURATION) + shared)
-		}
-	}
-
-	return totals
+	return time_lead.covers_of(spans, (cover) => cover.phase === time_phases.MERGE_PHASE)
 }
 
 function to_cycle(window: Interval, covers: ReadonlyArray<Cover>): CiCycle {
 	const rest = covers.map((cover) => cover.interval)
+	const lead = time_lead.lead(window, covers)
 
 	return {
 		started_ms: window.started_ms,
 		ended_ms: window.ended_ms,
 		duration_ms: window.ended_ms - window.started_ms,
 		naked_ms: time_overlap.uncovered_ms(window, rest),
-		lead_phase: heaviest(
-			weighted(window, covers, (cover) => cover.phase),
-			NO_LEAD,
-		),
-		lead_label: heaviest(
-			weighted(window, covers, (cover) => cover.label),
-			NO_LEAD,
-		),
+		lead_phase: lead.phase,
+		lead_label: lead.label,
 	}
 }
 

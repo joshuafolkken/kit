@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_bundles } from './time-bundles'
 import { time_cycles } from './time-cycles'
+import { time_delegated_wait } from './time-delegated-wait'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_failures } from './time-failures'
@@ -66,6 +67,7 @@ function empty_blocks(): Pick<TimeReport, EmptyBlock> {
 		by_invocation: [],
 		by_check: [],
 		ci_cycles: { ...time_cycles.NO_CYCLES },
+		delegated_wait: { ...time_delegated_wait.NO_WAITS },
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
@@ -87,6 +89,7 @@ type EmptyBlock =
 	| 'by_invocation'
 	| 'by_check'
 	| 'ci_cycles'
+	| 'delegated_wait'
 	| 'gaps'
 	| 'bundles'
 	| 'single_checks'

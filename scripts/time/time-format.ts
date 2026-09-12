@@ -106,6 +106,16 @@ function format_share(part: number, whole: number): string {
 	return `${((part / whole) * PERCENT_SCALE).toFixed(PERCENT_DECIMALS)}%`
 }
 
+// A dollar figure, to the caller's own precision. Two cost blocks print money now — the phase costs
+// and the per-subagent context-construction costs — and each rounds to a different place (a run total
+// to the cent, a per-round-trip figure finer), so the decimals are the caller's and only the `$` and
+// the `toFixed` are shared. It sits here beside the other number formatters rather than in one block,
+// for the reason `format_minutes` does: a second copy beside the second renderer is how two cost rows
+// of one report come to punctuate a dollar amount two ways (joshuafolkken/kit#1606).
+function usd(amount: number, decimals: number): string {
+	return `$${amount.toFixed(decimals)}`
+}
+
 // The one place the three columns are laid out, so a row carrying words instead of a duration lines
 // up with the rows that carry one rather than overrunning the numeric column.
 function format_columns(label: string, minutes: string, suffix: string): string {
@@ -162,6 +172,7 @@ const time_format = {
 	format_minutes,
 	format_seconds,
 	format_share,
+	usd,
 	format_columns,
 	format_row,
 	format_spread,

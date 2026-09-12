@@ -218,10 +218,6 @@ const NOT_MEASURED_NOTE = 'the cost corpus was not read for this scope'
 const UNPRICED_LABEL = 'unpriced requests'
 const UNPRICED_NOTE = 'on a model the price table does not carry · the total above is a floor'
 
-function usd(amount: number, decimals: number): string {
-	return `$${amount.toFixed(decimals)}`
-}
-
 function requests_text(count: number): string {
 	return `${String(count)} request(s)`
 }
@@ -230,7 +226,7 @@ function bucket_line(label: string, bucket: Bucket, facts: PhaseCostFacts): stri
 	const share = time_format.format_share(bucket.cost_usd, facts.cost_usd)
 	const suffix = [share, requests_text(bucket.request_count)].join(time_format.SUFFIX_SEPARATOR)
 
-	return time_format.format_columns(label, usd(bucket.cost_usd, TOTAL_DECIMALS), suffix)
+	return time_format.format_columns(label, time_format.usd(bucket.cost_usd, TOTAL_DECIMALS), suffix)
 }
 
 function unattributed_lines(facts: PhaseCostFacts): Array<string> {
@@ -247,11 +243,15 @@ function total_line(facts: PhaseCostFacts): string {
 	const trips = `over ${String(facts.round_trip_count)} round trip(s)`
 	const suffix = [requests_text(facts.request_count), trips].join(time_format.SUFFIX_SEPARATOR)
 
-	return time_format.format_columns(TOTAL_LABEL, usd(facts.cost_usd, TOTAL_DECIMALS), suffix)
+	return time_format.format_columns(
+		TOTAL_LABEL,
+		time_format.usd(facts.cost_usd, TOTAL_DECIMALS),
+		suffix,
+	)
 }
 
 function per_trip_line(facts: PhaseCostFacts): string {
-	const amount = usd(facts.usd_per_round_trip, TRIP_DECIMALS)
+	const amount = time_format.usd(facts.usd_per_round_trip, TRIP_DECIMALS)
 
 	return time_format.format_columns(PER_TRIP_LABEL, amount, DENOMINATOR_NOTE)
 }

@@ -3,6 +3,7 @@ import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { describe, expect, it } from 'vitest'
 import { time_format } from './time-format'
 import { time_investigation } from './time-investigation'
+import { time_phases } from './time-phases'
 import { time_report_fixture } from './time-report-fixture'
 import { time_spans } from './time-spans'
 import { time_transcript_fixture } from './time-transcript-fixture'
@@ -111,5 +112,41 @@ describe('time_investigation.investigation_lines — the block', () => {
 			.join('\n')
 
 		expect(line_of(text, REFUSED_CLASS)).toContain(time_format.NOT_MEASURED)
+	})
+})
+
+// joshuafolkken/kit#1868: the same reads, split by the phase each fell in. The setup share is the
+// reading done before implementation starts, which is what the Issue asks the block to surface.
+describe('time_investigation.build_investigation — the phase each read fell in', () => {
+	const SETUP_FILES = ['scripts/setup-a.ts', 'scripts/setup-b.ts']
+	const IMPLEMENT_FILE = 'scripts/impl-c.ts'
+	const SETUP_READS = 2
+	const IMPLEMENT_READS = 1
+
+	// Two reads of files the run goes on to edit, made before the first edit (setup), then a read of an
+	// un-edited file after it (implement). The first edit is what closes setup.
+	const text = [
+		...target_turn_lines(0, SETUP_FILES),
+		edit_call_line(EDIT_MINUTE, BRANCH, SETUP_FILES[0] ?? '', 'edit-a'),
+		result_line(EDIT_MINUTE + ONE, BRANCH, 'edit-a'),
+		edit_call_line(EDIT_MINUTE + 2, BRANCH, SETUP_FILES[1] ?? '', 'edit-b'),
+		result_line(EDIT_MINUTE + 3, BRANCH, 'edit-b'),
+		...target_turn_lines(LATE_TURN, [IMPLEMENT_FILE]),
+	].join('\n')
+
+	it('attributes the reads made before the first edit to setup', () => {
+		const totals = totals_of(text)
+
+		expect(totals.by_phase[time_phases.SETUP_PHASE]).toEqual({ [EDIT_TARGET_CLASS]: SETUP_READS })
+		expect(time_investigation.setup_count_for(totals, EDIT_TARGET_CLASS)).toBe(SETUP_READS)
+	})
+
+	it('keeps the reads made after the first edit out of the setup count', () => {
+		const totals = totals_of(text)
+
+		expect(totals.by_phase[time_phases.IMPLEMENT_PHASE]).toEqual({
+			[UNDER_THRESHOLD_CLASS]: IMPLEMENT_READS,
+		})
+		expect(time_investigation.setup_count_for(totals, UNDER_THRESHOLD_CLASS)).toBe(NONE)
 	})
 })

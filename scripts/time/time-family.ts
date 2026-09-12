@@ -1,4 +1,5 @@
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { time_delegated_wait, type DelegatedWaitTotals } from './time-delegated-wait'
 import { time_overlap, type Interval } from './time-overlap'
 import { time_spans, type Span } from './time-spans'
 
@@ -374,6 +375,9 @@ function collect(input: FamilyInput): Relatives {
 interface SessionSpans {
 	spans: Array<Span>
 	unread: Array<string>
+	// The delegation windows this session's own spans bracketed, read here beside `resolve_delegated`
+	// because the fold that follows erases which spans were the units' (joshuafolkken/kit#1881).
+	delegated_wait: DelegatedWaitTotals
 }
 
 // **Every read in the session scope goes through here, so no failure is folded into an empty
@@ -431,10 +435,17 @@ function for_session(files: ReadonlyArray<SessionFile>, file: SessionFile): Sess
 	const family = group(files).get(cost_transcript.owning_session_id(file)) ?? empty_family()
 	const unread: Array<string> = []
 	const units = session_units(family, file, read, unread)
+	const own = session_own(family, file, read, unread)
+	const waits = time_delegated_wait.waits_of(own, units)
 
 	return {
-		spans: time_overlap.resolve_delegated(session_own(family, file, read, unread), units),
+		spans: time_overlap.resolve_delegated(own, units),
 		unread: [...new Set(unread)],
+		delegated_wait: time_delegated_wait.build_totals(
+			waits,
+			unread.length === 0,
+			family.units.length > 0,
+		),
 	}
 }
 

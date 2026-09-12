@@ -407,7 +407,7 @@ describe('time_run.build_run_report — sources the caller already collected', (
 		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT), {
 			found: collected,
 			search: undefined,
-			priced_of: undefined,
+			cost_of: undefined,
 		})
 
 		expect(read).not.toHaveBeenCalled()
@@ -423,7 +423,7 @@ describe('time_run.build_run_report — sources the caller already collected', (
 		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT, asked), {
 			found: undefined,
 			search,
-			priced_of: undefined,
+			cost_of: undefined,
 		})
 
 		expect(pulls_asked(asked)).toHaveLength(0)

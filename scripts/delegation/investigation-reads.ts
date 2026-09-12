@@ -494,7 +494,7 @@ interface Replay {
 	reset_ms: number
 	window_start_ms: number
 	refused_at_ms: number
-	// The whole run's successful writes, gathered once by `classify_reads` and carried so `tally_now`
+	// The whole run's successful writes, gathered once by `classified_reads` and carried so `tally_now`
 	// can hand them to the same exclusion the live guard makes (joshuafolkken/kit#1840).
 	edited: ReadonlySet<string>
 }
@@ -559,23 +559,21 @@ function step(replay: Replay, span: Span, edited: ReadonlySet<string>): string |
 
 	const found = read_class(replay, span, edited)
 
+	// A refusal moves the disarm forward, exactly as the hook's own stamp does.
+	if (found === REFUSED_CLASS) replay.refused_at_ms = span.ended_ms
+
 	apply_span(replay.pending, span, edited)
 
 	return found
 }
 
-// A refusal moves the disarm forward, exactly as the hook's own stamp does.
-function record(
-	replay: Replay,
-	classes: Array<string>,
-	found: string | undefined,
-	at_ms: number,
-): void {
-	if (found === undefined) return
-
-	classes.push(found)
-
-	if (found === REFUSED_CLASS) replay.refused_at_ms = at_ms
+// **A read paired with where it fell in the run** (joshuafolkken/kit#1868). `index` is the read span's
+// position in the array handed to `classified_reads`; `time-investigation.ts` classifies that same
+// array's phases and pairs the two by index, so it can say which phase — setup above all — each read
+// landed in.
+interface ClassifiedRead {
+	found: string
+	index: number
 }
 
 const FIRST_SPAN = 0
@@ -593,15 +591,20 @@ function fresh_replay(spans: ReadonlyArray<Span>, edited: ReadonlySet<string>): 
 // **What each of a run's reads was, replayed through this rule's own predicates**
 // (joshuafolkken/kit#1764). It is the measurement half of the guard and shares every decision with
 // it — the subject test, the threshold, the delegation reset and the re-arm — because a second walk
-// that merely resembled the guard would answer about a rule nobody ships.
-function classify_reads(spans: ReadonlyArray<Span>): Array<string> {
+// that merely resembled the guard would answer about a rule nobody ships. Each read carries its span's
+// index, so `time-investigation.ts` can place it in a phase (joshuafolkken/kit#1868).
+function classified_reads(spans: ReadonlyArray<Span>): Array<ClassifiedRead> {
 	const edited = edited_files(spans)
 	const replay = fresh_replay(spans, edited)
-	const classes: Array<string> = []
+	const reads: Array<ClassifiedRead> = []
 
-	for (const span of spans) record(replay, classes, step(replay, span, edited), span.ended_ms)
+	for (const [index, span] of spans.entries()) {
+		const found = step(replay, span, edited)
 
-	return classes
+		if (found !== undefined) reads.push({ found, index })
+	}
+
+	return reads
 }
 
 const investigation_reads = {
@@ -611,7 +614,7 @@ const investigation_reads = {
 	READ_CLASSES,
 	REFUSED_CLASS,
 	UNDER_THRESHOLD_CLASS,
-	classify_reads,
+	classified_reads,
 	subject_targets,
 	DELEGATION_TOOLS,
 	READ_TOOLS,
@@ -629,5 +632,5 @@ const investigation_reads = {
 	tally_of,
 }
 
-export type { ReadTally }
+export type { ClassifiedRead, ReadTally }
 export { investigation_reads }

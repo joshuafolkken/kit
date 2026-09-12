@@ -3,6 +3,7 @@ import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
 import { time_cli } from './time-cli'
 import { time_cycles } from './time-cycles'
+import { time_delegated_wait } from './time-delegated-wait'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
@@ -95,6 +96,18 @@ function invocation_rows(count: number): Array<InvocationTotal> {
 	}))
 }
 
+const NO_BLOCKS = {
+	gaps: { ...time_gaps.NO_GAPS },
+	bundles: { ...time_bundles.NO_BUNDLES },
+	single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
+	gate_runs: { ...time_gate_runs.NO_GATE_RUNS },
+	parent_turns: { ...time_parent_turns.NO_PARENT_TURNS },
+	investigation: { ...time_investigation.NO_INVESTIGATION },
+	followup_stages: { ...time_followup_stages.NO_FOLLOWUP_STAGES },
+	rework: { ...time_rework.NO_REWORK },
+	failures: { ...time_failures.NO_FAILURES },
+}
+
 function report(notes: ReadonlyArray<string> = []): TimeReport {
 	return {
 		scope: `issue #${String(ISSUE)}`,
@@ -111,6 +124,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		model_ms_per_round_trip: MINUTE_MS,
 		categories: { model_ms: MINUTE_MS, tool_ms: 0, human_ms: 0, ci_ms: 0 },
 		ci_cycles: { ...time_cycles.NO_CYCLES },
+		delegated_wait: { ...time_delegated_wait.NO_WAITS },
 		has_ci_data: false,
 		notes: [...notes],
 		phases: [],
@@ -119,16 +133,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		by_josh_command: rows(JOSH_ROWS, 'josh'),
 		by_invocation: invocation_rows(INVOCATION_ROWS),
 		by_check: check_rows(JOSH_ROWS),
-
-		gaps: { ...time_gaps.NO_GAPS },
-		bundles: { ...time_bundles.NO_BUNDLES },
-		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
-		gate_runs: { ...time_gate_runs.NO_GATE_RUNS },
-		parent_turns: { ...time_parent_turns.NO_PARENT_TURNS },
-		investigation: { ...time_investigation.NO_INVESTIGATION },
-		followup_stages: { ...time_followup_stages.NO_FOLLOWUP_STAGES },
-		rework: { ...time_rework.NO_REWORK },
-		failures: { ...time_failures.NO_FAILURES },
+		...NO_BLOCKS,
 	}
 }
 
