@@ -43,6 +43,41 @@ function lane_directory(root: string, issue: string): string {
 	return path.join(root, issue)
 }
 
+// A lane directory's own name is the issue number, so the number a checkout belongs to is readable
+// from its path alone.
+const LANE_ISSUE_PATTERN = /^\d+$/u
+// Built from the suffix above rather than spelled again, so the two readings of a lane root cannot
+// drift apart. `.kit-lanes` and `.app-kit-lanes` both match; a plain `lanes` does not, because
+// `default_lane_root` always writes the leading dot.
+const DEFAULT_LANE_ROOT_PATTERN = new RegExp(String.raw`^\..+${LANE_DIRECTORY_SUFFIX}$`, 'u')
+
+function is_lane_root(directory: string, environment: LaneEnvironment): boolean {
+	const configured = environment[LANE_ROOT_KEY]?.trim() ?? ''
+
+	if (configured.length > 0) return path.resolve(configured) === directory
+
+	return DEFAULT_LANE_ROOT_PATTERN.test(path.basename(directory))
+}
+
+// **The inverse of `lane_directory`, and the one lane test that needs no git.** `lane_registry`
+// answers the same question authoritatively by parsing `git worktree list`, but that read is
+// asynchronous and a `PreToolUse` guard is synchronous by contract — so a guard that has to know
+// whether the checkout it is running in is a lane reads it off the path instead
+// (joshuafolkken/kit#1864). It is deliberately the weaker of the two: it says the directory *sits
+// where a lane sits*, never that a work tree is registered there, so a caller that needs the
+// registration still goes through `lane_registry`.
+function lane_issue_of(
+	directory: string,
+	environment: LaneEnvironment = process.env,
+): string | undefined {
+	const resolved = path.resolve(directory)
+	const issue = path.basename(resolved)
+
+	if (!LANE_ISSUE_PATTERN.test(issue)) return undefined
+
+	return is_lane_root(path.dirname(resolved), environment) ? issue : undefined
+}
+
 function lane_branch(issue: string): string {
 	return `${issue}${LANE_BRANCH_SUFFIX}`
 }
@@ -53,6 +88,7 @@ const lane_paths = {
 	default_lane_root,
 	lane_branch,
 	lane_directory,
+	lane_issue_of,
 	lane_root,
 }
 

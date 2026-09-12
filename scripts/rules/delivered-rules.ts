@@ -5,6 +5,7 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-gua
 import { time_shell } from '#scripts/time/time-shell'
 import { early_heartbeat } from './early-heartbeat'
 import { piped_verification } from './piped-verification'
+import { pre_gate_cut } from './pre-gate-cut'
 import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
@@ -323,6 +324,39 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: run_tail.is_backgrounded_push_step,
 		reaches: run_tail.is_push_step_call,
 	},
+	// **The one row whose trigger consults the world beside the command**, because "is this a lane that
+	// has not cut" is not readable from the call: it is the working directory's own name and the cut
+	// record on disk. Both reads are synchronous, and the command match runs first, so a run that never
+	// types `pnpm josh gate` pays nothing for it.
+	//
+	// **Once per run rather than `decide`, and the direction of the error is why.** Taking the cut ends
+	// the process, so this is not the recurring act joshuafolkken/kit#1570 wrote `decide` for — and the
+	// four verdicts that legitimately leave a run at the gate (`not-a-lane`, `unready`, `busy`,
+	// `failed`) all need the reissue to go through. A row that refused every time would wedge exactly
+	// those runs; a row that refuses once cannot.
+	//
+	// **`pnpm josh rule:value` reads this row with a ceiling of about 50%, and that is recorded rather
+	// than hidden** (joshuafolkken/kit#1864 review round 2). A cut relaunches a *new session*, which
+	// the measurement groups as a run of its own, and that resumed run issues the entry check — so it
+	// is counted by `reaches` while never being able to satisfy `keeps`, which only the cutting run
+	// can. Ten perfectly obedient children therefore read as ten kept out of twenty. **No predicate
+	// here can separate the two**: `CallTest` sees one call and its turn, never the run, and both
+	// processes issue byte-identical `--resume` strings. Dropping `reaches` is strictly worse — the
+	// trigger evaluates against the *measuring* process's working directory, so it is always false
+	// from the main checkout and the row would read as no runs at all. Read this row's rate as a floor.
+	//
+	// **It overlaps `piped-verification` on a piped gate call, and the order is safe in both
+	// directions.** `pnpm josh gate | tail` in an uncut lane is a real instance of both defects; the
+	// earlier row speaks, its own reason says to reissue, and this one delivers on the reissue — the
+	// reading "the losing rule's delivery is still correct one call later" that the comment below
+	// requires of any admissible overlap.
+	{
+		id: 'pre-gate-cut',
+		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate),
+		reason: pre_gate_cut.PRE_GATE_CUT_REASON,
+		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
+		reaches: on_bash_command(pre_gate_cut.asks_about_the_cut),
+	},
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that
@@ -541,6 +575,7 @@ const delivered_rules = {
 	ISSUE_COMMENTS_REASON,
 	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
+	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
 	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,

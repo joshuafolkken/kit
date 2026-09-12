@@ -115,8 +115,8 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
 (joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside it
 rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
 enumeration and the single source of what a turn where the trigger does not fire means. **The four
-described below are not the whole set** — the enumeration has grown to eight rows, of which
-`scripts/rules/delivered-rules.ts` carries six and two are their own binaries. The count that used to
+described below are not the whole set** — the enumeration has grown to nine rows, of which
+`scripts/rules/delivered-rules.ts` carries seven and two are their own binaries. The count that used to
 open this paragraph said `Four` and had been wrong since the fifth row landed, which is what a
 restated count does; it is gone rather than corrected, because a number kept in two places drifts
 again (joshuafolkken/kit#1525).

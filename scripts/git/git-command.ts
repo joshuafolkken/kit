@@ -38,13 +38,19 @@ async function head_commit(): Promise<string> {
 // `<repo>/.git`, and the commit-message file lives under the first. Asking git rather than assuming
 // a directory named `.git` is what makes a bare repository and a `--separate-git-dir` clone answer
 // correctly too (joshuafolkken/kit#1106).
+// Exported so a caller that must ask the same question **synchronously** asks it with the same
+// arguments rather than a second spelling of them (joshuafolkken/kit#1864). `git_spawn` is
+// asynchronous throughout and a `PreToolUse` guard is synchronous by contract, so the one place that
+// needs it runs these arguments itself — sharing the list is what keeps that from becoming a clone.
+const GIT_DIRECTORY_ARGUMENTS: ReadonlyArray<string> = [
+	'rev-parse',
+	'--absolute-git-dir',
+	'--path-format=absolute',
+	'--git-common-dir',
+]
+
 async function git_directories(): Promise<Array<string>> {
-	const output = await git_spawn.read([
-		'rev-parse',
-		'--absolute-git-dir',
-		'--path-format=absolute',
-		'--git-common-dir',
-	])
+	const output = await git_spawn.read([...GIT_DIRECTORY_ARGUMENTS])
 
 	return output.split('\n').filter((line) => line !== '')
 }
@@ -512,6 +518,7 @@ async function count_merges(range: string): Promise<number> {
 }
 
 const git_command = {
+	GIT_DIRECTORY_ARGUMENTS,
 	branch,
 	status,
 	repository_root,

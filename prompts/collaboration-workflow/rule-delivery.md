@@ -53,6 +53,7 @@
 | **検証コマンドのパイプ**（`output-bounds.md`）                                                              | `pnpm josh rule:guard` — 合否を意味する josh のチェック（`gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval` ／ `overrides` ／ `ranges`）がパイプの手前に立った `Bash`                            | 検証の終了コードが握りつぶされていない ＝ 失敗が失敗として伝わる                 |
 | **早すぎる進捗報告**（`.claude/skills/workflow-commands/epicrun.md` → 「Progress while the run is quiet」） | `pnpm josh rule:guard` — 待つことだけが目的の `Bash`（全区間が `sleep`、または `sleep` に `echo` ／ `:` ／ `date` が並ぶだけ）。既に生きているタイマーがある回、またはその報告が間隔前に着地する回に拒否する | 待機タイマーを自前で張っていない ＝ 時計は `run:progress` が 1 本だけ持っている  |
 | **run 末尾の空転**（`SKILL.md` → §2h）                                                                      | `pnpm josh rule:guard` — commit・push・PR 作成をまとめる段（`pnpm josh git -y` ／ 別名 `josh g`、`--yes` も同じ）を**前景**で出した `Bash`。`run_in_background` が付いていれば引き金に当たらない             | 背景で発行している ＝ 完了通知が run を再開させ、push とマージのあいだが空かない |
+| **gate 手前の cut**（`.claude/skills/workflow-commands/pre-gate-cut.md`）                                   | `pnpm josh rule:guard` — レーンの作業ツリーに居て cut 記録がまだ無いまま `pnpm josh gate`（別名 `josh ga` も同じ）を走らせる `Bash`                                                                          | レーン以外の checkout に居る、または既に cut 済み ＝ 規則が守られている状態      |
 
 **引き金はシェルのコマンド文字列しか見えない。** したがって node の中から REST で Issue を作る経路（`pnpm josh propagate` など）は上の正規表現に掛からない。同じ理由で、本文をファイルで渡す `gh api --input <file>` もタイトルが文字列に現れないため掛からない（`-f` / `-F` / `--field` / `--raw-field` の 4 綴りは覆う）。**これが、規則本文を配送に移したうえで常駐側にトリガ 1 行を残す理由の 1 つである** — 常駐の 1 行は経路によらず効き、配送はそれを効く瞬間に補強する。引き金つきの配送だけにすると、正規表現が知っている綴りだけが規則の適用範囲になる。
 
@@ -106,3 +107,4 @@ WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/c
 - `scripts/issue-comments-rule.test.ts` — コメント読み取りの手順が `SKILL.md` → §2g に単一ソースとして存在し、3 つの `#N` 入口がそれを**再掲せずに指す**こと（矛盾時の規則を 3 箇所に写せばクローンになる）。フックが届かないセッションでも規則が残ることを、この対で担保する
 - `scripts/shell-body-rule.test.ts` — 本文のシェル評価が `shell-body.md` に単一ソースとして存在し、配送文が被害・安全な綴り・再発行の指示を運ぶこと
 - `scripts/piped-verification-rule.test.ts` — 検証コマンドのパイプが `output-bounds.md` に単一ソースとして存在し、配送文が仕組み・逃げ道・境界の 3 つを運び、読み取り専用の一覧を巻き込んでいないこと
+- `scripts/pre-gate-cut-rule.test.ts` — gate 手前の cut の手順が `.claude/skills/workflow-commands/pre-gate-cut.md` に単一ソースとして存在し、この文書と `docs/josh-commands.md` の双方が引き金を書いていること。発火・非発火（レーンかつ未 cut でのみ拒否し、レーン外と cut 済みでは無言）は `scripts/rules/pre-gate-cut.test.ts` が固定する

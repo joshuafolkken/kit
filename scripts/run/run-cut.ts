@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { git_utilities } from '#scripts/git/constants'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
@@ -40,6 +42,10 @@ const PRE_GATE_PHASE = 'pre-gate'
 // cut rather than blocking it.
 const CUT_MAX_AGE_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
 const CUT_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
+
+// The synchronous git read runs inside a `PreToolUse` hook, which holds the tool call for as long as
+// it takes; `rev-parse` takes no lock, so anything past a second is a fault rather than slow work.
+const GIT_READ_TIMEOUT_MS = 5000
 
 const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'
@@ -152,6 +158,57 @@ function classify(raw: string | undefined, now: Date): CutRead {
 
 function read_cut(target: string, now: Date = new Date()): CutRead {
 	return classify(stamp_file.read_stamp_text(target), now)
+}
+
+// **The same read as `read_cut(cut_path(await worktree_directory()))`, taken synchronously**
+// (joshuafolkken/kit#1864). The pre-gate cut is enforced from a `PreToolUse` guard, and a guard
+// answers synchronously or not at all — so the one git call the path derivation needs is made here
+// with `git_command.GIT_DIRECTORY_ARGUMENTS`, the same argument list the asynchronous reader uses,
+// rather than a second spelling of it. Everything after the path is already shared: `cut_path` keys
+// the record and `classify` parses and expires it.
+//
+// **A fault reads as "no cut was taken", and that direction is deliberate rather than fail-open.** A
+// checkout git cannot describe, a record that will not parse and an expired one all come back
+// `undefined`, which the pre-gate guard treats as uncut — so it speaks rather than staying silent.
+// The alternative errs the other way: a read fault would be taken for "already cut" and the guard
+// would go quiet on exactly the run it exists for. The cost of this direction is one refusal a lane
+// can answer by reissuing, since that row is delivered once per run.
+function worktree_git_directory_sync(): string | undefined {
+	try {
+		// The binary is resolved through `git_utilities` exactly as `git-spawn.ts` resolves it, so this
+		// call does not answer to whatever `PATH` happens to hold. It runs the binary directly with an
+		// argument array and no `shell` option, and both are internally controlled, never untrusted
+		// input.
+		const output = execFileSync(
+			git_utilities.get_git_command_for_spawn(),
+			[...git_command.GIT_DIRECTORY_ARGUMENTS],
+			// git's own diagnostics are discarded: a checkout it cannot describe is already the
+			// `undefined` below, and a hook that let `fatal: not a git repository` through would print it
+			// in front of a tool call that is about to be allowed.
+			// A `PreToolUse` hook holds the tool call while it runs, so the read is bounded rather than
+			// left to whatever git does.
+			{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: GIT_READ_TIMEOUT_MS },
+		) // NOSONAR
+
+		return output.split('\n').find((line) => line !== '')
+	} catch {
+		return undefined
+	}
+}
+
+// **The directory is injectable so a test never has to write to the live record.** Keyed to the work
+// tree, that record is the one a resumed lane child depends on, and a suite that wrote to it would
+// erase the very state the guard reads — the unit suite runs inside `pnpm josh gate`, which is the
+// call the guard is standing in front of.
+function carried_cut_sync(
+	now: Date = new Date(),
+	directory: string | undefined = worktree_git_directory_sync(),
+): RunCut | undefined {
+	if (directory === undefined) return undefined
+
+	const read = read_cut(cut_path(directory), now)
+
+	return read.kind === 'carried' ? read.cut : undefined
 }
 
 function fresh_cut(spec: CutSpec, now: Date): RunCut {
@@ -268,6 +325,7 @@ const run_cut = {
 	adopt_cut,
 	begin_cut,
 	busy_message,
+	carried_cut_sync,
 	classify,
 	classify_resume,
 	current_state,
@@ -282,6 +340,7 @@ const run_cut = {
 	unknown_message,
 	unreadable_message,
 	worktree_directory,
+	worktree_git_directory_sync,
 }
 
 export type { CutRead, CutResume, CutResumeRequest, CutSpec, CutState, RunCut }
