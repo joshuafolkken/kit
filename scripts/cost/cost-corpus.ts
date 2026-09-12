@@ -31,7 +31,7 @@ function accumulate_missing(sessions: ReadonlyArray<SessionUsage>): MissingData 
 // Every session for this project, newest first. A `--session` narrows it here rather than in each
 // caller, so "that session does not exist" is one answer instead of three.
 function load_corpus(cwd: string, session_id?: string): Corpus {
-	const files = cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd))
+	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
 	const wanted =
 		session_id === undefined ? files : files.filter((file) => file.session_id === session_id)
 	const sessions = wanted.map((file) => cost_transcript.read_session(file))

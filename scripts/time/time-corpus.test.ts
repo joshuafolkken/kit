@@ -18,9 +18,9 @@ const state = { home: '' }
 
 beforeEach(() => {
 	state.home = mkdtempSync(path.join(tmpdir(), 'time-corpus-'))
-	vi.spyOn(cost_transcript, 'transcript_directory').mockImplementation((cwd: string) =>
+	vi.spyOn(cost_transcript, 'transcript_directories').mockImplementation((cwd: string) => [
 		path.join(state.home, cost_transcript.project_slug(cwd)),
-	)
+	])
 })
 
 afterEach(() => {

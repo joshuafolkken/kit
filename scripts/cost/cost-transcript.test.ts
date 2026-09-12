@@ -158,6 +158,132 @@ describe('cost_transcript.list_sessions', () => {
 	})
 })
 
+const MAIN = CWD
+
+// A transcript filed under an arbitrary working directory's slug, so a lane's own slug and the main
+// checkout's can each be populated independently (joshuafolkken/kit#1825).
+function write_transcript(home: string, cwd: string, session_id: string, content: string): void {
+	const directory = cost_transcript.transcript_directory(cwd, home)
+
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(
+		path.join(directory, `${session_id}${cost_transcript.TRANSCRIPT_EXTENSION}`),
+		content,
+	)
+}
+
+// A lane work tree whose `.git` file resolves to the main checkout `MAIN`, paired with a fresh home.
+function lane_home(): { home: string; lane: string } {
+	const home = mkdtempSync(path.join(tmpdir(), 'cost-for-'))
+
+	return { home, lane: make_worktree(`${MAIN}/.git/worktrees/1825`) }
+}
+
+function directories_of(home: string, lane: string): Array<string> {
+	return cost_transcript.transcript_directories(lane, home)
+}
+
+function ids_for(home: string, lane: string): Array<string> {
+	return cost_transcript
+		.list_sessions_across(directories_of(home, lane))
+		.map((file) => file.session_id)
+}
+
+describe('cost_transcript.list_sessions_across', () => {
+	// joshuafolkken/kit#1749 files a dispatched lane child's transcript under the lane's own slug.
+	it('finds a transcript filed under the lane own slug', () => {
+		const { home, lane } = lane_home()
+
+		write_transcript(home, lane, 'lane-run', usage_line('r1', 5))
+
+		expect(ids_for(home, lane)).toStrictEqual(['lane-run'])
+	})
+
+	// The joshuafolkken/kit#1617 case, kept working: the session stayed in the main checkout and only
+	// prefixed its commands with the lane path, so its transcript is under the main slug.
+	it('finds a transcript filed under the main checkout slug', () => {
+		const { home, lane } = lane_home()
+
+		write_transcript(home, MAIN, 'main-run', usage_line('r1', 5))
+
+		expect(ids_for(home, lane)).toStrictEqual(['main-run'])
+	})
+
+	it('unions transcripts found under both slugs', () => {
+		const { home, lane } = lane_home()
+
+		write_transcript(home, lane, 'lane-run', usage_line('r1', 5))
+		write_transcript(home, MAIN, 'main-run', usage_line('r2', 5))
+
+		expect(ids_for(home, lane).toSorted((left, right) => left.localeCompare(right))).toStrictEqual([
+			'lane-run',
+			'main-run',
+		])
+	})
+
+	// A session file lives under one slug, but a defensive dedupe keeps a merge from doubling what it
+	// measured should the same id ever surface under both.
+	it('counts a session found under both slugs once', () => {
+		const { home, lane } = lane_home()
+
+		write_transcript(home, lane, 'shared', usage_line('r1', 5))
+		write_transcript(home, MAIN, 'shared', usage_line('r1', 5))
+
+		expect(cost_transcript.list_sessions_across(directories_of(home, lane))).toHaveLength(1)
+	})
+
+	it('returns nothing when neither slug has a transcript', () => {
+		const { home, lane } = lane_home()
+
+		expect(cost_transcript.list_sessions_across(directories_of(home, lane))).toStrictEqual([])
+	})
+})
+
+describe('cost_transcript.searched_directories', () => {
+	it('reports both candidate slugs, each absent when nothing was written', () => {
+		const { home, lane } = lane_home()
+
+		const searched = cost_transcript.searched_directories(directories_of(home, lane))
+
+		expect(searched).toHaveLength(2)
+		expect(searched.every((directory) => !directory.exists)).toBe(true)
+	})
+
+	it('distinguishes an existing-but-empty slug from an absent one', () => {
+		const { home, lane } = lane_home()
+
+		mkdirSync(cost_transcript.transcript_directory(MAIN, home), { recursive: true })
+
+		const searched = cost_transcript.searched_directories(directories_of(home, lane))
+		const lane_directory = cost_transcript.transcript_directory(lane, home)
+		const main_directory = cost_transcript.transcript_directory(MAIN, home)
+
+		expect(searched.find((directory) => directory.path === lane_directory)?.exists).toBe(false)
+		expect(searched.find((directory) => directory.path === main_directory)?.exists).toBe(true)
+	})
+})
+
+describe('cost_transcript.missing_message', () => {
+	it('gives an absent directory a different reason from an existing empty one', () => {
+		const lines = cost_transcript.missing_message(
+			[
+				{ path: '/a/lane', exists: false },
+				{ path: '/a/main', exists: true },
+			],
+			undefined,
+		)
+
+		expect(lines.join('\n')).toContain('/a/lane — no such directory')
+		expect(lines.join('\n')).toContain('/a/main — no transcripts here')
+	})
+
+	it('names the session it looked for', () => {
+		const lines = cost_transcript.missing_message([{ path: '/a/main', exists: true }], 'abc')
+
+		expect(lines[0]).toContain('No transcript named abc')
+	})
+})
+
 // Which of a listing `josh cost` means by "the run that just finished". The unit almost always
 // writes the newer file — the parent is waiting while it works — so the head of the listing would
 // answer a no-argument run with one child of a batch.

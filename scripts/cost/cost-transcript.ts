@@ -88,6 +88,28 @@ function session_cwd(cwd: string): string {
 	return segment === NOT_FOUND ? cwd : absolute.slice(0, segment)
 }
 
+// The directories a run's transcripts might be filed under, given the working directory a command ran
+// in (joshuafolkken/kit#1825). Two are legitimate, so both are searched and `list_sessions_across`
+// merges what it finds:
+//   - the cwd's own slug — where a *dispatched* lane child writes, because `lane:dispatch` launches it
+//     as a `claude -p fullrun #N` process whose working directory is the lane (joshuafolkken/kit#1749);
+//   - the session-checkout's slug — where a session that stayed in the main checkout and only prefixed
+//     its commands with the lane path writes, the case `session_cwd` was added for
+//     (joshuafolkken/kit#1617).
+//
+// Deduped when the two coincide: a main checkout, a submodule, or a `.git` this cannot parse resolves
+// to itself, so the common case searches exactly one directory as before.
+//
+// **The caller invokes this and hands the result to the two readers**, rather than either reader
+// resolving the cwd itself. It is the single point a test redirects the walk into a temporary home,
+// and a reader that re-resolved could name a directory the report never searched.
+function transcript_directories(cwd: string, home: string = homedir()): Array<string> {
+	const own = transcript_directory(cwd, home)
+	const rewritten = transcript_directory(session_cwd(cwd), home)
+
+	return own === rewritten ? [own] : [own, rewritten]
+}
+
 interface SessionFile {
 	session_id: string
 	path: string
@@ -179,6 +201,26 @@ function list_sessions(directory: string): Array<SessionFile> {
 	return [...own_files(directory, names), ...units].toSorted(
 		(left, right) => right.modified_ms - left.modified_ms,
 	)
+}
+
+// Every session found across a set of candidate directories (joshuafolkken/kit#1825), newest first and
+// each `session_id` kept once. `transcript_directories` is what produces the set; a session file lives
+// under exactly one slug, so the candidates normally hold disjoint sets and the dedupe is what keeps a
+// run counted a single time should the same session ever surface under both — a merge must not double
+// what it measured.
+function list_sessions_across(directories: ReadonlyArray<string>): Array<SessionFile> {
+	const seen = new Set<string>()
+	const merged = directories.flatMap((directory) => list_sessions(directory))
+	const newest_first = merged.toSorted((left, right) => right.modified_ms - left.modified_ms)
+	const kept: Array<SessionFile> = []
+
+	for (const file of newest_first) {
+		if (seen.has(file.session_id)) continue
+		seen.add(file.session_id)
+		kept.push(file)
+	}
+
+	return kept
 }
 
 // The session a transcript belongs with: itself, or — for a delegated unit — the session that
@@ -292,22 +334,68 @@ function read_optional(file: SessionFile): string | undefined {
 	return read_text(file.path)
 }
 
+// One directory the search looked in, and whether it was there to look in. `exists` tells a directory
+// that was absent from one that was present but held no transcript — the distinction
+// joshuafolkken/kit#1617 found `read_directory` swallowing, which is what let a lane's missing slug
+// read the same as an empty one and delayed finding this bug (joshuafolkken/kit#1825).
+interface SearchedDirectory {
+	path: string
+	exists: boolean
+}
+
+// **A missing directory and an empty one are different answers**, and `read_directory` folds both to
+// an empty listing. This asks the filesystem the one question that separates them, so the missing
+// message can report each candidate's real reason.
+function directory_exists(directory: string): boolean {
+	try {
+		return statSync(directory).isDirectory()
+	} catch {
+		return false
+	}
+}
+
+// The directories a search covered, each tagged with whether it existed — what the missing message is
+// built from. Takes the same list `transcript_directories` handed the walk, so the report can never
+// name a directory the search did not actually look in.
+function searched_directories(directories: ReadonlyArray<string>): Array<SearchedDirectory> {
+	return directories.map((directory) => ({
+		path: directory,
+		exists: directory_exists(directory),
+	}))
+}
+
+function describe_searched(directory: SearchedDirectory): string {
+	return `  ${directory.path} — ${directory.exists ? 'no transcripts here' : 'no such directory'}`
+}
+
 // What to say when the discovery above found nothing. It lives here rather than in either command
 // because both `josh cost` and `josh time` reach it, and a second copy would drift the moment one of
 // them learned something about where transcripts live (joshuafolkken/kit#1267). The message, not the
 // printing: each command owns its own streams and exit code.
 //
-// **The directory is passed in, not resolved here.** The whole point of the message is to name where
-// the command looked, so it has to be the same string the search used — resolving it a second time
-// can name a directory that was never searched.
+// **The directories are passed in, not resolved here.** The whole point of the message is to name
+// where the command looked, so they have to be the same paths the search used — resolving them a
+// second time can name a directory that was never searched. Both candidates are listed, each with its
+// own reason (absent, or present but empty), so a run whose lane slug does not exist reads differently
+// from one whose main slug exists and is empty (joshuafolkken/kit#1825).
 //
 // "No transcript was found" and "this run cost nothing" are different answers, and only one of them
 // is ever true — which is why neither command may report an empty corpus as a zero.
-function missing_message(directory: string, session_id: string | undefined): Array<string> {
-	if (session_id !== undefined) return [`No transcript named ${session_id} under ${directory}`]
+function missing_message(
+	searched: ReadonlyArray<SearchedDirectory>,
+	session_id: string | undefined,
+): Array<string> {
+	const lead =
+		session_id === undefined
+			? 'No transcripts found. Searched:'
+			: `No transcript named ${session_id}. Searched:`
+	const listed = searched.map((directory) => describe_searched(directory))
+
+	if (session_id !== undefined) return [lead, ...listed]
 
 	return [
-		`No transcripts found under ${directory}`,
+		lead,
+		...listed,
 		'Claude Code writes them per project; run this from the project it ran in.',
 	]
 }
@@ -318,9 +406,12 @@ const cost_transcript = {
 	UNIT_DIRECTORY,
 	project_slug,
 	transcript_directory,
+	transcript_directories,
 	session_cwd,
 	unit_directory,
 	list_sessions,
+	list_sessions_across,
+	searched_directories,
 	owning_session_id,
 	latest_own_index,
 	tally,
@@ -330,5 +421,5 @@ const cost_transcript = {
 	missing_message,
 }
 
-export type { SessionFile, SessionUsage }
+export type { SearchedDirectory, SessionFile, SessionUsage }
 export { cost_transcript }

@@ -1,4 +1,3 @@
-import { cost_transcript } from '../scripts/cost/cost-transcript'
 import { git_followup_cleanup, type CleanupStep } from '../scripts/git/git-followup-cleanup'
 import { git_followup_pending } from '../scripts/git/git-followup-pending'
 import { git_next_issues } from '../scripts/git/git-next-issues'
@@ -132,18 +131,19 @@ async function notify_missing_record(issue: number, outcome: RunRecordOutcome): 
 // **Printed above `print_completion`**, because `print_pending_release` stays the final line of the
 // console output by contract.
 //
-// **The root the record is written against is the *session's* checkout, not this process's**
-// (joshuafolkken/kit#1628). A child of an `epicrun` runs in a lane work tree, and `process.cwd()`
-// there is the lane — which broke both halves of this call at once, because `record_run` hands the
-// same value to the transcript lookup and to the append. The lookup slugs a lane path to a project
-// directory that has never existed, so every lane run came back unmeasured and nothing was appended
-// at all; and had it been appended, it would have gone to a file `pnpm josh lane:close` deletes.
-// Thirteen consecutive merges were lost that way. `cost_transcript.session_cwd` is the same
-// normalization `scripts/time/time-cli.ts` already applies on the read side (joshuafolkken/kit#1617);
-// only the writer was left behind, and this is that asymmetry closed.
+// **The raw working directory is handed to `record_run`, which splits the two uses itself**
+// (joshuafolkken/kit#1825). A child of an `epicrun` runs in a lane work tree, and `process.cwd()`
+// there is the lane. Since `lane:dispatch` launches the child as its own process
+// (joshuafolkken/kit#1749), its transcript is filed under the lane's own slug — so the lookup must
+// start from the raw lane cwd, which `list_sessions_across` searches alongside the main checkout's slug.
+// Pre-rewriting to `session_cwd` here is what regressed it: it hid every dispatched child's transcript
+// by looking only in the main slug, and #1628's fix — added before the child was a separate process —
+// became the cause once #1749 landed. `record_run` still resolves the durable history root through
+// `session_cwd` internally, so the appended line lands in the main checkout rather than in a lane's
+// own `.time-history.jsonl`, which `pnpm josh lane:close` deletes.
 //
 // The `cwd` parameter exists for the test that pins it: the property under test is that a lane-shaped
-// work tree resolves *away* from itself, which cannot be asserted against the suite's own directory.
+// work tree is passed through unchanged, which cannot be asserted against the suite's own directory.
 async function record_run_report(
 	issue_number: string | undefined,
 	should_merge: boolean,
@@ -154,7 +154,7 @@ async function record_run_report(
 	const completed = parse_completed_issue_number(issue_number)
 	if (completed === undefined) return
 
-	const outcome = await time_history.record_run(completed, cost_transcript.session_cwd(cwd))
+	const outcome = await time_history.record_run(completed, cwd)
 	for (const line of outcome.lines) console.info(line)
 
 	await notify_missing_record(completed, outcome)

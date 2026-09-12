@@ -54,9 +54,9 @@ const state = { home: '' }
 function use_transcript_home(): void {
 	beforeEach(() => {
 		state.home = mkdtempSync(path.join(tmpdir(), 'time-run-'))
-		vi.spyOn(cost_transcript, 'transcript_directory').mockImplementation((cwd: string) =>
+		vi.spyOn(cost_transcript, 'transcript_directories').mockImplementation((cwd: string) => [
 			path.join(state.home, cost_transcript.project_slug(cwd)),
-		)
+		])
 	})
 
 	afterEach(() => {

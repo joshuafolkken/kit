@@ -75,7 +75,9 @@ function group_runs(files: ReadonlyArray<SessionFile>): Array<Array<SessionFile>
 }
 
 function runs_in(cwd: string): Array<Array<SessionFile>> {
-	return group_runs(cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd)))
+	return group_runs(
+		cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd)),
+	)
 }
 
 // **A group holding only delegated units is not a run** (joshuafolkken/kit#1642). `cost-transcript.ts`

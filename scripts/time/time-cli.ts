@@ -217,18 +217,18 @@ function usage_lines(argv: ReadonlyArray<string>): Array<string> {
 }
 
 function pick_session(cwd: string, session_id: string): SessionFile | undefined {
-	return cost_transcript
-		.list_sessions(cost_transcript.transcript_directory(cwd))
-		.find((file) => file.session_id === session_id)
+	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
+
+	return files.find((file) => file.session_id === session_id)
 }
 
 // An absent transcript is reported, never timed at zero. "No transcript was found" and "this run
 // took no time" are different answers, and only one of them is ever true. The wording is
 // `cost_transcript`'s — the same directory, so the same sentence.
 function report_empty(cwd: string, session_id: string | undefined): number {
-	const directory = cost_transcript.transcript_directory(cwd)
+	const searched = cost_transcript.searched_directories(cost_transcript.transcript_directories(cwd))
 
-	for (const line of cost_transcript.missing_message(directory, session_id)) console.error(line)
+	for (const line of cost_transcript.missing_message(searched, session_id)) console.error(line)
 
 	return FAILURE_EXIT_CODE
 }
@@ -251,7 +251,7 @@ function to_timeline(spans: ReadonlyArray<Span>): Timeline {
 // handoff and the teardown the session ran around it. Without both, `--session` and `--issue` read
 // different corpora of the same run and disagree about how long its review took.
 function build_session_report(cwd: string, file: SessionFile): TimeReport {
-	const files = cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd))
+	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
 	const found = time_family.for_session(files, file)
 
 	return time_report.build_report(
@@ -422,16 +422,13 @@ async function dispatch(options: Options, cwd: string): Promise<number> {
 	return await run_issue(options.issue, cwd, options)
 }
 
-// **The default is the *session's* checkout, not this process's.** Every command of a lane child runs
-// with the lane as its cwd while the session writing the transcripts stays in the main checkout, so a
-// raw `process.cwd()` sent the whole walk to a project directory that does not exist
-// (joshuafolkken/kit#1617). Normalizing here rather than at each of the six `transcript_directory`
-// call sites keeps one answer to "which directory" — the one the `No transcripts found under …`
-// message prints.
-async function run(
-	argv: ReadonlyArray<string>,
-	cwd: string = cost_transcript.session_cwd(process.cwd()),
-): Promise<number> {
+// **The default is this process's own working directory, searched at both slugs.** A dispatched lane
+// child writes its transcript under the lane's own slug (joshuafolkken/kit#1749), while a session that
+// stayed in the main checkout and only prefixed its commands with the lane path writes under the main
+// slug (joshuafolkken/kit#1617). `list_sessions_across` and `searched_directories` cover both from the
+// raw cwd, so pre-rewriting to `session_cwd` here would drop the lane's own slug and hide the child
+// (joshuafolkken/kit#1825).
+async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
 	const options = parse_options(argv)
 
 	if (options === undefined) {

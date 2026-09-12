@@ -76,12 +76,13 @@ What one invocation does, in order:
   or a `queue`, ends here, which is why this one seam covers all of them. **It measures nothing of its
   own**: the report is built by the same builder `josh time` calls, and what is printed is a short
   block — elapsed, turns, round trips, the per-round-trip cost, and the same figures against the
-  previous recorded run. **It is written against the *session's* checkout, not the process's**
-  (joshuafolkken/kit#1628): a child running in a lane work tree resolves back to the main checkout
-  first, the same normalization the read side has applied since joshuafolkken/kit#1617. Without it
-  the lane looked for its own transcripts under a project directory that has never existed, came back
-  unmeasured, and appended nothing at all — thirteen consecutive merges were lost that way, and had
-  they been appended they would have gone to a file `pnpm josh lane:close` deletes. **It cannot fail a
+  previous recorded run. **The record is looked up from where the run happened, and appended to the
+  durable checkout** (joshuafolkken/kit#1628, joshuafolkken/kit#1825): a dispatched lane child files
+  its transcript under the lane's own slug (joshuafolkken/kit#1749), so the lookup searches both that
+  slug and the main checkout's, while the append resolves back to the main checkout — a line written
+  into a lane's own file would go to one `pnpm josh lane:close` deletes. Before joshuafolkken/kit#1628
+  the lane looked for its transcripts under a project directory that has never existed, came back
+  unmeasured, and appended nothing at all — thirteen consecutive merges were lost that way. **It cannot fail a
   run**: the merge has already happened by the time it runs, so a history that cannot be read or
   written prints one line saying the measurement was unavailable and names the
   `pnpm josh time --issue <N>` that would take it — **and, since joshuafolkken/kit#1628, sends that

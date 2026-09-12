@@ -68,15 +68,14 @@ vi.mock('../scripts/run/run-hold', () => ({
 	},
 }))
 
-const { cost_transcript } = await import('../scripts/cost/cost-transcript')
 const { git_next_issues } = await import('../scripts/git/git-next-issues')
 const { git_followup_finish } = await import('./git-followup-finish')
 
 const fetch_next_issue_lines_mock = vi.mocked(git_next_issues.fetch_next_issue_lines)
 
-// `cost_transcript` is deliberately not mocked: the property under test is that a real linked work
-// tree resolves away from itself, and a stub would pin the call shape instead of the behavior.
-// A lane's `.git` is a *file* holding `gitdir: <main>/.git/worktrees/<name>` — this builds that.
+// A real linked work tree rather than a stub: the property under test is that `record_run_report`
+// hands the lane's own directory through unchanged, so the behavior is pinned rather than the call
+// shape. A lane's `.git` is a *file* holding `gitdir: <main>/.git/worktrees/<name>` — this builds that.
 function make_lane_worktree(): { directory: string; main: string } {
 	const main = mkdtempSync(path.join(tmpdir(), 'followup-main-'))
 	const directory = mkdtempSync(path.join(tmpdir(), 'followup-lane-'))
@@ -215,20 +214,21 @@ describe('the run report is emitted only by a merged run', () => {
 	it('records the run that merged, against the checkout it ran in', async () => {
 		await git_followup_finish.record_run_report('#42', true)
 
-		expect(record_run_mock).toHaveBeenCalledWith(42, cost_transcript.session_cwd(process.cwd()))
+		expect(record_run_mock).toHaveBeenCalledWith(42, process.cwd())
 	})
 
-	// joshuafolkken/kit#1628. The regression this pins: a lane child wrote its record into the lane's
-	// own work tree, which `pnpm josh lane:close` deletes — and, one step earlier, looked for its
-	// transcripts under a project slug derived from the lane path, which has never existed, so the run
-	// came back unmeasured and nothing was appended at all. Thirteen consecutive merges were lost.
-	it('records a lane child against the main checkout, never the lane work tree', async () => {
+	// joshuafolkken/kit#1825. `record_run` is handed the raw work tree the run happened in: a dispatched
+	// lane child's transcript is filed under the lane's own slug (joshuafolkken/kit#1749), so the lookup
+	// must start there. `record_run` resolves the durable history root itself, so pre-rewriting to
+	// `session_cwd` here — as joshuafolkken/kit#1628 did, before the child was a separate process — is
+	// what hid every lane child's transcript by looking only in the main slug.
+	it('hands record_run the raw lane work tree, not the rewritten main checkout', async () => {
 		const lane = make_lane_worktree()
 
 		await git_followup_finish.record_run_report('#42', true, lane.directory)
 
-		expect(record_run_mock).toHaveBeenCalledWith(42, lane.main)
-		expect(record_run_mock).not.toHaveBeenCalledWith(42, lane.directory)
+		expect(record_run_mock).toHaveBeenCalledWith(42, lane.directory)
+		expect(record_run_mock).not.toHaveBeenCalledWith(42, lane.main)
 	})
 
 	it('records nothing on a --no-merge run', async () => {

@@ -300,6 +300,28 @@ describe('time_history.format_block — the run that just finished', () => {
 	})
 })
 
+// joshuafolkken/kit#1825. A dispatched lane child runs with the lane as its cwd, but the durable
+// history lives in the main checkout: a line written into the lane's own file is deleted with the lane
+// by `pnpm josh lane:close`, so the record must land in the main checkout the lane resolves to.
+describe('time_history.record_run records against the durable checkout', () => {
+	it('records a lane child against the main checkout it resolves to, not the lane', async () => {
+		const main = mkdtempSync(path.join(tmpdir(), 'time-history-main-'))
+		const lane = mkdtempSync(path.join(tmpdir(), 'time-history-lane-'))
+
+		writeFileSync(
+			path.join(lane, '.git'),
+			`gitdir: ${path.join(main, '.git', 'worktrees', '1825')}\n`,
+		)
+
+		await time_history.record_run(CURRENT_ISSUE, lane, build_report, now)
+
+		expect(time_history.read_records(main).map((entry) => entry.issue)).toStrictEqual([
+			CURRENT_ISSUE,
+		])
+		expect(time_history.read_records(lane)).toStrictEqual([])
+	})
+})
+
 describe('time_history.record_run', () => {
 	it('records the finished run and renders it', async () => {
 		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_report, now)
