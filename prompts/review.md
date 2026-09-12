@@ -28,7 +28,7 @@ pnpm josh review:level            # alias: josh rl
 pnpm josh review:level --staged
 ```
 
-**Inside a workflow, run `pnpm josh review:brief` instead and pass the whole thing to `/code-review`.** It prints the level on its first line and then the rest of what the run already knows: whether `pnpm josh gate` has passed — or is running right now — **on this exact tree**, how this project runs its unit suite, and the target — the whole change on round 1, and on `--round 2` only the files the first round's fixes touched.
+**Inside a workflow, run `pnpm josh review:brief` instead and pass the whole thing to the review subagent, which runs `/code-review` in its own context** (never the `Skill` tool in the main line — "The review runs in a subagent, never a main-line skill load" below). It prints the level on its first line and then the rest of what the run already knows: whether `pnpm josh gate` has passed — or is running right now — **on this exact tree**, how this project runs its unit suite, and the target — the whole change on round 1, and on `--round 2` only the files the first round's fixes touched.
 
 ```bash
 pnpm josh review:brief            # round 1; alias: josh rb
@@ -38,6 +38,14 @@ pnpm josh review:brief --round 2  # the verification pass, scoped to the fix del
 **It exists because `/code-review` runs in a forked process that reads none of this repository's documents** (joshuafolkken/kit#1241). Only the invocation argument reaches it, so a rule written here — "do not re-run what the gate proved", "the second round reads the fix delta" — has no way to bind. Measured on joshuafolkken/kit#1240: both rounds re-ran the unit suite the gate had just passed, both fumbled the runner, and round 2 re-read the whole diff, for 439 seconds on a seven-file change.
 
 **Two halves, and only one of them is mechanical.** The round-2 target _is_ the scope, so a narrowed round is narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so its effect is measured rather than assumed. **The brief never claims a green gate it cannot prove**: with no record, or with one taken before an edit, it prints `Not verified` and asserts nothing.
+
+### The review runs in a subagent, never a main-line skill load
+
+**Inside a workflow the review is spawned in a subagent — the `Agent` tool — and the main line never loads `/code-review` through the `Skill` tool** (joshuafolkken/kit#1855). Loading a skill mid-run swaps the active skill's instructions into the leading text of the prompt, and that text sits in front of the whole cached conversation — so a `Skill(code-review)` call **rewrites the entire cached prefix rather than appending to it**. Measured on `fullrun #1839`: the turn after the skill loaded wrote **303,637 `cache_creation_input_tokens`** while `cache_read_input_tokens` fell from 315,843 to 15,472 — one request re-creating almost the whole context, about 11.8% of that run's cost, for a review that was going to run in a fork anyway. Loading `workflow-commands` at the run's start costs a fraction of that, because there is little accumulated context in front of it to invalidate; the same skill load mid-run, with 300k of prefix behind it, is what is expensive.
+
+**The `Agent` tool is already in the main line's tool set, so calling it appends to the prompt rather than rewriting its prefix.** The subagent runs `/code-review` in its own fresh context, where loading the skill is cheap because there is almost no prefix to re-create; it returns the findings markdown, and the main line reads that as an ordinary tool result and continues through the chain rule exactly as before. The brief the main line composes with `pnpm josh review:brief` is passed to the subagent as its prompt, so the subagent reviews the same diff, at the same level, for the same rounds — **nothing the review reads, scopes or decides changes, only where the skill is loaded** (`CLAUDE.md` → "検証ゲートを弱めるのも workaround": narrowing the review would be that violation, and this narrows nothing).
+
+**This is not the cheaper-tier delegation `SKILL.md` → §2b keeps the review out of.** That row is a downgrade to a cheaper model, refused because a cheaper review finds less; this is context isolation at the **same** model — the subagent inherits the main-loop model — so the review's quality is untouched. The fork it formalizes is the one the review-level section above already names ("It exists because `/code-review` runs in a forked process"): `/code-review` was always going to run in a forked process, and this only moves the _launch_ of that fork off the `Skill` tool and onto the `Agent` tool.
 
 ### The brief names the checkout, and a review that read another one is refused
 

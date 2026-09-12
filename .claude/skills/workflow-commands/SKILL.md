@@ -168,7 +168,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   `latest-gate.md` is the single source, **read in full in the turn `latest:scope` answers
   `required` and not before** (§1, "Three documents are read at the point of use"); `kickoff` never
   reaches it, because it never implements.
-- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → **`pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) is *started* when the review starts, and *joined* before the commit** — the same treatment `josh eval` already gets below, and for the same reason: neither the gate nor the review writes to the working tree, so paying for them one after the other is pure waiting (joshuafolkken/kit#1242, measured at 187 seconds of a 1623-second run) → `/code-review` with the brief `pnpm josh review:brief` prints
+- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → **`pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) is *started* when the review starts, and *joined* before the commit** — the same treatment `josh eval` already gets below, and for the same reason: neither the gate nor the review writes to the working tree, so paying for them one after the other is pure waiting (joshuafolkken/kit#1242, measured at 187 seconds of a 1623-second run) → a subagent running `/code-review` with the brief `pnpm josh review:brief` prints
   (the level, what the gate has already proved **or is still proving** on this exact tree, and the target)
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**,
   the second one a verification pass over the fixes rather than a second full read of the diff —
@@ -1202,7 +1202,7 @@ the three waits a run actually has:
 
 | While this runs | Do this beside it |
 | --------------- | ----------------- |
-| `pnpm josh gate` | `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
+| `pnpm josh gate` | a subagent running `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
 | CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
 | `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 300000` |
