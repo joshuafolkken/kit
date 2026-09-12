@@ -5,7 +5,7 @@ runs several of them through one lane pool ("Several epics in one run" below). R
 well — each child is a `fullrun` — and read this file for what running many of them unattended
 changes. **`chain-rule.md` and `followup.md` are not entry reads**: each is fetched in full in the
 turn that reaches it — `chain-rule.md` before the `/code-review` step, `followup.md` in the turn
-that issues `pnpm josh followup` — per `SKILL.md` → §1, "Four documents are read at the point of
+that issues `pnpm josh followup` — per `SKILL.md` → §1, "Five documents are read at the point of
 use".
 
 **What it changes about `queue` is the blast radius of a stop.** `queue` makes each issue's explicit
@@ -1471,7 +1471,7 @@ per child, and treat a single non-numeric line as the verdict.
    happens at **every** child's merge, not only when something is about to stop: see "The counters
    live in the conversation" below for why a session that carries on past a compaction loses them
    otherwise. Their **values** are counted inside the run rather than read back here, so only the
-   write waits for the merge (`SKILL.md` → §2h).
+   write waits for the merge (`background-commands.md`).
 
    **The hand-off check is asked at every child's merge, delegated or not** — `pnpm josh cost --over
    300000`, in the reading turn above beside `pnpm josh issue:state` and `pnpm josh lane:list`
@@ -2032,7 +2032,7 @@ re-measurement belongs to `pnpm josh cost` and `pnpm josh time`.
 
 **So the parent starts no wait of its own.** While something of this run's own is in flight, the next
 turn is the one the **watcher's exit delivers** — a background command's completion is what
-re-invokes the session (`SKILL.md` → §2h), so the wake is delivered rather than timed. **A `Bash`
+re-invokes the session (`background-commands.md`), so the wake is delivered rather than timed. **A `Bash`
 call that only sleeps is the spelling this forbids**, and so is a turn whose whole content is asking
 `epic:next` again to see whether anything has changed since the last ask.
 

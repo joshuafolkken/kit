@@ -138,7 +138,7 @@ describe('time_gate_runs — the printed block', () => {
 	})
 })
 
-// joshuafolkken/kit#1812: the gate is launched into the background (§2h), so `by_invocation` sees only
+// joshuafolkken/kit#1812: the gate is launched into the background (`background-commands.md`), so `by_invocation` sees only
 // the two-second dispatch and the `gate` phase only the launch's own seconds. Its real runtime is in
 // the background run — the launch to the call that read the output back — and this reads it in the
 // shape `ci_cycles` uses: the real length, and the naked part the run spent on it alone.

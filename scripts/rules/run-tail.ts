@@ -160,9 +160,10 @@ const RUN_TAIL_REASON =
 	'itself stays in the **foreground** — nearly every step after it reads its result. But a tail ' +
 	'does follow the merge, measured at 3.0 min and 5.9% of a run (joshuafolkken/kit#1462), so ' +
 	'empty it beforehand: the steps that read the merge result stay after `followup`, and the rest ' +
-	'are composed in the turn that issues it, bar the one exception §2h names. The ' +
-	'procedure is `.claude/skills/workflow-commands/SKILL.md` → §2h, "A command that can take minutes ' +
-	'is issued in the background". **This rule fires on every foreground push, not once per run**, so ' +
+	'are composed in the turn that issues it, bar the one exception background-commands.md names. The ' +
+	'procedure is `.claude/skills/workflow-commands/background-commands.md`, "A command that can take ' +
+	'minutes is issued in the background". **This rule fires on every foreground push, not once per ' +
+	'run**, so ' +
 	'reissuing the same call in the foreground will be refused again.'
 
 const run_tail = {

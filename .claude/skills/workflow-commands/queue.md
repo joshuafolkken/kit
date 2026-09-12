@@ -3,7 +3,7 @@
 Each issue in the queue is a full `fullrun`, so read `fullrun.md` as well; this file only adds what
 running several of them back to back changes. **`chain-rule.md` and `followup.md` are not entry
 reads** — each is read in the turn that reaches it: `chain-rule.md` before the `/code-review` step,
-`followup.md` in the turn that issues `pnpm josh followup`, per `SKILL.md` → §1, "Four documents are
+`followup.md` in the turn that issues `pnpm josh followup`, per `SKILL.md` → §1, "Five documents are
 read at the point of use".
 
 

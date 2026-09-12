@@ -141,7 +141,7 @@ merged.
 
 ## Consistency with the chain rule
 
-`chain-rule.md` and `SKILL.md` → §2h forbid ending a turn at the push, because there the review and
+`chain-rule.md` and `background-commands.md` forbid ending a turn at the push, because there the review and
 the commit are behind you and CI is in flight with nothing set to resume. **The pre-gate cut is the
 opposite case and a sanctioned boundary**: it ends the turn *before* the gate, and it relaunches a
 fresh process in the same act, so the run continues rather than stalling. The resumed process then

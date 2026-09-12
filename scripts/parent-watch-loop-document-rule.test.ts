@@ -139,8 +139,9 @@ describe(`${BACKLOGRUN} — the loop cites the rule`, () => {
 	})
 })
 
-// §2h is the single source of "a command that can take minutes is issued in the background", and the
-// parent's wake is that rule at the batch's scale — so it names the rule and points at it.
+// background-commands.md is the single source of "a command that can take minutes is issued in the
+// background" since joshuafolkken/kit#1873; the parent's wake is that rule at the batch's scale, which
+// stayed resident in `SKILL.md` → §2h — so §2h names it and points at the single source.
 describe(`${SKILL} — §2h names the batch-scale application`, () => {
 	const content = read_unwrapped(SKILL)
 

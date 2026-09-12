@@ -68,7 +68,7 @@ reasons keep it out of the gate, each sufficient: the gate re-runs on every fix 
 `epicrun` child, and one `josh eval` is five real Claude sessions; and the review rewrites the very
 prose being measured, so a verdict *read* before the review converges is a verdict about a draft.
 
-**Backgrounding it is not this file's own convention** — it is `SKILL.md` → §2h, "A command that can take minutes is issued in the background", applied to one command; the test for what may run beside a backgrounded command, and the one command that stays in the foreground, are written there (joshuafolkken/kit#1510).
+**Backgrounding it is not this file's own convention** — it is `background-commands.md`, "A command that can take minutes is issued in the background", applied to one command; the test for what may run beside a backgrounded command, and the one command that stays in the foreground, are written there (joshuafolkken/kit#1510).
 
 **The two overlap because neither writes.** `/code-review` and `josh eval` both only read the working
 tree — a review's fixes are applied after it reports — so the suite's wall-clock hides inside the
