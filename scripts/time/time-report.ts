@@ -12,6 +12,7 @@ import { time_gate_runs, type GateRunTotals } from './time-gate-runs'
 import { time_heading } from './time-heading'
 import { time_investigation, type InvestigationTotals } from './time-investigation'
 import { time_invocations, type InvocationTotal } from './time-invocations'
+import { time_josh_commands } from './time-josh-commands'
 import { time_model_gaps } from './time-model-gaps'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import { time_phase_costs, type PhaseCostFacts } from './time-phase-costs'
@@ -354,6 +355,9 @@ type ReportWalks = ReportTables & Pick<TimeReport, 'parent_turns'>
 
 function report_tables(input: ReportInput, turns: TurnTotals): ReportWalks {
 	const { spans } = input
+	// The two josh-keyed tables count every command a chain ran; every other table reads the raw spans
+	// (joshuafolkken/kit#1883).
+	const josh_spans = time_josh_commands.with_chained(spans)
 
 	return {
 		parent_turns: time_parent_turns.build_parent_turns(spans),
@@ -364,8 +368,8 @@ function report_tables(input: ReportInput, turns: TurnTotals): ReportWalks {
 			totals_by(spans, (span) => span.label),
 			turns.by_label,
 		),
-		by_josh_command: totals_by(spans, (span) => span.josh_command),
-		by_invocation: time_invocations.build_invocations(spans),
+		by_josh_command: totals_by(josh_spans, (span) => span.josh_command),
+		by_invocation: time_invocations.build_invocations(josh_spans),
 		by_check: [...input.by_check],
 	}
 }

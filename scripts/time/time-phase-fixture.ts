@@ -44,26 +44,33 @@ function paired(merged: Span, extra: Partial<Span>): Span {
 	return { ...merged, own_duration_ms: extra.own_duration_ms ?? merged.duration_ms }
 }
 
+// The fields no case varies, written once so a new `Span` field lands in one literal — the same
+// pattern `time-span-fixture.ts` uses, and what keeps `base_span` inside the per-function line limit.
+const UNVARIED = {
+	category: time_spans.TOOL_CATEGORY,
+	label: '',
+	josh_command: '',
+	josh_commands: [],
+	check_key: '',
+	marker: time_markers.NO_MARKER,
+	is_bundleable: false,
+	is_writing: false,
+	has_prior_reference: false,
+	targets: [],
+	writes: [],
+	message_id: time_spans.NO_MESSAGE_ID,
+	issue: time_markers.NO_ISSUE,
+	branch: 'main',
+	call_id: '',
+	outcome: time_spans.UNKNOWN_OUTCOME,
+	followup_stages: [],
+	is_continuation: false,
+	...time_spans.no_background(),
+} satisfies Partial<Span>
+
 function base_span(start_minute: number, minutes: number, extra: Partial<Span>): Span {
 	return {
-		category: time_spans.TOOL_CATEGORY,
-		label: '',
-		josh_command: '',
-		check_key: '',
-		marker: time_markers.NO_MARKER,
-		is_bundleable: false,
-		is_writing: false,
-		has_prior_reference: false,
-		targets: [],
-		writes: [],
-		message_id: time_spans.NO_MESSAGE_ID,
-		issue: time_markers.NO_ISSUE,
-		branch: 'main',
-		call_id: '',
-		outcome: time_spans.UNKNOWN_OUTCOME,
-		followup_stages: [],
-		is_continuation: false,
-		...time_spans.no_background(),
+		...UNVARIED,
 		ended_ms: (start_minute + minutes) * MINUTE_MS,
 		...time_spans.equal_durations(minutes * MINUTE_MS),
 		...extra,
