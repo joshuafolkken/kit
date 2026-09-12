@@ -121,6 +121,10 @@ const NO_RESULT: ResultFacts = {
 interface ToolCall {
 	label: string
 	josh_command: string
+	// Every josh subcommand the call ran, where `josh_command` is only the first (joshuafolkken/kit#1883).
+	// A chained `pnpm josh lint:related && pnpm josh test:related` carries both; the count tables expand
+	// it so the ones `josh_command` drops are still counted.
+	josh_commands: ReadonlyArray<string>
 	check_key: string
 	marker: PhaseMarker
 	is_bundleable: boolean
@@ -146,6 +150,7 @@ interface ToolCall {
 const NO_CALL: ToolCall = {
 	label: '',
 	josh_command: '',
+	josh_commands: [],
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
@@ -157,6 +162,7 @@ const NO_CALL: ToolCall = {
 const UNKNOWN_CALL: ToolCall = {
 	label: UNKNOWN_TOOL,
 	josh_command: '',
+	josh_commands: [],
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
@@ -234,6 +240,7 @@ function non_bash_call(name: string, input: unknown, message_id: string): ToolCa
 	return {
 		label: name,
 		josh_command: '',
+		josh_commands: [],
 		check_key: time_single_check.NO_CHECK,
 		marker: time_markers.tool_marker(name, input),
 		message_id,
@@ -254,6 +261,7 @@ function bash_call(input: unknown, message_id: string): ToolCall {
 	return {
 		label: time_shell.bash_label(command),
 		josh_command,
+		josh_commands: time_shell.josh_commands_of(command),
 		check_key: time_single_check.check_key(josh_command, command),
 		marker: time_markers.bash_marker(command),
 		message_id,
@@ -441,6 +449,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>, finished: FinishedAt): A
 		category: event.category,
 		label: event.label,
 		josh_command: event.josh_command,
+		josh_commands: event.josh_commands,
 		check_key: event.check_key,
 		marker: event.marker,
 		is_bundleable: event.is_bundleable,
@@ -507,6 +516,7 @@ const time_spans = {
 	// `time-shell.ts` moving out of this file changed no call site (joshuafolkken/kit#1344).
 	bash_label: time_shell.bash_label,
 	josh_command_of: time_shell.josh_command_of,
+	josh_commands_of: time_shell.josh_commands_of,
 	parse_line,
 	parse_timeline,
 }

@@ -23,6 +23,7 @@ const LAUNCH_LABEL = 'Agent'
 // round trips are then read by the adjacency fallback exactly as they were. A case about turns
 // overrides it, which is what makes the two rules testable apart.
 const UNVARIED = {
+	josh_commands: [],
 	check_key: '',
 	marker: time_markers.NO_MARKER,
 	is_bundleable: false,

@@ -9,6 +9,9 @@ import { time_spans, type Span } from './time-spans'
 
 const { ASSISTANT_LINE: ASSISTANT, MINUTE_MS } = time_line_fixture
 const { at, assistant_text, prompt, tool_result, tool_use } = time_line_fixture
+const LINT = 'josh lint:related'
+const TEST = 'josh test:related'
+const CHAIN = `pnpm ${LINT} && pnpm ${TEST}`
 
 const PNPM_LABEL = 'Bash: pnpm'
 
@@ -167,7 +170,7 @@ describe('time_spans.bash_label — prefixes that are not the command', () => {
 
 describe('time_spans.josh_command_of', () => {
 	it('reads the subcommand out of a pnpm josh invocation', () => {
-		expect(time_spans.josh_command_of('cd /x && pnpm josh test:related')).toBe('josh test:related')
+		expect(time_spans.josh_command_of('cd /x && pnpm josh test:related')).toBe(TEST)
 	})
 
 	it('reads a bare josh invocation too', () => {
@@ -214,6 +217,42 @@ describe('time_spans.josh_command_of', () => {
 	})
 })
 
+// The counterpart that reads the whole chain (joshuafolkken/kit#1883). `josh_command_of` names only
+// the first so a span's duration is attributed once; this names every one so the count tables stop
+// dropping `test:related` from the standard `lint:related && test:related` verification form.
+describe('time_spans.josh_commands_of', () => {
+	it('reads every subcommand of a chained call, not just the first', () => {
+		expect(time_spans.josh_commands_of(CHAIN)).toEqual([LINT, TEST])
+	})
+
+	it('answers a single-element list for a lone command', () => {
+		expect(time_spans.josh_commands_of('pnpm josh gate')).toEqual(['josh gate'])
+	})
+
+	// The first command-bearing segment is not josh, so `josh_command_of` answers '' and the count
+	// would be lost entirely — this reader still finds the josh command behind it.
+	it('reads the josh command even when a non-josh command opens the chain', () => {
+		expect(time_spans.josh_commands_of('git status && pnpm josh test:related')).toEqual([TEST])
+	})
+
+	it('expands each command through the alias map', () => {
+		expect(time_spans.josh_commands_of('pnpm josh ga && pnpm josh lint')).toEqual([
+			'josh gate',
+			'josh lint',
+		])
+	})
+
+	// Quoted text is removed before the split, so a chain quoted inside a `gh` body names nothing — the
+	// same reason `discarded_commands` unquotes first.
+	it('reads no command out of one quoted after a shell operator', () => {
+		expect(time_spans.josh_commands_of('gh api -f body="x && pnpm josh lint"')).toEqual([])
+	})
+
+	it('answers none for a chain that names no josh subcommand', () => {
+		expect(time_spans.josh_commands_of('git status && echo done')).toEqual([])
+	})
+})
+
 describe('time_spans.parse_timeline — josh attribution', () => {
 	it('carries the josh subcommand on the tool span it was measured from', () => {
 		const { spans } = time_spans.parse_timeline(
@@ -226,6 +265,16 @@ describe('time_spans.parse_timeline — josh attribution', () => {
 		expect(spans.map((span) => [span.label, span.josh_command, span.duration_ms])).toEqual([
 			[PNPM_LABEL, 'josh gate', 3 * MINUTE_MS],
 		])
+	})
+
+	// The span carries the whole chain, not just its first command (joshuafolkken/kit#1883), so the
+	// count tables downstream can read every josh command the call ran.
+	it('carries every subcommand of a chained call on the span', () => {
+		const { spans } = time_spans.parse_timeline(
+			[tool_use(0, 'Bash', 'tool-1', { command: CHAIN }), tool_result(3, 'tool-1')].join('\n'),
+		)
+
+		expect(spans.map((span) => span.josh_commands)).toEqual([[LINT, TEST]])
 	})
 })
 
