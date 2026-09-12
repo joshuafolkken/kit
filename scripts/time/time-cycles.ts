@@ -35,7 +35,6 @@ const NO_DURATION = 0
 const HEADING = 'CI cycles (in run order):'
 const CYCLE_LABEL = 'CI cycles'
 const NO_CYCLE = 'no CI cycle ran on this pull request'
-const NAKED_PREFIX = 'naked '
 const BEHIND_PREFIX = 'behind '
 // A phase or a label nothing was found for. Model and human spans carry no label at all, so a cycle
 // hidden behind thinking alone is named by its phase rather than by a blank row — the rule
@@ -175,7 +174,7 @@ function behind_note(cycle: CiCycle): Array<string> {
 }
 
 function cycle_suffix(cycle: CiCycle): string {
-	const naked = `${NAKED_PREFIX}${time_format.format_seconds(cycle.naked_ms)}`
+	const naked = `${time_format.NAKED_PREFIX}${time_format.format_seconds(cycle.naked_ms)}`
 
 	return [naked, ...behind_note(cycle)].join(time_format.SUFFIX_SEPARATOR)
 }
