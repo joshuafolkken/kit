@@ -5,6 +5,7 @@ import { cost_usage, type UsageRecord } from './cost-usage'
 const OPUS = 'claude-opus-5'
 const IMAGINARY = 'claude-imaginary-9'
 const MILLION = 1_000_000
+const COST_CURVE = 'Cost curve'
 
 function record(input_tokens: number, model: string = OPUS): UsageRecord {
 	return {
@@ -94,7 +95,7 @@ describe('cost_curve formatting', () => {
 	it('renders the quartile lines and the first-to-last growth', () => {
 		const lines = cost_curve.format_curve_lines(cost_curve.build_curve(climbing())).join('\n')
 
-		expect(lines).toContain('Cost curve')
+		expect(lines).toContain(COST_CURVE)
 		expect(lines).toContain('Q1')
 		expect(lines).toContain('Q4')
 	})
@@ -103,5 +104,50 @@ describe('cost_curve formatting', () => {
 		const sim = cost_curve.simulate_cap([record(100, IMAGINARY)], 500_000)
 
 		expect(cost_curve.format_cap_lines(sim).join('\n')).toContain(cost_curve.NOT_MEASURED)
+	})
+})
+
+describe('cost_curve.curve_for_sessions', () => {
+	it('marks a single main-line session as measured and reads its growth', () => {
+		const curve = cost_curve.curve_for_sessions([climbing()])
+
+		expect(curve.measured).toBe(true)
+		expect(curve.last_context_tokens).toBe(800_000)
+	})
+
+	// Regression (joshuafolkken/kit#1853): a scope spanning the main line and a delegated unit must
+	// not be read as one run. The unit starts from low context, so concatenating the two used to make
+	// the positional quartiles fall rather than climb — the curve is withheld instead.
+	it('withholds the curve when two sessions are mixed rather than reporting a broken one', () => {
+		const unit = [record(20_000), record(30_000)]
+		const curve = cost_curve.curve_for_sessions([climbing(), unit])
+
+		expect(curve.measured).toBe(false)
+		expect(curve.session_count).toBe(2)
+		expect(curve.buckets).toHaveLength(0)
+	})
+
+	it('withholds the curve when no main-line session is in scope', () => {
+		const curve = cost_curve.curve_for_sessions([])
+
+		expect(curve.measured).toBe(false)
+		expect(curve.session_count).toBe(0)
+	})
+
+	it('ignores empty session groups when isolating the main line', () => {
+		const curve = cost_curve.curve_for_sessions([[], climbing(), []])
+
+		expect(curve.measured).toBe(true)
+		expect(curve.first_context_tokens).toBe(100_000)
+	})
+})
+
+describe('cost_curve.format_curve_lines when withheld', () => {
+	it('prints "not measured" with the session count for a mixed scope', () => {
+		const curve = cost_curve.curve_for_sessions([climbing(), [record(1)]])
+		const lines = cost_curve.format_curve_lines(curve).join('\n')
+
+		expect(lines).toContain(COST_CURVE)
+		expect(lines).toContain(cost_curve.NOT_MEASURED)
 	})
 })

@@ -93,3 +93,18 @@ describe('cost_corpus.attribute_corpus — delegated units', () => {
 		expect(cost_corpus.floor_for_issue(unattributed, 999)).toBe(0)
 	})
 })
+
+describe('cost_corpus.mainline_records', () => {
+	// The curve is built from the main line alone (joshuafolkken/kit#1853): the delegated unit's
+	// records are dropped, and the main-line session's are grouped together in read order.
+	it('groups the main-line records and drops delegated units', () => {
+		write_session(SESSION_A, [usage_line('r1', ISSUE_BRANCH), usage_line('r2', ISSUE_BRANCH)])
+		write_unit(SESSION_A, 'agent-1', [usage_line('u1', ISSUE_BRANCH)])
+		const pairs = cost_corpus.attributed(cost_corpus.load_corpus(CWD))
+
+		const groups = cost_corpus.mainline_records(pairs)
+
+		expect(groups).toHaveLength(1)
+		expect(groups[0]).toHaveLength(2)
+	})
+})

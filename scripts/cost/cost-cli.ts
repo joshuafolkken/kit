@@ -255,6 +255,7 @@ function to_scope_report(
 		records: pairs.map((pair) => pair.record),
 		missing,
 		resident_billed_tokens: pairs.reduce((sum, pair) => sum + pair.baseline_tokens, 0),
+		curve_sessions: cost_corpus.mainline_records(pairs),
 		...optional_cap_tokens(cap),
 	})
 }

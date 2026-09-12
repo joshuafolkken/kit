@@ -1,6 +1,7 @@
 import { cost_composition, type Composition } from './cost-composition'
 import { cost_curve, type CapSimulation, type Curve } from './cost-curve'
 import { cost_format } from './cost-format'
+import { cost_outliers, type Outliers } from './cost-outliers'
 import { cost_pricing, type ModelCost } from './cost-pricing'
 import { cost_resident, type ResidentBreakdown } from './cost-resident'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
@@ -86,6 +87,10 @@ interface CostReport {
 	// run's cost that fell at or under it (joshuafolkken/kit#1838). Both absent on an empty scope.
 	curve?: Curve
 	cap_simulation?: CapSimulation
+	// The requests whose cache write dominated the scope, largest first — the single most expensive
+	// round trips, which the totals and the positional curve both average away
+	// (joshuafolkken/kit#1853). Absent on an empty scope.
+	outliers?: Outliers
 }
 
 interface ReportInput {
@@ -95,6 +100,10 @@ interface ReportInput {
 	resident_billed_tokens: number
 	measurement?: Measurement
 	cap_tokens?: number
+	// The in-scope records of each non-delegated (main-line) session, grouped by session, from which
+	// the curve is built. Absent for a single-session scope, where the flat `records` are already one
+	// session and the curve reads them directly (joshuafolkken/kit#1853).
+	curve_sessions?: ReadonlyArray<ReadonlyArray<UsageRecord>>
 }
 
 // `exactOptionalPropertyTypes` rejects `{ measurement: undefined }`, so an absent measurement
@@ -104,9 +113,22 @@ function optional_measurement(measurement: Measurement | undefined): { measureme
 }
 
 // `curve` is computed for every non-empty scope; `cap_simulation` only when a cap was requested.
-// Both follow the same absent-key idiom so a scope with no data carries neither.
-function optional_curve(records: ReadonlyArray<UsageRecord>): { curve?: Curve } {
-	return records.length === 0 ? {} : { curve: cost_curve.build_curve(records) }
+// Both follow the same absent-key idiom so a scope with no data carries neither. The curve is built
+// from the main-line sessions the caller grouped, falling back to the flat records for a
+// single-session scope that passed none (joshuafolkken/kit#1853).
+function optional_curve(
+	records: ReadonlyArray<UsageRecord>,
+	curve_sessions: ReadonlyArray<ReadonlyArray<UsageRecord>> | undefined,
+): { curve?: Curve } {
+	if (records.length === 0) return {}
+
+	return { curve: cost_curve.curve_for_sessions(curve_sessions ?? [records]) }
+}
+
+// The largest requests by cache write, for every non-empty scope. Same absent-key idiom, so an empty
+// scope carries no `outliers` key.
+function optional_outliers(records: ReadonlyArray<UsageRecord>): { outliers?: Outliers } {
+	return records.length === 0 ? {} : { outliers: cost_outliers.build_outliers(records) }
 }
 
 function optional_cap(
@@ -132,8 +154,9 @@ function build_report(input: ReportInput): CostReport {
 		breakdown: build_breakdown(input.records, input.resident_billed_tokens),
 		missing: input.missing,
 		...optional_measurement(input.measurement),
-		...optional_curve(input.records),
+		...optional_curve(input.records, input.curve_sessions),
 		...optional_cap(input.records, input.cap_tokens),
+		...optional_outliers(input.records),
 	}
 }
 
@@ -219,6 +242,10 @@ function cap_lines(cap: CapSimulation | undefined): Array<string> {
 	return cap === undefined ? [] : cost_curve.format_cap_lines(cap)
 }
 
+function outlier_lines(outliers: Outliers | undefined): Array<string> {
+	return outliers === undefined ? [] : cost_outliers.format_outlier_lines(outliers)
+}
+
 function unpriced_lines(models: ReadonlyArray<string>): Array<string> {
 	if (models.length === 0) return []
 
@@ -266,6 +293,7 @@ function format_report(report: CostReport): string {
 		...measurement_lines(report.measurement),
 		...curve_lines(report.curve),
 		...cap_lines(report.cap_simulation),
+		...outlier_lines(report.outliers),
 		...unpriced_lines(report.unpriced_models),
 		...missing_lines(report.missing),
 	].join('\n')
