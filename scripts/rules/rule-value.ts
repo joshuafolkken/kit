@@ -190,30 +190,25 @@ function turn_key(entry: DatedLine, index: number): string {
 	return entry.message_id
 }
 
-function merge_turn(turn: DatedLine, entry: DatedLine): void {
-	turn.calls.push(...entry.calls)
-	turn.errors.push(...entry.errors)
-}
+// **The turn a call belongs to, gathered by id but never moved** (joshuafolkken/kit#1804). A folded
+// turn used to be *placed* where it opened, which both grouped a message's calls and reordered them:
+// a background unit's call landing between two blocks of a parent message was read after the whole
+// parent turn instead of at its own instant. This gathers each message's calls without touching the
+// timeline order — the reading walks the lines in the order `dated_lines_of` sorted them and asks
+// this map only for a call's siblings. A line with no id keys a turn of its own, so its context is
+// its own calls.
+function turns_by_key(entries: ReadonlyArray<DatedLine>): Map<string, Array<IssuedCall>> {
+	const turns = new Map<string, Array<IssuedCall>>()
 
-function place_turn(turns: Map<string, DatedLine>, entry: DatedLine, key: string): void {
-	const opened = turns.get(key)
+	for (const [index, entry] of entries.entries()) {
+		const key = turn_key(entry, index)
+		const opened = turns.get(key)
 
-	if (opened === undefined) turns.set(key, entry)
-	else merge_turn(opened, entry)
-}
+		if (opened === undefined) turns.set(key, [...entry.calls])
+		else opened.push(...entry.calls)
+	}
 
-// A turn is placed where it opened, so the timeline order the reading depends on is the order the
-// turns began in — a call hoisted to its own turn's first line was issued before whatever came back
-// in between, which is exactly what "kept before the refusal" is asking. **Within one transcript.**
-// Across the transcripts of one run, a background unit's call landing between two blocks of a parent
-// message is reordered around the hoist; that is open as joshuafolkken/kit#1804, because which
-// instant anchors a folded turn is a decision rather than a slip.
-function fold_turns(entries: ReadonlyArray<DatedLine>): Array<DatedLine> {
-	const turns = new Map<string, DatedLine>()
-
-	for (const [index, entry] of entries.entries()) place_turn(turns, entry, turn_key(entry, index))
-
-	return [...turns.values()]
+	return turns
 }
 
 // **A refusal's body is the reason and nothing else, from its first character.** The hook denies a
@@ -253,22 +248,32 @@ function observe_for_rule(
 	rule: MeasuredRule,
 	state: RuleState,
 	calls: ReadonlyArray<IssuedCall>,
+	turn: ReadonlyArray<IssuedCall>,
 ): void {
-	// The folded turn's calls, not the line's: `fold_turns` has already gathered every block written
-	// under one message id, so a call's siblings are the rest of the turn it went out in.
-	for (const call of calls) observe_call(rule, state, call, calls)
+	// This line's own calls, read in order; `turn` is every call the message issued, so a call's
+	// siblings are the rest of the turn it went out in even where the transcript split them across
+	// lines. The two coincide except when a message spans several lines (joshuafolkken/kit#1804).
+	for (const call of calls) observe_call(rule, state, call, turn)
 }
 
-function observe_calls(states: Map<string, RuleState>, calls: ReadonlyArray<IssuedCall>): void {
+function observe_calls(
+	states: Map<string, RuleState>,
+	calls: ReadonlyArray<IssuedCall>,
+	turn: ReadonlyArray<IssuedCall>,
+): void {
 	for (const rule of delivered_rules.MEASURED_RULES) {
 		const state = states.get(rule.id)
 
-		if (state !== undefined) observe_for_rule(rule, state, calls)
+		if (state !== undefined) observe_for_rule(rule, state, calls, turn)
 	}
 }
 
-function observe_line(states: Map<string, RuleState>, entry: DatedLine): void {
-	observe_calls(states, entry.calls)
+function observe_line(
+	states: Map<string, RuleState>,
+	entry: DatedLine,
+	turn: ReadonlyArray<IssuedCall>,
+): void {
+	observe_calls(states, entry.calls, turn)
 
 	for (const text of entry.errors) observe_error(states, text)
 }
@@ -286,17 +291,23 @@ function dated_lines_of(text: string): Array<DatedLine> {
 }
 
 function timeline_of(texts: ReadonlyArray<string>): Array<DatedLine> {
-	const entries = texts.flatMap((text) => dated_lines_of(text))
-
-	return fold_turns(entries.toSorted((left, right) => left.at_ms - right.at_ms))
+	return texts
+		.flatMap((text) => dated_lines_of(text))
+		.toSorted((left, right) => left.at_ms - right.at_ms)
 }
 
 // Every text belonging to one run — the session transcript and the transcripts of the units it
-// delegated — read as one timeline.
+// delegated — read as one timeline. The lines are walked in timestamp order; `turns_by_key` supplies
+// each call the rest of its message as context, so grouping no longer reorders the reading
+// (joshuafolkken/kit#1804).
 function read_run(texts: ReadonlyArray<string>): Map<string, RuleState> {
 	const states = blank_states()
+	const entries = timeline_of(texts)
+	const turns = turns_by_key(entries)
 
-	for (const entry of timeline_of(texts)) observe_line(states, entry)
+	for (const [index, entry] of entries.entries()) {
+		observe_line(states, entry, turns.get(turn_key(entry, index)) ?? entry.calls)
+	}
 
 	return states
 }
