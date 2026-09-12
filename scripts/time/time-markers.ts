@@ -22,11 +22,26 @@ import { json_value } from '#scripts/json-value'
 // them performs on GitHub — so the earliest of the two is taken and neither is required, which is
 // what keeps a delegated unit (whose parent loaded the skill) and a resumed run measurable.
 //
-// **The code-review skill call carries the review's whole duration**, so it is a marker rather than
-// a window boundary: measured on this repository's own transcripts, the `Skill` call for
-// `code-review` returns its result three to four minutes later, because the skill runs the review
-// and hands back the finding list. A window from the invocation to the next command would instead
-// swallow whatever the run did afterwards.
+// **The review boundary sits on whatever call the main line spends the review inside**, and since
+// joshuafolkken/kit#1855 that is an `Agent` call rather than a `Skill` one. Before it, the main line
+// loaded `/code-review` through the `Skill` tool and that call returned three to four minutes later
+// with the finding list — so the `Skill(code-review)` call carried the review's whole duration and
+// was the marker. #1855 moved the review into a forked subagent launched with the `Agent` tool, and
+// the main line no longer loads the skill at all: the `Skill(code-review)` call now lives inside the
+// fork's own transcript, where it returns instantly (it only loads the skill text), and the review's
+// real wall clock is the fork's own `Read`/`grep` spans. Those spans carry no marker of their own, so
+// they inherit the marker of the parent span they run inside — the `Agent` call (`time-overlap.ts`,
+// joshuafolkken/kit#1439). Left unmarked that parent deletes the phase rather than moving it, which is
+// the ~0 ms `review` joshuafolkken/kit#1846 measured. So the `Agent` launch is marked here, exactly
+// as the `Skill` call was, and the old `Skill(code-review)` marker stays for pre-#1855 transcripts.
+//
+// **The launch is recognized by its prompt carrying both `/code-review` and `review:attest`.** The
+// first is the instruction to invoke the review skill; the second is the attestation line
+// `pnpm josh review:brief` emits into the brief the launch passes verbatim (joshuafolkken/kit#1522).
+// Neither alone is enough: an investigation subagent about the review tooling quotes `/code-review`
+// in prose and is handed no brief, so `review:attest` is what tells a genuine review launch from a
+// discussion of one — measured against five real launches, it admits the review and rejects every
+// investigation.
 
 type PhaseMarker = 'none' | 'plan' | 'edit' | 'review' | 'workflow'
 
@@ -43,6 +58,17 @@ const SKILL_TOOL = 'Skill'
 const SKILL_KEY = 'skill'
 const REVIEW_SKILL = 'code-review'
 const WORKFLOW_SKILL = 'workflow-commands'
+
+// The forked review launch (joshuafolkken/kit#1846). `Agent` is the tool the main line spawns the
+// review subagent with, and `prompt` is where the instruction to it lives.
+const AGENT_TOOL = 'Agent'
+const PROMPT_KEY = 'prompt'
+// Both must be present. `/code-review` is the invocation the launch tells the subagent to run;
+// `review:attest` is the attestation line the passed-through `review:brief` carries and a discussion
+// of the review never does — so the pair admits a genuine review launch and rejects an investigation
+// subagent that merely mentions the review tooling.
+const REVIEW_INVOCATION = '/code-review'
+const REVIEW_ATTEST = 'review:attest'
 
 // The two skill calls that are boundaries, keyed by name. A map rather than a second `if`, so a
 // third boundary skill is a row and not another branch through the same function.
@@ -90,17 +116,34 @@ const IN_PROGRESS_FIELD = 'labels[]=in-progress'
 // issue" could only drift apart.
 const NO_ISSUE = cost_attribute.UNATTRIBUTED_KEY
 
-function skill_name(input: unknown): string {
+// One string field of a call's input, or `''` where the input is not a record or the field is not a
+// string. Shared by the two calls that read one — the skill name and the agent prompt — so the
+// record guard exists once.
+function string_field(input: unknown, key: string): string {
 	if (!json_value.is_record(input)) return ''
 
-	const skill = input[SKILL_KEY]
+	const value = input[key]
 
-	return typeof skill === 'string' ? skill : ''
+	return typeof value === 'string' ? value : ''
+}
+
+function skill_name(input: unknown): string {
+	return string_field(input, SKILL_KEY)
+}
+
+// An `Agent` launch's boundary: the review marker when its prompt is a genuine code-review run, and
+// no marker otherwise.
+function agent_marker(input: unknown): PhaseMarker {
+	const prompt = string_field(input, PROMPT_KEY)
+	const is_review = prompt.includes(REVIEW_INVOCATION) && prompt.includes(REVIEW_ATTEST)
+
+	return is_review ? REVIEW_MARKER : NO_MARKER
 }
 
 // A non-Bash call's boundary, read from the tool name and its input.
 function tool_marker(name: string, input: unknown): PhaseMarker {
 	if (EDIT_TOOLS.has(name)) return EDIT_MARKER
+	if (name === AGENT_TOOL) return agent_marker(input)
 	if (name !== SKILL_TOOL) return NO_MARKER
 
 	return SKILL_MARKERS.get(skill_name(input)) ?? NO_MARKER

@@ -266,18 +266,21 @@ function encloses(outer: Interval, inner: Interval): boolean {
 }
 
 // **A unit's spans inherit the marker of the parent span they replace** (joshuafolkken/kit#1439).
-// The parent holds one `Skill(code-review)` call across the whole time the review agent ran, and that
-// call is the only thing in either transcript that says those minutes were a review: the unit's own
-// spans are `Read`s and `grep`s and carry no marker at all. So subtracting the parent's minutes
-// without carrying its marker across does not move the phase to the unit, it deletes the phase —
-// measured on run #1428, whose 403-second review read as 141 milliseconds the moment the units it
-// delegated were read at all.
+// The parent holds one call across the whole time the review agent ran — a `Skill(code-review)` call
+// before joshuafolkken/kit#1855, and the `Agent` launch `time-markers.ts` marks as the review since it
+// — and that call is the only thing in either transcript that says those minutes were a review: the
+// unit's own spans are `Read`s and `grep`s and carry no marker at all. So subtracting the parent's
+// minutes without carrying its marker across does not move the phase to the unit, it deletes the
+// phase — measured on run #1428, whose 403-second review read as 141 milliseconds the moment the
+// units it delegated were read at all, and again on joshuafolkken/kit#1846 once the launch moved onto
+// the `Agent` tool and the marked `Skill` call left the parent transcript for the fork's own.
 //
 // **Only an unmarked span inherits, and only from a parent span that encloses it.** A unit span that
 // already says what it is keeps its own answer, and a parent span that does not enclose the unit was
 // never what those minutes were spent inside. In practice that makes the rule fire exactly where it
-// was written for: the span a delegated unit runs inside is the parent's `Task`/`Agent` call, which
-// carries no marker, and a marked one is a `Skill` call the unit is genuinely a part of.
+// was written for: the span a delegated unit runs inside is the parent's `Task`/`Agent` call, and the
+// marked one enclosing it is the review launch — the `Agent` call `time-markers.ts` marks since
+// joshuafolkken/kit#1855, or the `Skill(code-review)` call the unit was genuinely a part of before it.
 // **The narrowest enclosing marked span, never the first one the array happens to hold.** Several
 // marked spans can enclose the same unit, and the array is in the order the transcripts were read
 // rather than in time order — so `find` would answer with whichever was parsed first and charge the
