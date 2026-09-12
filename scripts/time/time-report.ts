@@ -3,11 +3,13 @@ import { time_category_table, type CategoryTotals } from './time-category-table'
 import type { CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_cycles, type CycleTotals } from './time-cycles'
+import { time_delegated_wait, type DelegatedWaitTotals } from './time-delegated-wait'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_followup_stages, type FollowupStageTotals } from './time-followup-stages'
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_gate_runs, type GateRunTotals } from './time-gate-runs'
+import { time_heading } from './time-heading'
 import { time_investigation, type InvestigationTotals } from './time-investigation'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_model_gaps } from './time-model-gaps'
@@ -192,6 +194,12 @@ interface TimeReport extends TurnSplit {
 	// separates a cycle that ran behind the second review round — costing nothing — from one the run
 	// sat through. Built by `time-cycles.ts`, which also renders the block.
 	ci_cycles: CycleTotals
+	// The idle the main line spent waiting on a delegated unit, broken out of the model share it is
+	// otherwise folded into (joshuafolkken/kit#1881). The categories count that wait as model time;
+	// only this separates a run that sat idle behind a delegation from one that overlapped it with its
+	// own work or a parallel launch. Built by `time-delegated-wait.ts` at the resolve site, since the
+	// origin is gone by the time a report holds spans.
+	delegated_wait: DelegatedWaitTotals
 	// The same elapsed time again, this time as the stretches it was spent in rather than as totals
 	// (joshuafolkken/kit#1311). Every span lands in exactly one segment, so these sum to the three
 	// transcript shares — the phase table's total without the CI share, which no span covers.
@@ -234,6 +242,10 @@ interface ReportInput {
 	// measured wherever the transcript was missing.
 	windows: RunWindows
 	notes: ReadonlyArray<string>
+	// The delegation windows this run's spans were built from, captured at the resolve site because the
+	// origin is lost once the fold runs (joshuafolkken/kit#1881). Optional: a caller with no delegation
+	// to report omits it, and `build_from_spans` reads `NO_WAITS` in its place.
+	delegated_wait?: DelegatedWaitTotals
 	by_check: ReadonlyArray<CheckTotal>
 }
 
@@ -401,6 +413,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		rework: time_rework.build_rework(spans, input.diff),
 		categories,
 		has_ci_data: ci.has_ci_data,
+		delegated_wait: input.delegated_wait ?? time_delegated_wait.NO_WAITS,
 		notes: [...input.notes],
 		...report_tables(input, turns),
 		failures: time_failures.build_failures(spans),
@@ -416,6 +429,7 @@ function build_report(
 	session_id: string,
 	timeline: Timeline,
 	notes: ReadonlyArray<string> = [],
+	delegated_wait: DelegatedWaitTotals = time_delegated_wait.NO_WAITS,
 ): TimeReport {
 	return build_from_spans({
 		scope: `session ${session_id}`,
@@ -430,28 +444,9 @@ function build_report(
 			time_windows.NO_OUTER_WINDOWS,
 		),
 		notes,
+		delegated_wait,
 		by_check: [],
 	})
-}
-
-// The sentence names no particular transcript, because a run scope reaches here when no transcript
-// was found at all — "this transcript has fewer" would then be about a file nobody located.
-// What sits under the scope line in every report: the notes that qualify the figures, then the three
-// windows those figures are lengths inside of.
-function heading_lines(report: TimeReport): Array<string> {
-	return [...time_format.note_lines(report.notes), ...time_windows.window_lines(report.windows)]
-}
-
-function format_empty(report: TimeReport): string {
-	return [
-		`${report.scope} — no timed lines`,
-		// The windows are printed here too: an issue nobody worked on in this checkout can still have
-		// been filed and closed, and that is a measurement even where no span was read.
-		...heading_lines(report),
-		'',
-		'A span needs two dated lines to sit between, and nothing read here has a pair. So there is',
-		'no elapsed time to divide up.',
-	].join('\n')
 }
 
 // **The blocks that say what the run did with its turns, gathered into one function** so the page
@@ -473,17 +468,20 @@ function turn_blocks(report: TimeReport): Array<string> {
 
 // Each block below is one line, and the page is the order of those lines.
 function format_report(report: TimeReport): string {
-	if (report.span_count === 0 && report.categories.ci_ms === 0) return format_empty(report)
+	if (report.span_count === 0 && report.categories.ci_ms === 0) {
+		return time_heading.format_empty(report)
+	}
 
 	return [
 		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
-		...heading_lines(report),
+		...time_heading.heading_lines(report),
 		'',
 		'Where the wall clock went:',
 		...time_category_table.category_lines(report),
 		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
 		...time_phase_costs.cost_lines(report.phase_costs),
 		...time_cycles.cycle_lines(report.ci_cycles),
+		...time_delegated_wait.wait_lines(report.delegated_wait),
 		...time_segments.segment_lines(report.segments),
 		...time_trips.trip_lines(report),
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
@@ -529,7 +527,7 @@ const time_report = {
 	format_columns,
 	format_row,
 	unmeasured_row,
-	format_empty,
+	format_empty: time_heading.format_empty,
 	format_report,
 }
 

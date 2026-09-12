@@ -368,6 +368,19 @@ Read from the JSON, in this order:
   `by_tool` is never read as "nothing to batch"** — and
   `recoverable_round_trips: 0` on a measured run is a real answer — a run that batched everything
   had nothing to recover, which is not the same as a run nobody could read.
+- **the idle spent waiting on a delegated unit — `delegated_wait`, read like the `CI cycles` block**
+  ([#1881](https://github.com/joshuafolkken/kit/issues/1881)). `resolve_delegated` folds a delegation's
+  wait into the model share, so the `categories` model wait counts it and nothing else separates a run
+  that sat idle behind a subagent from one that overlapped it. Each row is one delegation window with
+  its `naked` part — the wall clock the main line spent with nothing else running and only one unit in
+  flight, which a second lane would remove — and its counterpart named the way a cycle's is: `behind
+  <phase>` for concurrent main-line work, and `parallel` for the wall clock two or more units ran at
+  once, a fan-out that was never a serial wait. **Rank a "parallelize this delegation" proposal on the
+  naked figure, not on the window's length** — a window that ran wholly `behind` other work or as a
+  `parallel` launch is already overlapped and saves nothing, exactly as a CI cycle hidden behind the
+  review does. **`not measured` is not zero, and the block is withheld entirely for a run that never
+  delegated**: an unread unit transcript has an unknown window rather than an empty one, so a
+  `naked 0.0 s` row is a measured overlap while a withheld block is a run with no subagents at all.
 - **the work that was thrown away, and how much change the run bought** — `rework`
   ([#1387](https://github.com/joshuafolkken/kit/issues/1387)). Two readings out of one field. `files`
   names every path the run's `Edit` / `Write` calls touched with its edit count, and `presence` says

@@ -1,5 +1,10 @@
 import { cost_attribute } from '#scripts/cost/cost-attribute'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import {
+	time_delegated_wait,
+	type DelegatedWait,
+	type DelegatedWaitTotals,
+} from './time-delegated-wait'
 import { time_duplicate, type SessionSpans } from './time-duplicate'
 import { time_family, type Family, type SpanReader } from './time-family'
 import { time_overlap } from './time-overlap'
@@ -89,6 +94,9 @@ interface IssueSpans {
 	// from `session_count` because such a transcript contributed no span, and folding the two would
 	// report a run that is missing minutes as one that spent none.
 	unread_count: number
+	// The delegation windows this run waited on, read at the resolve site because the fold that follows
+	// erases which spans were the units' (joshuafolkken/kit#1881).
+	delegated_wait: DelegatedWaitTotals
 }
 
 // Drained with a loop rather than a spread of `Map#values()`: `Iterator#toArray` is not in this
@@ -125,6 +133,11 @@ interface Collector {
 	// alone cannot say whether it was the session's own file or one of its units that contributed.
 	contributed: Set<string>
 	unread: Set<string>
+	// Whether any unread transcript is a delegated unit of a family this issue touched — the unread
+	// counterpart of `resolved.has_delegation`, which only sees a unit whose spans were read
+	// (joshuafolkken/kit#1881). Without it the issue scope reports a run whose one delegation could not
+	// be read as a run that never delegated, while the session scope says `not measured`.
+	has_unread_unit: boolean
 }
 
 function new_collector(): Collector {
@@ -134,6 +147,7 @@ function new_collector(): Collector {
 		transcripts: new Map(),
 		contributed: new Set(),
 		unread: new Set(),
+		has_unread_unit: false,
 	}
 }
 
@@ -178,6 +192,22 @@ function attributed_spans(collector: Collector): Map<string, ReadonlyArray<Span>
 	return found
 }
 
+// Whether any unread transcript is a delegated unit of a touched family. A fully covered delegation
+// whose transcript could not be read leaves no span for `resolved.has_delegation` to see, so the run
+// would otherwise report at issue scope as one that never delegated (joshuafolkken/kit#1881). Read
+// from the family listing, which keeps the unit whether or not its transcript parsed — the same source
+// the session scope's `family.units.length` reads.
+function unread_delegation(
+	unread: ReadonlySet<string>,
+	families: ReadonlyMap<string, Family>,
+): boolean {
+	for (const [, family] of families) {
+		if (family.units.some((unit) => unread.has(unit.session_id))) return true
+	}
+
+	return false
+}
+
 // **The second pass — the family of what the first pass read** (joshuafolkken/kit#1439). It runs
 // after the walk rather than inside it because which transcripts are relatives is not known until
 // the whole listing has been attributed: a unit is claimed by the minutes of a parent that may be
@@ -203,6 +233,8 @@ function absorb_relatives(
 
 	for (const one of found.added) absorb_spans(collector, one.file, one.spans)
 	for (const session_id of found.unread) collector.unread.add(session_id)
+
+	collector.has_unread_unit = unread_delegation(collector.unread, families)
 }
 
 // Each session's spans resolved against its own units, then folded together under the same key — a
@@ -217,19 +249,41 @@ function absorb_relatives(
 //
 // `resolve_delegated` is the identity for a session that delegated nothing, which is why a run that
 // never delegated reports exactly as it did before.
-function resolved_spans(by_session: ReadonlyMap<string, SessionSpans>): Array<Span> {
+interface ResolvedSpans {
+	spans: Array<Span>
+	// The delegation windows read from the same sessions, before the fold above erased which spans were
+	// the units' (joshuafolkken/kit#1881).
+	waits: Array<DelegatedWait>
+	has_delegation: boolean
+}
+
+// One session folded in: its spans resolved into `seen`, its delegation windows pushed onto `waits`,
+// and whether it delegated at all returned. The windows are read from the same `own`/`delegated`
+// split `resolve_delegated` consumes, so the two agree about which spans were the units'.
+function absorb_session(
+	seen: Map<string, Span>,
+	waits: Array<DelegatedWait>,
+	collected: SessionSpans,
+): boolean {
+	const own = values_of(collected.own)
+	const delegated = values_of(collected.delegated)
+
+	waits.push(...time_delegated_wait.waits_of(own, delegated))
+	absorb(seen, time_overlap.resolve_delegated(own, delegated))
+
+	return delegated.length > NO_SPANS
+}
+
+function resolved_spans(by_session: ReadonlyMap<string, SessionSpans>): ResolvedSpans {
 	const seen = new Map<string, Span>()
+	const waits: Array<DelegatedWait> = []
+	let has_delegation = false
 
 	for (const [, collected] of time_duplicate.assign_duplicates(by_session)) {
-		const resolved = time_overlap.resolve_delegated(
-			values_of(collected.own),
-			values_of(collected.delegated),
-		)
-
-		absorb(seen, resolved)
+		if (absorb_session(seen, waits, collected)) has_delegation = true
 	}
 
-	return values_of(seen)
+	return { spans: values_of(seen), waits, has_delegation }
 }
 
 // How many transcripts the sessions that survived the separation contributed. **Counted from the
@@ -252,9 +306,10 @@ function transcripts_in(
 // until the arithmetic has run only means the arithmetic ran over a corpus that was never this run's.
 function to_issue_spans(collector: Collector, issue_number: number): IssueSpans {
 	const split = time_sessions.separate(collector.by_session, issue_number)
+	const resolved = resolved_spans(split.kept)
 
 	return {
-		spans: resolved_spans(split.kept),
+		spans: resolved.spans,
 		session_count: transcripts_in(collector.transcripts, split.kept),
 		excluded: split.excluded,
 		narrowed: split.narrowed,
@@ -262,6 +317,11 @@ function to_issue_spans(collector: Collector, issue_number: number): IssueSpans 
 		has_other_run_markers: split.has_other_run_markers,
 		attributed_count: split.attributed_count,
 		unread_count: collector.unread.size,
+		delegated_wait: time_delegated_wait.build_totals(
+			resolved.waits,
+			collector.unread.size === NO_SESSIONS,
+			resolved.has_delegation || collector.has_unread_unit,
+		),
 	}
 }
 
@@ -276,6 +336,7 @@ function empty_spans(): IssueSpans {
 		has_other_run_markers: false,
 		attributed_count: NO_SESSIONS,
 		unread_count: NO_SESSIONS,
+		delegated_wait: time_delegated_wait.NO_WAITS,
 	}
 }
 
