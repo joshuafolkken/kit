@@ -1383,9 +1383,11 @@ per child, and treat a single non-numeric line as the verdict.
    **Start the unit without blocking on it — `pnpm josh lane:dispatch <N>` when the child runs in a
    lane, which records where it writes as it starts it — and poll.** Blocking on the return
    leaves the parent with no turn in which to notice that the return is never coming, which is the
-   whole of "A delegated unit that stopped without reporting" above. Poll at the polling interval; ask
+   whole of "A delegated unit that stopped without reporting" above. **Start no wait of your own** —
+   the next turn is the one the progress watcher's exit delivers ("The parent keeps no clock of its
+   own" above) — and on that wake ask
    `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "<the lane's directory>"`
-   found>` once that file has been unchanged for the silent-unit window. **The flag is what you saw,
+   found>` where that file has been unchanged for the silent-unit window. **The flag is what you saw,
    never what kind of child it is**: passing `alive` without running `pgrep` answers `alive` for ever,
    including for a child that died an hour ago.
 
@@ -1444,22 +1446,48 @@ per child, and treat a single non-numeric line as the verdict.
    `in-progress`, which `epic:next` classifies as waiting on time *before* it consults any blocker,
    so it answers `wait` — the loop would poll to the 90-minute stale window and learn nothing.
 
-   Then **write the run's counters into the epic progress comment** — children run, Issues filed,
-   **consecutive failures**, `auto-ok` pickups taken, and the time the run started. This happens at
-   **every** child's merge, not only when something is about to stop: see "The counters live in the
-   conversation" below for why a session that carries on past a compaction loses them otherwise.
+   **A merge is one event, and it is one turn of the parent's — never a chain of them.** Measured on
+   the run this rule was written from, a single child's merge cost the parent **three** API calls and
+   the run's ending another three, each one a full re-read of a saturated context to write two lines
+   (joshuafolkken/kit#1836). **None of the reads a merge needs takes another's result as input**,
+   which is the criterion the turn-batching convention already states
+   (`prompts/collaboration-workflow/turn-batching.md`), so `pnpm josh issue:state <N>` — with
+   `--repo <owner/repo>` for a cross-repository child — `pnpm josh lane:list` and
+   `pnpm josh cost --over 300000` go out **together**, never one turn each.
 
-   Then **ask the hand-off check — at every child's merge, delegated or not**, immediately after the
-   merge and `pnpm josh ms`: `pnpm josh cost --over 300000`, beside `pnpm josh lane:list` in the same
-   turn. Go back to step 1 on `under`; on `over` **the run hands its lanes over and stops in that same
+   **The acting half is the next turn, and it is also one.** `pnpm josh ms`, `pnpm josh lane:close
+   <N>`, the counters comment below and the next `epic:next` ask all take the classification those
+   reads produced, and none of them takes another of them, so they go out together too.
+
+   **In steady state that is one parent call per event, because the acting turn also issues the reads
+   the next event needs.** The turn that closes child A's lane is the turn that asks for child B, and
+   the turn that reads B's state is the turn that acted on A — so no turn is ever spent only reading.
+   **A turn whose whole content is one read, or one two-line progress report, is the shape this
+   forbids.**
+
+   **The counters go into the epic progress comment in that acting turn** — children run, Issues
+   filed, **consecutive failures**, `auto-ok` pickups taken, and the time the run started. This
+   happens at **every** child's merge, not only when something is about to stop: see "The counters
+   live in the conversation" below for why a session that carries on past a compaction loses them
+   otherwise. Their **values** are counted inside the run rather than read back here, so only the
+   write waits for the merge (`SKILL.md` → §2h).
+
+   **The hand-off check is asked at every child's merge, delegated or not** — `pnpm josh cost --over
+   300000`, in the reading turn above beside `pnpm josh issue:state` and `pnpm josh lane:list`
+   rather than in a turn of its own. Go back to step 1 on `under`; on `over` **the run hands its lanes over and stops in that same
    turn** — no new child is taken, the lanes already in flight keep running, and the next session picks
    them up from `lane:list` and `pnpm josh lane:output` (see "The hand-off" below). The one reading
    that does not stop is a lane nobody could poll — `unreadable`, or `open` with no recorded path.
    **Never read the condition off
    `pnpm josh delegate epic-child`** — it is a static policy lookup that answers `delegate` everywhere,
    so a gate built on it never fires.
-3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
-   repository has work but this one does not", which is a wait from here.
+3. **`wait`** — go back to step 1. **With something of this run's own in flight, that happens on the
+   wake the progress watcher's exit delivers** and the parent starts no sleep of its own; the 60 s
+   figure then bounds how soon the ask may be repeated rather than scheduling it. **With nothing in
+   flight the watcher declines and never exits, so the parent keeps the interval** — which is the
+   case for "another repository has work but this one does not", and for a cross-repository publish
+   wait. The table in "The wake exists only while something is in flight" above decides which,
+   and it is read rather than judged.
 4. **`stop`** — report the parked children and finish.
 5. **`complete`** — post the epic summary, then run the pickup in "After the epic — issues opted
    in with `auto-ok`" below, and finish.
@@ -1970,8 +1998,8 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null 
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| Polling interval | 60 s | A child's `fullrun` takes minutes; a shorter poll only spends API quota. |
-| `backlogrun` idle-watch poll | 5 min | Not the interval above. What a watch waits on is a person filing an issue and applying `auto-ok`, which happens on human timescales — and every ask bills the parent session's whole history, so asking every minute spends thirty requests to learn nothing thirty times (joshuafolkken/kit#1676). |
+| Polling interval | 60 s | **A floor between two asks, never a clock the parent sets.** A child's `fullrun` takes minutes, so asking more often only spends API quota. It bounds a re-ask made while the parent is *already awake*; what wakes it is "The parent keeps no clock of its own" below. |
+| `backlogrun` idle-watch poll | 5 min | Not the interval above, and a floor in the same sense. What a watch waits on is a person filing an issue and applying `auto-ok`, which happens on human timescales — and every ask bills the parent session's whole history, so asking every minute spends thirty requests to learn nothing thirty times (joshuafolkken/kit#1676). |
 | Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. A working unit rewrites its transcript continuously, so half an hour of no movement is not a slow child; it is a child whose average end-to-end time on joshuafolkken/kit#1176 was 31 min producing nothing at all. Past it, run the four traces above and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Longer than any single child has taken; past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget (joshuafolkken/kit#863). A failed publish never appears. |
@@ -1981,6 +2009,71 @@ Each timeout **ends the wait and reports** — none of them is retried indefinit
 label is removed first (above), so the next poll can offer it. **A graph that has deadlocked on a
 cycle is not this loop's to untangle**: `epic:next` detects it and exits with an error, so `epicrun`
 confines itself to ending the wait and reporting it.
+
+### The parent keeps no clock of its own — the watcher's exit is the wake
+
+**The numbers above are floors between asks, and they were being read as a timer the parent sets.**
+A parent that sets one spends a turn per tick at the point its context is largest — the exact cost
+`run:progress` was built to remove, which `scripts/run/run-progress-cli.ts` states at its head: "a
+parent that waits and reports spends one of its own turns per heartbeat — 36 of them in a three-hour
+run, taken at the point its context is largest." The watcher took the *reporting* out of the parent;
+the parent went on keeping the clock anyway, so the two ran side by side and the run paid for both
+(joshuafolkken/kit#1836).
+
+**The two are separated by arithmetic, not by inspection.** A `backlogrun` parent was measured at
+**24 API calls in one hour, averaging 356K of context each**, its own context flat at 329K → 368K
+across that hour — a saturated context re-read to write two lines. **At the default twenty-minute
+interval the watcher can account for at most three of those 24**, because it cannot exit more often
+than its interval; every remaining call is a turn the parent woke itself for. That is the whole
+separation, and it needs no second reading of the transcript — which matters, because the transcript
+parsing that produced these figures is what `.claude/skills/diag/SKILL.md` forbids, and the
+re-measurement belongs to `pnpm josh cost` and `pnpm josh time`.
+
+**So the parent starts no wait of its own.** While something of this run's own is in flight, the next
+turn is the one the **watcher's exit delivers** — a background command's completion is what
+re-invokes the session (`SKILL.md` → §2h), so the wake is delivered rather than timed. **A `Bash`
+call that only sleeps is the spelling this forbids**, and so is a turn whose whole content is asking
+`epic:next` again to see whether anything has changed since the last ask.
+
+**The wake is used for both halves at once.** The turn that relays the line is the turn that acts on
+what the line says: a line showing a free lane is the ask for the next child, and a line showing
+every lane still busy is not an ask at all. Relaying in one turn and acting in the next is the
+duplication this section removes, in a second place.
+
+**The cost is latency, and it is named rather than hidden.** A lane that frees just after a line can
+sit idle until the next one — **up to one interval**. That is the trade taken deliberately: one
+interval of one idle lane against roughly twenty-one turns an hour, each at the largest context the
+run ever has. **A person who wants the latency back shortens the interval** — `--interval`, or
+`progress_interval_minutes` in the repository's own configuration ("Progress while the run is quiet"
+above) — which moves the wake and the report together and keeps the parent's turn count tied to one
+number instead of two.
+
+**What is not dropped.** Every timeout in the table above still ends its wait, and the silent-unit
+liveness check is still asked — on the wake the watcher delivers rather than on a clock of the
+parent's own. Those bound waits; none of them starts a turn.
+
+#### The wake exists only while something is in flight
+
+**`--wait` ends at the first line it *prints*, and it prints only where there is something to
+report.** With no child in flight it **declines** instead: the loop goes on waiting by design — "a
+quiet repository keeps the loop waiting instead of ending it", `scripts/run/run-progress-cli.ts` —
+and a `gh` listing it could not read declines the same way. **A declined watcher does not exit until
+its `--hours` bound, an hour by default.** So the wake above is not available in every state the
+parent can wait in, and where it is unavailable **the parent keeps the interval after all**:
+
+| The parent is waiting on | What wakes it |
+| --- | --- |
+| A child of this run's, in flight | **The watcher's exit.** Start no wait of your own |
+| A blocker that resolves elsewhere with nothing of this run's in flight — a cross-repository publish, another repository's work | **The polling interval, kept by the parent.** The watcher declines and will not exit |
+| GitHub not answering (`retry`) | **The polling interval, kept by the parent.** The outage that produced `retry` stops the watcher reading too, so it declines |
+| An empty backlog during `backlogrun`'s idle watch | **The 5-minute idle poll, kept by the parent.** Nothing carries `in-progress`, so the watcher declines for the whole watch |
+
+**This boundary is written as a table because reading the rule past it is expensive and silent.** A
+`backlogrun` idle watch has a 30-minute budget, and a parent waiting for a wake that cannot arrive
+before the watcher's one-hour bound would end that watch having polled the backlog **zero** times;
+a three-`retry` cap meant to survive a brief outage would take three hours to spend. The saving this
+section is for comes from the in-flight row, which is where a run spends nearly all of its waiting —
+and it is the only row where the watcher was ever going to exit.
 
 `epic:next` does not report when a label was applied, so read that from the issue's timeline:
 

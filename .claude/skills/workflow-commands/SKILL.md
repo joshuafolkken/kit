@@ -1223,6 +1223,14 @@ act, so the run continues rather than stalling — the sanctioned boundary disti
 turn-end this section forbids. The boundary, its two commands and the resume verification are the
 `pre-gate-cut.md` skill document, its single source.
 
+**A parent waiting on its children is this same rule at the batch's scale.** A background command's
+completion is what re-invokes the session, so a parent with children in flight already has a wake
+delivered to it and never has to time one — which is why the `epicrun` / `backlogrun` loop starts no
+sleep of its own and reads its polling figures as floors on a re-ask rather than as a clock to keep
+(`epicrun.md` → "The parent keeps no clock of its own", the single source, joshuafolkken/kit#1836).
+The same measurement settles a merge event at one parent turn rather than three, by the criterion
+this section already applies: the calls that take no other call's result go out together.
+
 This section is the single source of the rule. `followup.md`, `eval-gate.md`, `chain-rule.md` and
 `epicrun.md` → "Progress while the run is quiet" route here for it rather than restating it.
 
