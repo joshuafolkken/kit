@@ -97,6 +97,16 @@ describe('observations_flush — the refusals name what to do next', () => {
 		expect(message).toContain(MS_COMMAND)
 	})
 
+	// joshuafolkken/kit#1768: a default branch behind origin cuts a branch that conflicts by
+	// construction, so the refusal names the branch, the remote it is behind, and `pnpm josh ms`.
+	it('sends a stale default branch to pnpm josh ms before cutting a branch', () => {
+		const message = observations_flush.behind_default_message(DEFAULT_BRANCH)
+
+		expect(message).toContain(DEFAULT_BRANCH)
+		expect(message).toContain(`origin/${DEFAULT_BRANCH}`)
+		expect(message).toContain(MS_COMMAND)
+	})
+
 	// The opposite advice, on the one branch where `pnpm josh ms` would discard the only copy of an
 	// appended line: a flush branch holds its observations as a commit, so the working tree shows
 	// nothing and a silent checkout loses them.
