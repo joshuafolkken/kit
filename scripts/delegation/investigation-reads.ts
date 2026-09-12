@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
-import { hook_decision } from '#scripts/josh/hook-decision'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_bundle_call } from '#scripts/time/time-bundle-call'
 import { time_shell } from '#scripts/time/time-shell'
@@ -63,6 +63,11 @@ const REASON = `${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files 
 interface ReadTally {
 	// The files read and not since edited, resolved so the two ways a target reaches here compare.
 	pending: ReadonlyArray<string>
+	// How many of those entered the set **after** the instant the caller asked about — the refusal's,
+	// in the one call that matters (joshuafolkken/kit#1764). It is the second way a refusal re-arms:
+	// a run that ignores the one refusal it gets goes on accumulating, and a threshold's worth of new
+	// unedited files is a second accumulation whatever the run did about the first.
+	pending_since: number
 	// When the last delegated unit closed, or `NEVER_MS` where the window holds none. This is what
 	// re-arms a refusal: a delegation after the recorded one is a new accumulation.
 	reset_ms: number
@@ -223,11 +228,20 @@ function delegation_instant(span: Span | undefined): number {
 	return span === undefined ? hook_decision.NEVER_MS : span.ended_ms
 }
 
-function add_all(pending: Set<string>, targets: ReadonlyArray<string>): void {
-	for (const target of targets) pending.add(target)
+// **The set records *when* each file entered it, which is the whole of the second re-arm**
+// (joshuafolkken/kit#1764). A plain set could say how many files were pending and never how many of
+// them arrived after the refusal, so a run that ignored its one refusal was indistinguishable from
+// one that had read nothing since. The first entry stands: a re-read of a file already pending is
+// not a new accumulation, exactly as it is not a new count.
+function add_all(
+	pending: Map<string, number>,
+	targets: ReadonlyArray<string>,
+	at_ms: number,
+): void {
+	for (const target of targets) if (!pending.has(target)) pending.set(target, at_ms)
 }
 
-function delete_all(pending: Set<string>, targets: ReadonlyArray<string>): void {
+function delete_all(pending: Map<string, number>, targets: ReadonlyArray<string>): void {
 	for (const target of targets) pending.delete(target)
 }
 
@@ -242,14 +256,14 @@ function delete_all(pending: Set<string>, targets: ReadonlyArray<string>): void 
 // write has to be the one that stands. Reading `span.writes` rather than `span.marker` and
 // `span.targets` is also what makes `MultiEdit` and `NotebookEdit` subtract at all: they carry the
 // edit marker but, being outside `BUNDLEABLE_TOOLS`, arrive naming nothing.
-function apply_span(pending: Set<string>, span: Span): void {
+function apply_span(pending: Map<string, number>, span: Span): void {
 	if (DELEGATION_TOOLS.has(span.label)) {
 		pending.clear()
 
 		return
 	}
 
-	if (is_content_read(span.label)) add_all(pending, subject_targets(span.targets))
+	if (is_content_read(span.label)) add_all(pending, subject_targets(span.targets), span.ended_ms)
 
 	delete_all(pending, subject_targets(span.writes))
 }
@@ -261,14 +275,19 @@ function last_delegation_ms(spans: ReadonlyArray<Span>): number {
 // **The window is the tail the hook read, not the whole run.** That is the same bound the batching
 // guard works under, and it costs nothing here: the set is cleared at every delegation anyway, so a
 // tail that reaches back past the last one already holds the whole accumulation.
-function tally_of(text: string): ReadTally {
+function pending_after(pending: ReadonlyMap<string, number>, since_ms: number): number {
+	return [...pending.values()].filter((at_ms) => at_ms > since_ms).length
+}
+
+function tally_of(text: string, since_ms: number = hook_decision.NEVER_MS): ReadTally {
 	const { spans, started_ms } = time_spans.parse_timeline(text)
-	const pending = new Set<string>()
+	const pending = new Map<string, number>()
 
 	for (const span of spans) apply_span(pending, span)
 
 	return {
-		pending: [...pending],
+		pending: [...pending.keys()],
+		pending_since: pending_after(pending, since_ms),
 		reset_ms: last_delegation_ms(spans),
 		window_start_ms: started_ms,
 	}
@@ -307,10 +326,44 @@ function is_at_threshold(pending_count: number): boolean {
 // the 256 KB tail there is no `reset_ms` left to beat, and one stale stamp disarmed the rest of the
 // session. This is the bound `batch-guard.ts` already documents for its own window — one extra
 // refusal per window rather than silence — and it errs toward delegating, which is the goal.
-function is_rearmed(tally: ReadTally, refused_at_ms: number): boolean {
-	if (refused_at_ms === hook_decision.NEVER_MS) return true
-
+//
+// **And a further accumulation re-arms it, which is what "one refusal per accumulation" had always
+// meant and never done** (joshuafolkken/kit#1764). A delegation was the only thing that could clear
+// the disarm, so a run that *ignored* the refusal — read on without delegating — was never spoken to
+// again however many unedited files it went on to open: the one case the threshold exists for was the
+// one case it stopped covering. `docs/josh-commands.md` had already published the corrected
+// behavior — "one per accumulation and re-arms after the next three unedited reads" — against code
+// that did nothing of the kind, which is the shipped-mechanism-not-working defect
+// joshuafolkken/kit#1262 declared highest priority.
+//
+// **It is not a refusal on the next call.** The count has to climb a whole threshold again, so a
+// false positive still costs one round trip; what it cannot do any more is buy silence for the rest
+// of the run.
+//
+// **And it does not apply inside a delegated unit, which is the one place the remedy does not exist.**
+// The hook counts a unit's reading against the unit (joshuafolkken/kit#1424), and the refusal asks for
+// a dispatch — but a unit is already where §2b sends the reading, and a read-only one (`Explore`,
+// `Plan`) has no `Agent` tool to dispatch with. Re-armed there, the arm would toll the very execution
+// tier this rule exists to move work to, one round trip per threshold's worth of files, for an
+// instruction the unit cannot carry out. So a unit keeps the behavior it had: one refusal, which
+// states the norm, and no repetition.
+function has_cleared_the_disarm(tally: ReadTally, refused_at_ms: number): boolean {
 	return tally.reset_ms > refused_at_ms || refused_at_ms < tally.window_start_ms
+}
+
+function is_rearmed(tally: ReadTally, refused_at_ms: number, can_delegate = true): boolean {
+	if (refused_at_ms === hook_decision.NEVER_MS) return true
+	if (has_cleared_the_disarm(tally, refused_at_ms)) return true
+
+	return can_delegate && is_at_threshold(tally.pending_since)
+}
+
+// A transcript under a session's `subagents/` directory is a delegated unit's. The segment is
+// `cost-transcript.ts`'s, which owns the layout — spelling it a second time here is the clone
+// `CLAUDE.md` prohibits, and the hook is handed the derived fork path rather than the parent's
+// (`hook-decision.ts` → `guard_reason_for_payload`).
+function is_unit_transcript(transcript: string): boolean {
+	return transcript.split(path.sep).includes(cost_transcript.UNIT_DIRECTORY)
 }
 
 function is_refusable_command(call: GuardedCall): boolean {
@@ -343,18 +396,186 @@ function is_refusable_call(call: GuardedCall): boolean {
 	return call.name === cost_blocks.BASH_TOOL && is_refusable_command(call)
 }
 
-function should_block(text: string, call: GuardedCall, refused_at_ms: number): boolean {
+function should_block(
+	text: string,
+	call: GuardedCall,
+	refused_at_ms: number,
+	run?: GuardRun,
+): boolean {
 	if (!is_refusable_call(call)) return false
 
-	const tally = tally_of(text)
+	const tally = tally_of(text, refused_at_ms)
 
 	if (!is_at_threshold(tally.pending.length)) return false
 
-	return adds_a_subject_file(tally.pending, call) && is_rearmed(tally, refused_at_ms)
+	const can_delegate = run === undefined || !is_unit_transcript(run.transcript)
+
+	return adds_a_subject_file(tally.pending, call) && is_rearmed(tally, refused_at_ms, can_delegate)
+}
+
+// What a read this rule saw was, in the four answers the rule itself can give
+// (joshuafolkken/kit#1764). `pnpm josh time` prints them as a block, and the ids are here rather than
+// there because each one is a fact about the guard: the two above the line are the reading §2b leaves
+// in the main line on purpose, and the two below it are the reading it sends to a unit.
+//
+// **The last is the gap, and naming it is the point.** A read that reached the threshold and was not
+// refused is neither by design nor caught, and nothing could see it — so the 35.9% of a run's turns
+// that `investigation` accounts for could not be told apart from the reading that belongs there. Two
+// things put a read in it, and the row deliberately covers both: a refusal already standing that the
+// arm above had not re-armed, and a spelling the guard never refuses at all (`sed -n`, below).
+const EDIT_TARGET_CLASS = 'edit targets'
+const UNDER_THRESHOLD_CLASS = 'under the threshold'
+const REFUSED_CLASS = 'refused'
+// Kept inside `time-format.ts`'s 24-character label column, which the fuller phrasing overflowed —
+// the prose beside the block is where the two reasons are named.
+const LET_THROUGH_CLASS = 'let through'
+const READ_CLASSES: ReadonlyArray<string> = [
+	EDIT_TARGET_CLASS,
+	UNDER_THRESHOLD_CLASS,
+	REFUSED_CLASS,
+	LET_THROUGH_CLASS,
+]
+
+// **The live guard refuses a `Read` always and a shell read only where the line cannot also write**,
+// which is why `Bash: sed` is counted and never refused: `sed -n` prints and `sed -i` rewrites, and
+// `time-batch-guard.ts` → `is_read_only_call` answers conservatively for both. A span carries the
+// label but not the command, so the replay asks the question the span *can* answer — and of the eight
+// printing commands, `sed` is the only one on `time-bundle-call.ts`'s writing list. **The residual is
+// named rather than hidden**: a redirection inside a `cat` line also stops the live call being refusable
+// and is invisible here, so a handful of such reads land in `refused` that the guard would have let
+// through. It is the same direction as the row below and far smaller.
+const NEVER_REFUSED_LABELS: ReadonlySet<string> = new Set([time_shell.bash_label('sed')])
+
+// The guard's state as a replay walks a recorded run, which is `ReadTally` plus the one thing a live
+// hook keeps on disk instead — the instant it last refused.
+interface Replay {
+	pending: Map<string, number>
+	reset_ms: number
+	window_start_ms: number
+	refused_at_ms: number
+}
+
+// **Every file the run ever wrote, gathered before the walk rather than during it.** The pending set
+// subtracts an edit when it happens, which is right for the live guard and wrong for this question: a
+// read made twenty turns before its edit is still a read of a file the run edited, and §2b keeps
+// exactly that one in the main line.
+function edited_files(spans: ReadonlyArray<Span>): Set<string> {
+	const edited = new Set<string>()
+
+	for (const span of spans) for (const target of subject_targets(span.writes)) edited.add(target)
+
+	return edited
+}
+
+// The tally the live guard would have held at this instant, so the re-arm is asked of the one
+// function that answers it rather than of a second copy of the rule.
+function tally_now(replay: Replay): ReadTally {
+	return {
+		pending: [...replay.pending.keys()],
+		pending_since: pending_after(replay.pending, replay.refused_at_ms),
+		reset_ms: replay.reset_ms,
+		window_start_ms: replay.window_start_ms,
+	}
+}
+
+// The same two conditions `should_block` asks: the accumulated count is at the boundary, and this
+// read actually adds a file to it.
+function reaches_threshold(replay: Replay, targets: ReadonlyArray<string>): boolean {
+	const added = targets.filter((target) => !replay.pending.has(target))
+
+	return added.length > 0 && is_at_threshold(replay.pending.size)
+}
+
+// Whether the guard would have refused this read had it been armed — the same two conditions
+// `is_refusable_call` puts in front of every refusal, asked of a span.
+function would_refuse(replay: Replay, span: Span): boolean {
+	if (NEVER_REFUSED_LABELS.has(span.label)) return false
+
+	return is_rearmed(tally_now(replay), replay.refused_at_ms)
+}
+
+function class_of(replay: Replay, span: Span, edited: ReadonlySet<string>): string {
+	const targets = subject_targets(span.targets)
+
+	if (targets.every((target) => edited.has(target))) return EDIT_TARGET_CLASS
+	if (!reaches_threshold(replay, targets)) return UNDER_THRESHOLD_CLASS
+
+	return would_refuse(replay, span) ? REFUSED_CLASS : LET_THROUGH_CLASS
+}
+
+// A span that is not a read, or whose every target was an instruction document or a session file,
+// classifies as nothing at all — it never reached the count, so putting it in a row would report the
+// guard as having an opinion about it.
+function read_class(replay: Replay, span: Span, edited: ReadonlySet<string>): string | undefined {
+	if (!is_content_read(span.label)) return undefined
+	if (subject_targets(span.targets).length === 0) return undefined
+
+	return class_of(replay, span, edited)
+}
+
+function step(replay: Replay, span: Span, edited: ReadonlySet<string>): string | undefined {
+	if (DELEGATION_TOOLS.has(span.label)) {
+		replay.reset_ms = span.ended_ms
+		apply_span(replay.pending, span)
+
+		return undefined
+	}
+
+	const found = read_class(replay, span, edited)
+
+	apply_span(replay.pending, span)
+
+	return found
+}
+
+// A refusal moves the disarm forward, exactly as the hook's own stamp does.
+function record(
+	replay: Replay,
+	classes: Array<string>,
+	found: string | undefined,
+	at_ms: number,
+): void {
+	if (found === undefined) return
+
+	classes.push(found)
+
+	if (found === REFUSED_CLASS) replay.refused_at_ms = at_ms
+}
+
+const FIRST_SPAN = 0
+
+function fresh_replay(spans: ReadonlyArray<Span>): Replay {
+	return {
+		pending: new Map<string, number>(),
+		reset_ms: hook_decision.NEVER_MS,
+		window_start_ms: spans[FIRST_SPAN]?.ended_ms ?? hook_decision.NEVER_MS,
+		refused_at_ms: hook_decision.NEVER_MS,
+	}
+}
+
+// **What each of a run's reads was, replayed through this rule's own predicates**
+// (joshuafolkken/kit#1764). It is the measurement half of the guard and shares every decision with
+// it — the subject test, the threshold, the delegation reset and the re-arm — because a second walk
+// that merely resembled the guard would answer about a rule nobody ships.
+function classify_reads(spans: ReadonlyArray<Span>): Array<string> {
+	const edited = edited_files(spans)
+	const replay = fresh_replay(spans)
+	const classes: Array<string> = []
+
+	for (const span of spans) record(replay, classes, step(replay, span, edited), span.ended_ms)
+
+	return classes
 }
 
 const investigation_reads = {
 	CONTENT_READ_COMMANDS,
+	EDIT_TARGET_CLASS,
+	LET_THROUGH_CLASS,
+	READ_CLASSES,
+	REFUSED_CLASS,
+	UNDER_THRESHOLD_CLASS,
+	classify_reads,
+	subject_targets,
 	DELEGATION_TOOLS,
 	READ_TOOLS,
 	REASON,

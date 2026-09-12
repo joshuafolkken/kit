@@ -7,6 +7,7 @@ import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
 import { time_gate_runs } from './time-gate-runs'
+import { time_investigation } from './time-investigation'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import type { PhaseTotal } from './time-phases'
 import type { TimeReport } from './time-report'
@@ -77,6 +78,7 @@ type Breakdown = Pick<
 	| 'bundles'
 	| 'single_checks'
 	| 'gate_runs'
+	| 'investigation'
 	| 'parent_turns'
 	| 'followup_stages'
 	| 'rework'
@@ -99,6 +101,7 @@ function empty_breakdown(): Breakdown {
 		bundles: { ...time_bundles.NO_BUNDLES },
 		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
 		gate_runs: { ...time_gate_runs.NO_GATE_RUNS },
+		investigation: { ...time_investigation.NO_INVESTIGATION },
 		parent_turns: { ...time_parent_turns.NO_PARENT_TURNS },
 		followup_stages: { ...time_followup_stages.NO_FOLLOWUP_STAGES },
 		rework: { ...time_rework.NO_REWORK },

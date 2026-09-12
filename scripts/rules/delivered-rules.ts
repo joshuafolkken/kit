@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
+import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
@@ -361,9 +362,49 @@ const BATCHING_RULE: MeasuredRule = {
 	reaches: time_batch_guard.is_guarded_call,
 }
 
+// **The row `pnpm josh rule:value` scores the investigation guard from** (joshuafolkken/kit#1764).
+// It is measured but not delivered, for exactly the reason the batching row is: `josh
+// investigation:guard` has delivered it since joshuafolkken/kit#1460, and a row in `DELIVERED_RULES`
+// would refuse the same violation a second time, each refusal spending a record the other cannot
+// see. Until now it was the second delivered rule the measurement could not read at all — and the
+// one whose subject, `investigation` at 35.9% of a run's turns, is the largest contributor any
+// mechanism here addresses.
+//
+// **It declares no `is_trigger`, and that is honest rather than a gap.** Whether a read would be
+// refused depends on the reads *behind* it — `investigation_reads.should_block` reads the transcript
+// tail for exactly that — and the measurement hands a predicate one call at a time, so a call-shaped
+// trigger could only be a guess. The refusal itself is what the transcript records, and
+// `observe_error` takes that as the trigger.
+//
+// **`reaches` is the read the guard could have refused, not the refusal**, the distinction
+// joshuafolkken/kit#1643 drew: scored against a trigger that fires only on the violation, the rate
+// would be taken over runs that broke the rule at least once and would read near zero by
+// construction.
+//
+// **It declares no `keeps` either, and the unmeasured cell is the honest answer rather than a gap.**
+// The obvious predicate — a subagent dispatch — credits *any* dispatch, because that is what the
+// guard's own reset does; a run that read twenty files in the main line, was never refused and sent
+// one review agent at the end would score as full compliance. That row would sit near 100% for the
+// rule this very Issue measures as let through on a third of all reads, and `pnpm josh rule:value` is
+// what retirement decisions are read from. The module's own doctrine settles it: a rule with no
+// `keeps` is reported unmeasured, because 0 and 1 are both claims the data does not make. **The
+// compliance reading exists elsewhere and is better**: `pnpm josh time`'s `Investigation reads:`
+// block, built from this same guard's predicates, says per run how much reading was refused, let
+// through, or main-line by design. What this row adds is the reach and the delivery count, which is
+// the continuous reading the guard had none of.
+const INVESTIGATION_RULE: MeasuredRule = {
+	id: 'investigation',
+	reason: investigation_reads.REASON,
+	reaches: investigation_reads.is_refusable_call,
+}
+
 // Every rule the measurement can score, delivery registry first so a printed table reads in
 // enumeration order with the rows delivered from here at the top.
-const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [...DELIVERED_RULES, BATCHING_RULE]
+const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
+	...DELIVERED_RULES,
+	BATCHING_RULE,
+	INVESTIGATION_RULE,
+]
 
 // **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
 // that had already obeyed it, which is the failure `hook_decision`'s stamp exists to prevent; the

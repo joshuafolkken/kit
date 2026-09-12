@@ -114,6 +114,19 @@ describe('investigation_refusal — the threshold, and its second firing', () =>
 		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeDefined()
 	})
 
+	// joshuafolkken/kit#1764: the disarm is per accumulation, and a run that ignores its one refusal
+	// goes on accumulating. Until this arm existed only a delegation cleared it, so the one run the
+	// threshold exists for — one that reads on and never delegates — was never spoken to twice.
+	it('refuses again once another accumulation has piled up without a delegation', () => {
+		const transcript = write_transcript('second-accumulation', [
+			...at_threshold_lines(),
+			...target_turn_lines(LATE_TURN, subject_files('late')),
+		])
+
+		expect(investigation_refusal(payload_of(transcript), EARLIER_REFUSAL_MS)).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeDefined()
+	})
+
 	it('says nothing below the threshold', () => {
 		const transcript = write_transcript('below', target_turn_lines(0, [LONE_FILE]))
 
@@ -165,6 +178,27 @@ describe('investigation_refusal — a delegated unit is judged on its own histor
 		).toBeDefined()
 		expect(existsSync(refusal_path(fork))).toBe(true)
 		expect(existsSync(refusal_path(parent))).toBe(false)
+	})
+
+	// joshuafolkken/kit#1764: a unit is already where the reading is sent, and a read-only one has no
+	// `Agent` tool to dispatch with — so the accumulation arm would toll that tier one round trip per
+	// threshold's worth of files for an instruction it cannot carry out. Its one refusal stands; the
+	// repetition does not.
+	it('does not re-arm on a second accumulation inside a unit', () => {
+		const parent = write_transcript('unit-parent', target_turn_lines(0, [LONE_FILE]))
+		const fork = time_hook_transcript.fork_path(parent, 'unit-2')
+
+		mkdirSync(path.dirname(fork), { recursive: true })
+		writeFileSync(
+			fork,
+			[...at_threshold_lines(), ...target_turn_lines(LATE_TURN, subject_files('late'))].join('\n'),
+		)
+		WRITTEN_TRANSCRIPTS.push(fork)
+
+		const unit_payload = payload_of(parent, { agent_id: 'unit-2' })
+
+		expect(investigation_refusal(unit_payload, EARLIER_REFUSAL_MS)).toBeDefined()
+		expect(investigation_refusal(unit_payload, NOW_MS)).toBeUndefined()
 	})
 })
 
