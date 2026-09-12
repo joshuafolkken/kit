@@ -10,6 +10,7 @@ import { security_updates } from '#scripts/security-updates'
 import { running_binary } from '#scripts/version/running-binary'
 import { doctor_io, type GitTopLevel } from './doctor-io'
 import { doctor_logic } from './doctor-logic'
+import { doctor_ports } from './doctor-ports'
 
 const FIX_FLAG = '--fix'
 const UNKNOWN = '(unknown)'
@@ -160,6 +161,18 @@ function report_repository_map(git: GitTopLevel): void {
 	console.info(doctor_logic.format_repository_map(map))
 }
 
+// Each discovered repository's port seed and the ports it resolves to, and any seed shared by more
+// than one of them (joshuafolkken/kit#1494). Anchored on the same map as `report_repository_map`, so
+// it prints from inside a repository and nowhere else.
+function report_port_seeds(git: GitTopLevel): void {
+	if (git.state !== 'inside') return
+
+	const map = repo_discovery.discover_repositories(git.top_level)
+
+	console.info('')
+	console.info(doctor_ports.report_port_seeds(map))
+}
+
 function main(): void {
 	const is_fix = process.argv.includes(FIX_FLAG)
 	const ctx = gather_context()
@@ -172,6 +185,7 @@ function main(): void {
 	print_report(ctx)
 	report_path_diagnosis(ctx, is_fix)
 	report_repository_map(git)
+	report_port_seeds(git)
 	report_repository_settings(git)
 }
 
@@ -183,6 +197,7 @@ const doctor = {
 	reclaim_shim,
 	handle_shadow,
 	report_repository_map,
+	report_port_seeds,
 	main,
 }
 

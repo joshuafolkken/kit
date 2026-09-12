@@ -42,12 +42,12 @@ function main_block(): string {
 	return [`worktree ${MAIN_TREE}`, HEAD_LINE, 'branch refs/heads/main'].join('\n')
 }
 
-function open_on_disk(issue: string, seed: string | undefined): void {
+function open_on_disk(issue: string, seat: string | undefined): void {
 	const directory = path.join(LANE_ROOT, issue)
 
 	mkdirSync(directory, { recursive: true })
 
-	if (seed !== undefined) writeFileSync(path.join(directory, '.env'), `PORT_SEED=${seed}\n`)
+	if (seat !== undefined) writeFileSync(path.join(directory, '.env'), `JOSH_LANE_SEAT=${seat}\n`)
 }
 
 // git always lists the main work tree first, from whichever work tree the command was run in, and
@@ -85,8 +85,8 @@ describe('reading the open lanes', () => {
 
 		const lanes = await lane_registry.list_lanes()
 
-		expect(lanes.map((lane) => lane.seed)).toStrictEqual([6, 8])
-		expect(lane_registry.used_seeds(lanes)).toStrictEqual([6, 8])
+		expect(lanes.map((lane) => lane.seat)).toStrictEqual([6, 8])
+		expect(lane_registry.used_seats(lanes)).toStrictEqual([6, 8])
 	})
 
 	// Stranded is the directory being gone, not git's `prunable` flag: git marks a registration
@@ -97,7 +97,7 @@ describe('reading the open lanes', () => {
 		const lanes = await lane_registry.list_lanes()
 
 		expect(lanes[0]?.is_stranded).toBe(true)
-		expect(lane_registry.used_seeds(lanes)).toStrictEqual([])
+		expect(lane_registry.used_seats(lanes)).toStrictEqual([])
 	})
 
 	// Read as free, the seat would be handed to the next lane while the ports it holds are still
@@ -108,7 +108,7 @@ describe('reading the open lanes', () => {
 
 		const lanes = await lane_registry.list_lanes()
 
-		expect(lanes[0]?.seed).toBeUndefined()
+		expect(lanes[0]?.seat).toBeUndefined()
 		expect(lane_registry.unreadable_lanes(lanes).map((lane) => lane.issue)).toStrictEqual(['1490'])
 	})
 })
@@ -150,16 +150,16 @@ describe('what does not count as a lane', () => {
 		expect(lane_registry.parse_block(mismatched, LANE_ROOT)).toBeUndefined()
 	})
 
-	// `read_root_seed` answers 0 for a file with no seed line, and 0 is the main work tree's seat — so
-	// a lane booked there would be treated as sharing it while it still runs on its own ports.
-	it('reports a lane whose .env lost its seed line, rather than booking it on seat 0', async () => {
+	// `read_lane_seat` answers undefined for a file with no seat line, so a lane whose seat line was
+	// lost is reported unreadable rather than booked on seat 0, the main work tree's own.
+	it('reports a lane whose .env lost its seat line, rather than booking it on seat 0', async () => {
 		open_on_disk('1490', undefined)
 		writeFileSync(path.join(LANE_ROOT, '1490', '.env'), 'TELEGRAM_CHAT_ID=42\n')
 		list_of(lane_block('1490'))
 
 		const lanes = await lane_registry.list_lanes()
 
-		expect(lanes[0]?.seed).toBeUndefined()
+		expect(lanes[0]?.seat).toBeUndefined()
 		expect(lane_registry.unreadable_lanes(lanes)).toHaveLength(1)
 	})
 

@@ -12,6 +12,7 @@ const NESTED_DIRECTORY_NAME = 'e2e'
 const DEFAULT_DEV_PORT = 5173
 const FILE_SEED = 3
 const FILE_SEED_TEXT = String(FILE_SEED)
+const SEED_MULTIPLIER = 10
 const SUCCESS_EXIT_CODE = 0
 const PORT_SEED_KEY = 'PORT_SEED'
 
@@ -30,7 +31,7 @@ describe('josh port — where it reads .env from', () => {
 	it('applies the seed in the project root .env', () => {
 		const result = josh_cli_fixture.run_josh(['port', 'dev'], { cwd: project })
 
-		expect(result.stdout).toBe(String(DEFAULT_DEV_PORT + FILE_SEED))
+		expect(result.stdout).toBe(String(DEFAULT_DEV_PORT + FILE_SEED * SEED_MULTIPLIER))
 		expect(result.exit_code).toBe(SUCCESS_EXIT_CODE)
 	})
 
@@ -39,7 +40,7 @@ describe('josh port — where it reads .env from', () => {
 
 		const result = josh_cli_fixture.run_josh(['port', 'dev'], { cwd: nested })
 
-		expect(result.stdout).toBe(String(DEFAULT_DEV_PORT + FILE_SEED))
+		expect(result.stdout).toBe(String(DEFAULT_DEV_PORT + FILE_SEED * SEED_MULTIPLIER))
 		expect(result.exit_code).toBe(SUCCESS_EXIT_CODE)
 	})
 })
