@@ -6,7 +6,7 @@ import { delivered_rules, type MeasuredRule } from './delivered-rules'
 // (joshuafolkken/kit#1525).
 //
 // **It exists because the eviction order was decided by protection rather than by value.**
-// `.claude/skills/workflow-commands/SKILL.md` → §3 recorded that when a rule is trimmed to keep a
+// `.claude/skills/workflow-commands/rule-residency.md` recorded that when a rule is trimmed to keep a
 // byte count, the sentence that goes is the one no marker pinned (joshuafolkken/kit#951) — so the
 // least-defended text leaves, never the least-useful. Nothing in the repository could tell the two
 // apart: `scripts/josh/hook-decision.ts` keeps a once-per-run stamp that answers "has this fired

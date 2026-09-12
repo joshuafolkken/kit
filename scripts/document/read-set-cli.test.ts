@@ -117,8 +117,10 @@ describe('josh read:set', () => {
 
 		expect(
 			read_set_cli.saved_percent({
+				bash_output_cap: 0,
 				entry: 'none',
 				files: [],
+				point_of_use: [],
 				sections: [],
 				whole: empty,
 				scoped: empty,

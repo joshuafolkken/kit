@@ -2997,6 +2997,12 @@ pnpm josh read:set queue --json
 - **An unrecognized keyword is refused, with the known ones listed.** Left to fall through it produced a complete, plausible report — the skill file, the gate documents, `whole` equal to `scoped`, a saving of zero — and exited 0, so a mistyped keyword answered "nothing to save" instead of "no such entry".
 - **Measured on 2026-09-11**, the `queue` entry reads 143,274 tokens whole against 106,090 as sections — a 26% difference paid before anything is implemented, against a session that measured `over` at exactly that point.
 
+**Since [#1797](https://github.com/joshuafolkken/kit/issues/1797) the report also says how to fetch the set, and what is no longer in it.**
+
+- **Each file row carries the tool that can deliver it whole.** The cap is read out of the distributed `.claude/settings.json` (`BASH_MAX_OUTPUT_LENGTH`) rather than restated here, so it cannot drift from the harness, and a row whose file is larger than it is marked `Read (over the Bash cap)`. A `cat` of such a file returns a middle-truncated preview, which is how one measured entry paid for the same five files twice — so the closing line states the rule outright: one `Read` call per file, never `cat`, never two files in one command.
+- **A `-- read at the point of use, not at the entry --` block lists `latest-gate.md`, `eval-gate.md` and `followup.md` with their costs.** They are no longer counted in `whole` or `scoped`, and neither is a section reference that points into one of them — counted, `followup.md` would be back in the entry figure under another name. They are **listed rather than dropped**, because a saving reported with nowhere for the cost to have gone is not a measurement: each is still fetched whole, by the command whose turn reaches it ([`SKILL.md`](https://github.com/joshuafolkken/kit/blob/main/.claude/skills/workflow-commands/SKILL.md) → "Three documents are read at the point of use").
+- **Measured on 2026-09-12**, the `fullrun` entry fell from 140,305 tokens whole to 110,802, and from 102,801 scoped to 73,243 — the three point-of-use documents plus the two bodies that left `SKILL.md` for `observation-filing.md` and `rule-residency.md`.
+
 ### `josh time`
 
 Report where a run's wall clock went, read from the same transcripts `josh cost` prices ([#1267](https://github.com/joshuafolkken/kit/issues/1267)) and, for the part no transcript records, from GitHub ([#1268](https://github.com/joshuafolkken/kit/issues/1268)).

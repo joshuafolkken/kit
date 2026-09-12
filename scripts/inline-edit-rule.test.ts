@@ -5,7 +5,7 @@ import {
 	read_unwrapped_rule_surface,
 	WORKFLOW_PROMPT_DIRECTORY,
 } from './ai-document-fixture'
-import { SKILL_ENTRY_FILE, SKILL_ROOT } from './skill-fixture'
+import { SKILL_ROOT } from './skill-fixture'
 
 // joshuafolkken/kit#1150: measured on the joshuafolkken/kit#1144 transcript, 145 calls of the
 // `python3 - <<'PY'` file-editing form carried 79,317 tokens — 81.7% of every Bash command body and
@@ -18,7 +18,9 @@ import { SKILL_ENTRY_FILE, SKILL_ROOT } from './skill-fixture'
 // on demand, and the reasoning staying at the pointer rather than being pasted back beside it.
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/file-edits.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
-const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/${SKILL_ENTRY_FILE}`
+// The residency list left `SKILL.md` §3 for `rule-residency.md` in joshuafolkken/kit#1797; the entry
+// file still names that document, and the list itself is pinned where it now lives.
+const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/rule-residency.md`
 const SUITE_PATH = 'scripts/inline-edit-rule.test.ts'
 // The figures the two issues were filed on. Quotable enough to be the first thing pasted back into
 // an always-loaded document, which is what makes them the marker for "the reasoning stayed put".

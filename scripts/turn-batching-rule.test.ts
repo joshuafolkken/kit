@@ -6,7 +6,7 @@ import {
 	read_unwrapped_rule_surface,
 	WORKFLOW_PROMPT_DIRECTORY,
 } from './ai-document-fixture'
-import { SKILL_ENTRY_FILE, SKILL_ROOT } from './skill-fixture'
+import { SKILL_ROOT } from './skill-fixture'
 
 // joshuafolkken/kit#1304: measured on four merged runs, a `fullrun` issued between 1.00 and 1.13 tool
 // calls per round trip — independent reads and edits went out one per turn. On #1295 the 34 `Edit`
@@ -25,7 +25,9 @@ const TOPIC_FILE = 'turn-batching.md'
 const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
 const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
-const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/${SKILL_ENTRY_FILE}`
+// The delivered-rules list left `SKILL.md` §3 for `rule-residency.md` (joshuafolkken/kit#1797):
+// it binds when a rule is being placed or moved, never on a turn spent executing an Issue.
+const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/rule-residency.md`
 const SUITE_PATH = 'scripts/turn-batching-rule.test.ts'
 // The trigger that now delivers the rule. Named once: the enumeration, both residency lists and this
 // suite have to agree on the command, and a string kept correct in one of four places is not kept.

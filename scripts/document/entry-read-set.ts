@@ -22,11 +22,32 @@ const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
 const ONE_LINE = 1
 
-// **`kickoff` is the one entry that reaches neither gate document, and that is `SKILL.md` §1's own
-// sentence rather than a judgement made here**: it never implements, so it never reaches the
-// dependency-update step `latest-gate.md` governs nor the verification gate `eval-gate.md` does.
-const PLAN_ONLY_ENTRY = 'kickoff'
-const GATE_FILES: ReadonlyArray<string> = ['latest-gate.md', 'eval-gate.md']
+// **Three documents left the entry read because their first use is a named command, not the entry**
+// (joshuafolkken/kit#1797). `latest-gate.md` is read when `pnpm josh latest:scope` answers
+// `required`, `eval-gate.md` when `pnpm josh eval:scope` does, and `followup.md` in the turn that
+// issues `pnpm josh followup`. **They are not deferred and not summarized** — each is fetched whole,
+// in the same turn, by the step that has to obey it; what changed is only that a run which never
+// reaches the step never pays for it. Measured on `fullrun #1783`, `eval:scope` answered `skip` and
+// `eval-gate.md` was a total loss, while `followup.md` rode 55 requests before its first use.
+// `SKILL.md` → §1, "Three documents are read at the point of use", is the single source.
+const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
+	'latest-gate.md',
+	'eval-gate.md',
+	'followup.md',
+])
+
+// **The fetch cap is read from the settings file rather than restated here.** Every document in the
+// set is larger than it, so a `cat` of one hands back a middle-truncated preview and the file is
+// then read a second time — the two wasted requests joshuafolkken/kit#1797 measured. A number copied
+// into this file would be a second declaration of the cap, and would drift the first time the
+// settings changed; the harness's own default stands in only where the file declares nothing.
+const SETTINGS_FILE = path.join('.claude', 'settings.json')
+const HARNESS_DEFAULT_CAP_CHARS = 30_000
+const ENV_KEY = 'env'
+const CAP_KEY = 'BASH_MAX_OUTPUT_LENGTH'
+// `section()` hands back a `##` heading's `###` children with it, so the table parse has to say
+// where it stops — see `table_rows`.
+const SUBSECTION_PREFIX = '### '
 
 const TABLE_ROW = /^\|(?<entry>[^|]+)\|(?<files>[^|]+)\|\s*$/u
 const MARKDOWN_NAME = /`(?<name>[\w.-]+\.md)`/gu
@@ -73,6 +94,12 @@ interface ReadSetCost {
 	entry: string
 	files: ReadonlyArray<FileCost>
 	sections: ReadonlyArray<SectionCost>
+	// What the entry no longer reads, each fetched whole by the command whose turn reaches it. Listed
+	// rather than dropped: a saving reported without saying where the cost went is not a measurement.
+	point_of_use: ReadonlyArray<FileCost>
+	// The character cap a Bash result is truncated at, so the report can say which of the files above
+	// a `cat` cannot deliver whole.
+	bash_output_cap: number
 	// Every file in the set read in full, the referenced ones included — what a run pays with no way
 	// to fetch a heading.
 	whole: Cost
@@ -153,24 +180,63 @@ function push_row(rows: Map<string, ReadonlyArray<string>>, line: string): void 
 
 // The table lives inside `SKILL.md` → "1. Which file to read", so the parse is scoped to that
 // section: every other table in the document would otherwise contribute rows of its own.
+//
+// **And it stops at the section's first subsection.** `section()` returns a `##` heading's `###`
+// children with it, and joshuafolkken/kit#1797 put a second two-column table under one of them — the
+// point-of-use triggers. Its rows parse as entry rows, and only the "no `.md` in the second column"
+// guard kept `latest`, `eval` and `followup` out of the keyword set; one edit adding a document name
+// to a trigger cell would have registered them as entry points. The stop makes that explicit rather
+// than incidental.
 function table_rows(root: string): Map<string, ReadonlyArray<string>> {
 	const rows = new Map<string, ReadonlyArray<string>>()
 	const found = document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)
 	const lines = (found?.text ?? '').split('\n')
 
-	for (const line of lines) push_row(rows, line)
+	for (const line of lines) {
+		if (line.startsWith(SUBSECTION_PREFIX)) break
+
+		push_row(rows, line)
+	}
 
 	return rows
 }
 
-function gate_files(entry: string): ReadonlyArray<string> {
-	return entry === PLAN_ONLY_ENTRY ? [] : GATE_FILES
+function is_usable_cap(chars: number): boolean {
+	return Number.isSafeInteger(chars) && chars > NOTHING
 }
 
+function property_of(value: unknown, key: string): unknown {
+	if (typeof value !== 'object' || value === null) return undefined
+
+	return Reflect.get(value, key)
+}
+
+// **Parsed as JSON rather than matched in the raw text.** A regular expression takes the first
+// occurrence anywhere in the file, so a hook command string naming the variable would win over the
+// `env` block — and the report would then mark a file `cat`-able that a `cat` truncates, which is
+// the one drift reading the settings dynamically was meant to remove. A file that is missing or does
+// not parse answers `undefined` and falls through to the harness default below.
+function declared_cap(text: string): unknown {
+	try {
+		return property_of(property_of(JSON.parse(text), ENV_KEY), CAP_KEY)
+	} catch {
+		return undefined
+	}
+}
+
+function bash_output_cap(root: string): number {
+	const text = document_section.read_optional(path.join(root, SETTINGS_FILE)) ?? ''
+	const chars = Number(declared_cap(text))
+
+	return is_usable_cap(chars) ? chars : HARNESS_DEFAULT_CAP_CHARS
+}
+
+// **A point-of-use document is dropped from the set wherever a table row still names it**, so the
+// entry cost cannot be reported as including a file the entry does not read.
 function files_for(root: string, entry: string): ReadonlyArray<string> {
 	const declared = table_rows(root).get(entry) ?? []
 
-	return unique([SKILL_FILE, ...declared, ...gate_files(entry)])
+	return unique([SKILL_FILE, ...declared]).filter((file) => !POINT_OF_USE_FILES.has(file))
 }
 
 // A reference that wrapped across a source line carries the newline and the next line's indent
@@ -188,11 +254,18 @@ function is_sibling_document(root: string, name: string): boolean {
 // it is. **And only into a sibling workflow document**: a pointer at `CLAUDE.md` names text that is
 // resident on every request already, and one at a `prompts/` topic names a file reached on its own
 // step rather than at the entry.
+//
+// **A pointer into a point-of-use document is not an entry cost either** (joshuafolkken/kit#1797).
+// Counting one would put `followup.md` straight back into the entry figure under another name, when
+// the whole point is that the run reaches it half an hour later — and then only by fetching it whole
+// at that moment, which is a cost of that step rather than of the entry.
 function is_counted(
 	root: string,
 	reference: SectionReference,
 	files: ReadonlyArray<string>,
 ): boolean {
+	if (POINT_OF_USE_FILES.has(reference.file)) return false
+
 	return !files.includes(reference.file) && is_sibling_document(root, reference.file)
 }
 
@@ -322,16 +395,22 @@ function scoped_cost(root: string, sections: ReadonlyArray<SectionReference>): C
 	return total(files.map((file) => file_scoped_cost(root, file, headings_for(sections, file))))
 }
 
+function file_costs(root: string, names: ReadonlyArray<string>): Array<FileCost> {
+	return names.map((file) => ({ file, cost: cost_of(read_document(root, file)) }))
+}
+
 function costed(root: string, entry: string): ReadSetCost {
 	const { files, sections } = read_set(root, entry)
-	const file_costs = files.map((file) => ({ file, cost: cost_of(read_document(root, file)) }))
+	const own_costs = file_costs(root, files)
 	const section_costs = sections.map((reference) => section_cost(root, reference))
-	const own = total(file_costs.map((row) => row.cost))
+	const own = total(own_costs.map((row) => row.cost))
 
 	return {
 		entry,
-		files: file_costs,
+		files: own_costs,
 		sections: section_costs,
+		point_of_use: file_costs(root, [...POINT_OF_USE_FILES]),
+		bash_output_cap: bash_output_cap(root),
 		whole: total([own, referenced_cost(root, sections)]),
 		scoped: total([own, scoped_cost(root, sections)]),
 	}
@@ -342,12 +421,13 @@ function entries(root: string): Array<string> {
 }
 
 const entry_read_set = {
-	GATE_FILES,
-	PLAN_ONLY_ENTRY,
+	HARNESS_DEFAULT_CAP_CHARS,
+	POINT_OF_USE_FILES,
 	SECTION_REFERENCE,
 	SKILL_DIRECTORY,
 	SKILL_FILE,
 	TABLE_SECTION,
+	bash_output_cap,
 	cost_of,
 	costed,
 	document_path,

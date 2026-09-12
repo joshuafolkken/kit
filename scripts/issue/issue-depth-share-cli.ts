@@ -10,7 +10,7 @@ import { issue_depth_share, type DepthShare } from './issue-depth-share'
 
 // **`josh depth:share` — the depth-0 share of the open backlog, read rather than hand-counted**
 // (joshuafolkken/kit#1729). The denominator, and why it is what it is, are stated once in
-// `.claude/skills/workflow-commands/SKILL.md` → §2i, "The depth-0 share"; `issue-depth-share.ts`
+// `.claude/skills/workflow-commands/observation-filing.md` → "The depth-0 share"; `issue-depth-share.ts`
 // implements it. This file fetches the listing and prints what that module computed.
 //
 // **Two readings of the same backlog must produce the same number**, which is the requirement the

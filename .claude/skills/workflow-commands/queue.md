@@ -1,7 +1,9 @@
 # `queue` — Sequential multi-issue fullrun
 
-Each issue in the queue is a full `fullrun`, so read `fullrun.md`, `chain-rule.md` and
-`followup.md` as well; this file only adds what running several of them back to back changes.
+Each issue in the queue is a full `fullrun`, so read `fullrun.md` and `chain-rule.md` as well; this
+file only adds what running several of them back to back changes. **`followup.md` is not one of
+them** — it is read in full in the turn that issues `pnpm josh followup`, per `SKILL.md` → §1,
+"Three documents are read at the point of use".
 
 
 `queue #N1 #N2 #N3 ...` runs `fullrun` for each issue in order. All issues must already exist (no `new` variant).

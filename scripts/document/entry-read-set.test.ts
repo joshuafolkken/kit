@@ -16,6 +16,7 @@ const HALF_AGAIN = 1.5
 const NOTHING = 0
 
 const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', QUEUE, 'epicrun', 'backlogrun']
+const PLAN_ONLY = 'kickoff'
 const EXPECTED_ENTRIES: ReadonlyArray<string> = [
 	'backlogrun',
 	'epicrun',
@@ -36,36 +37,50 @@ describe('entry_read_set.read_set — which files', () => {
 		)
 	})
 
+	// §1 carries a second two-column table under a `###` subsection — the point-of-use triggers — and
+	// `section()` returns a heading's children with it. Its rows parse as entry rows, so the keyword
+	// set would grow by three the first time a trigger cell named a document (joshuafolkken/kit#1797).
+	it.each(['latest', 'eval', 'followup'])(
+		'reads no keyword out of a subsection table: %s',
+		(word) => {
+			expect(entry_read_set.entries(ROOT)).not.toContain(word)
+		},
+	)
+
 	it('always includes the skill file itself, which the table does not list', () => {
 		expect(entry_read_set.read_set(ROOT, 'kickoff').files).toContain(entry_read_set.SKILL_FILE)
 	})
 
-	it.each(IMPLEMENTING)('gives %s both gate documents', (entry) => {
-		expect(entry_read_set.read_set(ROOT, entry).files).toEqual(
-			expect.arrayContaining([...entry_read_set.GATE_FILES]),
-		)
-	})
+	// joshuafolkken/kit#1797: the two gate documents and `followup.md` are read by the command that
+	// has to obey them, in full and in the same turn, so no entry reads one at the entry. Asserted
+	// over every keyword rather than over `kickoff` alone — the old rule exempted the plan-only entry
+	// and this one has no exemption to make.
+	it.each([...IMPLEMENTING, PLAN_ONLY])('gives %s no point-of-use document', (entry) => {
+		const { files } = entry_read_set.read_set(ROOT, entry)
 
-	// `kickoff` never implements, so it reaches neither the dependency-update step nor the gate.
-	it('gives the plan-only entry neither gate document', () => {
-		const { files } = entry_read_set.read_set(ROOT, entry_read_set.PLAN_ONLY_ENTRY)
-
-		for (const gate of entry_read_set.GATE_FILES) expect(files).not.toContain(gate)
+		for (const later of entry_read_set.POINT_OF_USE_FILES) expect(files).not.toContain(later)
 	})
 
 	it("takes queue's declared files from the table row", () => {
 		expect(entry_read_set.read_set(ROOT, QUEUE).files).toEqual(
-			expect.arrayContaining(['queue.md', 'fullrun.md', 'chain-rule.md', 'followup.md']),
+			expect.arrayContaining(['queue.md', 'fullrun.md', 'chain-rule.md']),
 		)
 	})
 
-	// A keyword with no row contributes no declared file, so what is left is the skill file plus the
-	// gate documents every implementing entry reaches — never a throw and never an empty set.
+	// A keyword with no row contributes no declared file, so what is left is the skill file alone —
+	// never a throw and never an empty set.
 	it('answers with the shared files alone for a keyword the table does not carry', () => {
 		expect(entry_read_set.read_set(ROOT, UNKNOWN_ENTRY).files).toStrictEqual([
 			entry_read_set.SKILL_FILE,
-			...entry_read_set.GATE_FILES,
 		])
+	})
+
+	// A pointer into a point-of-use document is not an entry cost either: counted, it would put
+	// `followup.md` back into the entry figure under another name.
+	it.each([...IMPLEMENTING])('counts no section of a point-of-use document for %s', (entry) => {
+		const cited = entry_read_set.read_set(ROOT, entry).sections.map((one) => one.file)
+
+		for (const later of entry_read_set.POINT_OF_USE_FILES) expect(cited).not.toContain(later)
 	})
 })
 

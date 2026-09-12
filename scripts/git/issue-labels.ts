@@ -118,7 +118,7 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 
 // joshuafolkken/kit#1729: the depth of an issue's subject, recorded as a label at filing time.
 //
-// **The definition is not here.** `.claude/skills/workflow-commands/SKILL.md` → §2i, "The depth test",
+// **The definition is not here.** `.claude/skills/workflow-commands/observation-filing.md` → "The depth test",
 // is the single source: depth 0 is what a consumer of this package touches, depth 1 the run
 // orchestration that executes an Issue, depth 2 what measures a run. These constants are the
 // recording of that table, never a second copy of it — a label whose description restated the rule
@@ -149,7 +149,7 @@ const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, 
 // description, so provisioning from here is what gives each one a stable color a reader can scan by.
 // Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
 //
-// **The provisioning command lives in `SKILL.md` → §2i**, because prose cannot import this module —
+// **The provisioning command lives in `observation-filing.md`**, because prose cannot import this module —
 // the same split `FILING_ROUTE_LABELS` above lives with. `scripts/issue-depth-label.test.ts` keys
 // those three command lines to this array, so a color changed here without the document fails.
 const DEPTH_LABELS: ReadonlyArray<{

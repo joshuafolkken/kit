@@ -13,7 +13,7 @@ import {
 // denominators, which is why they could not be compared.
 //
 // **The denominator rule is not restated here.**
-// `.claude/skills/workflow-commands/SKILL.md` → §2i, "The depth-0 share", is its single source, and a
+// `.claude/skills/workflow-commands/observation-filing.md` → "The depth-0 share", is its single source, and a
 // paraphrase in this comment would be the clone `CLAUDE.md` prohibits — the same decision
 // `scripts/git/issue-labels.ts` records for the depth labels' own descriptions. What follows is the
 // implementation of that rule: a filter, three tallies and a percentage, with the only judgement —
