@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { lane_cache } from './lane-cache'
 import { lane_environment } from './lane-environment'
 import { lane_install, type InstallResult } from './lane-install'
 import { lane_paths } from './lane-paths'
@@ -174,7 +175,12 @@ function build_plan(
 // and every lane opened without it failed on its first `pnpm josh …`. It runs after the `.env`
 // rather than before, so a lane that fails here still carries the seat it was allocated and the
 // failure is recoverable by re-running the install alone.
-async function materialize(plan: LanePlan): Promise<void> {
+//
+// **The gate's verification caches are seeded from the main checkout before the install**
+// (joshuafolkken/kit#1849), so the lane's first `josh gate` is warm rather than cold. It is
+// best-effort and runs after the `.env` write for the same reason the install does: a lane whose
+// warming found nothing still carries its seat and is perfectly usable, cold first gate and all.
+async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 	// The seat lock is released in `finally`: on success the `.env` is on disk and the seat is
 	// discoverable by the next open, and on failure nothing was created that should hold it.
 	try {
@@ -184,6 +190,7 @@ async function materialize(plan: LanePlan): Promise<void> {
 
 		await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
 		writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
+		lane_cache.seed_caches(source_root, plan.lane.directory)
 		guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
 	} finally {
 		rmSync(plan.seat_lock, { recursive: true, force: true })
@@ -214,7 +221,7 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 
 	if (plan === undefined) return FULL_OUTCOME
 
-	await materialize(plan)
+	await materialize(plan, repository_root)
 
 	return { kind: 'opened', lane: plan.lane }
 }

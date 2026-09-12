@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
@@ -272,6 +273,26 @@ describe('refusing to open a lane', () => {
 		install_answers(false, INSTALL_FAILURE)
 
 		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(new RegExp(INSTALL_FAILURE, 'u'))
+	})
+})
+
+// joshuafolkken/kit#1849: a fresh work tree has none of the git-ignored gate caches, so the lane's
+// first `josh gate` runs cold; opening copies them from the main checkout so it starts warm. The
+// unit-level behavior is `lane-cache.test.ts`; what belongs here is that the open wires the main
+// repository root through to the copy.
+describe('opening a lane — its verification caches', () => {
+	it('seeds the gate caches the main checkout has into the new lane', async () => {
+		for (const cache_file of GATE_CACHE_FILES) {
+			writeFileSync(path.join(REPOSITORY_ROOT, cache_file), `warm:${cache_file}`)
+		}
+
+		await lane_open.open_lane(ISSUE)
+
+		for (const cache_file of GATE_CACHE_FILES) {
+			expect(readFileSync(path.join(LANE_ROOT, ISSUE, cache_file), 'utf8')).toBe(
+				`warm:${cache_file}`,
+			)
+		}
 	})
 })
 
