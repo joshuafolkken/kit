@@ -171,13 +171,22 @@ describe('arguments', () => {
 		expect(output.warned).toEqual([run_progress_cli.USAGE])
 	})
 
-	it('caps an abandoned watcher at eight hours by default', () => {
-		expect(run_progress_cli.to_max_ms(undefined)).toBe(run_progress_cli.DEFAULT_MAX_HOURS * HOUR)
+	it('caps an abandoned watcher at one hour by default', () => {
+		// The value the bound is pinned to, not just `DEFAULT_MAX_HOURS * HOUR`, which would hold for any
+		// default (joshuafolkken/kit#1802): a watcher left on an already-merged run is gone within the hour.
+		expect(run_progress_cli.DEFAULT_MAX_HOURS).toBe(1)
+		expect(run_progress_cli.to_max_ms(undefined)).toBe(HOUR)
 	})
 
 	it('takes a hand-typed cap, and falls back for one that is not a positive number', () => {
 		expect(run_progress_cli.to_max_ms('2')).toBe(2 * HOUR)
 		expect(run_progress_cli.to_max_ms('none')).toBe(run_progress_cli.DEFAULT_MAX_HOURS * HOUR)
+	})
+
+	it('builds the expiry notice from the default rather than a hardcoded number', () => {
+		expect(run_progress_cli.WAIT_EXPIRED_NOTICE).toContain(
+			`${String(run_progress_cli.DEFAULT_MAX_HOURS)} by default`,
+		)
 	})
 
 	it('passes the transcript paths through to the reading', async () => {

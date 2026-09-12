@@ -1327,7 +1327,7 @@ issue leaves the `in-progress` listing at the merge, so whatever is still waitin
 the rule above and `--hours` ends it. **A stop keeps that label on purpose** — that is
 what makes the stop resumable — so **no further `--wait` is started** after the stop notification,
 and any long-running watcher still in the background is stopped in the same turn, or it reports for
-up to eight more hours into a session that is waiting on a person. That covers
+up to an hour more into a session that is waiting on a person. That covers
 `halfrun`'s stop before commit, a `needs-human-review` stop, a split or prerequisite stop, and
 `queue`'s failure stop.
 
