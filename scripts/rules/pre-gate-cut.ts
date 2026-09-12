@@ -26,26 +26,56 @@ const CUT_COMMANDS: ReadonlySet<string> = new Set(['run:cut'])
 // children issued `--resume` and went straight on to the gate, so a predicate that counted any
 // `run:cut` would have been silent on exactly the runs this rule exists for.
 const CUT_MODE_FLAG = /(?:^|\s)--(?:resume|end|json)(?:[=\s]|$)/u
+// **The one entry call the resumed half never makes** (joshuafolkken/kit#1867).
+// `.claude/skills/workflow-commands/pre-gate-cut.md` sends a `fresh` verdict on to "claim the hold,
+// ask the session boundary, read the issue, implement", and tells a `resume` verdict to "skip the
+// title, the plan, the fresh hold claim and the implementation". So the hold claim is what a run made
+// on the near side of the pre-gate boundary carries and the process the cut produced does not.
+const HOLD_COMMANDS: ReadonlySet<string> = new Set(['run:hold'])
+// **A release is not a claim, and the subcommand name alone cannot tell the two apart.** `run:release`
+// is registered as the hold script under `--release`, so a segment naming the hold command may be
+// either — the same asymmetry `CUT_MODE_FLAG` exists for one command up. Reading a release as a claim
+// would put the resumed session, which releases at its merge, straight back into the denominator this
+// predicate exists to keep it out of.
+const HOLD_MODE_FLAG = /(?:^|\s)--release(?:[=\s]|$)/u
 
 // **Alias-expanded rather than matched as text**, so `pnpm josh ga` and `pnpm josh rct` are the same
 // calls as their canonical spellings. Segment-wise for the reason every other row here is: one shell
 // line carries several commands, and a name quoted inside a body is not the command being invoked.
-function runs_the_gate(command: string): boolean {
+//
+// **One reading of that question rather than one per name set.** Four predicates here differ only in
+// which subcommands they look for and which mode flag turns the call into a different one, and a
+// second copy of the walk is the clone `CLAUDE.md` prohibits — the copy nobody corrected would be the
+// one that stops seeing an alias. `mode_flag` is optional because two of the four ask about the
+// subcommand whatever mode it was invoked in.
+function invokes_josh(command: string, names: ReadonlySet<string>, mode_flag?: RegExp): boolean {
 	return shell_segments
 		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, GATE_COMMANDS))
+		.some(
+			(segment) =>
+				shell_segments.is_josh_command(segment, names) && mode_flag?.test(segment) !== true,
+		)
 }
 
-function is_cut_segment(segment: string): boolean {
-	return shell_segments.is_josh_command(segment, CUT_COMMANDS)
+function runs_the_gate(command: string): boolean {
+	return invokes_josh(command, GATE_COMMANDS)
 }
 
 function takes_the_cut(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => is_cut_segment(segment) && !CUT_MODE_FLAG.test(segment))
+	return invokes_josh(command, CUT_COMMANDS, CUT_MODE_FLAG)
 }
 
+// Whether this command claims the working tree, in either spelling and in neither release spelling.
+function claims_the_hold(command: string): boolean {
+	return invokes_josh(command, HOLD_COMMANDS, HOLD_MODE_FLAG)
+}
+
+// **One half of the occasion, never the whole of it** (joshuafolkken/kit#1867). Taken alone this
+// predicate enrols both processes of one obedient lane child: the cut relaunches a second session
+// which issues this same entry check byte for byte and can never take a cut of its own, so the row
+// read at half its true rate. `delivered-rules.ts` pairs it with `claims_the_hold`, which only the
+// near half of the boundary makes.
+//
 // **The occasion the rule governs, as far as a transcript can answer it.** A lane child issues
 // `pnpm josh run:cut --resume <N>` at its entry whatever it goes on to do, so a run that reaches for
 // the command in any spelling is one this rule could have bound on. Whether a checkout *is* a lane is
@@ -54,7 +84,7 @@ function takes_the_cut(command: string): boolean {
 // where the rule can never be kept, and `pnpm josh rule:value` would read the row low by
 // construction. joshuafolkken/kit#1643 names exactly that failure.
 function asks_about_the_cut(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_cut_segment(segment))
+	return invokes_josh(command, CUT_COMMANDS)
 }
 
 // What the trigger has to know about the world, passed in so the decision itself is testable without
@@ -93,7 +123,7 @@ function is_uncut_gate(command: string, state: LaneCutState = current_state()): 
 // The instruction in the shape a refusal can carry: what the cut is for, what each verdict means, and
 // the reissue sentence every delivery needs. **The verdicts are spelled out rather than pointed at**,
 // because `cut` is the only one that ends the turn and a run told merely to "take the cut" would have
-// to go and read which of the other four leave it holding the run — the same reason the WIP cap's
+// to go and read which of the other five leave it holding the run — the same reason the WIP cap's
 // delivery names its three interrupt tests instead of naming the file they live in.
 const PRE_GATE_CUT_REASON =
 	'⛔ pre-gate cut: this checkout is a lane and the gate is the boundary to cut at, so take the cut ' +
@@ -113,6 +143,7 @@ const PRE_GATE_CUT_REASON =
 const pre_gate_cut = {
 	PRE_GATE_CUT_REASON,
 	asks_about_the_cut,
+	claims_the_hold,
 	is_uncut_gate,
 	runs_the_gate,
 	takes_the_cut,

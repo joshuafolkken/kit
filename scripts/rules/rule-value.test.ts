@@ -4,8 +4,11 @@ import { time_transcript_line } from '#scripts/time/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'
+import { rule_value_fixture } from './rule-value-fixture'
 
-const TIMESTAMP = '2026-09-09T00:00:00.000Z'
+// The transcript shapes, shared with every row's own suite so the two cannot drift apart.
+const { TIMESTAMP, assistant_line, call_line, reading_for, result_line, session, tool_use_block } =
+	rule_value_fixture
 const NEXT_TIMESTAMP = '2026-09-09T00:00:01.000Z'
 const LATER_TIMESTAMP = '2026-09-09T00:00:02.000Z'
 const FILED_TIMESTAMP = '2026-09-09T00:00:09.000Z'
@@ -20,32 +23,6 @@ const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 // A rule whose trigger is the violation itself, so it declares `reaches` (joshuafolkken/kit#1643).
 const SHELL_BODY = 'shell-body'
 const BODY_BY_PATH = 'pnpm josh followup --notify-message-file /tmp/body.md'
-
-function tool_use_block(command: string, index: number): Record<string, unknown> {
-	return { type: 'tool_use', id: `toolu_${String(index)}`, name: 'Bash', input: { command } }
-}
-
-function assistant_line(
-	blocks: ReadonlyArray<unknown>,
-	timestamp: string,
-	message_id: string,
-): string {
-	return JSON.stringify({
-		type: 'assistant',
-		timestamp,
-		message: { id: message_id, content: blocks },
-	})
-}
-
-// One transcript line carrying one tool call, in the shape `time_transcript_line.parse_line` reads.
-// **It carries no message id, so it is a turn of its own** — the id is what joins lines into one
-// turn, and a fixture sharing one across every call would make every session read as one batched
-// turn (joshuafolkken/kit#1792).
-function call_line(command: string, timestamp: string = TIMESTAMP): string {
-	const blocks = [tool_use_block(command, 0)]
-
-	return assistant_line(blocks, timestamp, time_transcript_line.NO_MESSAGE_ID)
-}
 
 // The rule delivered by a binary of its own, so `rule:value` reads it from `MEASURED_RULES` while
 // `rule:guard` never delivers it (joshuafolkken/kit#1792).
@@ -80,26 +57,6 @@ function turn_lines(commands: ReadonlyArray<string>): string {
 			assistant_line([tool_use_block(command, index)], TIMESTAMP, BATCHED_MESSAGE_ID),
 		)
 		.join('\n')
-}
-
-function result_line(content: string, timestamp: string = TIMESTAMP): string {
-	return JSON.stringify({
-		type: 'user',
-		timestamp,
-		message: { content: [{ type: 'tool_result', content, is_error: true }] },
-	})
-}
-
-function session(...commands: ReadonlyArray<string>): string {
-	return commands.map((command) => call_line(command)).join('\n')
-}
-
-function reading_for(id: string, runs: ReadonlyArray<ReadonlyArray<string>>): RuleReading {
-	const found = rule_value.measure(runs).find((reading) => reading.id === id)
-
-	if (found === undefined) throw new Error(`no reading for ${id}`)
-
-	return found
 }
 
 describe('rule_value.measure — what the carried text earns unaided', () => {

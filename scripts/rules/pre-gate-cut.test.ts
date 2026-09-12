@@ -7,6 +7,8 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { pre_gate_cut, type LaneCutState } from './pre-gate-cut'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
+import { rule_value, type RuleReading } from './rule-value'
+import { rule_value_fixture } from './rule-value-fixture'
 
 // joshuafolkken/kit#1864: the pre-gate cut fired 0 times in 6 lane children while it was carried as
 // prose, so this suite owns the two halves that decide whether the refusal fires at all — the command
@@ -23,6 +25,9 @@ const TAKE_THE_CUT = `pnpm josh run:cut ${ISSUE}`
 // four of the six measured children issued before walking straight on to the gate.
 const RESUME_CHECK = `pnpm josh run:cut --resume ${ISSUE}`
 const END_THE_CUT = 'pnpm josh run:cut --end'
+// The entry step the `fresh` verdict sends a run on to and the `resume` verdict tells its counterpart
+// to skip — the one call that separates a cut run's two sessions (joshuafolkken/kit#1867).
+const CLAIM_THE_HOLD = `pnpm josh run:hold ${ISSUE}`
 const NOW_MS = 1_700_000_000_000
 const SAYS_NOTHING = 'says nothing about %j'
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'pre-gate-cut-'))
@@ -51,6 +56,15 @@ function state_of(directory: string, cut?: RunCut): LaneCutState {
 
 function call_of(command: string): { name: string; input: unknown } {
 	return { name: BASH, input: { command } }
+}
+
+// One run's transcript: lone calls in the order given, each its own turn.
+function run_of(...commands: ReadonlyArray<string>): Array<string> {
+	return [rule_value_fixture.session(...commands)]
+}
+
+function pre_gate_row(runs: ReadonlyArray<ReadonlyArray<string>>): RuleReading {
+	return rule_value_fixture.reading_for(RULE_ID, runs)
 }
 
 function payload_of(name: string, command: string, tool_name = BASH): string {
@@ -134,6 +148,30 @@ describe('asks_about_the_cut', () => {
 
 	it.each([[GATE], [`pnpm josh run:hold ${ISSUE}`]])(SAYS_NOTHING, (command) => {
 		expect(pre_gate_cut.asks_about_the_cut(command)).toBe(false)
+	})
+})
+
+describe('claims_the_hold', () => {
+	it.each([[CLAIM_THE_HOLD], [`pnpm josh rh ${ISSUE}`]])(
+		'reads %j as claiming the working tree',
+		(command) => {
+			expect(pre_gate_cut.claims_the_hold(command)).toBe(true)
+		},
+	)
+
+	// **`run:release` is the other end of the same record and is not the claim.** A run that only ever
+	// released one made no claim of its own, and reading it as one would put the resumed session — which
+	// releases at its merge — straight back into the denominator this predicate exists to keep it out of.
+	it.each([
+		[TAKE_THE_CUT],
+		[RESUME_CHECK],
+		[`pnpm josh run:release ${ISSUE}`],
+		// The release written as the hold script's own flag, which the subcommand name alone reads as a
+		// claim.
+		[`pnpm josh run:hold --release ${ISSUE}`],
+		[GATE],
+	])(SAYS_NOTHING, (command) => {
+		expect(pre_gate_cut.claims_the_hold(command)).toBe(false)
 	})
 })
 
@@ -234,9 +272,9 @@ describe('rule_delivery — inside a lane checkout', () => {
 		expect(reason).toBe(delivered_rules.PRE_GATE_CUT_REASON)
 	})
 
-	// **Once per run, so obeying can never wedge the run.** Four verdicts — `not-a-lane`, `unready`,
-	// `busy` and `failed` — legitimately leave this process at the gate, and each of them needs the
-	// reissue to pass.
+	// **Once per run, so obeying can never wedge the run.** Five verdicts — `not-a-lane`, `unready`,
+	// `busy`, `failed` and `unknown` — legitimately leave this process at the gate, and each of them
+	// needs the reissue to pass.
 	it('says nothing on the reissued gate run', () => {
 		const payload = payload_of('pre-gate-cut-once', GATE)
 
@@ -249,13 +287,46 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 })
 
+// **The two sessions of one cut run, which the row used to read as two runs** (joshuafolkken/kit#1867).
+// A cut relaunches a fresh process, so a perfectly obedient lane child reaches the measurement as two
+// transcripts issuing the identical entry check — and only the first of them can ever take a cut, so
+// scored on the asking alone the row had a ceiling of about 50%.
+describe('rule_value.measure — the pre-gate cut row', () => {
+	it('counts the session that claimed the working tree and took the cut as a run that kept the rule', () => {
+		const reading = pre_gate_row([run_of(RESUME_CHECK, CLAIM_THE_HOLD, TAKE_THE_CUT)])
+
+		expect(reading.sessions).toBe(1)
+		expect(reading.unaided_kept).toBe(1)
+	})
+
+	it('counts a lane child that held the tree and ran the gate uncut as reached, never as kept', () => {
+		const reading = pre_gate_row([run_of(RESUME_CHECK, CLAIM_THE_HOLD, GATE)])
+
+		expect(reading.sessions).toBe(1)
+		expect(reading.unaided_kept).toBe(0)
+	})
+
+	// It skips the fresh hold claim by specification and has no cut of its own left to take, so counting
+	// it enrolled a session that could only ever be scored as a failure.
+	it('leaves the session the cut produced out of the denominator', () => {
+		expect(pre_gate_row([run_of(RESUME_CHECK, GATE)]).sessions).toBe(0)
+	})
+
+	it('reads one obedient lane child at 100%, not at the half its two sessions used to read', () => {
+		const cut = run_of(RESUME_CHECK, CLAIM_THE_HOLD, TAKE_THE_CUT)
+		const resumed = run_of(RESUME_CHECK, GATE)
+
+		expect(rule_value.unaided_rate(pre_gate_row([cut, resumed]))).toBe(100)
+	})
+})
+
 describe('PRE_GATE_CUT_REASON', () => {
 	it.each([
 		// The command that fixes it — the only thing that makes a refusal actionable.
 		['pnpm josh run:cut <N>'],
 		// What `cut` obliges, which is the half a run cannot infer from the verdict alone.
 		['end the turn immediately'],
-		// The four verdicts that leave this process holding the run.
+		// The five verdicts that leave this process holding the run.
 		['not-a-lane'],
 		['busy'],
 		// The pointer, and the reissue sentence every delivery needs.

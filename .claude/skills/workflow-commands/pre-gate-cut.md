@@ -79,6 +79,13 @@ pressure, and `run:hold` — the one boundary step that never gets missed — is
   runs that obeyed.
 - **`--resume`, `--end` and `--json` do not count as taking the cut**, because they ask about one
   rather than take it. Counting them would have credited four of the six measured children.
+- **The denominator `pnpm josh rule:value` scores the row over asks two things, not one**
+  (joshuafolkken/kit#1867). The cut relaunches a *new session*, which the measurement reads as a run
+  of its own and which issues the byte-identical entry check while having no cut left to take — so
+  scored on the asking alone, ten perfectly obedient children read as ten kept out of twenty. The row
+  therefore also asks whether the run claimed the working-tree hold: `fresh` sends a run on to claim
+  it and `resume` tells its counterpart to skip that claim, so the claim is what marks the session on
+  the near side of the boundary. Nothing about the delivery changes — this is the reading only.
 
 The row, its trigger and the enumeration it joins are
 `prompts/collaboration-workflow/rule-delivery.md`; `scripts/rules/pre-gate-cut.test.ts` pins that it
