@@ -21,7 +21,8 @@ import { investigation_reads } from './investigation-reads'
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigation-guard-'))
 const WRITTEN_TRANSCRIPTS: Array<string> = []
-const { BRANCH, call_line, result_line, ms, target_turn_lines } = time_transcript_fixture
+const { BRANCH, call_line, error_result_line, result_line, ms, target_turn_lines } =
+	time_transcript_fixture
 
 const BELOW_THRESHOLD = delegation_policy.INVESTIGATION_FILE_THRESHOLD - 1
 const NOW_MS = ms(59)
@@ -34,6 +35,8 @@ const AGENT_NAME = 'unit-1'
 const NEXT_FILE = 'scripts/next.ts'
 const LONE_FILE = 'scripts/only.ts'
 const READ_TOOL = 'Read'
+const DENIED_ID = 'denied-call'
+const UNIT_NAME = 'unit-2'
 // "Unset" is spelled as the empty string rather than by deleting the key, exactly as
 // `batch-guard.test.ts` does: a dynamic `delete` is banned here, and an empty value takes the
 // identical path through the switch — it is not one of the recognized disabling spellings.
@@ -55,6 +58,15 @@ function delegated_lines(): Array<string> {
 		call_line(DELEGATION_MINUTE, BRANCH, 'Agent', AGENT_ID),
 		result_line(DELEGATION_END_MINUTE, BRANCH, AGENT_ID),
 		...target_turn_lines(LATE_TURN, subject_files('late')),
+	]
+}
+
+// A read the guard denied, written the way the harness writes one: the call, then a `tool_result`
+// carrying the refusal and `is_error`.
+function refused_read_lines(): Array<string> {
+	return [
+		call_line(LATE_TURN, BRANCH, READ_TOOL, DENIED_ID),
+		error_result_line(LATE_TURN + 1, BRANCH, DENIED_ID, investigation_reads.REASON),
 	]
 }
 
@@ -127,6 +139,18 @@ describe('investigation_refusal — the threshold, and its second firing', () =>
 		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeDefined()
 	})
 
+	// joshuafolkken/kit#1764: a denied call is written to the transcript like any other, so counting
+	// its targets put them into the set at an instant *after* the refusal stamp — pre-loading the
+	// accumulation with the very read the refusal stopped. A refused three-file bundle then re-armed
+	// the guard on the next call, which is the wedge the threshold climb exists to prevent.
+	it('does not count the read it refused toward the next accumulation', () => {
+		const lines = [...at_threshold_lines(), ...refused_read_lines()]
+		const transcript = write_transcript('refused-read', lines)
+
+		expect(investigation_refusal(payload_of(transcript), EARLIER_REFUSAL_MS)).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+	})
+
 	it('says nothing below the threshold', () => {
 		const transcript = write_transcript('below', target_turn_lines(0, [LONE_FILE]))
 
@@ -186,7 +210,7 @@ describe('investigation_refusal — a delegated unit is judged on its own histor
 	// repetition does not.
 	it('does not re-arm on a second accumulation inside a unit', () => {
 		const parent = write_transcript('unit-parent', target_turn_lines(0, [LONE_FILE]))
-		const fork = time_hook_transcript.fork_path(parent, 'unit-2')
+		const fork = time_hook_transcript.fork_path(parent, UNIT_NAME)
 
 		mkdirSync(path.dirname(fork), { recursive: true })
 		writeFileSync(
@@ -195,7 +219,7 @@ describe('investigation_refusal — a delegated unit is judged on its own histor
 		)
 		WRITTEN_TRANSCRIPTS.push(fork)
 
-		const unit_payload = payload_of(parent, { agent_id: 'unit-2' })
+		const unit_payload = payload_of(parent, { agent_id: UNIT_NAME })
 
 		expect(investigation_refusal(unit_payload, EARLIER_REFUSAL_MS)).toBeDefined()
 		expect(investigation_refusal(unit_payload, NOW_MS)).toBeUndefined()

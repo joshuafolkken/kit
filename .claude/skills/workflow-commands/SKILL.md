@@ -633,10 +633,10 @@ the run. **The other way a refusal re-arms is another accumulation, and until
 joshuafolkken/kit#1764 the code did not do it**: only a delegation cleared the disarm, so a run that
 *ignored* its one refusal — read on and never delegated — was never spoken to again however many
 unedited files it went on to open. The one run this threshold exists for was the one run the guard
-fell silent on. Measured over 296 recorded sessions and 3,063 main-line reads, **1,124 of them — 36.7%
-— reached the threshold and were let through**; with the arm in place that falls to 910 and the
-refusals rise from 186 to 400. Reads of a file the run itself edits (827) and reads below the
-threshold (926) are untouched by the change, which is the check that it moved only what it was meant
+fell silent on. Measured over 296 recorded sessions and 3,064 main-line reads, **1,132 of them — 36.9%
+— reached the threshold and were let through**; with the arm in place that falls to 920 and the
+refusals rise from 184 to 396. Reads of a file the run itself edits (827) and reads below the
+threshold (921) are untouched by the change, which is the check that it moved only what it was meant
 to. **The arm does not apply inside a delegated unit**: a unit is already where this rule sends the
 reading, and a read-only one has no `Agent` tool to dispatch with, so repeating the refusal there
 would toll that tier for an instruction it cannot carry out. `pnpm josh time`'s `Investigation reads:` block prints those four figures for one run, from

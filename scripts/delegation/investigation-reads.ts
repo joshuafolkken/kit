@@ -228,6 +228,20 @@ function delegation_instant(span: Span | undefined): number {
 	return span === undefined ? hook_decision.NEVER_MS : span.ended_ms
 }
 
+// **A read that failed carried no text into the prompt, so it is not what this rule counts**
+// (joshuafolkken/kit#1764). The case that matters is the guard's own refusal: Claude Code writes a
+// denied call to the transcript as a `tool_use` block with an errored `tool_result`, and the stamp is
+// written *before* the reason is returned — so counting the denied read's targets put them into the
+// set at an instant after the refusal, pre-loading `pending_since` with the very read the refusal
+// stopped. A refused `cat a.ts b.ts c.ts` — the batched read `CLAUDE.md` mandates — took
+// `pending_since` straight to the threshold and re-armed the guard on the next call, which is the
+// wedge "climb a whole threshold again" exists to prevent. Every other failed read is excluded by the
+// same test and for the same reason: nothing arrived. An **unknown** outcome still counts, because a
+// result nobody recorded is not a failure.
+function is_failed_read(span: Span): boolean {
+	return span.outcome === time_spans.FAILED_OUTCOME
+}
+
 // **The set records *when* each file entered it, which is the whole of the second re-arm**
 // (joshuafolkken/kit#1764). A plain set could say how many files were pending and never how many of
 // them arrived after the refusal, so a run that ignored its one refusal was indistinguishable from
@@ -263,7 +277,9 @@ function apply_span(pending: Map<string, number>, span: Span): void {
 		return
 	}
 
-	if (is_content_read(span.label)) add_all(pending, subject_targets(span.targets), span.ended_ms)
+	if (is_content_read(span.label) && !is_failed_read(span)) {
+		add_all(pending, subject_targets(span.targets), span.ended_ms)
+	}
 
 	delete_all(pending, subject_targets(span.writes))
 }

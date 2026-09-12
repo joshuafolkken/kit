@@ -273,17 +273,18 @@ describe('rule_value.measure — rules nothing can score', () => {
 		expect(rule_value.unaided_rate(unmeasured)).toBeUndefined()
 	})
 
-	// **Every *delivered* rule, not every measured one** (joshuafolkken/kit#1764). The investigation row
-	// declares none on purpose — no call-shaped test can tell a delegation of the reading from any other
-	// dispatch — and the module's own doctrine is that such a rule reads unmeasured rather than as
-	// compliant. A delivered row has no such excuse: its trigger is call-shaped by construction.
-	it('declares a compliance test on every delivered rule, so none of them reads as unmeasured', () => {
-		const delivered = new Set(delivered_rules.DELIVERED_RULES.map((rule) => rule.id))
+	// **Every rule but the one that cannot have a compliance test** (joshuafolkken/kit#1764). The
+	// investigation row declares none on purpose — no call-shaped test can tell a delegation of the
+	// reading from any other dispatch — and the module's doctrine is that such a rule reads unmeasured
+	// rather than as compliant. Naming it exactly keeps the guard over every other row, the batching
+	// one included, rather than exempting a whole registry to make room for one exception.
+	it('declares a compliance test on every rule but the one that cannot have one', () => {
 		const unmeasured = rule_value
 			.measure([[session(FILING)]])
 			.filter((reading) => !reading.is_measurable)
+			.map((reading) => reading.id)
 
-		expect(unmeasured.filter((reading) => delivered.has(reading.id))).toStrictEqual([])
+		expect(unmeasured).toStrictEqual([INVESTIGATION])
 	})
 })
 
