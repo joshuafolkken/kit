@@ -9,6 +9,7 @@ import { entry_read_set } from './entry-read-set'
 const ROOT = process.cwd()
 const QUEUE = 'queue'
 const EPICRUN = 'epicrun.md'
+const CHAIN_RULE = 'chain-rule.md'
 const UNKNOWN_ENTRY = 'no-such-entry'
 // The margin the section read has to beat: the cited sections together stay under two thirds of the
 // files they were cut from. Loose on purpose — it asserts the shape, not today's figure.
@@ -59,7 +60,7 @@ describe('entry_read_set.read_set — which files', () => {
 
 	it("takes queue's declared files from the table row", () => {
 		expect(entry_read_set.read_set(ROOT, QUEUE).files).toEqual(
-			expect.arrayContaining(['queue.md', 'fullrun.md', 'chain-rule.md']),
+			expect.arrayContaining(['queue.md', 'fullrun.md']),
 		)
 	})
 
@@ -78,6 +79,22 @@ describe('entry_read_set.read_set — which files', () => {
 
 		for (const later of entry_read_set.POINT_OF_USE_FILES) expect(cited).not.toContain(later)
 	})
+})
+
+describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#1856)', () => {
+	// chain-rule.md governs the /code-review → followup chain, which binds after the first edit, so it
+	// left the entry read of the four entries that used to list it and joined the point-of-use set. A
+	// named guard rather than the dynamic loop, so the reduction is pinned by the document it is about.
+	it('classifies chain-rule.md as a point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(CHAIN_RULE)
+	})
+
+	it.each(['fullrun', QUEUE, 'epicrun', 'backlogrun'])(
+		'keeps chain-rule.md out of the entry read of %s, which once read it whole',
+		(entry) => {
+			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(CHAIN_RULE)
+		},
+	)
 })
 
 describe('entry_read_set.read_set — which sections', () => {
