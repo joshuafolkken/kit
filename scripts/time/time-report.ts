@@ -2,6 +2,7 @@ import { time_bundles, type BundleTotals } from './time-bundles'
 import { time_category_table, type CategoryTotals } from './time-category-table'
 import type { CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
+import { time_contributor_costs, type ContributorCostFacts } from './time-contributor-costs'
 import { time_cycles, type CycleTotals } from './time-cycles'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_followup_stages, type FollowupStageTotals } from './time-followup-stages'
@@ -132,6 +133,11 @@ interface TimeReport extends TurnSplit {
 	// absent here means the question was never asked, while a present record with `is_measured: false`
 	// means it was asked and the corpus could not answer.
 	phase_costs?: PhaseCostFacts
+	// The same run's dollars keyed by purpose instead of stage, with a `no tool call` bucket for the
+	// billed turns that issued nothing (joshuafolkken/kit#1872). Optional for the same reason
+	// `phase_costs` is: absent means no scope read the cost corpus, present-but-unmeasured means it
+	// was read and could not answer.
+	contributor_costs?: ContributorCostFacts
 	// The same model wait as `model_ms_per_round_trip`, as the spread it was a mean of
 	// (joshuafolkken/kit#1386). The mean above says what a trip cost typically; only this says whether
 	// a run was slow everywhere or slow once — and the two need opposite fixes, since batching removes
@@ -483,6 +489,7 @@ function format_report(report: TimeReport): string {
 		...time_category_table.category_lines(report),
 		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
 		...time_phase_costs.cost_lines(report.phase_costs),
+		...time_contributor_costs.cost_lines(report.contributor_costs),
 		...time_cycles.cycle_lines(report.ci_cycles),
 		...time_segments.segment_lines(report.segments),
 		...time_trips.trip_lines(report),

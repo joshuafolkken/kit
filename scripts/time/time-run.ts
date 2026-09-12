@@ -1,5 +1,6 @@
 import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
+import { time_contributor_costs } from './time-contributor-costs'
 import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
 import { time_issue_window } from './time-issue-window'
@@ -451,13 +452,17 @@ function to_report(facts: RunFacts): TimeReport {
 		by_check: facts.checks,
 	})
 	const found_notes = [...window_note(window, report.elapsed_ms), ...serial_note(report)]
-	const phase_costs = time_phase_costs.build({
+	// One input, keyed two ways: `phase_costs` by stage, `contributor_costs` by purpose. Neither
+	// re-walks the corpus — both place the same priced requests against the same spans.
+	const cost_input = {
 		spans: found.spans,
 		requests: facts.priced,
 		round_trip_count: report.round_trip_count,
-	})
+	}
+	const phase_costs = time_phase_costs.build(cost_input)
+	const contributor_costs = time_contributor_costs.build(cost_input)
 
-	return { ...report, notes: [...notes, ...found_notes], phase_costs }
+	return { ...report, notes: [...notes, ...found_notes], phase_costs, contributor_costs }
 }
 
 // What a batch caller has already read for this child, so neither source is read once per child

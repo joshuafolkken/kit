@@ -184,8 +184,16 @@ function turn_keys(trip: ReadonlyArray<Span>): Array<string> {
 	return trip.map((span) => time_command_key.command_key(span))
 }
 
+// The contributor one round trip belongs to, from the keys its calls carry. Exposed so the
+// per-contributor cost block labels a trip's wall-clock stretch by the same rule this block counts it
+// by (joshuafolkken/kit#1872): one mapping, so the count table and the cost table cannot come to
+// disagree about what a turn was for.
+function contributor_of_trip(trip: ReadonlyArray<Span>): string {
+	return contributor_of(turn_keys(trip))
+}
+
 function count_turn(counts: Map<string, number>, trip: ReadonlyArray<Span>): void {
-	const contributor = contributor_of(turn_keys(trip))
+	const contributor = contributor_of_trip(trip)
 
 	counts.set(contributor, (counts.get(contributor) ?? NONE) + ONE)
 }
@@ -245,6 +253,7 @@ const time_parent_turns = {
 	NO_PARENT_TURNS,
 	build_parent_turns,
 	contributor_of,
+	contributor_of_trip,
 	count_for,
 	parent_turn_lines,
 }
