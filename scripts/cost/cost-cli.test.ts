@@ -321,30 +321,6 @@ describe('cost_cli.run --over', () => {
 	})
 })
 
-describe('cost_cli.per_request_cost', () => {
-	it('divides the billed input by the requests that paid for it', () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10), usage_line('r2', MAIN, 10)])
-		const corpus = cost_cli.load_corpus(CWD)
-		const reports = cost_cli.build_reports({ is_all: false, is_json: false }, corpus, CWD)
-		const [report] = reports ?? []
-
-		expect(report).toBeDefined()
-		expect(cost_cli.per_request_cost(report as never)).toBeGreaterThan(0)
-	})
-
-	// Dividing by no requests would throw or answer Infinity; a session that has asked nothing has
-	// nothing to hand off.
-	it('answers zero for a session with no requests', () => {
-		const empty = {
-			scope: 'x',
-			request_count: 0,
-			breakdown: { billed_input_tokens: 0 },
-		}
-
-		expect(cost_cli.per_request_cost(empty as never)).toBe(0)
-	})
-})
-
 // joshuafolkken/kit#1151. Both decompositions are read from one transcript's own lines, so they
 // belong to the whole-session scope and to no other — an issue's slice and a `--all` corpus have no
 // single session to read them from.
@@ -415,5 +391,33 @@ describe('cost_cli.run --over — what it refuses', () => {
 
 	it('refuses a negative threshold', () => {
 		expect(cost_cli.to_threshold('-1')).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1838: `--cap` is a whole-run counterfactual the session-scoped `--over` could
+// not express; the verdict math itself is unit-tested in cost-verdict.test.ts.
+describe('cost_cli.parse_options — the cap flag', () => {
+	it('reads a cap', () => {
+		expect(cost_cli.parse_options(['--cap', '200000'])?.cap).toBe(200_000)
+	})
+
+	// A non-number is a typo, `--all` gives many reports (which ratio?), and `--over` is a second
+	// verdict on one run.
+	it.each([
+		['--cap', 'x'],
+		['--cap', '1', ALL_FLAG],
+		['--cap', '1', '--over', '1'],
+	])('refuses %s', (...argv) => {
+		expect(cost_cli.parse_options(argv)).toBeUndefined()
+	})
+})
+
+describe('cost_cli.run --cap', () => {
+	// The fixture request bills one input token, so a cap of 5 keeps it — the whole cost.
+	it('prints the share of cost at or under the cap', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
+		expect(cost_cli.run(['--cap', '5'], CWD)).toBe(0)
+		expect(stdout().trim()).toBe('100.0%')
 	})
 })

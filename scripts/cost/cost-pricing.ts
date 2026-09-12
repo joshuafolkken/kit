@@ -42,6 +42,16 @@ const CONTEXT_MARKER = '['
 // Claude Code appends a context-window marker to the model id it records — `claude-opus-5[1m]` —
 // and a deployment may carry a date suffix. Both name the same priced model, so the id is reduced
 // to its longest prefix that the table knows rather than reported as unknown.
+//
+// The `[1m]` marker is the 1M-context beta, and stripping it to the base rate is confirmed correct,
+// not an approximation (joshuafolkken/kit#1838). The published price list — platform.claude.com
+// "Long context pricing", read 2026-09 — states that Claude 4.6 and later models "include the full
+// 1M token context window at standard pricing (a 900k-token request is billed at the same per-token
+// rate as a 9k-token request)". Every id in `MODEL_PRICES` is 4.6-or-later, so no request has an
+// input-size surcharge band to account for, whatever its size. (Fast mode is a separate premium, but
+// it is signalled by `speed: "fast"` rather than by the context marker, so it is not this marker's
+// concern.) Were a future model to reintroduce a >200K band, the marker could no longer be stripped
+// blindly and this function would branch on the input size instead.
 function resolve_price(model: string): ModelPrice | undefined {
 	const base = model.split(CONTEXT_MARKER)[0] ?? model
 	const direct = MODEL_PRICES[base]

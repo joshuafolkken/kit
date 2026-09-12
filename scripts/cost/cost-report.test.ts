@@ -220,3 +220,72 @@ describe('cost_report.format_share', () => {
 		expect(cost_report.format_share(0, 0)).toBe('n/a')
 	})
 })
+
+function climbing(): Array<UsageRecord> {
+	return Array.from({ length: 8 }, (_unused, index) =>
+		record(String(index), { input_tokens: (index + 1) * 100_000 }),
+	)
+}
+
+function capped(records: ReadonlyArray<UsageRecord>, cap: number): CostReport {
+	return cost_report.build_report({
+		scope: SESSION_SCOPE,
+		records,
+		missing: NO_MISSING,
+		resident_billed_tokens: 0,
+		cap_tokens: cap,
+	})
+}
+
+describe('cost_report.build_report cost curve', () => {
+	it('carries a positional cost curve of four quartiles', () => {
+		const report = report_of(climbing())
+
+		expect(report.curve?.buckets).toHaveLength(4)
+		expect(report.curve?.first_context_tokens).toBe(100_000)
+		expect(report.curve?.last_context_tokens).toBe(800_000)
+	})
+
+	it('shows context growing across the run', () => {
+		const buckets = report_of(climbing()).curve?.buckets ?? []
+		const averages = buckets.map((bucket) => bucket.avg_context_tokens ?? 0)
+		const first = averages[0] ?? 0
+		const last = averages[3] ?? 0
+
+		expect(last).toBeGreaterThan(first)
+	})
+
+	it('omits the curve for an empty scope', () => {
+		expect(report_of([], ISSUE_SCOPE).curve).toBeUndefined()
+	})
+
+	it('renders the curve in the text report', () => {
+		expect(formatted([record('a', { input_tokens: 100 })])).toContain('Cost curve')
+	})
+})
+
+describe('cost_report.build_report cap simulation', () => {
+	// context 200K (cost $1) and 800K (cost $4); a 500K cap keeps only the first — 20% of the cost.
+	const two = [record('a', { input_tokens: 200_000 }), record('b', { input_tokens: 800_000 })]
+
+	it('is absent unless a cap was requested', () => {
+		expect(report_of(two).cap_simulation).toBeUndefined()
+	})
+
+	it('reports the share of cost at or under the cap', () => {
+		const sim = capped(two, 500_000).cap_simulation
+
+		expect(sim?.within_cap_requests).toBe(1)
+		expect(sim?.cost_ratio).toBeCloseTo(0.2)
+	})
+
+	it('withholds the ratio rather than reporting 0 when nothing could be priced', () => {
+		const unpriced = [{ ...record('a', { output_tokens: 10 }), model: IMAGINARY }]
+
+		expect(capped(unpriced, 500_000).cap_simulation?.cost_ratio).toBeUndefined()
+	})
+
+	it('renders the cap simulation in the text report', () => {
+		expect(cost_report.format_report(capped(two, 500_000))).toContain('Cap simulation')
+	})
+})
