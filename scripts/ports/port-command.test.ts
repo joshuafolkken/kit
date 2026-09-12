@@ -5,6 +5,7 @@ import { port_command } from './port-command'
 const DEFAULT_DEV_PORT = 5173
 const DEFAULT_PREVIEW_PORT = 4173
 const SEED = 1
+const SEED_MULTIPLIER = 10
 const SUCCESS_EXIT_CODE = 0
 const USAGE_EXIT_CODE = 1
 
@@ -36,9 +37,11 @@ describe('josh port', () => {
 	it('follows the seed, so a package.json script and Playwright agree on the port', () => {
 		const environment = seeded(SEED)
 
-		expect(port_command.run(['dev'], environment).text).toBe(String(DEFAULT_DEV_PORT + SEED))
+		expect(port_command.run(['dev'], environment).text).toBe(
+			String(DEFAULT_DEV_PORT + SEED * SEED_MULTIPLIER),
+		)
 		expect(port_command.run(['preview'], environment).text).toBe(
-			String(DEFAULT_PREVIEW_PORT + SEED),
+			String(DEFAULT_PREVIEW_PORT + SEED * SEED_MULTIPLIER),
 		)
 	})
 })

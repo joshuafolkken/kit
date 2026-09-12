@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
@@ -20,12 +20,28 @@ import { lane_start_point } from './lane-start-point'
 interface LanePlan {
 	lane: LaneInfo
 	environment_content: string
+	// The seat lock held across this lane's creation, released once its `.env` is on disk.
+	seat_lock: string
+}
+
+interface SeatReservation {
+	seat: number
+	lock: string
 }
 
 type OpenOutcome =
 	{ kind: 'already-open'; lane: LaneInfo } | { kind: 'full' } | { kind: 'opened'; lane: LaneInfo }
 
 const FULL_OUTCOME: OpenOutcome = { kind: 'full' }
+
+// The seat a lane will take is claimed by exclusively creating its lock directory here, under the
+// lanes root and clear of the lanes themselves (which are numbered, never dot-prefixed). The claim
+// is what closes the gap between reading the free seats and writing the lane's `.env`: two
+// `lane:open` runs that both saw seat 1 free cannot both create the same lock, so the loser steps to
+// the next free seat (joshuafolkken/kit#1494). The lock is released once the lane's `.env` is on
+// disk and the seat is discoverable — or on any failure — so only a hard crash mid-open can strand
+// one, which removing the lanes-root `.seat-locks` directory clears.
+const SEAT_LOCK_DIR = '.seat-locks'
 
 // A root with no `.env` is the normal state of a fresh clone and of CI, and it means seed 0 — the
 // same reading `ports/index.js` gives a missing file. The lane still gets a file, because the seed
@@ -36,15 +52,54 @@ function read_root_environment(repository_root: string): string {
 	return existsSync(file) ? readFileSync(file, 'utf8') : ''
 }
 
-function build_lane(root: string, issue: string, seed: number): LaneInfo {
+function build_lane(
+	root: string,
+	issue: string,
+	seat: number,
+	environment_content: string,
+): LaneInfo {
+	// The ports are resolved from the exact `.env` the lane will carry, through the one formula in
+	// `ports/index.js`, so the opened-lane confirmation prints the numbers the lane will actually run.
+	const port_pair = lane_environment.read_lane_ports(environment_content)
+
 	return {
 		issue,
 		branch: lane_paths.lane_branch(issue),
 		directory: lane_paths.lane_directory(root, issue),
-		seed,
+		seat,
+		development_port: port_pair.development,
+		preview_port: port_pair.preview,
 		output: undefined,
 		is_stranded: false,
 	}
+}
+
+function seat_lock_path(root: string, seat: number): string {
+	return path.join(root, SEAT_LOCK_DIR, `seat-${String(seat)}`)
+}
+
+// Claim `lock` by creating it exclusively — `false` when another open already holds it. The parent
+// is ensured first (idempotent); the lock itself is a non-recursive `mkdirSync`, so an existing one
+// throws rather than passing silently, which is what makes the claim atomic.
+function claim_seat(lock: string): boolean {
+	mkdirSync(path.dirname(lock), { recursive: true })
+
+	try {
+		mkdirSync(lock)
+
+		return true
+	} catch {
+		return false
+	}
+}
+
+function reserve_seat(root: string, free: ReadonlyArray<number>): SeatReservation | undefined {
+	for (const seat of free) {
+		const lock = seat_lock_path(root, seat)
+		if (claim_seat(lock)) return { seat, lock }
+	}
+
+	return undefined
 }
 
 /**
@@ -91,14 +146,17 @@ function build_plan(
 	lanes: ReadonlyArray<LaneInfo>,
 ): LanePlan | undefined {
 	const root_content = read_root_environment(repository_root)
-	const base = lane_seed_policy.seed_base(root_content)
-	const seed = lane_seed_policy.allocate_seed(base, lane_registry.used_seeds(lanes))
+	const free = lane_seed_policy.free_seats(lane_registry.used_seats(lanes))
+	const reservation = reserve_seat(root, free)
 
-	if (seed === undefined) return undefined
+	if (reservation === undefined) return undefined
+
+	const environment_content = lane_environment.lane_file_content(root_content, reservation.seat)
 
 	return {
-		lane: build_lane(root, issue, seed),
-		environment_content: lane_environment.lane_file_content(root_content, seed),
+		lane: build_lane(root, issue, reservation.seat, environment_content),
+		environment_content,
+		seat_lock: reservation.lock,
 	}
 }
 
@@ -117,13 +175,19 @@ function build_plan(
 // rather than before, so a lane that fails here still carries the seat it was allocated and the
 // failure is recoverable by re-running the install alone.
 async function materialize(plan: LanePlan): Promise<void> {
-	mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
+	// The seat lock is released in `finally`: on success the `.env` is on disk and the seat is
+	// discoverable by the next open, and on failure nothing was created that should hold it.
+	try {
+		mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
 
-	const start_point = await lane_start_point.resolve_for_branch(plan.lane.branch)
+		const start_point = await lane_start_point.resolve_for_branch(plan.lane.branch)
 
-	await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
-	writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
-	guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
+		await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
+		writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
+		guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
+	} finally {
+		rmSync(plan.seat_lock, { recursive: true, force: true })
+	}
 }
 
 /**

@@ -4,10 +4,11 @@ import { parseArgs } from 'node:util'
 import { cost_attribute } from './cost-attribute'
 import { cost_blocks } from './cost-blocks'
 import { cost_composition } from './cost-composition'
+import { cost_corpus, type AttributedRecord, type Corpus } from './cost-corpus'
 import { cost_report, type CostReport, type Measurement, type MissingData } from './cost-report'
 import { cost_resident } from './cost-resident'
 import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
-import { cost_usage, type UsageRecord } from './cost-usage'
+import { cost_usage } from './cost-usage'
 
 // `josh cost` — what a run actually spent, read from Claude Code's own session transcripts
 // (joshuafolkken/kit#962).
@@ -147,35 +148,6 @@ function scope_label(key: number): string {
 	return key === cost_attribute.UNATTRIBUTED_KEY ? 'unattributed' : `issue #${String(key)}`
 }
 
-interface Corpus {
-	sessions: Array<SessionUsage>
-	// Kept beside the sessions so the whole-session scope can re-read its transcript for the two
-	// decompositions (joshuafolkken/kit#1151). Parsed lazily and only for that one file: classifying
-	// the content blocks of all 158 transcripts to print one issue's cost would be work nothing
-	// reads.
-	files: Array<SessionFile>
-	missing: MissingData
-}
-
-function accumulate_missing(sessions: ReadonlyArray<SessionUsage>): MissingData {
-	return {
-		no_usage_lines: sessions.reduce((sum, session) => sum + session.no_usage_lines, 0),
-		malformed_lines: sessions.reduce((sum, session) => sum + session.malformed_lines, 0),
-		unreadable_sessions: sessions.filter((session) => !session.is_readable).length,
-	}
-}
-
-// Every session for this project, newest first. A `--session` narrows it here rather than in each
-// caller, so "that session does not exist" is one answer instead of three.
-function load_corpus(cwd: string, session_id?: string): Corpus {
-	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
-	const wanted =
-		session_id === undefined ? files : files.filter((file) => file.session_id === session_id)
-	const sessions = wanted.map((file) => cost_transcript.read_session(file))
-
-	return { sessions, files: wanted, missing: accumulate_missing(sessions) }
-}
-
 // The resident and context decompositions for one whole session. Built here rather than in
 // `build_report` because only this scope has a transcript file to read them from.
 function build_measurement(cwd: string, file: SessionFile, session: SessionUsage): Measurement {
@@ -221,73 +193,10 @@ function report_session(corpus: Corpus, cwd: string): CostReport | undefined {
 	return cost_report.build_report({
 		scope: `session ${session.session_id}`,
 		records: session.records,
-		missing: accumulate_missing([session]),
+		missing: cost_corpus.accumulate_missing([session]),
 		resident_billed_tokens: session.baseline_tokens * session.records.length,
 		...optional_measurement(cwd, file, session),
 	})
-}
-
-interface AttributedRecord {
-	record: UsageRecord
-	issue: number
-	// The resident baseline of the session this record was read from. Carried per record because a
-	// scope that spans sessions has no single baseline, and the first record of a *filtered* set is
-	// a warm mid-session request rather than a preamble — reading it as one reported an issue as
-	// 86.5% resident against a real session's 27.7%.
-	baseline_tokens: number
-}
-
-// Attribution is per session, because the branch sequence a session walks is what carries the
-// mapping; concatenating sessions first would let one session's trailing branch attribute the next
-// session's opening requests.
-function attributed_per_session(corpus: Corpus): Array<AttributedRecord> {
-	return corpus.sessions.flatMap((session) =>
-		cost_attribute.group_by_issue(session.records).flatMap((group) =>
-			group.records.map((record) => ({
-				record,
-				issue: group.issue,
-				baseline_tokens: session.baseline_tokens,
-			})),
-		),
-	)
-}
-
-// An occurrence carrying an issue beats one that does not. A copy written before the branch existed
-// has nothing to attribute it to, so keeping it would move a real request into `unattributed`.
-function is_better(candidate: AttributedRecord, existing: AttributedRecord): boolean {
-	const { UNATTRIBUTED_KEY } = cost_attribute
-
-	return existing.issue === UNATTRIBUTED_KEY && candidate.issue !== UNATTRIBUTED_KEY
-}
-
-function values_of(best: ReadonlyMap<string, AttributedRecord>): Array<AttributedRecord> {
-	const collected: Array<AttributedRecord> = []
-
-	for (const [, pair] of best) collected.push(pair)
-
-	return collected
-}
-
-// **Dedupe again, across sessions.** Resuming or forking a session copies the earlier lines into a
-// new transcript file, so one billed request appears in several — 152 such request ids in this
-// repository's own transcripts, some in three files. Per-session dedup does not see them, and every
-// scope spanning more than one session would bill those requests twice or three times.
-function dedupe_across_sessions(pairs: ReadonlyArray<AttributedRecord>): Array<AttributedRecord> {
-	const best = new Map<string, AttributedRecord>()
-
-	for (const pair of pairs) {
-		const existing = best.get(pair.record.request_id)
-
-		if (existing === undefined || is_better(pair, existing)) {
-			best.set(pair.record.request_id, pair)
-		}
-	}
-
-	return values_of(best)
-}
-
-function attributed(corpus: Corpus): Array<AttributedRecord> {
-	return dedupe_across_sessions(attributed_per_session(corpus))
 }
 
 // One issue, across every session that touched it. A child implemented over two sessions — an
@@ -311,16 +220,28 @@ function to_scope_report(
 	})
 }
 
-function report_issue(corpus: Corpus, issue_number: number): CostReport {
-	const pairs = attributed(corpus).filter((pair) => pair.issue === issue_number)
+// An issue scope is the one place a unit that could not follow its parent disappears — in `--all` it
+// still shows in the `unattributed` bucket — so the count is merged into `missing` here alone, marking
+// `cost_usd` a floor exactly as `unpriced_models` does.
+function with_unattributed(missing: MissingData, unattributed_units: number): MissingData {
+	return { ...missing, unattributed_sessions: unattributed_units }
+}
 
-	return to_scope_report(scope_label(issue_number), pairs, corpus.missing)
+function report_issue(corpus: Corpus, issue_number: number): CostReport {
+	const attribution = cost_corpus.attribute_corpus(corpus)
+	const pairs = cost_corpus
+		.dedupe_across_sessions(attribution.pairs)
+		.filter((pair) => pair.issue === issue_number)
+	const floor = cost_corpus.floor_for_issue(attribution.unattributed, issue_number)
+	const missing = with_unattributed(corpus.missing, floor)
+
+	return to_scope_report(scope_label(issue_number), pairs, missing)
 }
 
 function report_all(corpus: Corpus): Array<CostReport> {
 	const merged = new Map<number, Array<AttributedRecord>>()
 
-	for (const pair of attributed(corpus)) {
+	for (const pair of cost_corpus.attributed(corpus)) {
 		merged.set(pair.issue, [...(merged.get(pair.issue) ?? []), pair])
 	}
 
@@ -413,7 +334,7 @@ function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 		return FAILURE_EXIT_CODE
 	}
 
-	const reports = build_reports(options, load_corpus(cwd, options.session), cwd)
+	const reports = build_reports(options, cost_corpus.load_corpus(cwd, options.session), cwd)
 
 	if (reports === undefined) return report_empty(cwd, options.session)
 	if (options.over !== undefined) return report_over(reports, options.over)
@@ -434,11 +355,11 @@ function main(argv: ReadonlyArray<string>): void {
 const cost_cli = {
 	USAGE,
 	parse_options,
-	load_corpus,
+	load_corpus: cost_corpus.load_corpus,
 	report_session,
 	report_issue,
 	report_all,
-	attributed,
+	attributed: cost_corpus.attributed,
 	to_threshold,
 	per_request_cost,
 	report_over,

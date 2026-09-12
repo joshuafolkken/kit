@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
 
-// joshuafolkken/kit#1490: the listing is what answers "how many lanes are open, for which issue, and
-// on which ports". The ports are resolved through `ports/index.js` rather than added up here, so the
-// numbers printed are the ones `josh port` and `playwright.config.ts` resolve inside the lane.
+// joshuafolkken/kit#1490, joshuafolkken/kit#1494: the listing answers "how many lanes are open, for
+// which issue, on which seat and ports". The registry resolves the ports through `ports/index.js`
+// when it reads each lane's `.env`, so the report only displays them — the numbers are the ones
+// `josh port` and `playwright.config.ts` resolve inside the lane.
 
-const DEV_BASE = 5173
-const PREVIEW_BASE = 4173
-const SEED = 6
+const SEAT = 6
+const DEV_PORT = 5236
+const PREVIEW_PORT = 4236
 const LANE_BRANCH = '1490-lane'
 const LANE_DIRECTORY = '/w/.kit-lanes/1490'
 
@@ -17,27 +18,27 @@ function lane(overrides: Partial<LaneInfo> = {}): LaneInfo {
 		issue: '1490',
 		branch: LANE_BRANCH,
 		directory: LANE_DIRECTORY,
-		seed: SEED,
+		seat: SEAT,
+		development_port: DEV_PORT,
+		preview_port: PREVIEW_PORT,
 		output: undefined,
 		is_stranded: false,
 		...overrides,
 	}
 }
 
+const UNREADABLE = { seat: undefined, development_port: undefined, preview_port: undefined }
+
 describe('listing the open lanes', () => {
-	it('says which issue, which ports and where, on one line per lane', () => {
+	it('says which issue, which seat and ports, and where, on one line per lane', () => {
 		const line = lane_report.describe_lane(lane())
 
 		expect(line).toContain('#1490')
-		expect(line).toContain(`dev ${String(DEV_BASE + SEED)}`)
-		expect(line).toContain(`preview ${String(PREVIEW_BASE + SEED)}`)
+		expect(line).toContain(`seat ${String(SEAT)}`)
+		expect(line).toContain(`dev ${String(DEV_PORT)}`)
+		expect(line).toContain(`preview ${String(PREVIEW_PORT)}`)
 		expect(line).toContain(LANE_DIRECTORY)
 		expect(line).toContain(lane_report.OPEN_STATE)
-	})
-
-	it('resolves the ports through the same module the lane itself will read', () => {
-		expect(lane_report.development_port(SEED)).toBe(DEV_BASE + SEED)
-		expect(lane_report.preview_port(SEED)).toBe(PREVIEW_BASE + SEED)
 	})
 
 	it('says so plainly when nothing is open', () => {
@@ -51,7 +52,7 @@ describe('listing the open lanes', () => {
 	})
 
 	it('marks a lane whose work tree is gone as stranded', () => {
-		const line = lane_report.describe_lane(lane({ is_stranded: true, seed: undefined }))
+		const line = lane_report.describe_lane(lane({ is_stranded: true, ...UNREADABLE }))
 
 		expect(line).toContain(lane_report.STRANDED_STATE)
 	})
@@ -59,10 +60,10 @@ describe('listing the open lanes', () => {
 	// Shown rather than hidden: this is the state that stops the next `lane:open`, and a refusal
 	// whose cause was invisible in the listing would look like the command misbehaving.
 	it('marks a live lane whose seat could not be read as unreadable', () => {
-		const line = lane_report.describe_lane(lane({ seed: undefined }))
+		const line = lane_report.describe_lane(lane(UNREADABLE))
 
 		expect(line).toContain(lane_report.UNREADABLE_STATE)
-		expect(line).not.toContain(`dev ${String(DEV_BASE)}`)
+		expect(line).toContain('seat -')
 	})
 })
 
@@ -92,11 +93,11 @@ describe('the recorded output path in the listing', () => {
 })
 
 describe('the line printed when a lane opens', () => {
-	it('names the branch and the ports the lane got', () => {
+	it('names the branch, the seat and the ports the lane got', () => {
 		const opened = lane_report.describe_opened(lane())
 
 		expect(opened).toContain(LANE_BRANCH)
-		expect(opened).toContain(`PORT_SEED=${String(SEED)}`)
-		expect(opened).toContain(String(PREVIEW_BASE + SEED))
+		expect(opened).toContain(`seat ${String(SEAT)}`)
+		expect(opened).toContain(String(PREVIEW_PORT))
 	})
 })

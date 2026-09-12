@@ -1,11 +1,11 @@
-import { PORT_SEED_KEY, ports } from '#ports'
 import type { LaneInfo } from './lane-registry'
 
-// What a person reads when they ask what is open (joshuafolkken/kit#1490).
+// What a person reads when they ask what is open (joshuafolkken/kit#1490, joshuafolkken/kit#1494).
 //
-// The ports are computed through `ports/index.js` rather than by adding the bases here, so the
-// numbers printed are the same numbers `josh port` and `playwright.config.ts` will resolve inside
-// the lane — a second formula would be a place for them to disagree.
+// The dev and preview ports are the ones the registry already resolved through `ports/index.js`
+// when it read each lane's `.env`, so the numbers printed here are the same ones `josh port` and
+// `playwright.config.ts` resolve inside the lane — nothing recomputes them, so there is no second
+// formula for the two to disagree over.
 
 const NO_LANES = 'No lanes are open.'
 const OPEN_STATE = 'open'
@@ -17,28 +17,14 @@ const UNREADABLE_STATE = 'unreadable'
 const UNKNOWN_VALUE = '-'
 const COLUMN_SEPARATOR = '  '
 
-function seed_environment(seed: number): Record<string, string> {
-	return { [PORT_SEED_KEY]: String(seed) }
-}
-
-function development_port(seed: number): number {
-	return ports.resolve_development_port(seed_environment(seed))
-}
-
-function preview_port(seed: number): number {
-	return ports.resolve_preview_port(seed_environment(seed))
-}
-
 function lane_state(lane: LaneInfo): string {
 	if (lane.is_stranded) return STRANDED_STATE
 
-	return lane.seed === undefined ? UNREADABLE_STATE : OPEN_STATE
+	return lane.seat === undefined ? UNREADABLE_STATE : OPEN_STATE
 }
 
-function seed_columns(seed: number | undefined): Array<string> {
-	if (seed === undefined) return [UNKNOWN_VALUE, UNKNOWN_VALUE, UNKNOWN_VALUE]
-
-	return [String(seed), String(development_port(seed)), String(preview_port(seed))]
+function value_or_unknown(value: number | undefined): string {
+	return value === undefined ? UNKNOWN_VALUE : String(value)
 }
 
 // The recorded output path goes last and is labelled, so it is told apart from the directory beside
@@ -50,13 +36,11 @@ function output_column(output: string | undefined): string {
 }
 
 function describe_lane(lane: LaneInfo): string {
-	const [seed, development, preview] = seed_columns(lane.seed)
-
 	return [
 		`#${lane.issue}`,
-		`seed ${String(seed)}`,
-		`dev ${String(development)}`,
-		`preview ${String(preview)}`,
+		`seat ${value_or_unknown(lane.seat)}`,
+		`dev ${value_or_unknown(lane.development_port)}`,
+		`preview ${value_or_unknown(lane.preview_port)}`,
 		lane.branch,
 		lane_state(lane),
 		lane.directory,
@@ -70,16 +54,16 @@ function describe_lanes(lanes: ReadonlyArray<LaneInfo>): string {
 	return lanes.map((lane) => describe_lane(lane)).join('\n')
 }
 
-function describe_ports(seed: number | undefined): string {
-	if (seed === undefined) return 'no port seed could be read'
+function describe_ports(lane: LaneInfo): string {
+	if (lane.seat === undefined) return 'no lane seat could be read'
 
-	return `${PORT_SEED_KEY}=${String(seed)}, dev ${String(development_port(seed))}, preview ${String(preview_port(seed))}`
+	return `seat ${String(lane.seat)}, dev ${value_or_unknown(lane.development_port)}, preview ${value_or_unknown(lane.preview_port)}`
 }
 
 // The one-line confirmation a person reads on standard error while standard output carries the
 // directory alone, so `dir=$(pnpm josh lane:open 1490)` stays usable.
 function describe_opened(lane: LaneInfo): string {
-	return `Opened a lane for #${lane.issue} on ${lane.branch}: ${describe_ports(lane.seed)}.`
+	return `Opened a lane for #${lane.issue} on ${lane.branch}: ${describe_ports(lane)}.`
 }
 
 const lane_report = {
@@ -90,9 +74,7 @@ const lane_report = {
 	describe_lane,
 	describe_lanes,
 	describe_opened,
-	development_port,
 	lane_state,
-	preview_port,
 }
 
 export { lane_report }

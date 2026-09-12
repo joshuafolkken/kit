@@ -1,15 +1,19 @@
 import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { environment_file_fixture } from './environment-file-fixture'
-import { PORT_SEED_KEY, ports, type PortEnvironment } from './index.js'
+import { LANE_SEAT_KEY, PORT_SEED_KEY, ports, type PortEnvironment } from './index.js'
 
 const DEFAULT_DEV_PORT = 5173
 const DEFAULT_PREVIEW_PORT = 4173
 const SEED = 1
-// Stated independently of the module's own arithmetic: the highest seed that still keeps the dev
-// port — the higher of the two bases — inside the 65535 the protocol allows.
-const MAX_SEED = 60_362
+const SEED_MULTIPLIER = 10
+const LANE_SEAT = 3
+// The offset is `seed × 10 + lane`, so a whole band stays below the 1000 between the two port bases
+// only while the seed is at most 99; the seat is the units digit, 0..9.
+const MAX_SEED = 99
 const ABOVE_MAX_SEED = String(MAX_SEED + 1)
+const MAX_LANE = 9
+const ABOVE_MAX_LANE = String(MAX_LANE + 1)
 
 // A silent fallback to 0 would put two projects back on one port, which is the failure the seed
 // exists to remove, so every malformed shape has to raise instead of defaulting.
@@ -59,7 +63,7 @@ describe('ports.resolve_seed', () => {
 		expect(ports.resolve_seed(environment('7'))).toBe(7)
 	})
 
-	it('accepts the highest seed that keeps both ports below the protocol maximum', () => {
+	it('accepts the highest seed whose whole band stays below 1000', () => {
 		const highest = environment(String(MAX_SEED))
 
 		expect(ports.resolve_seed(highest)).toBe(MAX_SEED)
@@ -83,11 +87,19 @@ describe('ports.resolve_development_port / ports.resolve_preview_port', () => {
 		expect(ports.resolve_preview_port({})).toBe(DEFAULT_PREVIEW_PORT)
 	})
 
-	it('moves both ports by the same seed', () => {
+	it('multiplies the seed by ten, so distinct seeds occupy disjoint bands', () => {
 		const seeded = environment(String(SEED))
 
-		expect(ports.resolve_development_port(seeded)).toBe(DEFAULT_DEV_PORT + SEED)
-		expect(ports.resolve_preview_port(seeded)).toBe(DEFAULT_PREVIEW_PORT + SEED)
+		expect(ports.resolve_development_port(seeded)).toBe(DEFAULT_DEV_PORT + SEED * SEED_MULTIPLIER)
+		expect(ports.resolve_preview_port(seeded)).toBe(DEFAULT_PREVIEW_PORT + SEED * SEED_MULTIPLIER)
+	})
+
+	it('adds the lane seat within the band, so lanes of one project never collide', () => {
+		const with_seat = { [PORT_SEED_KEY]: String(SEED), [LANE_SEAT_KEY]: String(LANE_SEAT) }
+		const offset = SEED * SEED_MULTIPLIER + LANE_SEAT
+
+		expect(ports.resolve_development_port(with_seat)).toBe(DEFAULT_DEV_PORT + offset)
+		expect(ports.resolve_preview_port(with_seat)).toBe(DEFAULT_PREVIEW_PORT + offset)
 	})
 
 	it('gives two seeds two distinct port pairs, so both previews can run at once', () => {
@@ -100,6 +112,20 @@ describe('ports.resolve_development_port / ports.resolve_preview_port', () => {
 	it('propagates an invalid seed rather than serving a default port', () => {
 		expect(() => ports.resolve_development_port(environment('abc'))).toThrow(PORT_SEED_KEY)
 		expect(() => ports.resolve_preview_port(environment('abc'))).toThrow(PORT_SEED_KEY)
+	})
+})
+
+describe('ports.resolve_lane', () => {
+	// The seat is a separate key from the seed, and 0 — the main work tree — when unset, so a
+	// checkout that never opens a lane stays on its seed's own band exactly.
+	it('reads JOSH_LANE_SEAT and is 0 for the main work tree', () => {
+		expect(LANE_SEAT_KEY).toBe('JOSH_LANE_SEAT')
+		expect(ports.resolve_lane({})).toBe(0)
+		expect(ports.resolve_lane({ [LANE_SEAT_KEY]: String(LANE_SEAT) })).toBe(LANE_SEAT)
+	})
+
+	it('rejects a seat past the last one rather than overflowing into the next band', () => {
+		expect(() => ports.resolve_lane({ [LANE_SEAT_KEY]: ABOVE_MAX_LANE })).toThrow(LANE_SEAT_KEY)
 	})
 })
 
@@ -132,8 +158,8 @@ afterAll(() => {
 describe('ports.load_environment_file', () => {
 	it('puts the seed written in .env where every reader of process.env finds it', () => {
 		expect(load_seed_from(`${PORT_SEED_KEY}=${FILE_SEED_TEXT}\n`)).toBe(true)
-		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED)
-		expect(ports.resolve_preview_port()).toBe(DEFAULT_PREVIEW_PORT + FILE_SEED)
+		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED * SEED_MULTIPLIER)
+		expect(ports.resolve_preview_port()).toBe(DEFAULT_PREVIEW_PORT + FILE_SEED * SEED_MULTIPLIER)
 	})
 
 	// A project with no `.env` is the CI case and the un-migrated consumer, so the loader has to be
@@ -232,7 +258,7 @@ describe('ports.load_environment_file — .env from a subdirectory', () => {
 		const nested = environment_file_fixture.make_subdirectory(marked_project, NESTED_DIRECTORY_NAME)
 
 		expect(ports.load_environment_file(nested)).toBe(true)
-		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED)
+		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED * SEED_MULTIPLIER)
 	})
 
 	// A `.env` beside the caller must not win. An `e2e/.env` holding unrelated fixture data and no
@@ -244,7 +270,7 @@ describe('ports.load_environment_file — .env from a subdirectory', () => {
 		environment_file_fixture.write_environment_file(nested, `${PORT_SEED_KEY}=${NESTED_SEED}\n`)
 
 		expect(ports.load_environment_file(nested)).toBe(true)
-		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED)
+		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED * SEED_MULTIPLIER)
 	})
 })
 
@@ -274,7 +300,7 @@ describe('ports.load_environment_file — where the search stops', () => {
 		vi.spyOn(process, 'cwd').mockReturnValue(path.join(marked, NESTED_DIRECTORY_NAME))
 
 		expect(ports.load_environment_file('.')).toBe(true)
-		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED)
+		expect(ports.resolve_development_port()).toBe(DEFAULT_DEV_PORT + FILE_SEED * SEED_MULTIPLIER)
 	})
 
 	// The search stops at the root rather than climbing on, so a `.env` in the directory that

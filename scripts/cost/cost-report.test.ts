@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { cost_report, type CostReport, type MissingData } from './cost-report'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 
-const NO_MISSING: MissingData = { no_usage_lines: 0, malformed_lines: 0, unreadable_sessions: 0 }
+const NO_MISSING: MissingData = {
+	no_usage_lines: 0,
+	malformed_lines: 0,
+	unreadable_sessions: 0,
+	unattributed_sessions: 0,
+}
 const RESIDENT = 100_000
 const MILLION = 1_000_000
 const ISSUE_SCOPE = 'issue #962'
@@ -139,11 +144,22 @@ describe('cost_report.format_report', () => {
 			no_usage_lines: 2,
 			malformed_lines: 3,
 			unreadable_sessions: 1,
+			unattributed_sessions: 0,
 		})
 
 		expect(text).toContain('unparseable lines: 3')
 		expect(text).toContain('assistant lines without usage: 2')
 		expect(text).toContain('unreadable sessions: 1')
+	})
+
+	// joshuafolkken/kit#1812: a delegated unit that could not be attributed to an issue carries cost
+	// that lands in no issue scope, so it is counted and the total is marked a floor — the same reading
+	// `unpriced_models` gets, so a `missing` of three zeros can no longer read as a complete count.
+	it('reports delegated units that could not be attributed, and marks the cost a floor', () => {
+		const text = formatted([record('a')], { ...NO_MISSING, unattributed_sessions: 2 })
+
+		expect(text).toContain('delegated units not attributed to an issue: 2')
+		expect(text).toContain('floor')
 	})
 
 	it('says nothing about missing data when there is none', () => {

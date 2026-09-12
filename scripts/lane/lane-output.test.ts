@@ -22,8 +22,8 @@ const ISSUE = '1713'
 const OTHER_ISSUE = '9999'
 const LANE_DIRECTORY = path.join(LANE_ROOT, ISSUE)
 const ENV_FILE = path.join(LANE_DIRECTORY, '.env')
-const SEED = 6
-const SEED_LINE = 'PORT_SEED=6\n'
+const SEAT = 6
+const SEAT_LINE = 'JOSH_LANE_SEAT=6\n'
 const UNIT_FILE_NAME = 'agent-7.jsonl'
 const UNIT_OUTPUT = path.join(scratch, UNIT_FILE_NAME)
 const LATER_OUTPUT = path.join(scratch, 'agent-8.jsonl')
@@ -65,7 +65,7 @@ function recorded_lines(): Array<string> {
 }
 
 beforeEach(() => {
-	open_lane_on_disk(SEED_LINE)
+	open_lane_on_disk(SEAT_LINE)
 })
 
 describe('recording where a lane’s unit writes', () => {
@@ -97,7 +97,7 @@ describe('recording where a lane’s unit writes', () => {
 
 		const [lane] = await lane_registry.list_lanes()
 
-		expect(lane?.seed).toBe(SEED)
+		expect(lane?.seat).toBe(SEAT)
 	})
 
 	it('answers none for a lane whose child has not been handed over yet', async () => {
@@ -178,7 +178,9 @@ describe('what a refusal tells the caller', () => {
 					issue: ISSUE,
 					branch: '',
 					directory: LANE_DIRECTORY,
-					seed: undefined,
+					seat: undefined,
+					development_port: undefined,
+					preview_port: undefined,
 					output: undefined,
 					is_stranded: false,
 				},

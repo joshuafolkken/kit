@@ -43,12 +43,14 @@ const OTHER_ISSUE = '1491'
 const LANE_BRANCH = '1490-lane'
 const SEED = 6
 
-function lane_of(issue: string, seed: number): LaneInfo {
+function lane_of(issue: string, seat: number): LaneInfo {
 	return {
 		issue,
 		branch: `${issue}-lane`,
 		directory: path.join(LANE_ROOT, issue),
-		seed,
+		seat,
+		development_port: undefined,
+		preview_port: undefined,
 		output: undefined,
 		is_stranded: false,
 	}
@@ -56,12 +58,12 @@ function lane_of(issue: string, seed: number): LaneInfo {
 
 // A lane with uncommitted work in it — the state a park or a failure leaves, and the one a close
 // that refused to force would walk away from.
-function open_on_disk(issue: string, seed: number): LaneInfo {
-	const lane = lane_of(issue, seed)
+function open_on_disk(issue: string, seat: number): LaneInfo {
+	const lane = lane_of(issue, seat)
 
 	mkdirSync(lane.directory, { recursive: true })
 	writeFileSync(path.join(lane.directory, 'uncommitted.txt'), 'work in progress')
-	writeFileSync(path.join(lane.directory, '.env'), `PORT_SEED=${String(seed)}\n`)
+	writeFileSync(path.join(lane.directory, '.env'), `JOSH_LANE_SEAT=${String(seat)}\n`)
 
 	return lane
 }
@@ -153,7 +155,7 @@ describe('judging a close by what is left', () => {
 describe('sweeping up after an interruption', () => {
 	it('prunes only the lanes whose work tree is gone', async () => {
 		const live = open_on_disk(ISSUE, SEED)
-		const stranded = { ...lane_of(OTHER_ISSUE, SEED + 1), is_stranded: true, seed: undefined }
+		const stranded = { ...lane_of(OTHER_ISSUE, SEED + 1), is_stranded: true, seat: undefined }
 
 		lanes_are([live, stranded])
 

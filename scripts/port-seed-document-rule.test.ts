@@ -72,10 +72,15 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'unset or blank means `0` (`5173` / `4173`)',
 ]
 
+// joshuafolkken/kit#1494: the offset became `seed × 10 + lane`, a documented, distributed contract
+// change that moves a set seed's ports — so the formula and the notice that the meaning changed are
+// pinned here, the way the no-fallback guarantee above is, against a silent reword that drops them.
 const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
 	'is a hard error rather than a silent fall back to the default',
 	'A busy port still **fails loudly** — nothing retries on another port',
 	'so the E2E suite follows the seed with no configuration',
+	'`seed × 10 + lane`',
+	'The formula changed in',
 ]
 
 describe('PORT_SEED documentation', () => {

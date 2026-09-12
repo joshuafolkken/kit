@@ -31,6 +31,11 @@ const NOT_MEASURED = 'not measured'
 // than in `time-report.ts` because two blocks print it — the round-trip price and the bundling block —
 // and `time-bundles.ts` cannot import `time-report.ts`, which imports it (joshuafolkken/kit#1344).
 const NO_CALLS = 'no tool call to divide'
+// The word both the CI-cycle block and the gate-runtime block put in front of their naked-seconds
+// figure (joshuafolkken/kit#1812). Two renderers of the same report, and `time-cycles.ts` cannot
+// import `time-gate-runs.ts` nor the reverse, so it is written once here — the rule this file's header
+// states, and the reason `NO_CALLS` already sits beside it.
+const NAKED_PREFIX = 'naked '
 // The category labels, shared with the epic scope's table and with the round-trip block's price row
 // rather than spelled out in each. The tables answer the same question at three scales, so a label
 // renamed in one and not the others is a report that disagrees with itself — which is the defect
@@ -146,6 +151,7 @@ function note_lines(notes: ReadonlyArray<string>): Array<string> {
 const time_format = {
 	MAX_ROWS,
 	NO_CALLS,
+	NAKED_PREFIX,
 	SUFFIX_SEPARATOR,
 	NOT_MEASURED,
 	MODEL_LABEL,

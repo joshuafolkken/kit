@@ -124,7 +124,20 @@ describe(`${SKILL_PATH} — reads what the run cost, not only how long it took`,
 		'**Read `missing` before quoting any of them, and a non-zero count is unmeasured rather than zero.**',
 		'`no_usage_lines`, `malformed_lines`, `unreadable_sessions`',
 		'**withheld is not measured as zero**',
+		'`unattributed_sessions` is the fourth',
+		'a `missing` of three zeros is not proof of a complete read',
 	])('does not read an unpriced corpus as zero dollars: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// joshuafolkken/kit#1812: the gate is launched into the background, so its phase and its
+	// per-invocation rows are the dispatch and not the runtime — read like `ci`, whose `ci: 0` never
+	// meant nobody waited. The runtime is the `Gate runtime (backgrounded)` block.
+	it.each([
+		'**`gate` is read like `ci`, and for the same reason**',
+		'`Gate runtime (backgrounded)`',
+		'A small `gate` figure no more means the gate was fast than',
+	])('reads the backgrounded gate runtime like ci: %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
 

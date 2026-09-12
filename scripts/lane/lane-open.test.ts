@@ -1,15 +1,15 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
 
-// joshuafolkken/kit#1490: opening a lane has to produce a work tree that carries **its own** port
-// seed and the root's other settings. `git_command` is mocked because the assertions are about what
-// this module asks git for and what it writes beside it, not about git itself —
-// `git-worktree.test.ts` pins the flags of the worktree calls, and `lane-registry.test.ts` the
-// reading of the seats.
+// joshuafolkken/kit#1490, joshuafolkken/kit#1494: opening a lane produces a work tree that keeps the
+// project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. `git_command` is mocked because
+// the assertions are about what this module asks git for and what it writes beside it, not about git
+// itself — `git-worktree.test.ts` pins the flags of the worktree calls, and `lane-registry.test.ts`
+// the reading of the seats.
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
@@ -36,9 +36,9 @@ vi.mock('./lane-registry', () => ({
 		list_lanes: vi.fn(),
 		main_repository_root: vi.fn(),
 		unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
-			lanes.filter((lane) => !lane.is_stranded && lane.seed === undefined),
-		used_seeds: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
-			lanes.flatMap((lane) => (lane.seed === undefined ? [] : [lane.seed])),
+			lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined),
+		used_seats: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
+			lanes.flatMap((lane) => (lane.seat === undefined ? [] : [lane.seat])),
 	},
 }))
 
@@ -53,11 +53,15 @@ const REPOSITORY_ROOT = path.join(scratch, 'kit')
 const LANE_ROOT = path.join(scratch, 'lanes')
 const BOT_TOKEN = 'TELEGRAM_BOT_TOKEN=abc:123'
 const CHAT_ID = 'TELEGRAM_CHAT_ID=42'
-const ROOT_ENV = [BOT_TOKEN, CHAT_ID, 'PORT_SEED=5', ''].join('\n')
-const ROOT_SEED = 5
+const ROOT_SEED_LINE = 'PORT_SEED=5'
+const SEAT_1_LINE = 'JOSH_LANE_SEAT=1'
+const SEAT_2_LINE = 'JOSH_LANE_SEAT=2'
+const ROOT_ENV = [BOT_TOKEN, CHAT_ID, ROOT_SEED_LINE, ''].join('\n')
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
 const START_POINT = 'refs/remotes/origin/main'
+const DEV_BASE = 5173
+const PREVIEW_BASE = 4173
 // What `prepare` prints in a linked work tree, whose hooks belong to the primary repository
 // (joshuafolkken/kit#1503, #1507). It rides on a successful install and must not refuse the lane.
 const LEFTHOOK_WARNING = 'lefthook install failed: git hooks are NOT installed.'
@@ -80,12 +84,18 @@ function lane_environment_file(issue: string): string {
 	return readFileSync(path.join(LANE_ROOT, issue, '.env'), 'utf8')
 }
 
-function live_lane(issue: string, seed: number | undefined): LaneInfo {
+function seat_lock_path(seat: number): string {
+	return path.join(LANE_ROOT, '.seat-locks', `seat-${String(seat)}`)
+}
+
+function live_lane(issue: string, seat: number | undefined): LaneInfo {
 	return {
 		issue,
 		branch: `${issue}-lane`,
 		directory: path.join(LANE_ROOT, issue),
-		seed,
+		seat,
+		development_port: seat === undefined ? undefined : DEV_BASE + seat,
+		preview_port: seat === undefined ? undefined : PREVIEW_BASE + seat,
 		output: undefined,
 		is_stranded: false,
 	}
@@ -139,33 +149,54 @@ describe('opening a lane', () => {
 		)
 	})
 
-	// Seat 0 is the main work tree's, and it keeps the seed it already had: nothing here rewrites the
-	// root `.env`, so a project that never opens a lane stays on exactly the ports it has today.
-	it('gives the lane its own seed and the root other keys, leaving the root seed alone', async () => {
+	// The lane keeps the project's seed and adds only its seat, so the file shows the two apart and the
+	// root `.env` is left exactly as it was — a project that never opens a lane keeps today's ports.
+	it('adds the lane its own seat, keeps the project seed, and leaves the root alone', async () => {
 		await lane_open.open_lane(ISSUE)
 
 		const written = lane_environment_file(ISSUE)
 
-		expect(written).toContain(`PORT_SEED=${String(ROOT_SEED + 1)}`)
+		expect(written).toContain(SEAT_1_LINE)
+		expect(written).toContain(ROOT_SEED_LINE)
 		expect(written).toContain(BOT_TOKEN)
 		expect(written).toContain(CHAT_ID)
 		expect(root_environment_file()).toBe(ROOT_ENV)
 	})
 
-	it('takes the lowest seed no open lane holds, read from those lanes .env', async () => {
-		lanes_are([live_lane(OTHER_ISSUE, ROOT_SEED + 1)])
+	it('takes the lowest seat no open lane holds', async () => {
+		lanes_are([live_lane(OTHER_ISSUE, 1)])
 
 		await lane_open.open_lane(ISSUE)
 
-		expect(lane_environment_file(ISSUE)).toContain(`PORT_SEED=${String(ROOT_SEED + 2)}`)
+		expect(lane_environment_file(ISSUE)).toContain(SEAT_2_LINE)
 	})
 
-	it('still gives a lane a seed when the root has no .env at all', async () => {
+	it('still gives a lane a seat when the root has no .env at all', async () => {
 		rmSync(path.join(REPOSITORY_ROOT, '.env'), { force: true })
 
 		await lane_open.open_lane(ISSUE)
 
-		expect(lane_environment_file(ISSUE)).toBe('PORT_SEED=1\n')
+		expect(lane_environment_file(ISSUE)).toBe(`${SEAT_1_LINE}\n`)
+	})
+})
+
+describe('claiming a lane seat atomically', () => {
+	// The seat is claimed by exclusively creating its lock directory, so once the lane's `.env` is on
+	// disk the lock is released and only a hard crash mid-open could strand one (joshuafolkken/kit#1494).
+	it('releases the seat lock once the lane is on disk', async () => {
+		await lane_open.open_lane(ISSUE)
+
+		expect(existsSync(seat_lock_path(1))).toBe(false)
+	})
+
+	// The lock is what closes the gap between reading the free seats and writing the `.env`: a seat
+	// another open already holds cannot be claimed, so this open steps to the next free one.
+	it('steps past a seat whose lock another open already holds', async () => {
+		mkdirSync(seat_lock_path(1), { recursive: true })
+
+		await lane_open.open_lane(ISSUE)
+
+		expect(lane_environment_file(ISSUE)).toContain(SEAT_2_LINE)
 	})
 })
 
@@ -196,7 +227,7 @@ describe('refusing to open a lane', () => {
 	// Reopening would mean `worktree add` onto a path git still registers, after this side had
 	// already handed the caller a second seat.
 	it('refuses a lane that is already open, and asks git for nothing', async () => {
-		lanes_are([live_lane(ISSUE, ROOT_SEED + 1)])
+		lanes_are([live_lane(ISSUE, 1)])
 
 		const outcome = await lane_open.open_lane(ISSUE)
 
@@ -204,10 +235,10 @@ describe('refusing to open a lane', () => {
 		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
 	})
 
-	it('refuses once every seat in the band is taken, rather than reusing one', async () => {
+	it('refuses once every seat is taken, rather than reusing one', async () => {
 		const seats = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-		lanes_are(seats.map((offset) => live_lane(String(offset), ROOT_SEED + offset)))
+		lanes_are(seats.map((seat) => live_lane(String(seat), seat)))
 
 		const outcome = await lane_open.open_lane(ISSUE)
 
