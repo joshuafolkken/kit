@@ -2,8 +2,10 @@ import { time_bundles, type BundleTotals } from './time-bundles'
 import { time_category_table, type CategoryTotals } from './time-category-table'
 import type { CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
+import type { ContributorCostFacts } from './time-contributor-costs'
+import { time_cost_blocks } from './time-cost-blocks'
 import { time_cycles, type CycleTotals } from './time-cycles'
-import { time_delegated_cost, type DelegatedCostFacts } from './time-delegated-cost'
+import type { DelegatedCostFacts } from './time-delegated-cost'
 import { time_delegated_wait, type DelegatedWaitTotals } from './time-delegated-wait'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_followup_stages, type FollowupStageTotals } from './time-followup-stages'
@@ -16,7 +18,7 @@ import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_josh_commands } from './time-josh-commands'
 import { time_model_gaps } from './time-model-gaps'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
-import { time_phase_costs, type PhaseCostFacts } from './time-phase-costs'
+import type { PhaseCostFacts } from './time-phase-costs'
 import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_ranked_tables } from './time-ranked-tables'
@@ -136,6 +138,11 @@ interface TimeReport extends TurnSplit {
 	// absent here means the question was never asked, while a present record with `is_measured: false`
 	// means it was asked and the corpus could not answer.
 	phase_costs?: PhaseCostFacts
+	// The same run's dollars keyed by purpose instead of stage, with a `no tool call` bucket for the
+	// billed turns that issued nothing (joshuafolkken/kit#1872). Optional for the same reason
+	// `phase_costs` is: absent means no scope read the cost corpus, present-but-unmeasured means it
+	// was read and could not answer.
+	contributor_costs?: ContributorCostFacts
 	// What launching each delegated subagent cost, and the run's total (joshuafolkken/kit#1882). **An
 	// optional key like `phase_costs`**, and for the same reason: only the run scopes read the cost
 	// corpus, so absent means the question was never asked and a present record with `is_measured:
@@ -489,8 +496,7 @@ function format_report(report: TimeReport): string {
 		'Where the wall clock went:',
 		...time_category_table.category_lines(report),
 		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
-		...time_phase_costs.cost_lines(report.phase_costs),
-		...time_delegated_cost.cost_lines(report.delegated_cost),
+		...time_cost_blocks.cost_block_lines(report),
 		...time_cycles.cycle_lines(report.ci_cycles),
 		...time_delegated_wait.wait_lines(report.delegated_wait),
 		...time_segments.segment_lines(report.segments),

@@ -122,6 +122,22 @@ describe('time_parent_turns.build_parent_turns — one turn, one contributor', (
 	})
 })
 
+describe('time_parent_turns.contributor_of_trip', () => {
+	// The per-contributor cost block labels a trip by this, so it has to answer the same purpose the
+	// count does — one mapping, or the two tables disagree about what a turn was for.
+	it('names the purpose a round trip served', () => {
+		expect(time_parent_turns.contributor_of_trip([tool(EDIT_LABEL)])).toBe(
+			time_parent_turns.IMPLEMENTATION,
+		)
+	})
+
+	it('reads a trip that edited and also read as implementation, by the same precedence', () => {
+		expect(time_parent_turns.contributor_of_trip([tool(READ_LABEL), tool(EDIT_LABEL)])).toBe(
+			time_parent_turns.IMPLEMENTATION,
+		)
+	})
+})
+
 describe('time_parent_turns.parent_turn_lines — the block', () => {
 	it('prints one row per contributor, under the heading', () => {
 		const lines = time_parent_turns.parent_turn_lines(totals_of([tool(GH_LABEL)]))

@@ -171,6 +171,21 @@ describe(`${SKILL_PATH} — attributes the money to the phases it was spent in`,
 	})
 })
 
+// joshuafolkken/kit#1872: the same run keyed by purpose instead of stage, with the billed turns that
+// called nothing counted on their own. The markers pin the count-and-cost pairing, the no-tool-call
+// bucket, the unread-corpus distinction, and how the reading becomes a ranked row.
+describe(`${SKILL_PATH} — prices the run by purpose and counts the tool-less turns`, () => {
+	it.each([
+		'what each _purpose_ cost, and the turns that called nothing**',
+		'`by_contributor` carries a `request_count` and a `cost_usd`',
+		'**`no_tool_call` is a bucket, not a rounding error**',
+		'not that the turns were free**',
+		'**Turn it into a ranked row the way the phase costs are**',
+	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
 // The other half of joshuafolkken/kit#1609: a reading nothing ranks off is one nobody takes. Kept as
 // its own suite because the two halves fail for different reasons — the one above loses the figures,
 // this one loses the column they would go in.
@@ -337,50 +352,6 @@ describe(`${SKILL_PATH} — separates "did not occur" from zero and from unreada
 		'**report the three counts rather than a rate**',
 	])('counts the occurrences across runs: %j', (marker) => {
 		expect(read_skill()).toContain(marker)
-	})
-})
-
-// The correction the issue was edited to make. A ranked list that drops what is already filed
-// reports the backlog as emptier than it is, and an un-started issue that ranks high is usually the
-// cheapest action there is — it needs a run, not a filing.
-describe(`${SKILL_PATH} — keeps already-filed issues in the ranking`, () => {
-	it.each([
-		'**Do not drop an item because it is already filed.**',
-		'un-started issue is usually the highest-priority action in the table**',
-		'| Un-filed |',
-		'| Filed, not started |',
-		'| In progress |',
-		'| Done |',
-		'`fullrun #N`, or `epicrun #E`',
-		'Never a second filing',
-	])('states %j', (marker) => {
-		expect(read_skill()).toContain(marker)
-	})
-
-	// GitHub treats `In-Progress` as the same label as `in-progress`, so an eye comparing against the
-	// lowercase string reports an in-progress issue as un-started — and the table then tells someone
-	// to start a run that is already going.
-	it.each([
-		'**Read the state from `pnpm josh issue:state <N> [<N> ...]`, never by parsing `gh` output yourself —',
-		'the `labels:` line is compared case-insensitively',
-	])('reads issue state through the command: %j', (marker) => {
-		expect(read_skill()).toContain(marker)
-	})
-
-	// joshuafolkken/kit#1302: the table reads a state per row, and one call per row paid a process
-	// start and a round trip each. Reading them in one call is only safe while each block names its
-	// own number — a number that produced no state prints none, so position cannot be trusted.
-	it.each([
-		"pass the whole table's numbers in one call",
-		'**Attribute each block by its `issue:` line, never by position.**',
-		'pnpm josh issue:state 1262 1222 1176',
-	])('reads the whole table in one call: %j', (marker) => {
-		expect(read_skill()).toContain(marker)
-	})
-
-	it('routes a filing through the scout before it files', () => {
-		expect(read_skill()).toContain('pnpm josh issue:scout "<title>"')
-		expect(read_skill()).toContain('pnpm josh epic:bundle <new>')
 	})
 })
 

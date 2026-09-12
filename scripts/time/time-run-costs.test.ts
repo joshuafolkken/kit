@@ -72,3 +72,20 @@ describe('time_run.build_run_report — the cost the phases and launches are att
 		expect(asked).toEqual([`${CWD}#${String(ISSUE)}`])
 	})
 })
+
+describe('time_run.build_run_report — priced by contributor for the --json breakdown', () => {
+	it('reports the contributor costs unmeasured when no caller asked for them', async () => {
+		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT))
+
+		expect(report.contributor_costs?.is_measured).toBe(false)
+	})
+
+	it('carries the same run priced by contributor for the --json breakdown', async () => {
+		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT), sources([]))
+
+		expect([report.contributor_costs?.is_measured, report.contributor_costs?.cost_usd]).toEqual([
+			true,
+			ONE_DOLLAR,
+		])
+	})
+})
