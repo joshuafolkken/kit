@@ -52,7 +52,12 @@ const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
 // again. How an epic's children are grouped into execution waves — and the condition under which a
 // wave may not be declared at all — is a topic of its own, and a topic file the index does not list
 // is a file nobody opens. The row itself measured 199 bytes, and the ceiling moves by that full row.
-const INDEX_CEILING_BYTES = 9768
+// And once more by one row for `issue-citation.md` (joshuafolkken/kit#1758), on the same reading
+// again. How session-facing output cites an Issue — a number-link plus a short Japanese summary — is
+// a rule whose body the resident budget kept out of CLAUDE.md, so it lives in a topic file of its
+// own, and a topic file the index does not list is a file nobody opens. The row itself measured 200
+// bytes, and the ceiling moves by that full row.
+const INDEX_CEILING_BYTES = 9968
 
 // The fixture already enumerates them for the concatenating reader; re-implementing it here would
 // let the two drift and quietly stop covering a file the reader still concatenates.

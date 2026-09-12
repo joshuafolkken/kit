@@ -18,6 +18,7 @@
 | Step 3: 計画コメントを記録して通知する                                         | [`plan-comment.md`](./collaboration-workflow/plan-comment.md)                           |
 | `/code-review` → `followup` の連鎖規則                                         | [`chain-rule.md`](./collaboration-workflow/chain-rule.md)                               |
 | 報告フォーマット（平易な概要 ＋ 技術詳細）                                     | [`report-format.md`](./collaboration-workflow/report-format.md)                         |
+| セッション向け出力で Issue はリンク＋短い日本語要約で参照する                  | [`issue-citation.md`](./collaboration-workflow/issue-citation.md)                       |
 | Step 5: PR結果確認 + 完了通知（別スクリプト）                                  | [`completion-notify.md`](./collaboration-workflow/completion-notify.md)                 |
 | 後から関連が判明した Issue を epic に束ねる                                    | [`epic-bundle.md`](./collaboration-workflow/epic-bundle.md)                             |
 | `into <target>` — 作った Issue をその場で EPIC へ入れる                        | [`into-epic.md`](./collaboration-workflow/into-epic.md)                                 |
