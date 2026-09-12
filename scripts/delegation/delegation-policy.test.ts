@@ -7,11 +7,19 @@ const GATE_FIX = 'gate-fix'
 const UNLISTED = 'anything-nobody-listed'
 const REVIEW = 'review'
 const EPIC_CHILD = 'epic-child'
+const FOLLOWUP_FILING = 'followup-filing'
+const ISSUE_COMMENT = 'issue-comment'
 const QUEUE_CHILD = 'queue-child'
 const INVESTIGATION = 'investigation'
 const DIAGNOSIS = 'diagnosis'
 // One title shared by the two rows that each assert their own membership.
 const DELEGATABLE_CASE = 'is delegatable'
+// Titles and a verifier string shared by the epic-child and followup-filing blocks — both are
+// whole-procedure units the parent verifies by re-reading GitHub state.
+const STATE_VERIFIER_CASE = 'names the parent-side state read as its verifier'
+const NOT_SUMMARY_CASE = 'does not rest on the summary the unit returns'
+const ISSUE_STATE_READ = 'pnpm josh issue:state'
+const KEPT_DELIBERATELY = 'kept deliberately'
 // The first line `--list` writes, and nothing else writes it: it is what says the listing ran.
 const LIST_HEADING = 'delegatable:'
 
@@ -90,8 +98,8 @@ describe('epic-child is a second unit on the one mechanism', () => {
 	// `in-progress`, which `epic:next` buckets as waiting on time before it looks at any blocker, so
 	// it answers `wait` rather than reporting the failure. A verifier naming it would contradict the
 	// documents in the same change.
-	it('names the parent-side state read as its verifier', () => {
-		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('pnpm josh issue:state')
+	it(STATE_VERIFIER_CASE, () => {
+		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain(ISSUE_STATE_READ)
 	})
 
 	// joshuafolkken/kit#1054: `gh issue view` goes through GraphQL, which a cloud session is answered
@@ -105,7 +113,7 @@ describe('epic-child is a second unit on the one mechanism', () => {
 		expect(delegation_policy.reason_for(EPIC_CHILD)).not.toContain('epic:next')
 	})
 
-	it('does not rest on the summary the unit returns', () => {
+	it(NOT_SUMMARY_CASE, () => {
 		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('not from the summary')
 	})
 
@@ -136,6 +144,42 @@ describe('epic-child is a second unit on the one mechanism', () => {
 		)
 
 		expect(covering.map((step) => step.name)).toStrictEqual([EPIC_CHILD])
+	})
+})
+
+// joshuafolkken/kit#1892 puts the late-run follow-up filing chain on this same enumeration. It is a
+// whole sub-procedure of a run, verified exactly as `epic-child` is — the parent re-reads the filed
+// Issue from GitHub rather than trusting the unit's summary. Filing an Issue is verifiable in a way a
+// bare `issue-comment` (still rejected) is not, which is the boundary the last case guards.
+describe('followup-filing is a third unit on the one mechanism', () => {
+	it(DELEGATABLE_CASE, () => {
+		expect(delegation_policy.verdict_for(FOLLOWUP_FILING)).toBe(delegation_policy.DELEGATE_VERDICT)
+	})
+
+	// The parent-side state read, not the returned summary: a unit checking its own report is no
+	// verifier, the same trap `epic-child` avoids.
+	it(STATE_VERIFIER_CASE, () => {
+		expect(delegation_policy.reason_for(FOLLOWUP_FILING)).toContain(ISSUE_STATE_READ)
+	})
+
+	it(NOT_SUMMARY_CASE, () => {
+		expect(delegation_policy.reason_for(FOLLOWUP_FILING)).toContain("not the unit's summary")
+	})
+
+	// The whole chain is the unit, so the row names each step an agent has to run.
+	it('covers the whole filing chain', () => {
+		const step = delegation_policy.find_step(FOLLOWUP_FILING)
+
+		expect(step?.does).toContain('issue:scout')
+		expect(step?.does).toContain('epic:bundle')
+		expect(step?.does).toContain('epic --add')
+	})
+
+	// The boundary against the rejected row it most resembles: filing an Issue is verifiable because
+	// the parent reads it back, while a decision-log comment is the record with nothing to check it.
+	it('leaves the rejected issue-comment kept', () => {
+		expect(delegation_policy.verdict_for(ISSUE_COMMENT)).toBe(delegation_policy.KEEP_VERDICT)
+		expect(delegation_policy.reason_for(ISSUE_COMMENT)).toContain(KEPT_DELIBERATELY)
 	})
 })
 
@@ -230,7 +274,7 @@ describe('delegation_policy.reason_for', () => {
 
 	// The two kinds of `keep` are different answers: one was judged, the other was never considered.
 	it('tells a deliberate rejection apart from an unlisted step', () => {
-		expect(delegation_policy.reason_for(REVIEW)).toContain('kept deliberately')
+		expect(delegation_policy.reason_for(REVIEW)).toContain(KEPT_DELIBERATELY)
 		expect(delegation_policy.reason_for(UNLISTED)).toContain('kept by default')
 	})
 })
