@@ -5,6 +5,7 @@ import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { time_bundles } from './time-bundles'
 import { time_cycles } from './time-cycles'
+import { time_delegated_wait } from './time-delegated-wait'
 import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
@@ -119,6 +120,7 @@ const RUN_REPORT: TimeReport = {
 	by_invocation: [],
 	by_check: [],
 	ci_cycles: { ...time_cycles.NO_CYCLES },
+	delegated_wait: { ...time_delegated_wait.NO_WAITS },
 	gaps: { ...time_gaps.NO_GAPS },
 	bundles: { ...time_bundles.NO_BUNDLES },
 	single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },

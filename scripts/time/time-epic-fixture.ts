@@ -2,6 +2,7 @@ import { expect } from 'vitest'
 import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
 import { time_cycles } from './time-cycles'
+import { time_delegated_wait } from './time-delegated-wait'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
@@ -74,6 +75,7 @@ type Breakdown = Pick<
 	| 'by_invocation'
 	| 'by_check'
 	| 'ci_cycles'
+	| 'delegated_wait'
 	| 'gaps'
 	| 'bundles'
 	| 'single_checks'
@@ -97,6 +99,7 @@ function empty_breakdown(): Breakdown {
 		by_invocation: [],
 		by_check: [],
 		ci_cycles: { ...time_cycles.NO_CYCLES },
+		delegated_wait: { ...time_delegated_wait.NO_WAITS },
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },

@@ -1,3 +1,4 @@
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { time_bundle_call } from './time-bundle-call'
 import { time_writes } from './time-writes'
@@ -287,5 +288,78 @@ describe('time_bundle_call.call_facts', () => {
 
 	it('refuses a tool nobody classified', () => {
 		expect(time_bundle_call.call_facts('Task', { path: OTHER_PATH }).is_bundleable).toBe(false)
+	})
+})
+
+// The read-only `josh` bookkeeping commands are bundleable even though `pnpm` leads them and is a
+// mutation word (joshuafolkken/kit#1875). The guard was blind to exactly this class, so the bookkeeping
+// calls the Issue measured going out one per turn were never refused and never counted recoverable.
+describe('time_bundle_call.bash_facts — read-only josh bookkeeping', () => {
+	// The subcommand is split on whitespace, not `words_of` — whose separators include `:`, which would
+	// break `issue:state` into two tokens and lose the name.
+	it.each([
+		'pnpm josh issue:state 1875',
+		'pnpm josh release:scope',
+		'pnpm josh eval:scope',
+		'pnpm josh epic:bundle 1875',
+		'pnpm josh cost --over 300000',
+	])('reads a full-name josh bookkeeping command as bundleable: %s', (command) => {
+		const facts = time_bundle_call.bash_facts(command)
+
+		expect(facts.is_bundleable).toBe(true)
+		expect(facts.may_write).toBe(false)
+	})
+
+	// An alias resolves to its canonical name before the allow-list test.
+	it.each(['josh ist 1875', 'pnpm josh co', 'pnpm josh ird 1 2'])(
+		'resolves the alias %s to its canonical read command',
+		(command) => {
+			expect(time_bundle_call.bash_facts(command).is_bundleable).toBe(true)
+		},
+	)
+
+	// The writing josh commands keep the leading word `pnpm` turning them away.
+	it.each([
+		'pnpm josh gate',
+		'pnpm josh followup',
+		'pnpm josh git -y',
+		'pnpm josh main:sync',
+		'pnpm josh run:progress --mark',
+	])('keeps a writing josh command non-bundleable: %s', (command) => {
+		expect(time_bundle_call.bash_facts(command).is_bundleable).toBe(false)
+	})
+
+	// A chained line falls through rather than being trusted as a read — the launcher `pnpm` would
+	// otherwise hide the mutation from `has_mutation`.
+	it.each(['pnpm josh issue:state 1875 && rm foo', 'pnpm josh cost | grep over'])(
+		'refuses a chained josh line: %s',
+		(command) => {
+			expect(time_bundle_call.bash_facts(command).is_bundleable).toBe(false)
+		},
+	)
+})
+
+// **The allow-list may not drift from the CLI** (joshuafolkken/kit#1875): a name here that is not a
+// real `josh` command would silently never match, and a writing command creeping in would over-report.
+// This pins both against the command map itself.
+describe('time_bundle_call.READ_JOSH_SUBCOMMANDS — pinned to the CLI', () => {
+	it('names only real josh commands', () => {
+		for (const name of time_bundle_call.READ_JOSH_SUBCOMMANDS) {
+			expect(Object.hasOwn(COMMAND_MAP, name)).toBe(true)
+		}
+	})
+
+	it.each([
+		'gate',
+		'followup',
+		'git',
+		'main:sync',
+		'run:hold',
+		'run:release',
+		'run:progress',
+		'notify',
+		'epic',
+	])('excludes the writing command %s', (name) => {
+		expect(time_bundle_call.READ_JOSH_SUBCOMMANDS.has(name)).toBe(false)
 	})
 })

@@ -1,5 +1,6 @@
-import { investigation_reads } from '#scripts/delegation/investigation-reads'
+import { investigation_reads, type ClassifiedRead } from '#scripts/delegation/investigation-reads'
 import { time_format } from './time-format'
+import { time_phases } from './time-phases'
 import { time_spans, type Span } from './time-spans'
 
 // What the main line's reading *was*, rather than how much of it there was
@@ -19,7 +20,7 @@ import { time_spans, type Span } from './time-spans'
 //
 // **The classification is `investigation-reads.ts`'s, not a second reading of the same rule.** That
 // module is the guard: the subject test, the threshold, the delegation reset and the re-arm all live
-// there, and `classify_reads` replays them over a recorded run. A walk here that merely resembled the
+// there, and `classified_reads` replays them over a recorded run. A walk here that merely resembled the
 // guard would answer about a rule nobody ships — the clone `CLAUDE.md` prohibits, in the one place a
 // drift would have a measurement and a mechanism disagree about the same threshold.
 //
@@ -32,6 +33,7 @@ const { format_columns, format_share, unmeasured_row, SUFFIX_SEPARATOR } = time_
 
 const HEADING = 'Investigation reads:'
 const READS_NOTE = 'of the reads this run made'
+const SETUP_NOTE = 'in setup'
 
 const NONE = 0
 const ONE = 1
@@ -46,43 +48,90 @@ interface InvestigationTotals {
 	// `JSON.stringify` renders a `Map` as `{}`. A class that claimed no read is absent rather than
 	// zero; the renderer defaults it.
 	by_class: Readonly<Record<string, number>>
+	// The same tally split by the phase each read fell in (joshuafolkken/kit#1868), so the setup-phase
+	// share of each class — the reading done before implementation starts — is answerable from the tool
+	// rather than by hand. Nested plain records for the same `JSON.stringify` reason as `by_class`; a
+	// phase or class that saw no read is absent.
+	by_phase: Readonly<Record<string, Readonly<Record<string, number>>>>
 	is_measured: boolean
 }
 
 const NO_INVESTIGATION: InvestigationTotals = {
 	read_count: NONE,
 	by_class: {},
+	by_phase: {},
 	is_measured: false,
+}
+
+// `bucket[name] += 1`, defaulting the absent first entry of a class to zero.
+function bump(bucket: Record<string, number>, name: string): void {
+	bucket[name] = (bucket[name] ?? NONE) + ONE
 }
 
 function tally(classes: ReadonlyArray<string>): Record<string, number> {
 	const counts: Record<string, number> = {}
 
-	for (const found of classes) counts[found] = (counts[found] ?? NONE) + ONE
+	for (const found of classes) bump(counts, found)
+
+	return counts
+}
+
+// **Each read's phase, crossed with its class** (joshuafolkken/kit#1868). A read carries the index of
+// its span in the array handed to `build_investigation`, and `time_phases.classify` of that same array
+// gives the phase at each index — so the two pair by index, the way `time-placed.ts` reads a gap's
+// phase. A phase that saw no read is absent, so the setup-phase share is read straight off the result.
+function tally_by_phase(
+	reads: ReadonlyArray<ClassifiedRead>,
+	phases: ReadonlyArray<string>,
+): Record<string, Record<string, number>> {
+	const counts: Record<string, Record<string, number>> = {}
+
+	for (const read of reads) {
+		const phase = phases[read.index] ?? time_phases.OTHER_PHASE
+		const bucket = counts[phase] ?? {}
+
+		bump(bucket, read.found)
+		counts[phase] = bucket
+	}
 
 	return counts
 }
 
 function build_investigation(spans: ReadonlyArray<Span>): InvestigationTotals {
-	const classes = investigation_reads.classify_reads(spans)
+	const reads = investigation_reads.classified_reads(spans)
+	const phases = time_phases.classify(spans)
 
 	return {
-		read_count: classes.length,
-		by_class: tally(classes),
+		read_count: reads.length,
+		by_class: tally(reads.map((read) => read.found)),
+		by_phase: tally_by_phase(reads, phases),
 		is_measured: time_spans.has_transcript_data(spans.length),
 	}
 }
 
-// Read through one function so the record's dynamic key is looked up in exactly one place.
+// A safe read of a dynamic key: an absent or explicitly-undefined entry defaults to zero. Every
+// dynamic key on these records is looked up through here, so the lookup lives in exactly one place.
+function count_in(bucket: Readonly<Record<string, number>> | undefined, name: string): number {
+	if (bucket === undefined || !Object.hasOwn(bucket, name)) return NONE
+
+	return bucket[name] ?? NONE
+}
+
 function count_for(totals: InvestigationTotals, name: string): number {
-	return Object.hasOwn(totals.by_class, name) ? (totals.by_class[name] ?? NONE) : NONE
+	return count_in(totals.by_class, name)
+}
+
+// How many of a class's reads fell in `setup` — the phase joshuafolkken/kit#1868 is about.
+function setup_count_for(totals: InvestigationTotals, name: string): number {
+	return count_in(totals.by_phase[time_phases.SETUP_PHASE], name)
 }
 
 function class_row(totals: InvestigationTotals, name: string): string {
 	const count = count_for(totals, name)
 	const share = format_share(count, totals.read_count)
+	const setup = [String(setup_count_for(totals, name)), SETUP_NOTE].join(' ')
 
-	return format_columns(name, String(count), [share, READS_NOTE].join(SUFFIX_SEPARATOR))
+	return format_columns(name, String(count), [share, READS_NOTE, setup].join(SUFFIX_SEPARATOR))
 }
 
 // **A run whose transcript was not read says so rather than reporting four zeroes**, the same word
@@ -102,6 +151,7 @@ const time_investigation = {
 	build_investigation,
 	count_for,
 	investigation_lines,
+	setup_count_for,
 }
 
 export type { InvestigationTotals }

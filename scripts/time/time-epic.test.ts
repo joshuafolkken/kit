@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_corpus, type IssueSpans } from './time-corpus'
+import { time_delegated_wait } from './time-delegated-wait'
 import { time_epic } from './time-epic'
 import { time_epic_fixture, type ReportInput } from './time-epic-fixture'
 import { time_pull_fixture } from './time-pull-fixture'
@@ -190,6 +191,7 @@ function issue_spans(session_count: number): IssueSpans {
 		has_other_run_markers: false,
 		attributed_count: session_count,
 		unread_count: 0,
+		delegated_wait: { ...time_delegated_wait.NO_WAITS },
 	}
 }
 

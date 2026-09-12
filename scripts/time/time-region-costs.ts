@@ -127,10 +127,6 @@ const NOT_MEASURED_NOTE = 'the cost corpus was not read for this scope'
 const UNPRICED_LABEL = 'unpriced requests'
 const UNPRICED_NOTE = 'on a model the price table does not carry · the total above is a floor'
 
-function usd(amount: number, decimals: number): string {
-	return `$${amount.toFixed(decimals)}`
-}
-
 function requests_text(count: number): string {
 	return `${String(count)} request(s)`
 }
@@ -142,7 +138,7 @@ function bucket_line(label: string, bucket: Bucket, total_cost: number): string 
 	const share = time_format.format_share(bucket.cost_usd, total_cost)
 	const suffix = [share, requests_text(bucket.request_count)].join(time_format.SUFFIX_SEPARATOR)
 
-	return time_format.format_columns(label, usd(bucket.cost_usd, TOTAL_DECIMALS), suffix)
+	return time_format.format_columns(label, time_format.usd(bucket.cost_usd, TOTAL_DECIMALS), suffix)
 }
 
 // The leftover row, carrying the caller's own word for what fell outside every interval and the note
@@ -157,13 +153,13 @@ function total_line(cost_usd: number, request_count: number, round_trip_count: n
 	const trips = `over ${String(round_trip_count)} round trip(s)`
 	const suffix = [requests_text(request_count), trips].join(time_format.SUFFIX_SEPARATOR)
 
-	return time_format.format_columns(TOTAL_LABEL, usd(cost_usd, TOTAL_DECIMALS), suffix)
+	return time_format.format_columns(TOTAL_LABEL, time_format.usd(cost_usd, TOTAL_DECIMALS), suffix)
 }
 
 function per_trip_line(usd_per_round_trip: number): string {
 	return time_format.format_columns(
 		PER_TRIP_LABEL,
-		usd(usd_per_round_trip, TRIP_DECIMALS),
+		time_format.usd(usd_per_round_trip, TRIP_DECIMALS),
 		DENOMINATOR_NOTE,
 	)
 }
@@ -195,7 +191,6 @@ const time_region_costs = {
 	label_at,
 	tally,
 	unpriced_count,
-	usd,
 	requests_text,
 	bucket_line,
 	leftover_line,
