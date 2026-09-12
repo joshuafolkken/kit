@@ -196,7 +196,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   the review concluded**, and because that fix is uncommitted like every other, it lands in the
   round-2 fix delta and is reviewed with the rest.
   **Where a second round is coming, the pull request opens between the two** (joshuafolkken/kit#1261):
-  once round 1's fixes are in, run `pnpm josh gate` → join → `pnpm josh git -y`,
+  once round 1's fixes are in, run `pnpm josh gate` → join → `pnpm josh git -y "<title> #<N>"`,
   and then run round 2 beside the CI that commit started. **Nothing edits the tree between that gate
   and the commit** (joshuafolkken/kit#1486) — the version bump a child used to make here is gone,
   because `pnpm josh release` decides the version from main's own history — so the gate the commit
