@@ -40,6 +40,29 @@ describe('time_markers.tool_marker', () => {
 	})
 })
 
+// Since joshuafolkken/kit#1855 the review runs in a forked subagent launched with the `Agent` tool, so
+// the marker moved off the main-line `Skill` call and onto that launch (joshuafolkken/kit#1846).
+describe('time_markers.tool_marker — the forked review launch', () => {
+	it('marks a forked code-review Agent launch as the review boundary', () => {
+		const prompt = 'Invoke the /code-review skill using this brief: run pnpm josh review:attest abc'
+
+		expect(time_markers.tool_marker('Agent', { prompt })).toBe(time_markers.REVIEW_MARKER)
+	})
+
+	// An investigation subagent about the review tooling quotes the invocation but is handed no brief,
+	// so it carries no attestation line — the token that tells a genuine launch from a discussion. This
+	// is the exact shape of run #1855's "Map code-review invocation" investigation agent.
+	it('leaves an Agent that mentions the review but carries no attest line unmarked', () => {
+		const prompt = 'Map where the /code-review invocation is spawned and how review:brief is passed'
+
+		expect(time_markers.tool_marker('Agent', { prompt })).toBe(time_markers.NO_MARKER)
+	})
+
+	it('leaves an Agent launch whose input is not a record unmarked', () => {
+		expect(time_markers.tool_marker('Agent', 'run the review')).toBe(time_markers.NO_MARKER)
+	})
+})
+
 describe('time_markers.bash_marker', () => {
 	it('marks posting a plan comment as the end of planning', () => {
 		const command = `gh api ${ISSUE_PATH}/comments -f body="the plan"`
