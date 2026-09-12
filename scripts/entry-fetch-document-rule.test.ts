@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { read_unwrapped } from './ai-document-fixture'
 import { claude_settings_fixture } from './claude-settings-fixture'
 import { entry_read_set } from './document/entry-read-set'
@@ -27,6 +29,7 @@ import { read_set_cli } from './document/read-set-cli'
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CAP_KEY = 'BASH_MAX_OUTPUT_LENGTH'
+const ENV_KEY = 'env'
 const FULLRUN = 'fullrun'
 const NOTHING = 0
 const STATES_CASE = 'states: %j'
@@ -57,6 +60,46 @@ const POINT_OF_USE_TRIGGERS: ReadonlyArray<[string, string]> = [
 	['eval-gate.md', '`pnpm josh eval:scope` answers `required`'],
 	['followup.md', 'Before issuing `pnpm josh followup`'],
 ]
+
+// **The subsection table's rows parse as entry rows, and one edit is all it takes.** Its first column
+// holds a document name, from which `ENTRY_KEYWORD` reads `followup`; until the parse learned to stop
+// at the subsection, the only thing keeping that out of the keyword set was the second column
+// happening to carry no `.md`. This fixture is that column carrying one — the scenario the live
+// document is one edit away from, and the one a test against the live document cannot reach.
+const SUBSECTION_TABLE_SKILL = `## 1. Which file to read
+
+| Typed keyword | Read |
+| ------------- | ---- |
+| \`demo\` | \`demo.md\` |
+
+### Three documents are read at the point of use, not at the entry
+
+| Document | Read it when |
+| -------- | ------------ |
+| \`followup.md\` | Before issuing \`pnpm josh followup\` (\`followup.md\` → "When it runs") |
+`
+
+const temporary_roots: Array<string> = []
+
+function fixture_root(skill: string, settings: string): string {
+	const root = mkdtempSync(path.join(tmpdir(), 'read-set-'))
+	const skill_directory = path.join(root, entry_read_set.SKILL_DIRECTORY)
+
+	temporary_roots.push(root)
+	mkdirSync(skill_directory, { recursive: true })
+	writeFileSync(path.join(skill_directory, entry_read_set.SKILL_FILE), skill, 'utf8')
+	writeFileSync(path.join(root, '.claude', 'settings.json'), settings, 'utf8')
+
+	return root
+}
+
+function cap_of(settings: string): number {
+	return entry_read_set.bash_output_cap(fixture_root(SUBSECTION_TABLE_SKILL, settings))
+}
+
+afterAll(() => {
+	for (const root of temporary_roots) rmSync(root, { force: true, recursive: true })
+})
 
 function skill_text(): string {
 	return read_unwrapped(SKILL)
@@ -110,6 +153,17 @@ describe(`${SKILL} names the documents read at the point of use`, () => {
 // **The cap is read, never restated.** A number copied into the measuring command would be a second
 // declaration of it, and would drift the first time the settings file changed — which is how the
 // report would come to mark a file `cat`-able that a `cat` truncates.
+describe('the entry table parse stops at the section’s own subsection', () => {
+	// Asserted against a fixture rather than the live document: in `SKILL.md` the trigger table's
+	// second column carries no `.md`, so `push_row`'s own guard suppresses these rows and a test
+	// there passes with the stop deleted.
+	it('reads no keyword out of a subsection table that names a document', () => {
+		const root = fixture_root(SUBSECTION_TABLE_SKILL, '{}')
+
+		expect(entry_read_set.entries(root)).toStrictEqual(['demo'])
+	})
+})
+
 describe('the fetch cap the report prints', () => {
 	it('is the one the distributed settings file declares', () => {
 		expect(entry_read_set.bash_output_cap(process.cwd())).toBe(declared_cap())
@@ -121,12 +175,33 @@ describe('the fetch cap the report prints', () => {
 		expect(topic).toContain(`"${CAP_KEY}": "${String(declared_cap())}"`)
 	})
 
+	it('reads the declared value out of the env block', () => {
+		expect(cap_of(`{"${ENV_KEY}":{"${CAP_KEY}":"1234"}}`)).toBe(1234)
+	})
+
+	// The regular expression this replaced took the first match anywhere in the file, so a hook
+	// command naming the variable won over the declaration the harness actually reads.
+	it('is not taken from an earlier mention outside the env block', () => {
+		const settings = `{"hooks":[{"command":"${CAP_KEY}=99"}],"${ENV_KEY}":{"${CAP_KEY}":"1234"}}`
+
+		expect(cap_of(settings)).toBe(1234)
+	})
+
 	// A checkout with no settings file still answers, with the harness's own default rather than zero:
 	// a cap of zero would mark every file unreadable, and a cap of infinity none.
-	it('falls back to the harness default where nothing is declared', () => {
-		expect(entry_read_set.bash_output_cap('/nonexistent-root')).toBe(
-			entry_read_set.HARNESS_DEFAULT_CAP_CHARS,
-		)
+	it.each([
+		['no settings file', undefined],
+		['a file that does not parse', 'not json at all'],
+		['an env block with no declaration', `{"${ENV_KEY}":{}}`],
+		['a declaration that is not a number', `{"${ENV_KEY}":{"${CAP_KEY}":"none"}}`],
+		['a declaration of zero', `{"${ENV_KEY}":{"${CAP_KEY}":"0"}}`],
+	])('falls back to the harness default given %s', (_label, settings) => {
+		const cap =
+			settings === undefined
+				? entry_read_set.bash_output_cap('/nonexistent-root')
+				: cap_of(settings)
+
+		expect(cap).toBe(entry_read_set.HARNESS_DEFAULT_CAP_CHARS)
 	})
 })
 

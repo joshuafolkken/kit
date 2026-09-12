@@ -98,7 +98,11 @@ interface ReadSetCost {
 	// rather than dropped: a saving reported without saying where the cost went is not a measurement.
 	point_of_use: ReadonlyArray<FileCost>
 	// The character cap a Bash result is truncated at, so the report can say which of the files above
-	// a `cat` cannot deliver whole.
+	// a `cat` cannot deliver whole. **Compared against each file's byte count, which is a deliberate
+	// conservative proxy**: these documents are heavily non-ASCII, so bytes run above characters and
+	// the comparison can only over-mark, never under-mark. Over-marking costs nothing — the rule
+	// beneath the report is one `Read` per file either way — while under-marking would invite the
+	// `cat` that truncates.
 	bash_output_cap: number
 	// Every file in the set read in full, the referenced ones included — what a run pays with no way
 	// to fetch a heading.

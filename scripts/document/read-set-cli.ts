@@ -110,10 +110,13 @@ function point_of_use_lines(report: ReadSetCost, width: number): Array<string> {
 function fetch_lines(report: ReadSetCost): Array<string> {
 	const cap = report.bash_output_cap.toLocaleString('en-US')
 
+	// **Scoped to the rows that carry the marker, not to every row.** Every row is marked `Read`, so a
+	// sentence keyed on the word `Read` would claim a `cat` truncates files that are well under the
+	// cap — the contradiction round 1 found on the row, relocated to the closing line.
 	return [
 		`  ${FETCH_RULE}`,
-		`  A Bash result is truncated past ${cap} characters, so a \`cat\` of any file marked \`Read\``,
-		'  above returns a preview rather than the file, and it is then read a second time.',
+		`  A Bash result is truncated past ${cap} characters, so a \`cat\` of any file marked`,
+		`  \`${OVER_CAP_NOTE.trim()}\` returns a preview rather than the file, and it is then read a second time.`,
 		'',
 	]
 }

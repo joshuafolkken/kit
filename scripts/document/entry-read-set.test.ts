@@ -37,15 +37,11 @@ describe('entry_read_set.read_set — which files', () => {
 		)
 	})
 
-	// §1 carries a second two-column table under a `###` subsection — the point-of-use triggers — and
-	// `section()` returns a heading's children with it. Its rows parse as entry rows, so the keyword
-	// set would grow by three the first time a trigger cell named a document (joshuafolkken/kit#1797).
-	it.each(['latest', 'eval', 'followup'])(
-		'reads no keyword out of a subsection table: %s',
-		(word) => {
-			expect(entry_read_set.entries(ROOT)).not.toContain(word)
-		},
-	)
+	// §1 also carries a two-column table under a `###` subsection — the point-of-use triggers — whose
+	// rows parse as entry rows, and the parse stops before it (joshuafolkken/kit#1797). Asserted in
+	// `scripts/entry-fetch-document-rule.test.ts` against a fixture rather than here: in the live
+	// document those rows are suppressed by `push_row`'s own guard, so a check here would pass with
+	// the stop deleted.
 
 	it('always includes the skill file itself, which the table does not list', () => {
 		expect(entry_read_set.read_set(ROOT, 'kickoff').files).toContain(entry_read_set.SKILL_FILE)
