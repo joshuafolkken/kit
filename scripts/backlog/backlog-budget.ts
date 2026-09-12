@@ -48,7 +48,10 @@ const RUN_VERDICT = 'run'
 const WATCH_VERDICT = 'watch'
 const STOP_VERDICT = 'stop'
 
-// `run` — start what `backlog:next` offered. `watch` — sleep the polling interval and ask again.
+// `run` — start what `backlog:next` offered. `watch` — sleep the polling interval and ask again,
+// except while something of the run's own is in flight, where the wake is the progress watcher's exit
+// and the interval is only a floor (`epicrun.md` → "The wake exists only while something is in
+// flight").
 // `stop` — report and finish. There is no fourth: an answer the loop cannot act on is a verdict
 // nobody can write a loop against.
 type BudgetVerdict = typeof RUN_VERDICT | typeof WATCH_VERDICT | typeof STOP_VERDICT
