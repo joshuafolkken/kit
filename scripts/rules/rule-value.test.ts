@@ -8,6 +8,7 @@ import { rule_value, type RuleReading } from './rule-value'
 const TIMESTAMP = '2026-09-09T00:00:00.000Z'
 const NEXT_TIMESTAMP = '2026-09-09T00:00:01.000Z'
 const LATER_TIMESTAMP = '2026-09-09T00:00:02.000Z'
+const FILED_TIMESTAMP = '2026-09-09T00:00:09.000Z'
 const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 
@@ -119,7 +120,7 @@ describe('rule_value.measure — what the carried text earns unaided', () => {
 		// `list_sessions` returns newest first, so the parent that filed can arrive ahead of the unit
 		// that counted. Read back to back that scores "trigger reached, not kept"; read as one
 		// timeline it is a run that kept the rule.
-		const filed = call_line(FILING, '2026-09-09T00:00:09.000Z')
+		const filed = call_line(FILING, FILED_TIMESTAMP)
 		const counted = call_line(COUNT, NEXT_TIMESTAMP)
 		const reading = reading_for(WIP_CAP, [[filed, counted]])
 
@@ -390,6 +391,39 @@ describe('rule_value.measure — what counts as one turn', () => {
 		const between = result_line('ok', NEXT_TIMESTAMP)
 		const closed = assistant_line([tool_use_block(READ_B, 1)], LATER_TIMESTAMP, BATCHED_MESSAGE_ID)
 		const reading = reading_for(BATCHING, [[`${opened}\n${between}\n${closed}`]])
+
+		expect(reading.unaided_kept).toBe(1)
+	})
+})
+
+// **A folded turn is placed for its context, not for its position** (joshuafolkken/kit#1804). One
+// parent message spans time — a text block, then a call — and a background unit drops a call between
+// the two. Read in timeline order the unit's call precedes the parent's; folded to the parent's
+// opening line it followed it, because the fold used to place a turn where it opened.
+const PARENT_MESSAGE_ID = 'msg_parent'
+
+// The parent message's opening block: a thought, no call, carrying the id at t0 so the turn opens
+// before the unit's call at t2 and closes with the filing at t9.
+function thought_line(timestamp: string = TIMESTAMP): string {
+	return assistant_line(
+		[{ type: 'text', text: 'planning the filing' }],
+		timestamp,
+		PARENT_MESSAGE_ID,
+	)
+}
+
+function parent_call_line(command: string, timestamp: string): string {
+	return assistant_line([tool_use_block(command, 0)], timestamp, PARENT_MESSAGE_ID)
+}
+
+describe('rule_value.measure — a folded turn is not reordered around a unit call', () => {
+	it('reads a unit call that landed between two blocks of a parent message in timeline order', () => {
+		// The parent opens with a thought at t0 and files (its trigger) at t9; a delegated unit counts
+		// open Issues (keeps) at t2, between them. Placing the folded parent turn at t0 absorbs the t9
+		// filing, so the trigger is read before the t2 count and the run is scored "reached, not kept".
+		const parent = `${thought_line()}\n${parent_call_line(FILING, FILED_TIMESTAMP)}`
+		const unit = call_line(COUNT, LATER_TIMESTAMP)
+		const reading = reading_for(WIP_CAP, [[parent, unit]])
 
 		expect(reading.unaided_kept).toBe(1)
 	})
