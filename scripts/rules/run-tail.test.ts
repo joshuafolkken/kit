@@ -216,7 +216,7 @@ describe('RUN_TAIL_REASON', () => {
 		// The boundary, so the rule does not read as contradicting the foreground rule for followup.
 		['foreground'],
 		// The pointer to the procedure, and the two Issues the rule rests on.
-		['§2h'],
+		['background-commands.md'],
 		['joshuafolkken/kit#1510'],
 		['joshuafolkken/kit#1333'],
 		// A recurring rule has to say so, or a reader treats one refusal as the whole of it.

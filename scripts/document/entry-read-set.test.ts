@@ -10,6 +10,7 @@ const ROOT = process.cwd()
 const QUEUE = 'queue'
 const EPICRUN = 'epicrun.md'
 const CHAIN_RULE = 'chain-rule.md'
+const BACKGROUND_COMMANDS = 'background-commands.md'
 const UNKNOWN_ENTRY = 'no-such-entry'
 // The margin the section read has to beat: the cited sections together stay under two thirds of the
 // files they were cut from. Loose on purpose — it asserts the shape, not today's figure.
@@ -95,6 +96,16 @@ describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#18
 			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(CHAIN_RULE)
 		},
 	)
+})
+
+describe('entry_read_set — background-commands.md is point-of-use (joshuafolkken/kit#1873)', () => {
+	// §2h's body left SKILL.md for background-commands.md, read before the first backgroundable command
+	// (the gate). It binds only after the first edit, so it never belonged in the entry read — and
+	// because it was never a table row, the general loop above already keeps it out of every entry; what
+	// this pins is that it is classified point-of-use in the first place.
+	it('classifies background-commands.md as a point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(BACKGROUND_COMMANDS)
+	})
 })
 
 describe('entry_read_set.read_set — which sections', () => {

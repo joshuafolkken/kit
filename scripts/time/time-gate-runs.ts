@@ -79,7 +79,7 @@ interface GateRunTotals {
 	// would report a length that is knowable as unknown.
 	has_backgrounded_gate: boolean
 	// Whether a backgrounded gate's runtime could be read at all. `false` with a backgrounded gate prints
-	// `not measured` rather than a zero: the gate is launched into the background (§2h), so `by_invocation`
+	// `not measured` rather than a zero: the gate is launched into the background (`background-commands.md`), so `by_invocation`
 	// sees only the dispatch and the phase table only the launch's own seconds — neither is its length.
 	is_runtime_measured: boolean
 }
@@ -126,7 +126,7 @@ function count_following(gates: ReadonlyArray<Span>, outcome: SpanOutcome): numb
 }
 
 // The background ids of the gate launches that were backgrounded. A gate run in the foreground carries
-// no background id and shows its length in its own span; this reading is for the backgrounded gate §2h
+// no background id and shows its length in its own span; this reading is for the backgrounded gate (`background-commands.md`)
 // directs a run to, whose runtime the launch span alone cannot show.
 function gate_background_ids(spans: ReadonlyArray<Span>): Set<string> {
 	return new Set(

@@ -59,7 +59,7 @@ loosening that comparison would give up joshuafolkken/kit#1722's single-writer g
 Read this file, then the one for the command that was typed. `fullrun`, `queue`, `epicrun` and
 `backlogrun` also obey `chain-rule.md`, but at a point of use rather than at the entry: it governs
 the `/code-review` → `followup` chain, which runs *after* the first edit, so it is read then and not
-here (see "Four documents are read at the point of use" below). `halfrun` and `kickoff` never reach
+here (see "Five documents are read at the point of use" below). `halfrun` and `kickoff` never reach
 it — `halfrun` stops before the commit, and `kickoff` never implements.
 
 | Typed keyword                            | Read                                        |
@@ -89,19 +89,20 @@ cannot truncate, never a judgement about whether enough of it came back.
 `pnpm josh read:set [<keyword>]` prints the cap, marks every file that exceeds it, and states this
 instruction beneath the report, so the rule arrives with the figures rather than only here.
 
-### Four documents are read at the point of use, not at the entry
+### Five documents are read at the point of use, not at the entry
 
-**`followup.md`, `eval-gate.md`, `latest-gate.md` and `chain-rule.md` are not entry reads**
-(joshuafolkken/kit#1797, joshuafolkken/kit#1856). Each is fetched **in full, in the same turn, by
-the step that has to obey it** — and that step is a named command, so there is no judgement about
-when:
+**`followup.md`, `eval-gate.md`, `latest-gate.md`, `chain-rule.md` and `background-commands.md` are
+not entry reads** (joshuafolkken/kit#1797, joshuafolkken/kit#1856, joshuafolkken/kit#1873). Each is
+fetched **in full, in the same turn, by the step that has to obey it** — and that step is a named
+command, so there is no judgement about when:
 
-| Document         | Read it when                                                                   |
-| ---------------- | ------------------------------------------------------------------------------ |
-| `latest-gate.md` | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
-| `eval-gate.md`   | `pnpm josh eval:scope` answers `required` — before `pnpm josh eval` runs        |
-| `followup.md`    | Before issuing `pnpm josh followup`, in that same turn                          |
-| `chain-rule.md`  | Before running the `/code-review` step (`fullrun` / `queue` / `epicrun` / `backlogrun`) |
+| Document                | Read it when                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
+| `eval-gate.md`          | `pnpm josh eval:scope` answers `required` — before `pnpm josh eval` runs        |
+| `followup.md`           | Before issuing `pnpm josh followup`, in that same turn                          |
+| `chain-rule.md`         | Before running the `/code-review` step (`fullrun` / `queue` / `epicrun` / `backlogrun`) |
+| `background-commands.md` | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `queue` / `epicrun` / `backlogrun`) |
 
 **This is "read it at the point of use", not "read it later", and the difference is what makes it
 safe.** joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each measured a rule demoted to "read it
@@ -116,11 +117,11 @@ bind until after the first edit — so at the moment this measurement is taken, 
 run carried it for nothing.
 
 **A `skip` answer is the whole answer, and it reads nothing** — that arm is `latest-gate.md` and
-`eval-gate.md`, whose `:scope` command can say the step is not due. `followup.md` and `chain-rule.md`
-have no such skip: their step always comes for an implementing run, so they are read when it arrives
-rather than conditionally. Either way **the trigger sentence for each of the four is resident in §2
-and in the command's own file**, so a run that never opens these documents still calls the right
-command at the right moment.
+`eval-gate.md`, whose `:scope` command can say the step is not due. `followup.md`, `chain-rule.md`
+and `background-commands.md` have no such skip: their step always comes for an implementing run, so
+they are read when it arrives rather than conditionally. Either way **the trigger sentence for each
+of the five is resident in §2 and in the command's own file**, so a run that never opens these
+documents still calls the right command at the right moment.
 
 ### A section reference is read as a section
 
@@ -168,7 +169,12 @@ sentence now lives in, which is the same requirement §3 puts on any rule that i
 `/code-review` → `followup` chain, which does not bind until after the first edit, so it left the
 table above for the point-of-use list. Nothing in `chain-rule.md` itself changed — it is read whole
 at `/code-review` exactly as before — only the turn it is read on, so no sentence moved with it and
-no assertion was lost.
+no assertion was lost. **joshuafolkken/kit#1873 moved a fifth — §2h's body to
+`background-commands.md`** — this one an extraction like §2i's, not a reclassification like
+`chain-rule.md`'s: §2h binds only after the first edit, at the gate, the push and the merge, so the
+body left `SKILL.md` for the point-of-use list and the resident section is now a pointer plus the one
+line that carries the rule at a batch's scale. Its marker suite was re-pointed at the new file rather
+than dropped, the same requirement §3 puts on any trimmed rule.
 
 **`backlogrun` reads `epicrun.md` too, and that is the point rather than an omission.** It changes
 only which issues are offered and by what authorization; every procedure for *running* one of them —
@@ -183,7 +189,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   trigger is elapsed time since the last update in this checkout, never a judgement, and the
   `dependency-update` skill is loaded afterwards exactly as before whenever the update actually ran.
   `latest-gate.md` is the single source, **read in full in the turn `latest:scope` answers
-  `required` and not before** (§1, "Four documents are read at the point of use"); `kickoff` never
+  `required` and not before** (§1, "Five documents are read at the point of use"); `kickoff` never
   reaches it, because it never implements.
 - **The verification gate**, in this order: refactor per `prompts/refactoring.md` → **`pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) is *started* when the review starts, and *joined* before the commit** — the same treatment `josh eval` already gets below, and for the same reason: neither the gate nor the review writes to the working tree, so paying for them one after the other is pure waiting (joshuafolkken/kit#1242, measured at 187 seconds of a 1623-second run) → a subagent running `/code-review` with the brief `pnpm josh review:brief` prints
   (the level, what the gate has already proved **or is still proving** on this exact tree, and the target)
@@ -195,7 +201,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   (`prompts/review.md` → "Review round cap" and "The second round is a verification pass, not a second
   full review") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
   answers `required` (`eval-gate.md`, **read in full in that same turn and not at the entry** — §1,
-  "Four documents are read at the point of use"). `kickoff` is the exception —
+  "Five documents are read at the point of use"). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
   **Whether that second round is due at all is `pnpm josh review:round2 --round-1-closed`'s answer,
   never a judgement** (joshuafolkken/kit#1433): `skip` on the two arms it names — round 1 wrote no fix
@@ -1182,99 +1188,17 @@ that runs no hooks still owes the read.
 
 ## 2h. A command that can take minutes is issued in the background
 
-**A run's idle time collects in its tail, and the two ways it collects there are one mistake**
-(joshuafolkken/kit#1510). `fullrun #1501` ran 45m03s on about 17 minutes of work. Of the 25 minutes
-nothing was running, **6m28s** was a `pnpm josh git -y` issued in the **foreground** with a
-900-second tool timeout — above the harness's own 600-second cap, so the harness detached it at the
-cap and nothing read the output file for six and a half minutes afterwards — and **6m06s** was bare
-CI: the push landed, the turn ended, and the merge started only once the person asked whether it was
-merging. Both halves handed the deciding of *when to look back* to something that was never going to
-decide it.
-
-**Issue it in the background, and never give a foreground call a timeout above the harness cap.**
-The cap decides how long a foreground call waits, not the number passed to it, so a number above the
-cap chooses the detached path without choosing the completion notification that should come with it.
-A call issued detached from the start re-invokes the run when it exits — which is what makes the
-completion *delivered* rather than something to remember to poll for.
-
-**Which commands, and the one that is deliberately not among them:**
-
-- **`pnpm josh git -y` — background.** Commit, the pre-push hook's unit suite, the push (120 seconds
-  with one automatic retry, `scripts/git/git-push-transport.ts`) and the pull request. It is about a
-  minute in the ordinary case and reached 19m26s once, on a transport fault.
-- **`pnpm josh gate` — background, and already so.** It is *started* when `/code-review` starts and
-  *joined* before the commit (§2, joshuafolkken/kit#1242); that is backgrounding under an older name,
-  and nothing about it changes here.
-- **`pnpm josh eval` — background**, started with the review and read after it, on `required` only
-  (`eval-gate.md`).
-- **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nearly
-  every step after it reads its result — the one that does not is named below — so detaching it
-  would move the reading rather than overlap anything, and would buy an empty turn. **`followup.md`
-  is read in full in the turn that issues the call, and not at the entry** (§1, "Three documents are
-  read at the point of use"); `followup.md` →
-  "Always run `pnpm josh followup` in the foreground" stays exactly as it is, and shell `&`
-  backgrounding is a different thing again — it never works at all.
-
-**A tail does follow the merge, and it is not small** (joshuafolkken/kit#1462). This section first
-gave a different reason for that last bullet — that the merge ends the run, leaving no tail to
-overlap — and the measurement says otherwise. `pnpm josh time` charges to **`post-run`** exactly what runs
-after the last `followup` span ends: **3.0 min, 5.9% of a 50.5-minute run**, in the lane child
-`--issue 1599` (PR #1602); **2 min 31 s, 14% of 20m15s**, in the plain `fullrun #1597` (PR #1603);
-**3.1 min** hand-measured in run #1441's delegated child, which is where this Issue started. **What
-was wrong is the premise, not the conclusion** — `followup` stays foreground, and what changes is
-*where the tail's work is done*.
-
-**So the tail is emptied before `followup` is issued, rather than worked through after it returns.**
-One question decides each step, and it is asked of the step rather than judged: **does it read the
-merge result?**
-
-- **It does — the step stays after `followup`.** `pnpm josh ms`, `pnpm josh issue:state <N>`,
-  `pnpm josh epic:next`, `pnpm josh auto-ok:next --exclude <N>`, and `pnpm josh lane:close` /
-  `pnpm josh lane:list`. Each is a verifier or is keyed to a merge that has to have happened, and
-  bringing one forward would have it read a state nobody has reached yet. **De-duplicating a step is
-  not removing it**: the parent reads the child's state from GitHub *because* a summary is not a
-  verifier ("Each child runs in a delegated unit"), so none of these may be dropped or answered from
-  memory.
-- **It does not — the step is composed in the turn that issues `followup`.** The epic progress
-  comment's counter *values* (children run, Issues filed, consecutive failures, `auto-ok` pickups,
-  the run's start time) are all counted inside the run, and the completion report body is already
-  placed beside `pnpm josh git -y` in the table below. **Only the write follows the merge.** The
-  comment exists because a compaction takes the counters at a moment nobody chooses (`epicrun.md` →
-  "The counters live in the conversation"), so composing the values earlier moves no write and loses
-  no counter.
-- **`pnpm josh cost --over 300000` stays after the merge, and reads nothing from it.** It measures
-  this session's own transcript, so the question above would bring it forward — but its answer grows
-  with the session, and asking it a call early under-reads the very number the hand-off is decided
-  on. It is seconds of tail against a guard on session size, so it keeps its documented seam
-  (`epicrun.md` → "The check is asked at every merge").
-
-**What runs beside a backgrounded command is the work that writes nothing to the working tree.** That
-is the whole test, and it is the same one that lets the gate and the review overlap (§2): a step that
-edits makes the background command's result stale, so it is not something to overlap with. Applied to
-the three waits a run actually has:
-
-| While this runs | Do this beside it |
-| --------------- | ----------------- |
-| `pnpm josh gate` | a subagent running `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
-| `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
-| CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
-| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 300000` |
-
-**The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
-resumes the run, and the turn that reads it goes straight through any branch-2 filing and
-`pnpm josh epic:bundle` to `pnpm josh followup`. joshuafolkken/kit#1333 had already settled that end
-state for a clean second round, and symptom 2 above is its regression — **so the guarantee is a
-mechanism and not only the procedure**: `pnpm josh rule:guard` refuses the foreground push step and
-states both halves at that call (`prompts/collaboration-workflow/rule-delivery.md`). A turn *ending*
-is the absence of a call and no `PreToolUse` hook can see one, so the last call before the seam is
-where the rule can be put; the push reissued detached is not refused again, so a run that obeys pays
-nothing.
-
-**One turn does end before the push, and only one: a dispatched lane child's pre-gate cut**
-(joshuafolkken/kit#1839). It ends the turn before the gate and relaunches a fresh process in the same
-act, so the run continues rather than stalling — the sanctioned boundary distinct from the push
-turn-end this section forbids. The boundary, its two commands and the resume verification are the
-`pre-gate-cut.md` skill document, its single source.
+**The rule and its whole procedure are `background-commands.md`, read at its point of use — before
+backgrounding the first long-running command (`pnpm josh gate`), and again wherever a run backgrounds
+one afterwards.** It governs issuing `pnpm josh git -y`, `pnpm josh gate` and the CI wait detached
+while `pnpm josh followup` stays in the foreground, the guarantee that the turn never ends at the
+push — bar a dispatched lane child's pre-gate cut (`pre-gate-cut.md`), the one sanctioned turn-end
+before it — and the tail that is emptied before `followup` rather than worked through after it. **It binds
+only after the first edit** — which is why it left the entry read for the point of use (§1, "Five
+documents are read at the point of use", joshuafolkken/kit#1873). `background-commands.md` is the
+single source; `followup.md`, `eval-gate.md`, `chain-rule.md` and `epicrun.md` → "Progress while the
+run is quiet" route to it, and the run-tail guard (`prompts/collaboration-workflow/rule-delivery.md`)
+refuses a foreground push and names it.
 
 **A parent waiting on its children is this same rule at the batch's scale.** A background command's
 completion is what re-invokes the session, so a parent with children in flight already has a wake
@@ -1282,10 +1206,7 @@ delivered to it and never has to time one — which is why the `epicrun` / `back
 sleep of its own and reads its polling figures as floors on a re-ask rather than as a clock to keep
 (`epicrun.md` → "The parent keeps no clock of its own", the single source, joshuafolkken/kit#1836).
 The same measurement settles a merge event at one parent turn rather than three, by the criterion
-this section already applies: the calls that take no other call's result go out together.
-
-This section is the single source of the rule. `followup.md`, `eval-gate.md`, `chain-rule.md` and
-`epicrun.md` → "Progress while the run is quiet" route here for it rather than restating it.
+this rule already applies: the calls that take no other call's result go out together.
 
 ## 2i. An observation worth filing is filed without asking
 

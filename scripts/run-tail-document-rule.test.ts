@@ -15,10 +15,11 @@ const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 // Shared by the two marker suites, so neither can pass under a title the other does not use.
 const CARRIES = 'carries %j'
 
-// The section heading is a marker of its own: every pointer below cites it by number, so a renamed
-// section would leave four documents pointing at nothing.
-const SECTION = '## 2h. A command that can take minutes is issued in the background'
-const SECTION_REFERENCE = '§2h'
+// background-commands.md is the single source since joshuafolkken/kit#1873; `SKILL.md` → §2h is now
+// a pointer to it, and every tail document cites the file by name rather than the section number.
+const BACKGROUND_COMMANDS = '.claude/skills/workflow-commands/background-commands.md'
+const SECTION = '# A command that can take minutes is issued in the background'
+const SECTION_REFERENCE = '`background-commands.md`'
 const GATE_COMMAND = '`pnpm josh gate`'
 const PUSH_COMMAND = '`pnpm josh git -y`'
 
@@ -54,7 +55,7 @@ const POINTERS: ReadonlyArray<[string, string]> = [
 		`**${PUSH_COMMAND} is issued in the background, and the turn does not end when it is**`,
 	],
 	[CHAIN_RULE, '**Ending the turn at the push is the same violation as ending it at the review**'],
-	[FOLLOWUP, `**It is the deliberate exception to \`SKILL.md\` → ${SECTION_REFERENCE}**`],
+	[FOLLOWUP, `**It is the deliberate exception to ${SECTION_REFERENCE}**`],
 	[
 		EVAL_GATE,
 		'A command that can take minutes is issued in the background", applied to one command',
@@ -63,9 +64,9 @@ const POINTERS: ReadonlyArray<[string, string]> = [
 
 const POINTER_DOCUMENTS: ReadonlyArray<string> = [CHAIN_RULE, FOLLOWUP, EVAL_GATE]
 
-describe(`${SKILL} — §2h is the single source`, () => {
+describe(`${BACKGROUND_COMMANDS} is the single source`, () => {
 	it.each(SINGLE_SOURCE_MARKERS)(CARRIES, (marker) => {
-		expect(read_unwrapped(SKILL)).toContain(marker)
+		expect(read_unwrapped(BACKGROUND_COMMANDS)).toContain(marker)
 	})
 
 	// The three waits a run has, named so the "run something beside it" instruction is actionable
@@ -73,7 +74,7 @@ describe(`${SKILL} — §2h is the single source`, () => {
 	it.each([GATE_COMMAND, PUSH_COMMAND, 'CI, after the push'])(
 		'names %j as a wait with work beside it',
 		(wait) => {
-			expect(read_unwrapped(SKILL)).toContain(wait)
+			expect(read_unwrapped(BACKGROUND_COMMANDS)).toContain(wait)
 		},
 	)
 
@@ -83,11 +84,14 @@ describe(`${SKILL} — §2h is the single source`, () => {
 	it.each([["it is the run's last call"], ['so there is nothing to overlap']])(
 		'no longer claims %j',
 		(retracted) => {
-			expect(read_unwrapped(SKILL)).not.toContain(retracted)
+			expect(read_unwrapped(BACKGROUND_COMMANDS)).not.toContain(retracted)
 		},
 	)
+})
 
-	// The shared list in §2 is what a run reads before it reaches any single section.
+// The shared list in §2 is what a run reads before it reaches any single section, and it stays
+// resident in SKILL.md as the one-line pointer to background-commands.md (joshuafolkken/kit#1873).
+describe(`${SKILL} announces the rule in the shared list`, () => {
 	it('announces the rule in the list every entry point shares', () => {
 		const content = read_unwrapped(SKILL)
 
@@ -97,12 +101,12 @@ describe(`${SKILL} — §2h is the single source`, () => {
 	})
 })
 
-describe('the documents open at the tail point at §2h', () => {
+describe('the documents open at the tail point at background-commands.md', () => {
 	it.each(POINTERS)('%s carries %j', (document_path, marker) => {
 		expect(read_unwrapped(document_path)).toContain(marker)
 	})
 
-	it.each(POINTER_DOCUMENTS)('%s cites the section by number', (document_path) => {
+	it.each(POINTER_DOCUMENTS)('%s cites background-commands.md by name', (document_path) => {
 		expect(read_unwrapped(document_path)).toContain(SECTION_REFERENCE)
 	})
 
@@ -115,7 +119,7 @@ describe('the documents open at the tail point at §2h', () => {
 // row for it — the check joshuafolkken/kit#1524 put in front of every rule that leaves residency.
 describe(`${RULE_DELIVERY} — the row and its exemption are written down`, () => {
 	it.each([
-		`**run 末尾の空転**（\`SKILL.md\` → ${SECTION_REFERENCE}）`,
+		`**run 末尾の空転**（${SECTION_REFERENCE}）`,
 		PUSH_COMMAND,
 		'`run_in_background` が付いていれば引き金に当たらない',
 	])(CARRIES, (marker) => {

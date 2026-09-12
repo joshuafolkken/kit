@@ -48,7 +48,7 @@ const FETCH_MARKERS: ReadonlyArray<string> = [
 ]
 
 const POINT_OF_USE_MARKERS: ReadonlyArray<string> = [
-	'### Four documents are read at the point of use, not at the entry',
+	'### Five documents are read at the point of use, not at the entry',
 	'Each is fetched **in full, in the same turn, by the step that has to obey it**',
 	// The half that separates this from a demotion, kept verbatim because it is the half a reword loses.
 	'This is "read it at the point of use", not "read it later", and the difference is what makes it safe',
@@ -61,6 +61,8 @@ const POINT_OF_USE_TRIGGERS: ReadonlyArray<[string, string]> = [
 	['followup.md', 'Before issuing `pnpm josh followup`'],
 	// joshuafolkken/kit#1856: governed by a named step — `/code-review` — not a `:scope` command.
 	['chain-rule.md', 'Before running the `/code-review` step'],
+	// joshuafolkken/kit#1873: §2h's body, read before the first backgroundable command (the gate).
+	['background-commands.md', 'Before backgrounding `pnpm josh gate`'],
 ]
 
 // **The subsection table's rows parse as entry rows, and one edit is all it takes.** Its first column
