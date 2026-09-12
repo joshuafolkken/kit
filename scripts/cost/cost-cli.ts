@@ -5,6 +5,8 @@ import { cost_attribute } from './cost-attribute'
 import { cost_blocks } from './cost-blocks'
 import { cost_composition } from './cost-composition'
 import { cost_corpus, type AttributedRecord, type Corpus } from './cost-corpus'
+import { cost_document_sources } from './cost-document-sources'
+import type { DocumentBreakdown } from './cost-documents'
 import { cost_report, type CostReport, type Measurement, type MissingData } from './cost-report'
 import { cost_resident } from './cost-resident'
 import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
@@ -88,6 +90,14 @@ function optional_cap(cap: number | undefined): { cap?: number } {
 // apart from `optional_cap`: that one carries the parsed CLI flag, this one the report-input field.
 function optional_cap_tokens(cap: number | undefined): { cap_tokens?: number } {
 	return cap === undefined ? {} : { cap_tokens: cap }
+}
+
+// Same absent-key idiom the optional flags use: a scope built with no document breakdown carries no
+// key rather than an undefined one, which `exactOptionalPropertyTypes` rejects.
+function optional_documents(documents: DocumentBreakdown | undefined): {
+	documents?: DocumentBreakdown
+} {
+	return documents === undefined ? {} : { documents }
 }
 
 // A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
@@ -232,23 +242,30 @@ function report_session(
 		missing: cost_corpus.accumulate_missing([session]),
 		resident_billed_tokens: session.baseline_tokens * session.records.length,
 		...optional_measurement(cwd, file, session),
+		...optional_documents(cost_document_sources.for_session(file, session)),
 		...optional_cap_tokens(cap),
 	})
+}
+
+// The optional tail of a scope report, bundled so `to_scope_report` stays within the parameter
+// limit: `--all` reads no transcripts for its documents, so it passes neither.
+interface ScopeExtras {
+	cap: number | undefined
+	documents?: DocumentBreakdown
 }
 
 // One issue, across every session that touched it. A child implemented over two sessions — an
 // interrupted run resumed later — would otherwise be reported at half its cost.
 //
 // Here the corpus-wide missing counts *are* the right ones: a line that could not be read carries no
-// branch, so there is no way to rule out that it belonged to this issue.
-// Each contributing session's own baseline, times the records it contributed. That is what the
-// scope actually paid to re-read the resident preamble, and it is the only form that survives a
-// scope spanning several sessions.
+// branch, so there is no way to rule out that it belonged to this issue. Each contributing session's
+// own baseline, times the records it contributed, is what the scope paid to re-read the resident
+// preamble — the only form that survives a scope spanning several sessions.
 function to_scope_report(
 	label: string,
 	pairs: ReadonlyArray<AttributedRecord>,
 	missing: MissingData,
-	cap: number | undefined,
+	extras: ScopeExtras,
 ): CostReport {
 	return cost_report.build_report({
 		scope: label,
@@ -256,7 +273,8 @@ function to_scope_report(
 		missing,
 		resident_billed_tokens: pairs.reduce((sum, pair) => sum + pair.baseline_tokens, 0),
 		curve_sessions: cost_corpus.mainline_records(pairs),
-		...optional_cap_tokens(cap),
+		...optional_cap_tokens(extras.cap),
+		...optional_documents(extras.documents),
 	})
 }
 
@@ -275,7 +293,10 @@ function report_issue(corpus: Corpus, issue_number: number, cap: number | undefi
 	const floor = cost_corpus.floor_for_issue(attribution.unattributed, issue_number)
 	const missing = with_unattributed(corpus.missing, floor)
 
-	return to_scope_report(scope_label(issue_number), pairs, missing, cap)
+	return to_scope_report(scope_label(issue_number), pairs, missing, {
+		cap,
+		documents: cost_document_sources.for_issue(corpus, pairs),
+	})
 }
 
 function report_all(corpus: Corpus): Array<CostReport> {
@@ -287,7 +308,9 @@ function report_all(corpus: Corpus): Array<CostReport> {
 
 	return [...merged]
 		.toSorted(([left], [right]) => left - right)
-		.map(([key, pairs]) => to_scope_report(scope_label(key), pairs, corpus.missing, undefined))
+		.map(([key, pairs]) =>
+			to_scope_report(scope_label(key), pairs, corpus.missing, { cap: undefined }),
+		)
 }
 
 // The empty check is made once, for every scope. `--all` and `--issue` used to answer an absent

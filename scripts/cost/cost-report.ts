@@ -1,5 +1,6 @@
 import { cost_composition, type Composition } from './cost-composition'
 import { cost_curve, type CapSimulation, type Curve } from './cost-curve'
+import { cost_documents, type DocumentBreakdown } from './cost-documents'
 import { cost_format } from './cost-format'
 import { cost_outliers, type Outliers } from './cost-outliers'
 import { cost_pricing, type ModelCost } from './cost-pricing'
@@ -91,6 +92,10 @@ interface CostReport {
 	// round trips, which the totals and the positional curve both average away
 	// (joshuafolkken/kit#1853). Absent on an empty scope.
 	outliers?: Outliers
+	// The carry cost of each entry-read instruction document, largest first (joshuafolkken/kit#1871).
+	// Present where a transcript was read for the scope; absent otherwise, so a point-of-use ranking
+	// reads it rather than re-measuring the transcript by hand.
+	documents?: DocumentBreakdown
 }
 
 interface ReportInput {
@@ -104,6 +109,10 @@ interface ReportInput {
 	// the curve is built. Absent for a single-session scope, where the flat `records` are already one
 	// session and the curve reads them directly (joshuafolkken/kit#1853).
 	curve_sessions?: ReadonlyArray<ReadonlyArray<UsageRecord>>
+	// The entry-read document breakdown, built by the caller from the scope's transcripts. Absent for
+	// a scope the caller did not read them for — `--all`, where reading every transcript to rank one
+	// run's documents would be work nothing reads (joshuafolkken/kit#1871).
+	documents?: DocumentBreakdown
 }
 
 // `exactOptionalPropertyTypes` rejects `{ measurement: undefined }`, so an absent measurement
@@ -129,6 +138,14 @@ function optional_curve(
 // scope carries no `outliers` key.
 function optional_outliers(records: ReadonlyArray<UsageRecord>): { outliers?: Outliers } {
 	return records.length === 0 ? {} : { outliers: cost_outliers.build_outliers(records) }
+}
+
+// Same absent-key idiom: a scope whose caller read no transcript for its documents carries no key,
+// exactly as an absent measurement does.
+function optional_documents(documents: DocumentBreakdown | undefined): {
+	documents?: DocumentBreakdown
+} {
+	return documents === undefined ? {} : { documents }
 }
 
 function optional_cap(
@@ -157,6 +174,7 @@ function build_report(input: ReportInput): CostReport {
 		...optional_curve(input.records, input.curve_sessions),
 		...optional_cap(input.records, input.cap_tokens),
 		...optional_outliers(input.records),
+		...optional_documents(input.documents),
 	}
 }
 
@@ -246,6 +264,12 @@ function outlier_lines(outliers: Outliers | undefined): Array<string> {
 	return outliers === undefined ? [] : cost_outliers.format_outlier_lines(outliers)
 }
 
+function document_lines(documents: DocumentBreakdown | undefined): Array<string> {
+	if (documents === undefined || documents.rows.length === 0) return []
+
+	return ['', ...cost_documents.format_documents(documents)]
+}
+
 function unpriced_lines(models: ReadonlyArray<string>): Array<string> {
 	if (models.length === 0) return []
 
@@ -291,6 +315,7 @@ function format_report(report: CostReport): string {
 		'Cost by model:',
 		...model_lines(report.by_model),
 		...measurement_lines(report.measurement),
+		...document_lines(report.documents),
 		...curve_lines(report.curve),
 		...cap_lines(report.cap_simulation),
 		...outlier_lines(report.outliers),
