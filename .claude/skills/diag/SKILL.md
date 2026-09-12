@@ -350,7 +350,14 @@ Read from the JSON, in this order:
   ([#1607](https://github.com/joshuafolkken/kit/issues/1607)): one row per tool, carrying how many of
   the recoverable trips were its and how many separate sequences to go and look at — so **the tool a
   batching proposal names is read off this block rather than reconstructed from the transcript by
-  hand**, which is what it cost before the breakdown existed. The `recoverable by tool` row prints the
+  hand**, which is what it cost before the breakdown existed. **An `Agent` row is the spread-apart
+  launch series** ([#1854](https://github.com/joshuafolkken/kit/issues/1854)): independent subagent
+  launches that went out one per turn when they could have fanned out in one, kept out of the
+  consecutive series because a launch is never bundleable and its turns sit minutes apart rather than
+  adjacent. Read it as the other rows are — its `sequence_count` is how many separate fan-outs to look
+  at and its trips are what issuing them together would have saved — and the launches that referenced a
+  prior finding or sat behind an intervening write are already dropped from it, so it names only the
+  ones that genuinely could have been one turn. The `recoverable by tool` row prints the
   reconciliation — `13 of 13 attributed` — and **it balances on every real run**, because only a
   bundleable call enters a sequence and every one of those carries a label. **So a shortfall is a
   defect in the report, not a bucket of unlabelled calls**: report it rather than ranking off the
@@ -455,7 +462,11 @@ innermost it actually cuts.
 `bundles.by_tool` — the heaviest row is the proposal, and its `sequence_count` says how many separate
 places in the run to go and look at — and size the saving from that row's own
 `recoverable_round_trips` times `model_ms_per_round_trip`, never from the whole block's total, which
-belongs to every tool at once. **"The density is 1.39, so batch harder" is not a row**: nothing in it
+belongs to every tool at once. **An `Agent` row proposes a fan-out rather than a tool batch**
+([#1854](https://github.com/joshuafolkken/kit/issues/1854)): the independent subagent launches it
+names went out one per turn and could have been issued together, so the row's action is "launch these
+in one turn", and its saving is sized from its own `recoverable_round_trips` exactly as any other row's
+is. **"The density is 1.39, so batch harder" is not a row**: nothing in it
 says what to change, and it is what three consecutive runs failed to move. Where the breakdown is
 withheld (`is_measured: false`), say so and rank the row on the evidence that is left rather than
 reporting a tool the block did not name. A `recoverable by tool` row that does not balance is a defect

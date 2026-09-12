@@ -16,6 +16,7 @@ describe('time_bundle_call.tool_facts', () => {
 			targets: [READ_PATH],
 			is_writing: false,
 			may_write: false,
+			has_prior_reference: false,
 		})
 	})
 
@@ -31,6 +32,7 @@ describe('time_bundle_call.tool_facts', () => {
 			targets: [],
 			is_writing: false,
 			may_write: false,
+			has_prior_reference: false,
 		})
 	})
 
@@ -43,6 +45,32 @@ describe('time_bundle_call.tool_facts', () => {
 	})
 })
 
+// A launch's prompt is the one place the read-only dependency between two subagents is visible
+// (joshuafolkken/kit#1854): a marker phrase is a floor on it, never over-called, so a prompt without
+// one reads as independent and a non-launch tool never answers `true`.
+describe('time_bundle_call.tool_facts — a launch that builds on a prior finding', () => {
+	const INDEPENDENT = 'Map the lane machinery and return the call sites.'
+	const DEPENDENT = 'Based on the previous finding, trace where the id is written.'
+
+	it('reads a launch whose prompt names no back-reference as independent', () => {
+		expect(time_bundle_call.tool_facts('Agent', { prompt: INDEPENDENT }).has_prior_reference).toBe(
+			false,
+		)
+	})
+
+	it('reads a launch whose prompt builds on a prior finding as dependent', () => {
+		expect(time_bundle_call.tool_facts('Agent', { prompt: DEPENDENT }).has_prior_reference).toBe(
+			true,
+		)
+	})
+
+	it('reads a non-launch tool as never referencing a prior finding', () => {
+		expect(time_bundle_call.tool_facts('Read', { prompt: DEPENDENT }).has_prior_reference).toBe(
+			false,
+		)
+	})
+})
+
 describe('time_bundle_call.bash_facts — which commands count', () => {
 	it('reads an inspection command as bundleable', () => {
 		expect(time_bundle_call.bash_facts(`cat ${READ_PATH}`)).toEqual({
@@ -50,6 +78,7 @@ describe('time_bundle_call.bash_facts — which commands count', () => {
 			targets: [READ_PATH],
 			is_writing: false,
 			may_write: false,
+			has_prior_reference: false,
 		})
 	})
 
@@ -65,6 +94,7 @@ describe('time_bundle_call.bash_facts — which commands count', () => {
 			targets: [],
 			is_writing: false,
 			may_write: false,
+			has_prior_reference: false,
 		})
 	})
 
@@ -235,6 +265,7 @@ describe('time_bundle_call.call_facts', () => {
 			targets: [READ_PATH],
 			is_writing: false,
 			may_write: false,
+			has_prior_reference: false,
 		})
 	})
 
@@ -250,6 +281,7 @@ describe('time_bundle_call.call_facts', () => {
 			targets: [OTHER_PATH],
 			is_writing: false,
 			may_write: false,
+			has_prior_reference: false,
 		})
 	})
 
