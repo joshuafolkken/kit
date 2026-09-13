@@ -143,6 +143,12 @@ spending it** (joshuafolkken/kit#1714). `epicrun.md` → "The hand-off" stops th
 under `backlogrun` that seam does not stop the _run_. The next session picks the same invocation up
 and carries on with the budget already partly spent.
 
+**A resumed session's carried-over lanes are polled beside new work, never waited out.** The lanes a
+cut handed over finish in their own detached units, and the resumed parent opens new independent lanes
+in the same turn it polls them rather than serializing behind their merges: `epicrun.md` → "A
+carried-over merge does not stand in front of the next lane" is the single source, and this file adds
+nothing to it.
+
 **This is not an exception to the explicit-invocation rule above — it is what that rule already
 says.** What §0 forbids is **inferring** a workflow from the shape of a request; it has never required
 the keystroke to land in every session's own transcript. `epicrun.md` → "Each child runs in a
@@ -623,6 +629,11 @@ authorization, which is what an `epicrun` child already is:
   mid-run" for the branch.
 - **`in-progress` left behind by an interrupted run** is `epicrun.md` → "`in-progress` is removed by
   whoever finds it stale".
+- **A child released from `needs-decision` is re-dispatched to a lane, never implemented by the
+  parent.** The parent is an orchestrator: `epicrun.md` → "The parent orchestrates and never
+  implements a child in its own context" is the single source, and `epicrun.md` → "Removing the label
+  is Tier A" carries the re-dispatch itself. This file adds nothing to it — a released `backlogrun`
+  child takes a lane exactly as an `epicrun` child does.
 
 ## What runs once per session, not once per issue
 
