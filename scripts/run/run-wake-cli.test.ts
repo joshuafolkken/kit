@@ -4,6 +4,7 @@ import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
+import { run_progress_clock } from './run-progress-clock'
 import { run_wake } from './run-wake'
 import { run_wake_cli } from './run-wake-cli'
 
@@ -48,6 +49,12 @@ function log_target(): string {
 	return run_wake.wake_log_path(REPOSITORY)
 }
 
+// The woken session's progress record, keyed on the same directory `resolve_context` resolves — the
+// primary checkout, whose own git directory is this common one (joshuafolkken/kit#1910).
+function progress_target(): string {
+	return run_progress_clock.stamp_target_of(REPOSITORY)
+}
+
 // Written as a stamp rather than through `begin_carry`, because what these cases turn on is a record
 // that has already been counted into and cut — the state a supervisor actually meets.
 function write_carry(is_handed_off: boolean): void {
@@ -75,11 +82,13 @@ beforeEach(() => {
 	run_wake.remove_wake(wake_target())
 	run_carry.end_carry(carry_target())
 	rmSync(log_target(), { force: true })
+	stamp_file.remove_stamp(progress_target())
 })
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
 	rmSync(log_target(), { force: true })
+	stamp_file.remove_stamp(progress_target())
 })
 
 describe('josh run:wake — the stdout contract', () => {
@@ -169,6 +178,35 @@ describe('josh run:wake --list — a person can see what is running', () => {
 		await run_wake_cli.run(['--list'])
 
 		expect(errors.join('\n')).toContain('woke 1 session(s) across 2 cut(s)')
+	})
+})
+
+// joshuafolkken/kit#1910. A headless parent woken after a cut prints its progress only to its own
+// transcript, so `--list` relays the last heartbeat it persisted — a person's one window onto the run
+// once they are no longer the parent session. The line relayed is the watcher's own output verbatim.
+describe('josh run:wake --list — the woken session’s progress', () => {
+	const LINE =
+		'⏳ at 2026-09-10 12:00+00:00 / 12:00Z · quiet 3m · #1904 in-progress PR:open · lanes none · load 1.0 · record unread · unchanged 3m · next later'
+
+	it('relays the last heartbeat line and keeps standard output one token', async () => {
+		write_carry(false)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
+		run_progress_clock.mark(progress_target(), NOW.getTime(), LINE)
+
+		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
+		expect(out).toStrictEqual([run_wake_cli.SUPERVISING_VERDICT])
+		expect(errors.join('\n')).toContain(`progress: ${LINE}`)
+	})
+
+	// Before the first heartbeat there is no line, and "progress: (none)" on every pre-heartbeat listing
+	// is one a reader stops seeing — so it is omitted, the way a count of zero outstanding launches is.
+	it('says nothing about progress before the first heartbeat', async () => {
+		write_carry(false)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
+
+		await run_wake_cli.run(['--list'])
+
+		expect(errors.join('\n')).not.toContain('progress:')
 	})
 })
 

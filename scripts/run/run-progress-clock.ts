@@ -44,7 +44,12 @@ const GIT_TIMEOUT_MS = 5000
 // linked work tree, a bare repository and a `--separate-git-dir` clone all answer correctly.
 const GIT_DIRECTORY_ARGUMENTS: ReadonlyArray<string> = ['rev-parse', '--absolute-git-dir']
 
-const report_stamp_schema = z.object({ reported_at: z.string() })
+// `line` is the last heartbeat the watcher printed, kept verbatim beside the clock so a reader that
+// cannot see the watcher's transcript — a person checking a woken headless `backlogrun` through
+// `josh run:wake --list` — still reads the exact line it emitted (joshuafolkken/kit#1910). It is
+// optional because a bare `--mark` moves the clock without producing one, and because a record written
+// before this field existed carries only `reported_at`.
+const report_stamp_schema = z.object({ reported_at: z.string(), line: z.string().optional() })
 
 function parse_stamp(raw: string): number | undefined {
 	const parsed = report_stamp_schema.safeParse(JSON.parse(raw))
@@ -54,6 +59,24 @@ function parse_stamp(raw: string): number | undefined {
 	const reported_at = Date.parse(parsed.data.reported_at)
 
 	return Number.isNaN(reported_at) ? undefined : reported_at
+}
+
+/**
+ * The last heartbeat line the watcher persisted, or `undefined` for an absent, unparsable, or
+ * pre-`line` record. This is what `josh run:wake --list` relays to a person who is no longer the parent
+ * session — the headless parent woken after a cut prints its progress only to its own transcript, and
+ * this record is the one place that line survives (joshuafolkken/kit#1910).
+ */
+function read_last_line(target: string): string | undefined {
+	const raw = stamp_file.read_stamp_text(target)
+
+	if (raw === undefined) return undefined
+
+	try {
+		return report_stamp_schema.safeParse(JSON.parse(raw)).data?.line
+	} catch {
+		return undefined
+	}
 }
 
 /**
@@ -75,8 +98,15 @@ function read_last_report(target: string): number | undefined {
 	}
 }
 
-function mark(target: string, now_ms: number): void {
-	stamp_file.write_stamp(target, { reported_at: new Date(now_ms).toISOString() })
+// A heartbeat carries its line; a bare `--mark` (a real report resetting the clock) carries none and
+// **preserves the line already there** rather than blanking it — so `josh run:wake --list` keeps
+// showing the most recent heartbeat between a run's real reports rather than going empty on every one
+// (joshuafolkken/kit#1910).
+function mark(target: string, now_ms: number, line?: string): void {
+	const reported_at = new Date(now_ms).toISOString()
+	const kept = line ?? read_last_line(target)
+
+	stamp_file.write_stamp(target, kept === undefined ? { reported_at } : { reported_at, line: kept })
 }
 
 // `undefined` is passed straight through so `stamp_file`'s own default root stands, which is what the
@@ -159,6 +189,7 @@ const run_progress_clock = {
 	life_target_of,
 	mark,
 	parse_stamp,
+	read_last_line,
 	read_last_report,
 	read_last_report_sync,
 	stamp_target_of,

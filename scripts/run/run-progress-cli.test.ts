@@ -151,7 +151,9 @@ describe('--once — one line now', () => {
 		await expect(run_progress_cli.run(['--once'])).resolves.toBe(0)
 		expect(output.printed).toHaveLength(1)
 		expect(output.printed[0]).toContain('#1520')
-		expect(mark).toHaveBeenCalledWith(STAMP, expect.any(Number))
+		// joshuafolkken/kit#1910: the line it records is the exact line it printed, so `run:wake --list`
+		// relays the watcher's own output verbatim to a person who is no longer the parent.
+		expect(mark).toHaveBeenCalledWith(STAMP, expect.any(Number), output.printed[0])
 	})
 
 	it('prints no line and records nothing when no child is in flight', async () => {
@@ -269,7 +271,7 @@ describe('the watch loop — one tick at a time', () => {
 		const next = await run_progress_cli.step(OPTIONS, STAMP, loop_at(Date.now() - 30 * MINUTE))
 
 		expect(output.printed).toHaveLength(1)
-		expect(mark).toHaveBeenCalledWith(STAMP, expect.any(Number))
+		expect(mark).toHaveBeenCalledWith(STAMP, expect.any(Number), output.printed[0])
 		expect(next.retry_at_ms).toBe(0)
 		expect(next.state).toBeDefined()
 	})

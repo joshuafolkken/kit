@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
+import { run_progress_clock } from './run-progress-clock'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
@@ -107,6 +108,11 @@ interface WakeContext {
 	// Where everything this supervisor starts writes its output (joshuafolkken/kit#1746). It is named
 	// in `--list` and in every warning, because a path nobody is told is a file nobody reads.
 	log_target: string
+	// The woken session's progress record, keyed on the primary checkout's git directory — the one the
+	// resumed `backlogrun` parent runs in, so its own git directory is this common one. `--list` reads
+	// the last heartbeat from here and relays it, which is a headless parent's only window onto a person
+	// after a cut (joshuafolkken/kit#1910).
+	progress_target: string
 	worktree: string
 }
 
@@ -170,6 +176,7 @@ async function resolve_context(): Promise<WakeContext | undefined> {
 		carry_target: run_carry.carry_path(directory),
 		wake_target: run_wake.wake_path(directory),
 		log_target,
+		progress_target: run_progress_clock.stamp_target_of(directory),
 		worktree: path.dirname(directory),
 	}
 }
@@ -201,12 +208,23 @@ function outstanding_line(wake: RunWake): string | undefined {
 	return `${String(wake.attempts)} launch(es) outstanding for the current cut, none claimed yet`
 }
 
+// The last heartbeat the woken session persisted, relayed here because a headless parent's progress
+// reaches its own transcript alone — after a cut, `--list` is the person's one window onto it
+// (joshuafolkken/kit#1910). Absent until the first heartbeat, and omitted rather than shown empty, the
+// way `outstanding_line` omits a count of zero.
+function progress_line(context: WakeContext): string | undefined {
+	const line = run_progress_clock.read_last_line(context.progress_target)
+
+	return line === undefined ? undefined : `progress: ${line}`
+}
+
 // The wake count is printed beside the carry record's `cuts` rather than alone, because the two being
 // equal is the property worth being able to check — one wake per cut is the whole invariant, and since
 // joshuafolkken/kit#1746 `woke` counts records actually claimed rather than sessions started.
 // **The outstanding line beside it is what makes a shortfall readable**: the count is observed at a
 // poll, so it lags a claim by up to one interval, and launches still outstanding are what say whether
 // a missing wake is one not yet seen or one that never arrived.
+
 function describe_wake(wake: RunWake, context: WakeContext): string {
 	const live = run_wake.is_supervisor_live(wake) ? 'running' : 'not running'
 	const cuts = carry_cuts(run_carry.read_carry(context.carry_target))
@@ -216,6 +234,7 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 		`supervisor: process ${String(wake.pid)} (${live}), watching since ${wake.started_at}`,
 		`woke ${String(wake.woke)} session(s) across ${cuts} cut(s)`,
 		outstanding_line(wake),
+		progress_line(context),
 		`output: ${context.log_target}`,
 		`stop it with \`${STOP_COMMAND}\``,
 	]
