@@ -153,8 +153,6 @@ Check code with prettier and eslint.
 
 ```bash
 pnpm josh lint
-pnpm josh lint:prettier   # prettier only
-pnpm josh lint:eslint     # eslint only
 ```
 
 ### `josh lint:related`
@@ -225,8 +223,6 @@ Format code with prettier and eslint.
 
 ```bash
 pnpm josh format
-pnpm josh format:prettier  # prettier only
-pnpm josh format:eslint    # eslint only
 ```
 
 ### `josh format:edited`
@@ -368,46 +364,6 @@ The refusal leaves through `hookSpecificOutput.permissionDecision`, the only sha
 
 **Verify it the way #1390 asks to be verified**: run `pnpm josh time --issue <N>` afterwards and compare the pre-implementation phase — `plan` plus `setup`, or the run start to the first `Edit` where the phase table charges a delegated run to `pre-run` — against run #1441's hand-measured 15.4 min and 34%.
 
-### `josh rule:value`
-
-Report what each trigger-delivered rule's carried text earns **unaided** ([#1525](https://github.com/joshuafolkken/kit/issues/1525)). It reads this checkout's recorded sessions — the same corpus `josh time` and `josh cost` read — and prints one row per rule in `MEASURED_RULES` (`scripts/rules/delivered-rules.ts`):
-
-```
-pnpm josh rule:value                       # this checkout
-pnpm josh rule:value /path/to/checkout     # a lane has no sessions of its own; name the primary one
-```
-
-| Column    | Meaning                                                                                                                                                                                                                                                          |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `runs`    | Runs that reached the situation the rule governs — its trigger, or `reaches` where the row declares one. A run that never reaches it says nothing about the rule. A run's delegated units are folded into it, never counted beside it                            |
-| `kept`    | Of those, the runs that kept the rule **unaided** — before the trigger fired, or without it firing at all, which is the ordinary case for a row that declares `reaches`. Runs are ordered by timestamp, so a unit's call counts before a later one in the parent |
-| `refused` | Of those, the runs in which a refusal was delivered                                                                                                                                                                                                              |
-| `unaided` | `kept / runs` — what the carried text earns with no help from the hook, or `-` / `no runs`                                                                                                                                                                       |
-
-**The window before the delivery fires is the rule's absence.** A rule refuses at most once per run, so every session holds a stretch in which the hook has said nothing and only the carried text — the resident copy, where there is one — is asking for compliance. Compliance credited _after_ the trigger is the delivery's contribution, not the text's, and is deliberately not counted.
-
-**`-` means unmeasured, never zero.** Naming the act that counts as keeping a rule is the rule's own business, so it sits on the enumeration beside the trigger as `keeps`; a row that declares none cannot be scored, and reporting `0` would assert "never kept" while `100` would assert the opposite. Every enumerated row declares one since [#1643](https://github.com/joshuafolkken/kit/issues/1643), so no row reads `-` today — the marker stays because the next row added may arrive without one.
-
-**A trigger is not always the situation the rule governs, and the denominator follows the situation** ([#1643](https://github.com/joshuafolkken/kit/issues/1643)). `wip-cap` fires on the filing and `issue-comments` on the body read — acts a run that keeps the rule performs too, so the trigger _is_ the situation and nothing more is needed. The other four fire only on the violation: a run that backgrounded every push never trips `run-tail`, and one that passed every body by path never trips `shell-body`. Taking the trigger as the denominator there would score each rate over the runs that broke the rule at least once, and all four would read near zero by construction — a false retirement candidate, which is the one outcome this measurement exists to avoid. Such a row declares `reaches`, the governed act in **either** spelling, and that is what `runs` counts. A row without it is unchanged, which is why `wip-cap` and `issue-comments` read exactly what they read before.
-
-**`no runs` is the other empty cell, and it is a different fact** ([#1642](https://github.com/joshuafolkken/kit/issues/1642)). A rule that declares `keeps` but whose trigger no recorded run reached has nothing to divide by either — but it is measurable, and one more run may score it. Both cells printed `-` until this was split, so a rule the corpus simply had not exercised read as one nothing can ever score.
-
-**A group of transcripts holding no session of its own is not counted as a run, and the number dropped is printed.** Delegated units live in a `subagents/` directory beside their session's transcript and are folded into it; where the session file has been pruned and that directory survived, the units group under a parent that no longer exists. Scored as runs they would put subagent transcripts back into the denominator — the miscount [#1525](https://github.com/joshuafolkken/kit/issues/1525) closed, reached from the other side — so they are dropped, and `orphaned unit groups skipped: N` appears under `runs read` whenever any were.
-
-**A refusal is identified from the parsed block, not by matching the raw line** ([#1642](https://github.com/joshuafolkken/kit/issues/1642)). The `refused` column counts an errored `tool_result` whose body **opens with** that rule's reason, which is how the hook writes one. The test it replaced looked for the literal `"is_error":true` anywhere in the line and then for the reason anywhere in the same line: one space after the colon in a future serializer would have taken every `refused` column to zero — indistinguishable from a hook that never fired — and a single `cat scripts/rules/delivered-rules.ts && false` scored a refusal against all six rules at once, because that file carries every reason verbatim.
-
-**Use it to decide what leaves when the resident budget binds**, in place of the old order in which the sentence no marker pinned was the one that went ([#951](https://github.com/joshuafolkken/kit/issues/951)). The first reading refused the deletion it was built to justify: over 220 recorded runs the WIP cap, which keeps a resident copy, scored 55%, while the Issue-comments rule, which has none, scored 15% — so the resident text that looked most redundant on a reading of the prose is doing the most work. The retirement route the reading feeds is `.claude/skills/workflow-commands/SKILL.md` → §3.
-
-**The second reading covered the other four and produced no candidate either** ([#1643](https://github.com/joshuafolkken/kit/issues/1643)). Over 225 recorded runs: `shell-body` 81%, `early-heartbeat` 67%, `wip-cap` 57%, `issue-comments` 15%, `piped-verification` 13%, `run-tail` 4%. **The two rules that keep a resident copy are the two at the top** — `shell-body` at 81% and `wip-cap` at 57% — and exactly one rule without a copy sits between them: `early-heartbeat`, at 67% over **18 runs**, the smallest denominator in the table by a factor of five. So nothing was retired, and `.claude/skills/workflow-commands/SKILL.md` → §3 records the reading rather than lowering the bar until a deletion appeared. **The figures move as the corpus grows**, so re-read them rather than quoting these when the question comes up again.
-
-**A rule delivered by a binary of its own is measured here too, and the batching guard was the one that was not** ([#1792](https://github.com/joshuafolkken/kit/issues/1792)). `DELIVERED_RULES` is the _delivery_ registry — every row in it becomes a live `PreToolUse` guard — so a batching row added there would refuse a violation `pnpm josh batch:guard` is already refusing, writing two once-per-run records for one call of which Claude Code surfaces a single decision. `MEASURED_RULES` is that registry plus the rows delivered elsewhere, and it is what this command reads. The most-cited resident rule in the repository therefore had no continuous reading at all: the guard fired, the refusals landed in the transcript in the same shape as the other six, and nothing counted them.
-
-**The batching row is scored on the refusal, because its trigger is not call-shaped.** `time_batch_guard.should_block` decides from the turns _behind_ a call, and a compliance test here is handed one call at a time — so the row declares no `is_trigger`, and the refusal recorded in the transcript closes the unaided window instead. **`keeps` is the one test of the seven that reads the turn rather than the call**: a call the guard could have refused that went out beside the calls not needing its result. **`reaches` is that same call in either spelling** — alone in its turn or beside siblings — which is what keeps the row off the near-zero reading [#1643](https://github.com/joshuafolkken/kit/issues/1643) names, and the compliant act being a frequent one means this row's `unaided` reads high by construction. **`refused` is the column that carries the new information**: how often the guard had to speak at all, which is what tells a batching change that shipped from one that did not. The first reading, over 297 recorded runs: **276 runs, 237 kept, 47 refused, 86% unaided** — the top of the table, so the most-cited resident rule in the repository is earning its place rather than sitting on the retirement list it had never been measured against. **The figures move as the corpus grows**, so re-read them rather than quoting these.
-
-**The investigation guard is the second such row, and it is the one whose subject is largest** ([#1764](https://github.com/joshuafolkken/kit/issues/1764)). `pnpm josh investigation:guard` has delivered the pre-implementation reading threshold since [#1460](https://github.com/joshuafolkken/kit/issues/1460), so its row sits in `MEASURED_RULES` and not in `DELIVERED_RULES` for exactly the batching row's reason — a second delivery would refuse one violation twice, each refusal spending a record the other cannot see. Its `keeps` is a subagent dispatch, which is what §2b asks for and the one compliance act that is not a shell command at all; its `reaches` is a read the guard could have refused, so the denominator is the runs that did any main-line reading rather than only the runs that broke the rule. Until this row existed the largest contributor `josh time` measures — `investigation`, at **35.9%** of a run's turns over nineteen runs — had no continuous reading of whether the mechanism aimed at it was working.
-
-**Reading that row also settled what a turn is here: a message id, not a line** ([#1792](https://github.com/joshuafolkken/kit/issues/1792)). Claude Code writes one line per content block and repeats the message id on each, so a turn that thought and then issued two calls is three lines carrying one id — the reading `scripts/time/time-round-trips.ts` already takes. Scored per line the batching row read **3 kept of 276 against 47 refusals, 1%**: a batched turn is indistinguishable from two turns of one call, which is this rule's entire subject scored backwards, and a near-zero reading is the manufactured retirement candidate the measurement exists to avoid. **Nor is adjacency enough**, which is the half worth writing down: the first call's result and the attachments beside it are themselves timestamped lines, so they sit _between_ the blocks of one message — folded against the entry before it, this checkout's last 8 sessions took 520 multi-call messages down to 58 turns. The fold is keyed by id, exactly as `turn_key` is. The other six rows are unaffected either way — their compliance tests ask about one call — and their figures did not move when the fold was added, which is what says the fold changed the reading only where a turn is what is being asked about.
-
 ### `josh rule:guard`
 
 Deliver a rule at the tool call that binds it, instead of carrying it resident in `CLAUDE.md` on every turn ([#1524](https://github.com/joshuafolkken/kit/issues/1524)). Like the other two guards it is not run by hand: `.claude/settings.json` wires it to `PreToolUse` and Claude Code pipes the call it is about to run to it as JSON on stdin.
@@ -449,12 +405,11 @@ Print, on stdout, the language this session writes in, resolved from `JOSH_SESSI
 
 **Wired to `UserPromptSubmit` alone ([#1930](https://github.com/joshuafolkken/kit/issues/1930)).** The drift happens on a session's first turn and is overwritten each turn by the English hook text, so the injection has to repeat every turn — which `UserPromptSubmit` already does, the first turn included. It was also on `SessionStart`, but that only made the first turn resolve it twice, so that wiring was removed. It declares no `tsx_arguments`, so it stays eligible for in-process dispatch rather than paying a second tsx start on every prompt.
 
-### `josh cspell`
+### `josh cspell:dot`
 
-Run spell check.
+Run spell check, including dotfiles.
 
 ```bash
-pnpm josh cspell          # *.{ts,js,md,yaml,yml,json}
 pnpm josh cspell:dot      # includes dotfiles
 ```
 
@@ -697,7 +652,6 @@ josh test takes no extra arguments — pass them to josh test:unit or josh test:
 | Composite | Pass arguments to instead                   |
 | --------- | ------------------------------------------- |
 | `test`    | `test:unit`, `test:e2e`                     |
-| `format`  | `format:prettier`, `format:eslint`          |
 | `latest`  | `latest:corepack`, `latest:update`, `audit` |
 
 Every other command — the ones that invoke a single tool or script — forwards extra arguments exactly as before; `pnpm josh test:e2e --workers=1` reaches Playwright unchanged.
@@ -868,7 +822,7 @@ The steps, in the consumer's own directory:
 | Step                       | What runs                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------- |
 | `working tree check`       | refuses a tree that is dirty, not on its default branch, or behind its remote   |
-| `josh vu`                  | `pnpm add -D <toolkit>@latest`, **once per installed toolkit**, base tier first |
+| `josh version --upgrade`   | `pnpm add -D <toolkit>@latest`, **once per installed toolkit**, base tier first |
 | `josh sync`                | that toolkit's own CLI — `pnpm josh sync`, then `pnpm josh-app sync`, once each |
 | `verification gate`        | [`josh gate`](#josh-gate)                                                       |
 | `open issue`               | one issue naming every toolkit the run carried                                  |
@@ -1150,7 +1104,7 @@ Show the global install version, the current project version, and the latest pub
 pnpm josh version   # alias: josh v
 ```
 
-`version` (and `version:upgrade`) always inspect **both targets**:
+`version` (and `version --upgrade`) always inspect **both targets**:
 
 - **Global**: queried via `pnpm ls -g @joshuafolkken/kit`.
 - **Project**: read from `node_modules/@joshuafolkken/kit/package.json` in the current directory.
@@ -1158,6 +1112,8 @@ pnpm josh version   # alias: josh v
 In addition, `version` reports the **running binary** — the version and package directory of the install that actually executed, resolved from `import.meta.url`. The running binary is the single source of truth: the `Running:` line tells you which `josh` produced this very report, independent of the global/project query. This restores the guarantee that a stale or shadowing binary self-reports rather than hiding behind the `pnpm ls -g` number.
 
 A target that is not installed is reported as `not installed`. A stale target gets a `Run:` hint with the exact upgrade command (`pnpm add -g` for global, `pnpm add -D … && fix-gh-packages` for the project). `josh v` and `pnpm josh v` produce the same report.
+
+Pass `--upgrade` to upgrade `@joshuafolkken/kit` to the latest published version for **both** the global install and the current project instead of only reporting: the global install is upgraded with `pnpm add -g`, and the project devDependency with `pnpm add -D` followed by a re-run of `fix-gh-packages`. A target that is not installed or already up to date is skipped. Inside the kit repo itself there is no `node_modules/@joshuafolkken/kit`, so the project target is naturally skipped — no accidental self-install.
 
 #### Release-age holds
 
@@ -1178,9 +1134,9 @@ So a pinned `Run:` hint always installs and is **never** suppressed. What the wi
   Latest:  1.80.0
 ```
 
-Since kit publishes several releases a day, a residual `⚠` right after a **successful** `version:upgrade` is the normal case rather than a failure — the `Held:` line says so instead of leaving the marker unexplained. An effective install below what an unpinned resolve reaches is genuinely stale and gets no such line.
+Since kit publishes several releases a day, a residual `⚠` right after a **successful** `version --upgrade` is the normal case rather than a failure — the `Held:` line says so instead of leaving the marker unexplained. An effective install below what an unpinned resolve reaches is genuinely stale and gets no such line.
 
-The publish timestamps come from the same GitHub Packages endpoint that resolves `Latest:`, fetched only when the effective install is behind `Latest:` and only when a window is actually configured; when they cannot be read the report renders exactly as it did before. `version:upgrade` is unchanged. See [#808](https://github.com/joshuafolkken/kit/issues/808).
+The publish timestamps come from the same GitHub Packages endpoint that resolves `Latest:`, fetched only when the effective install is behind `Latest:` and only when a window is actually configured; when they cannot be read the report renders exactly as it did before. `version --upgrade` is unchanged. See [#808](https://github.com/joshuafolkken/kit/issues/808).
 
 #### PATH shadowing warning
 
@@ -1194,18 +1150,6 @@ When the `josh` first on `PATH` is **not** the pnpm-global install — for examp
 ```
 
 Run [`josh doctor --fix`](#josh-doctor) to reclaim the global CLI. The warning is silent when there is no shadowing.
-
-### `josh version:upgrade`
-
-Upgrade `@joshuafolkken/kit` to the latest published version for **both** the global install and the current project.
-
-```bash
-pnpm josh version:upgrade   # alias: josh vu
-```
-
-Both `josh vu` and `pnpm josh vu` behave the same: the global install is upgraded with `pnpm add -g`, and the project devDependency with `pnpm add -D` followed by a re-run of `fix-gh-packages`. A target that is not installed or already up to date is skipped. Inside the kit repo itself there is no `node_modules/@joshuafolkken/kit`, so the project target is naturally skipped — no accidental self-install.
-
----
 
 ### `josh ranges`
 
@@ -1415,33 +1359,6 @@ pnpm josh reconcile-templates --check    # verify templates are in sync; non-zer
 
 Tripwire hashes live in `.template-source-manifest.json` at the repo root (kit-internal; not distributed). A pre-commit hook runs `--check` whenever a tracked source or copy template is staged: a copy pair that is out of date, or a tripwire source that changed without being reconciled, blocks the commit. Run `pnpm josh reconcile-templates` (reviewing any tripwire template first), then commit the regenerated copies and updated manifest alongside the source.
 
-### `josh sync-workflow-pins`
-
-Keep the action SHA pins in `templates/workflows/*` in sync with `.github/workflows/*`. The runtime workflows are the single source of truth for pins; the distributed templates intentionally diverge in structure (steps, commands, comment language), so only the `uses:` SHA pins are propagated.
-
-```bash
-pnpm josh sync-workflow-pins           # rewrite template pins to match the runtime workflows
-pnpm josh sync-workflow-pins --check    # verify pins are in sync; non-zero on drift
-```
-
-Dependabot bumps the runtime workflows under `.github/workflows/` only — its `github-actions` ecosystem cannot scan `templates/` — so an action bump always leaves the templates behind. **This is no longer something you have to fix.** Consumer workflows have their pins resolved from `.github/workflows/*` at the moment `josh init` / `josh sync` writes them, so a stale template ref never reaches a consumer and never fails CI. The command remains available for keeping the committed templates tidy; running it is optional housekeeping, not a step in any workflow. The command errors if a single action is pinned to conflicting SHAs across the runtime workflows.
-
-What _is_ still enforced is that every action used by `templates/workflows/*` also appears in `.github/workflows/*` — an action with no runtime counterpart has no canonical pin to resolve from, so its template ref would ship verbatim. See joshuafolkken/kit#747.
-
-### `josh sync-dependabot-pins`
-
-Automate the template-pin refresh over one or more Dependabot action-bump PRs. For each PR number it checks out the PR branch, runs the same sync as `sync-workflow-pins`, and — when pins drifted — commits the template update and pushes it back to the PR branch, then restores the branch you started on.
-
-> **No longer required to unblock a Dependabot PR.** This command existed because template drift used to fail the kit's own CI, making every action bump a manual fix-up. Pins are now resolved when a consumer workflow is written, so a Dependabot PR that touches only `.github/workflows/**` is green on its own. Use this command when you want the committed templates to read as current — not because a PR is stuck. See joshuafolkken/kit#747.
-
-```bash
-pnpm josh sdp 578 641              # sync + push template pins for each Dependabot PR
-pnpm josh sync-dependabot-pins 578
-pnpm josh sdp --dry-run 578 641    # print the plan per PR; no checkout, commit or push
-```
-
-`--dry-run` performs no git side effects (no checkout, commit or push), so it is safe to run against an uncommitted working tree — for example while verifying the command itself before committing. Only template pins under `templates/workflows/` are staged, so unrelated working-tree changes are never committed to a Dependabot PR. As a safety guard the command only commits when the checked-out branch is a `dependabot/…` branch; a mistyped or non-Dependabot PR number is skipped without any commit.
-
 ### `josh latest`
 
 Update pnpm via corepack, update all dependencies to latest, and run a security audit.
@@ -1580,52 +1497,11 @@ The output claims the result rather than the omission, because a line reading "t
 
 That sentence is built in one place for all three readers — the gate's own skip, this hook and [`josh pre-push-unit`](#josh-pre-push-unit) — so a claim this load-bearing cannot drift into three different claims.
 
-### `josh hook:install`
-
-Install git hooks via lefthook.
-
-```bash
-pnpm josh hook:install
-```
-
-### `josh hook:uninstall`
-
-Uninstall git hooks.
-
-```bash
-pnpm josh hook:uninstall
-```
-
-### `josh hook:commit` / `josh hook:push`
-
-Run pre-commit or pre-push hooks manually (useful for debugging).
-
-```bash
-pnpm josh hook:commit
-pnpm josh hook:push
-```
-
 ---
 
 ## AI tools
 
 Helpers for AI-assisted development workflows.
-
-### `josh prep`
-
-Pre-implementation preparation: reads context and primes the AI for a task.
-
-```bash
-pnpm josh prep
-```
-
-### `josh issue`
-
-Fetch GitHub issue details for use in an AI-assisted workflow.
-
-```bash
-pnpm josh issue 42
-```
 
 ### `josh issue:read`
 
@@ -2347,31 +2223,6 @@ Standard output carries the single verdict word and standard error the reason, s
 **A flag that was given but could not be read makes the whole invocation unreadable.** A mistyped `--idle` is never defaulted to "no idle watch" — that would end the run at the first empty backlog, answering a question nobody asked. This is `path_decision.has_unknown_flag`'s contract, and the printer is the one every mechanically-decided command in this repository shares.
 
 **The entry point that consumes this answer is `backlogrun`**, defined in `.claude/skills/workflow-commands/backlogrun.md` → "The two budgets". The command is read-only, holds no state of its own, and never applies or removes a label.
-
-### `josh depth:share`
-
-Reports the depth-0 share of the open backlog from the depth labels recorded on the Issues ([#1729](https://github.com/joshuafolkken/kit/issues/1729)).
-
-```bash
-pnpm josh depth:share          # → <depth-0>/<denominator> = <n>% ; alias: josh dsh
-pnpm josh depth:share --json   # the same figures as one JSON object
-```
-
-[#1698](https://github.com/joshuafolkken/kit/issues/1698) set the share of open Issues at depth 0 as its measurable target and left nothing that measures it: no Issue recorded a depth, so obtaining the number meant opening every open Issue and classifying it by eye. Two such counts a day apart gave 3/23 ≈ 13% and 3/14 ≈ 21%, and they are **not comparable** — they took different denominators, and neither said which.
-
-**The denominator is a rule rather than a choice.** `.claude/skills/workflow-commands/SKILL.md` → §2i, "The depth-0 share", is its single source, and `scripts/issue/issue-depth-share.ts` is where it is implemented:
-
-| Counted in the denominator                                                                                                        | Not counted                                                                                                               |
-| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Every open Issue without the `epic` label, `route:tier-a` and `route:interrupt` included, whether or not it carries a depth label | An open Issue carrying `epic` — a container rather than a deliverable, and with no subject of its own to read a depth off |
-
-- **An Issue with no depth label is inside the denominator** and is reported separately as `unlabelled`. Left out, the share would improve every time a filing skipped the label.
-- **An Issue carrying more than one depth label counts as the lowest depth present**, the one closest to the consumer — a fixed tie-break, so the same backlog measured twice cannot answer twice.
-- **A listing that hit the scan ceiling is reported as capped**, and one that could not be read at all answers `unknown` on stdout with the reason on stderr. **Never a share of zero** — that would be a measurement invented out of a failed fetch.
-
-The plain form prints the headline on stdout and the full breakdown on stderr, so `pnpm josh depth:share 2>/dev/null` is the number alone. `--json` emits one object carrying `share` — the headline, or the string `unknown` — plus `denominator`, `depth_0`, `depth_1`, `depth_2`, `unlabelled`, `epics_excluded`, `share_percent` and `cutoff` (`none` / `row_limit` / `page_ceiling`, from `scripts/git/listing-cutoff.ts`). **`share` is the one key both shapes carry**, so a consumer tells a measured run from an unreadable one by reading it rather than by sniffing for a key only one of them has.
-
-The command is read-only: it applies no label and files nothing. Applying the labels is the filing routes' job, defined in the same §2i.
 
 ### `needs-human-review` — the opposite label
 
@@ -3372,7 +3223,7 @@ Per invocation (repeated commands):
 
 **The failure block separates work from rework** ([#1309](https://github.com/joshuafolkken/kit/issues/1309)). A row saying `josh gate 3.8 min 4 call(s)` cannot say whether the four runs were four pieces of work or one piece done four times, and on the run this was filed from **three of five gate runs were failures** — one spell-check test half a second over its timeout, one resident-document size violation whose own test ran in five milliseconds. Neither was slow; both were re-run. So every span now carries how its call came back, and the block prints the calls that failed and the time spent on the attempts that followed them. **A re-run is the next call of the same command after one that failed**, not every repeat: the gate runs once beside the review and again over the tree round 1's fixes moved, by design, and counting repeats alone would charge that to failure. The identity a repeat is judged on is the josh subcommand where there is one and the tool label otherwise — the same key the two tables below are built on.
 
-**The outcome is the tool call's, and a josh check's own words are read on top of it** ([#1361](https://github.com/joshuafolkken/kit/issues/1361)). The base reading is the `is_error` the harness writes on a tool result, which reports whether the _call_ failed rather than whether the command inside it did: `pnpm josh gate 2>&1 | tail -40` exits with `tail`'s status, so a red gate read through a pipe came back as a call that succeeded. Measured over this machine's kit transcripts from 2026-09-04 onward, that was **13 of the 13 gate runs that printed a failure line** — none of them counted, which is exactly the rework the block exists to expose. So a result whose call ran `pnpm josh <cmd>` is also read for the failure line josh itself printed (`✗ verification gate failed: lint`), and one found there marks the call failed whatever the pipe reported. **The promotion goes one way only** — a call the harness already marked failed stays failed — and it is confined to josh's own output, whose format this repository owns; the icon is shared with the commands that print it rather than restated, so a rename breaks the build instead of the count. **A command's own verdict outranks the lines it forwarded** ([#1374](https://github.com/joshuafolkken/kit/issues/1374)): `josh gate` prints the body of a step that skipped or passed with warnings, and that body is eslint's, svelte-check's, vitest's or cspell's — one of them opening a line with the failure icon would make a _green_ gate a failed call and charge the next gate run as rework. So the gate's own `✔ verification gate passed` / `✗ verification gate failed` line is read first and settles the call, built from the same prefix the reader matches. A per-command list of failure-line patterns was rejected instead: tight enough to exclude a third-party warning, it is a list of per-command shapes, and the next josh command to print a failure line is silently not counted. Commands that state no verdict — `josh health`, `josh propagate` — are read from the icon exactly as before. What remains invisible is a non-josh command inside a pipeline and a body truncated past its failure line, which keeps the figure a floor rather than a ceiling — a lower one than before. **Where no outcome was readable at all the two rows say `not measured`** — a fifth of the tool results in the transcripts measured carry no `is_error` (a file read, an answered question), and a run of only those failed nothing _that was seen_, which is not the same as failing nothing. Where some outcomes _were_ readable, how many were not is printed beside the failure count rather than folded into it; on the withheld rows it is not repeated, because there it would be the call count the round-trip block prints two lines above.
+**The outcome is the tool call's, and a josh check's own words are read on top of it** ([#1361](https://github.com/joshuafolkken/kit/issues/1361)). The base reading is the `is_error` the harness writes on a tool result, which reports whether the _call_ failed rather than whether the command inside it did: `pnpm josh gate 2>&1 | tail -40` exits with `tail`'s status, so a red gate read through a pipe came back as a call that succeeded. Measured over this machine's kit transcripts from 2026-09-04 onward, that was **13 of the 13 gate runs that printed a failure line** — none of them counted, which is exactly the rework the block exists to expose. So a result whose call ran `pnpm josh <cmd>` is also read for the failure line josh itself printed (`✗ verification gate failed: lint`), and one found there marks the call failed whatever the pipe reported. **The promotion goes one way only** — a call the harness already marked failed stays failed — and it is confined to josh's own output, whose format this repository owns; the icon is shared with the commands that print it rather than restated, so a rename breaks the build instead of the count. **A command's own verdict outranks the lines it forwarded** ([#1374](https://github.com/joshuafolkken/kit/issues/1374)): `josh gate` prints the body of a step that skipped or passed with warnings, and that body is eslint's, svelte-check's, vitest's or cspell's — one of them opening a line with the failure icon would make a _green_ gate a failed call and charge the next gate run as rework. So the gate's own `✔ verification gate passed` / `✗ verification gate failed` line is read first and settles the call, built from the same prefix the reader matches. A per-command list of failure-line patterns was rejected instead: tight enough to exclude a third-party warning, it is a list of per-command shapes, and the next josh command to print a failure line is silently not counted. Commands that state no verdict — `josh propagate`, say — are read from the icon exactly as before. What remains invisible is a non-josh command inside a pipeline and a body truncated past its failure line, which keeps the figure a floor rather than a ceiling — a lower one than before. **Where no outcome was readable at all the two rows say `not measured`** — a fifth of the tool results in the transcripts measured carry no `is_error` (a file read, an answered question), and a run of only those failed nothing _that was seen_, which is not the same as failing nothing. Where some outcomes _were_ readable, how many were not is printed beside the failure count rather than folded into it; on the withheld rows it is not repeated, because there it would be the call count the round-trip block prints two lines above.
 
 **The last two blocks reconcile what the run edited against what it merged** ([#1387](https://github.com/joshuafolkken/kit/issues/1387)). The failure block above catches a command re-run after it failed; it cannot catch a change of approach, where nothing failed and the work was thrown away anyway. Hand-measuring run #1379 found `scripts/verification-gate.ts` **edited twice and absent from the merged diff**, which every scope of this command read as ordinary implementation. So one extra request — `repos/{owner}/{repo}/pulls/<N>/files` — is joined to the transcript's own `Edit` / `Write` calls, and both readings come out of it: which paths never landed, and how large the diff that did land was. **The change size is what makes two runs comparable at all**: 27 minutes on a 254-line change and 27 on a 4-line one are the same line in every other block here, and the second is not the same run.
 
@@ -3541,194 +3392,6 @@ Turns by contributor (median, then min – max):
 **A reading nobody could take is excluded, never counted as zero** — the property the whole scope rests on. A phase absent from two of five runs is **three samples and says so**, so a row is never dragged toward zero by the runs that never reached that stage; a phase no run detected prints `not measured` exactly as it does for one run; and a run that merged with **no session transcript attributed** is left out of the transcript-side rows entirely, with a note saying how many were excluded and why — it still contributes its CI wait, because that half _was_ read. The run list under the heading is what makes the sample checkable: a distribution whose readings nobody can name is not one a reader can verify. `--top` reaches each run's own tables exactly as it reaches an epic's children, and the distribution tables themselves are left uncapped for the reason `by_check` is — their rows are bounded by the vocabulary rather than by the length of a run. **Nothing about the measurement is new**: the runs are chosen here and measured by the same fan-out `--epic` goes through, so a second reading of a run cannot exist to disagree with the first.
 
 **Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the flags that pick a scope, and naming more than one of `--issue` / `--session` / `--epic` / `--last` / `--period` is refused rather than answered silently. `--period` with no run history to read exits non-zero and says the file is written by `josh followup`, rather than printing a period in which nothing happened. `--last` with no merged run to resolve exits non-zero too, rather than printing a distribution of zeroes. An epic that could not be read exits non-zero too — an epic that tracks no children is a real, empty answer and says so instead. The same distinction reaches inside a batch ([#1352](https://github.com/joshuafolkken/kit/issues/1352)): a child of `--epic`, or a run of `--last`, whose report could not be **built** at all is printed as `failed` rather than as `not run`, counted in its own note, and makes the command exit non-zero — where `not run` stays the ordinary answer for a child the batch simply never reached, and keeps the exit code at 0. The per-check table draws it too: a check-run read that was refused says so in a note instead of leaving an empty `By CI check` table that reads as a run GitHub recorded no checks for. And `--last` says when two merged pull requests named one issue ([#1365](https://github.com/joshuafolkken/kit/issues/1365)): the older is folded into the newer, because both halves of that issue's measurement are the same and keeping both would put one run into the distribution twice — but the fold is now **named** rather than silent, the note carrying the pull request numbers and `--json` the same numbers in `collapsed_pulls`, so a set called "the last 5" cannot be built from six merges with nothing saying so. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row unless `--top <rows>` asks for fewer, which says how many it withheld in a note rather than stopping silently.
-
-### `josh layers`
-
-List the checks that run in more than one verification layer, read from this project's own
-configuration.
-
-```bash
-pnpm josh layers          # alias: josh ly
-pnpm josh layers --json   # every row, for a script or another report
-```
-
-```
-Verification layers — 5 read: gate, pre-commit, commit-msg, pre-push, ci
-
-  Repeated across layers
-  cspell                   3 layers   gate (project) · pre-commit (staged) · ci (project)
-  eslint                   3 layers   gate (project) · pre-commit (staged) · ci (project)
-  prettier                 3 layers   gate (project) · pre-commit (staged) · ci (project)
-  type-check               3 layers   gate (project) · pre-commit (project) · ci (project)
-  unit-tests               3 layers   gate (project) · pre-push (project) · ci (project)
-  dependency-audit         2 layers   pre-push (project) · ci (project)
-  dependency-install       2 layers   pre-push (project) · ci (project)
-
-  One layer only
-  branch-guard              1 layer   pre-commit (project)
-  …
-```
-
-**It is not part of `josh time`, and that is a design decision rather than an omission**
-(joshuafolkken/kit#1313, under epic joshuafolkken/kit#1315). `josh time` reads Claude Code's session
-transcripts, and this repetition is invisible there in principle: a hook's seconds are buried inside
-`josh git`'s 33–39 seconds, and CI's appear only as a per-check duration with nothing to compare
-them against. Saying which check runs in which layer needs the configuration files, which is a
-different reading of a different source.
-
-**Nothing here is written down as today's answer.** The four sources are re-read on every run: the
-gate's checks come from `gate-plan.ts`, which is `josh gate`'s own declaration of what it runs;
-`lefthook.yml` is followed through its `extends` list, so the kit-internal file and the distributed
-`lefthook/base.yml` are both read; every hook section carrying `commands` or `setup` becomes a
-layer, so a hook added tomorrow is picked up without editing anything; and CI is every job of every
-workflow a **pull request** triggers — a `push`-only workflow runs after the merge and is not
-something a run waits for.
-
-**The scope column is what says how much of a repeat is really the same work.** A hook command
-carrying one of lefthook's file-list placeholders — `{staged_files}`, `{push_files}`, `{files}` —
-sees only the files the hook handed it and is reported as `staged`; everything else, `{all_files}`
-included, is `project`. That is how kit's pre-commit `tsc --noEmit` shows up as a whole-project type
-check sitting beside four staged-only ones.
-
-**Not every repeated row is a check to remove**, which is the other half of reporting rather than
-deciding. `dependency-install` repeats between the pre-push `setup` and CI's install step and is
-supposed to: `lefthook/base.yml` records at length (joshuafolkken/kit#813) why that barrier exists.
-The row is there because it is real repeated work, not because it is a candidate.
-
-**It reports on the working directory, and there is deliberately no flag naming another checkout.**
-A file system path taken off the command line and handed straight to `readdir` / `readFile` is a
-traversal waiting for a wrong argument, and what such a flag bought was a diagnostic convenience —
-the command's use is "which checks repeat in the project I am in", where the installed kit _is_
-that project's gate.
-
-**A `josh` sub-command it cannot resolve is reported, not dropped.** The name appears in an
-`unresolved josh commands:` note, so a hook rewired to a new target surfaces as a name to classify
-rather than vanishing out of the table with nothing to say it had. **Expanding is not resolving**: a
-target that carries its own command line — `josh hook:commit`, which runs the whole pre-commit hook —
-is judged by what that expansion reached, and one that reached no check is reported by name exactly
-like a target nothing knew about (joshuafolkken/kit#1367). Reporting only the names that failed to
-expand would have left the loudest case silent, since a step running the whole of another layer is
-the one worth seeing in a duplication report.
-
-**It reports and changes nothing.** Which repeats are worth removing is a decision about what a hook
-should guard — a red pre-push suite still catches what a local gate was never run for — so this
-command puts the list in front of whoever makes that decision and stops there.
-
-### `josh bench`
-
-Measure what a verification command costs with its cache cold and with it warm, by running it twice.
-
-```bash
-pnpm josh bench                      # alias: josh bn — the four gate checks
-pnpm josh bench gate                 # the whole gate, all three caches cleared
-pnpm josh bench lint --repeat 3      # three cycles, the median of each phase
-pnpm josh bench --json               # every row, for a script or another report
-```
-
-```
-Cold and warm cost — 4 command(s) measured
-
-  lint                      128.4 s   warm 2.9 s · 44.3× faster · cleared .eslintcache
-  test:unit                  18.2 s   warm 18.0 s · 1.0× faster · no cache cleared
-  cspell:dot                  8.4 s   warm 1.4 s · 6.0× faster · cleared .cspellcache
-  check                       3.8 s   warm 1.4 s · 2.7× faster · cleared .tsbuildinfo
-```
-
-**It is not part of `josh time`, and that is a design decision rather than an omission**
-([#1314](https://github.com/joshuafolkken/kit/issues/1314), under epic
-[#1315](https://github.com/joshuafolkken/kit/issues/1315)). `josh time` reads Claude Code's session
-transcripts and reports what a past run took; a transcript records one reading of a command in
-whatever cache state that run happened to be in, so the difference between a cold and a warm one
-exists nowhere in it. The answer has to be measured, which is a different act on a different source
-— the same judgement `josh layers` was split out on.
-
-**Cold is produced, not assumed.** One cycle per target is: remove that target's caches, run it, run
-it again. The second run reads the caches the first one wrote, so the pair is a measurement rather
-than a claim about the state the checkout was in when you typed the command.
-
-**The clearing is defined per target.** `josh lint` writes only the eslint cache, so measuring it
-clears only that — clearing all three first would report a cold type check and a cold spell check as
-part of the lint's own cost. `josh bench gate` clears all three, because the gate writes all three.
-
-**The gate is measured with `--force`, and without it that row would be a fiction.** `josh gate`
-reuses a green result recorded on an unedited tree ([#1328](https://github.com/joshuafolkken/kit/issues/1328)),
-so the warm reading — taken seconds after a green cold one, with nothing edited in between — would be
-the skip notice rather than a run, and a green record already on disk would skip both readings. The
-flag is what makes the pair a measurement, and the gate accepts it precisely because a person may know
-something outside the tree moved, which is exactly what this command has just done to its caches.
-
-**Nothing outside the gate's own cache files is ever removed, and nothing survives the run.** The
-removable set is `GATE_CACHE_FILES` in `scripts/josh/josh-command-types.ts` — the gate's own
-declaration of what it writes — and every entry of it is git-ignored and spell-check-excluded, which
-`scripts/josh/gate-cache-flags.test.ts` already asserts. So a run changes no tracked file and leaves
-nothing in `git status`; the warm run rewrites each cleared cache before the command exits, and a
-cache that did not come back is reported in a note rather than left silent. The edit hook's
-`.eslintcache.edit` is **not** in that set and is refused outright: a second writer on that file is
-[#1332](https://github.com/joshuafolkken/kit/issues/1332) exactly.
-
-**A gate running on this tree stops the command before it removes anything, and the question is asked
-again before every clearing.** `josh gate` is started beside `/code-review` and holds its three caches
-open for the whole of it, so clearing them mid-flight would corrupt the run paying for them. A default
-run is minutes long and clears a target's caches before each cold reading, so a check once at start-up
-would walk straight into a gate a hook or another session started after it; once a gate is running the
-readings are void anyway, and the run stops rather than finishing with figures nobody can use. The
-in-flight marker carries the gate's pid **and the time that process started**
-([#1245](https://github.com/joshuafolkken/kit/issues/1245)), so one left behind by a killed gate blocks
-nothing — and goes on blocking nothing after the operating system reissues that pid, which the pid on
-its own could not promise. **The uncertain answer refuses rather than clears**: where the start time
-cannot be read at all, a marker naming a live pid holds `josh bench` back, because being wrong the
-other way deletes the caches a running gate is reading.
-
-**Stopping keeps the readings it already took** ([#1369](https://github.com/joshuafolkken/kit/issues/1369)).
-The abort's rationale is that a reading taken beside a gate measures neither of them, and that does not
-reach backwards: the targets finished _before_ the gate started were measured on a tree nothing else was
-running on. So their rows are printed, the targets the run never reached print `not measured`, and a note
-says the run was interrupted and how many cycles each unfinished target managed — `cycles not finished:
-cspell:dot 0 of 1, test:unit 0 of 1`. Discarding them made a user pay several minutes again because a
-pre-commit hook started a gate thirty seconds ago.
-
-```
-Cold and warm cost — 2 command(s) measured
-
-  lint                      128.4 s   warm 2.9 s · 44.3× faster · cleared .eslintcache
-  check                       3.8 s   warm 1.4 s · 2.7× faster · cleared .tsbuildinfo
-  cspell:dot                          not measured
-  test:unit                           not measured
-
-  interrupted by josh gate starting on this tree; cycles not finished: cspell:dot 0 of 1, test:unit 0 of 1
-```
-
-**An interruption has its own exit code, `2`.** `0` still means every target asked for was measured and
-`1` still means the measurement produced nothing usable, so anything that only asks whether the run
-finished reads non-zero exactly as before; the third value is what lets a caller tell a gate holding the
-caches — worth retrying in a minute — from a red check that wants fixing. It is also on the report
-itself, as `is_interrupted`, so a `--json` consumer reads the fact rather than inferring it from a note's
-wording.
-
-**A command that keeps no cache says so.** `josh test:unit` declares none — vitest's cache lives under
-`node_modules`, and emptying that is a reinstall rather than a cold run — so its two readings measure
-the operating system's page cache and run-to-run noise, and the row is labelled `no cache cleared`
-rather than presenting the difference as a cache effect.
-
-**A reading whose command exited non-zero is excluded from the figures and counted**, and its output
-is written to stderr once per target — not once per phase per cycle — so the red check is visible
-rather than only tallied. A check that stops at its
-first error has measured how long it took to find that error, not what the check costs; averaging it
-in is how a red tree comes to look like a cache win. A target whose every reading failed prints
-`not measured`, never a zero — and **a report in which nothing at all was measured exits non-zero**,
-so a `--json` consumer cannot read success off an empty answer.
-
-**A ratio below one is printed as a slowdown.** The figure is cold ÷ warm, and on a target that clears
-no cache noise routinely puts the warm reading above the cold one; `0.9× faster` would assert a cache
-win the measurement contradicts, so the row says `1.1× slower` instead.
-
-**`--repeat` takes the median, not the mean**, for the reason every timing table in this package does:
-one reading interrupted by a background build moves a mean of three by seconds and a median not at
-all. It is capped at 9 — one cycle of the default set is already two runs of every gate check, and a
-cold lint alone is measured in minutes.
-
-**The whole gate is left out of the default set**, since it is the sum of the four checks and
-measuring both would double the wall clock to print the same seconds twice. Name it to get it.
 
 ### `josh eval`
 

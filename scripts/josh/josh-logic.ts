@@ -5,6 +5,7 @@ import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
 import { package_version_schema } from '#scripts/schemas'
 import { resolve_spawn_exit } from '#scripts/spawn-exit'
 import { execaSync } from 'execa'
+import { command_suggest } from './command-suggest'
 import {
 	ALIASES,
 	CATEGORY_ORDER,
@@ -88,6 +89,26 @@ function read_package_version(): string {
 
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`
 const USAGE = 'Usage: josh <command> [options]'
+const ALL_HINT = "Run 'josh --all' to also list kit-maintenance commands."
+
+// The help splits by audience: `josh --help` shows the commands a kit user runs day to day, and
+// `josh --all` adds the kit-maintenance ones below (joshuafolkken/kit#1928). These are the
+// maintenance set — publishing, propagating and reconciling kit itself, plus the git-hook internals
+// that lefthook invokes rather than a person. Membership lives here, one reviewable list, rather than
+// as a flag threaded through every command entry.
+const MAINTENANCE_COMMANDS: ReadonlySet<string> = new Set([
+	'release',
+	'release:scope',
+	'propagate',
+	'reconcile-templates',
+	'audit:provision',
+	'eval',
+	'secretlint-scan',
+	'prevent-main-commit',
+	'check-commit-message',
+	'pre-push-unit',
+	'pre-commit-type-check',
+])
 
 function build_alias_lookup(): Map<string, string> {
 	const lookup = new Map<string, string>()
@@ -118,33 +139,52 @@ function format_category_section(
 	return [`${category}:`, ...lines].join('\n')
 }
 
-function format_help(): string {
+function collect_visible(is_all: boolean): Map<CommandCategory, Array<[string, CommandEntry]>> {
 	const by_category = new Map<CommandCategory, Array<[string, CommandEntry]>>(
 		CATEGORY_ORDER.map((cat) => [cat, []]),
 	)
 
 	for (const [cmd, entry] of Object.entries(COMMAND_MAP)) {
-		by_category.get(entry.category)?.push([cmd, entry])
+		if (is_all || !MAINTENANCE_COMMANDS.has(cmd)) {
+			by_category.get(entry.category)?.push([cmd, entry])
+		}
 	}
 
-	const alias_lookup = build_alias_lookup()
-	const sections = CATEGORY_ORDER.map((cat) =>
-		format_category_section(cat, by_category.get(cat) ?? [], alias_lookup),
-	)
-
-	return [HEADER, '', sections.join('\n\n'), '', USAGE].join('\n')
+	return by_category
 }
 
-// `josh <unknown>` used to answer on two streams: the error line on stderr and the help listing on
-// stdout. A shell substituting `$(josh port dev)` captures stdout alone, so the whole listing
-// became the port argument — how #825 surfaced, on a consumer whose kit predated `josh port`. That
-// install cannot be rescued from here (a kit without the command is also a kit without this fix);
-// what this does guarantee is that every kit carrying it answers a name it cannot resolve — a typo,
-// a retired command — with an empty stdout. Composing both halves into one string is what lets the
-// caller put them on the same stream; `josh` and `josh help` still print the listing to stdout,
-// because there the listing is the answer rather than the diagnosis.
+// `josh --help` lists the day-to-day commands; `josh --all` adds the kit-maintenance ones. A category
+// left empty once the maintenance commands are filtered out is dropped rather than printed as a bare
+// heading (joshuafolkken/kit#1928).
+function format_help(is_all = false): string {
+	const by_category = collect_visible(is_all)
+	const alias_lookup = build_alias_lookup()
+	const sections = CATEGORY_ORDER.map((cat) => [cat, by_category.get(cat) ?? []] as const)
+		.filter(([, entries]) => entries.length > 0)
+		.map(([cat, entries]) => format_category_section(cat, entries, alias_lookup))
+	const footer = is_all ? USAGE : `${USAGE}\n${ALL_HINT}`
+
+	return [HEADER, '', sections.join('\n\n'), '', footer].join('\n')
+}
+
+// Every name a user could type — the canonical commands and their aliases — ranked by edit distance
+// so `josh gat` points at `gate` (joshuafolkken/kit#1928).
+function all_command_names(): Array<string> {
+	return [...Object.keys(COMMAND_MAP), ...Object.keys(ALIASES)]
+}
+
+// `josh <unknown>` answers on stderr with a short line rather than the whole listing. A shell
+// substituting `$(josh port dev)` captures stdout alone, so a name this kit cannot resolve — a typo,
+// a retired command — must leave that stream empty rather than dump the toolkit index there, how #825
+// surfaced. It used to print the full help here; #1928 cut that to one line plus a "did you mean"
+// when a close command exists, so the diagnosis is readable and the stdout contract is unchanged.
+// `josh` and `josh --help` still print the listing to stdout, because there it is the answer rather
+// than the diagnosis.
 function format_unknown_command(cmd: string): string {
-	return `Unknown command: ${cmd}\n\n${format_help()}`
+	const suggestion = command_suggest.closest_command(cmd, all_command_names())
+	const hint = suggestion === undefined ? '' : ` Did you mean '${suggestion}'?`
+
+	return `Unknown command: ${cmd}.${hint} Run 'josh --help' to list commands.`
 }
 
 // A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and

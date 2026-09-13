@@ -851,6 +851,6 @@ all — they are pointers to it.
 actually being placed, moved or retired.** The two questions above decide *whether*; that file decides
 *how much*, and carries the trigger-plus-pointer shape a resident rule takes, the enumeration of every
 resident rule that has an on-demand counterpart, the retirement route and its three tests, and the
-readings of `pnpm josh rule:value`. **No run reaches it** — the moment it binds is a turn spent editing
+readings of the retired `rule:value` measurement. **No run reaches it** — the moment it binds is a turn spent editing
 these documents, never a turn spent executing an Issue. It is the single source of everything it
 carries.

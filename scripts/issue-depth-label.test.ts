@@ -8,7 +8,6 @@ import {
 	INTERRUPT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
 } from '#scripts/git/issue-labels'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { read_repo_file } from './ai-document-fixture'
 
@@ -21,11 +20,7 @@ import { read_repo_file } from './ai-document-fixture'
 // something worth filing rather than at every entry. The depth labels, the provisioning commands and
 // the denominator rule all went with it; `SKILL.md` → §2i keeps the rule they carry out.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/observation-filing.md'
-const COMMAND_DOC = 'docs/josh-commands.md'
 const LABEL_MODULE = 'scripts/git/issue-labels.ts'
-const SHARE_MODULE = 'scripts/issue/issue-depth-share.ts'
-const COMMAND_NAME = 'depth:share'
-const COMMAND_ALIAS = 'dsh'
 const DEPTH_LABEL_COUNT = 3
 // The placeholder spelling every filing template carries — the depth itself varies per Issue, so the
 // template names the flag and §2i names how to choose the number.
@@ -132,34 +127,4 @@ describe('the denominator', () => {
 			expect(skill).toContain(`\`${label}\``)
 		},
 	)
-
-	// The module implements the rule and must not restate it — a paraphrase in a comment is the clone
-	// `CLAUDE.md` prohibits, and pinning that paraphrase with a marker would make the clone permanent.
-	// So what is asserted is that the module points at the section instead.
-	it('is pointed at from the module that implements it, never paraphrased there', () => {
-		expect(read_repo_file(SHARE_MODULE)).toContain('The denominator rule is not restated here')
-		expect(read_repo_file(SHARE_MODULE)).toContain(WORKFLOW_SKILL)
-	})
-})
-
-describe('the command that reads the share', () => {
-	it('is registered', () => {
-		expect(Object.keys(COMMAND_MAP)).toContain(COMMAND_NAME)
-	})
-
-	it('carries its alias', () => {
-		expect(ALIASES[COMMAND_ALIAS]).toBe(COMMAND_NAME)
-	})
-
-	it.each([WORKFLOW_SKILL, COMMAND_DOC])('is documented in %s', (path) => {
-		expect(read_repo_file(path)).toContain(`pnpm josh ${COMMAND_NAME}`)
-	})
-
-	it('names the alias in the command reference', () => {
-		expect(read_repo_file(COMMAND_DOC)).toContain(`alias: josh ${COMMAND_ALIAS}`)
-	})
-
-	it('never answers a failed fetch with a share', () => {
-		expect(unwrapped(COMMAND_DOC)).toContain('**Never a share of zero**')
-	})
 })

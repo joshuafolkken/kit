@@ -14,12 +14,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
-const PIPED_ANSWER_COMMANDS = [
-	'epic-next.ts',
-	'epic-bundle-cli.ts',
-	'epic-audit-cli.ts',
-	'epic-plan-cli.ts',
-] as const
+const PIPED_ANSWER_COMMANDS = ['epic-next.ts', 'epic-bundle-cli.ts', 'epic-audit-cli.ts'] as const
 
 // Comment lines are dropped before the check: every one of these files explains *why* it avoids
 // `process.exit()`, and a search over the prose would match the explanation rather than a call.

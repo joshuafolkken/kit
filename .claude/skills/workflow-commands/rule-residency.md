@@ -4,7 +4,7 @@
 retired — not at the entry** (joshuafolkken/kit#1797). §3 keeps the two questions that decide
 *whether* a rule is resident; what follows decides *how much of it* is, and carries the enumeration
 of every resident rule that has an on-demand counterpart and the retirement route and its three tests.
-The `pnpm josh rule:value` readings it used to carry no longer gate reduction — that gating was
+The `rule:value` readings it used to carry no longer gate reduction — that gating was
 retracted on 2026-09-13 (joshuafolkken/kit#1931 → `## Decisions`) and they are retained below only as
 history.
 
@@ -167,7 +167,7 @@ opens none of them is a turn on which the label is never reached, so residency w
 budget that the next genuinely-resident rule then has to take back out of existing prose.
 
 **The freeze on reducing resident text was lifted on 2026-09-13** (joshuafolkken/kit#1931 →
-`## Decisions`, carried out in joshuafolkken/kit#1924). Until then `pnpm josh rule:value` was read as a
+`## Decisions`, carried out in joshuafolkken/kit#1924). Until then `rule:value` was read as a
 gate on reduction: three successive readings each retired nothing, and `CLAUDE.md` stayed at ~56 KB
 while its duplicated procedure bodies — the completion gate, the pre-commit self-review, the Step 0
 report format, the upstream-interrupt procedure — sat resident beside pointers that already held them.
@@ -181,7 +181,7 @@ are retained as history of how the gate was applied, not as a live constraint.**
 happened to pin** (joshuafolkken/kit#1525). The old order was the reverse: a rule edited to keep a
 byte count lost whichever neighboring sentence was not pinned by a marker, so the least-defended
 text went rather than the least-useful one, and the bias grew with every rule added
-(joshuafolkken/kit#951). `pnpm josh rule:value` replaces that with a reading — over this checkout's
+(joshuafolkken/kit#951). `rule:value` replaces that with a reading — over this checkout's
 recorded sessions it reports, per trigger-delivered rule, how often the run had already kept the rule
 at the moment the trigger fired. **That window is the rule's absence**, because the hook has said
 nothing yet and only the carried text is asking; the ratio is what the carried text earns unaided.
@@ -205,11 +205,11 @@ these.
 
 **The third reading added the row the table had never carried, and it changed no verdict either**
 (joshuafolkken/kit#1792). The batching guard is delivered by a binary of its own, so it sat outside
-the registry `rule:value` reads and the most-cited resident rule in the repository had no continuous
+the registry `rule:value` read and the most-cited resident rule in the repository had no continuous
 reading at all. Over 297 recorded runs it reads **86% unaided over 276 runs, with 47 refusals** — the
 top of the table, so it too is earning its place and nothing is retired on this reading. **The row is scored on its refusal rather than on a trigger**, because whether a call would
-be refused depends on the turns behind it; `docs/josh-commands.md` → "`josh rule:value`" carries that
-and the turn-is-a-message-id correction the first reading of the row exposed.
+be refused depends on the turns behind it, which is also where the turn-is-a-message-id correction the
+first reading of the row exposed came from.
 
 **Measuring the four needed a distinction the first reading did not have, and it is the half worth
 carrying forward.** A rule's denominator is the situation it governs, and that is the trigger only
@@ -218,7 +218,7 @@ performs anyway. The other four fire only on the violation: a run that backgroun
 trips `run-tail`. Scored against the trigger they would all have read near zero, and near zero reads
 as "the carried text earns nothing" — **a manufactured retirement candidate, which is the one outcome
 this measurement exists to prevent**. Such a row declares `reaches` instead, the governed act in
-either spelling; `docs/josh-commands.md` → "`josh rule:value`" carries the column meanings.
+either spelling.
 
 **The three tests then refused every remaining candidate, and that is the route working rather than
 failing.** The four resident one-liners left behind by trigger delivery all fail test 2: the

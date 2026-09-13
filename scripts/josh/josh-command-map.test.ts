@@ -2,12 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { ALIASES, CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-map'
 
 const ALL_COMMAND_NAMES = Object.keys(COMMAND_MAP)
-const VERSION_UPGRADE_COMMAND = 'version:upgrade'
-const TEST_WATCH_COMMAND = 'test:watch'
-const TEST_UI_COMMAND = 'test:ui'
 const TEST_E2E_COMMAND = 'test:e2e'
 const TEST_UNIT_COMMAND = 'test:unit'
-const HEALTH_COMMAND = 'health'
 const ALL_ALIAS_KEYS = Object.keys(ALIASES)
 const DEVELOPMENT_CATEGORY = 'Development'
 const OPTIONAL_ENV_FILE_FLAG = '--env-file-if-exists=.env'
@@ -75,8 +71,8 @@ describe('COMMAND_MAP — command lookup by name', () => {
 		expect(entry?.category).toBe('Versioning')
 	})
 
-	it('resolves version:upgrade command with script and Versioning category', () => {
-		const entry = get_command(VERSION_UPGRADE_COMMAND)
+	it('resolves version command with script and Versioning category', () => {
+		const entry = get_command('version')
 
 		expect(entry?.script).toBeDefined()
 		expect(entry?.category).toBe('Versioning')
@@ -84,30 +80,6 @@ describe('COMMAND_MAP — command lookup by name', () => {
 })
 
 describe('COMMAND_MAP — new dev commands', () => {
-	it('resolves test:watch command with shell and Development category', () => {
-		const entry = get_command(TEST_WATCH_COMMAND)
-
-		expect(entry).toBeDefined()
-		expect(entry?.shell).toBeDefined()
-		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
-	})
-
-	it('resolves test:ui command with shell and Development category', () => {
-		const entry = get_command(TEST_UI_COMMAND)
-
-		expect(entry).toBeDefined()
-		expect(entry?.shell).toBeDefined()
-		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
-	})
-
-	it('resolves health command with script and Development category', () => {
-		const entry = get_command(HEALTH_COMMAND)
-
-		expect(entry).toBeDefined()
-		expect(entry?.script).toBeDefined()
-		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
-	})
-
 	it('routes test:e2e through the guard script instead of a raw shell command', () => {
 		const entry = get_command(TEST_E2E_COMMAND)
 
@@ -181,10 +153,6 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 		expect(get_alias('fu')).toBe('followup')
 	})
 
-	it('resolves vu alias to version:upgrade', () => {
-		expect(get_alias('vu')).toBe(VERSION_UPGRADE_COMMAND)
-	})
-
 	it('resolves tu alias to test:unit', () => {
 		expect(get_alias('tu')).toBe('test:unit')
 	})
@@ -195,26 +163,6 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 })
 
 describe('ALIASES — new command aliases', () => {
-	it('resolves tw alias to test:watch', () => {
-		expect(get_alias('tw')).toBe(TEST_WATCH_COMMAND)
-	})
-
-	it('resolves tui alias to test:ui', () => {
-		expect(get_alias('tui')).toBe(TEST_UI_COMMAND)
-	})
-
-	it('resolves he alias to health', () => {
-		expect(get_alias('he')).toBe(HEALTH_COMMAND)
-	})
-
-	it('resolves swp alias to sync-workflow-pins', () => {
-		expect(get_alias('swp')).toBe('sync-workflow-pins')
-	})
-
-	it('resolves sdp alias to sync-dependabot-pins', () => {
-		expect(get_alias('sdp')).toBe('sync-dependabot-pins')
-	})
-
 	it('resolves dr alias to doctor', () => {
 		expect(get_alias('dr')).toBe('doctor')
 	})

@@ -9,12 +9,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	},
 	version: {
 		script: 'scripts/version/version-check.ts',
-		description: 'Show global, project, and latest @joshuafolkken/kit versions',
-		category: 'Versioning',
-	},
-	'version:upgrade': {
-		script: 'scripts/version/version-update.ts',
-		description: 'Upgrade @joshuafolkken/kit to latest for both global and project',
+		description: 'Show kit versions; --upgrade updates the global and project install',
 		category: 'Versioning',
 	},
 	// A `script` entry, not a shell one: script paths resolve against the kit package root, so this

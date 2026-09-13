@@ -25,7 +25,7 @@ const GH_CONSTANT = 'FIXTURE_GH_BINARY'
 const GIT_CONSTANT = 'FIXTURE_GIT_BINARY'
 const SCRIPTS_DIRECTORY = 'scripts'
 const SCRIPTS_AI_DIRECTORY = 'scripts-ai'
-const ISSUE_PREP_FILE = 'scripts-ai/issue-prep.ts'
+const SCRIPTS_AI_FILE = 'scripts-ai/epic.ts'
 const GH_EXEC_FILE = 'scripts/git/git-gh-exec.ts'
 const GUARD_MODULE_EXCLUSION = '!scripts/gh-subcommand-guard.ts'
 const PACKAGE_JSON = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json')
@@ -65,7 +65,7 @@ describe('gh subcommand guard — the repository as it stands', () => {
 			SCRIPTS_DIRECTORY,
 			SCRIPTS_AI_DIRECTORY,
 		])
-		expect(gh_subcommand_guard.source_files(SCRIPTS_AI_DIRECTORY)).toContain(ISSUE_PREP_FILE)
+		expect(gh_subcommand_guard.source_files(SCRIPTS_AI_DIRECTORY)).toContain(SCRIPTS_AI_FILE)
 		expect(gh_subcommand_guard.source_files(SCRIPTS_DIRECTORY)).toContain(GH_EXEC_FILE)
 	})
 
@@ -313,12 +313,12 @@ describe('gh subcommand guard — line numbers and URLs', () => {
 describe('gh subcommand guard — the failure message', () => {
 	it('names the file, the line and the command', () => {
 		const message = gh_subcommand_guard.describe_violation({
-			file: ISSUE_PREP_FILE,
+			file: SCRIPTS_AI_FILE,
 			line: 21,
 			subcommand: 'issue',
 		})
 
-		expect(message).toContain(`${ISSUE_PREP_FILE}:21`)
+		expect(message).toContain(`${SCRIPTS_AI_FILE}:21`)
 		expect(message).toContain('gh issue')
 	})
 

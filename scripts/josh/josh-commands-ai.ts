@@ -10,16 +10,6 @@ const LANE_ARGUMENTS = { script: LANE_SCRIPT, tsx_arguments: OPTIONAL_ENV_FILE_F
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const AI_COMMANDS: Record<string, CommandEntry> = {
-	prep: {
-		script: 'scripts-ai/prep.ts',
-		description: 'Pre-implementation preparation',
-		category: 'AI tools',
-	},
-	issue: {
-		script: 'scripts-ai/issue-prep.ts',
-		description: 'Fetch GitHub issue details',
-		category: 'AI tools',
-	},
 	'issue:read': {
 		script: 'scripts/issue/issue-read-cli.ts',
 		description: "Print each issue's title, body and every comment on it, in one call",
@@ -89,11 +79,6 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Say whether a backlogrun may start more work, keep watching, or finish',
 		category: 'AI tools',
 	},
-	'depth:share': {
-		script: 'scripts/issue/issue-depth-share-cli.ts',
-		description: 'Report the depth-0 share of the open backlog from the recorded depth labels',
-		category: 'AI tools',
-	},
 	cost: {
 		script: 'scripts/cost/cost-cli.ts',
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",
@@ -112,16 +97,6 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	time: {
 		script: 'scripts/time/time-cli.ts',
 		description: "Report where a run's wall clock went: model wait, tool execution, human wait",
-		category: 'AI tools',
-	},
-	layers: {
-		script: 'scripts/layers/layers-cli.ts',
-		description: 'List the checks that run in more than one verification layer',
-		category: 'AI tools',
-	},
-	bench: {
-		script: 'scripts/bench/bench-cli.ts',
-		description: 'Measure what a verification command costs with its cache cold and warm',
 		category: 'AI tools',
 	},
 	'review:brief': {
@@ -237,12 +212,6 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// declaring any disqualifies a command from in-process dispatch, and this one runs in front of
 		// every read. The script calls `process.loadEnvFile` itself instead, through
 		// `hook-decision.ts`.
-	},
-	'rule:value': {
-		script: 'scripts/rules/rule-value-cli.ts',
-		description:
-			"What each trigger-delivered rule's carried text earns unaided, read off this checkout's recorded sessions",
-		category: 'AI tools',
 	},
 	'rule:guard': {
 		script: 'scripts/rules/rule-guard.ts',

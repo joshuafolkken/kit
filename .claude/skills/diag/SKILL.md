@@ -52,17 +52,6 @@ pnpm josh time --period <N> --top 5 --json  # the backlog over the last N days �
   loop's own asks, or reading issues. **A large contributor is a reason to look, never a finding** —
   whether those turns were avoidable is `Bundling:`'s answer, and the two are ranked together in
   step 3.
-- **`pnpm josh layers`** (alias `josh ly`): which checks run in more than one verification layer —
-  `josh gate`, the pre-commit and pre-push hooks, CI — cannot be read from a transcript. Run it when
-  a candidate is about removing work rather than overlapping it; it reads the configuration files, so
-  it stays true when a hook changes. It measures no seconds, so rank its row in step 3 on what the
-  repeated check costs in `josh time`'s own tables.
-- **`pnpm josh bench <target>`** (alias `josh bn`): before proposing a saving on a verification
-  command, measure it cold against warm — a transcript records one run in whatever cache state it
-  happened to be in, so a slow `josh gate` in the tables says nothing about whether the next one is
-  slow or merely cold. Rank the candidate on the figure the run will actually pay; a row whose cold
-  reading dominates is a cache problem, not a check to remove. It re-runs real commands, so ask it
-  about the one or two rows in question.
 
 ```bash
 pnpm josh cost --issue <N> --json     # this run's cost; alias: josh co
@@ -466,9 +455,6 @@ pnpm josh issue:scout "<title>" --body "<one line, citing the issue this follows
 
 - It does not implement anything, and it opens no pull request.
 - It does not run `fullrun` / `epicrun` on what it ranks. It prints the command; the person types it.
-- It does not measure anything itself. **Every figure came out of one of four commands**, and none is
+- It does not measure anything itself. **Every figure came out of one of two commands**, and none is
   re-derived here: the wall clock from `pnpm josh time` and the dollars from `pnpm josh cost` — two
-  readings of the same recorded sessions, which is why they can be quoted side by side — plus the two
-  things no transcript records: which check runs in more than one verification layer, from
-  `pnpm josh layers`; and what a check costs cold against warm, from `pnpm josh bench`, the one source
-  here that re-runs a command instead of reading a record of one.
+  readings of the same recorded sessions, which is why they can be quoted side by side.

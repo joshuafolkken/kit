@@ -11,9 +11,11 @@ const josh_mock = vi.hoisted(() => {
 
 vi.mock('./josh-logic', () => ({
 	josh_logic: {
-		format_help: (): string => josh_mock.state.format_help_return,
+		format_help: (_is_all?: boolean): string => josh_mock.state.format_help_return,
+		// #1928 cut the unknown-command answer to a single line — the error line plus a "did you mean",
+		// no full listing. This process's only job is to route it to stderr with an empty stdout.
 		format_unknown_command: (cmd: string): string =>
-			`${josh_mock.UNKNOWN_PREFIX}${cmd}\n\n${josh_mock.state.format_help_return}`,
+			`${josh_mock.UNKNOWN_PREFIX}${cmd}. Run 'josh --help' to list commands.`,
 		// The real one answers with a promise, because a script the dispatcher runs in its own
 		// process is awaited rather than spawned (joshuafolkken/kit#1342).
 		run_command: async (_cmd: string, _arguments: Array<string>): Promise<number> =>
@@ -69,6 +71,17 @@ describe('josh.ts — help command', () => {
 		expect(vi.mocked(console.info)).toHaveBeenCalledWith(HELP_OUTPUT)
 		expect(vi.mocked(console.error)).not.toHaveBeenCalled()
 	})
+
+	// `--all` in the command slot is a help request too (joshuafolkken/kit#1928): it prints the
+	// listing, maintenance commands included, rather than resolving a command named `--all`.
+	it('prints help to stdout for a bare --all', async () => {
+		process.argv = [...ARGV_BASE, '--all']
+
+		await import('./josh')
+
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(HELP_OUTPUT)
+		expect(vi.mocked(console.error)).not.toHaveBeenCalled()
+	})
 })
 
 describe('josh.ts — unknown command', () => {
@@ -90,13 +103,13 @@ describe('josh.ts — unknown command', () => {
 		expect(vi.mocked(console.info)).not.toHaveBeenCalled()
 	})
 
-	it('reports the command name and the help listing on stderr', async () => {
+	it('reports the command name on stderr without the full help listing', async () => {
 		await expect(import('./josh')).rejects.toThrow(PROCESS_EXIT_CALLED)
 
 		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
 			expect.stringContaining(`${josh_mock.UNKNOWN_PREFIX}${UNKNOWN_CMD}`),
 		)
-		expect(vi.mocked(console.error)).toHaveBeenCalledWith(expect.stringContaining(HELP_OUTPUT))
+		expect(vi.mocked(console.error)).not.toHaveBeenCalledWith(expect.stringContaining(HELP_OUTPUT))
 	})
 })
 

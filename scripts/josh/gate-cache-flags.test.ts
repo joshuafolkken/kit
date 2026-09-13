@@ -60,10 +60,6 @@ describe('verification gate cache flags', () => {
 		expect(command_line_of('cspell:dot')).toContain(CSPELL_CACHE_FLAGS.join(' '))
 	})
 
-	it('keeps the eslint cache the other two were modelled on', () => {
-		expect(command_line_of('lint:eslint')).toContain(ESLINT_CACHE_FLAGS.join(' '))
-	})
-
 	// `josh lint` runs `lint-parallel.ts`, never the `lint:eslint` map entry, so asserting only the
 	// entry above would stay green while the gate's own lint step wrote a cache nothing ignores.
 	it('runs the gate lint step through the same eslint cache', () => {
