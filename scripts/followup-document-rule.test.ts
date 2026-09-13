@@ -18,11 +18,18 @@ import { describe, expect, it } from 'vitest'
 // in the index and re-create the duplication the rollout removes, on the pointer side.
 
 const SKILL = '.claude/skills/workflow-commands/followup.md'
+// The post-execution reference `followup.md` was split into (joshuafolkken/kit#1905): the stage-timing
+// block, the `failure` Telegram and the AI-reviewer comment scan moved here, so the markers that pin
+// them read this file rather than the point-of-use one.
+const REFERENCE = '.claude/skills/workflow-commands/followup-reference.md'
 const POINTER = 'prompts/collaboration-workflow/completion-notify.md'
 // The file the two sections were cut from. It keeps its other rules, and keeps being cited for them.
 const OPERATING_RULES = 'prompts/collaboration-workflow/operating-rules.md'
 const CLAUDE_DOC = 'CLAUDE.md'
 const DEPENDENCY_SKILL = '.claude/skills/dependency-update/SKILL.md'
+// The `failure` Telegram flag, pinned in both the reference-states and the followup-no-longer-carries
+// blocks below — a constant rather than a repeated literal (joshuafolkken/kit#1905).
+const FAILURE_TASK_TYPE = '--task-type failure'
 // The declaration `pointer-citation-document-rule.test.ts` detects a pointer by. Asserted absent
 // from `operating-rules.md`: placing it there is exactly the failure the extraction route avoids.
 const POINTER_MARKER = 'この規則の単一ソースは'
@@ -45,18 +52,11 @@ const RULE_MARKERS: ReadonlyArray<string> = [
 	'**It fires before the merge, not after it**',
 	// The gate green CI does not open.
 	'**Green CI is not authorization to merge while AI review findings are open.**',
-	'`Actionable comments posted: N` with N > 0',
-	// A read that failed is not a clean scan (joshuafolkken/kit#973).
-	'**A comment listing that could not be read is treated exactly like a standing blocker.**',
 	// The completion notification has exactly one route, and one way of being run.
 	'Never send `completion` Telegram notifications manually',
 	'**Always run `pnpm josh followup` in the foreground**',
 	'Shell backgrounding never works',
 	CI_TIMEOUT_ENV,
-	// The temporary arrangement and its revert condition. Without the revert issue the skip reads as
-	// the design rather than as something to undo.
-	'while CodeRabbit reviews are slow, CodeRabbit is non-blocking end to end',
-	'Revert together with kit#752',
 ]
 
 // What the canonical documents alone used to carry. `SKILL.md` → "Trimming is moving, never
@@ -73,9 +73,6 @@ const FOLDED_IN_MARKERS: ReadonlyArray<string> = [
 	'edits the Issue body when the body is empty, and adds a comment when it already has content',
 	// Silence is failure, not a quiet success.
 	'A CI failure or an exception is re-thrown as-is with **no** Telegram sent',
-	// The one notification sent by hand, and the trap of sending it per retry.
-	'**by hand, exactly once**',
-	'--task-type failure',
 	// The options table.
 	'the workflow puts no completion report on the pull request',
 	'Not a bare list of `Added … / Changed …`',
@@ -121,6 +118,39 @@ describe(`${SKILL} — carries what only the canonical documents had`, () => {
 	it('cites the operating rules for the section that stayed there', () => {
 		expect(content).toContain('CI チェック失敗時の対応')
 		expect(content).not.toContain('operating-rules.md` → "Auto-merge')
+	})
+})
+
+// The sections that moved to the post-execution reference (joshuafolkken/kit#1905). Each marker is
+// load-bearing exactly as it was in followup.md — the move changed the file it lives in, not whether
+// the rule is stated — so the assertion follows the text to its new home.
+describe(`${REFERENCE} — states the post-execution sections that moved out`, () => {
+	const content = read_unwrapped(REFERENCE)
+
+	it.each([
+		'`Actionable comments posted: N` with N > 0',
+		'**A comment listing that could not be read is treated exactly like a standing blocker.**',
+		'while CodeRabbit reviews are slow, CodeRabbit is non-blocking end to end',
+		'Revert together with kit#752',
+		'**by hand, exactly once**',
+		FAILURE_TASK_TYPE,
+	])('the reference states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+// The reduction the split is for (joshuafolkken/kit#1905): the moved sections are gone from the
+// point-of-use `followup.md`, so the read that lands in the turn that issues the command is smaller.
+describe(`${SKILL} — no longer carries the moved post-execution sections`, () => {
+	const content = read_unwrapped(SKILL)
+
+	it.each([
+		'followup stages total:',
+		'Nothing here asks you to compare anything by eye',
+		'The release point is a position plus a command',
+		FAILURE_TASK_TYPE,
+	])('followup.md has dropped %j', (marker) => {
+		expect(content).not.toContain(marker)
 	})
 })
 

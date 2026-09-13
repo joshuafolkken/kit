@@ -18,7 +18,9 @@ import { describe, expect, it } from 'vitest'
 // judgement back on the reader is one regression; one that quietly reinstates the stop is the other.
 
 const DOCS = 'docs/josh-commands.md'
-const FOLLOWUP_SKILL = '.claude/skills/workflow-commands/followup.md'
+// The config-file reporting section moved out of `followup.md` into its post-execution reference
+// (joshuafolkken/kit#1905).
+const FOLLOWUP_REFERENCE = '.claude/skills/workflow-commands/followup-reference.md'
 const CHAIN_RULE_SKILL = '.claude/skills/workflow-commands/chain-rule.md'
 
 const COMMAND = 'sync:scope'
@@ -102,37 +104,37 @@ describe('docs/josh-commands.md states how a path is matched', () => {
 	})
 })
 
-describe('the followup skill states the report as a mechanism', () => {
+describe('the followup reference states the report as a mechanism', () => {
 	it.each(FOLLOWUP_MARKERS)('states %j', (marker) => {
-		expect(read_unwrapped(FOLLOWUP_SKILL)).toContain(marker)
+		expect(read_unwrapped(FOLLOWUP_REFERENCE)).toContain(marker)
 	})
 
 	it('names all three distribution lists', () => {
-		const content = read_unwrapped(FOLLOWUP_SKILL)
+		const content = read_unwrapped(FOLLOWUP_REFERENCE)
 
 		for (const list_name of LIST_NAMES) expect(content).toContain(list_name)
 	})
 
 	it('points at the command that answers the same question', () => {
-		expect(read_unwrapped(FOLLOWUP_SKILL)).toContain('pnpm josh sync:scope')
+		expect(read_unwrapped(FOLLOWUP_REFERENCE)).toContain('pnpm josh sync:scope')
 	})
 
 	// Named once, as a thing that is gone — and never as something to pass.
 	it('says the bypass flag is gone', () => {
-		expect(read_unwrapped(FOLLOWUP_SKILL)).toContain(`\`${REMOVED_FLAG}\` is gone`)
+		expect(read_unwrapped(FOLLOWUP_REFERENCE)).toContain(`\`${REMOVED_FLAG}\` is gone`)
 	})
 
 	// **Read raw, not unwrapped**: `read_unwrapped` collapses the document to one line, so `[^\n]*`
 	// would span the whole file and match the command name in the title against the flag named in a
 	// paragraph — the regex needs the real line breaks to mean "on one line".
 	it('shows no invocation passing it', () => {
-		expect(read_repo_file(FOLLOWUP_SKILL)).not.toMatch(REMOVED_FLAG_INVOCATION)
+		expect(read_repo_file(FOLLOWUP_REFERENCE)).not.toMatch(REMOVED_FLAG_INVOCATION)
 	})
 
 	// The old instruction sent the run to compose the notification itself. It does not any more, and
 	// leaving the sentence behind would have two documents disagreeing about who sends it.
 	it('no longer tells the run to send the confirmation by hand', () => {
-		expect(read_unwrapped(FOLLOWUP_SKILL)).not.toContain(
+		expect(read_unwrapped(FOLLOWUP_REFERENCE)).not.toContain(
 			'CI status check indicates a managed config file was updated',
 		)
 	})

@@ -6,6 +6,7 @@ import { time_shell } from '#scripts/time/time-shell'
 import { early_heartbeat } from './early-heartbeat'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
+import { prior_comment_read } from './prior-comment-read'
 import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
@@ -60,6 +61,12 @@ interface DeliveredRule {
 	// What the model is told. The deny reason is the only text that reaches it, so it carries the
 	// instruction and the pointer rather than a summary of either.
 	reason: string
+	// **A stand-down read from the transcript tail, not the call** (joshuafolkken/kit#1905). A rule
+	// whose subject a run can *satisfy earlier in the run* — the comments read on the first open, so a
+	// later body read of the same Issue asks for nothing new — supplies this so the delivery is
+	// suppressed once that earlier act is on the tail. It is checked before `is_first_delivery`, so a
+	// satisfied call neither refuses nor spends the once-per-run record. Absent, delivery is unchanged.
+	already_satisfied?: (tail: string, call: GuardedCall) => boolean
 	// **A rule that has to bind on every occurrence supplies this, and once-per-run stops applying to
 	// it** (joshuafolkken/kit#1570). Once per run is right for a rule a run then obeys — read the
 	// comments, count the Issues, put the body in a file — because the refusal changes what the run
@@ -179,7 +186,25 @@ function is_api_read(segment: string): boolean {
 	return !API_FIELD.test(segment)
 }
 
+// A field projection — `--jq` for `gh api`, `--json` for `gh issue view` — whose value never names the
+// body. `gh api …/issues/<N> --jq '{state, labels}'` fetches the Issue only to read its state or its
+// labels, which is a state check and not the body read this rule guards (joshuafolkken/kit#1905); a
+// `--jq '.body'` still names the body and stays a body read. The value is taken quoted or bare, so the
+// comma list `--json state,labels` and the expression `'{state, labels}'` are read the same way.
+const FIELD_PROJECTION = /(?:--jq|--json)[= ]\s*('[^']*'|"[^"]*"|\S+)/u
+const NAMES_THE_BODY = /\bbody\b/u
+
+function projects_away_body(segment: string): boolean {
+	const projection = FIELD_PROJECTION.exec(segment)
+
+	if (projection === null) return false
+
+	return !NAMES_THE_BODY.test(projection[1] ?? '')
+}
+
 function is_body_read_segment(segment: string): boolean {
+	if (projects_away_body(segment)) return false
+
 	if (ISSUE_VIEW_COMMAND.test(segment)) return true
 
 	return GH_API_COMMAND.test(segment) && ISSUE_BODY_PATH.test(segment) && is_api_read(segment)
@@ -313,6 +338,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		id: 'issue-comments',
 		is_trigger: on_bash_command(is_body_only_issue_read),
 		reason: ISSUE_COMMENTS_REASON,
+		already_satisfied: prior_comment_read.already_read_for_call,
 		keeps: on_bash_command(reads_issue_comments),
 	},
 	{
@@ -536,17 +562,24 @@ function is_first_delivery(
 // **It is a trade, and the other side is named rather than hidden**: an arm allowed inside that window
 // that really does run is not recorded either, so a second one before it fires goes uncaught. A missing
 // record loses one detection; a wrong one blocks every arm until it expires.
+// **Both extras hang off `is_first_delivery`, and a row declares at most one.** `decide` is for a
+// recurring rule (joshuafolkken/kit#1570); `already_satisfied` is for a once-per-run rule the run can
+// satisfy earlier (joshuafolkken/kit#1905), where the earlier act stands the delivery down before the
+// once-per-run record is spent. A row with neither takes `is_first_delivery` unchanged.
 function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_block'] {
-	const { decide } = rule
+	const { decide, already_satisfied } = rule
 
-	if (decide === undefined) return is_first_delivery
+	if (decide === undefined && already_satisfied === undefined) return is_first_delivery
 
 	return function should_block(
 		tail: string,
 		call: GuardedCall,
-		_delivered_at_ms: number,
+		delivered_at_ms: number,
 		run: GuardRun,
 	): boolean {
+		if (already_satisfied?.(tail, call) === true) return false
+		if (decide === undefined) return is_first_delivery(tail, call, delivered_at_ms, run)
+
 		return decide(call, run, !will_batch_guard_refuse(tail, call, run))
 	}
 }
