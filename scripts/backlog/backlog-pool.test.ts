@@ -1,4 +1,5 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
+import type { EpicChild } from '#scripts/epic/epic-graph'
 import { ALREADY_DONE_LABEL, AUTO_OK_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { describe, expect, it } from 'vitest'
@@ -57,7 +58,12 @@ describe('backlog_pool.to_child', () => {
 // left is Tier C — so a person is the only thing that resolves it. Bucketed with the rows that are
 // waiting on time, it would be reported as something that resolves itself and nobody would ever be
 // told to close it.
-const STANDALONE_CONTEXT = { tracked: new Map<number, number>(), exclude: [], repo: READING_REPO }
+const STANDALONE_CONTEXT = {
+	tracked: new Map<number, number>(),
+	exclude: [],
+	repo: READING_REPO,
+	running: new Set<string>(),
+}
 
 function opted_in(number: number, labels: ReadonlyArray<string>): OpenIssueData {
 	return auto_ok_fixture.issue(number, CREATED_EARLIER, [AUTO_OK_LABEL, ...labels])
@@ -91,5 +97,135 @@ describe('backlog_pool.classify_standalone — the rows a person has to resolve'
 		const offered = backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable
 
 		expect(offered.map((child) => child.number)).toEqual([ROW_NUMBER])
+	})
+})
+
+// joshuafolkken/kit#1943: a blocker outside every graph is weighed against what the backlog runs.
+const EPIC_CHILD = 20
+const OTHER_EPIC_CHILD = 30
+const THIRD_CHILD = 40
+
+function epic_child(number: number, blockers: ReadonlyArray<number> = []): EpicChild {
+	return {
+		number,
+		repo: READING_REPO,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blockers.map((blocker) => ({ repo: READING_REPO, number: blocker })),
+	}
+}
+
+function blocked_row(state: 'OPEN' | 'CLOSED'): OpenIssueData {
+	return auto_ok_fixture.blocked_issue(ROW_NUMBER, CREATED_EARLIER, [
+		{ number: BLOCKER_NUMBER, state },
+	])
+}
+
+describe('backlog_pool.running_set', () => {
+	// The blocker carries no `auto-ok` of its own; its epic's does, which is what put it in the graph.
+	it('counts an opted-in epic child and a standalone row alike', () => {
+		const running = backlog_pool.running_set(
+			[[epic_child(EPIC_CHILD)]],
+			[opted_in(ROW_NUMBER, [])],
+			READING_REPO,
+		)
+
+		expect(running).toEqual(
+			new Set([`${READING_REPO}#${String(EPIC_CHILD)}`, `${READING_REPO}#${String(ROW_NUMBER)}`]),
+		)
+	})
+
+	it('leaves out a standalone row a person has to resolve', () => {
+		const running = backlog_pool.running_set(
+			[],
+			[opted_in(ROW_NUMBER, [NEEDS_DECISION_LABEL])],
+			READING_REPO,
+		)
+
+		expect(running.size).toBe(0)
+	})
+})
+
+describe('backlog_pool.classify_standalone — a blocker outside the backlog', () => {
+	it('sends a row waiting on an open issue the backlog does not run to a person', () => {
+		const result = backlog_pool.classify_standalone([blocked_row('OPEN')], STANDALONE_CONTEXT)
+
+		expect(result.human.map((child) => child.number)).toEqual([ROW_NUMBER])
+	})
+
+	it('keeps a row waiting on an open issue the backlog does run on time', () => {
+		const running = new Set([`${READING_REPO}#${String(BLOCKER_NUMBER)}`])
+		const result = backlog_pool.classify_standalone([blocked_row('OPEN')], {
+			...STANDALONE_CONTEXT,
+			running,
+		})
+
+		expect(result.time.map((child) => child.number)).toEqual([ROW_NUMBER])
+	})
+})
+
+describe('backlog_pool.cross_epic_cycles', () => {
+	it('reports a cycle whose links cross from one epic into another', () => {
+		const anomalies = backlog_pool.cross_epic_cycles(
+			[[epic_child(EPIC_CHILD, [OTHER_EPIC_CHILD])], [epic_child(OTHER_EPIC_CHILD, [EPIC_CHILD])]],
+			[],
+		)
+
+		expect(anomalies.map((anomaly) => anomaly.kind)).toEqual(['cycle'])
+		expect(anomalies[0]?.message).toContain(`#${String(EPIC_CHILD)}`)
+	})
+
+	it('leaves a cycle inside one epic to that epic', () => {
+		const one_epic = [
+			epic_child(EPIC_CHILD, [OTHER_EPIC_CHILD]),
+			epic_child(OTHER_EPIC_CHILD, [EPIC_CHILD]),
+		]
+
+		expect(backlog_pool.cross_epic_cycles([one_epic], [])).toEqual([])
+	})
+
+	it('reports nothing for an ordering that crosses epics without looping', () => {
+		const graphs = [[epic_child(EPIC_CHILD)], [epic_child(OTHER_EPIC_CHILD, [EPIC_CHILD])]]
+
+		expect(backlog_pool.cross_epic_cycles(graphs, [])).toEqual([])
+	})
+
+	// Standalone rows looping only among themselves have always waited without stopping the backlog.
+	it('leaves a loop among standalone rows alone', () => {
+		const rows = [
+			epic_child(EPIC_CHILD, [OTHER_EPIC_CHILD]),
+			epic_child(OTHER_EPIC_CHILD, [EPIC_CHILD]),
+		]
+
+		expect(backlog_pool.cross_epic_cycles([], rows)).toEqual([])
+	})
+})
+
+describe('backlog_pool.cross_epic_cycles — what only waits behind a loop', () => {
+	// A child downstream of a loop already known is not a loop of its own.
+	it('does not name an epic child that only waits behind a standalone loop', () => {
+		const rows = [
+			epic_child(EPIC_CHILD, [OTHER_EPIC_CHILD]),
+			epic_child(OTHER_EPIC_CHILD, [EPIC_CHILD]),
+		]
+
+		expect(backlog_pool.cross_epic_cycles([[epic_child(THIRD_CHILD, [EPIC_CHILD])]], rows)).toEqual(
+			[],
+		)
+	})
+})
+
+describe('backlog_pool.settle_standalone', () => {
+	// A row blocked from outside the backlog needs a person, and so does the row waiting on it.
+	it('takes out a row waiting on a row that is blocked from outside, however long the chain', () => {
+		const outside_blocked = auto_ok_fixture.blocked_issue(ROW_NUMBER, CREATED_EARLIER, [
+			{ number: BLOCKER_NUMBER, state: 'OPEN' },
+		])
+		const behind = auto_ok_fixture.blocked_issue(THIRD_CHILD, CREATED_EARLIER, [
+			{ number: ROW_NUMBER, state: 'OPEN' },
+		])
+		const running = backlog_pool.running_set([], [outside_blocked, behind], READING_REPO)
+
+		expect(running.size).toBe(0)
 	})
 })

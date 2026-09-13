@@ -209,6 +209,15 @@ Reading labels instead fails in an ordinary state: when one repository's child h
 another's is waiting for a release to publish, nothing carries `in-progress` or `needs-decision` —
 and a label-based reading calls that "done" in the one moment it must wait.
 
+**A blocker outside every named epic is weighed, not ignored** (joshuafolkken/kit#1943). Closed, it
+resolves (a cross-repository one still waits for its release); open and tracked by any epic named in
+the same call, the child waits on time unless that blocker itself waits on a person, which the child
+inherits; open and tracked by none, the child waits on a person and the
+blocker is named on standard error; a state the relation did not carry reads as waiting. **So an order
+between two epics is recorded with a native `blocked-by` relation and honoured by naming both epics**
+— `epic:next 1936 1931`, or `backlog:next`, whose set is the whole opted-in backlog. The table is
+`docs/josh-commands.md` → "`josh epic:next`".
+
 Two things stop the command rather than being worked around: a **circular dependency**, and a
 **disagreement between the epic body and the `blocked-by` relations** (an epic written before `josh`
 recorded them, a recording that failed, or a relation hand-added since). Only a line that is

@@ -1,9 +1,10 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { Classification } from '#scripts/epic/epic-classify'
-import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
+import { epic_graph, type EpicChild, type GraphAnomaly } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import type { EpicView } from '#scripts/epic/epic-next-views'
+import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import { git_next_issues } from '#scripts/git/git-next-issues'
 import {
 	ALREADY_DONE_LABEL,
@@ -40,14 +41,49 @@ interface StandaloneContext {
 	tracked: ReadonlyMap<number, number>
 	exclude: ReadonlyArray<number>
 	repo: string
+	// Every issue this backlog may run (joshuafolkken/kit#1943). A row whose open blocker is outside it
+	// waits on a person rather than on time, exactly as an epic child's does.
+	running: ReadonlySet<string>
 }
 
 function is_epic_row(issue: OpenIssueData): boolean {
 	return has_any_label(issue.labels, EPIC_LABELS)
 }
 
-function needs_decision(issue: OpenIssueData): boolean {
-	return has_any_label(issue.labels, DECISION_LABELS)
+// Whether a row is waiting on an open issue this backlog will never run. Only a blocker whose state
+// was read counts: one with no state stays `time`, the fail-safe `auto_ok_cli.is_runnable` already
+// applies to it.
+function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo: string): boolean {
+	return epic_issue
+		.blocker_references_of(issue, repo)
+		.some((blocker) => blocker.state === 'OPEN' && !running.has(epic_graph.blocker_key(blocker)))
+}
+
+function needs_person(issue: OpenIssueData, context: StandaloneContext): boolean {
+	return (
+		has_any_label(issue.labels, DECISION_LABELS) ||
+		waits_outside(issue, context.running, context.repo)
+	)
+}
+
+// The running set with every standalone row a person has to resolve taken out, repeated until a pass
+// removes nothing — a row waiting on such a row waits on that person too, however long the chain.
+function settle_standalone(
+	running: ReadonlySet<string>,
+	issues: ReadonlyArray<OpenIssueData>,
+	repo: string,
+): ReadonlySet<string> {
+	const settled = new Set(running)
+
+	// An epic row is never in the set, so deleting its key changes nothing and it needs no filter.
+	for (const issue of issues) {
+		const is_stuck =
+			has_any_label(issue.labels, DECISION_LABELS) || waits_outside(issue, running, repo)
+
+		if (is_stuck) settled.delete(epic_graph.key_of({ repo, number: issue.number }))
+	}
+
+	return settled.size === running.size ? running : settle_standalone(settled, issues, repo)
 }
 
 // An opted-in row as the graph's node type. Both halves of the pool are then the same shape, so one
@@ -122,14 +158,59 @@ function classify_standalone(
 	return {
 		runnable: to_children(runnable, context.repo),
 		time: to_children(
-			withheld.filter((issue) => !needs_decision(issue)),
+			withheld.filter((issue) => !needs_person(issue, context)),
 			context.repo,
 		),
 		human: to_children(
-			withheld.filter((issue) => needs_decision(issue)),
+			withheld.filter((issue) => needs_person(issue, context)),
 			context.repo,
 		),
 	}
+}
+
+// Every issue the backlog may run: each opted-in epic's children and the standalone rows
+// (joshuafolkken/kit#1943). A child is opted in through its epic's `auto-ok` even where it carries none
+// of its own, which is why the set is built from the graphs that were read rather than from labels. A
+// standalone row a person has to resolve is left out, so a row waiting on it waits for that person too;
+// an epic child in the same state is taken out by `epic_next_views.settle_views`.
+function running_set(
+	graphs: ReadonlyArray<ReadonlyArray<EpicChild>>,
+	issues: ReadonlyArray<OpenIssueData>,
+	repo: string,
+): ReadonlySet<string> {
+	const running = epic_outside_blocker.running_keys([
+		...graphs.flat(),
+		...to_children(standalone_rows(issues), repo),
+	])
+
+	return settle_standalone(running, issues, repo)
+}
+
+// A cycle no single epic can see, because its links cross from one graph into another. Each epic's own
+// cycle is already that epic's anomaly, and a loop among standalone rows alone has always left them
+// waiting without stopping the backlog, so what is reported here is only what crossing a graph adds.
+function cross_epic_cycles(
+	graphs: ReadonlyArray<ReadonlyArray<EpicChild>>,
+	standalone: ReadonlyArray<EpicChild>,
+): Array<GraphAnomaly> {
+	const within = new Set(
+		[...graphs, standalone].flatMap((children) => epic_graph.find_stuck_children(children)),
+	)
+	// The loops already known are left out before the walk rather than filtered from its answer, so what
+	// only sits downstream of one peels away instead of being named as a loop of its own.
+	const union = [...epic_graph.index_children([...graphs.flat(), ...standalone]).values()]
+	const stuck = epic_graph.find_stuck_children(
+		union.filter((child) => !within.has(epic_graph.key_of(child))),
+	)
+
+	if (stuck.length === 0) return []
+
+	return [
+		{
+			kind: 'cycle',
+			message: `Dependency cycle across the backlog: ${stuck.join(', ')} can never start until a person breaks it`,
+		},
+	]
 }
 
 // Two epics can list the same child. `epic:next` answers about one epic at a time and never sees it;
@@ -217,6 +298,9 @@ function merge_classifications(left: Classification, right: Classification): Cla
 
 const backlog_pool = {
 	classify_standalone,
+	cross_epic_cycles,
+	running_set,
+	settle_standalone,
 	drop_excluded,
 	epic_classification,
 	is_epic_row,

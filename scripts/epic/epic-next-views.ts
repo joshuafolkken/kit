@@ -1,6 +1,7 @@
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
+import { epic_graph } from './epic-graph'
 import type { EpicReference } from './epic-issue'
 import { epic_lane_offer, type RepoPool } from './epic-lane-offer'
 import { epic_report, type EpicNextResult, type EpicVerdict } from './epic-report'
@@ -35,6 +36,10 @@ interface EpicView {
 	reference: EpicReference
 	snapshot: EpicSnapshot
 	result: EpicNextResult
+	// Every issue this invocation may run — the children of all the named epics, plus a backlog's
+	// standalone issues — which a candidate's blockers are re-weighed against at confirmation
+	// (joshuafolkken/kit#1943). Absent, a view confirms against its own epic's children alone.
+	running?: ReadonlySet<string>
 }
 
 // Written exactly as it was typed. A bare number stays bare, because qualifying it here would name
@@ -46,9 +51,10 @@ function format_reference(reference: EpicReference): string {
 // What the candidate confirmation reads with. The blockers come from `epic_fetch`'s own reader, so
 // a candidate is addressed exactly as every other read of a child is — a cross-repository child
 // through its own repository, and a local one bare (joshuafolkken/kit#1012).
-function confirm_context(snapshot: EpicSnapshot): ConfirmContext {
+function confirm_context(snapshot: EpicSnapshot, running?: ReadonlySet<string>): ConfirmContext {
 	return {
 		children: snapshot.children,
+		running,
 		resolve: epic_cross_repo.resolve_cross_repo,
 		read_blockers: async (child) =>
 			await epic_fetch.read_child_blockers(child, snapshot.current_repo),
@@ -63,7 +69,7 @@ function confirm_context(snapshot: EpicSnapshot): ConfirmContext {
 function pools_of(views: ReadonlyArray<EpicView>, repo: string): ReadonlyArray<RepoPool> {
 	return views.map((view) => ({
 		candidates: epic_report.candidates_for_repo(view.result, repo),
-		context: confirm_context(view.snapshot),
+		context: confirm_context(view.snapshot, view.running),
 	}))
 }
 
@@ -102,7 +108,29 @@ function aggregate_text(views: ReadonlyArray<EpicView>): string {
 	return views.map((view) => format_view(view, is_many)).join(BLOCK_SEPARATOR)
 }
 
+// The running set with every issue that waits on a person taken out, and the views built from it
+// (joshuafolkken/kit#1943). A blocker in another named epic only waits when that blocker itself can
+// finish: one parked, or one that is itself blocked from outside, holds its dependants for a person
+// exactly as a parked blocker inside one epic does. Each pass removes what the previous one sent to a
+// person, so the set only shrinks, and the walk ends at the first pass that removes nothing.
+function settle_views(
+	running: ReadonlySet<string>,
+	build: (running: ReadonlySet<string>) => ReadonlyArray<EpicView>,
+): ReadonlyArray<EpicView> {
+	const views = build(running)
+	const stuck = new Set(
+		views.flatMap((view) => view.result.blocked_on_people.map((child) => epic_graph.key_of(child))),
+	)
+	// Deleted in a loop: `Set#difference` is not in this project's TS lib.
+	const settled = new Set(running)
+
+	for (const key of stuck) settled.delete(key)
+
+	return settled.size === running.size ? views : settle_views(settled, build)
+}
+
 const epic_next_views = {
+	settle_views,
 	format_reference,
 	confirm_context,
 	pools_of,

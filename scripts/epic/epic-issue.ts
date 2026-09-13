@@ -72,10 +72,9 @@ function blocker_references_of(
 	issue: Pick<EpicIssue, 'blockedBy'>,
 	fallback_repo = '',
 ): Array<IssueReference> {
-	return (issue.blockedBy?.nodes ?? []).map((blocker) => ({
-		repo: git_gh_issue_rest.repo_of_url(blocker.repository_url) ?? fallback_repo,
-		number: blocker.number,
-	}))
+	return (issue.blockedBy?.nodes ?? []).map((blocker) =>
+		git_gh_issue_rest.reference_of_blocker(blocker, fallback_repo),
+	)
 }
 
 // The same blockers as bare numbers, for the callers that predate the qualified read: the planner and

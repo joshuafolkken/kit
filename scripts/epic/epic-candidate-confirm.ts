@@ -27,6 +27,9 @@ interface ConfirmContext {
 	children: ReadonlyArray<EpicChild>
 	resolve: ResolveDependency
 	read_blockers: BlockersReader
+	// The issues this invocation may run, so a re-classified candidate weighs an outside blocker exactly
+	// as `decide` did (joshuafolkken/kit#1943). Absent, the classifier's own default applies.
+	running?: ReadonlySet<string> | undefined
 }
 
 // The answer for one repository: the children to offer, or the verdict that stands in its place when
@@ -95,12 +98,12 @@ function with_blockers(
 function is_still_runnable(
 	child: EpicChild,
 	children: ReadonlyArray<EpicChild>,
-	resolve: ResolveDependency,
+	context: ConfirmContext,
 ): boolean {
 	const key = epic_graph.key_of(child)
 
 	return epic_classify
-		.classify_children(children, resolve)
+		.classify_children(children, context.resolve, context.running)
 		.runnable.some((candidate) => epic_graph.key_of(candidate) === key)
 }
 
@@ -139,12 +142,10 @@ function warn_withheld(candidate: EpicChild, listed: ReadonlyArray<IssueReferenc
 
 // Relations the listing recovered that this epic does not track as a child.
 //
-// `classify_children` drops such a blocker — "a blocker outside the epic is somebody else's problem"
-// is `epic_graph`'s standing rule, and it applies to a relation the summary counted honestly exactly
-// as it does to one it missed, so withholding only here would offer a child with a declared outside
-// blocker while refusing the identical child whose counter went stale. The candidate is therefore
-// still offered. What is new is that the run has just paid a request to learn the relation exists, so
-// the discard is named rather than silent (joshuafolkken/kit#1121).
+// `classify_children` weighs such a blocker since joshuafolkken/kit#1943, so a candidate that is still
+// offered here has only outside blockers the classifier found finished. The relation is still named,
+// because the run has just paid a request to learn it exists and the graph holds nothing to order it
+// against (joshuafolkken/kit#1121).
 function untracked_blockers(
 	listed: ReadonlyArray<IssueReference>,
 	children: ReadonlyArray<EpicChild>,
@@ -159,7 +160,7 @@ function warn_untracked(candidate: EpicChild, untracked: ReadonlyArray<IssueRefe
 
 	console.warn(
 		`⚠ #${String(candidate.number)} is offered although its relations listing names ${named}: ` +
-			'this epic does not track those, and its graph holds nothing to order them against',
+			'this epic does not track those, and every one of them is already finished',
 	)
 }
 
@@ -195,7 +196,7 @@ async function confirm_one(
 	}
 
 	const children = with_blockers(context.children, candidate, listed)
-	const is_confirmed = is_still_runnable(candidate, children, context.resolve)
+	const is_confirmed = is_still_runnable(candidate, children, context)
 
 	warn_recovered(candidate, listed, children, is_confirmed)
 
@@ -240,10 +241,10 @@ async function confirm_candidates(
 // `repo_verdict` maps that to `wait`, exactly as it does for a repository that never had a candidate.
 function withheld_verdict(
 	children: ReadonlyArray<EpicChild>,
-	resolve: ResolveDependency,
+	context: ConfirmContext,
 ): EpicVerdict {
 	return epic_report.decide_verdict(
-		epic_classify.classify_children(children, resolve),
+		epic_classify.classify_children(children, context.resolve, context.running),
 		NO_ANOMALIES,
 	)
 }
@@ -261,7 +262,7 @@ async function answer_for_repo(
 	const outcome = await confirm_candidates(candidates, context, wanted)
 	if (outcome.confirmed.length > NO_LANES) return { children: outcome.confirmed, verdict: 'run' }
 
-	return { children: [], verdict: withheld_verdict(outcome.children, context.resolve) }
+	return { children: [], verdict: withheld_verdict(outcome.children, context) }
 }
 
 const epic_candidate_confirm = {
