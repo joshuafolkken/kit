@@ -188,6 +188,21 @@ describe('entry_read_set.costed', () => {
 		expect(report.scoped.tokens - own.tokens).toBeLessThanOrEqual(per_reference.tokens)
 	})
 
+	// **A file cited at non-adjacent sections fabricates no boundary token** (joshuafolkken/kit#1934).
+	// The queue entry cites four disjoint, non-adjacent `epicrun.md` sections; costing their union by
+	// joining the skipped-gap lines into one string fabricated a token at every gap, drifting `scoped`
+	// a token above the per-reference sum and printing a false negative saving. Costed as contiguous
+	// runs instead, the deduped figure equals the per-reference sum exactly — none of these references
+	// overlaps, so no line is dropped and none is fabricated. A regression to the join would break the
+	// equality upward, which the `<=` guard above would also catch; this pins the exact expected value.
+	it('fabricates no boundary token for a file cited at non-adjacent sections', () => {
+		const report = entry_read_set.costed(ROOT, QUEUE)
+		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
+		const own = entry_read_set.total(report.files.map((file) => file.cost))
+
+		expect(report.scoped.tokens - own.tokens).toBe(per_reference.tokens)
+	})
+
 	// The whole point of the measurement: the sections a `queue` entry cites are a fraction of the
 	// files it used to open for them. Equal figures would mean the reference scan had stopped
 	// resolving and every pointer was being charged at its file.

@@ -402,6 +402,33 @@ function charged_lines(markdown: string, headings: ReadonlyArray<string>): Set<n
 	return charged
 }
 
+// **The union's charged lines are split into contiguous runs, and each run is costed on its own
+// natural text.** Joining non-adjacent lines with `\n` into one string fabricates a token boundary at
+// every gap the union skipped, so the estimate could drift a token *above* the per-reference sum even
+// with no real overlap — a false negative saving the measurement must never print
+// (joshuafolkken/kit#1934). A run is a maximal stretch of consecutive charged lines, which is exactly
+// the contiguous text a reader of that section actually reads, so summing the runs both mirrors the
+// real read and keeps `scoped` at or below the per-reference sum by construction.
+function extend_or_start(runs: Array<Array<number>>, index: number): void {
+	const current = runs.at(-1)
+
+	if (current?.at(-1) === index - ONE_LINE) current.push(index)
+	else runs.push([index])
+}
+
+function contiguous_runs(charged: ReadonlySet<number>): Array<Array<number>> {
+	const runs: Array<Array<number>> = []
+	const ascending = [...charged].toSorted((left, right) => left - right)
+
+	for (const index of ascending) extend_or_start(runs, index)
+
+	return runs
+}
+
+function run_text(lines: ReadonlyArray<string>, run: ReadonlyArray<number>): string {
+	return run.map((index) => lines[index] ?? '').join('\n')
+}
+
 // **Charged per file over the union of the lines its references cover, never per reference.**
 // Summing the references instead double-counts the two ways one file can be cited twice — two
 // unresolved headings each charged at the whole file, and a `##` section cited beside one of its own
@@ -416,7 +443,7 @@ function file_scoped_cost(root: string, file: string, headings: ReadonlyArray<st
 
 	const lines = markdown.split('\n')
 
-	return cost_of([...charged].map((index) => lines[index] ?? '').join('\n'))
+	return total(contiguous_runs(charged).map((run) => cost_of(run_text(lines, run))))
 }
 
 function scoped_cost(root: string, sections: ReadonlyArray<SectionReference>): Cost {
