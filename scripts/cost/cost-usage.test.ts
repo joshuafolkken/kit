@@ -200,6 +200,44 @@ describe('cost_usage.dedupe', () => {
 	})
 })
 
+// joshuafolkken/kit#1899: a response is written thinking → tool_use, sharing one request id. The
+// round trip's cost window opens at the tool_use line — the later one — so the request instant has to
+// fold to it, not to the first line, or the request lands before its own window.
+const LATER = '2026-09-09T01:00:30.000Z'
+
+function records_of(...raws: ReadonlyArray<string>): Array<UsageRecord> {
+	return raws.flatMap((raw) => {
+		const outcome = cost_usage.parse_line(raw)
+
+		return outcome.kind === 'record' ? [outcome.record] : []
+	})
+}
+
+describe('cost_usage.dedupe folding the request instant to its latest line', () => {
+	it('takes the later line, whichever order the lines arrive in', () => {
+		const forward = records_of(line({ timestamp: AT }), line({ timestamp: LATER }))
+		const reversed = records_of(line({ timestamp: LATER }), line({ timestamp: AT }))
+
+		expect(cost_usage.dedupe(forward)[0]?.at_ms).toBe(Date.parse(LATER))
+		expect(cost_usage.dedupe(reversed)[0]?.at_ms).toBe(Date.parse(LATER))
+	})
+
+	it('takes the readable instant when an earlier line of the request carried none', () => {
+		const records = records_of(line(), line({ timestamp: LATER }))
+
+		expect(cost_usage.dedupe(records)[0]?.at_ms).toBe(Date.parse(LATER))
+	})
+
+	it('keeps the first-seen branch while folding the instant', () => {
+		const records = records_of(
+			line({ timestamp: AT, gitBranch: 'first' }),
+			line({ timestamp: LATER, gitBranch: 'second' }),
+		)
+
+		expect(cost_usage.dedupe(records)[0]?.branch).toBe('first')
+	})
+})
+
 describe('cost_usage.sum_totals', () => {
 	it('adds every quantity across requests', () => {
 		expect(cost_usage.sum_totals([record('a', 3), record('b', 4)]).output_tokens).toBe(7)
