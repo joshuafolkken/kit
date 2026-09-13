@@ -25,7 +25,7 @@ import { init_logic } from './init-logic'
  * consumer a settings file that never enables the plugin, and the skills would be missing.
  */
 function transform_copied_content(destination_path: string, content: string): string {
-	const with_paths = init_logic.transform_prompt_paths(content)
+	const with_paths = init_logic.transform_distributed_paths(content)
 	const with_pins = workflow_pin_logic.apply_pins_for_destination(destination_path, with_paths)
 	const with_marker = managed_marker_logic.apply_marker_for_destination(
 		destination_path,

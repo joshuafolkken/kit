@@ -18,6 +18,7 @@ import { sync_configs } from './sync-configs'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const PACKAGE_JSON = 'package.json'
 const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
+const CLAUDE_MD_FILENAME = 'CLAUDE.md'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -208,8 +209,29 @@ function migrate_removed_skills(): void {
 	for (const result of results) report_migration_result(result)
 }
 
+// CLAUDE.md is not byte-copied (joshuafolkken/kit#1878): a consumer's file is one @import of kit's
+// published rules plus the project's own additions below it. Ensure the import line is present
+// without ever disturbing those additions — so this ignores --force, which would otherwise mean
+// discarding a consumer's content.
+function sync_claude_md(destination_path: string): void {
+	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : undefined
+	const ensured = init_logic.ensure_claude_md_import(existing)
+
+	if (ensured === existing) {
+		console.info(`  ✔ unchanged ${CLAUDE_MD_FILENAME}`)
+
+		return
+	}
+
+	mkdirSync(path.dirname(destination_path), { recursive: true })
+	writeFileSync(destination_path, ensured)
+	console.info(`  ✔ synced    ${CLAUDE_MD_FILENAME}`)
+}
+
 function sync_ai_copy_all(is_force: boolean): void {
 	console.info('AI files:')
+
+	sync_claude_md(path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME))
 
 	for (const filename of init_logic.get_ai_copy_files()) {
 		sync_ai_copy_file(filename, is_force)
@@ -347,6 +369,7 @@ const sync = {
 	sync_file_mapping,
 	sync_ai_file,
 	sync_workspace_yaml,
+	sync_claude_md,
 	sync_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,

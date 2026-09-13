@@ -1,5 +1,6 @@
 import { json_format } from '#scripts/config-merge/json-format'
 import { vscode_settings_schema } from '#scripts/schemas'
+import { distributed_paths } from './distributed-paths'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
 import { init_logic_secretlint } from './init-logic-secretlint'
@@ -75,8 +76,11 @@ const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_
 // exits zero.
 const PREPARE_CMD = `(${GUARDED_LEFTHOOK_CMD} || true) && (${GUARDED_FIX_GH_PACKAGES_CMD} || true)`
 
+// CLAUDE.md is deliberately absent: it is no longer byte-copied. A consumer's CLAUDE.md is a single
+// @import of kit's published, path-transformed rules (ensure_claude_md_import), so a package update
+// alone keeps it current (joshuafolkken/kit#1878). AGENTS.md / GEMINI.md / .cursorrules stay copies
+// here — they are for other tools that do not read CLAUDE.md's import.
 const AI_COPY_FILES: ReadonlyArray<string> = [
-	'CLAUDE.md',
 	'AGENTS.md',
 	'GEMINI.md',
 	'CODE_OF_CONDUCT.md',
@@ -125,8 +129,6 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 // for any future distributed directory; the migration that removes a consumer's stale skill copies
 // lives in `scripts/sync/skill-migration.ts`.
 const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
-
-const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
 
 const LEFTHOOK_EXTENDS = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
 
@@ -423,17 +425,6 @@ function strip_managed_postinstall(content: string): string {
 	)
 }
 
-// A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
-// open. `josh eval:scope`'s trigger set is written `prompts/**` in the distributed documents, and
-// rewriting it to `node_modules/@joshuafolkken/kit/prompts/**` would print a path that can never
-// appear in a consumer's diff and is not what the command matches (joshuafolkken/kit#907).
-function transform_prompt_paths(content: string): string {
-	return content.replaceAll(
-		/`prompts\/([^`*]+)`/gu,
-		(_match, prompt_path: string) => `\`${PROMPTS_PACKAGE_PREFIX}${prompt_path}\``,
-	)
-}
-
 function merge_prettier_plugin_development_deps(content: string): string {
 	return init_logic_json_merge.merge_development_dependencies(content, PRETTIER_PLUGIN_DEV_DEPS)
 }
@@ -446,6 +437,7 @@ const init_logic = {
 	...init_logic_secretlint,
 	...init_logic_yaml_merge,
 	...init_logic_deploy_vps,
+	...distributed_paths,
 	generate_tsconfig,
 	merge_tsconfig_exclude,
 	get_tsconfig_exclude_entries,
@@ -474,7 +466,6 @@ const init_logic = {
 	get_suggested_scripts_for_content,
 	merge_prepare_lifecycle_cmd,
 	strip_managed_postinstall,
-	transform_prompt_paths,
 }
 
 export { init_logic }
