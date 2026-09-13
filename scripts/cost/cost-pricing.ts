@@ -152,6 +152,13 @@ function total_cost(costs: ReadonlyArray<ModelCost>): { usd: number; unpriced: A
 	}
 }
 
+// The priced total in dollars, discarding the unpriced-model list — the one-line composition of
+// `total_cost` over `cost_by_model` that callers reach for when they need only the number, kept here
+// so it is not spelled out at each call site (joshuafolkken/kit#1939).
+function cost_of(records: ReadonlyArray<ModelUsage>): number {
+	return total_cost(cost_by_model(records)).usd
+}
+
 const cost_pricing = {
 	CACHE_WRITE_5M_MULTIPLIER,
 	CACHE_WRITE_1H_MULTIPLIER,
@@ -162,6 +169,7 @@ const cost_pricing = {
 	estimate_composition,
 	cost_by_model,
 	total_cost,
+	cost_of,
 }
 
 export type { CostComposition, ModelCost, ModelPrice, ModelUsage }

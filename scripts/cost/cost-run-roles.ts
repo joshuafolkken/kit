@@ -72,7 +72,7 @@ function records_of(nodes: ReadonlyArray<RunNode>): Array<UsageRecord> {
 }
 
 function cost_of(records: ReadonlyArray<UsageRecord>): number {
-	return cost_pricing.total_cost(cost_pricing.cost_by_model(records)).usd
+	return cost_pricing.cost_of(records)
 }
 
 // A session's active span: the last request instant less the first. Zero when fewer than two

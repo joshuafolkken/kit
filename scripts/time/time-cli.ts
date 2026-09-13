@@ -17,6 +17,8 @@ import { time_report, type TimeReport } from './time-report'
 import { time_request_costs } from './time-request-costs'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
+import { time_run_state } from './time-run-state'
+import { time_run_state_collect } from './time-run-state-collect'
 import { time_spans, type Span, type Timeline } from './time-spans'
 
 // `josh time` — where a run's wall clock went, read from Claude Code's own session transcripts and,
@@ -445,12 +447,33 @@ async function dispatch_scoped(options: Options, cwd: string): Promise<number | 
 	return undefined
 }
 
+// The run-state lead the no-argument path prepends: the run this checkout is carrying, read from the
+// `run:carry` / `run:wake` records so a stopped run is surfaced at the front rather than left for the
+// run-tree report to bury (joshuafolkken/kit#1939). Text only — `--json` prints the structured
+// run-tree record alone.
+async function run_state_lead(cwd: string, is_json: boolean): Promise<Array<string>> {
+	if (is_json) return []
+
+	const facts = await time_run_state_collect.read_facts(cwd, Date.now())
+
+	return [...time_run_state.lead_lines(facts)]
+}
+
+// The bare no-argument default and `--run`: the run tree, led by the run-state block when the run has
+// not finished. The tree report is `cost-run-report.ts`'s, shared with `josh cost`; only this entry
+// prepends the lead, so `josh cost --run` is unchanged.
+async function run_tree(cwd: string, options: Options): Promise<number> {
+	const lead = await run_state_lead(cwd, options.is_json)
+
+	return cost_run_report.run(cwd, undefined, options.is_json, lead)
+}
+
 async function dispatch(options: Options, cwd: string): Promise<number> {
 	if (options.session !== undefined) return run_session(options.session, cwd, options)
 
 	const scoped = await dispatch_scoped(options, cwd)
 
-	return scoped ?? cost_run_report.run(cwd, undefined, options.is_json)
+	return scoped ?? (await run_tree(cwd, options))
 }
 
 // **The default is this process's own working directory, searched at both slugs.** A dispatched lane
