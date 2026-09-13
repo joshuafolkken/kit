@@ -363,27 +363,34 @@ function total_span_ms(spans: ReadonlyArray<{ duration_ms: number }>): number {
 // One tool span, named and placed on the minute grid, for the suites that test the arithmetic rather
 // than the reading. Here rather than beside each of them because two suites now assert against spans
 // built exactly this way, and a builder that drifted would let them disagree about what a span is.
+// The fields no case varies, written once so a new `Span` field lands in one literal — the pattern
+// `time-span-fixture.ts` and `time-phase-fixture.ts` use, and what keeps `span` inside its line limit.
+const UNVARIED_SPAN = {
+	category: time_spans.TOOL_CATEGORY,
+	josh_command: '',
+	josh_commands: [],
+	refusal_guard: '',
+	check_key: '',
+	marker: time_markers.NO_MARKER,
+	is_bundleable: false,
+	is_writing: false,
+	has_prior_reference: false,
+	targets: [],
+	writes: [],
+	message_id: time_spans.NO_MESSAGE_ID,
+	issue: time_markers.NO_ISSUE,
+	branch: 'main',
+	call_id: '',
+	outcome: time_spans.UNKNOWN_OUTCOME,
+	followup_stages: [],
+	is_continuation: false,
+	...time_spans.no_background(),
+} satisfies Partial<Span>
+
 function span(label: string, ended_minute: number, duration_minutes: number): Span {
 	return {
-		category: time_spans.TOOL_CATEGORY,
+		...UNVARIED_SPAN,
 		label,
-		josh_command: '',
-		josh_commands: [],
-		check_key: '',
-		marker: time_markers.NO_MARKER,
-		is_bundleable: false,
-		is_writing: false,
-		has_prior_reference: false,
-		targets: [],
-		writes: [],
-		message_id: time_spans.NO_MESSAGE_ID,
-		issue: time_markers.NO_ISSUE,
-		branch: 'main',
-		call_id: '',
-		outcome: time_spans.UNKNOWN_OUTCOME,
-		followup_stages: [],
-		is_continuation: false,
-		...time_spans.no_background(),
 		ended_ms: ended_minute * MINUTE_MS,
 		...time_spans.equal_durations(duration_minutes * MINUTE_MS),
 	}

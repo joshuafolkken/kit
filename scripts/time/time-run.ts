@@ -5,6 +5,7 @@ import { time_contributor_costs } from './time-contributor-costs'
 import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_delegated_cost } from './time-delegated-cost'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
+import { time_guard_refusals } from './time-guard-refusals'
 import { time_issue_window } from './time-issue-window'
 import { time_last_select } from './time-last-select'
 import type { Interval } from './time-overlap'
@@ -444,12 +445,13 @@ function run_notes(facts: RunFacts): Array<string> {
 function cost_blocks(
 	facts: RunFacts,
 	round_trip_count: number,
-): Pick<TimeReport, 'phase_costs' | 'contributor_costs'> {
+): Pick<TimeReport, 'phase_costs' | 'contributor_costs' | 'guard_refusals'> {
 	const cost_input = { spans: facts.found.spans, requests: facts.reading?.priced, round_trip_count }
 
 	return {
 		phase_costs: time_phase_costs.build(cost_input),
 		contributor_costs: time_contributor_costs.build(cost_input),
+		guard_refusals: time_guard_refusals.build(cost_input),
 	}
 }
 

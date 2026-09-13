@@ -66,6 +66,10 @@ const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
 interface ResultFacts {
 	call_id: string
 	outcome: SpanOutcome
+	// Which guard refused the call this result closed, and `''` for every non-refusal
+	// (joshuafolkken/kit#1913). Carried here for the reason `outcome` is: the result block is gone by
+	// the time the per-guard refusal breakdown aggregates, and only what was read off it survives.
+	refusal_guard: string
 	// The id the harness assigned when it took this call's command into the background, and `''` for
 	// every other result (joshuafolkken/kit#1662). Fourth field for the reason the others are here:
 	// the launch's body is the only place the id is written, and the body is gone by the time
@@ -81,6 +85,7 @@ interface ResultFacts {
 const NO_RESULT: ResultFacts = {
 	call_id: '',
 	outcome: UNKNOWN_OUTCOME,
+	refusal_guard: '',
 	background_id: time_background.NO_BACKGROUND,
 	followup_stages: time_followup_stage.NO_STAGES,
 }
@@ -351,6 +356,7 @@ function facts_of(result: Block, call: ToolCall): ResultFacts {
 	return {
 		call_id: result.result_id,
 		outcome: outcome_of(result, call),
+		refusal_guard: result.refusal_guard,
 		background_id: result.background_id,
 		followup_stages: result.followup_stages,
 	}
@@ -444,6 +450,19 @@ function background_fields(event: TimelineEvent, finished: FinishedAt): Backgrou
 	}
 }
 
+// The four result-borne fields a span keeps, spread into `to_spans` so that builder stays inside its
+// line limit — `background_id`, the fifth `ResultFacts` field, is set by `background_fields` instead.
+function result_facts_of(
+	event: TimelineEvent,
+): Pick<ResultFacts, 'call_id' | 'outcome' | 'refusal_guard' | 'followup_stages'> {
+	return {
+		call_id: event.call_id,
+		outcome: event.outcome,
+		refusal_guard: event.refusal_guard,
+		followup_stages: event.followup_stages,
+	}
+}
+
 function to_spans(events: ReadonlyArray<TimelineEvent>, finished: FinishedAt): Array<Span> {
 	return events.slice(1).map((event, index) => ({
 		category: event.category,
@@ -460,9 +479,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>, finished: FinishedAt): A
 		message_id: event.message_id,
 		issue: event.issue,
 		branch: event.branch,
-		call_id: event.call_id,
-		outcome: event.outcome,
-		followup_stages: event.followup_stages,
+		...result_facts_of(event),
 		is_continuation: false,
 		...background_fields(event, finished),
 		ended_ms: event.timestamp_ms,

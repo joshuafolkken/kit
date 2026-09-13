@@ -13,6 +13,7 @@ import { time_followup_stages, type FollowupStageTotals } from './time-followup-
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_gate_runs, type GateRunTotals } from './time-gate-runs'
+import { time_guard_refusals, type GuardRefusalFacts } from './time-guard-refusals'
 import { time_heading } from './time-heading'
 import { time_investigation, type InvestigationTotals } from './time-investigation'
 import { time_invocations, type InvocationTotal } from './time-invocations'
@@ -238,6 +239,13 @@ interface TimeReport extends TurnSplit {
 	// without a second walk. **The epic scope does not aggregate it yet**: `time-epic.ts` sums the
 	// categories alone, so `josh time --epic` prints no rework block.
 	failures: FailureTotals
+	// Which guard refused this run's calls, how often, and what re-issuing cost
+	// (joshuafolkken/kit#1913). The failure block above counts every errored call and cannot say which
+	// guard spoke; this ranks the guards, and marks the false positives a run re-issued the same call
+	// past. **Optional like `contributor_costs`**: only the run scopes read the cost corpus, so absent
+	// means no scope built it and a present record with `is_measured: false` read no transcript. Built
+	// by `time-guard-refusals.ts`, which also renders the block.
+	guard_refusals?: GuardRefusalFacts
 }
 
 // Everything `build_from_spans` needs. A record rather than seven positional parameters, which the
@@ -484,6 +492,7 @@ function turn_blocks(report: TimeReport): Array<string> {
 		...time_investigation.investigation_lines(report.investigation),
 		...time_followup_stages.followup_stage_lines(report.followup_stages),
 		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
+		...time_guard_refusals.guard_refusal_lines(report.guard_refusals),
 		...time_rework.rework_lines(report.rework),
 	]
 }

@@ -73,6 +73,12 @@ const NO_MESSAGE_ID = ''
 // harness wrote back, from its first character, so an opening this long identifies the speaker
 // without retaining the output of every failed command a session ran.
 const ERROR_TEXT_LIMIT = 256
+// The icon every guard refusal opens with (joshuafolkken/kit#1913). It is not `status_icons.FAIL_ICON`
+// — that one (`✗`) marks a josh check's failing item, which `has_failure_line` scans for; this one
+// marks a PreToolUse hook's *deny* reason, which is a different body carried in a different result. No
+// shared constant exists because each guard writes the literal in its own reason, so the one place a
+// refusal is *detected* names it here.
+const REFUSAL_MARKER = '⛔'
 
 interface Block {
 	type: string
@@ -99,6 +105,12 @@ interface Block {
 	// `"is_error":true` against the raw line, a test one whitespace in the serializer defeats and
 	// which cannot tell one errored block from another on the same line.
 	error_text: string
+	// Which guard refused this call, read off the opening of an errored result and `''` for every other
+	// block (joshuafolkken/kit#1913). It obeys the same prohibition as `error_text` — what is kept is a
+	// short label, never the body — and it exists so the per-guard refusal breakdown can be answered from
+	// the parsed block rather than by re-scanning the body downstream. `''` where the result was not a
+	// `⛔` refusal, so a reader tells "no guard spoke" from "this guard spoke" without a second parse.
+	refusal_guard: string
 	// The id the harness assigned to a command it took into the background, and `''` for every other
 	// block (joshuafolkken/kit#1662). It is the fourth field read off the body under the same
 	// prohibition as the three above — what is kept is the id, never the text it was read from — and
@@ -138,20 +150,38 @@ function block_names(
 	}
 }
 
+// **A refusal is identified by what its body opens with, never by what it carries inside**
+// (joshuafolkken/kit#1913). The hook denies a call on behalf of the one guard whose trigger fired and
+// writes that guard's reason back as the whole result, so the speaker is the token after the `⛔` and
+// before the first `:` — `⛔ pre-gate cut: …` is `pre-gate cut`. A reason with no colon (a headline
+// like `⛔ scoped checks not green on this tree`) is taken whole. Reading the opening rather than
+// searching the body is what stops a result that merely quoted a reason being read as a refusal.
+function guard_from_refusal(text: string): string {
+	const trimmed = text.trimStart()
+	if (!trimmed.startsWith(REFUSAL_MARKER)) return ''
+
+	const headline = trimmed.slice(REFUSAL_MARKER.length).split('\n', 1)[0]?.trimStart() ?? ''
+	const colon = headline.indexOf(':')
+
+	return (colon === -1 ? headline : headline.slice(0, colon)).trim()
+}
+
 // **The body is flattened once and both readers are handed the text.** `result_text` is what turns a
 // content field that may be a string or a list of blocks into one string, and it is idempotent on a
 // string — so passing its own output back to `has_failure_line` reads exactly as passing the raw
 // field did, at one flattening instead of two (joshuafolkken/kit#1445).
 function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
 	const text = time_reported_failure.result_text(raw.content)
+	const is_error = raw.is_error ?? undefined
 
 	return {
 		...block_names(raw),
 		input: raw.input,
-		is_error: raw.is_error ?? undefined,
+		is_error,
 		has_failure_line: time_reported_failure.has_failure_line(text),
 		followup_stages: time_followup_stage.read_stages(text),
-		error_text: raw.is_error === true ? text.slice(0, ERROR_TEXT_LIMIT) : '',
+		error_text: is_error === true ? text.slice(0, ERROR_TEXT_LIMIT) : '',
+		refusal_guard: is_error === true ? guard_from_refusal(text) : '',
 		background_id: time_background.launch_id(text),
 	}
 }
@@ -211,7 +241,13 @@ function parse_line(line: string): TranscriptLine | undefined {
 	return parsed.success ? to_line(parsed.data) : undefined
 }
 
-const time_transcript_line = { ERROR_TEXT_LIMIT, NO_MESSAGE_ID, parse_line }
+const time_transcript_line = {
+	ERROR_TEXT_LIMIT,
+	REFUSAL_MARKER,
+	NO_MESSAGE_ID,
+	guard_from_refusal,
+	parse_line,
+}
 
 export type { Block, TranscriptLine }
 export { time_transcript_line }

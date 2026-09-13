@@ -192,3 +192,85 @@ describe('cost_documents.format_documents', () => {
 		expect(cost_documents.format_documents({ rows: [], total_cost_usd: 0 })).toEqual([])
 	})
 })
+
+const SMALL_CONTEXT = 1000
+const LARGE_CONTEXT = 50_000
+const DOC_BODY = 'x'.repeat(300)
+const DOC_TOKENS = 100
+const READ_TWICE = 2
+
+// The conversation size at each request, so a read carries how big the context was when it happened.
+function context_records(contexts: ReadonlyArray<number>): Array<UsageRecord> {
+	return contexts.map((cache_read_tokens, index) => ({
+		request_id: `req_${String(index + 1)}`,
+		model: MODEL,
+		branch: 'main',
+		at_ms: index,
+		totals: { ...EMPTY_TOTALS, cache_read_tokens },
+	}))
+}
+
+// SKILL read at request 1 (small context) and read whole again at request 3 (large context) — the
+// same-session re-read this block measures.
+const DOUBLE_READ = [
+	read_line('req_1', 'tu_1', SKILL),
+	result_line('tu_1', DOC_BODY),
+	plain_line('req_2'),
+	read_line('req_3', 'tu_3', SKILL),
+	result_line('tu_3', DOC_BODY),
+	plain_line('req_4'),
+].join('\n')
+
+function skill_row(): NonNullable<ReturnType<typeof cost_documents.build>['rows'][number]> {
+	const [row] = cost_documents.build([
+		{ raw: DOUBLE_READ, records: context_records([SMALL_CONTEXT, 0, LARGE_CONTEXT, 0]) },
+	]).rows
+
+	if (row === undefined) throw new Error('no SKILL row')
+
+	return row
+}
+
+describe('cost_documents.build — re-reads', () => {
+	it('counts every read and leaves the earliest read carry unchanged', () => {
+		const row = skill_row()
+
+		expect(row.read_count).toBe(READ_TWICE)
+		expect(row.tokens).toBe(DOC_TOKENS)
+		expect(row.carried_requests).toBe(3)
+	})
+
+	it('carries the context size at each read point', () => {
+		const row = skill_row()
+
+		expect(row.reads.map((read) => read.context_tokens)).toEqual([SMALL_CONTEXT, LARGE_CONTEXT])
+		expect(row.reads[0]?.is_first).toBe(true)
+		expect(row.reads[1]?.is_first).toBe(false)
+	})
+
+	it('prices the duplicate read past the first', () => {
+		const row = skill_row()
+
+		expect(row.duplicate_cost_usd).toBeGreaterThan(0)
+	})
+
+	it('reports a singly-read document as one read with no duplicate cost', () => {
+		const [skill] = cost_documents.build([{ raw: RAW, records: records(5) }]).rows
+
+		expect(skill?.read_count).toBe(1)
+		expect(skill?.duplicate_cost_usd).toBe(0)
+		expect(skill?.reads).toHaveLength(1)
+	})
+
+	it('names the re-read count in the rendered row', () => {
+		const breakdown = cost_documents.build([
+			{ raw: DOUBLE_READ, records: context_records([SMALL_CONTEXT, 0, LARGE_CONTEXT, 0]) },
+		])
+
+		const skill_line = cost_documents
+			.format_documents(breakdown)
+			.find((line) => line.includes('SKILL.md'))
+
+		expect(skill_line).toContain('read 2x')
+	})
+})

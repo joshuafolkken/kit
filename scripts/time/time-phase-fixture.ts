@@ -63,6 +63,7 @@ const UNVARIED = {
 	branch: 'main',
 	call_id: '',
 	outcome: time_spans.UNKNOWN_OUTCOME,
+	refusal_guard: '',
 	followup_stages: [],
 	is_continuation: false,
 	...time_spans.no_background(),
