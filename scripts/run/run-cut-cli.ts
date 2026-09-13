@@ -27,6 +27,7 @@ const CUT_VERDICT = 'cut'
 const RESUME_VERDICT = 'resume'
 const FRESH_VERDICT = 'fresh'
 const STALE_VERDICT = 'stale'
+const HANDED_OFF_VERDICT = 'handed-off'
 const BUSY_VERDICT = 'busy'
 const NOT_A_LANE_VERDICT = 'not-a-lane'
 const UNREADY_VERDICT = 'unready'
@@ -51,6 +52,14 @@ function report_busy(cut_record: RunCut): number {
 	console.error(run_cut.busy_message(cut_record))
 
 	return report(BUSY_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// A successor already resumed this cut; a process woken after its own hand-off is told to stop rather
+// than to investigate (joshuafolkken/kit#1935). It is a benign, non-failing stop.
+function report_handed_off(cut_record: RunCut): number {
+	console.error(run_cut.handed_off_message(cut_record))
+
+	return report(HANDED_OFF_VERDICT, SUCCESS_EXIT_CODE)
 }
 
 function report_unreadable(): number {
@@ -178,6 +187,8 @@ async function verify_and_adopt(
 		is_held: state.is_held,
 	})
 
+	if (verdict === HANDED_OFF_VERDICT) return report_handed_off(cut_record)
+
 	if (verdict === 'stale') return report_stale(cut_record)
 
 	return adopt(target, cut_record)
@@ -263,6 +274,7 @@ const run_cut_cli = {
 	ENDED_VERDICT,
 	FAILED_VERDICT,
 	FRESH_VERDICT,
+	HANDED_OFF_VERDICT,
 	NOT_A_LANE_VERDICT,
 	RESUME_VERDICT,
 	STALE_VERDICT,

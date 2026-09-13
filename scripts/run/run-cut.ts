@@ -89,9 +89,12 @@ interface CutResumeRequest {
 	is_held: boolean
 }
 
-// **`resume` carries the run on; `stale` stops it.** A resume failure — wrong branch, a clean tree, an
-// expired record, no declared cut, or a tree no longer under its hold — is `stale` rather than run.
-type CutResume = 'resume' | 'stale'
+// **`resume` carries the run on; `stale` stops it; `handed-off` says a successor already took it.** A
+// resume failure — wrong branch, a clean tree, an expired record, no declared cut, or a tree no longer
+// under its hold — is `stale`. A record a successor has already adopted — `is_handed_off` spent back to
+// `false` — is `handed-off`, so a process woken after its own cut is told to stop rather than sent to
+// investigate a tree that is not wrong (joshuafolkken/kit#1935).
+type CutResume = 'resume' | 'stale' | 'handed-off'
 
 type CutRead =
 	| { kind: 'none' }
@@ -251,9 +254,20 @@ function matches_state(cut: RunCut, request: CutResumeRequest): boolean {
 	)
 }
 
+// A record a successor already adopted — the hand-off spent back to `false` for this issue's
+// invocation. It is told apart from a crash record (`is_handed_off` never set) so a process woken after
+// its own cut learns the run was carried on rather than being sent to investigate
+// (joshuafolkken/kit#1935).
+function is_adopted_cut(cut: RunCut, issue: string): boolean {
+	return cut.is_handed_off === false && cut.invocation === invocation_for(issue)
+}
+
 // A resume requires both a declared cut and a matching tree; anything short of that is `stale`, which
-// stops the run rather than gating a half-written or foreign tree, or one no longer under its hold.
+// stops the run rather than gating a half-written or foreign tree, or one no longer under its hold. A
+// record a successor already adopted is `handed-off` — a benign stop rather than a failure.
 function classify_resume(cut: RunCut, request: CutResumeRequest): CutResume {
+	if (is_adopted_cut(cut, request.issue)) return 'handed-off'
+
 	if (!is_declared_cut(cut, request.issue)) return 'stale'
 
 	return matches_state(cut, request) ? 'resume' : 'stale'
@@ -302,6 +316,12 @@ function busy_message(cut: RunCut): string {
 	return `Another process already resumed this cut — ${describe_cut(cut)}. Nothing was resumed here; a double launch was detected.`
 }
 
+// A successor already resumed this cut, so a process that reaches `--resume` after its own hand-off is
+// told to stop quietly rather than to investigate a tree that is not wrong (joshuafolkken/kit#1935).
+function handed_off_message(cut: RunCut): string {
+	return `This cut was already handed off to a successor — ${describe_cut(cut)}. Nothing was resumed here; the run is being carried on by the process that adopted it, so this one has nothing to do.`
+}
+
 // The record does not match the tree the fresh process is in — wrong branch, a clean tree, an expired
 // record, no declared cut, or a tree no longer under its hold. It is a resume failure, said as such
 // rather than reported as a success, so the run stops instead of gating the wrong tree.
@@ -333,6 +353,7 @@ const run_cut = {
 	describe_cut,
 	end_cut,
 	fresh_cut,
+	handed_off_message,
 	invocation_for,
 	is_expired,
 	read_cut,

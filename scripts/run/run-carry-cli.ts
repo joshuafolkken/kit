@@ -2,13 +2,12 @@
 import { fileURLToPath } from 'node:url'
 import {
 	run_carry,
-	type CarryChange,
 	type CarryClaim,
 	type CarryClaimRequest,
 	type CarryRead,
 	type RunCarry,
 } from './run-carry'
-import { run_carry_args, type Request } from './run-carry-args'
+import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts
 // (joshuafolkken/kit#1714). A `backlogrun` begins it, counts a merge and a filing into it, marks each
@@ -229,14 +228,28 @@ function claim_record(target: string, request: CarryClaimRequest, is_json: boole
 	return request.is_adoption ? adopt(target, request, is_json) : begin(target, request, is_json)
 }
 
+// The record is no longer this session's to advance — handed off at a cut, or taken over by a live
+// successor. It is a refusal exit, said without applying the change (joshuafolkken/kit#1935).
+function report_count_refused(carry: RunCarry, is_json: boolean): number {
+	console.error(run_carry.count_refused_message(carry))
+
+	return report(BUSY_VERDICT, carry, is_json, FAILURE_EXIT_CODE)
+}
+
 // A count against a record that is not there is `none` and exits non-zero: the loop believed it was
-// carrying a budget and it was not, and a silent zero would let the run keep its own tally instead.
-function count(target: string, read: CarryRead, change: CarryChange, is_json: boolean): number {
+// carrying a budget and it was not, and a silent zero would let the run keep its own tally instead. A
+// count against a record this session no longer owns is refused for the same reason, so the single
+// writer joshuafolkken/kit#1722 established is kept across a cut (joshuafolkken/kit#1935).
+function count(target: string, read: CarryRead, request: CountRequest, is_json: boolean): number {
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
 
-	const carry = run_carry.apply_change(target, read.carry, change)
+	if (run_carry.is_count_refused(read.carry, request.owner)) {
+		return report_count_refused(read.carry, is_json)
+	}
+
+	const carry = run_carry.apply_change(target, read.carry, request.change)
 
 	return read.kind === 'expired'
 		? report_expired(carry, is_json)
@@ -266,7 +279,7 @@ function act(target: string, request: Request, is_json: boolean): number {
 
 	if (request.kind === 'read') return report_read(read, is_json)
 
-	return count(target, read, request.change, is_json)
+	return count(target, read, request, is_json)
 }
 
 function report_unknown(is_json: boolean): number {

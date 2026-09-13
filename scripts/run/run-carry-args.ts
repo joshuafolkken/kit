@@ -17,11 +17,12 @@ const EMPTY_INVOCATION = ''
 // A pid below this addresses a process group rather than a process, which `process-identity.ts`
 // rejects on the read side. Refused here too, so a record never records an owner nothing can be.
 const MIN_PID = 1
-// `--owner` is written inside the two claiming alternatives rather than after the whole list, because
-// those are the only two that read it: `--end` accepts it and ignores it, and a usage line that
-// offered it there would be promising an ownership check nothing performs.
+// `--owner` is read by the two claiming alternatives and by the counting group (joshuafolkken/kit#1935):
+// a count checks the owner so a session whose record was handed off, or taken over by a successor,
+// cannot advance a budget that is no longer its own. `--end` alone accepts it and ignores it, and a
+// usage line that offered it there would be promising an ownership check nothing performs.
 const USAGE =
-	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | --cut | --merged <count> | --filed <count> | --done <issue> | --end'
+	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue>) [--owner <pid>] | --end'
 
 const OPTIONS = {
 	begin: { type: 'string' },
@@ -40,11 +41,16 @@ type ParsedValues = Partial<Record<OptionName, string | boolean>>
 // What `parseArgs` hands back for one option: the flag's own type, or nothing where it was not named.
 type OptionValue = string | boolean | undefined
 
+// The counting request carries the owner so `count` can refuse a write from a session that is no
+// longer the record's owner (joshuafolkken/kit#1935).
+interface CountRequest {
+	kind: 'count'
+	change: CarryChange
+	owner: CarryOwner
+}
+
 type Request =
-	| { kind: 'read' }
-	| { kind: 'claim'; claim: CarryClaimRequest }
-	| { kind: 'count'; change: CarryChange }
-	| { kind: 'end' }
+	CountRequest | { kind: 'read' } | { kind: 'claim'; claim: CarryClaimRequest } | { kind: 'end' }
 
 const READ_REQUEST: Request = { kind: 'read' }
 const END_REQUEST: Request = { kind: 'end' }
@@ -145,12 +151,12 @@ function to_owner(value: OptionValue): CarryOwner | undefined {
 }
 
 // The counting group, split out so the shape below stays a flat list of exits.
-function to_count_request(values: ParsedValues): Request | undefined {
+function to_count_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
 	const change = to_change(values)
 
 	if (change === undefined) return undefined
 
-	return { kind: 'count', change }
+	return { kind: 'count', change, owner }
 }
 
 // `--begin ""` is a loop whose invocation variable was unset. A record named by nothing is one every
@@ -166,10 +172,10 @@ function to_claim_request(
 	return { kind: 'claim', claim: { invocation, owner, is_adoption } }
 }
 
-function to_other_request(values: ParsedValues): Request | undefined {
+function to_other_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
 	if (values.end === true) return END_REQUEST
 
-	return has_count(values) ? to_count_request(values) : READ_REQUEST
+	return has_count(values) ? to_count_request(values, owner) : READ_REQUEST
 }
 
 function to_named_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
@@ -181,7 +187,7 @@ function to_named_request(values: ParsedValues, owner: CarryOwner): Request | un
 
 	if (adopted !== undefined) return to_claim_request(adopted, owner, true)
 
-	return to_other_request(values)
+	return to_other_request(values, owner)
 }
 
 function to_request(values: ParsedValues): Request | undefined {
@@ -201,5 +207,5 @@ const run_carry_args = {
 	to_request,
 }
 
-export type { OptionValue, ParsedValues, Request }
+export type { CountRequest, OptionValue, ParsedValues, Request }
 export { run_carry_args }
