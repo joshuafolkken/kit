@@ -243,12 +243,13 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 }
 
 function wake_session(context: WakeContext, invocation: string): LaunchResult {
-	const argv = run_wake_session.wake_argv(invocation)
+	const built = run_wake_session.wake_argv(invocation)
 
-	if (argv === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
+	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
+	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
 
 	return run_wake_session.launch(
-		{ argv, cwd: context.worktree, log_path: context.log_target },
+		{ argv: built.argv, cwd: context.worktree, log_path: context.log_target },
 		note_to_stderr,
 	)
 }

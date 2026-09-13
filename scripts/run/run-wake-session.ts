@@ -1,4 +1,4 @@
-import { detached_launch, type LaunchArgv } from './detached-launch'
+import { detached_launch, type AgentArgv, type LaunchArgv } from './detached-launch'
 import { run_invocation } from './run-invocation'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
@@ -53,7 +53,11 @@ function safe_invocation(invocation: string): string | undefined {
 	return rebuilt === invocation ? rebuilt : undefined
 }
 
-function wake_argv(invocation: string): LaunchArgv | undefined {
+// **The two failure modes are kept apart, not folded into one `undefined`** (joshuafolkken/kit#1932).
+// An unmatched or unsafe invocation is `undefined` and the caller names it as one; a rejected effort
+// override carries `agent_argv`'s own note through the `rejected` variant, so a `JOSH_LANE_EFFORT`
+// typo is reported as the env typo it is rather than as unreadable carried text.
+function wake_argv(invocation: string): AgentArgv | undefined {
 	const matched = safe_invocation(invocation)
 
 	if (matched === undefined) return undefined

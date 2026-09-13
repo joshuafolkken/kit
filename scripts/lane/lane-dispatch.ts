@@ -99,9 +99,13 @@ async function resolved_log(lane: LaneInfo): Promise<LogOutcome> {
 function started(lane: LaneInfo, log_path: string): DispatchOutcome {
 	const notes: Array<string> = []
 	const invocation = child_invocation(lane.issue)
+	const built = detached_launch.agent_argv(invocation)
+
+	if (built.kind === 'rejected') return { kind: 'failed', lane, log_path, note: built.note }
+
 	const result = detached_launch.launch(
 		{
-			argv: detached_launch.agent_argv(invocation),
+			argv: built.argv,
 			cwd: lane.directory,
 			log_path,
 			// The mark that tells the child it was dispatched rather than typed (joshuafolkken/kit#1904),

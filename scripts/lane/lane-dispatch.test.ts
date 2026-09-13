@@ -89,8 +89,10 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 	it('starts the agent CLI headless in the lane’s own work tree, writing to its own log', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
+		const built = detached_launch.agent_argv(`fullrun #${ISSUE}`)
+
 		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
-			argv: { command: 'claude', args: ['-p', `fullrun #${ISSUE}`] },
+			argv: built.kind === 'argv' ? built.argv : undefined,
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
 			env: { [lane_child_marker.KEY]: ISSUE },

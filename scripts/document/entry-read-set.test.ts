@@ -180,12 +180,21 @@ describe('entry_read_set.costed', () => {
 	// **A file cited more than once is charged once between its references** — summing them instead
 	// double-counts, and with two unresolved headings it could push `scoped` above `whole` and print a
 	// negative saving (joshuafolkken/kit#1776 review round 1).
+	//
+	// The comparison carries a rounding allowance of one token per reference (joshuafolkken/kit#1932).
+	// `scoped` estimates a file's cited lines as one reconstructed block — the lines joined by `\n`,
+	// which inserts a separator between every disjoint range — while `per_reference` sums each section's
+	// own estimate. `cost_tokens.estimate` rounds (`Math.round(chars / 3)`), so a single block can round
+	// up to a token past the sum of its separately-rounded parts. Real double-counting inflates `scoped`
+	// by whole sections, far past this allowance.
 	it('charges a file cited more than once only once between its references', () => {
 		const report = entry_read_set.costed(ROOT, QUEUE)
 		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
 		const own = entry_read_set.total(report.files.map((file) => file.cost))
 
-		expect(report.scoped.tokens - own.tokens).toBeLessThanOrEqual(per_reference.tokens)
+		expect(report.scoped.tokens - own.tokens).toBeLessThanOrEqual(
+			per_reference.tokens + report.sections.length,
+		)
 	})
 
 	// The whole point of the measurement: the sections a `queue` entry cites are a fraction of the

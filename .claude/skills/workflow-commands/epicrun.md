@@ -203,6 +203,13 @@ in-process subagent could not do is survive the session cut the hand-off takes �
 parent, and the next session read its frozen log as a child that had stopped. `pnpm josh lane:dispatch`
 is where a lane's child is started; "Handing the child over" below carries the command.
 
+**The lane child is launched with an explicit model and effort** (joshuafolkken/kit#1932). It is started
+as `claude -p --model <model> --effort <effort> fullrun #<N>`, defaulting to model `opus` — so a lane
+matches the parent session rather than whatever `~/.claude/settings.json` held — and effort `medium`,
+each overridable in `.env` with `JOSH_LANE_MODEL` / `JOSH_LANE_EFFORT`; an effort outside
+`low|medium|high|xhigh|max` refuses the launch, and the pair is recorded in the launch log so runs can
+be compared. `docs/josh-commands.md` → "`josh lane:dispatch`" is the single source.
+
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier, and it is the whole
 reason the unit may be delegated at all: a unit that reports a child finished without its PR merged
 leaves that child open, and `pnpm josh issue:state <N>` says so in one call. The child's own

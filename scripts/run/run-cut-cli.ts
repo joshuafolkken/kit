@@ -100,9 +100,13 @@ function report_relaunch_failure(target: string, note: string): number {
 
 function relaunch(target: string, lane: LaneInfo, invocation: string): number {
 	const notes: Array<string> = []
+	const built = detached_launch.agent_argv(invocation)
+
+	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
+
 	const result = detached_launch.launch(
 		{
-			argv: detached_launch.agent_argv(invocation),
+			argv: built.argv,
 			cwd: lane.directory,
 			log_path: lane_dispatch.default_log_path(lane),
 			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
