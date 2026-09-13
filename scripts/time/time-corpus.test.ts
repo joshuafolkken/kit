@@ -323,6 +323,21 @@ function count_reads(issue_numbers: ReadonlyArray<number>): number {
 	return read.mock.calls.length
 }
 
+// The shape an issue nobody worked on comes back as — every field withheld, none measured as a
+// stranger's work. Kept at module scope so the `it` asserting it stays short.
+const EMPTY_RESULT = {
+	spans: [],
+	session_count: 0,
+	excluded: [],
+	narrowed: [],
+	is_separated: false,
+	has_other_run_markers: false,
+	attributed_count: 0,
+	unread_count: 0,
+	delegated_wait: time_delegated_wait.build_totals([], true, false),
+	by_session: [],
+}
+
 describe('time_corpus.collect_for_issues — one pass, however many issues', () => {
 	beforeEach(() => {
 		write_session('one', fixture.issue_lines(0))
@@ -352,17 +367,7 @@ describe('time_corpus.collect_for_issues — one pass, however many issues', () 
 	it('answers for an issue no transcript mentions rather than omitting it', () => {
 		const found = time_corpus.collect_for_issues(CWD, [UNWORKED_ISSUE])
 
-		expect(found.get(UNWORKED_ISSUE)).toStrictEqual({
-			spans: [],
-			session_count: 0,
-			excluded: [],
-			narrowed: [],
-			is_separated: false,
-			has_other_run_markers: false,
-			attributed_count: 0,
-			unread_count: 0,
-			delegated_wait: time_delegated_wait.build_totals([], true, false),
-		})
+		expect(found.get(UNWORKED_ISSUE)).toStrictEqual(EMPTY_RESULT)
 	})
 
 	// An epic whose task list names no issue in this repository asks for nothing, and reading 296 MB

@@ -1,10 +1,13 @@
 import { cost_composition, type Composition } from './cost-composition'
 import { cost_curve, type CapSimulation, type Curve } from './cost-curve'
 import { cost_documents, type DocumentBreakdown } from './cost-documents'
+import { cost_dollar_composition, type DollarComposition } from './cost-dollar-composition'
 import { cost_format } from './cost-format'
 import { cost_outliers, type Outliers } from './cost-outliers'
+import { cost_output_turns, type OutputTurns } from './cost-output-turns'
 import { cost_pricing, type ModelCost } from './cost-pricing'
 import { cost_resident, type ResidentBreakdown } from './cost-resident'
+import { cost_sessions, type SessionCost } from './cost-sessions'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 
 // Turning per-request usage into the report a person reads and joshuafolkken/kit#921 cites
@@ -96,6 +99,15 @@ interface CostReport {
 	// Present where a transcript was read for the scope; absent otherwise, so a point-of-use ranking
 	// reads it rather than re-measuring the transcript by hand.
 	documents?: DocumentBreakdown
+	// The run's dollars split by token type, and the per-turn output distribution
+	// (joshuafolkken/kit#1912). Present for every non-empty scope, absent on an empty one — the same
+	// withheld-is-not-zero idiom `curve` and `outliers` follow.
+	cost_composition?: DollarComposition
+	output_turns?: OutputTurns
+	// One row per main-line session the scope spanned, oldest first (joshuafolkken/kit#1912). Present
+	// only where the caller built it — the issue and `--all` scopes — and absent on a single-session
+	// scope, which has no sub-sessions to break out.
+	by_session?: ReadonlyArray<SessionCost>
 }
 
 interface ReportInput {
@@ -113,6 +125,9 @@ interface ReportInput {
 	// a scope the caller did not read them for — `--all`, where reading every transcript to rank one
 	// run's documents would be work nothing reads (joshuafolkken/kit#1871).
 	documents?: DocumentBreakdown
+	// The session axis, built by the caller from the scope's attributed records. Absent for a
+	// single-session scope, which is already one session (joshuafolkken/kit#1912).
+	by_session?: ReadonlyArray<SessionCost>
 }
 
 // `exactOptionalPropertyTypes` rejects `{ measurement: undefined }`, so an absent measurement
@@ -157,6 +172,29 @@ function optional_cap(
 	return { cap_simulation: cost_curve.simulate_cap(records, cap_tokens) }
 }
 
+// The per-type dollar split and the output distribution, for every non-empty scope — the same
+// absent-key idiom `optional_curve` uses, so an empty scope carries neither key.
+function optional_composition(
+	by_model: ReadonlyArray<ModelCost>,
+	records: ReadonlyArray<UsageRecord>,
+): { cost_composition?: DollarComposition } {
+	return records.length === 0 ? {} : { cost_composition: cost_dollar_composition.build(by_model) }
+}
+
+function optional_output_turns(records: ReadonlyArray<UsageRecord>): {
+	output_turns?: OutputTurns
+} {
+	return records.length === 0 ? {} : { output_turns: cost_output_turns.build(records) }
+}
+
+// The session axis is the caller's — an issue slice knows which session each record came from, a
+// single-session scope has none — so it is passed through rather than built here.
+function optional_by_session(by_session: ReadonlyArray<SessionCost> | undefined): {
+	by_session?: ReadonlyArray<SessionCost>
+} {
+	return by_session === undefined ? {} : { by_session }
+}
+
 function build_report(input: ReportInput): CostReport {
 	const by_model = cost_pricing.cost_by_model(input.records)
 	const { usd, unpriced } = cost_pricing.total_cost(by_model)
@@ -175,6 +213,9 @@ function build_report(input: ReportInput): CostReport {
 		...optional_cap(input.records, input.cap_tokens),
 		...optional_outliers(input.records),
 		...optional_documents(input.documents),
+		...optional_composition(by_model, input.records),
+		...optional_output_turns(input.records),
+		...optional_by_session(input.by_session),
 	}
 }
 
@@ -270,6 +311,18 @@ function document_lines(documents: DocumentBreakdown | undefined): Array<string>
 	return ['', ...cost_documents.format_documents(documents)]
 }
 
+function composition_lines(composition: DollarComposition | undefined): Array<string> {
+	return composition === undefined ? [] : cost_dollar_composition.format(composition)
+}
+
+function output_turn_lines(turns: OutputTurns | undefined): Array<string> {
+	return turns === undefined ? [] : cost_output_turns.format(turns)
+}
+
+function session_lines(by_session: ReadonlyArray<SessionCost> | undefined): Array<string> {
+	return by_session === undefined ? [] : cost_sessions.format(by_session)
+}
+
 function unpriced_lines(models: ReadonlyArray<string>): Array<string> {
 	if (models.length === 0) return []
 
@@ -319,6 +372,9 @@ function format_report(report: CostReport): string {
 		...curve_lines(report.curve),
 		...cap_lines(report.cap_simulation),
 		...outlier_lines(report.outliers),
+		...composition_lines(report.cost_composition),
+		...output_turn_lines(report.output_turns),
+		...session_lines(report.by_session),
 		...unpriced_lines(report.unpriced_models),
 		...missing_lines(report.missing),
 	].join('\n')

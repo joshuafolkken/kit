@@ -192,6 +192,7 @@ function issue_spans(session_count: number): IssueSpans {
 		attributed_count: session_count,
 		unread_count: 0,
 		delegated_wait: { ...time_delegated_wait.NO_WAITS },
+		by_session: [],
 	}
 }
 

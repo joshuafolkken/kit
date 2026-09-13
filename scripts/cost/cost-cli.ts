@@ -9,6 +9,7 @@ import { cost_document_sources } from './cost-document-sources'
 import type { DocumentBreakdown } from './cost-documents'
 import { cost_report, type CostReport, type Measurement, type MissingData } from './cost-report'
 import { cost_resident } from './cost-resident'
+import { cost_sessions } from './cost-sessions'
 import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
 import { cost_usage } from './cost-usage'
 import { cost_verdict } from './cost-verdict'
@@ -273,6 +274,7 @@ function to_scope_report(
 		missing,
 		resident_billed_tokens: pairs.reduce((sum, pair) => sum + pair.baseline_tokens, 0),
 		curve_sessions: cost_corpus.mainline_records(pairs),
+		by_session: cost_sessions.build(pairs),
 		...optional_cap_tokens(extras.cap),
 		...optional_documents(extras.documents),
 	})

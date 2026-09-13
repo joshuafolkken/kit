@@ -17,6 +17,14 @@ const MERGED_SCRIPT: GhScript = { pull_body: merged_pull(2, 8) }
 const ONE_DOLLAR = 1
 const UNIT_TOKENS = 500_000
 const UNIT_COST = 1.1
+const DELEGATED_UNIT = {
+	session_id: 'agent-a',
+	baseline_tokens: UNIT_TOKENS,
+	cost_usd: UNIT_COST,
+	is_priced: true,
+	model: 'claude-opus-5',
+	purpose: 'review' as const,
+}
 
 function cost_reader(asked: Array<string>, units: RunCostReading['units']): RunCostReader {
 	return (cwd: string, issue_number: number) => {
@@ -47,9 +55,7 @@ describe('time_run.build_run_report — the cost the phases and launches are att
 	})
 
 	it('carries the delegated launch costs through', async () => {
-		const units = [
-			{ session_id: 'agent-a', baseline_tokens: UNIT_TOKENS, cost_usd: UNIT_COST, is_priced: true },
-		]
+		const units = [DELEGATED_UNIT]
 		const report = await time_run.build_run_report(
 			ISSUE,
 			CWD,
