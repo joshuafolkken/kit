@@ -102,6 +102,9 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'`halfrun` is included, and the reason is that the trigger is silence rather than command identity',
 	'One watcher per run, and the outermost invocation is the one that starts it',
 	'In a single-issue run it starts immediately after `pnpm josh run:hold` succeeds',
+	// joshuafolkken/kit#1947. The "outermost invocation starts it" rule is now enforced by the command,
+	// not only by this prose — a dispatched lane child, marked `JOSH_LANE_CHILD`, is refused a watcher.
+	'a dispatched lane child is refused a watcher by its `JOSH_LANE_CHILD` mark',
 	// The two a cross-repository target and a stopping run would otherwise get wrong silently: a
 	// watcher reading the wrong repository's listing, and one left reporting after the run stopped.
 	"It is started in the target repository's checkout, and `--mark` is run there too",
