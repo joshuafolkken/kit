@@ -1250,8 +1250,15 @@ a result nobody read must never be printed as one.
 **It goes to the session only.** No Telegram: the existing `confirmation` and `completion` messages
 are what interrupt a person, and a heartbeat every twenty minutes beside them would cheapen both.
 
-**Nothing is reported while no child is in flight**, so a run parked on a decision goes quiet rather
-than repeating itself, and the first child to start is reported at once.
+**A heartbeat is emitted from the moment a run has started, even before any child carries
+`in-progress`** (joshuafolkken/kit#1900). "A run has started" is read from a mechanical record rather
+than from the label — a registered lane, a held work tree, or a carried budget — so the window
+between a run starting and its child's first label no longer goes dark. The line names that pre-label
+stage as an observed fact (`no in-progress child yet`) rather than guessing, and the lanes field
+beside it carries whatever evidence exists. A run parked on a decision still shows only observations
+and never "still running", and the first child to reach `in-progress` is reported at once. **Only a
+checkout with no run recorded at all — no hold, no carried budget, no lane, and no `in-progress`
+child — stays silent**, which is what keeps an ordinary conversational session outside the heartbeat.
 
 **The scope is every implementing run, not this command alone** (joshuafolkken/kit#1546). `fullrun`,
 `queue` and `halfrun` start the same watcher under the same rules, and this section is the single
@@ -1274,8 +1281,9 @@ starts one for the whole batch, before its first issue, and never one per issue.
 
 **In a single-issue run it starts immediately after `pnpm josh run:hold` succeeds** — the first
 point at which the run is committed to running, which is the same place in the order that "before
-step 1 of the loop" is here. Nothing is reported until the issue carries `in-progress`, so the
-window before the label costs nothing and needs no special case.
+step 1 of the loop" is here. The hold `run:hold` just wrote is itself the mechanical record that says
+the run has started, so a heartbeat is emitted from that point even before the issue carries
+`in-progress` — the window before the label is now covered rather than dark (joshuafolkken/kit#1900).
 
 **It is started in the target repository's checkout, and `--mark` is run there too.** A
 cross-repository reference — `fullrun joshuafolkken/app-kit#12`, `queue joshuafolkken/app-kit#12

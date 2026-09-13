@@ -64,7 +64,7 @@ const DISABLED_NOTICE = `\`${ENVIRONMENT_KEY}=${DISABLED_VALUE}\` is set, so no 
 const MARKED_NOTICE =
 	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
 const IDLE_NOTICE =
-	'No open issue in this repository carries `in-progress`, so no child is in flight and there is nothing to report.'
+	'No run has started in this checkout (no hold, carried budget, or lane) and no open issue carries `in-progress`, so there is nothing to report.'
 const UNREADABLE_NOTICE =
 	'The `in-progress` listing could not be read, so nothing is reported. That is not "nothing is running" — check `gh auth status` and ask again.'
 const FAILED_TICK_PREFIX =
@@ -230,9 +230,9 @@ async function attempt(
  * print one straight after the run's real report — which is the single thing this command is built
  * not to do.
  *
- * **A tick that printed nothing does not move the report clock.** Where no child is in flight the
- * silence has not been broken, so the first child to appear is reported at once instead of waiting out
- * an interval it spent idle; what a decline moves instead is the read cooldown.
+ * **A tick that printed nothing does not move the report clock.** A decline now means no run has
+ * started here at all, so the silence has not been broken and the first report is emitted at once
+ * instead of waiting out an interval spent idle; what a decline moves instead is the read cooldown.
  */
 async function step(options: WatchOptions, target: string, loop: WatchLoop): Promise<WatchLoop> {
 	const now_ms = Date.now()
@@ -370,9 +370,11 @@ async function once(options: WatchOptions): Promise<number> {
  * reads and written after them, so two of these running at once could both find the same silence due
  * and both print; `epicrun.md` starts exactly one, which is where that is guaranteed.
  *
- * **A decline is not an exit.** Nothing is reported while no child is in flight, so a quiet repository
- * keeps the loop waiting instead of ending it — returning there would hand the caller an instant
- * answer to restart, and the documented restart makes that a poll rather than a heartbeat.
+ * **A decline is not an exit.** A decline now means no run has started here at all — no hold, no
+ * carried budget, no lane, and no `in-progress` child — so a genuinely idle repository keeps the loop
+ * waiting instead of ending it; returning there would hand the caller an instant answer to restart,
+ * and the documented restart makes that a poll rather than a heartbeat. Once a run has started the
+ * loop reports and exits even before the first child carries `in-progress` (joshuafolkken/kit#1900).
  */
 async function wait_once(options: WatchOptions): Promise<number> {
 	return await drive(options, true)

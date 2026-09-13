@@ -47,8 +47,11 @@ const DOC_MARKERS: ReadonlyArray<string> = [
 	// Configurable and disable-able, which is an acceptance condition rather than a nicety.
 	'JOSH_PROGRESS_INTERVAL_MINUTES',
 	'JOSH_PROGRESS=0',
-	// Idle and unreadable are not one answer.
-	'A repository with nothing in flight is told apart from one whose listing could not be read',
+	// Idle and unreadable are not one answer; idle now means no run underway (joshuafolkken/kit#1900).
+	'A repository with no run underway is told apart from one whose listing could not be read',
+	// joshuafolkken/kit#1900. The watcher reports from run start, read from a mechanical record, so the
+	// window before a child's first `in-progress` label no longer goes dark.
+	'A run underway is reported even before its first child carries `in-progress`',
 	// joshuafolkken/kit#1560. The absolute observation time, and the three decisions behind it — the
 	// third of which now prints both clocks, so the local half is pinned beside the UTC one.
 	'When the observation was taken, with its date, on the local clock and in UTC',
@@ -84,7 +87,9 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'The line carries observations, never "still running"',
 	'a result nobody read must never be printed as one',
 	'It goes to the session only',
-	'Nothing is reported while no child is in flight',
+	// joshuafolkken/kit#1900. The watcher reports from run start, read from a mechanical record, so the
+	// pre-label window no longer goes dark — the sentence this used to pin said the opposite.
+	'A heartbeat is emitted from the moment a run has started',
 	// joshuafolkken/kit#1567. The relayed line was already one line; what cost was the run's own
 	// prose around it — 27.9% of everything a measured parent accumulated, the largest single
 	// source. A tick with no bound reprints the epic's table and pays for it on every later request.

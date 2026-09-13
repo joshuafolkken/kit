@@ -285,3 +285,28 @@ describe('format_line — what it says when it has nothing to say', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#1900. A run underway with no `in-progress` child yet reports an empty children
+// set, and the slot says the pre-label stage as an observed fact rather than sitting blank.
+describe('format_children — the pre-label stage', () => {
+	it('names the pre-label stage when the run has started but no child is in flight', () => {
+		expect(run_progress.format_children([])).toBe(run_progress.NO_CHILD_YET)
+	})
+
+	it('puts that pre-label marker on the line in place of a blank children slot', () => {
+		const pre_label = run_progress.format_line(observations({ children: [] }), {
+			interval_ms: INTERVAL,
+			now_ms: NOW,
+			quiet_since_ms: NOW - MINUTE,
+			unchanged_since_ms: NOW,
+		})
+
+		expect(pre_label).toContain(run_progress.NO_CHILD_YET)
+	})
+
+	it('joins the children with a separator once any are in flight', () => {
+		expect(
+			run_progress.format_children([{ issue: '9', labels: [IN_PROGRESS], pr_state: 'open' }]),
+		).toBe('#9 in-progress PR:open')
+	})
+})

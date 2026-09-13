@@ -10,20 +10,49 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('#scripts/epic/epic-busy', () => ({ epic_busy: { read_repository: vi.fn() } }))
 vi.mock('#scripts/lane/lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
 vi.mock('./run-preflight', () => ({ run_preflight: { read_child_state: vi.fn() } }))
+vi.mock('#scripts/git/git-command', () => ({ git_command: { git_directories: vi.fn() } }))
+vi.mock('./run-hold', () => ({ run_hold: { read_hold: vi.fn(), hold_path: vi.fn() } }))
+vi.mock('./run-carry', () => ({ run_carry: { read_carry: vi.fn(), carry_path: vi.fn() } }))
 
 const { epic_busy } = await import('#scripts/epic/epic-busy')
 const { lane_registry } = await import('#scripts/lane/lane-registry')
 const { run_preflight } = await import('./run-preflight')
+const { git_command } = await import('#scripts/git/git-command')
+const { run_hold } = await import('./run-hold')
+const { run_carry } = await import('./run-carry')
 const { run_progress_read } = await import('./run-progress-read')
 
 const read_repository = vi.mocked(epic_busy.read_repository)
 const list_lanes = vi.mocked(lane_registry.list_lanes)
 const read_child_state = vi.mocked(run_preflight.read_child_state)
+const git_directories = vi.mocked(git_command.git_directories)
+const read_hold = vi.mocked(run_hold.read_hold)
+const read_carry = vi.mocked(run_carry.read_carry)
+const hold_path = vi.mocked(run_hold.hold_path)
+const carry_path = vi.mocked(run_carry.carry_path)
 
 const REPO = 'joshuafolkken/kit'
 const NOW = 1_800_000_000_000
 const MINUTE = 60_000
 const IN_PROGRESS = 'in-progress'
+const WORKTREE_GIT_DIR = '/wt/.git'
+const REPOSITORY_GIT_DIR = '/repo/.git'
+// Valid record payloads for the run-started signals, built to their real shapes so the mocks need no
+// type assertion (joshuafolkken/kit#1900).
+const A_TIME = '2026-09-13T00:00:00Z'
+const A_HOLD = { issue: '1900', taken_at: A_TIME, pid: 1 }
+const A_CARRY = { invocation: 'backlogrun', started_at: A_TIME, merged: 0, filed: 0, cuts: 0 }
+const A_LANE_OBSERVATION = { issue: '1900', state: 'open' }
+const A_LANE_INFO = {
+	issue: '1900',
+	branch: '1900-lane',
+	directory: '/lanes/1900',
+	seat: 1,
+	development_port: 5183,
+	preview_port: 4183,
+	output: undefined,
+	is_stranded: false,
+}
 
 const temporary = { directory: '' }
 
@@ -40,6 +69,11 @@ beforeEach(() => {
 	temporary.directory = mkdtempSync(path.join(tmpdir(), 'josh-progress-'))
 	list_lanes.mockResolvedValue([])
 	read_child_state.mockResolvedValue({ branch_name: '1520-lane', pr_state: 'open' })
+	git_directories.mockResolvedValue([WORKTREE_GIT_DIR, REPOSITORY_GIT_DIR])
+	hold_path.mockReturnValue('/hold')
+	carry_path.mockReturnValue('/carry')
+	read_hold.mockReturnValue({ kind: 'free' })
+	read_carry.mockReturnValue({ kind: 'none' })
 })
 
 afterEach(() => {
@@ -118,9 +152,9 @@ async function observe(): ReturnType<typeof run_progress_read.read_observations>
 }
 
 describe('read_observations — the three answers a tick can give', () => {
-	// A listing that arrived empty is the only one that means "there is nothing to report". Both of
-	// the others saw less than the whole listing, and reporting either as idle would be a confident
-	// absence built on a read nobody completed.
+	// A listing that arrived empty is the only one that can mean "there is nothing to report", and only
+	// when no run has started (the default here). Both of the others saw less than the whole listing,
+	// and reporting either as idle would be a confident absence built on a read nobody completed.
 	it.each([
 		['idle', 'idle'],
 		['unreadable', 'unreadable'],
@@ -170,5 +204,64 @@ describe('read_children and read_lanes', () => {
 		await expect(run_progress_read.read_lanes()).resolves.toEqual([
 			{ issue: '1520', state: 'open' },
 		])
+	})
+})
+
+describe('has_run_started — a run underway, read from a mechanical record', () => {
+	it('is true on a registered lane, without reading git at all', async () => {
+		await expect(run_progress_read.has_run_started([A_LANE_OBSERVATION])).resolves.toBe(true)
+		expect(git_directories).not.toHaveBeenCalled()
+	})
+
+	it.each([
+		['held', { kind: 'held', hold: A_HOLD }],
+		['stale', { kind: 'stale', hold: A_HOLD }],
+	] as const)('is true when the work tree hold is %s', async (_label, read) => {
+		read_hold.mockReturnValue(read)
+
+		await expect(run_progress_read.has_run_started([])).resolves.toBe(true)
+	})
+
+	it.each([
+		['carried', { kind: 'carried', carry: A_CARRY }],
+		['expired', { kind: 'expired', carry: A_CARRY }],
+	] as const)('is true when the repository carry is %s', async (_label, read) => {
+		read_carry.mockReturnValue(read)
+
+		await expect(run_progress_read.has_run_started([])).resolves.toBe(true)
+	})
+
+	it('is false when no lane, hold, or carry records a run', async () => {
+		await expect(run_progress_read.has_run_started([])).resolves.toBe(false)
+	})
+})
+
+describe('read_observations — a run underway with no in-progress child yet', () => {
+	// The label is exactly what is missing in this window, so an empty children set is reported as an
+	// observation rather than declined — the heartbeat before the first child labels itself.
+	it('observes empty children when a lane says a run has started', async () => {
+		read_repository.mockResolvedValue({ kind: 'idle' })
+		list_lanes.mockResolvedValue([A_LANE_INFO])
+
+		await expect(observe()).resolves.toMatchObject({
+			kind: 'observed',
+			observations: { children: [] },
+		})
+	})
+
+	it('observes empty children when the work tree hold says a run has started', async () => {
+		read_repository.mockResolvedValue({ kind: 'idle' })
+		read_hold.mockReturnValue({ kind: 'held', hold: A_HOLD })
+
+		await expect(observe()).resolves.toMatchObject({
+			kind: 'observed',
+			observations: { children: [] },
+		})
+	})
+
+	it('declines as idle when no record and no label says a run is underway', async () => {
+		read_repository.mockResolvedValue({ kind: 'idle' })
+
+		await expect(observe()).resolves.toMatchObject({ kind: 'idle' })
 	})
 })
