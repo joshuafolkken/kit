@@ -144,12 +144,21 @@ describe('a canonical topic file that has become a pointer', () => {
 // than one spelling of it.
 describe('a pointer is reached from the index, never from a citation', () => {
 	// Reported as the list of offenders rather than one case per document, so a failure names every
-	// place that has to change instead of the first one alphabetically.
-	it.each(pointer_topics())('$topic is cited by nothing but its own skill', (pointer) => {
-		const offenders = citing_documents(pointer).filter((path) => cites_pointer(path, pointer))
+	// place that has to change instead of the first one alphabetically. joshuafolkken/kit#1925 deleted
+	// the stubs, so the set is empty — a bare `it.each([])` is "No test found in suite", so it takes the
+	// same empty-set fallback the suites above use and stays green over nothing.
+	const pointers = pointer_topics()
 
-		expect(offenders).toEqual([])
-	})
+	it.each(pointers.length === 0 ? [undefined] : pointers)(
+		'$topic is cited by nothing but its own skill',
+		(pointer) => {
+			if (pointer === undefined) return
+
+			const offenders = citing_documents(pointer).filter((path) => cites_pointer(path, pointer))
+
+			expect(offenders).toEqual([])
+		},
+	)
 })
 
 // Recording the decision is half of it: the next topic converted under joshuafolkken/kit#1176 is

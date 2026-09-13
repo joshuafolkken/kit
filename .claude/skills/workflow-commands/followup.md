@@ -1,15 +1,10 @@
 # Finishing a run — `pnpm josh followup`
 
-Everything between a green CI and a merged PR: what `followup` scans for, the gate that stops
-a run, how auto-merge is authorized, and the Telegram notifications. `fullrun` and `queue` both end
-here; `halfrun` never reaches this file, because it stops before the commit.
+Everything between a green CI and a merged PR: what `followup` scans for, the gate that stops a run,
+how auto-merge is authorized, and the Telegram notifications. `fullrun` and `queue` both end here;
+`halfrun` never reaches this file, because it stops before the commit.
 
-This file is the single source of the rule. `prompts/collaboration-workflow/completion-notify.md` is
-a pointer to it (joshuafolkken/kit#1187 rollout of the joshuafolkken/kit#1174 pattern), and the two
-sections it also replaced — "Auto-merge（default for `fullrun`）" and "`completion` 通知は
-`pnpm josh followup` 経由のみ" — were cut out of
-`prompts/collaboration-workflow/operating-rules.md`, which keeps its other operating rules and is
-still cited for them.
+This file is the single source of the rule.
 
 ## Where it sits — Step 5, after `pnpm josh git`
 
@@ -19,93 +14,52 @@ commit and the pull request come first; this is everything after them.
 What one invocation does, in order:
 
 - **Waits for the CI status checks — the required ones only.** A non-required check (CodeQL, Workers
-  Builds) is never waited on, so a run does not hang on a check that cannot block the merge. **A
-  non-required check that failed is still reported to the user**, per
-  `prompts/collaboration-workflow/operating-rules.md` → "CI チェック失敗時の対応", which stays there
-  because it is about honest reporting rather than about this command.
+  Builds) is never waited on. A non-required check that failed is still reported to the user
+  (`prompts/collaboration-workflow/operating-rules.md` → "CI チェック失敗時の対応").
 - **Checks unresolved CodeRabbit line comments**, posting the ignore-reason comment when one is
   supplied.
-- **Scans the AI reviewers' top-level comments** — the section below, run independently of CI status.
-- **Sends the `completion` Telegram (✅) itself**, once every gate above has passed. A CI failure or
-  an exception is re-thrown as-is with **no** Telegram sent — so a silent run is a failed run, never
-  a quiet success. **It fires before the merge, not after it**: a merge rejected by a branch
-  protection or a conflict leaves the ✅ already sent, so never read a received completion Telegram
-  as proof the pull request merged. Read what the command printed. **It is not the only message the
-  command can send**: the run report below adds a `warning` Telegram (⚠️) after the merge when the
-  run could not be recorded in the time history — so a ⚠️ arriving after a ✅ for the same issue is
-  one run, not two.
+- **Scans the AI reviewers' top-level comments** — run independently of CI status.
+- **Sends the `completion` Telegram (✅) itself**, once every gate above has passed. A CI failure or an
+  exception is re-thrown as-is with **no** Telegram sent — so a silent run is a failed run. **It fires
+  before the merge, not after it**: a merge rejected by branch protection or a conflict leaves the ✅
+  already sent, so never read a received completion Telegram as proof the pull request merged — read
+  what the command printed.
 - **Merges** — unless `--no-merge` was passed. **Merging is the default**, and `--merge` is a
-  deprecated no-op kept for compatibility: passing nothing merges just the same. `--no-merge` is the
-  only thing that stops it.
-- **Posts the completion report to the Issue**, after the merge: it **edits the Issue body when the
-  body is empty, and adds a comment when it already has content**. The report never goes to the pull
-  request. A run that stopped at the merge therefore has no Issue comment, and the missing comment —
-  not a missing Telegram — is what a failed merge looks like from GitHub.
+  deprecated no-op. `--no-merge` is the only thing that stops it.
+- **Posts the completion report to the Issue**, after the merge: it edits the Issue body when the body
+  is empty, and adds a comment when it already has content. The report never goes to the pull request.
+  A run that stopped at the merge therefore has no Issue comment, and the missing comment is what a
+  failed merge looks like from GitHub.
 - **Closes the epics the Issue completes**, on a merged run only.
-- **Takes the `in-progress` label back off the Issue**, on a merged run only
-  (joshuafolkken/kit#1794). Every entry point writes that label before it implements, and nothing
-  took it off on the ordinary ending — the pull request merged, the Issue closed, and the mark saying
-  "a run is holding this" stayed on. **A run that merged nothing keeps it**, because the Issue is
-  still open and a run may still be holding it. The removal reads the Issue's labels and sends back
-  the spelling GitHub stored, so an `In-Progress` repository is not missed (joshuafolkken/kit#1132),
-  and an Issue that never carried the label is never written to — the read is one call either way.
-  Nothing today reads the label on a closed Issue — `epic:next`, `epic:busy`, `run:progress` and the
-  `auto-ok` pickup all filter to open ones — which is the argument for fixing it rather than against: the day one of them loses that
-  filter, the label is already on every Issue the repository has run.
-- **Nothing after the merge can end the run** (joshuafolkken/kit#1539). Once the pull request has
-  merged, every remaining step — the Issue comment, the epic close, the run report, the review
-  records and the working-tree hold release — runs on its own: one that fails is **reported by name,
-  with the command that finishes it by hand where one exists** — `pnpm josh run:release --force` for the
-  hold, `gh pr comment` or `gh api … /comments` for the completion report, whichever the notify target
-  named. The epic auto-close and the run report have
-  no command of their own and name none, rather than pointing at one that only reports. The steps
-  after a failure still run. Before the merge nothing
-  changes: a failure there still ends the run, because nothing irreversible has happened and
-  re-running the command is the whole recovery. **Three merged runs ended the other way** — #1197,
-  #1537 and #1319 each threw at the Issue comment and left the hold behind, and the non-zero exit
-  read to `epicrun` and `queue` as a failed child. **A reported cleanup failure is not a merge
-  failure**: read the ⚠ lines, run what they name, and do not re-run the merge.
-- **Recovers the issue number from the pull request body** when the invocation named none: the
-  `closes #N` keyword the closes-and-context stage already reads is what supplies it, so a completion
-  report, an epic close and a run report are still made for a run whose command line forgot the
-  number.
-- **Emits the run report and appends it to `.time-history.jsonl`**, on a merged run only
-  (joshuafolkken/kit#1471). Until then the measurement only ever happened when a person typed `diag`,
-  so a run nobody asked about left no record at all — and a measurement that is not continuous cannot
-  say whether the last change made anything faster. Every `fullrun`, and every child of an `epicrun`
-  or a `queue`, ends here, which is why this one seam covers all of them. **It measures nothing of its
-  own**: the report is built by the same builder `josh time` calls, and what is printed is a short
-  block — elapsed, turns, round trips, the per-round-trip cost, and the same figures against the
-  previous recorded run. **The record is looked up from where the run happened, and appended to the
-  durable checkout** (joshuafolkken/kit#1628, joshuafolkken/kit#1825): a dispatched lane child files
-  its transcript under the lane's own slug (joshuafolkken/kit#1749), so the lookup searches both that
-  slug and the main checkout's, while the append resolves back to the main checkout — a line written
-  into a lane's own file would go to one `pnpm josh lane:close` deletes. Before joshuafolkken/kit#1628
-  the lane looked for its transcripts under a project directory that has never existed, came back
-  unmeasured, and appended nothing at all — thirteen consecutive merges were lost that way. **It cannot fail a
-  run**: the merge has already happened by the time it runs, so a history that cannot be read or
-  written prints one line saying the measurement was unavailable and names the
-  `pnpm josh time --issue <N>` that would take it — **and, since joshuafolkken/kit#1628, sends that
-  same fact as a `warning` Telegram (⚠️)**, because thirteen runs lost their record with the printed
-  line sitting unread in every one of their console logs. **The warning is not a `failure`**: the run
-  merged, and only its measurement did not land. A send that itself fails is reported on stderr and
-  the run still carries on. **It never fires for a history that was switched off** — `JOSH_TIME_HISTORY=0`
-  is an answer, not a gap, and warning once per merge about an opted-out feature is how a warning
-  channel stops being read. `JOSH_TIME_HISTORY=0` turns the whole step off,
-  and the full tables stay where they were — `pnpm josh time`, and the `diag` skill that reads them.
-  **What reads the accumulation back is `pnpm josh time --period <days>`**
-  (joshuafolkken/kit#1470): it groups the recorded runs into lanes by the wall clock they occupied and
-  reports the backlog's throughput, idle time and serialization — the questions one run's internals
-  cannot answer. That is why the record carries the run's `started_at` / `ended_at` as well as its
-  headline figures.
+- **Takes the `in-progress` label back off the Issue**, on a merged run only. A run that merged nothing
+  keeps it. The removal reads the Issue's labels and sends back the spelling GitHub stored, so an
+  `In-Progress` repository is not missed, and an Issue that never carried the label is never written to.
+- **Nothing after the merge can end the run.** Once the pull request has merged, every remaining step —
+  the Issue comment, the epic close, the run report, the review records and the working-tree hold
+  release — runs on its own: one that fails is reported by name, with the command that finishes it by
+  hand where one exists (`pnpm josh run:release --force` for the hold; `gh pr comment` or `gh api …
+  /comments` for the completion report). Before the merge nothing changes: a failure there still ends
+  the run, because re-running the command is the whole recovery. **A reported cleanup failure is not a
+  merge failure**: read the ⚠ lines, run what they name, and do not re-run the merge.
+- **Recovers the issue number from the pull request body** when the invocation named none: the `closes
+  #N` keyword supplies it.
+- **Emits the run report and appends it to `.time-history.jsonl`**, on a merged run only. It measures
+  nothing of its own — the report is the same block `josh time` builds (elapsed, turns, round trips,
+  the per-round-trip cost, and the same figures against the previous recorded run). The record is
+  looked up from where the run happened and appended to the durable checkout. **It cannot fail a run**:
+  a history that cannot be read or written prints one line saying the measurement was unavailable,
+  names the `pnpm josh time --issue <N>` that would take it, and sends that same fact as a `warning`
+  Telegram (⚠️). The warning is not a `failure`: the run merged, and only its measurement did not land.
+  **It never fires for a history that was switched off** — `JOSH_TIME_HISTORY=0` turns the whole step
+  off. `pnpm josh time --period <days>` reads the accumulation back.
 
 ### The post-execution reference is in `followup-reference.md`
 
 Everything the run reaches **after** it issues `pnpm josh followup` is in `followup-reference.md`, so
-the read that lands in the turn that issues the command stays small (joshuafolkken/kit#1905): the
-per-stage timing block the command prints and how to read it, the `failure` Telegram sent by hand when
-recovery is given up, the AI-reviewer comment scan, the config-file report, and the release ask that
-closes the completion summary. What stays below is what a run needs **before** it issues the command.
+the read that lands in the turn that issues the command stays small: the per-stage timing block the
+command prints and how to read it, the `failure` Telegram sent by hand when recovery is given up, the
+AI-reviewer comment scan, the config-file report, and the release ask that closes the completion
+summary. What stays below is what a run needs **before** it issues the command.
 
 ### The options
 
@@ -114,7 +68,7 @@ closes the completion summary. What stays below is what a run needs **before** i
 | `--no-merge` | **The only flag that stops the merge.** Merging is the default; `--merge` is a deprecated no-op |
 | `--notify-target` | `pr` \| `issue` \| `both`, defaulting to `issue`. **Keep the default** — the workflow puts no completion report on the pull request |
 | `--notify-message` | The completion comment body, in the `JOSH_SESSION_LANG` language (`ja` when unset), in the two-layer report shape: three lines of `Cause: / Fix: / Result:` first, one plain sentence each with no jargon or file names, then the changes as bullets under `Details:`. **Not a bare list of `Added … / Changed …`** |
-| `--notify-message-file` | The same body, read from a file (`-` reads stdin). **Use it whenever the report names a command or a path** — a report that does is the ordinary case here, and inside shell double quotes a backtick or a `$` is evaluated before this command starts: joshuafolkken/kit#1198 recorded a completion body that reached Telegram with a word missing, and a comment body whose own words ran as git commands. No `\n` expansion happens to a file, which already holds real newlines; passing both flags is refused rather than ranked (`prompts/collaboration-workflow/shell-body.md`) |
+| `--notify-message-file` | The same body, read from a file (`-` reads stdin). **Use it whenever the report names a command or a path** — inside shell double quotes a backtick or a `$` is evaluated before this command starts (`prompts/collaboration-workflow/shell-body.md`) |
 | `--coderabbit-ignore-reason` | The reason comment for leaving CodeRabbit line comments unresolved |
 | `--ai-review-ignore-reason` | The reason comment for leaving an AI-review blocker (Claude Review / a CodeRabbit summary) unresolved |
 | `--issue-number` | The Issue number — or give it positionally as `"<title> #<number>"` |
@@ -164,8 +118,7 @@ Details:
 ```
 
 Example 4 — no merge (after a `kickoff`, or when the merge is done by hand). **`--no-merge` is not
-decoration here**: leave it out and this command merges, because merging is what `followup` does
-unless told otherwise.
+decoration**: leave it out and this command merges.
 
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
@@ -181,32 +134,72 @@ Details:
 
 ## `auto-merge` — Default `fullrun` behavior
 
-Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup`, which handles the full sequence internally: wait for CI → verify AI review findings → send completion notification → merge. The user does **not** need to add a keyword. Invoking `fullrun` is itself the explicit authorization to merge.
+Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup`, which handles the full sequence
+internally: wait for CI → verify AI review findings → send completion notification → merge. The user
+does **not** need to add a keyword. Invoking `fullrun` is itself the explicit authorization to merge.
 
 ```bash
 pnpm josh followup "<title> #<N>" --notify-message "..."
 pnpm josh ms
 ```
 
-- **Always run `pnpm josh ms` after a successful merge.** `pnpm josh followup` leaves the working tree on the merged feature branch; running `pnpm josh ms` (= checkout default branch + `git pull`) returns it to the default branch with the merge commit pulled. `fullrun` / `fullrun new` / `queue` always end on the default branch. Skip this step only if the merge itself failed (the workflow already stopped).
-- **In a lane, the terminal step is `pnpm josh lane:close <N>` instead, and `josh ms` refuses.** A lane is a linked work tree, and git allows one branch in one work tree at a time — checking the default branch out from a lane takes that lane out of `josh lane:list`, strands its port seat, and makes every other lane's `josh ms` fail with git's `already used by` refusal. `josh ms` therefore exits non-zero there and says so, which is the expected answer rather than a failure to recover from (joshuafolkken/kit#1535). The default-branch refresh is the parent's, in the primary checkout, exactly as `epicrun.md` already describes.
-- **AI review findings are checked automatically.** `pnpm josh followup` scans for CodeRabbit / Claude Review findings before merging. If blockers are found, it sends a `confirmation` Telegram and exits non-zero — fix the findings and re-run `pnpm josh followup`. **Green CI is not authorization to merge while AI review findings are open.** (SonarCloud findings are **not** scanned by `followup` the way CodeRabbit / Claude comments are. Instead the `sonar-qube.yml` CI workflow runs the scan with `sonar.qualitygate.wait=true`, so a red Quality Gate fails the required `SonarQube` check — which `followup` already waits on before merging.)
-- **CodeRabbit rate-limit is not a finding.** If the only CodeRabbit comment is a rate-limit warning (body contains `rate limited by coderabbit.ai` or `Rate limit exceeded`) and there is no substantive review, treat it as "no findings" and proceed. The same applies if CodeRabbit produced no comment at all on the latest commit.
-- **Verify CodeRabbit findings before bypassing.** When CodeRabbit posts a substantive finding, do not pass `--coderabbit-ignore-reason` reflexively — first verify whether the finding is correct. Concrete example: CodeRabbit may flag a GitHub Actions SHA pin like `pnpm/action-setup@<sha> # v6.0.8` as "not matching the tag", because it queried `gh api repos/<owner>/<repo>/git/ref/tags/v6.0.8` which returns the **annotated-tag-object SHA**, not the **commit SHA** that the tag points to. GitHub Actions pins use the commit SHA. Confirm with `gh api repos/<owner>/<repo>/commits/<tag> --jq '.sha'` — if that matches the pinned SHA, the finding is a false positive. Only then bypass with `--coderabbit-ignore-reason "<verification-based-reason>"`, citing the verification command and its output.
-- Merge goes through REST internally — the pull request's own merge endpoint with an explicit `merge_method`, a direct merge rather than GitHub's `--auto` flag (`gh pr merge` goes through GraphQL, which a cloud session is refused; joshuafolkken/kit#1029). All required checks are already green by this point. **That path is `followup`'s, not yours**: `.claude/settings.json` refuses `gh pr merge`, and since joshuafolkken/kit#1062 the `gh api` and `gh api graphql` spellings of the same merge as well — `followup` is unaffected because it calls gh from inside a node script, so the Bash matcher only ever sees `pnpm josh …`. The deny is the implementation; the prohibition in `CLAUDE.md` → "Git Rules" is the rule, and it is what covers any spelling the patterns still miss.
-- Use the merge strategy the repo allows (`--merge` / `--squash` / `--rebase`). Default to `--merge`. Inspect with `gh api repos/<owner>/<repo> --jq '{allow_merge_commit, allow_squash_merge, allow_rebase_merge}'` when unsure.
-- Do **not** pass `--delete-branch` unless the user asks. Branch cleanup is a separate explicit instruction.
-- If the merge fails (e.g. branch protections not met, conflicts), report the reason and stop — do not retry with different flags or bypass protections.
-- **If the user wants to skip the merge step**, use `kickoff` (plan-only) or explicitly say "do not merge" / "do not auto-merge" in the same turn. In that case, pass `--no-merge` to `pnpm josh followup`. Outside a `fullrun` invocation, never run `gh pr merge` on your own.
-
-The portable, cross-AI wording of this section used to sit in `prompts/collaboration-workflow/operating-rules.md` as well; it is single-sourced here now (joshuafolkken/kit#1187).
+- **Always run `pnpm josh ms` after a successful merge.** `pnpm josh followup` leaves the working tree
+  on the merged feature branch; `pnpm josh ms` (checkout default branch + `git pull`) returns it to the
+  default branch with the merge commit pulled. Skip this step only if the merge itself failed.
+- **In a lane, the terminal step is `pnpm josh lane:close <N>` instead, and `josh ms` refuses.** A lane
+  is a linked work tree, and git allows one branch in one work tree at a time. `josh ms` exits non-zero
+  there and says so, which is the expected answer. The default-branch refresh is the parent's, in the
+  primary checkout.
+- **AI review findings are checked automatically.** `pnpm josh followup` scans for CodeRabbit / Claude
+  Review findings before merging. If blockers are found, it sends a `confirmation` Telegram and exits
+  non-zero — fix the findings and re-run. **Green CI is not authorization to merge while AI review
+  findings are open.** (SonarCloud findings are not scanned by `followup`; the `sonar-qube.yml` CI
+  workflow runs the scan with `sonar.qualitygate.wait=true`, so a red Quality Gate fails the required
+  `SonarQube` check, which `followup` waits on.)
+- **CodeRabbit rate-limit is not a finding.** If the only CodeRabbit comment is a rate-limit warning
+  (`rate limited by coderabbit.ai` or `Rate limit exceeded`) and there is no substantive review, treat
+  it as "no findings" and proceed. Same if CodeRabbit produced no comment on the latest commit.
+- **Verify CodeRabbit findings before bypassing.** Do not pass `--coderabbit-ignore-reason` reflexively
+  — first verify. Example: CodeRabbit may flag a GitHub Actions SHA pin like `pnpm/action-setup@<sha> #
+  v6.0.8` as "not matching the tag" because it queried the annotated-tag-object SHA, not the commit
+  SHA. Confirm with `gh api repos/<owner>/<repo>/commits/<tag> --jq '.sha'` — if that matches the
+  pinned SHA, the finding is a false positive. Only then bypass, citing the verification command.
+- Merge goes through REST internally — the pull request's own merge endpoint with an explicit
+  `merge_method` (`gh pr merge` goes through GraphQL, which a cloud session is refused). **That path is
+  `followup`'s, not yours**: `.claude/settings.json` refuses `gh pr merge` and the `gh api` / `gh api
+  graphql` spellings of the same merge; `followup` calls gh from inside a node script. The prohibition
+  in `CLAUDE.md` → "Git Rules" is the rule.
+- Use the merge strategy the repo allows (`--merge` / `--squash` / `--rebase`); default to `--merge`.
+  Inspect with `gh api repos/<owner>/<repo> --jq '{allow_merge_commit, allow_squash_merge,
+  allow_rebase_merge}'` when unsure.
+- Do **not** pass `--delete-branch` unless the user asks.
+- If the merge fails (branch protections, conflicts), report the reason and stop — do not retry with
+  different flags or bypass protections.
+- **If the user wants to skip the merge step**, use `kickoff` or say "do not merge" in the same turn,
+  and pass `--no-merge`. Outside a `fullrun` invocation, never run `gh pr merge` on your own.
 
 ## Completion notifications: always via `pnpm josh followup`
 
-Never send `completion` Telegram notifications manually with `pnpm josh notify --task-type completion ...`. Always use `pnpm josh followup` — it fetches the PR URL through REST (`repos/{owner}/{repo}/pulls/{N}`) and always includes it, whereas the manual CLI does not auto-populate `--pr-url` and will produce a Telegram message missing the PR link.
+Never send `completion` Telegram notifications manually with `pnpm josh notify --task-type completion
+...`. Always use `pnpm josh followup` — it fetches the PR URL through REST
+(`repos/{owner}/{repo}/pulls/{N}`) and always includes it, whereas the manual CLI does not
+auto-populate `--pr-url`.
 
-**Always run `pnpm josh followup` in the foreground** (no `&` suffix, no shell backgrounding). **It is the deliberate exception to `background-commands.md`**, which sends every other minutes-long command to the background: nearly every step after this one reads its result, so detaching it would move the reading rather than overlap anything, and would buy an empty turn (joshuafolkken/kit#1510). A tail *does* follow the merge — this paragraph used to say nothing did, and joshuafolkken/kit#1462 measured 3.0 min of it — but what to do about that belongs to `background-commands.md` and is not restated here. The commands that do go to the background — `pnpm josh git -y` above all — and what runs beside each of them are `background-commands.md`'s, and are not restated here. It waits for CI — 32 minutes by default, about 34 worst case (see `docs/josh-commands.md`) — which can outlast one tool call, so give the call the largest timeout it accepts (in Claude Code, `timeout: 600000`, 10 min). Where the harness detaches an over-running command and reports when it finishes, wait for that report instead of re-running. Where it kills the call at the cap instead, the merge and the completion notification are lost with it: set `JOSH_CI_TIMEOUT_SECONDS` to a budget that fits inside the cap for that run and re-run `followup` once CI has settled. Shell backgrounding never works — a process started with `&` inside a tool call does not survive the call returning, so the command silently disappears and the PR stays unmerged.
+**Always run `pnpm josh followup` in the foreground** (no `&`, no shell backgrounding). **It is the
+deliberate exception to `background-commands.md`**: nearly every step after it reads its result, so
+detaching it would buy an empty turn. It waits for CI — 32 minutes by default, about 34 worst case —
+which can outlast one tool call, so give the call the largest timeout it accepts (in Claude Code,
+`timeout: 600000`). Where the harness detaches an over-running command and reports when it finishes,
+wait for that report instead of re-running. Where it kills the call at the cap, set `JOSH_CI_TIMEOUT_SECONDS`
+to a budget that fits inside the cap and re-run once CI has settled. Shell backgrounding never works.
 
-- Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh followup "<title> #<N>" --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` each time you want to notify completion (notification is sent right before the merge).
-- `pnpm josh notify` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications (no automated alternative exists for those).
-- **The count of unreleased merges is surfaced at completion — not a version.** When `pnpm josh followup` finishes it prints `🚚 unreleased merges on main: <n>` as the final console line and puts the same count in the `completion` Telegram body, so a release nobody has run stays visible (joshuafolkken/kit#1486). **Do not report a shipped version.** A child no longer bumps, so the project's `package.json` names the *previous* release rather than anything this run shipped, and what does ship is decided later by `pnpm josh release`. The Telegram is sent before the merge and says so; the console line is printed after it, from a freshly fetched default branch, and needs no such note. **Surfacing the count was never enough on its own** — both of those carried it while 53 merges accumulated unreleased (joshuafolkken/kit#1582), because a number nobody is told to act on is a number nobody acts on. What the run *does* about it is `followup-reference.md` → "When `pnpm josh release` runs", and that is what closes the completion summary.
+- Applies to the initial PR and every follow-up commit — re-run `pnpm josh followup "<title> #<N>"
+  --notify-message "..."` each time you want to notify completion (notification is sent right before
+  the merge).
+- `pnpm josh notify` remains the right tool for `planning`, `confirmation`, `kickoff_retry` and
+  `failure` notifications.
+- **The count of unreleased merges is surfaced at completion — not a version.** When `pnpm josh
+  followup` finishes it prints `🚚 unreleased merges on main: <n>` and puts the same count in the
+  `completion` Telegram body. **Do not report a shipped version**: a child no longer bumps, so
+  `package.json` names the *previous* release, and what ships is decided later by `pnpm josh release`.
+  What the run *does* about it is `followup-reference.md` → "When `pnpm josh release` runs".

@@ -7,9 +7,8 @@ description: The procedures for the `josh epic:*` commands that make an epic run
 
 These four commands are what turn an epic from a list of issue numbers into something a run can
 execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
-skill is the operational procedure, and the two must agree. **`epic:plan` is no longer among them**:
-its body is single-sourced here (joshuafolkken/kit#1189, the joshuafolkken/kit#1174 rollout), and
-`prompts/collaboration-workflow/epic-plan.md` is a pointer to this file rather than a second copy.
+skill is the operational procedure, and the two must agree. **`epic:plan`'s body is single-sourced
+here.**
 
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` — live in the
 `workflow-commands` skill.
