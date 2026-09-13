@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/run-cut'
 import { time_batch_guard } from '#scripts/time/time-batch-guard'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
@@ -52,12 +53,20 @@ function cut_of(issue: string): RunCut {
 	}
 }
 
+// The dispatched-child case the refusal exists for: the mark names this lane's own issue.
 function state_of(directory: string, cut?: RunCut): LaneCutState {
 	function carried(): RunCut | undefined {
 		return cut
 	}
 
-	return { directory, carried }
+	return { directory, carried, marked_issue: ISSUE }
+}
+
+// A lane checkout whose mark is absent (a person working there) or names another issue (a leak from
+// the parent session) — the cases that must stay silent. `marked_issue` is required, so passing
+// `undefined` here is meaningful rather than a redundant default.
+function state_marked(directory: string, marked_issue: string | undefined): LaneCutState {
+	return { ...state_of(directory), marked_issue }
 }
 
 function call_of(command: string): { name: string; input: unknown } {
@@ -89,6 +98,9 @@ function payload_of(name: string, command: string, tool_name = BASH): string {
 
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
+	// Every test starts with no dispatch mark, so a leak from the lane-checkout block below cannot fire
+	// the refusal in a case that expects silence; the lane block sets it in its own beforeEach.
+	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
 })
 
@@ -219,6 +231,22 @@ describe('uncut_lane_issue', () => {
 		expect(pre_gate_cut.uncut_lane_issue(state)).toBe(ISSUE)
 	})
 
+	// **A person working in the lane carries no dispatch mark, so the rule stays silent for them**
+	// (joshuafolkken/kit#1904). This is the half that used to be the model's to judge.
+	it('says nothing when the lane carries no dispatch mark', () => {
+		const state = state_marked(LANE_DIRECTORY, undefined)
+
+		expect(pre_gate_cut.uncut_lane_issue(state)).toBeUndefined()
+	})
+
+	// **A mark that leaked in from the parent session names some other issue**, so requiring it to
+	// equal this lane's issue reads the leak as a person too.
+	it('says nothing when the dispatch mark names another issue', () => {
+		const state = state_marked(LANE_DIRECTORY, '1850')
+
+		expect(pre_gate_cut.uncut_lane_issue(state)).toBeUndefined()
+	})
+
 	it.each([[LANE_ROOT], [WORK_DIRECTORY], [path.join(LANE_ROOT, 'main')]])(
 		'says nothing about %j, which is not a lane checkout',
 		(directory) => {
@@ -240,6 +268,12 @@ describe('is_uncut_gate', () => {
 
 	it('says nothing about a gate run outside a lane', () => {
 		expect(pre_gate_cut.is_uncut_gate(GATE, state_of(WORK_DIRECTORY))).toBe(false)
+	})
+
+	it('says nothing about a gate run in a lane with no dispatch mark', () => {
+		const state = state_marked(LANE_DIRECTORY, undefined)
+
+		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(false)
 	})
 
 	it('says nothing about the cut itself, issued in the same lane', () => {
@@ -281,10 +315,14 @@ describe('rule_delivery — inside a lane checkout', () => {
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
+		// A real dispatched child arrives here with the mark set; `current_state` reads it from the live
+		// environment, so the delivery cases below only fire once it names this lane.
+		process.env[lane_child_marker.KEY] = ISSUE
 	})
 
 	afterAll(() => {
 		process.chdir(ORIGINAL_DIRECTORY)
+		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	})
 
 	// The temporary lane sits outside any repository, so the git directory cannot be read and the cut

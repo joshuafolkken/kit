@@ -1,3 +1,4 @@
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { run_cut, type RunCut } from '#scripts/run/run-cut'
 import { shell_segments } from './shell-segments'
@@ -88,17 +89,30 @@ function asks_about_the_cut(command: string): boolean {
 }
 
 // What the trigger has to know about the world, passed in so the decision itself is testable without
-// a lane on disk and without a git call.
+// a lane on disk and without a git call. `marked_issue` is the dispatch mark read from the
+// environment — the fact that makes the human-or-child question mechanical rather than the model's to
+// judge (joshuafolkken/kit#1904).
 interface LaneCutState {
 	directory: string
 	carried: (now?: Date) => RunCut | undefined
+	marked_issue: string | undefined
 }
 
 function current_state(): LaneCutState {
-	return { directory: process.cwd(), carried: run_cut.carried_cut_sync }
+	return {
+		directory: process.cwd(),
+		carried: run_cut.carried_cut_sync,
+		marked_issue: lane_child_marker.marked_issue(),
+	}
 }
 
-// **The resumed process must stay silent, and the cut record is what says so.** After a cut,
+// **The dispatch mark is what tells a child apart from a person, and it counts only for this lane.**
+// A person working in the lane carries no mark, so the rule stays silent for them — the
+// human-or-child call is read from the environment, never left to the model. A mark that leaked in
+// from the parent session names some other issue, so requiring it to equal this lane's issue reads
+// that leak as a person too (joshuafolkken/kit#1904).
+//
+// **The resumed process must also stay silent, and the cut record is what says so.** After a cut,
 // `adopt_cut` leaves the record in place with `is_handed_off: false`, so a carried record naming this
 // issue means the process asking is the one the cut already produced. Without this half the rule
 // would fire on the fresh process too — refusing a gate call on a run that had kept the rule
@@ -107,6 +121,8 @@ function uncut_lane_issue(state: LaneCutState): string | undefined {
 	const issue = lane_paths.lane_issue_of(state.directory)
 
 	if (issue === undefined) return undefined
+
+	if (state.marked_issue !== issue) return undefined
 
 	return state.carried()?.issue === issue ? undefined : issue
 }
@@ -126,19 +142,20 @@ function is_uncut_gate(command: string, state: LaneCutState = current_state()): 
 // to go and read which of the other five leave it holding the run — the same reason the WIP cap's
 // delivery names its three interrupt tests instead of naming the file they live in.
 const PRE_GATE_CUT_REASON =
-	'⛔ pre-gate cut: this checkout is a lane and the gate is the boundary to cut at, so take the cut ' +
-	'before running it. `pnpm josh run:cut <N>` ends this process and relaunches a fresh one that ' +
-	'resumes from the gate, dropping the thinking built up while implementing rather than carrying it ' +
-	'on every later request — joshuafolkken/kit#1839 measured 176K of 204K output riding across that ' +
-	'boundary, and joshuafolkken/kit#1864 measured the step itself firing 0 times in 6 lane children ' +
-	'while it was carried as prose. Issue `pnpm josh run:cut <N>` now, and read the verdict: on `cut`, ' +
-	'**end the turn immediately** — the fresh process owns the run from there and must not be waited ' +
-	'for; on `not-a-lane`, `unready`, `busy`, `failed` or `unknown`, this process carries the run on ' +
-	'and the gate is simply the next call. Never relaunch a second process after `busy`. **If you are ' +
-	'a person working in this lane rather than a dispatched child, do not take the cut** — it would ' +
-	'launch a detached run behind you; reissue the gate instead, which passes because this fires once ' +
-	'per run. The procedure is `.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue the gate ' +
-	'once the cut has answered — it cannot repeat on the call in hand.'
+	'⛔ pre-gate cut: this checkout is a lane dispatched for this issue and the gate is the boundary to ' +
+	'cut at, so take the cut before running it. `pnpm josh run:cut <N>` ends this process and ' +
+	'relaunches a fresh one that resumes from the gate, dropping the thinking built up while ' +
+	'implementing rather than carrying it on every later request — joshuafolkken/kit#1839 measured ' +
+	'176K of 204K output riding across that boundary, and joshuafolkken/kit#1864 measured the step ' +
+	'itself firing 0 times in 6 lane children while it was carried as prose. Issue ' +
+	'`pnpm josh run:cut <N>` now, and read the verdict: on `cut`, **end the turn immediately** — the ' +
+	'fresh process owns the run from there and must not be waited for; on `not-a-lane`, `unready`, ' +
+	'`busy`, `failed` or `unknown`, this process carries the run on and the gate is simply the next ' +
+	'call. Never relaunch a second process after `busy`. This fired because the dispatch mark names ' +
+	'this lane; a person working here carries no mark and sees no refusal, so there is no ' +
+	'human-or-child judgement left to make. The procedure is ' +
+	'`.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue the gate once the cut has answered — ' +
+	'this fires once per run, so it cannot repeat on the call in hand.'
 
 const pre_gate_cut = {
 	PRE_GATE_CUT_REASON,

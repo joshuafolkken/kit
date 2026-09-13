@@ -2,6 +2,7 @@ import { telegram_notify } from '#scripts/git/telegram-notify'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_issue_number } from '#scripts/run/run-issue-number'
+import { lane_child_marker } from './lane-child-marker'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
@@ -99,7 +100,14 @@ function started(lane: LaneInfo, log_path: string): DispatchOutcome {
 	const notes: Array<string> = []
 	const invocation = child_invocation(lane.issue)
 	const result = detached_launch.launch(
-		{ argv: detached_launch.agent_argv(invocation), cwd: lane.directory, log_path },
+		{
+			argv: detached_launch.agent_argv(invocation),
+			cwd: lane.directory,
+			log_path,
+			// The mark that tells the child it was dispatched rather than typed (joshuafolkken/kit#1904),
+			// so the pre-gate cut fires from the environment instead of the model's reading of the prompt.
+			env: lane_child_marker.env_for(lane.issue),
+		},
 		(note) => {
 			notes.push(note)
 		},

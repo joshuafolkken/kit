@@ -3,6 +3,7 @@ import path from 'node:path'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -91,7 +92,16 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 			argv: { command: 'claude', args: ['-p', `fullrun #${ISSUE}`] },
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
+			env: { [lane_child_marker.KEY]: ISSUE },
 		})
+	})
+
+	// **The mark is what tells the child it was dispatched rather than typed** (joshuafolkken/kit#1904),
+	// so the pre-gate cut fires from the environment instead of the model's reading of its own prompt.
+	it('marks the child as dispatched for this issue', async () => {
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(launch.mock.calls[0]?.[0].env).toStrictEqual({ [lane_child_marker.KEY]: ISSUE })
 	})
 
 	it('records the path it writes to, so an unrecorded lane is not a reachable state', async () => {

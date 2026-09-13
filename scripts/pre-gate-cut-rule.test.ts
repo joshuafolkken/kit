@@ -36,11 +36,12 @@ describe('the delivered text — what the refusal states', () => {
 		expect(delivered).toContain('end the turn immediately')
 	})
 
-	// **The path test is looser than `run:cut`'s open-lane test, so a person working inside a lane is
-	// on its firing side.** Without this sentence the refusal reads as an instruction to cut, and
-	// following it would launch a detached run behind them.
-	it('tells a person working in the lane not to take the cut', () => {
-		expect(delivered).toContain('rather than a dispatched child, do not take the cut')
+	// **The dispatch mark is what fires the refusal now, so a person sees none** (joshuafolkken/kit#1904).
+	// The old text warned a person on the firing side not to cut; the mark takes them off it, so the
+	// refusal states why it fired rather than telling someone to ignore it.
+	it('states that the dispatch mark fired it, and a person carries none', () => {
+		expect(delivered).toContain('the dispatch mark names this lane')
+		expect(delivered).toContain('carries no mark and sees no refusal')
 	})
 })
 
@@ -61,12 +62,23 @@ describe(`${TOPIC_FILE} — the single source for the rule and the measurement b
 	// that fired in an ordinary checkout would refuse the gate of every interactive run, which this
 	// repository treats as worse than no rule at all.
 	it.each([
-		'**It fires in a lane and nowhere else.**',
+		'**It fires for a marked child and nowhere else**',
 		'**It is silent once the cut is carried**',
 		'**It fires once per run.**',
-		// The correction of a claim this document used to make the other way round.
-		'**The line it draws is not the same one `run:cut` draws**',
+		// The mark is what makes the guard's half mechanical, so the guard and `run:cut` need not agree.
+		'the guard and the command need not agree byte for byte',
 	])('states the boundary %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+
+	// **The mark's single-source documentation** (joshuafolkken/kit#1904): its name, meaning and
+	// lifetime live here and in the one module, so a reader learns what fires the rule in one place.
+	it.each([
+		'### The dispatch mark',
+		'`JOSH_LANE_CHILD`',
+		'scripts/lane/lane-child-marker.ts',
+		'documented here and nowhere else',
+	])('states the dispatch mark %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 
@@ -88,7 +100,9 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	// trigger has not been identified. This one's is a checkout that is not a lane, or a cut already
 	// taken.
 	it('says what a turn with no trigger means', () => {
-		expect(content).toContain('レーン以外の checkout に居る、または既に cut 済み')
+		expect(content).toContain(
+			'レーン以外の checkout に居る、目印が無い（レーン内の人）、または既に cut 済み',
+		)
 	})
 })
 

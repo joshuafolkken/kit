@@ -69,6 +69,12 @@ interface LaunchRequest {
 	// launch did before joshuafolkken/kit#1746 and what a caller with nowhere to write still gets — the
 	// log is an improvement on the diagnosis, never a precondition for starting a session.
 	log_path?: string | undefined
+	// Extra variables to set on the child, spread **after** the parent-session strip below, so a caller
+	// can hand the child a fact the inherited environment does not carry — a dispatched lane child's mark
+	// among them (joshuafolkken/kit#1904). Setting it here rather than mutating `process.env` keeps the
+	// launcher's own environment untouched, and spreading it last means an explicit value wins over an
+	// inherited one of the same name.
+	env?: Readonly<Record<string, string | undefined>>
 }
 
 function is_control_character(character: string): boolean {
@@ -244,12 +250,16 @@ function ensure_log(log_path: string, on_error: (note: string) => void): void {
 // and a session that runs without ever picking the run up.
 // Lifted out of the call so the `spawn` fits on one line, which is where the suppression below has to
 // sit: SonarQube's marker applies to the line the issue is raised on and to nothing else.
-function spawn_options(cwd: string, log: number | undefined): SpawnOptions {
+function spawn_options(
+	cwd: string,
+	log: number | undefined,
+	environment: Readonly<Record<string, string | undefined>> = {},
+): SpawnOptions {
 	return {
 		cwd,
 		detached: true,
 		stdio: log === undefined ? 'ignore' : ['ignore', log, log],
-		env: { ...process.env, ...agent_session_environment.removed_environment() },
+		env: { ...process.env, ...agent_session_environment.removed_environment(), ...environment },
 	}
 }
 
@@ -276,7 +286,7 @@ function spawned(
 	on_error: (note: string) => void,
 ): LaunchResult {
 	const { command, args } = request.argv
-	const child = spawn(command, [...args], spawn_options(request.cwd, log)) // NOSONAR — see above
+	const child = spawn(command, [...args], spawn_options(request.cwd, log, request.env)) // NOSONAR — see above
 
 	child.on('error', (error) => {
 		on_error(note_of(error))

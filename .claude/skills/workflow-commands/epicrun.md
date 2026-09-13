@@ -531,7 +531,11 @@ lands on the `main` the next one is then measured against.
 **A lane child may cut its own turn before the gate.** Implementation done, it ends its process and a
 fresh one resumes the same lane from the gate onward, so the thinking it built up while implementing
 is dropped rather than carried on every later call — the boundary, the two commands and the resume
-verification are `pre-gate-cut.md`, the single source (joshuafolkken/kit#1839).
+verification are `pre-gate-cut.md`, the single source (joshuafolkken/kit#1839). **The child is told
+apart from a person, and its resume stage is handed to it, by a mark the dispatch sets** —
+`JOSH_LANE_CHILD`, the lane's issue number — so the cut fires mechanically and a resumed child skips
+the entry it has already done rather than reconstructing it (`pre-gate-cut.md` → "The dispatch mark"
+and "The stage is passed to the resumed child", joshuafolkken/kit#1904).
 
 **One kind of child takes no lane beside anything: an interrupt whose subject is a defect in the
 verification path itself.** It runs alone, and the batch resumes only once it has merged. **Decide it
