@@ -660,7 +660,7 @@ All of these are `epicrun.md`'s, and are reached here in the same order and for 
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `epicrun.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:preflight <N>` before each child that is not in a lane | `epicrun.md` → "Preflight" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `epicrun.md` → "Progress while the run is quiet" |
-| `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
+| `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup-reference.md` → "When `pnpm josh release` runs" |
 
 **Two more run once per session and are this file's own, not `epicrun.md`'s**:
 `pnpm josh run:carry --begin "<the invocation, single-spaced>" --owner "$PPID"` before the plan and

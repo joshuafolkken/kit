@@ -103,7 +103,7 @@ WIP 上限の引き金は Issue の**作成**だけを見る。`…/issues/<N>/c
 - `scripts/claude-settings-hooks.test.ts` — `rule:guard` が `PreToolUse` に `Bash` だけを名指しして配線され、タイムアウトを宣言し、実在する josh サブコマンドを指すこと
 - `scripts/backlog-manufacturing-rule.test.ts` — WIP 上限が `wip-cap.md` に単一ソースとして存在し、配送文が数え方・拒否・2 つの免除・免除を決める 3 条件を運ぶこと
 - `scripts/turn-batching-rule.test.ts` — バッチングの配送文が判断基準を運び、参照先が `CLAUDE.md` ではなくこのディレクトリの `turn-batching.md` であること
-- `scripts/run-progress-document-rule.test.ts` — 早すぎる進捗報告の手順が `.claude/skills/workflow-commands/epicrun.md` の該当節に単一ソースとして存在し、この文書が行と 1 ラン 1 回の例外を書いていること。発火・非発火と「毎回発火する」ことは `scripts/rules/early-heartbeat.test.ts` が固定する
+- `scripts/document/document-markers.test.ts` — 早すぎる進捗報告の手順が `.claude/skills/workflow-commands/epicrun.md` の該当節に単一ソースとして存在し、この文書が行と 1 ラン 1 回の例外を書いていること。発火・非発火と「毎回発火する」ことは `scripts/rules/early-heartbeat.test.ts` が固定する
 - `scripts/issue-comments-rule.test.ts` — コメント読み取りの手順が `SKILL.md` → §2g に単一ソースとして存在し、3 つの `#N` 入口がそれを**再掲せずに指す**こと（矛盾時の規則を 3 箇所に写せばクローンになる）。フックが届かないセッションでも規則が残ることを、この対で担保する
 - `scripts/shell-body-rule.test.ts` — 本文のシェル評価が `shell-body.md` に単一ソースとして存在し、配送文が被害・安全な綴り・再発行の指示を運ぶこと
 - `scripts/piped-verification-rule.test.ts` — 検証コマンドのパイプが `output-bounds.md` に単一ソースとして存在し、配送文が仕組み・逃げ道・境界の 3 つを運び、読み取り専用の一覧を巻き込んでいないこと

@@ -35,7 +35,7 @@ egress が `403` で拒否されるため、GraphQL を経由するサブコマ�
 **この区別は機械には引けない。** `scripts/gh-document-guard.test.ts` はフェンス付きコードブロックだけを
 走査する。散文まで広げると、41 箇所のうち 39 箇所が「禁止の引用」か「対応状況の記録」であるため、
 allowlist に 25 件を並べることになり、それは何も守らない（joshuafolkken/kit#1505）。そこでガードは
-フェンスに留め、散文の側はこの規則と `scripts/gh-prose-rest-rule.test.ts` のマーカーテストで押さえる。
+フェンスに留め、散文の側はこの規則と `scripts/gh-document-guard.test.ts` のマーカーテストで押さえる。
 
 **書き換えるときは `pnpm josh` のコマンドで置き換えられないかを先に見る。** 例えば Issue の状態を読むのは
 `gh issue view` ではなく `pnpm josh issue:state <N>` で、これはラベルと `human_review` まで一度に返す。
