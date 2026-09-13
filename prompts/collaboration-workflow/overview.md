@@ -32,4 +32,4 @@
   2. **コード内コメント、テストタイトル（`describe` / `it` / `expect`）、コミットメッセージ**: リポジトリのコード規約であり、開発者個人の言語設定とは別の軸で決まる。
   3. **スクリプトが出力する固定文字列**: Telegram のヘッダーラベル（`Planning` / `Completion` など）、`Issue:` / `PR:` の URL ラベル、`--notify-message` 省略時の既定メッセージ。AI が書く文面ではなく、翻訳の仕組みも持たない。
 
-`JOSH_SESSION_LANG` は **開発者個人の設定**であり、`.env`（gitignore 済み・非コミット）に置く。リポジトリ共有の設定ではないため、consumer ごと・開発者ごとに自由に変えてよい。`josh sync` で上書きされることもない。**解決値はセッション開始時と毎ターン、`SessionStart` / `UserPromptSubmit` フック（`pnpm josh session:lang`）がコンテキストへ差し込む**ので、エージェントが `.env` を読まなくても言語を取り違えない。フック出力を表示しないハーネス（Codex / Gemini / Cursor）は従来どおり `.env` を読んで解決する。この変数がスクリプトの挙動を変えることはなく（`session:lang` が解決値を表示のために読むだけ）、制御するのは AI が書く文面の言語だけである。
+`JOSH_SESSION_LANG` は **開発者個人の設定**であり、`.env`（gitignore 済み・非コミット）に置く。リポジトリ共有の設定ではないため、consumer ごと・開発者ごとに自由に変えてよい。`josh sync` で上書きされることもない。**解決値は毎ターン、`UserPromptSubmit` フック（`pnpm josh session:lang`）が 1 度だけコンテキストへ差し込む**ので、エージェントが `.env` を読まなくても言語を取り違えない（最初のターンで二重解決していたため `SessionStart` からは外した）。フック出力を表示しないハーネス（Codex / Gemini / Cursor）は従来どおり `.env` を読んで解決する。この変数がスクリプトの挙動を変えることはなく（`session:lang` が解決値を表示のために読むだけ）、制御するのは AI が書く文面の言語だけである。

@@ -79,6 +79,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// second ~0.16 s tsx start off. The script calls `process.loadEnvFile` itself instead, which is
 		// node's own `--env-file` parser with node's own precedence.
 	},
+	'pretool:guard': {
+		script: 'scripts/pretool-guard.ts',
+		description:
+			'Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin)',
+		category: 'Development',
+		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this is the one
+		// PreToolUse hook consumers run before every guarded call, so it must stay eligible for
+		// in-process dispatch rather than pay a second tsx start. Each guard it composes loads `.env`
+		// through the shared loader.
+	},
 	'session:lang': {
 		script: 'scripts/josh/session-language-cli.ts',
 		description:

@@ -133,6 +133,7 @@ const ALIASES: Record<string, string> = {
 	lnd: 'lane:dispatch',
 	ig: 'investigation:guard',
 	rug: 'rule:guard',
+	ptg: 'pretool:guard',
 	ruv: 'rule:value',
 	ev: 'eval',
 	es: 'eval:scope',

@@ -35,9 +35,15 @@ const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = [...SHARED_PATH_MARKERS,
 // is validated against the roots such a transcript can legitimately be under before anything stats it
 // (joshuafolkken/kit#1485). It stats and never puts a byte on disk, which is the price of the
 // exemption.
+//
+// `plugin-install-hint` is the third: it reads `~/.claude/plugins` (best-effort) to suppress the
+// plugin-install hint at the end of `josh init` / `josh sync` when the kit plugin is already present.
+// It only reads the directory listing and never puts a byte on disk, which is the price of the
+// exemption (joshuafolkken/kit#1930).
 const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
 	path.join('cost', 'cost-transcript.ts'),
 	path.join('run', 'run-liveness.ts'),
+	path.join('init', 'plugin-install-hint.ts'),
 ]
 // Every way a Node script can put bytes on disk — sync, async and `fs/promises` alike — plus the
 // low-level primitives the named calls are built on. Each entry is written so it can only match a

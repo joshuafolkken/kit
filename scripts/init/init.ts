@@ -15,6 +15,7 @@ import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-action
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
+import { plugin_install_hint_module } from './plugin-install-hint'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -177,15 +178,7 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 // rather than through `sync`'s own `main()`, so the guard there never ran for it — and on top of the
 // 14 files #868 reproduced, `init` also rewrites `package.json` scripts and devDependencies
 // (joshuafolkken/kit#879). Checked before the first write, for the reason the sync guard is.
-function main(): void {
-	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
-
-	console.info('\n🚀 Initializing @joshuafolkken/kit\n')
-	run_config_file_actions()
-
-	console.info('\nPackage scripts:')
-	merge_project_package_json()
-
+function run_ai_file_actions(): void {
 	console.info('\nAI files:')
 	// `init` writes the same npm-disabling `.github/dependabot.yml` that `sync` distributes, so a
 	// freshly scaffolded repository is exposed from its first commit — and a new private repository
@@ -197,6 +190,19 @@ function main(): void {
 
 	report_repository_settings(name_with_owner)
 
+	plugin_install_hint_module.report_plugin_install_hint()
+}
+
+function main(): void {
+	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
+
+	console.info('\n🚀 Initializing @joshuafolkken/kit\n')
+	run_config_file_actions()
+
+	console.info('\nPackage scripts:')
+	merge_project_package_json()
+
+	run_ai_file_actions()
 	console.info('\n✅ Done.\n')
 }
 

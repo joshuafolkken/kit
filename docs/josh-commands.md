@@ -439,7 +439,7 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 
 ### `josh session:lang`
 
-Print, on stdout, the language this session writes in, resolved from `JOSH_SESSION_LANG` ([#1903](https://github.com/joshuafolkken/kit/issues/1903)). Like the other hooks it is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `SessionStart` and `UserPromptSubmit` events so the resolved value is injected into context at session start and on every turn. The handler is added beside the existing hooks in each event's `matcher: ""` entry:
+Print, on stdout, the language this session writes in, resolved from `JOSH_SESSION_LANG` ([#1903](https://github.com/joshuafolkken/kit/issues/1903)). Like the other hooks it is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `UserPromptSubmit` event so the resolved value is injected into context on every turn. The handler is added beside the existing hooks in that event's `matcher: ""` entry:
 
 ```json
 { "type": "command", "command": "pnpm josh session:lang", "timeout": 10 }
@@ -447,7 +447,7 @@ Print, on stdout, the language this session writes in, resolved from `JOSH_SESSI
 
 `JOSH_SESSION_LANG` is a personal, non-committed setting kept in `.env`, which the harness never loads into the process environment — so before this the value was invisible unless the agent read the file itself, and a one-word prompt like `diag` had nothing to infer a language from and drifted to the surrounding English. The `.env` read reuses the one loader (`process.loadEnvFile`, keeping node's precedence: a value already in the process environment wins over the file's), never a second parser. **Unset, empty and no-`.env` all resolve to `ja`** — the state a worktree without a `.env`, a cloud session and a consumer repository land in — and the printed line names the `JOSH_SESSION_LANG=en` opt-in for English. The line itself is a script-fixed string, so it stays English by the same rule that pins the Telegram header labels.
 
-**Wired to both events rather than one.** The drift happens on a session's first turn and is overwritten each turn by the English hook text, so a single `SessionStart` injection is too weak; `UserPromptSubmit` repeats it every turn. It declares no `tsx_arguments`, so it stays eligible for in-process dispatch rather than paying a second tsx start on every prompt.
+**Wired to `UserPromptSubmit` alone ([#1930](https://github.com/joshuafolkken/kit/issues/1930)).** The drift happens on a session's first turn and is overwritten each turn by the English hook text, so the injection has to repeat every turn — which `UserPromptSubmit` already does, the first turn included. It was also on `SessionStart`, but that only made the first turn resolve it twice, so that wiring was removed. It declares no `tsx_arguments`, so it stays eligible for in-process dispatch rather than paying a second tsx start on every prompt.
 
 ### `josh cspell`
 
@@ -1265,9 +1265,21 @@ Diagnose — and optionally repair — PATH shadowing of the global `josh`.
 ```bash
 pnpm josh doctor          # alias: josh dr — diagnose only
 pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
+pnpm josh doctor --ports  # also print the per-repository port-seed table
 ```
 
 `doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`). When the PATH `josh` differs from the pnpm-global one, it prints the same shadowing warning as `josh version` plus the recovery command.
+
+In a repository that consumes kit, `doctor` then prints a **Consumer setup** section ([#1930](https://github.com/joshuafolkken/kit/issues/1930)) — four checks for the ways the distribution can go silently wrong, each a one-line `✓` / `⚠` verdict that never fails the command:
+
+| Check           | Warns when                                                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **kit plugin**  | The plugin is not declared in `.claude/settings.json` (skills never load) — run `pnpm josh sync`, and `claude plugin install kit@kit` once if skills are still missing. |
+| **git hooks**   | `core.hooksPath` is set, which diverts git away from the hooks lefthook installs, so no pre-commit hook runs — unset it.                                                |
+| **`CLAUDE.md`** | The pointer resolves to rules that are not installed (`pnpm install`) or `CLAUDE.md` is missing entirely (`pnpm josh init`).                                            |
+| **secretlint**  | The `secretlint` binary is not installed, so the pre-commit secret scan cannot run — `pnpm install`.                                                                    |
+
+The section is printed only inside a kit consumer, so kit's own `doctor` stays quiet about it. kit is recognized by its own package name; a consumer either declares the dependency or already has it installed.
 
 `doctor` also reports the repository's **Dependabot security updates** setting, the prerequisite the distributed `.github/dependabot.yml` depends on once npm version updates are disabled ([#803](https://github.com/joshuafolkken/kit/issues/803)). `josh sync` prints the same line unconditionally, and `josh init` prints it when it actually wrote the config — see [docs/sync.md](./sync.md) for why it runs there too. Unlike those two, `doctor` reports only where the prerequisite exists: it skips the line outside a git work tree, and skips it in a repository that has no distributed `.github/dependabot.yml`. `doctor` diagnoses the global install and is routinely run from a home directory or from a clone of an unrelated project, where a Dependabot warning — and an enabling command aimed at someone else's repository — would be noise. Past that gate it always reports, including when the lookup fails, since a broken or unauthenticated `gh` must surface as `could not be read` rather than as silence. One of four results is printed:
 
@@ -1316,7 +1328,7 @@ Entries are `owner/repo=/absolute/path`, comma-separated, and an override wins o
 
 #### Port seeds across repositories
 
-`doctor` prints each discovered repository's **port seed** and the dev / preview ports it resolves to at its main work tree, and names any seed held by more than one of them ([#1494](https://github.com/joshuafolkken/kit/issues/1494)):
+**Printed only with `--ports` since [#1930](https://github.com/joshuafolkken/kit/issues/1930)** — it discovers every sibling repository and was the slowest, least diagnostic part of the default output, so it is now opt-in. With the flag, `doctor` prints each discovered repository's **port seed** and the dev / preview ports it resolves to at its main work tree, and names any seed held by more than one of them ([#1494](https://github.com/joshuafolkken/kit/issues/1494)):
 
 ```text
 Port seeds (dev / preview, and repositories sharing one):

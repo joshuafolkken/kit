@@ -46,11 +46,6 @@
 						"type": "command",
 						"command": "pnpm josh audit:provision",
 						"timeout": 180
-					},
-					{
-						"type": "command",
-						"command": "pnpm josh session:lang",
-						"timeout": 10
 					}
 				]
 			}
@@ -81,27 +76,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "pnpm josh batch:guard",
-						"timeout": 20
-					}
-				]
-			},
-			{
-				"matcher": "Read|Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "pnpm josh investigation:guard",
-						"timeout": 20
-					}
-				]
-			},
-			{
-				"matcher": "Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "pnpm josh rule:guard",
+						"command": "pnpm josh pretool:guard",
 						"timeout": 20
 					}
 				]
@@ -109,7 +84,7 @@
 		],
 		"PostToolUse": [
 			{
-				"matcher": "Edit|Write|Bash",
+				"matcher": "Edit|Write",
 				"hooks": [
 					{
 						"type": "command",

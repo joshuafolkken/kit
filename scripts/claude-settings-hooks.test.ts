@@ -17,15 +17,12 @@ const GITIGNORE_PATH = fileURLToPath(new URL('../.gitignore', import.meta.url))
 // what prettier and eslint made of it was a whole-project run. The command has to stay a `josh`
 // subcommand: a shell one-liner here would be a second copy of the logic in every consumer.
 const FORMAT_HOOK_COMMAND = 'pnpm josh format:edited'
-// The batching guard, wired to `PreToolUse` because that is the only event that can still stop a call
-// (joshuafolkken/kit#1390). The density line the formatting hook carries rides `PostToolUse`, where
-// the round trip has already been spent — three runs measured after it shipped came in unchanged at
-// 1.10–1.12 calls per round trip against a 1.50 floor.
-const GUARD_HOOK_COMMAND = 'pnpm josh batch:guard'
-// The investigation guard, on the same event and for the same reason (joshuafolkken/kit#1460): the
-// threshold it enforces was already distributed as prose and as an enumeration row, and run #1441
-// asked the question once and then read eight more unedited files without asking again.
-const READ_GUARD_HOOK_COMMAND = 'pnpm josh investigation:guard'
+// The consolidated PreToolUse guard (joshuafolkken/kit#1930): one process that runs the batching
+// guard (joshuafolkken/kit#1390), the investigation guard (joshuafolkken/kit#1460) and the rule
+// delivery guard (joshuafolkken/kit#1524) in turn. `PreToolUse` is the only event that can still stop
+// a call, and folding the three into one is two process starts saved on every guarded call — three
+// launches on every consumer's Bash call became one.
+const PRETOOL_GUARD_HOOK_COMMAND = 'pnpm josh pretool:guard'
 // Derived from the script's own per-spawn bound rather than written as a number: raising that bound
 // has to raise the declared budget with it, or the harness kills a run the script still considers
 // healthy — and it lands at a moment the script did not choose, possibly inside `prettier --write`.
@@ -46,40 +43,21 @@ const MINIMUM_GUARD_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 // Splitting on `|` alone would read the equally valid `"Edit, Write, Bash"` as one tool named
 // `Edit, Write, Bash` and fail every case below on a settings file that is correct.
 const TOOL_SEPARATORS = /[|,]/u
-// The formatter formats the file an edit named, so it needs the two edit tools; `Bash` joined them
-// for the density line it also carries (joshuafolkken/kit#1337), which reaches the sessions that edit
-// through `sed` — seven of the ten most recent in this checkout, and the ones measured under the floor.
-const FORMAT_TOOLS = ['Edit', 'Write', 'Bash']
-// The guard names `Edit` beside `Bash` since joshuafolkken/kit#1762, and `Read` since
-// joshuafolkken/kit#1798. It named `Bash` alone while
-// `is_guarded_call` answered `false` for every write, which made a wider matcher a process that could
-// only ever answer "allow"; the predicate was widened first, so the matcher now reaches a question that
-// has an answer. It is worth the process start because `Edit` alone carries **164 of the 251
-// recoverable round trips** measured over 20 runs, which `Bash` cannot reach however large its share of
-// the calls. **`Read` is the one the predicate was already answering for**: it has been bundleable all
-// along, so the wiring was the only thing keeping the refusal off the shape a run spends most of its
-// investigation in — 35.9% of one measured run's turns — and the matcher is what
-// joshuafolkken/kit#1798 measured as the reason only 2 of 7 clusters were caught.
-// **`Write` names it too since joshuafolkken/kit#1848**, but for the notice rather than the refusal:
-// `is_guarded_call` still answers `false` for it — a reissued `Write` is unconditional, so a false
-// positive on one would overwrite a sibling's applied edit in silence — so it is never refused. What
-// the matcher now reaches is `is_notice_call`, which has an answer: a run of single-call `Write` turns
-// earns a non-blocking notice, the largest recoverable contributor the refusal could never touch.
-const GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write']
-// The investigation guard names both, because in this repository the reading is split between them:
-// run #1441 issued 5 `Read` calls against 10 `cat`, 16 `sed` and 1 `tail`, so a `Read`-only wiring
-// would miss the idiom that carries most of the text. It is safe on `Bash` because it refuses only a
-// line that writes nothing — `is_read_only_call`, which is the test the batching guard used to share
-// with it and kept under that name when it widened (joshuafolkken/kit#1762).
-const READ_GUARD_TOOLS = ['Read', 'Bash']
-// The rule guard (joshuafolkken/kit#1524): the one dispatcher for rules whose trigger can be named as
-// a tool call, so the next rule to leave `CLAUDE.md` costs a row in `delivered-rules.ts` rather than a
-// fourth process in front of every call.
-const RULE_GUARD_HOOK_COMMAND = 'pnpm josh rule:guard'
-// `Bash` alone, and for a reason of its own rather than the batching guard's: every rule this
-// dispatcher carries names its binding moment as a shell call — filing an Issue, reading one, pushing
-// — so an `Edit` payload would start a process with no row to match it against.
-const RULE_GUARD_TOOLS = ['Bash']
+// The formatter formats the file an edit named, so it needs exactly the two edit tools. `Bash` was
+// dropped from the matcher (joshuafolkken/kit#1930): a shell call has no edited file to format, so
+// running the formatter after every `Bash` was overhead every consumer paid on every command. The
+// density line it used to also carry (joshuafolkken/kit#1337) is not worth that per-call cost, and
+// the batching it fed now rides the consolidated PreToolUse guard, which does intervene before the call.
+const FORMAT_TOOLS = ['Edit', 'Write']
+// The union of the three composed guards' matchers, since one process now answers for all of them.
+// `Bash` is where the rule delivery guard (joshuafolkken/kit#1524) and the read-only half of the
+// batching guard bind; `Edit` carries the largest share of the batching guard's recoverable round
+// trips (joshuafolkken/kit#1762); `Read` is the shape a run spends most of its investigation in
+// (joshuafolkken/kit#1798); `Write` earns the batching guard's non-blocking notice
+// (joshuafolkken/kit#1848). Each composed guard self-gates on the tool name inside its own candidate
+// test, so naming the union is safe — a guard the call does not concern returns "allow" without ever
+// reading the transcript.
+const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write']
 // The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
 // rather than a push that dies after the unit suite has already run.
@@ -95,6 +73,12 @@ const MINIMUM_PROVISION_TIMEOUT_SECONDS =
 // starts no download and reads no large file, so one script start is its whole budget.
 const SESSION_LANG_HOOK_COMMAND = 'pnpm josh session:lang'
 const MINIMUM_SESSION_LANG_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
+// The per-turn echoes are injected on every prompt, so each stays bounded (joshuafolkken/kit#1930).
+// The work-summary reminder carries every behavioral directive `prompt-hook-brevity.test.ts` pins
+// (its REQUIRED_DIRECTIVES) and points at the full rule in `CLAUDE.md`, which lands it near 800
+// characters. The real per-turn budget is the joined-text ceiling that suite owns (1,100 bytes); this
+// per-echo bound only has to keep a single reminder from growing past that same ceiling on its own.
+const ECHO_MAX_LENGTH = 1100
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.
@@ -223,15 +207,10 @@ describe_session_hook('.claude/settings.json — session-start audit provisionin
 	minimum_timeout_seconds: MINIMUM_PROVISION_TIMEOUT_SECONDS,
 })
 
-describe_session_hook('.claude/settings.json — session-start language resolution', {
-	event: 'SessionStart',
-	command: SESSION_LANG_HOOK_COMMAND,
-	minimum_timeout_seconds: MINIMUM_SESSION_LANG_TIMEOUT_SECONDS,
-})
-
-// `UserPromptSubmit` carries no tool matcher either, so it shares the session hook's three checks and
-// the empty-matcher assertion. The language hook rides both events; this is the per-turn half, wired
-// beside the two work-summary echoes rather than replacing them.
+// `UserPromptSubmit` carries no tool matcher, so it shares the session hook's three checks and the
+// empty-matcher assertion. The language hook rides this event alone since joshuafolkken/kit#1930 —
+// wired beside the work-summary echoes — because running it on SessionStart too resolved it twice on
+// the first turn.
 describe('.claude/settings.json — per-turn language resolution', () => {
 	const wiring: HookWiring = {
 		event: 'UserPromptSubmit',
@@ -253,25 +232,76 @@ describe_tool_hook('.claude/settings.json — post-edit formatting hook', {
 	minimum_timeout_seconds: MINIMUM_HOOK_TIMEOUT_SECONDS,
 })
 
-describe_tool_hook('.claude/settings.json — pre-call batching guard', {
+describe_tool_hook('.claude/settings.json — consolidated pre-call guard', {
 	event: 'PreToolUse',
-	command: GUARD_HOOK_COMMAND,
-	tools: GUARD_TOOLS,
+	command: PRETOOL_GUARD_HOOK_COMMAND,
+	tools: PRETOOL_GUARD_TOOLS,
 	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
 })
 
-describe_tool_hook('.claude/settings.json — pre-read investigation guard', {
-	event: 'PreToolUse',
-	command: READ_GUARD_HOOK_COMMAND,
-	tools: READ_GUARD_TOOLS,
-	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
+// The consolidation's own guarantee (joshuafolkken/kit#1930): PreToolUse is one entry running one
+// hook, so the three-launch cost is gone rather than merely relabelled.
+function pretool_entries(): ReadonlyArray<HookMatcher> {
+	return claude_settings_fixture.load_settings().hooks.PreToolUse ?? []
+}
+
+describe('.claude/settings.json — PreToolUse is one consolidated entry', () => {
+	it('declares exactly one matcher entry', () => {
+		expect(pretool_entries()).toHaveLength(1)
+	})
+
+	it('runs exactly one hook, the consolidated guard', () => {
+		const commands = pretool_entries()
+			.flatMap((entry) => entry.hooks)
+			.map((handler) => handler.command)
+
+		expect(commands).toEqual([PRETOOL_GUARD_HOOK_COMMAND])
+	})
 })
 
-describe_tool_hook('.claude/settings.json — pre-call rule delivery guard', {
-	event: 'PreToolUse',
-	command: RULE_GUARD_HOOK_COMMAND,
-	tools: RULE_GUARD_TOOLS,
-	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
+function all_hooks(): ReadonlyArray<HookHandler> {
+	const { hooks } = claude_settings_fixture.load_settings()
+	const events = [hooks.SessionStart, hooks.UserPromptSubmit, hooks.PreToolUse, hooks.PostToolUse]
+
+	return events.flatMap((matchers) => matchers ?? []).flatMap((entry) => entry.hooks)
+}
+
+// joshuafolkken/kit#1930: the language hook fired on both SessionStart and UserPromptSubmit, so the
+// first turn resolved it twice. It rides UserPromptSubmit alone now — every turn, the first included.
+describe('.claude/settings.json — the language hook is not duplicated', () => {
+	it('runs session:lang exactly once across every event', () => {
+		const count = all_hooks().filter(
+			(handler) => handler.command === SESSION_LANG_HOOK_COMMAND,
+		).length
+
+		expect(count).toBe(1)
+	})
+
+	it('does not run session:lang on SessionStart', () => {
+		const starts = (claude_settings_fixture.load_settings().hooks.SessionStart ?? []).flatMap(
+			(entry) => entry.hooks,
+		)
+
+		expect(starts.map((handler) => handler.command)).not.toContain(SESSION_LANG_HOOK_COMMAND)
+	})
+})
+
+// joshuafolkken/kit#1930: an echo hook is injected on every prompt, so each is kept short.
+function echo_commands(): ReadonlyArray<string> {
+	return (claude_settings_fixture.load_settings().hooks.UserPromptSubmit ?? [])
+		.flatMap((entry) => entry.hooks)
+		.map((handler) => handler.command)
+		.filter((command) => command.startsWith('echo '))
+}
+
+describe('.claude/settings.json — the per-turn echoes are short', () => {
+	it('injects at least one reminder echo', () => {
+		expect(echo_commands().length).toBeGreaterThan(0)
+	})
+
+	it('keeps every echo under the per-turn length budget', () => {
+		for (const command of echo_commands()) expect(command.length).toBeLessThan(ECHO_MAX_LENGTH)
+	})
 })
 
 describe('.claude/settings.json — deletion-policy hook reconciliation', () => {

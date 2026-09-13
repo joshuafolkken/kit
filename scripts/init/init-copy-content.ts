@@ -2,6 +2,7 @@ import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-log
 import { workflow_pin_logic } from '#scripts/sync/workflow-pin-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { claude_plugin_config } from './claude-plugin-config'
+import { hook_command_rewrite } from './hook-command-rewrite'
 import { init_logic } from './init-logic'
 
 /**
@@ -18,11 +19,14 @@ import { init_logic } from './init-logic'
  * workflow-pin-logic.ts for why the template refs are not authoritative, and
  * managed-marker-logic.ts for why the stamp is on the file rather than in a list.
  *
- * The consumer's `.claude/settings.json` gets one further pass: the kit plugin's marketplace and
- * `enabledPlugins` declaration is injected here, because the skills that used to be copied now ship
- * as the `kit` plugin and load from that declaration (joshuafolkken/kit#1879). Keeping it on this one
- * function is the same guarantee as the workflow passes — a copy path that skipped it would ship a
- * consumer a settings file that never enables the plugin, and the skills would be missing.
+ * The consumer's `.claude/settings.json` gets two further passes. The kit plugin's marketplace and
+ * `enabledPlugins` declaration is injected, because the skills that used to be copied now ship as the
+ * `kit` plugin and load from that declaration (joshuafolkken/kit#1879). And its hook commands are
+ * rewritten from `pnpm josh` to the published bundle invoked directly with node
+ * (joshuafolkken/kit#1930), so a consumer's guarded call does not pay a `pnpm` launch it never needed.
+ * Keeping both on this one function is the same guarantee as the workflow passes — a copy path that
+ * skipped the plugin block would ship a settings file that never enables the plugin, and one that
+ * skipped the rewrite would leave every consumer hook slower than it has to be.
  */
 function transform_copied_content(destination_path: string, content: string): string {
 	const with_paths = init_logic.transform_distributed_paths(content)
@@ -32,8 +36,15 @@ function transform_copied_content(destination_path: string, content: string): st
 		with_pins,
 		KIT_PACKAGE_NAME,
 	)
+	const with_plugin = claude_plugin_config.apply_plugin_config_for_destination(
+		destination_path,
+		with_marker,
+	)
 
-	return claude_plugin_config.apply_plugin_config_for_destination(destination_path, with_marker)
+	return hook_command_rewrite.apply_hook_command_rewrite_for_destination(
+		destination_path,
+		with_plugin,
+	)
 }
 
 export { transform_copied_content }
