@@ -4,6 +4,8 @@ import { git_command } from '#scripts/git/git-command'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_report } from '#scripts/lane/lane-report'
+import { run_carry, type CarryRead } from './run-carry'
+import { run_hold, type HoldRead } from './run-hold'
 import { run_liveness } from './run-liveness'
 import { run_preflight } from './run-preflight'
 import type { ChildObservation, LaneObservation, Observations } from './run-progress'
@@ -32,8 +34,10 @@ const FIRST_LOAD_AVERAGE = 0
 
 // A listing that arrived and had holders, a listing that arrived empty, and a listing that did not
 // arrive. All three end in no line being printed, and they are kept apart anyway: only the middle one
-// means "there is nothing to report", and saying so for the third would be a confident absence built
-// on a read nobody completed.
+// can mean "there is nothing to report", and saying so for the third would be a confident absence
+// built on a read nobody completed. **The middle one is `idle` only when no run has started** — a run
+// underway with no `in-progress` child yet is `observed` with an empty `children`, which is the
+// heartbeat this file emits before the first label appears (joshuafolkken/kit#1900).
 type ObservationRead =
 	{ kind: 'idle' } | { kind: 'observed'; observations: Observations } | { kind: 'unreadable' }
 
@@ -108,6 +112,46 @@ function read_record_age(paths: ReadonlyArray<string>, now_ms: number): number |
 	return now_ms - Math.max(...times)
 }
 
+function is_hold_present(read: HoldRead): boolean {
+	return read.kind === 'held' || read.kind === 'stale'
+}
+
+function is_carry_present(read: CarryRead): boolean {
+	return read.kind === 'carried' || read.kind === 'expired'
+}
+
+function hold_present(worktree: string | undefined): boolean {
+	return worktree !== undefined && is_hold_present(run_hold.read_hold(run_hold.hold_path(worktree)))
+}
+
+function carry_present(repository: string | undefined): boolean {
+	if (repository === undefined) return false
+
+	return is_carry_present(run_carry.read_carry(run_carry.carry_path(repository)))
+}
+
+// The mechanical records that say a run is underway, read from the same git directories the report
+// clock is keyed on: the work tree's own for the hold, the common one for the carried budget.
+async function has_run_record(): Promise<boolean> {
+	const [worktree, repository] = await git_command.git_directories()
+
+	return hold_present(worktree) || carry_present(repository)
+}
+
+/**
+ * Whether a run has started in this checkout, read from a mechanical record rather than from the
+ * `in-progress` label — the label is exactly what is missing in the window this bridges
+ * (joshuafolkken/kit#1900).
+ *
+ * A registered lane covers an `epicrun` / `backlogrun` parent whose child has not labelled yet — and
+ * it is the one signal already read for the line, so it is asked first and short-circuits the git
+ * reads. A held work tree covers a `fullrun` / `halfrun` between `run:hold` and its first label, and a
+ * carried budget covers a `backlogrun` / `queue` before its first lane opens.
+ */
+async function has_run_started(lanes: ReadonlyArray<LaneObservation>): Promise<boolean> {
+	return lanes.length > 0 || (await has_run_record())
+}
+
 interface ObservationRequest {
 	now_ms: number
 	output_paths: ReadonlyArray<string>
@@ -118,7 +162,7 @@ async function read_observations(request: ObservationRequest): Promise<Observati
 	const [children, lanes] = await Promise.all([read_children(request.repo), read_lanes()])
 
 	if (children === undefined) return UNREADABLE_READ
-	if (children.length === 0) return IDLE_READ
+	if (children.length === 0 && !(await has_run_started(lanes))) return IDLE_READ
 
 	const observations: Observations = {
 		children,
@@ -132,6 +176,7 @@ async function read_observations(request: ObservationRequest): Promise<Observati
 
 const run_progress_read = {
 	PROGRESS_PREFIX,
+	has_run_started,
 	live_target,
 	mark,
 	parse_stamp,

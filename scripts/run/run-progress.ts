@@ -82,6 +82,12 @@ interface ProgressState {
 }
 
 const NO_LANES = 'none'
+// The children slot when the run has started but no child carries `in-progress` yet
+// (joshuafolkken/kit#1900). It is an observed fact — zero in-progress children — not a guess about
+// what will appear: `read_observations` returns an observation at all only because a mechanical record
+// (a lane, a hold, or a carried budget) says a run is underway, and the lanes field beside this one
+// carries whatever evidence exists.
+const NO_CHILD_YET = 'no in-progress child yet'
 const QUIET_MARKER = '⏳'
 // `1970-01-01T00:00:00.000Z` cut after the minutes. Seconds are dropped because the interval this line
 // breaks is measured in minutes, and a heartbeat that claims a precision nobody uses is noise.
@@ -190,6 +196,16 @@ function format_child(child: ChildObservation): string {
 	return `#${child.issue} ${labels} PR:${child.pr_state}`
 }
 
+// An empty set is the pre-label stage, said as such rather than left as a blank slot between the
+// separators (joshuafolkken/kit#1900). After that change a `read_observations` result carries no
+// children exactly when a run has started and none has reached `in-progress` yet, so this is the one
+// place the two cases are told apart on the line.
+function format_children(children: ReadonlyArray<ChildObservation>): string {
+	if (children.length === 0) return NO_CHILD_YET
+
+	return children.map((child) => format_child(child)).join(' · ')
+}
+
 function format_lanes(lanes: ReadonlyArray<LaneObservation>): string {
 	if (lanes.length === 0) return NO_LANES
 
@@ -243,7 +259,7 @@ function format_line(observations: Observations, timing: LineTiming): string {
 	const observed_at = format_observed_at(timing.now_ms)
 	const quiet = format_minutes(timing.now_ms - timing.quiet_since_ms)
 	const unchanged = format_minutes(timing.now_ms - timing.unchanged_since_ms)
-	const children = observations.children.map((child) => format_child(child)).join(' · ')
+	const children = format_children(observations.children)
 	const lanes = format_lanes(observations.lanes)
 	const load = observations.load_average.toFixed(1)
 	const next = format_next_report(timing.now_ms, timing.interval_ms)
@@ -286,7 +302,9 @@ const run_progress = {
 	INTERVAL_KEY,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
+	NO_CHILD_YET,
 	format_child,
+	format_children,
 	format_lanes,
 	format_line,
 	format_next_report,
