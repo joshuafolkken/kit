@@ -3,6 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { gh_spawn } from '#scripts/gh-spawn'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_clock } from './run-progress-clock'
 import { run_progress_config } from './run-progress-config'
@@ -63,6 +64,12 @@ const USAGE =
 const DISABLED_NOTICE = `\`${ENVIRONMENT_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
 const MARKED_NOTICE =
 	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
+// A dispatched lane child carries `JOSH_LANE_CHILD`, and only the outermost run reports progress — a
+// child that started a watcher of its own would be the second one this command's whole design refuses
+// (joshuafolkken/kit#1947). The decision used to live in prose the child read as "start none"; the mark
+// makes it mechanical, so a bare `fullrun #N` handed to a lane no longer reads itself as outermost.
+const LANE_CHILD_NOTICE =
+	'This session is a dispatched lane child (`JOSH_LANE_CHILD`), so no progress watcher is started — the outermost run reports for every child.'
 const IDLE_NOTICE =
 	'No run has started in this checkout (no hold, carried budget, or lane) and no open issue carries `in-progress`, so there is nothing to report.'
 const UNREADABLE_NOTICE =
@@ -139,6 +146,14 @@ function report_usage(): number {
 
 function report_disabled(): number {
 	console.error(DISABLED_NOTICE)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// A lane child declining a watcher is a normal, expected state rather than a fault — the outermost run
+// covers it — so it exits success like a disabled reporter, not failure like an unreadable listing.
+function report_lane_child(): number {
+	console.error(LANE_CHILD_NOTICE)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -460,7 +475,10 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const values = read_arguments(argv)
 
 	if (values === undefined) return report_usage()
+	// `--mark` comes first, so a lane child still records its own real reports for the parent's clock;
+	// what it must not do is run a watcher, which every reporting form below would.
 	if (values.mark === true) return await mark_now()
+	if (lane_child_marker.is_child_of(process.cwd())) return report_lane_child()
 	if (is_disabled()) return report_disabled()
 
 	return await run_watch(values)
@@ -477,6 +495,7 @@ const run_progress_cli = {
 	FAILED_TICK_PREFIX,
 	FRESH_LOOP,
 	IDLE_NOTICE,
+	LANE_CHILD_NOTICE,
 	MARKED_NOTICE,
 	TICK_SECONDS,
 	UNREADABLE_NOTICE,

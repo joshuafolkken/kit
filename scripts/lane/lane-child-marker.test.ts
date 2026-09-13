@@ -37,3 +37,27 @@ describe('marked_issue', () => {
 		},
 	)
 })
+
+describe('is_child_of', () => {
+	// The lane issue is read from the checkout path, and the mark is trusted only where it names that
+	// issue — so a leaked mark for a different lane reads as a person's run (joshuafolkken/kit#1947).
+	const LANE = `/home/dev/.kit-lanes/${ISSUE}`
+
+	it('is true when the mark names the checkout own lane issue', () => {
+		expect(lane_child_marker.is_child_of(LANE, { [lane_child_marker.KEY]: ISSUE })).toBe(true)
+	})
+
+	it('is false when the mark names a different issue, so a leaked variable reads as a person', () => {
+		expect(lane_child_marker.is_child_of(LANE, { [lane_child_marker.KEY]: '9999' })).toBe(false)
+	})
+
+	it('is false when the mark is absent', () => {
+		expect(lane_child_marker.is_child_of(LANE, {})).toBe(false)
+	})
+
+	it('is false in a checkout that is not a lane, whatever the mark says', () => {
+		expect(
+			lane_child_marker.is_child_of('/home/dev/repo', { [lane_child_marker.KEY]: ISSUE }),
+		).toBe(false)
+	})
+})

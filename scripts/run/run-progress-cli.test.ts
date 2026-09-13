@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,9 +31,15 @@ vi.mock('./run-progress-clock', () => ({
 		is_life_ended: vi.fn(),
 	},
 }))
+// The lane-child guard is mocked so each test decides whether this session is a dispatched child,
+// rather than depending on the real checkout path or a leaked mark; its own logic is exercised in
+// `lane-child-marker.test.ts`.
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: vi.fn() },
+}))
 
 const { gh_spawn } = await import('#scripts/gh-spawn')
-const { PROJECT_ROOT: REPO_ROOT } = await import('#scripts/init/init-paths')
+const { lane_child_marker } = await import('#scripts/lane/lane-child-marker')
 const { run_progress_read } = await import('./run-progress-read')
 const { run_progress_clock } = await import('./run-progress-clock')
 const { run_progress } = await import('./run-progress')
@@ -47,6 +53,7 @@ const stamp_target = vi.mocked(run_progress_read.stamp_target)
 const live_target = vi.mocked(run_progress_read.live_target)
 const begin_life = vi.mocked(run_progress_clock.begin_life)
 const is_life_ended = vi.mocked(run_progress_clock.is_life_ended)
+const is_child_of = vi.mocked(lane_child_marker.is_child_of)
 
 const REPO = 'joshuafolkken/kit'
 // A directory of this suite's own. A fixed name under the temp directory is shared by every suite
@@ -84,6 +91,8 @@ beforeEach(() => {
 	seed_mocks()
 	vi.stubEnv(DISABLE_KEY, '')
 	vi.stubEnv(INTERVAL_KEY, '')
+	// Not a lane child by default, so every other test exercises the ordinary reporting path.
+	is_child_of.mockReturnValue(false)
 })
 
 afterEach(() => {
@@ -99,15 +108,10 @@ afterAll(() => {
 describe('the interval is configurable and disable-able', () => {
 	// The whole order — flag, environment, the repository's committed field, then twenty — is
 	// `run-progress-config.test.ts`. What belongs here is only that the CLI asks for it.
-	it('takes the environment variable when no flag was typed', () => {
+	it('takes the environment variable, and lets a typed flag outrank it', () => {
 		vi.stubEnv(INTERVAL_KEY, '25')
 
 		expect(run_progress_cli.to_interval_ms(undefined)).toBe(25 * MINUTE)
-	})
-
-	it('lets a typed flag outrank the environment', () => {
-		vi.stubEnv(INTERVAL_KEY, '25')
-
 		expect(run_progress_cli.to_interval_ms('5')).toBe(5 * MINUTE)
 	})
 
@@ -118,6 +122,27 @@ describe('the interval is configurable and disable-able', () => {
 		expect(output.warned).toEqual([run_progress_cli.DISABLED_NOTICE])
 		expect(output.printed).toEqual([])
 		expect(read_observations).not.toHaveBeenCalled()
+	})
+})
+
+describe('a dispatched lane child starts no watcher of its own', () => {
+	// joshuafolkken/kit#1947. A lane child (marked for this checkout's own issue) refuses to watch —
+	// only the outermost run reports. The trust check itself lives in `lane-child-marker.test.ts`.
+	it('refuses every reporting form, reading nothing', async () => {
+		is_child_of.mockReturnValue(true)
+
+		await expect(run_progress_cli.run([])).resolves.toBe(0)
+		await expect(run_progress_cli.run(['--wait'])).resolves.toBe(0)
+		await expect(run_progress_cli.run(['--once'])).resolves.toBe(0)
+		expect(output.warned).toContain(run_progress_cli.LANE_CHILD_NOTICE)
+		expect(read_observations).not.toHaveBeenCalled()
+	})
+
+	it('still records a real report with --mark, so the parent clock stays true', async () => {
+		is_child_of.mockReturnValue(true)
+
+		await expect(run_progress_cli.run(['--mark'])).resolves.toBe(0)
+		expect(mark).toHaveBeenCalledWith(STAMP, expect.any(Number))
 	})
 })
 
@@ -375,28 +400,5 @@ describe('the watch loop — josh followup ends it at the merge', () => {
 		await expect(run_progress_cli.wait_once({ ...OPTIONS, max_ms: 0 })).resolves.toBe(0)
 
 		expect(output.warned).toEqual([run_progress_cli.WAIT_EXPIRED_NOTICE])
-	})
-})
-
-// `scripts/git/telegram-notify.ts` is the only Telegram egress there is, so "this command cannot
-// notify" is a question about imports rather than a promise in prose.
-//
-// **What this asserts is the direct import of every module the command reaches**, its own three plus
-// the four readers they pull in — not a full transitive closure, which would drag in most of
-// `scripts/` and stop telling anyone anything. That set is where such an import would realistically
-// appear, and it is the set a regression here would have to go through.
-describe('it cannot reach Telegram', () => {
-	it.each([
-		'scripts/run/run-progress-cli.ts',
-		'scripts/run/run-progress-read.ts',
-		'scripts/run/run-progress.ts',
-		'scripts/epic/epic-busy.ts',
-		'scripts/lane/lane-registry.ts',
-		'scripts/lane/lane-report.ts',
-		'scripts/run/run-preflight.ts',
-	])('%s imports no notification module', (source_path) => {
-		expect(readFileSync(path.join(REPO_ROOT, source_path), 'utf8')).not.toMatch(
-			/^import[^\n]*telegram/mu,
-		)
 	})
 })

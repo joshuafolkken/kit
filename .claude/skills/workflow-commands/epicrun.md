@@ -1313,6 +1313,8 @@ from, so a unit can always tell that it is not the outermost, and a watcher star
 print into the unit's context instead of the session the person is watching. `queue` therefore
 starts one for the whole batch, before its first issue, and never one per issue.
 
+**The brief-naming decision is now backed by the command, not only by this prose** (joshuafolkken/kit#1947). A `fullrun #N` dispatched to a lane is handed a bare invocation that names no parent, so a child reading only the paragraph above could conclude it was the outermost and start a watcher — which is what happened. So a dispatched lane child is refused a watcher by its `JOSH_LANE_CHILD` mark: the child still runs `--mark` for the parent's clock, but every reporting form (`--wait`, `--once`, the default watch) exits at once with a notice and reads nothing. The prose stays the single source of *why*; the mark is what makes a child that misreads it harmless.
+
 **In a single-issue run it starts immediately after `pnpm josh run:hold` succeeds** — the first
 point at which the run is committed to running, which is the same place in the order that "before
 step 1 of the loop" is here. The hold `run:hold` just wrote is itself the mechanical record that says

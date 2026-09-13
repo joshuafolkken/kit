@@ -1,4 +1,5 @@
 import { run_issue_number } from '#scripts/run/run-issue-number'
+import { lane_paths } from './lane-paths'
 
 // The mark a dispatched lane child carries, so the pre-gate cut and a resume are decided from the
 // environment rather than from the model's reading of the prompt (joshuafolkken/kit#1904).
@@ -40,7 +41,18 @@ function marked_issue(source: MarkerSource = process.env): string | undefined {
 	return run_issue_number.ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
 }
 
-const lane_child_marker = { KEY, env_for: environment_for, marked_issue }
+// True when this session is a dispatched lane child for the checkout it is running in: the mark is
+// present and names this lane's own issue, read from the checkout path. A numeric mark naming a
+// *different* issue leaked in from a parent session into a checkout it does not belong to, so it is
+// read as a person's run — the trust condition the header describes, applied the same way
+// `pre-gate-cut.ts` applies it to the resume decision (joshuafolkken/kit#1947).
+function is_child_of(directory: string, source: MarkerSource = process.env): boolean {
+	const marked = marked_issue(source)
+
+	return marked !== undefined && marked === lane_paths.lane_issue_of(directory, { ...source })
+}
+
+const lane_child_marker = { KEY, env_for: environment_for, is_child_of, marked_issue }
 
 export type { MarkerSource }
 export { lane_child_marker }
