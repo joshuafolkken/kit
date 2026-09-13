@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
 import type { ReviewCheckout } from './review-checkout'
+import { review_level } from './review-level'
 import { review_tree } from './review-tree'
 
 // joshuafolkken/kit#1241: `/code-review` runs in a forked process that reads none of this
@@ -110,8 +111,8 @@ function gate_line(
 }
 
 describe('review_brief.compose — the level stays first', () => {
-	// `review:level`'s contract is that `$(pnpm josh review:level)` reads the answer. A brief that
-	// buried the level under a heading would break every caller that already reads it that way.
+	// The level-only mode's contract is that `$(pnpm josh review:brief --level-only)` reads the answer.
+	// A brief that buried the level under a heading would break every caller that already reads it that way.
 	it('puts the level alone on the first line', () => {
 		expect(compose({ round: 1, tree: { [FILE_A]: 'x' } }).split('\n', 1)[0]).toBe(LEVEL)
 	})
@@ -399,6 +400,27 @@ describe('review_brief_cli.parse_round', () => {
 			expect(review_brief_cli.parse_round(argv)).toBeUndefined()
 		},
 	)
+})
+
+// joshuafolkken/kit#1927: `review:level` folded into `review:brief --level-only`. `format_reason`
+// moved here with it and still says why a change took the level it did.
+describe('review_brief_cli.format_reason', () => {
+	const CODE = 'scripts/x.ts'
+	const INERT = '.editorconfig'
+
+	it('says a reduced change is inert', () => {
+		expect(review_brief_cli.format_reason([INERT], review_level.REDUCED_LEVEL)).toContain('inert')
+	})
+
+	it('names the path that forced the default level', () => {
+		expect(review_brief_cli.format_reason([CODE], review_level.DEFAULT_LEVEL)).toContain(CODE)
+	})
+
+	it('explains an empty diff rather than naming nothing', () => {
+		expect(review_brief_cli.format_reason([], review_level.DEFAULT_LEVEL)).toContain(
+			'no changed paths',
+		)
+	})
 })
 
 describe('review_tree.tree_of', () => {

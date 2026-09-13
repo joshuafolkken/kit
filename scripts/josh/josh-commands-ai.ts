@@ -124,15 +124,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Measure what a verification command costs with its cache cold and warm',
 		category: 'AI tools',
 	},
-	'review:level': {
-		script: 'scripts/review/review-level-cli.ts',
-		description: 'Print the /code-review level this change is reviewed at',
-		category: 'AI tools',
-	},
 	'review:brief': {
 		script: 'scripts/review/review-brief-cli.ts',
 		description:
-			'Print the whole /code-review invocation: level, what the gate already proved, target',
+			'Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone)',
 		category: 'AI tools',
 	},
 	'review:attest': {

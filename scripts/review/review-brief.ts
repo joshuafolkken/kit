@@ -39,6 +39,19 @@ function attest_line(nonce: string): string {
 	return `Attest before you report: run \`pnpm josh review:attest ${nonce}\` from the checkout you actually read. A non-zero exit means it was not the one above — report \`REVIEW TARGET MISMATCH\` and no findings. Never report "no findings" without that command having passed: a review of the wrong tree finds nothing wrong, and the run cannot tell that apart from approval (joshuafolkken/kit#1522).`
 }
 
+// **The rubric is handed over by path, not pasted in** (joshuafolkken/kit#1927). `/code-review` runs
+// in a forked process that reads none of this repository's documents, so the severity tests, the nine
+// categories and the output format never reached it — the review scored the diff on whatever the
+// forked skill happened to carry. The reviewer has file access (it already runs `git -C <root> …` and
+// `pnpm josh review:attest`), so the brief names the rubric's absolute path and requires it be read
+// and applied before anything is reported. Absolute because a forked agent resolves a relative path
+// against the tree it was spawned in, which is the wrong one during a lane run.
+const RUBRIC_RELATIVE_PATH = 'prompts/review-rubric.md'
+
+function rubric_line(root: string): string {
+	return `Rubric: read \`${root}/${RUBRIC_RELATIVE_PATH}\` first and apply it — it is the severity tests, the round output format, the nine categories and the stop conditions this review is scored against. You do not carry them otherwise, so a review that skips it is scored on the wrong rules.`
+}
+
 function checkout_block(checkout: ReviewCheckout, nonce: string): string {
 	return [
 		`Checkout: ${review_checkout.describe_checkout(checkout)}`,
@@ -363,11 +376,13 @@ function target_block(input: BriefInput): string {
 	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
 }
 
-// The level alone on the first line, because `review:level`'s contract — a caller reading the answer
-// with `$(...)` — is the one thing a brief must not break.
+// The level alone on the first line, because the level-only mode's contract — a caller reading the
+// answer with `$(...)` — is the one thing a brief must not break.
 function compose(input: BriefInput): string {
 	return [
 		input.level,
+		'',
+		rubric_line(input.checkout.root),
 		'',
 		checkout_block(input.checkout, input.nonce),
 		'',
@@ -396,6 +411,8 @@ const review_brief = {
 	no_snapshot_line,
 	NOTHING_LEFT_LINE,
 	NOT_VERIFIED_LINE,
+	rubric_line,
+	RUBRIC_RELATIVE_PATH,
 	ROUND_TWO_HEADING,
 	ROUND_TWO_QUESTION,
 	round_two_block,

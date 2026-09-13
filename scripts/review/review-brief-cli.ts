@@ -3,11 +3,12 @@ import { fileURLToPath } from 'node:url'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { path_decision } from '#scripts/josh/path-decision'
 import { scoped_green } from '#scripts/scoped-green'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
-import { review_level } from './review-level'
+import { review_level, type ReviewLevel } from './review-level'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -22,8 +23,16 @@ import { review_tree } from './review-tree'
 // round's fixes touched.
 
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh review:brief [--round <1|2>]'
+const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
 const ROUND_FLAG = '--round'
+// `review:level` folded in here (joshuafolkken/kit#1927): it was a second command deciding the same
+// thing `review:brief` already prints on its first line, so it is now a mode of this one. `--level-only`
+// answers the level alone — for a pre-commit review run outside any workflow — and, unlike the full
+// brief, it never refuses on the scoped-green gate: the level takes no judgement and reads the changed
+// paths and nothing else. `--staged` and `--json` are passed straight through, exactly as the old
+// command took them.
+const LEVEL_ONLY_FLAG = '--level-only'
+const LEVEL_KEY = 'level'
 const FIRST_ROUND = 1
 const FAILURE_EXIT_CODE = 1
 // The flag and its value; anything else is a usage error rather than a round.
@@ -170,6 +179,31 @@ function report_error(message: string): number {
 	return FAILURE_EXIT_CODE
 }
 
+// Why a change was reduced, or which path forced the default — moved here verbatim from the old
+// `review:level` command so `--level-only` says why rather than only what.
+function format_reason(paths: ReadonlyArray<string>, level: ReviewLevel): string {
+	if (level === review_level.REDUCED_LEVEL) {
+		return 'every changed path is inert — it neither executes nor instructs'
+	}
+
+	const deciding = review_level.deciding_paths(paths)
+
+	if (deciding.length === 0) return 'no changed paths; the default level stands'
+
+	return `changed paths that execute or instruct: ${path_decision.format_path_list(deciding)}`
+}
+
+// The level alone, over `path_decision` — the same reading `review:round2` shares — so `--staged`,
+// `--json` and the usage handling are the ones the old command had, not a second copy.
+async function run_level(argv: ReadonlyArray<string>): Promise<number> {
+	return await path_decision.run_path_decision(argv, {
+		usage: USAGE,
+		key: LEVEL_KEY,
+		decide: (paths) => review_level.level_for(paths),
+		explain: format_reason,
+	})
+}
+
 interface ChangeReading {
 	base: string
 	commit: string | undefined
@@ -188,6 +222,8 @@ async function read_change(): Promise<ChangeReading> {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
+
 	const round = parse_round(argv)
 
 	if (round === undefined) return report_error(USAGE)
@@ -209,13 +245,16 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const review_brief_cli = {
 	FIRST_ROUND,
+	format_reason,
 	KEPT_NOTE_PREFIX,
 	kept_note,
+	LEVEL_ONLY_FLAG,
 	main,
 	parse_round,
 	record_round_one,
 	report_error,
 	run,
+	run_level,
 	USAGE,
 }
 

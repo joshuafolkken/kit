@@ -112,7 +112,6 @@ const ALIASES: Record<string, string> = {
 	tm: 'time',
 	ly: 'layers',
 	bn: 'bench',
-	rl: 'review:level',
 	rb: 'review:brief',
 	r2: 'review:round2',
 	ra: 'review:attest',

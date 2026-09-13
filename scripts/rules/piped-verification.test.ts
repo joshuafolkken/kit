@@ -17,7 +17,7 @@ const REDIRECTED_GATE = 'pnpm josh gate 2>&1'
 const GATE_OR_ECHO = 'pnpm josh gate || echo failed'
 const PIPEFAIL_GATE = 'set -o pipefail; pnpm josh gate | tail -40'
 const PIPED_LISTING = 'git log --oneline -3 | head'
-const PIPED_ANSWER = 'pnpm josh review:level | tail -1'
+const PIPED_ANSWER = 'pnpm josh review:brief --level-only | tail -1'
 const NO_VERIFICATION = 'ls -la'
 
 describe('is_masked_verification', () => {

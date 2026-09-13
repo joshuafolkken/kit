@@ -1,656 +1,207 @@
 # Code Review Prompt
 
-This document is the **single source of truth** for reviewing a diff. The implementing session runs it inline, before committing — both for the pre-commit self-review and for the review step inside `fullrun` / `halfrun` / `queue`, whose **second** round is the one exception: it runs beside CI on a pull request the first round's fixes have already opened (see "The pull request opens between the rounds").
+This document is the review **policy**: which level a change is reviewed at, how many rounds a review
+runs, and what happens to a finding after the cap. Two other documents hold the rest, and this file
+points to them rather than restating them:
 
-**Default hypothesis: this diff contains at least one non-trivial issue.** Your job is not to confirm the implementation is correct — it is to find the issue. Work through each category assuming the code is wrong until you can prove otherwise. Do not declare a category clean unless you have actively tried to break it.
-
-**In the second round that hypothesis is aimed at the fix delta, not at the whole diff again.** Applied twice to one diff it returns new findings whether or not the code changed, because returning none is what it rules out — see "The second round is a verification pass, not a second full review" below.
+- The **rubric** the reviewer applies — the severity tests, the nine categories, the output format and
+  the stop conditions — is `prompts/review-rubric.md`, handed to `/code-review` by
+  `pnpm josh review:brief`.
+- The **orchestration** around a review — how the gate runs beside it, when the pull request opens, how
+  the merge is issued — is `.claude/skills/workflow-commands/chain-rule.md` → "Orchestration facts
+  single-sourced here".
 
 ---
 
 ## When to run
 
-- **Pre-commit self-review** (implementing session, inline): before every `git commit` on a feature branch — scope: the staged diff (`git diff --staged`)
-- **Workflow review step** (same session, inline): the last stage of the verification gate in `fullrun` / `halfrun` / `queue`. Round 1 runs before the commit — scope: `git diff main`. Round 2 runs after it, beside the CI the commit started, scoped to the fix delta ("The pull request opens between the rounds")
+- **Pre-commit self-review** (implementing session, inline): before every `git commit` on a feature
+  branch — scope: the staged diff (`git diff --staged`), level from
+  `pnpm josh review:brief --level-only`.
+- **Workflow review step** (same session, inline): the last stage of the verification gate in `fullrun`
+  / `halfrun` / `queue`, driven by the brief `pnpm josh review:brief` prints. Round 1 runs before the
+  commit — scope: `git diff main`. Round 2 runs after it, beside the CI the commit started
+  (`.claude/skills/workflow-commands/chain-rule.md` → "The pull request opens between the rounds, so CI
+  runs beside round 2").
 
-Re-run after applying fixes until **no high or medium findings remain — or until two reviews have run in total — the first one included — whichever comes first.** Low findings may be acknowledged and skipped with a reason. The cap is spelled out below and it is not optional.
-
-**The re-run is not this review a second time.** The second round is a **verification pass over the fixes** — its scope, its question, its categories and its output all differ from the first round's. Definition: "The second round is a verification pass, not a second full review" below.
+Re-run after applying fixes until **no high or medium findings remain — or until two reviews have run
+in total, the first included — whichever comes first.** The cap below is not optional. The second round
+is a verification pass over the fixes, not the first review again
+(`prompts/review-rubric.md` → "The second round is a verification pass, not a second full review").
 
 ---
 
-## Review level (decided by `josh review:level`, never by judgement)
+## Review level (decided by `pnpm josh review:brief --level-only`, never by judgement)
 
-**Run `pnpm josh review:level` and use what it prints.** It reads the changed paths and answers `low` or `medium`; `--staged` classifies the staged diff instead of the branch diff, and `--json` adds the reason.
-
-```bash
-pnpm josh review:level            # alias: josh rl
-pnpm josh review:level --staged
-```
-
-**Inside a workflow, run `pnpm josh review:brief` instead and pass the whole thing to the review subagent, which runs `/code-review` in its own context** (never the `Skill` tool in the main line — "The review runs in a subagent, never a main-line skill load" below). It prints the level on its first line and then the rest of what the run already knows: whether `pnpm josh gate` has passed — or is running right now — **on this exact tree**, how this project runs its unit suite, and the target — the whole change on round 1, and on `--round 2` only the files the first round's fixes touched.
+**Run `pnpm josh review:brief --level-only` and use what it prints.** It reads the changed paths and
+answers `low` or `medium`; `--staged` classifies the staged diff instead of the branch diff, and
+`--json` adds the reason. Inside a workflow, `pnpm josh review:brief` prints the same level on its first
+line and the rest of the brief with it.
 
 ```bash
-pnpm josh review:brief            # round 1; alias: josh rb
-pnpm josh review:brief --round 2  # the verification pass, scoped to the fix delta
+pnpm josh review:brief --level-only            # the branch diff
+pnpm josh review:brief --level-only --staged   # the staged diff
 ```
 
-**It exists because `/code-review` runs in a forked process that reads none of this repository's documents** (joshuafolkken/kit#1241). Only the invocation argument reaches it, so a rule written here — "do not re-run what the gate proved", "the second round reads the fix delta" — has no way to bind. Measured on joshuafolkken/kit#1240: both rounds re-ran the unit suite the gate had just passed, both fumbled the runner, and round 2 re-read the whole diff, for 439 seconds on a seven-file change.
-
-**Two halves, and only one of them is mechanical.** The round-2 target _is_ the scope, so a narrowed round is narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so its effect is measured rather than assumed. **The brief never claims a green gate it cannot prove**: with no record, or with one taken before an edit, it prints `Not verified` and asserts nothing.
-
-### The review runs in a subagent, never a main-line skill load
-
-**Inside a workflow the review is spawned in a subagent — the `Agent` tool — and the main line never loads `/code-review` through the `Skill` tool** (joshuafolkken/kit#1855). Loading a skill mid-run swaps the active skill's instructions into the leading text of the prompt, and that text sits in front of the whole cached conversation — so a `Skill(code-review)` call **rewrites the entire cached prefix rather than appending to it**. Measured on `fullrun #1839`: the turn after the skill loaded wrote **303,637 `cache_creation_input_tokens`** while `cache_read_input_tokens` fell from 315,843 to 15,472 — one request re-creating almost the whole context, about 11.8% of that run's cost, for a review that was going to run in a fork anyway. Loading `workflow-commands` at the run's start costs a fraction of that, because there is little accumulated context in front of it to invalidate; the same skill load mid-run, with 300k of prefix behind it, is what is expensive.
-
-**The `Agent` tool is already in the main line's tool set, so calling it appends to the prompt rather than rewriting its prefix.** The subagent runs `/code-review` in its own fresh context, where loading the skill is cheap because there is almost no prefix to re-create; it returns the findings markdown, and the main line reads that as an ordinary tool result and continues through the chain rule exactly as before. The brief the main line composes with `pnpm josh review:brief` is passed to the subagent as its prompt, so the subagent reviews the same diff, at the same level, for the same rounds — **nothing the review reads, scopes or decides changes, only where the skill is loaded** (`CLAUDE.md` → "Weakening a verification gate is a workaround too": narrowing the review would be that violation, and this narrows nothing).
-
-**This is not the cheaper-tier delegation `SKILL.md` → §2b keeps the review out of.** That row is a downgrade to a cheaper model, refused because a cheaper review finds less; this is context isolation at the **same** model — the subagent inherits the main-loop model — so the review's quality is untouched. The fork it formalizes is the one the review-level section above already names ("It exists because `/code-review` runs in a forked process"): `/code-review` was always going to run in a forked process, and this only moves the _launch_ of that fork off the `Skill` tool and onto the `Agent` tool.
-
-### The brief names the checkout, and a review that read another one is refused
-
-**`/code-review` is forked by the harness into the session's working directory, not the run's** (joshuafolkken/kit#1522). Where the run is implementing in a lane — a linked work tree opened by `pnpm josh lane:open` — that is a different tree entirely, holding the previous child's already-merged code. A review that reads it finds nothing wrong and says so, and **the failure arrives as approval**: the run reads "no findings" as a clean round and commits a diff nobody read.
-
-**So the brief names the checkout, mechanically.** `pnpm josh review:brief` prints the absolute repository root, the branch and the HEAD commit, generated from `git rev-parse` in the tree the run is implementing in; every target it prints carries `git -C <root>`, and the round-2 file list is absolute. Nothing here depends on a person remembering to paste a path into a hand-off — one omission reopens the hole, and reopens it silently.
-
-**And the review attests what it actually read.** The brief prints a nonce; the review runs `pnpm josh review:attest <nonce>` from the checkout it read, before it reports. That command asks git about its **own** working directory, so it cannot be satisfied by copying values out of the brief, and it exits non-zero when the tree is not the briefed one. On a non-zero exit the review reports `REVIEW TARGET MISMATCH` and no findings.
-
-**The run checks the other end — `pnpm josh review:attest --check` — before it acts on the verdict, and `pnpm josh followup` checks it again before merging.** A missing attestation is a refusal exactly as a mismatched one is: the defect produced no signal, so treating silence as a pass would leave the hole open in the shape it actually takes. A wrongly refused merge costs one re-run of the review; a wrongly allowed one ships unreviewed code.
-
-### The gate runs beside this review, not in front of it
-
-**`pnpm josh gate` is started when the review starts and joined before the commit** (joshuafolkken/kit#1242). The two read the same tree and neither writes to it, so running them one after the other was pure waiting — 187 seconds of a 1623-second run, measured on joshuafolkken/kit#1240.
-
-**So the brief has three states, not two**, and the middle one is the usual answer while a review is being composed:
-
-| The record says                           | The brief prints   | What it means                                                                                 |
-| ----------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
-| A green gate covers this exact tree       | `Already verified` | Lint, the type check, the spell check and the unit tests passed. Do not re-run them           |
-| A gate is running against this exact tree | `Running now`      | **No result is being claimed.** Do not re-run the unit suite; the run joins the gate's result |
-| Neither                                   | `Not verified`     | Nothing is claimed about any of the four checks                                               |
-
-**`Running now` forbids a re-run without asserting a pass, and the distinction is the whole point.** A gate that has not finished has no result to report, so the sentence says what is true — a gate was started on this tree at a named time and has not recorded a result — and names who reads that result. Re-running the unit suite here is wasted whether the gate ends green or red.
-
-**Joining is a step of the run, not a formality.** A red gate is fixed and re-run **whatever this review concluded** — a clean review says nothing about lint or the unit tests — and the fix is uncommitted like every other, so it lands in the round-2 fix delta and is reviewed with the rest. There is no path from here to a commit on a gate nobody read.
-
-**The gate is started once per run, not once per edit** (joshuafolkken/kit#1246). joshuafolkken/kit#1242 decided _when_ the one gate starts and left _how many_ there are untouched, and the count is the larger half: measured on joshuafolkken/kit#1241, ten gate runs came to 8.2 minutes of a 49.1-minute run — a 49-second average — second only to the two review rounds. Six of the ten ran before the review had started, each asking whether the edit just made had broken anything, and in every one of those six the answer came from a single check: lint or the spell check, while the other three checks in the same gate ran to completion with nothing to report. One check costs 4 to 17 seconds. (A standalone gate on an otherwise idle machine is faster than the average a run pays — 31 seconds measured here. The figure to reason about is what the run was billed.)
-
-**Which command to run is decided by whether the review has started, and by nothing else.** "This edit is big enough to warrant the whole gate" is the judgement under cost pressure the level rule below refuses to allow, and it resolves the same way — toward the expensive habit, on every edit.
-
-| Where the run is                                             | What to run                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Implementing — the review has not started                    | **The single check by name** — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's own type check. Never the whole gate. (Once a gate _has_ run, its block header names each command, including the type check's, which is resolved per project)                                |
-| The edit set is complete and the review is starting          | `pnpm josh gate`, started beside the review — the one gate the commit is decided on                                                                                                                                                                                                                                      |
-| From there on, a check that gate reported red has been fixed | `pnpm josh gate` again. The fix is what made the previous result stale, which is the rule above                                                                                                                                                                                                                          |
-| The edit set is final and the commit is next                 | `pnpm josh gate` again — that one covers the exact tree the commit carries, and it is joined before `pnpm josh git -y` ("The pull request opens between the rounds" below)                                                                                                                                               |
-| Round 2 fixed a finding in place                             | The single check the fix reaches, then the follow-up commit, then `pnpm josh gate` again — joined before `pnpm josh followup` rather than before that commit, so the CI it starts runs beside it ("The round-2 fix commit is pushed before its gate" below). **There is still no path to a merge on a gate nobody read** |
-| Round 2 changed no code                                      | Nothing local. The head commit already rests on a joined gate, and CI has been running on it since the pull request opened                                                                                                                                                                                               |
-
-**The table adds up to one sentence: one gate per commit, plus one wherever an edit landed after a gate.** A clean round 1 runs it **once** — the gate started beside the review is the one the commit rests on, because nothing touched the tree in between. A round 1 that produced fixes runs it **twice**. A round 2 that fixed a finding in place opens a **second commit**, so it adds a third. Every red gate adds one more, and those are the tree's doing rather than the rule's.
-
-**So the count is cut by making fewer edits land after a gate, never by skipping one.** Apply round 1's findings as **one** edit set and re-gate once: findings handed over in two batches pay two gates for one commit, which is the "once per edit" this rule was written against. **The floor is one and it is not a target** — a run reaches it by having nothing to fix, which is not something the run decides. `pnpm josh time`'s `Gate runs:` block is what says whether a run held to this, and it reports a gate that followed a red one as the allowed re-run rather than as excess, and one whose predecessor had no readable outcome as undetermined rather than as either (joshuafolkken/kit#1786).
-
-**Beyond that count, the one avoidable way a run inflates its gate tally is a piped verification command — and it is already guarded** (joshuafolkken/kit#1876). Measured on run #1864, which paid four gates where the model calls for three: `pnpm josh gate` was piped into `tail`, the `piped-verification` guard refused it (`scripts/rules/piped-verification.ts`, joshuafolkken/kit#1556), and the bare re-run it forced showed in `pnpm josh time` as an extra launch **and** as an after-red re-run. That fourth gate is a piping mistake rather than a model cost — the guard removes it by refusing the pipe, so the fix is to stop piping rather than to change the count. So an after-red re-run whose predecessor was a piping refusal reads as avoidable, distinct from the allowed re-run a genuine red gate earns above.
-
-**Two of the checks in the first row are scoped, and neither replaces what the gate runs.** `pnpm josh lint:related` checks only the changed files with prettier and eslint (joshuafolkken/kit#1298) — `josh lint` read the whole repository on every call, which measured 47–188 seconds per run and 18% of one 1,043-second implementation phase — and falls back to the whole tree, saying so, when it cannot narrow. `pnpm josh lint` is unchanged as what `pnpm josh gate` runs: a formatting or lint rule can be broken by a file the change never named, so the narrowed run is added in front of the whole one rather than in place of it.
-
-**The unit check in the first row is the scoped one** (joshuafolkken/kit#1257). `pnpm josh test:related` runs only the tests whose module graph reaches a changed file — 566 of 6,616 tests for a one-file change, 2.4s against 13.9s, and 7.9s of CPU against 110s — and falls back to the whole suite, saying so, when it cannot narrow. `pnpm josh test:unit` is unchanged as what `pnpm josh gate` runs and what the commit rests on: a marker suite that reads a document breaks without importing anything, so a module graph cannot see it and the scoped run is added in front of the full one rather than in place of it.
-
-**The criterion is the review, not the tree.** Once the gate has been started beside the review, every later edit — a red check's fix, a round-1 finding's fix — changes the tree and makes the last result stale, so every row below the second governs from there and a single check no longer answers for the commit. Reading the criterion as "no gate has run on _this exact_ tree" would send a run back to row 1 after every fix, which is the opposite of what the rows say.
-
-**No version bump goes in front of that gate, because a child no longer makes one** (joshuafolkken/kit#1486). The branch a child commits carries no `package.json` version change at all: `pnpm josh release` reads main's own history, counts the merges taken since the version last changed, and raises the version by that many minors in one place. So the gate joined before the commit covers the exact tree that commit carries, with nothing scheduled to invalidate it. **The ordering rule that used to sit here is gone with it** — joshuafolkken/kit#1437 had `josh gate` refuse whenever a green record covered work whose changed files carried no `package.json`, on the reasoning that the bump was still owed; with children not bumping, that shape is what every run looks like and the refusal would have rejected every gate after the first green one.
-
-**Nothing here weakens the join**, and the first row is the only one that removes work. The gate the commit rests on is still one started beside the review and joined before the commit; what the first row removes is the probing in front of it, which proves nothing the join does not prove again a few minutes later.
-
-**The level is decided from the changed paths and nothing else.** "This one is small" is a judgement made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped — the same reason the cross-package interrupt removed its own "does this block?" evaluation. A rule an agent applies from memory is a rule an agent can talk itself out of; one it has to run answers the same way every time.
+**The level is decided from the changed paths and nothing else.** "This one is small" is a judgement
+made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most
+likely to be shipped. A rule an agent applies from memory is a rule an agent can talk itself out of;
+one it has to run answers the same way every time.
 
 | Every changed path is…                                                                   | Level    | Rounds                  |
 | ---------------------------------------------------------------------------------------- | -------- | ----------------------- |
 | **inert** — `.editorconfig`, `.gitignore`, `LICENSE`, `CHANGELOG.md`, `*.code-workspace` | `low`    | 1                       |
 | anything else                                                                            | `medium` | up to 2 (the cap below) |
 
-**One non-inert path decides the whole change.** A review reads the change, not a subset of it, so there is no per-file level. An empty diff also takes `medium` — answering `low` to "nothing changed" would hand a reduced level to a caller that failed to read the diff.
+**One non-inert path decides the whole change.** A review reads the change, not a subset of it, so
+there is no per-file level. An empty diff also takes `medium` — answering `low` to "nothing changed"
+would hand a reduced level to a caller that failed to read the diff.
 
-**Three things that look inert are not.** `.vscode/**`, `.gitattributes` and `.prettierignore` are all in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`, so a defect in one reaches a consumer and is reviewed at `medium` like any other shipped file.
+**Three things that look inert are not.** `.vscode/**`, `.gitattributes` and `.prettierignore` are all
+in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`,
+so a defect in one reaches a consumer and is reviewed at `medium` like any other shipped file.
 
-**Documentation is not inert either, and that is deliberate.** `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` are all reviewed at `medium`. The "Non-runtime updates" exception in `CLAUDE.md` exempts them from _testing_, which is a different question: that exception asks whether an automated test could have caught the defect, and this asks whether a human reading the diff is the only thing that can. Measured on joshuafolkken/kit#963 and #965 — both documentation-only by that classification — a `medium` review found ten real defects in each: pointers into sections that had been removed, and citations naming the wrong file, in artifacts distributed to every consumer. Nothing else would have caught them.
+**Documentation is not inert either, and that is deliberate.** `CLAUDE.md`, `prompts/**`, `.claude/**`
+and `docs/**` are all reviewed at `medium`. The "Non-runtime updates" exception in `CLAUDE.md` exempts
+them from _testing_ — which asks whether an automated test could have caught the defect — while this
+asks whether a human reading the diff is the only thing that can. Measured on joshuafolkken/kit#963 and
+#965, both documentation-only by that classification: a `medium` review found ten real defects in each
+— pointers into sections that had been removed, and citations naming the wrong file, in artifacts
+distributed to every consumer — that nothing else would have caught.
 
-**The round cap below is unchanged**, and so is the rule that a confirmed High blocks regardless of round count.
+**A confirmed High blocks regardless of round count**, and the round cap below does not change that.
 
-### A single check answers once per tree
-
-**The table above sends an implementation loop to one check by name and said nothing about running that check again** (joshuafolkken/kit#1383). Measured on the run of joshuafolkken/kit#1379, it then issued eight single checks — 45.9 seconds of tool time, six of them in the fix phase, each its own round trip — and `pnpm josh gate` ran all four checks over the same tree 18.1 seconds after the last one.
-
-**The line is narrow, and only one class of call falls on the wrong side of it.** A check run again _after an edit_ is feedback, however often a run needs it: discarding that would push every mistake to the gate minutes later, and the rework costs more than the checks save. What is forbidden is a repeat of the same command **with the same arguments** over a tree nothing has touched since — the tree it would read is the tree the last answer was about, so the answer is known before the call goes out.
-
-| Since this check last ran | What to run                                                                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| A file was edited         | The check again, with no cap on how often. This is the feedback the first row of the table above exists for                           |
-| Nothing was edited        | Nothing. The last answer still describes this tree, and a second copy of an answer already in hand is the whole of what the call buys |
-
-**No cap is placed on how many single checks a run makes**, and that is deliberate: a cap is a judgement about how many is too many, and it would forbid a call that had something to find. The unchanged repeat needs no judgement at all — the criterion is mechanical, which is what `pnpm josh review:level` and `pnpm josh latest:scope` are for the same reason.
-
-**This document carries the rule, and `pnpm josh time` is what says whether it held.** Its `Single checks:` block counts the calls, how many sat in the fix phase, how many repeated an earlier command _and its arguments_, and how many of those had no edit between them. **On the run the issue was filed from, that last figure is zero**: all three repeats there followed an edit, so the estimate the issue carried — two calls definitely removable — does not survive being measured, and what it had found was the batching joshuafolkken/kit#1344 already measures. That is why no mechanism is built here. The one worth building is the reuse `pnpm josh gate` already has (joshuafolkken/kit#1328) and never another warning — joshuafolkken/kit#1344 measured three consecutive runs in which one moved nothing — and it is filed as joshuafolkken/kit#1420, to be built if the measured figure stays non-zero rather than on the assumption that it will.
-
-### origin/main is merged in before the gate, so the gate verifies the tree that merges
-
-**Before the gate and the review are started, `origin/main` is merged into the working branch** (joshuafolkken/kit#1837). One command does it, and it is the one already written for this and no other purpose:
-
-```bash
-pnpm josh main:merge   # fetch origin/<default>, then merge it into this branch; alias: josh mm
-```
-
-**Merging, not rebasing** — the direction is `origin/<default>` into the branch this checkout is on, never the reverse and never a rebase, because a rebase rewrites commits that are already pushed and needs a force push, which `.claude/settings.json` denies (joshuafolkken/kit#1446). `main:merge` names the strategy itself rather than reading it out of whoever's git configuration is in force, and it absorbs a diverged branch — the one state a plain `git pull` refuses — which is the entire reason to run it here.
-
-**Until this, the only merge of `origin/main` was after `followup` reported the conflict, which is the most expensive place it could be.** A lane is cut from `origin/main` at `lane:open` and runs its whole implementation, test loop, gate and review — about fifty minutes — while the other lanes merge; so `followup` comes back `mergeStateStatus: DIRTY`, and the conflict is resolved _after_ the gate has already run on a tree that will never exist. Measured on the lane this issue was filed from, that post-`followup` rework was **25.8% of the run, about twelve minutes** — a red gate, three fix edits, two extra gates and a third commit — and it is a permanent path rather than an accident, because parallel lanes are the premise. Merging in front of the gate shrinks the conflict window from _implementation-start to `followup`_ (~50 min) to _gate to `followup`_ (~15 min), and the gate then reads **the tree that will actually merge** instead of one that never existed.
-
-**The merge is the last edit, so the scoped pair and the gate run once over it, not twice around it.** It goes ahead of `pnpm josh lint:related && pnpm josh test:related` (the section below), which is the last edit those checks answer on, and ahead of the one `pnpm josh gate` the commit rests on — so the two rules already stated hold unchanged: "A single check answers once per tree" and "The scoped checks answer on the last edit". Placing it _after_ the scoped pair or the gate is what would add a rerun, by changing the tree they had just been green on; placing it before adds none. What it removes is the post-`followup` reruns the DIRTY path forced — two of the five gates measured on that lane were exactly those.
-
-**A no-op when nothing advanced, and most of what it saves is a lane's.** With `origin/<default>` already an ancestor of the branch the merge is up-to-date and changes nothing, so a standalone `fullrun` — cut from a fresh `git switch main && git pull` and usually short — pays a fetch and nothing more. The rule is written for every run because the gate should verify the merge tree in all of them, but the cost it buys back is almost entirely the lanes'.
-
-**A conflict here is the "Conflicts are not predicted" procedure fired early, not a new one.** `main:merge` exits non-zero and leaves the tree with conflict markers; resolve it in place, re-run the gate and one review round over the resolution, and — if it meets one of that section's four step-back conditions — park under them exactly as before (`.claude/skills/workflow-commands/epicrun.md` → "Conflicts are not predicted", the single source of the resolution steps and the merge-direction convention). Surfacing the conflict before the push rather than at `followup` is the whole point; the post-`followup` DIRTY path stays as the fallback for a conflict that arises in the gate-to-`followup` window, which merging earlier makes narrower but cannot close.
-
-### The scoped checks answer on the last edit
-
-**The section above says how often a single check may run, and said nothing about when the last one has to be** (joshuafolkken/kit#1511). Measured on `fullrun #1503`: the run started `pnpm josh gate` and review round 1 on a tree `pnpm josh lint:related` and `pnpm josh test:related` had **never once been green on**, and then spent 282 seconds — 31% of a 905-second run — picking up the consequences one at a time. Three findings arrived on three separate round trips with fourteen edits between them; the one call that ran both checks together produced two of them at once, in 13.8 seconds. **The review read a tree that was edited fourteen more times after it.**
-
-**So the scoped pair runs on the last edit, before the gate and the review are started** — not after them, and not per edit. That is one call, and it is the same one either way:
-
-```bash
-pnpm josh lint:related && pnpm josh test:related
-```
-
-**`pnpm josh review:brief` enforces it rather than asking.** Each of those two commands writes down the digests it was green on, against the same change base the green-gate record uses; the brief compares them exactly as `pnpm josh gate` compares its own record, and where either is missing or no longer describes this tree it puts a refusal on stderr and exits non-zero instead of composing a brief. **No brief means no round**: the brief is where `pnpm josh review:attest`'s nonce is minted, and a round that cannot attest does not count (`.claude/skills/workflow-commands/SKILL.md` → §2). Run the pair, reissue the command, and the run continues — the refusal costs one round trip, never the run.
-
-**It changes when the checks run, and nothing else.** Nothing is skipped, narrowed, reused in place of a check, or reinterpreted; `pnpm josh gate` still runs its four checks over the same tree afterwards. The refusal is on the brief rather than on the gate because CI runs `pnpm josh gate --verbose --no-unit` with no scoped check in front of it, and an empty file map, an unresolvable change base or `JOSH_SCOPED_GREEN=off` each allow rather than refuse. The full behavior is `docs/josh-commands.md` → "`josh review:brief`".
-
-### The pull request opens between the rounds, so CI runs beside round 2
-
-**`pnpm josh git -y` sits between the two review rounds** (joshuafolkken/kit#1261). Measured on joshuafolkken/kit#1251: the second round ran 171 seconds and the CI that followed it ran 98, and through those 98 seconds nothing else in the run was happening. The same reasoning the gate got one section up applies here — the pull request's checks and the verification pass read the same branch, so paying for them one after the other was pure waiting.
-
-**Only the second round moves, and that is what makes the overlap safe.** The first round still runs on the uncommitted tree and every High/Medium it finds is fixed before anything is committed, so the first commit still carries reviewed code — the requirement `CLAUDE.md` → "Pre-commit Self-Review" states. What changes is that the verification pass over those fixes now runs against an open pull request instead of in front of one.
-
-| Where the run is                 | What happens                                                                                                                                                                                                                                      |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Round 1 found no High/Medium     | Nothing changes. There is no second round, and the commit follows the join exactly as it always did — a red check fixed on the way still re-runs the gate, per the table above, which is a different trigger from this one                        |
-| Round 1's fixes are in           | `pnpm josh gate` → join → `pnpm josh git -y`. The pull request opens here and CI starts                                                                                                                                                           |
-| Round 2 is running               | CI is running beside it. Its brief reads `Already verified`, because the gate above covered the exact tree the commit carries                                                                                                                     |
-| Round 2 fixed a finding in place | The single check the fix reaches → `pnpm josh git -y` again — a follow-up commit on the same branch — then `pnpm josh gate` beside the CI that commit started, joined before the merge ("The round-2 fix commit is pushed before its gate" below) |
-| Round 2 only filed or dropped    | Nothing more to commit; the CI already running is the one the merge rests on                                                                                                                                                                      |
-
-**Nothing edits the tree between that gate and the commit** (joshuafolkken/kit#1486). The gate's record is keyed to the exact tree it read, so an edit made after it — the version bump children used to make here was the standing one — leaves round 2's brief reading `Not verified` and sends the round-2 agent back to the unit suite the gate had just passed, which is more than the overlap saves. With the bump gone the join is the last thing before `pnpm josh git -y`, and the commit rests on a gate that covered it exactly.
-
-**Round 2's target is therefore round 1's fixes and nothing else**, since the fix delta is every path whose digest moved since round 1. A `package.json` in it is a real edit somebody made rather than bookkeeping, and it is reviewed like any other.
-
-**The merge gate is untouched.** `pnpm josh followup` blocks on the head commit's checks, so a follow-up commit's CI is what the merge rests on, and every merge condition — all required checks green, no standing change request — is the one it was. A confirmed High found in round 2 still stops the run with a `confirmation` Telegram; the only difference is that the pull request exists and stays open and unmerged rather than never having been opened.
-
-**What this trades is a CI run for wall-clock, and the trade was made deliberately.** A second round that fixes something in place costs one extra commit and one extra CI run, and in exactly that case the overlap is paid straight back. Since joshuafolkken/kit#1219 the second round reads only the fix delta and asks whether each finding closed, so its usual result is no code change at all, and that is the case the overlap is bought for. Since joshuafolkken/kit#1326 that extra cycle runs beside the fix's own gate rather than after it — the section below — so the case the trade was made for is also the case it now costs least in.
-
-**This is the narrowed form of what joshuafolkken/kit#1216 rejected, and the narrowing is what its objection asked for.** That issue rejected opening the pull request before the review on a mechanism rather than a rule: the review changes code, so every fix pushed afterwards restarts CI and pays the overlap back. The round that changes code — the first — still runs before the commit.
-
-### The round-2 fix commit is pushed before its gate, so its CI runs beside it
-
-**The overlap joshuafolkken/kit#1261 bought stopped at the second round's own fix commit** (joshuafolkken/kit#1326). Reconstructed from the session transcript and GitHub's check-runs on joshuafolkken/kit#1299: the first CI cycle went green at 02:45:16 and the merge landed at 02:51:50, and every one of those 6 minutes 34 seconds was serial — a red `pnpm josh gate` (51s), a green one (50s), the push (30s), and only then the second CI cycle (149s), which could not start until both gates had finished. The reasoning is the one the two sections above already applied twice: the gate and the pull request's checks read the same branch and neither writes to it, so paying for them one after the other is pure waiting.
-
-**So a fix the second round makes in place is pushed before its gate, and the gate runs inside the CI wait instead of in front of it.** In order:
-
-| Step | What runs                                                                                                                                                  | Why here                                                                                                                                                                                                                                                                  |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | **The single check by name** the fix reaches — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's own type check | A scoped check answers in seconds what a red full gate answers in about fifty. On joshuafolkken/kit#1299 the 51-second red gate reported a `max-lines-per-function` violation in the one test file the fix had just edited — which `pnpm josh lint:related` reported in 9 |
-| 2    | `pnpm josh git -y "<title> #<N>"` — the follow-up commit on the same branch                                                                                | CI starts here. This is the only step that moves; every step keeps its content                                                                                                                                                                                            |
-| 3    | `pnpm josh gate`, started immediately after and **joined before `pnpm josh followup`**                                                                     | It now runs beside that CI cycle rather than ahead of it                                                                                                                                                                                                                  |
-
-**Pushing before the gate is not pushing unverified code, and two mechanisms are why.** `pnpm josh git -y` runs the commit and push hooks, which spell-check and lint the staged files, run the type check and run the whole unit suite — so a tree broken in those ways fails at the push rather than reaching CI at all. And CI's `Checks` job runs `pnpm josh gate --verbose` on the pushed commit, so the gate the merge rests on is run whether or not the local one is ever read.
-
-**Step 3 is still not optional, and the join is where the rule holds.** `pnpm josh followup` reads the pull request's checks and never reads the gate's record, so nothing but this run joining it keeps a merge from being decided on a gate nobody read — the same obligation "The gate runs beside this review, not in front of it" states, moved rather than removed. What the local run buys over waiting for CI's copy is the interval between them: a red check surfaces in about fifty seconds instead of at the end of a full cycle.
-
-**A red gate here costs one superseded CI cycle, and `ci.yml` bounds what that costs.** Fix it, re-run the single check that reported it, and run `pnpm josh git -y "<title> #<N>"` again — another follow-up commit on the same branch. The cycle running on the previous head is cancelled rather than run to completion, because `ci.yml` declares `concurrency: cancel-in-progress: true` keyed on the branch ref; the SonarQube workflow declares no group and finishes its superseded run. `pnpm josh followup` blocks on the head commit's checks, so the abandoned cycle decides nothing either way.
-
-**Every merge condition is the one it was.** All required checks green, the local gate green and joined, no standing change request, and a confirmed High still stopping the run — what changes is which of them waits for the other, and not one of them is dropped. This is the same trade joshuafolkken/kit#1261 accepted for the first cycle, applied to the second: wall-clock bought with actions minutes that a cancelled cycle mostly does not spend.
-
-### A clean second round issues the merge in the same turn
-
-**The last thing left after the two overlaps above is the run's own turn boundary** (joshuafolkken/kit#1333). Reconstructed from the session transcript and GitHub's check-runs on joshuafolkken/kit#1326 (PR #1327): the two sections above had done what they were for — CI hid entirely inside round 2 — and 134 seconds still separated all-checks-green at 06:34:37 from the merge at 06:36:51, 10% of a 1361-second run. Of those, 71 were round 2 still running and 44 were `pnpm josh followup` itself, and **19 were nothing at all**: the turn that read round 2's result ended, and a second turn issued the merge. That run made 67 model round trips averaging 10.1 seconds each, so the gap is two of them and nothing else.
-
-**So the turn that reads a clean second round is the turn that issues `pnpm josh followup`.** Clean is decided mechanically, not by judgement, and it has two halves: **no confirmed High is standing**, and the round routed nothing to branch 1 of the three-way disposition — nothing to fix in place. **The High half is stated here rather than imported from "Review round cap" below**, because a confirmed High takes none of the three exits and so satisfies the branch-1 half by saying nothing about it: one still standing after the second round stops the run with a `confirmation` Telegram, and no merge is issued at all. **A round that turned up only Lows is clean by this test**, since a Low takes branch 2 or branch 3 and neither writes a line of code. Branch 2 and branch 3 change no line of code, so the filing, `pnpm josh epic:bundle` and the one-line PR note all sit in that same stretch **ahead of** the merge call rather than in a turn after it, and the merge is issued as soon as the last of them has answered.
-
-**Nothing is skipped — only issued earlier.** Every input the merge rests on is read exactly as it was: the gate joined and green, and the required CI checks, which `pnpm josh followup` waits on and which still block the merge. What this removes is the pause between reading those results and acting on them, and a pause proves nothing about any of them. **It does not authorize shortening the reading either** — a gate nobody joined stops the merge here exactly as it does everywhere else in this document.
-
-**A round 2 that fixed something in place is the other path, and this section does not apply to it.** There the next step is the order "The round-2 fix commit is pushed before its gate" above defines — the single check the fix reaches, `pnpm josh git -y` again, then `pnpm josh gate` beside the CI that commit re-runs, joined before the merge — and the merge waits on that join because there is something new to read, not because a turn ended.
-
-**This is the round-1 append check applied to the round that ends the run.** "Auto-continue rule" below already requires the response carrying a clean review's markdown to carry the next tool call with it; that requirement was written around round 1's continuation (`pnpm josh git -y`), and round 2's — where the pull request is already open and the only step left is the merge — was left to be inferred from it. Both rounds now state the same instruction, and this section is its single source: `SKILL.md`, `chain-rule.md`, `fullrun.md`, `queue.md` and `prompts/collaboration-workflow/plan-comment.md` point here rather than restating it.
-
-## Severity (decided by a test, never by discretion)
-
-The output format below demands a severity on every finding, and for a long time nothing said what earns one. `medium` is a blocker — it must be fixed before the PR is opened — so a borderline finding rated `medium` costs a whole round, and whether it got one was left to whoever happened to be reviewing (joshuafolkken/kit#1220).
-
-**A finding is `medium` or higher only when both of these hold:**
-
-1. **It reaches something real** — a runtime code path, a distributed artifact a consumer reads, **or the verification that guards either**: a test, fixture or CI check whose defect lets one of the first two ship unnoticed. The third member is not decoration. `package.json` excludes `**/*.test.ts` and `**/*-fixture.ts` from what it ships, so without it a vacuous or wrongly-pinned suite — the failure mode this repository's marker suites exist to prevent — could never exceed `low` and would always be skippable in one line.
-2. **You can write the concrete failure scenario** — the inputs or state, and the wrong output, breakage or misreading that follows. Not "this could be confusing": the actual sequence.
-
-**Fail either test and the finding is `low`.** In particular, **a finding whose failure scenario you cannot write is `low` however uncomfortable it looks** — that is the whole of the second test, and it is the one that decides borderline cases.
-
-**Test 2 asks whether a scenario can be written, not whether you wrote one.** The cheap action — not attempting it — produces the non-blocking severity, which is the same cost-pressure inversion the level rule one section up exists to remove, and it is the one place this test is weaker than a command you run. So the obligation is to **attempt the scenario for every finding that passes test 1, and to say so when the attempt failed**: "no failure scenario — <what you tried>" is the evidence, and a `low` on a test-1 finding without it is not a severity, it is a skipped step.
-
-**A distributed artifact is on that list deliberately.** "Documentation is not inert either" above already reviews `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` at `medium`, on the measurement that joshuafolkken/kit#963 and #965 each carried ten real defects reaching every consumer with no test in front of them. A severity rule that ranked documentation below runtime code would contradict the level rule one section up.
-
-**This is the same move `josh review:level` made, one level down.** A rule an agent applies from memory is a rule an agent can talk itself out of, and a severity nobody defined is a severity that drifts upward under an instruction to find something. Measured, not theorized: rounds three and four of joshuafolkken/kit#854 were spent on a misplaced comment, an unused export and a stale comment — findings the Low rule already permitted skipping, treated as blockers because they came back without severities.
-
-**Test 2 is not a new demand.** Category 1 already requires an explicit trace — `Traced [input/state] → [result]` — and the failure scenario is that same sentence. What changes is that a finding without one no longer carries a blocking severity.
-
-**`high` and `low` are unchanged.** A `high` is fixed before committing and blocks the merge regardless of round count; a `low` that does not reach the user may be skipped with a one-line reason. This section decides which findings reach `medium`, not what a severity then does — with the one clarification below, which the second way of becoming a `low` makes necessary.
-
-**It agrees with the three-way disposition below.** Branch 2 files a finding that is a confirmed defect reaching a runtime code path, and "reaching" there is read with the same extension as test 1 here — a distributed artifact, and the verification guarding either, both count as reaching one. What branch 2 no longer carries is the "or it needs a decision" half it used to (joshuafolkken/kit#1469): a design question with no defect under it is branch 3's now, and neither of this section's two tests moved to make room for that.
-
-**A `low` is not automatically droppable, and the two ways of becoming one are why.** Branch 3 is the default exit, but branch 1 stands in front of it: **A finding that passed test 1 and was rated `low` for want of a failure scenario still reaches the user**, so where it closes in a few lines inside a file the diff already touches it is fixed rather than dropped. What joshuafolkken/kit#1469 changed is only its _other_ exit — with no failure scenario written it is not the confirmed defect branch 2 now requires, so where branch 1 does not take it, branch 3 does, with the one-line note that keeps it auditable. Reading every `low` as droppable is what would let the cheaper severity skip the cheap fix that was actually available, which is the drift this section exists to stop.
+---
 
 ## Review round cap (2 rounds)
 
-The severity rule above is not a stopping condition on its own. Every fix creates new surface, and a review whose scope is the whole change finds something in it — so the loop is bounded by how much new code the fixes produce, which is unbounded.
+The severity rule in the rubric is not a stopping condition on its own. Every fix creates new surface,
+and a review whose scope is the whole change finds something in it — so the loop is bounded by how much
+new code the fixes produce, which is unbounded.
 
-**Two rounds is the ceiling, not the schedule.** Whether the second one is due at all is `pnpm josh review:round2`'s answer — see "When round 2 is skipped entirely, and when it is not" below, which is the single source of that condition (joshuafolkken/kit#1433).
+**Two rounds is the ceiling, not the schedule.** Whether the second one is due at all is
+`pnpm josh review:round2`'s answer — "When round 2 is skipped entirely, and when it is not" below is
+the single source of that condition (joshuafolkken/kit#1433).
 
-This is measured, not theorized. On joshuafolkken/kit#854 four rounds produced 18 findings; on joshuafolkken/kit#855 two rounds produced 19. Almost none of them was a repeat: each round found new things, and many of those were about code the **previous round's fix** had just written. One fix replaced a line-based check with a proximity window, and the next two rounds each found a new defect in that window. Another moved a rule into a skill, and a later round moved it back. Two rounds of that is diligence; a third is the review chasing its own tail.
+This is measured, not theorized. On joshuafolkken/kit#854 four rounds produced 18 findings; on #855
+two rounds produced 19. Almost none of them was a repeat: each round found new things, and many of
+those were about code the **previous round's fix** had just written. Two rounds of that is diligence; a
+third is the review chasing its own tail.
 
 ### A merge-conflict resolution review is not one of the two
 
-**When `pnpm josh followup` reports `PR checks failed (merge conflict)`, the child resolves the conflict in its own lane and reviews the resolution — and that round does not count against the cap** (joshuafolkken/kit#1623). The cap bounds re-reading _the change under review_, because it is that change's fixes which create the new surface making the loop above unbounded. A resolution review reads a different subject: not the change, but what merging a moved `main` into it did. Charging it to the cap would mean a child that spent both rounds must merge its resolution unreviewed — the exact outcome the cap exists to prevent, reached from the other side.
-
-**It is one round, over the resolution diff only, and it terminates.** What bounds it is not the cap but the procedure that calls it: a child resolves at most once, and a second conflict parks it. `.claude/skills/workflow-commands/epicrun.md` → "Conflicts are not predicted" is the single source of the procedure and of the four conditions under which the run steps back instead of resolving. `pnpm josh review:attest --check` must answer `ok` before the merge is re-issued, exactly as for the rounds this one does not count against, and a confirmed High parks the child rather than buying it a further round.
-
-### The second round is a verification pass, not a second full review
-
-**The second round asks a different question from the first.** Until joshuafolkken/kit#1219 it asked the same one — read the whole diff adversarially — inside a document whose opening line forbids declaring anything clean without proof. Read one diff twice under that instruction and the two readings return different findings whether or not the code changed, because returning none is what the instruction rules out. So a Medium stood at the second round even where the fixes were sufficient, and the three-way disposition below had to be run every single time.
-
-**What changes is the question, never the standard.** A confirmed High still blocks the merge whatever the round count, the cap is still two rounds, and every rule below applies to this pass unchanged.
-
-|                | The first round                    | The second round                                                                                                                                                               |
-| -------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Scope**      | `git diff main` — the whole change | the **fix delta**: what the first round's fixes wrote, plus the call sites of any signature they changed                                                                       |
-| **Question**   | "review this change"               | "did each first-round finding actually close, and did the fix itself introduce a defect?"                                                                                      |
-| **Categories** | all nine                           | category 1 (Bug risks & logic errors), plus the categories the fix delta actually touches — i18n only if a fix added a user-visible string, Tests only if a fix changed a test |
-| **Output**     | the full template                  | one line per first-round finding with its resolution, then any new finding **inside the fix delta**                                                                            |
-
-Template for the second round:
-
-```md
-### First-round findings
-
-1. `src/foo.ts:42` (was high) — resolved — <how the fix closes it>
-2. `src/bar.ts:8` (was medium) — **not resolved** (medium) — <what still stands>
-
-### New findings in the fix delta
-
-- `src/foo.ts:47` (medium) — <problem> — <fix>
-
-### Summary
-
-<counts by severity across both sections, and overall go/no-go>
-```
-
-**A first-round finding the fix did not close is still a finding, at its original severity.** The pass narrows what is read, not what counts — an unresolved High blocks exactly as it did in the first round.
-
-**This is a generalization of a rule already written, not a relaxation of one.** Branch 1 of the three-way disposition below already states that **a fix-in-place never starts a new review round** — so the document has already accepted that a fix does not oblige anyone to read the whole diff again. The second round applies that same reasoning to the rest of the fixes: what has to be read is what the fix wrote, and re-reading the code no fix touched is what manufactures the artificial findings above.
-
-**It converges because the fix delta shrinks.** Each round's fixes are smaller than the last, so the scope is monotonically decreasing — which the whole-diff scope never was, and which is why the cap had to bound the loop from outside rather than the loop ending on its own.
-
-### The narrowing is real in scope and does not show in the wall clock
-
-**Convergence above is a statement about scope, and it is not a statement about cost.** joshuafolkken/kit#1305 read the `review` phase of 20 merged runs with `pnpm josh time`, and the two do not track each other. This note is here so the next reader finds the measurement instead of re-deriving the proposal it rules out.
-
-- **What the phase contains is a definition, and only the split inside it is a finding.** `scripts/time/time-markers.ts` makes the `code-review` call itself the `review` marker, so "the phase equals the agent's `Skill` calls" is how the phase is built rather than something the runs revealed. **The measurement's own content is the per-round split** — `by_invocation` reports each call separately, so round 1 and round 2 are readable apart for the first time. **And a review's cost is not all inside its phase**: the fixes a round demands are charged to `rework` (median 140 s across the 12 most recent of these 20 runs, which is the subset `pnpm josh time --last 12` reports together), which `scripts/time/time-phases.test.ts` keeps there deliberately. **Rank that row too** — reading this section as "the review's only cost is the two invocations" is the misreading it most invites.
-- **The pass is cheaper on the median and not reliably.** Round 1 runs a median 262.5 s (n = 20), round 2 a median 171 s (n = 14) — about a third off. But **3 of the 14 two-round runs paid more for round 2 than for round 1**, on a strictly smaller scope, so the saving is a tendency rather than a property.
-- **Round 1's cost tracks its input weakly at best, which is why narrowing buys so little.** Across 9 runs whose diffs span 136 to 1053 changed lines, round 1's duration correlates with that churn at **r = 0.05**. **State the sample with the coefficient: at n = 9 that carries a 95% interval of roughly ±0.65**, so this rules out a _strong_ relationship and not a real one. What is descriptive rather than inferential is the spread itself — the smallest diff cost 217 s and the largest 220 s, and the most expensive round 1 of the set (396 s) read the second-smallest diff. **A larger sample is exactly what would overturn this**, and re-measuring is the answer to a doubt about it rather than an argument. **It has since been re-measured, and it was overturned** (joshuafolkken/kit#1436): at 23 runs the same correlation is `r = 0.55`, so the coefficient in this bullet is the historical reading and not the current one. **What it was cited for survives the overturn** — see "Round 1's cost does track the change size, and splitting is still not how to cut it" below, which is the current single source for round 1's cost against its input.
-- **So a rewrite of what either round reads is not, on this evidence, a speed measure.** joshuafolkken/kit#1219 redefined round 2's question and joshuafolkken/kit#1241 fixed the mechanism that carries it into the forked process; both merged, and the phase's wall clock did not move. Neither was wasted — they buy fewer artificial findings, which is what they were for. **A third such proposal is not forbidden; it is asked to say why this data does not apply to it**, which is what nobody could do before the figures existed.
-
-**Round-count distribution, since it is the other thing a speed proposal assumes.** 6 of the 20 runs finished in one round (30%). **A one-round run's phase is one whole round 1, not half of a two-round run** — 216, 220, 226, 274, 297 and 327 s. **Round 1 is not a constant**, though: across all 20 runs it spans 177 to 396 s, a range wider than the median saving the pass above is credited with, so a budget built on any single figure here will be wrong in both directions.
-
-### The re-derivation round 2 does is real, and it is not what round 2 costs
-
-**joshuafolkken/kit#1418 opened the layer the section above never did.** joshuafolkken/kit#1305 read the `review` phase of 20 merged runs; this read the forked review agent's own transcript for **61 round-1/round-2 pairs** merged after joshuafolkken/kit#1241, through `pnpm josh time --session <session-id>/agent-<agent-id>` — the qualified scope `scripts/cost/cost-transcript.ts` already discovers, so the two layers are the same classification read at two grains rather than a second reader. **They agree, which is why this refines the section above instead of replacing it**: round 2 reads a median 172 s here against the phase's 171 s, and round 1 a median 251 s against 262.5 s.
-
-- **The pass is cheaper on the median and not reliably, at three times the sample.** The median round-2 span is **0.66 of its own round 1** (mean 0.73, n = 61), and **9 of the 61 paid more for round 2 than for round 1** — the same shape #1305 recorded at 3 of 14, not a new one. **Run #1399, the run #1418 was filed from, is one of the nine.** A single run reading near 1.00 is the tail of this distribution, not evidence about the mechanism, and reading one run as the mechanism is what the sample above exists to stop.
-- **Round 2 does re-derive round 1's evidence, and the re-derivation does not predict its cost.** A median **62%** of the paths round 2 named had already been opened by round 1, and a median **8 of its 22 round trips** named only such paths. Against round 2's span that share correlates at **r = -0.15** (n = 61) — the wrong sign — and the highest-overlap rounds measured, at 75% to 86%, are among the cheapest of the 61. **What predicts the span is the turn count**: round trips against it correlate at **r = +0.80**, which is joshuafolkken/kit#1344's lever rather than this one.
-- **A handover would carry the retired value in exactly the case it was built for.** Round 1's derivations are readings of the **pre-fix** tree, and round 2 verifies the **post-fix** one. On run #1399 both rounds ran the same `node -e` reproduction of the phase table's column output, and what it prints is what the fix changed — so a mechanism supplying round 1's output would supply the wrong one, and a round 2 that trusted it would report a finding closed against a value taken before the fix.
-- **The brief's "already verified" half is measured rather than assumed, as `scripts/review/review-brief.ts` requires of it.** **8 of the 61 round-2 agents (13%) still ran a gate check of their own** — `vitest`, `eslint`, `prettier --check` — against 12 of 61 (20%) in round 1. It is the smaller of the two wastes, and it is the one an instruction has already moved.
-- **This says what round 2 costs now; it does not say whether joshuafolkken/kit#1241 moved it.** A round 2 is identified by the round-2 brief, and that brief is what #1241 introduced — **one** pre-#1241 pair in this project's transcripts carries the marker, so no before-and-after baseline can be built at this layer. **The heading above therefore stands unchanged**: what is measured here is round 2 against round 1, never narrowing against not narrowing.
-
-**So handing round 1's derivations to round 2 is not adopted**, and the escalation guard above now has a second figure under it — **one that answers a narrower question than `r = 0.05` above, and only that question**. `r = 0.05` is round 1's cost against the size of its input, so a proposal to narrow what a round is _given_ is still measured against that one; `r = -0.15` is round 2's cost against how much of round 1's reading it repeats, so it is what a proposal to _carry round 1's work forward_ has to say does not reach it. A proposal aimed at how many _turns_ a round takes is the shape this data supports, and neither coefficient is the bar for it. **The first of those two bars has since moved** (joshuafolkken/kit#1436): a proposal to narrow what a round is _given_ is measured against "Round 1's cost does track the change size, and splitting is still not how to cut it" below, which re-fitted round 1 at 23 runs and refuses such a proposal on the fixed part of a round rather than on `r = 0.05`. `r = -0.15` is untouched by it, because it answers the other question.
+**When `pnpm josh followup` reports `PR checks failed (merge conflict)`, the child resolves the conflict
+in its own lane and reviews the resolution — and that round does not count against the cap**
+(joshuafolkken/kit#1623). The cap bounds re-reading _the change under review_; a resolution review reads
+a different subject — not the change, but what merging a moved `main` into it did.
+`.claude/skills/workflow-commands/epicrun.md` → "Conflicts are not predicted" is the single source of
+the procedure and of the four conditions under which the run steps back instead of resolving.
+`pnpm josh review:attest --check` must answer `ok` before the merge is re-issued, and a confirmed High
+parks the child rather than buying it a further round.
 
 ### When round 2 is skipped entirely, and when it is not
 
-**The two sections above answer a proposal to _narrow_ round 2. Neither answers a proposal to _not run_ one** (joshuafolkken/kit#1433): every figure in them was taken from a run that ran its second round, so nothing there measures what skipping one costs. This section decides when it is skipped, and **the decision is a command's rather than a reading of the list below**:
+**Two rounds is the ceiling; whether the second round runs at all is a command's answer, not a reading
+of a list** (joshuafolkken/kit#1433):
 
 ```bash
 pnpm josh review:round2 --round-1-closed   # → required | skip ; the reason on stderr
 ```
 
-**Ask it once round 1's fixes are in and before the commit.** The fix delta it reads is then exactly what those fixes touched. **Nothing between them and `pnpm josh git -y` writes to the working tree any more** (joshuafolkken/kit#1486): the version bump a child used to make here rewrote `package.json`, which is not inert, so a delta taken after it carried that write and answered `required` whatever round 1 did — neither arm could ever fire, and the ordering had to be spelled out to keep the condition alive. Children no longer bump, so the trap is gone rather than guarded against. **A `skip` moves only whether the second round runs.** The gate still re-runs before the commit, because round 1 edited the tree and that is what made the first gate's result stale — a skipped round is not the clean-first-round case, which has nothing edited to re-run for.
+**Ask it once round 1's fixes are in and before the commit.** Pass `--round-1-closed` only where every
+round-1 High/Medium finding actually closed — by a fix in this working tree, or as a verified false
+positive — and none was filed or deferred. **Without the flag the answer is `required`**, which is also
+what the command answers to every uncertainty it meets, a missing round-1 snapshot included.
 
-Pass `--round-1-closed` only where every round-1 High/Medium finding actually closed — by a fix in this working tree, or as a verified false positive — and none was filed or deferred. **Without the flag the answer is `required`**, which is also what the command answers to every uncertainty it meets, a missing round-1 snapshot included.
+**`skip` has exactly two arms, and both are states in which round 1's fix code needs no review**
+(joshuafolkken/kit#1222 — the round exists because round 1's fix code is otherwise unreviewed):
 
-**`skip` has exactly two arms, and both are states in which joshuafolkken/kit#1222's reason for the round does not arise.** That issue's conclusion is the one this section has to answer: round 2 exists because **round 1's fix code is unreviewed**, and that is structural rather than removable.
+| Arm                    | What it is                                                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **A — no fix code**    | The fix delta is empty: round 1's findings closed without an edit, so there is no unreviewed fix code                        |
+| **B — inert fix code** | Every path in the fix delta is inert by the review-level classification above — neither executing, instructing, nor shipping |
 
-| Arm                    | What it is                                                                                                                                                                                     | Why joshuafolkken/kit#1222's reason does not reach it                                                                                                                                                                                             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A — no fix code**    | The fix delta is empty: round 1's findings closed without an edit, and the snapshot it is measured against is round 1's own — recorded once per run and never retaken (joshuafolkken/kit#1441) | There is no unreviewed fix code, so the premise is absent rather than overridden. The brief already tells a round 2 here that its target is empty, so what the skip removes is a forked agent invocation that reads nothing                       |
-| **B — inert fix code** | Every path in the fix delta is inert by `josh review:level`'s classification                                                                                                                   | The fix code is unreviewed **and** unable to reach anyone: inert is defined as neither executing, nor instructing, nor shipping — the three ways a defect in this repository escapes, read here for the fix delta instead of for the whole change |
+**Neither arm weakens the standard.** A round-1 High/Medium that did not close is not a closed finding,
+so the flag is not passable; the cap is still two rounds; and a confirmed High still blocks the merge.
+**The wider line joshuafolkken/kit#1433 proposed — exempting anything that is not a runtime code path —
+is not adopted**: a documentation-only diff is exactly where the review is the only detector (the #963 /
+#965 measurement above), so a prompt fix answers `required`.
 
-**Neither arm weakens the standard.** A round-1 High/Medium that did not close is not a closed finding, so the flag is not passable; the cap is still two rounds; and a confirmed High still blocks the merge.
+**A skipped round is recorded on the Issue**, so the condition stays auditable and can be withdrawn if
+a defect is later traced to a skipped delta:
 
-**Arm A rests on the snapshot not being retaken, and that is enforced rather than left to a timestamp somebody might notice.** An empty fix delta has two readings — round 1 wrote no fix code, or the record was retaken against the fixed tree — and the digests cannot tell them apart, so joshuafolkken/kit#1441 removed the second reading instead of trying to detect it: `pnpm josh review:brief` records the round-1 snapshot **once per run** and a later round-1 invocation keeps the record it finds rather than overwriting it, so a bare re-run after the fixes can no longer empty the delta. The record's lifetime is one run and `pnpm josh followup` removes it at the end of a run that **merged**, which is what leaves the next run free to take its own — and nowhere else, because removing one while a run is still in flight is the direction that lets the next round-1 brief record a fresh snapshot against the already-fixed tree. **A record that outlives its run only ever widens the next one**: the delta is then measured from further back, the answer is `required`, and the round is paid rather than skipped. The answer still carries round 1's timestamp, because a delta measured from an older record is legible only to a reader who can see when that record was taken.
-
-#### The wider line joshuafolkken/kit#1433 proposed is not adopted
-
-The condition that issue arrived with was "the fix delta touches no **runtime code path**" — on run #1412 that meant prompts and tests. **It is rejected on evidence already in this repository, not on caution.** `scripts/review/review-level.ts` records why documentation is deliberately absent from the inert list: joshuafolkken/kit#963 and #965 were both documentation-only diffs, and a `medium` review found **ten real defects in each** — dangling pointers into removed sections, citations naming the wrong file, in artifacts distributed to every consumer — that **no test covered, because prose is what they were**. A prompt fix is precisely where the review is the only detector, so exempting it would remove the round in the case it earns its keep.
-
-**The narrower fallback that issue floated — "test files only" — is rejected on the same axis.** A test is the verification that guards a runtime path, and a defect a round-1 fix introduces there is silent: an assertion a fix weakened still passes, and the gate reports green. That is the third arm of "Severity"'s reach test, not an exception to it.
-
-**A distributed prompt is not documentation about this repository; it is what the agent executes.** This file decides whether a defect ships. Calling it inert would be calling itself inert.
-
-#### Skipping, rather than a lighter round
-
-The third option joshuafolkken/kit#1433 raised was replacing round 2 with a category-narrowed pass. **The two sections above rule it out.** Round 1's cost tracks the size of its input at `r = 0.05`, round 2's tracks how much of round 1 it repeats at `r = -0.15`, and what does predict a round's span is its **turn count**, at `r = +0.80`. A narrowed round still forks an agent and still takes turns, so it would buy what joshuafolkken/kit#1219 and joshuafolkken/kit#1241 bought — fewer artificial findings, and no wall clock. **The saving here is entirely in not forking**, which is why the answer is a skip rather than a cheaper read. **The first of those three coefficients has been re-measured since** (joshuafolkken/kit#1436) — round 1's cost against the size of its input is `r = 0.55` at 23 runs, not `r = 0.05` at 9 — and **the conclusion above is unaffected**: what rules a narrowed pass out is that it still forks an agent and still takes turns, and a size relation whose fixed part outweighs its size-dependent part at every diff this project has produced rules it out harder rather than softer.
-
-#### Recording a skip, so the condition can be judged later
-
-**A skipped round is recorded on the Issue, not only in the run.** Nothing else makes the frequency countable afterwards, and a condition nobody can audit is a condition nobody can withdraw.
-
-1. Label the Issue `review-round2-skipped`, created once per repository exactly as `in-progress` is: `gh api repos/{owner}/{repo}/labels -f name=review-round2-skipped -f color=c5def5 -f description="Review round 2 was skipped under the condition in prompts/review.md" --silent 2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=review-round2-skipped'`.
-2. Post an Issue comment under the heading `## Round 2 skipped`, naming **which arm fired** and quoting **the reason line the command printed**, verbatim — it carries the fix delta on arm B and round 1's timestamp on arm A. The label is what makes the set countable in one query; the comment is what makes a defect found later attributable to a particular skipped delta.
-
-Counting them is then one command: `gh api "repos/{owner}/{repo}/issues?labels=review-round2-skipped&state=all&per_page=100" --paginate --jq '.[] | select(.pull_request == null) | .number' | wc -l`. The count is taken by `wc -l` rather than by jq's `length` because `--jq` runs **per page**, so a `length` would print one number per page once the label passes 100 Issues. It is written as REST rather than as a subcommand for the reason `prompts/collaboration-workflow/gh-rest.md` gives — the subcommand is GraphQL-backed and a cloud session is answered `403` — and `prompts/collaboration-workflow/wip-cap.md` counts open Issues with the same shape.
-
-#### When the condition is withdrawn
-
-**Arm B is withdrawn on the first confirmed case** — a defect traced to a path that sat in a skipped run's fix delta, of a kind a verification pass would have caught. One is enough: the arm's whole claim is that such code cannot reach anyone, so a single counter-example is not a tail event, it is the claim being false. Withdrawing it means deleting arm B from the table above and from `scripts/review/review-round2.ts`, leaving arm A.
-
-**Arm A is not withdrawable by evidence of this kind, and saying so is not confidence.** An empty fix delta wrote nothing, so no defect can originate in it. The only thing that could retire arm A is the discovery that the delta was computed wrongly — and joshuafolkken/kit#1441 was exactly that discovery, in the **recording convention** rather than in the arm: the snapshot was retaken on every round-1 invocation, so an empty delta could mean the record had moved instead of the tree standing still. It was answered by fixing the convention, because the arm's premise holds wherever the record is trustworthy.
-
-**The two directions joshuafolkken/kit#1441 did not take are recorded here, so the next reader does not re-derive them.** Keeping round 1's _review completion_ time as a second record and comparing it against `taken_at` separates nothing: a snapshot retaken after the fixes and one taken where no fix was ever written both postdate every edit in the tree, so the comparison answers the same either way — and the second record would be written by an agent, so forgetting it is a third state. **Withdrawing arm A and keeping only arm B** is safe but expensive in the wrong place: the command is asked on every run that reaches it, so a first round that produced no fix code — the clean one this document's own decision table gives no second round at all — would start answering `required`, and the round would be run for the case the table says has none.
-
-### What a round-2 fix-in-place costs, and how often it is paid
-
-**joshuafolkken/kit#1261 named the price it was accepting and nobody had measured it** (joshuafolkken/kit#1382): one extra intermediate commit, and CI run twice whenever round 2 fixes a finding in place — branch 1 of the disposition below, and the only one of the three that pushes anything. The instrument is the round-2 disposition row of `.claude/skills/diag/SKILL.md` (joshuafolkken/kit#1403), applied per run to `pnpm josh time --last 20 --json` read without `--top`.
-
-**Three counts, and deliberately no rate.** Over the 20 most recently merged runs the detector answers **occurred 6 · did not occur 2 · could not tell 12**. **A rate is not quoted, because most of the set could not be classified** — that is the instrument's own instruction, and the reason is structural rather than a gap in the reading: 10 of the 12 carry a single `review` segment, which is a clean round 1 and a two-round run whose `pr` group fell under the absorption threshold alike. **What the counts do support is that the case is not rare** — 6 confirmed occurrences, and 6 of the 8 runs that could be classified at all.
-
-- **The serial stretch is 42.0 s to 132.8 s, median 100.2 s — 1.9% to 11.1% of its run, median 4.6%** (n = 6): #1414 42.0 s · #1347 76.1 s · #1305 83.2 s · #1385 117.2 s · #1387 ≥117.3 s · #1399 132.8 s. **#1387's figure is a lower bound**, because that run issued no single check at all for the sum's fourth component to be attributed to.
-- **The run joshuafolkken/kit#1382 was filed from is above all six.** Run #1379 read about 200 s and 12%, and every one of the six merged after it under the same rules — joshuafolkken/kit#1326 and joshuafolkken/kit#1333 were both already in place when #1379 ran, so nothing landed in between to explain the gap. The 200 s is the tail of this distribution rather than its centre, which is the misreading "The re-derivation round 2 does is real, and it is not what round 2 costs" above found in a single-run ratio.
-- **What the stretch is made of, summed across the six**: the second CI cycle **256.6 s**, the push **182.7 s**, the local gate **94.4 s**, the single check **34.9 s** (5 runs). **The two largest are both out of scope by joshuafolkken/kit#1382's own terms** — the CI cycle _is_ the verification of the fix, and the push is what runs the commit and pre-push hooks. A little over a fifth of the stretch is reachable at all.
-- **The gate component is bimodal, and this reading does not say why.** Three of the six paid 1.8 s to 3.5 s for it and three paid 17.4 s to 49.7 s — 85.7 s of the 94.4 s above. A launch and a completed run are what those two groups look like, but a `by_invocation` duration carries nothing about how the call was issued, so the cause is readable only from the session's own transcript (`pnpm josh time --session <session-id>/agent-<agent-id>`). **Recorded as an observation, not as a mechanism** — the rule the skill states for its own segment readings.
-
-**The six figures were read with the superseded CI component, and they are lower bounds** (joshuafolkken/kit#1465). Each took its CI cycle as the `ci` phase minus `categories.ci_ms`, which is the part of a cycle the merge spans cover _and nothing else does_ — so every minute of a cycle that no span covered at all, `followup` not yet issued or between attempts, fell out of it. On run #1441 that reading gave **56.5 s against a hand-measured 103 s**, and reported the total as sitting in the middle of the range above when the run was in fact past its maximum. `josh time` now prints a `CI cycles` block — one row per check window, with the naked seconds and what the rest of it hid behind — and the disposition row reads the last row's `naked` figure instead.
-
-**The six are not re-measured here, and the reason is not cost.** They have since fallen out of `--last 20`, so a re-reading today measures a different set of runs and produces a second distribution rather than correcting those six numbers. What can be said without re-measuring is the direction: **naked seconds are never less than the difference they replace**, so both the range and the median above can only rise. **So the reopen clause below is live rather than settled**, and re-reading the counts under the new reading is one `pnpm josh time --last <N>` and needs no Issue — the terms the (a) bullet below already sets. **Run it from the main checkout.** A linked work tree's project directory holds only its own session, so `--last` there reads every run as `no transcript`, and with no span to weigh a cycle against the naked figure is withheld as `not measured` rather than reported as the whole cycle.
-
-**(c) — the status quo — is taken, and (a) and (b) are not.**
-
-- **(b) — overlapping the post-merge routine into the second CI wait — has no target in the measurement.** Not one of the six carries a `wrapup` stretch between its `merge` row and `post-run`, and **five of the six merged before joshuafolkken/kit#1350**, so the absence is not that issue's doing either. The 53 s joshuafolkken/kit#1382 quotes was one run's, and it does not reproduce.
-- **(a) — reducing how often round 2 produces a commit — already has its lever, and building a second one here is not this document's to do.** joshuafolkken/kit#1433 shipped `pnpm josh review:round2`, which skips the round entirely on the two arms above, and epic joshuafolkken/kit#1222 — whose subject that is — has closed. **Its effect on the three counts is unmeasured**: no issue in this repository carries `review-round2-skipped`, so the condition has not fired once yet. Re-reading the counts once it has is one `pnpm josh time --last <N>` and needs no Issue.
-- **Cutting the required checks, or merging without waiting for the second cycle, is out of scope and stays so.** Both weaken the verification gate, which `CLAUDE.md` treats as a prohibited workaround. `pnpm josh followup` blocks on the head commit's checks, and that block is the whole reason the fix commit is verified at all.
-
-**What would reopen it.** A re-reading in which the median serial stretch climbs back toward the 200 s the issue was filed from, or one in which the reachable fifth — the local gate and the single check — grows past the two components that are out of scope. **A single run above the range is not that**, which is the entire content of the second bullet above.
-
-### Round 1's cost does track the change size, and splitting is still not how to cut it
-
-**joshuafolkken/kit#1436 took the re-measurement the first of these sections invited, and it came back the other way.** "The narrowing is real in scope and does not show in the wall clock" recorded round 1's duration against its input at `r = 0.05` over 9 runs, and said in so many words that a larger sample was exactly what would overturn it. It did: over **23 runs**, read from `pnpm josh time --last 30 --json` without `--top`, the same correlation is **`r = 0.55`** against changed lines — a rank correlation of **0.66**, and `r = 0.56` against changed files. **What makes that an overturn is the fitted slope's significance, not an interval the old reading excluded**: at 23 runs the slope is 0.086 s per changed line against a standard error of 0.029, about three standard errors from zero, while `r = 0.55` sits _inside_ the roughly ±0.65 the 9-run reading carried — which is what an interval that wide means. It could never have refused this result, so the overturn belongs to the larger sample rather than to a contradiction between the two. **The relation is real, and it is the rest of this section that decides the question.** It points where the retired coefficient pointed, for a different reason.
-
-- **The sample, and what could not be read.** 30 merged runs were measured; **23 carry a round-1 duration and 7 do not.** A round 1 is the earlier `review` row of an identified pair, or the single `review` row of a run corroborated as one-round — one `pr` row in `segments` and one `josh git` call in `by_josh_command`. The seven that failed are six single-`review`-row runs carrying **two** `pr` rows and two or three `josh git` calls, and one carrying two `review` rows and **no** `pr` row at all. **That is 23% of the window, and it is unreadable rather than zero** — `.claude/skills/diag/SKILL.md`'s pair-identification rule is what refuses them, and a reading that counted them would be a reading of something else.
-- **Fitted rather than correlated, because the decision turns on the split.** Round 1 runs about **242 s plus 0.086 s per changed line** (standard error 0.029, residual spread 56 s), so `R² = 0.30`: **seven tenths of round 1's variance is not the diff at all.** The whole size-dependent part on the largest diff of the set — 1,361 changed lines — is **117 s against a fixed 242 s**, and on the smallest, 59 lines, it is **5 s**.
-- **Splitting one Issue in two adds a whole intercept, at every size.** Two Issues pay the fixed part twice where one paid it once, and the size-dependent part is conserved because the lines are the same lines — so **the round-1 total rises by about 242 s whatever the diff was**, and there is no crossover to find. joshuafolkken/kit#1436 asked where splitting starts to pay: **the answer is nowhere in the measured range and nowhere above it**, since the variable part does not reach the fixed part until roughly 2,800 changed lines — twice the largest run measured — and arriving there would only make two halves cost what one whole cost, having doubled the fixed part to get it.
-- **The spread inside one size is wider than the spread across sizes.** The three runs of 9 changed files read **376.5 s, 273.6 s and 214.4 s** — 162 s apart, and in the wrong order, round 1 falling as their diffs grew from 350 to 561 lines. That one group is wider than the 117 s the fit attributes to the entire 23-fold range of input. Sorted by changed lines, **12 of 22 adjacent pairs have round 1 falling as the diff rises**, and round 1's whole range is **2.2×** across a **23×** range of diff.
-
-**So neither entrance is taken.** joshuafolkken/kit#1436 named two and this measurement answers both, and the decision is recorded here rather than in the Issue because an Issue closes.
-
-- **Moving the split assessment's threshold is not taken.** `.claude/skills/workflow-commands/split-assessment.md` → "Diff size is not a reason to split, and that is measured" carries it where a reader of that document will meet it. What is refused is an arm that **splits more** on this ground: a threshold added to shorten round 1 spends a whole extra round 1 to save a fraction of one. **joshuafolkken/kit#1469 later added a size condition that points the other way and is not refused by this** — it is a floor under splitting rather than a trigger for one, so at every size it splits as often as the old test or less often and never more, and the intercept measured here is what it removes. The direction is the whole of the distinction: an arm that would raise the number of splits at some size is refused whatever it is argued from.
-- **Narrowing what round 1 reads is not taken either.** The coefficient is real, so this is no longer refused on `r = 0.05` — it is refused on the intercept. Halving what round 1 reads recovers at most half of the size-dependent part: about **58 s on the largest run of the set and 2 s on the smallest**, inside a residual spread of 56 s. What predicts a round's span is still its turn count, which is joshuafolkken/kit#1344's lever and not this one.
-- **Reducing what round 1 finds was never a candidate.** `CLAUDE.md` treats narrowing or reinterpreting a verification gate — the review included — as a prohibited workaround, and joshuafolkken/kit#1436 put it out of scope in the same words. **Nothing decided here changes what a round 1 reads or what it reports.**
-
-**The fixed point, for whoever proposes this next.** Read round 1 as the earlier `review` row of `segments` in `pnpm josh time --last <N> --json`, **without `--top`** — the cap keeps the longest five segments and drops the short `pr` row the pair rule needs — with `rework.size` from the same report beside it. **Report the two coefficients and never a median**: a median round 1 hides the split between the fixed part and the size-dependent part, and that split is the whole of the answer above. **Report how many runs of the window were unreadable too**, because a fixed point that silently answers for three quarters of a window gets read as answering for all of it.
-
-**What would reopen it.** A re-fit in which the size-dependent part exceeds a whole round 1's fixed part inside the range this project's Issues actually occupy — which is a movement in the intercept as much as in the slope, so the two are re-read together and never one alone. **A single large run above the fit is not that**, for the reason "What a round-2 fix-in-place costs, and how often it is paid" gives just above: the tail of a distribution is not the distribution.
+1. Label the Issue `review-round2-skipped`, created once per repository:
+   `gh api repos/{owner}/{repo}/labels -f name=review-round2-skipped -f color=c5def5 -f description="Review round 2 was skipped under the condition in prompts/review.md" --silent 2>/dev/null || true`,
+   then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=review-round2-skipped'`.
+2. Post an Issue comment under the heading `## Round 2 skipped`, naming **which arm fired** and quoting
+   **the reason line the command printed**, verbatim.
 
 ### Three-way disposition after the cap
 
-**The cap needed three exits, not one.** For a long time it had exactly one: after the second round, every non-High finding was filed as a follow-up Issue. That is the largest single manufacturing line of follow-up Issues in this workflow, and it files Issues that are not worth one — joshuafolkken/kit#1069 corrected three comments that changed no executable line and still took six Issues across two REST-migration cleanups to do it, each carried over because a per-child scope check dropped it. **A finding's disposition is decided from what it is, mechanically — not from the filer's discretion.** After the second round, place every remaining non-High finding in exactly one of these:
+**After the second round, place every remaining non-High finding in exactly one of three exits, decided
+from what the finding is rather than from the filer's discretion** (joshuafolkken/kit#1469). **The
+default exit is branch 3, and branch 2 has to be earned**. Read them in order — branch 1 where the fix is
+trivial and local, branch 2 only where the finding clears the bar it names, branch 3 for everything
+left, which is most of them. "It might matter later" is branch 3.
 
-**The default exit is branch 3, and branch 2 has to be earned** (joshuafolkken/kit#1469). Read the three in order — branch 1 where the fix is trivial and local, branch 2 only where the finding clears the bar it names, branch 3 for everything left, which is most of them. Where a finding does not plainly clear branch 2's bar, it has not cleared it: "it might matter later" is branch 3, and so is every finding whose whole cost is that a reader of this repository would have liked it written differently.
+1. **Fix it in place.** The finding closes in a few lines inside a file the diff already touches, with
+   no design judgement — a stale comment, a name, an unused export. **A fix-in-place never starts a new
+   review round**: the fix widens the diff, so a naive re-review would re-open the loop the cap just
+   closed. The fix must stay **inside a file the diff already changed** and carry **no design decision**;
+   a finding that cannot close under both limits is filed, not fixed in place.
+2. **File it as an Issue.** The finding is a **confirmed defect that reaches a runtime code path** —
+   both halves, and neither on its own. Confirmed means the failure scenario is stated in concrete
+   inputs and state. **Reaching is read exactly as the rubric's Severity test 1 reads it** — a runtime
+   code path, a distributed artifact a consumer reads, or the verification that guards either — so in a
+   repository whose product is its distributed documents, a defect in one of those is a branch-2 finding
+   like any other. **"It needs a decision" is no longer a branch-2 condition on its own**: a design
+   question with no defect under it takes branch 3.
+3. **Drop it with a one-line note in the PR body.** **This is the default, and it takes everything the
+   other two branches did not**: a Low that does not reach the user, and every remaining finding that is
+   neither closable in place nor a confirmed runtime defect — a design preference or an unproven
+   suspicion included. **The note is not optional**: one line naming the finding and why it was dropped
+   is what keeps a dropped finding auditable rather than invisible.
 
-1. **Fix it in place.** The finding closes in a few lines inside a file the diff already touches, with no design judgement — a stale comment, a name, an unused export. **A fix-in-place never starts a new review round.** This is the ceiling that keeps the exit from buying back the round cap: the fix widens the diff, so a naive re-review would find it and re-open the loop the cap just closed. The bound is written into the exit itself — the fix must stay **inside a file the diff already changed** and carry **no design decision**; a finding that cannot close under both limits is not a fix-in-place, it is filed.
-2. **File it as an Issue.** The finding is a **confirmed defect that reaches a runtime code path** — both halves, and neither on its own (joshuafolkken/kit#1469). Confirmed means the failure scenario is stated in concrete inputs and state, not that it is plausible. **Reaching is read exactly as test 1 of "Severity" above reads it** — a runtime code path, a distributed artifact a consumer reads, **or the verification that guards either** — so in a repository whose product is its distributed documents, a defect in one of those is a branch-2 finding like any other; narrowing "reaching" to executable code here would contradict that section and the level rule with it. What the bar excludes is a finding with no defect under it at all: a wording preference, a naming opinion, a structural suggestion. **"It needs a decision" is no longer a branch-2 condition on its own**: a design question with no defect under it takes branch 3, where the one-line PR note is what a later reader finds. This is the branch the old blanket rule collapsed everything into, and the filing procedure below — reference the current Issue, then bundle — is unchanged for it.
-3. **Drop it with a one-line note in the PR body.** **This is the default, and it takes everything the other two branches did not** (joshuafolkken/kit#1469): a Low that does not reach the user — one that failed test 1 of "Severity" above — and every remaining finding that is neither closable in place nor a confirmed runtime defect, a design preference or an unproven suspicion included. This is the same disposition the pre-commit self-review already permits for a Low ("Low findings that do not reach the user may be skipped with a one-line reason"), extended past the round cap — the two documents no longer disagree about what happens to a Low. **The note is not optional**: one line in the PR body naming the finding and why it was dropped is what keeps a dropped finding auditable rather than invisible, and it costs nothing that a filing would not have cost twice over.
+**What it costs, and why that is the right trade.** A dropped finding that later turns out to matter is
+re-found by the next review of that code, at the price of one round it would have paid anyway. A filed
+finding that never mattered is carried forever — placed in an epic, offered by `epic:next`, read by
+everyone who scans the backlog. The two errors are not symmetric, and the old default was on the
+expensive side of them.
 
-**Why the default moved to branch 3.** The three exits were introduced to stop branch 2 taking everything, and they did not: `route:review-cap` stayed one of the three routes by which the backlog grew **+13.4 Issues a day** over the seven days to 2026-09-06 — 257 filings against 163 closures, with filings beating closures on all fourteen of the preceding fourteen days — against a `fullrun` that ran a median of about ten minutes from pull request to merge. **Arrival was the bottleneck, not execution**, and a disposition whose branches are all defensible resolves toward filing every time, because filing is the exit that looks most conscientious. Naming a default takes that pressure out: branch 2 now needs a stated failure scenario and a runtime path, and everything that cannot show both leaves in one line of the PR body. The other two manufacturing routes — the split assessment and `epic:bundle`'s per-filing placement work — moved in the same commit, for the reason joshuafolkken/kit#1469 gives: stopping one while the others run leaves the arrival rate where it was.
-
-**What it costs, and why that is the right trade.** A dropped finding that later turns out to matter is re-found by the next review of that code, at the price of one round it would have paid anyway. A filed finding that never mattered is carried forever: it is placed in an epic, offered by `epic:next`, and read by every person who scans the backlog. The two errors are not symmetric, and the old default was on the expensive side of them.
-
-**Findings that reduce to one root judgement are filed as one Issue, not several.** When two or more findings are the same underlying design decision seen from different call sites, they belong in a single follow-up Issue with a section per symptom (`## 現象 1` / `## 現象 2`), the shape joshuafolkken/kit#1077, #1068 and #1069 already use. Deciding this from the findings rather than the filer's discretion is the point: without the rule, whether they collapse is left to whoever happens to be filing.
+**Findings that reduce to one root judgement are filed as one Issue, not several** — a single follow-up
+Issue with a section per symptom (`## 現象 1` / `## 現象 2`).
 
 Only branch 2 files an Issue. What follows applies to that branch.
 
-- **A finding routed to branch 2 is filed as a follow-up Issue, and the current Issue completes.** Filing is mandatory for that branch — a finding that reaches a runtime path or needs a decision is never silently dropped — and the new Issue references the current one. (A confirmed High is not a branch-2 finding: it blocks the merge rather than being deferred — see below.)
-- **Filing does not end at the Issue.** `epic:next` only ever offers a child an epic's task list names, so an Issue in no epic is never handed to a running `epicrun` — picking it up takes a person who already knows its number. The deferred finding is not dropped, it is parked forever, which reads the same from the backlog. The step belongs here rather than only in the epic rules, because a procedure that ends at "file it" is followed to its end:
-
-  **The three steps run inside the CI wait, not before the commit.** Where the run opens a pull request — `fullrun`, `queue`, `epicrun` — they go after `pnpm josh git -y` and before `pnpm josh followup`. Where it does not — `halfrun`, or a standalone pre-commit self-review — they run as soon as the disposition is decided, because there is no CI to hide behind. **The deadline is unchanged**: the current Issue closes when the pull request merges and `followup` is what merges it, so every step still runs while the parent is open, which is all step 2 requires. What moves is only whose seconds they are. Measured: `epic:bundle` 43s and `epic --add` 18s on joshuafolkken/kit#1229, against the 78 seconds joshuafolkken/kit#1238 spent waiting on CI with nothing else to do (joshuafolkken/kit#1239).
-
-  **The chain may run in a delegated unit** — `pnpm josh delegate followup-filing` (joshuafolkken/kit#1892). It is a dependency chain `batch:guard` correctly keeps one call per step, so what makes it expensive is the ~340k context it runs in at a run's tail, not the step count — measured on run #1864 at eight round trips there. A fresh unit runs the same steps at a small context, given the finding text this branch already composed; the parent verifies by reading the filed Issue with `pnpm josh issue:state <new>`, the same GitHub-state check `epic-child` uses. Deferring the chain earlier instead was structurally blocked: the finding is only known after the review, and step 2 must run before the current Issue closes, so it can move neither earlier nor to a later session.
-
-  **This is not "review during CI", which was decided against.** joshuafolkken/kit#1216 rejected opening the pull request before the **first** review round, and the reason is not a rule but a mechanism: that would overlap work which **changes code**, so every fix pushed afterwards restarts CI and pays the overlap straight back. Filing changes no code, so the CI already running stays valid. The first round still happens before the commit and "Pre-commit Self-Review" is untouched. The second round is the one thing that does run beside CI, on the same mechanism read the other way: it reads only the fix delta and its usual result is no code change — "The pull request opens between the rounds, so CI runs beside round 2" above, joshuafolkken/kit#1261.
-
-  1. File the follow-up Issue referencing the current one (above), tagged `route:review-cap` so the backlog stays countable by filing route rather than by grepping issue bodies (joshuafolkken/kit#1083): `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:review-cap' -f 'labels[]=depth:<n>' -f body="<body referencing the current Issue>"`.
-  2. Run `pnpm josh epic:bundle <new>` — **before the current Issue closes.** The candidate search reads open issues only, so once the parent has closed the command answers `none` permanently and the relation can no longer be found (joshuafolkken/kit#947).
-  3. Act on its answer. **`epic:bundle` recommends and writes nothing**, so acting means running the write command yourself — never a hand edit of the epic body, which leaves the task list and the `blocked-by` relations disagreeing and `epic:next` returning `error`.
-
-  | Answer                                                                                                                                                                                                                                                                                                                                                                                                     | Do                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Tier                    |
-  | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-  | `add_to_epic`                                                                                                                                                                                                                                                                                                                                                                                              | `pnpm josh epic --add <E> <new>` — add `--before <M>` / `--after <M>` when the relation carries an order                                                                                                                                                                                                                                                                                                                                                               | **A — no confirmation** |
-  | `create_epic`                                                                                                                                                                                                                                                                                                                                                                                              | `pnpm josh epic "<title>" <new> <other> [--ordered]`                                                                                                                                                                                                                                                                                                                                                                                                                   | **A — no confirmation** |
-  | `ask` — candidates spread across two or more epics                                                                                                                                                                                                                                                                                                                                                         | **Choose the epic you recommend, run its write command, and record the decision** — what was taken, what was rejected, why, and the date — on both the new Issue and that epic's `## Decisions`. **This does not stop a run and does not park a child**: placing an issue is reversible in one `epic --add`, and merging epics is a different action nothing here proposes (joshuafolkken/kit#1339). Stop only where the two epics are genuinely too close to separate | **A — no confirmation** |
-  | `none`                                                                                                                                                                                                                                                                                                                                                                                                     | Nothing                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                       |
-  | **The command could not answer** — non-zero exit, or **any** ⚠ warning above a `Nothing to bundle.` verdict: a truncated listing, or an issue whose relations could not be read. A recorded dependency is one of the two strong signals, so a failed relation read turns a real `add_to_epic` into `none`. A definitive answer (`Add it to the epic …`, `Already in an epic`) stands even beside a warning | Stop and report, naming what it said. **A `none` printed after such a warning is not "nothing to bundle"** — the search was incomplete, and reading it as an answer files the Issue into no epic on the exact path this rule exists to close (joshuafolkken/kit#950)                                                                                                                                                                                                   | —                       |
-
-  **`none` is a real answer, not a failure.** A standalone pre-commit review has no current Issue for the new one to reference, so no candidate exists and the Issue stays in the backlog for a person to place. What the step requires is that the command is run while the parent is still open and its answer acted on, never that an epic is found.
-
-  Measured, not theorized: joshuafolkken/kit#943 was filed from a second review round with `親: joshuafolkken/kit#891` written in its body, and belonged to no epic. Its parent closed three minutes later. Where the step _was_ taken — joshuafolkken/kit#911, out of the same round cap — `epic:bundle` named the epic and the Issue was added to it. The only difference was whether the command was run (joshuafolkken/kit#946).
-
-- **A confirmed High is never deferred.** The three-way disposition covers Low and Medium only: a real defect does not ship because a round counter ran out, so a standing High blocks the merge — it is never fixed-in-place, filed, or dropped as one of the three exits.
-- **Blocking the merge is not the same as buying more rounds.** If a High is still standing after the second round, do not start a third — two rounds of fixing failed to close it, and a third is the review chasing its own tail. It says the change itself is not ready: stop, send a `confirmation` Telegram, and put the scope back to the user, where splitting the Issue is usually the answer.
-
-The cap is deliberately mechanical rather than a judgement call, because judgement is what fails here: on #854 the third and fourth rounds were spent on findings that the Low rule already permitted skipping — a misplaced comment, an unused export, a stale comment — treated as blockers because the review returned them without severities.
-
----
-
-## Review output format
-
-Output every category below with an explicit verdict. Do **not** omit categories.
-
-**This is the first round's format.** The second round is a verification pass and has its own, narrower one — see "The second round is a verification pass, not a second full review" above.
-
-For each finding:
-
-- Cite `file_path:line_number`
-- State **severity** (`high` / `medium` / `low`) — decided by the two tests in "Severity" above, not by discretion
-- Explain the concrete problem and the minimal fix
-- On a finding that passes test 1 of "Severity" but is rated `low`, write the attempt: `no failure scenario — <what you tried>`
-
-For categories with no findings, you **must** write a brief proof statement — not just `No issues`. Example: `No issues — checked null returns on X, verified Y edge case, Z is guarded by type.` A bare `No issues` is only acceptable for Security, Performance, i18n, and Comments when there is genuinely nothing to check (no auth code, no hot paths, no user strings, no comments touched).
-
-Template:
-
-```md
-### Bug risks & logic errors
-
-- `src/foo.ts:42` (high) — <problem> — <fix>
-
-### Security
-
-No issues — no auth code, no user input, no unsafe casts in diff.
-
-### Performance
-
-No issues — no loops, no reactive chains, no I/O on request paths.
-
-### Project conventions
-
-No issues — verified snake_case, no arrow functions, no magic numbers, i18n covered.
-
-### i18n
-
-No issues — no user-visible strings added.
-
-### Tests
-
-- `e2e/foo.test.ts:15` (medium) — assertion does not fail if implementation is inverted — rewrite to verify X not just that code runs
-
-### Comments & content
-
-No issues
-
-### Assumptions audit
-
-1. <assumption the implementation makes> — <what breaks if violated>
-2. ...
-
-### Confidence floor
-
-<One concrete thing in this change I am least confident about, and why.>
-
-### Summary
-
-<total counts by severity and overall go/no-go>
-```
-
----
-
-## Review categories (must all be checked)
-
-All nine are checked in the first round. **The second round checks category 1 plus the categories its fix delta actually touches** — the verification pass above, which is the only thing that narrows this list.
-
-### 1. Bug risks & logic errors
-
-Actively try to break the changed code before concluding it is correct.
-
-- **Off-by-one, nullability, promise handling, race conditions**: for every modified function that has branching logic, trace at least one non-happy-path scenario. Write the trace explicitly: `Traced [input/state] → [result] — confirmed/flagged because [reason]`.
-- **Broken invariants, wrong return types, mishandled edge cases**
-- **Boundary values and concurrency**: empty / zero / max inputs, unawaited promises, shared state, re-entrancy
-- **Impact outside the diff**: for every changed export or signature, open its callers and verify they still hold; flag duplication the change introduces
-- **Regressions**: does the change break any existing behavior covered elsewhere?
-
-`No issues` requires at least one explicit trace statement. Stating `No issues` without a trace is not allowed.
-
-### 2. Security
-
-- Injection (SQL, command, path traversal), XSS, CSRF
-- Auth / authorization gaps, secret or token handling, unsafe deserialization
-- Unsafe `as` casts that widen trust boundaries
-
-### 3. Performance
-
-- Obvious hotspots, N+1 queries, unnecessary re-renders / reactive churn
-- Large payloads, unbounded loops, blocking I/O on request paths
-- Avoid speculative micro-optimization — flag only concrete impact
-
-### 4. Project conventions (`CLAUDE.md`)
-
-**The gate has already run — do not re-verify what lint enforces.** `pnpm josh gate` precedes this review, and `pnpm josh format:edited` runs `eslint --fix` and `prettier --write` after every `Edit` / `Write`, so anything ESLint decides has already failed as an error or been corrected before you read the diff. Re-checking it inflates the first round's finding count, and in this document's own words every fix creates new surface — so a round spent on settled questions is what feeds the next one (joshuafolkken/kit#1221).
-
-**Settled by lint, and therefore not checked here** — each one verified against the rule that enforces it, never assumed:
-
-- **Naming** — `@typescript-eslint/naming-convention` (`eslint/rules/naming-convention.js`).
-- **`export default`** — `import/no-default-export` is `error` project-wide (`eslint/rules/import.js`), switched off only for `*.d.ts` in `eslint/base.js`.
-- **Individually named exports of function declarations, and of consts that are not `UPPER_CASE`** — `no-restricted-syntax` in `eslint/rules/code-quality.js`. **Its selector exempts `ArrowFunctionExpression`**, so `export const helper = (s: string): string => s` passes it; that gap is a reader's job, below.
-- **File names** — kebab-case through `unicorn/filename-case`.
-- **The `*.spec.*` suffix, and a top-level `tests/` directory** — `eslint/rules/test-filename.js`, wired into `eslint/base.js` itself since joshuafolkken/kit#1233, so it holds in kit and in every project built on that base config. **Both bans cover every JS/TS extension** (`.ts` `.tsx` `.mts` `.cts` `.js` `.jsx` `.mjs` `.cjs`) since joshuafolkken/kit#1414, and neither covers `.svelte`. **A trailing block switching `no-restricted-syntax` off is what can still take it away** — kit's own `eslint.config.js` does exactly that for its hand-written `.js` modules and re-states the two bans after it — so read a diff that adds one as a gate defect, per the last paragraph of this category. What the rule does not see is below.
-- **Magic numbers** — `@typescript-eslint/no-magic-numbers`; **`any`, unused vars, floating promises and explicit param and return types** — `eslint/rules/typescript.js` and `eslint/rules/promise.js`.
-- **Identical functions and repeated string literals** — `eslint/rules/sonarjs.js`.
-- **Every quality limit below.**
-
-- **Quality limits**: a reference, enforced by `eslint/rules/code-quality.js` and `eslint/rules/sonarjs.js` rather than re-checked here — function complexity ≤5, nesting ≤2, function ≤25 lines, file ≤300 lines, params ≤4, statements per function ≤10, cognitive complexity ≤4 — **the line counts are code lines, not physical lines**: `max-lines` and `max-lines-per-function` run with `skipBlankLines` and `skipComments`, so read what `pnpm josh lint` reports rather than `wc -l`, and test files (`*.test.ts` / `*.e2e.ts`) allow 35 code lines per function instead of 25 — **`*.spec.ts` is not on that list**, because the same config bans the name outright and a relaxation for a banned pattern is what makes it read as supported (joshuafolkken/kit#1414).
-
-**What only a reader can see — check these:**
-
-- **`function` syntax rather than an arrow const** — **no rule enforces this**: there is no `func-style` and no arrow selector anywhere in `eslint/`, and the named-export selector above explicitly exempts `ArrowFunctionExpression`. So `const do_thing = (n: number): number => n + 1` and `export const helper = (s: string): string => s` both lint clean, and this review is the only thing between either and the default branch. The route-file exemption in `CLAUDE.md` covers the named route handlers and nothing else.
-- **The early-return one-liner** — `curly` is configured `['error', 'multi-line']`, which requires braces on a multi-line body and never requires the one-liner form. A short `if (x) { return y }` passes lint, so "single `return` under 100 chars → one-liner `if (x) return y`" is a reader's check.
-- **Duplication that is not identical** — `sonarjs/no-identical-functions` sees only functions that match. Two implementations of one idea in different shapes are invisible to it, and they are exactly what "No clones — single-source" is about, package boundaries included.
-- **A name that satisfies the convention and says the wrong thing** — `naming-convention` checks the shape, never the meaning. An `is_` prefix on a function that returns a parsed value passes lint and misleads every caller.
-- **Grouping and layout** — a namespace object that collects unrelated functions, or a file whose contents no longer match what its name says. Structure is not something lint judges.
-- **Svelte semantics** — `$state` reassignment, `Props` as an interface name, restricted DOM manipulation, and `PascalCase.svelte` / `PascalCase.svelte.ts` file names where the project's lint does not cover them.
-- **Test placement beyond the two banned patterns** — the ban above decides the `*.spec.*` suffix and the top-level `tests/` directory, and nothing else. **A `tests/Foo.svelte` is outside both**, deliberately (joshuafolkken/kit#1414), so it is a reader's check. Colocation itself is what it cannot see: a test that avoids both and still sits in a directory away from the code it exercises lints clean, and so does an `*.e2e.ts` placed outside `src/routes/**`.
-
-**A gate finding that got through is still a finding.** If lint could have caught something and did not — a disabled rule, an ignored path, an `// eslint-disable` the change added — say so. That is a defect in the gate, and no other step is looking at it.
-
-### 5. i18n
-
-- All user-visible strings (labels, buttons, toasts, validation errors, page titles) use message keys
-- Message keys are added to **all** locale message files, not just one
-- No hardcoded user-visible strings slipped in
-
-### 6. Tests
-
-- Every code change has a corresponding test (unit or E2E) per `CLAUDE.md` Code Change Rules Step 0
-- Test titles are English only
-- Test names describe behavior, not implementation
-- **Mutation check**: for the most critical test added or changed, ask: "If I inverted or removed the key assertion/condition in the implementation, would this test fail?" If the answer is no or uncertain, the test does not verify the behavior — rewrite it.
-- **Requirement check**: does the test verify the behavior described in the issue/task, or just that code executes without error?
-
-### 7. Comments & content
-
-- Comments are English only
-- No narration comments (`// Added for issue #123`, `// TODO: refactor later`) — only comments explaining non-obvious _why_
-- No duplicated logic that should be extracted
-
-### 8. Assumptions audit
-
-List 2–3 implicit assumptions the implementation makes. For each, state what would break if the assumption were violated. This section cannot be empty or say "No assumptions."
-
-Examples of assumptions worth naming:
-
-- "The API always returns an array (not null)" — would break with a null-ref if the API changes
-- "The locale file always has this key" — would silently show a key string if a locale is missing
-- "The animation completes before the next interaction" — race condition if the user acts fast
-
-### 9. Confidence floor
-
-State the **one concrete thing** in this change you are least confident about, and explain why. This section cannot say "Nothing" or "No concerns." If genuinely nothing is uncertain, trace the exact logic path that gives you that confidence — that trace itself is the proof.
-
----
-
-## Stop conditions
-
-- **A checkout that cannot be attested** → report `REVIEW TARGET MISMATCH` and **no findings**, and do not report a verdict of any kind. `pnpm josh review:attest <nonce>` exiting non-zero means this review read a tree the brief did not describe, so everything it would say — "no findings" above all — is about somebody else's code (joshuafolkken/kit#1522)
-- **High** findings → must fix before committing
-- **Medium** findings → must fix before opening the PR
-- **Low** findings → document in the PR body if skipped
-
-If the diff is empty or trivial (e.g. whitespace only), state that explicitly and skip the review.
-
----
-
-## Auto-continue rule (fullrun-conditional) — read this BEFORE sending the review
-
-**This rule fires only when `/code-review` was invoked inside a `fullrun` / `fullrun new` / `queue` workflow.** Standalone `/code-review <PR>` invocations are exempt — for those, stop after the review markdown as normal. **A `halfrun` invocation NEVER enters fullrun mode** — halfrun runs this same review inside its verification gate, but it ends at the confirmation stop without committing: once the review settles, send the `confirmation` Telegram and stop with the work uncommitted.
-
-### How to tell which mode you are in
-
-You are in **fullrun mode** if BOTH of the following hold:
-
-1. The user's recent message (within the current conversation) contained `fullrun`, `fullrun new`, or `queue` as a typed command. The keyword is the only valid signal: pipeline markers (issue normalized, `josh latest` run, branch created, `pnpm josh git -y` invoked) no longer distinguish `fullrun` from `halfrun` and MUST NOT be used to infer fullrun mode.
-2. The implementation is finished and the verification gate has reached its review step. **Neither the presence nor the absence of a pull request is a signal about the mode**: round 1 runs before the commit, so none exists yet, while round 2 runs beside the CI that commit started, so one does — and a standalone `/code-review <PR>` is invoked against one too.
-
-If either condition is false, you are in **standalone mode** (or the halfrun confirmation stop) — do not call `followup`.
-
-### What to do in fullrun mode
-
-Before your response (the one containing the review markdown) is sent, run this self-check:
-
-1. Count high/medium-severity findings across all categories.
-2. If **any** high/medium findings exist → fix them in place and run the **second-round verification pass** — `/code-review` with the brief `pnpm josh review:brief --round 2` prints, which hands over the fix delta as the target and asks whether each finding closed, not a second full read of the diff (see "The second round is a verification pass, not a second full review"). **The pull request opens before that pass, not after it** — `pnpm josh gate` → `pnpm josh git -y`, so CI runs beside round 2 (see "The pull request opens between the rounds, so CI runs beside round 2"). A finding round 2 then fixes in place is pushed before its gate: the single check the fix reaches, then `pnpm josh git -y` again, then `pnpm josh gate` beside the CI that commit re-runs, joined before `pnpm josh followup` (see "The round-2 fix commit is pushed before its gate"). **Stop at two rounds** — after the second, route each remaining non-High finding through the three-way disposition (see "Review round cap"): fix it in place without starting a new review round, file it, or drop it with a one-line PR note. For a finding that is filed, run `pnpm josh epic:bundle <new>` on it **before this Issue closes** and act on its answer — `add_to_epic` / `create_epic` are Tier A, run the matching `pnpm josh epic` write command without asking; `ask` is Tier A too — choose the epic you recommend, run its write command, and record the decision on both the new Issue and that epic's `## Decisions`, without stopping or parking; `none` is a no-op — then continue the pipeline; a standing High blocks the merge but does not authorize a third round. **Do NOT call `followup` yet** — that prohibition is this item's, and this item is round 1's. **Where this already was the second round there is no third**: dispose of every remaining non-High finding, push a branch-1 fix before its gate (see "The round-2 fix commit is pushed before its gate"), and where none took branch 1, item 3 applies instead and the merge is issued in this same turn.
-3. If **no** high/medium findings exist (Low-only or completely clean) → your response MUST continue the pipeline in tool calls **after** the review markdown, in the same response: `pnpm josh git -y "<title> #<N>"`, then the follow-up filing and `pnpm josh epic:bundle` for anything the cap routed to branch 2 — placed here so it runs inside the CI wait — then `pnpm josh followup "<title> #<N>" --notify-message "..."`. **Do NOT end the turn with review markdown as the final assistant text.** **Where this was the second round, that continuation is the merge itself**: `git -y` is already behind you, so the same response issues `pnpm josh followup` after any branch-2 filing and `pnpm josh epic:bundle` (see "A clean second round issues the merge in the same turn").
-
-### Concrete failure pattern to self-recognize
-
-If you are about to send a response whose final text is the `/code-review` Markdown — with sections, severity-tagged findings, and a recommendation line — and **no tool call follows**, that response is a chain-rule violation. Cancel it. Add the `pnpm josh git -y` → follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup` tool calls to the same response before sending.
-
-This rule mirrors the chain-rule decision table in `.claude/skills/workflow-commands/chain-rule.md`, which is its single source. It is repeated here because the violation point is at the moment the review skill finishes producing markdown — the rule must be visible in the skill's own context, not just in the always-loaded project docs.
+- **A finding routed to branch 2 is filed as a follow-up Issue referencing the current one, and the
+  current Issue completes.** (A confirmed High is not a branch-2 finding: it blocks the merge rather
+  than being deferred — see below.)
+- **Filing does not end at the Issue.** `epic:next` only ever offers a child the task list of an epic
+  names, so an Issue in no epic is never handed to a running `epicrun` — the deferred finding is parked
+  forever, which reads the same from the backlog. **The three steps run inside the CI wait, not before
+  the commit.** Where the run opens a pull request — `fullrun`, `queue`, `epicrun` — they go after
+  `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
+  pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
+  delegated unit** — `pnpm josh delegate followup-filing` (joshuafolkken/kit#1892).
+
+  1. File the follow-up Issue referencing the current one, tagged `route:review-cap`:
+     `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:review-cap' -f 'labels[]=depth:<n>' -f body="<body referencing the current Issue>"`.
+  2. Run `pnpm josh epic:bundle <new>` — **before the current Issue closes.** The candidate search reads
+     open issues only, so once the parent has closed the command answers `none` permanently.
+  3. Act on its answer. **`epic:bundle` recommends and writes nothing**, so acting means running the
+     write command yourself — never a hand edit of the epic body, which leaves the task list and the
+     `blocked-by` relations disagreeing and `epic:next` returning `error`.
+
+  | Answer                                                                                            | Do                                                                                                                                                                                                                                                                                                                                | Tier                    |
+  | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+  | `add_to_epic`                                                                                     | `pnpm josh epic --add <E> <new>` — add `--before <M>` / `--after <M>` when the relation carries an order                                                                                                                                                                                                                          | **A — no confirmation** |
+  | `create_epic`                                                                                     | `pnpm josh epic "<title>" <new> <other> [--ordered]`                                                                                                                                                                                                                                                                              | **A — no confirmation** |
+  | `ask` — candidates spread across two or more epics                                                | **Choose the epic you recommend, run its write command, and record the decision** — what was taken, what was rejected, why — on both the new Issue and that epic's `## Decisions`. This does not stop a run and does not park a child (joshuafolkken/kit#1339); stop only where the two epics are genuinely too close to separate | **A — no confirmation** |
+  | `none`                                                                                            | Nothing                                                                                                                                                                                                                                                                                                                           | —                       |
+  | **The command could not answer** — non-zero exit, or **any** ⚠ warning above `Nothing to bundle.` | Stop and report, naming what it said. **A `none` printed after such a warning is not "nothing to bundle"** — the search was incomplete                                                                                                                                                                                            | —                       |
+
+- **A confirmed High is never deferred.** A real defect does not ship because a round counter ran out,
+  so a standing High blocks the merge — never fixed-in-place, filed, or dropped as one of the three
+  exits. If a High is still standing after the second round, do not start a third: stop, send a
+  `confirmation` Telegram, and put the scope back to the user, where splitting the Issue is usually the
+  answer.

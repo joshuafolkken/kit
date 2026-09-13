@@ -38,9 +38,10 @@ alongside it, in one commit.
 **Size is a bar a split has to clear; it is never a reason to split.** Question 2 is a *minimum* — below
 it the work stays whole — and nothing makes a large diff a reason to divide one. Splitting an Issue in
 two to shorten review round 1 lengthens it, because each Issue pays round 1's fixed cost again while
-the size-dependent part is merely divided between the halves (`prompts/review.md` → "Round 1's cost
-does track the change size, and splitting is still not how to cut it", the single source). **A proposal
-to add a size threshold that splits more is required to say why that data does not reach it.**
+the size-dependent part is merely divided between the halves (measured in joshuafolkken/kit#1436:
+round 1's cost is dominated by a fixed part that two Issues pay twice, so there is no diff size at
+which splitting to cut it pays). **A proposal to add a size threshold that splits more is required to
+say why that data does not reach it.**
 
 ## What each entry point does with the answer
 
