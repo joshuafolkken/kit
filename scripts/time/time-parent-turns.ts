@@ -107,7 +107,6 @@ const CONTRIBUTOR_KEYS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = 
 			'josh epic:check',
 			'josh cost',
 			'josh delegate',
-			'josh eval:scope',
 			'josh latest:scope',
 			'josh release:scope',
 			'josh review:brief',

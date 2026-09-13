@@ -126,7 +126,6 @@ const CHILD_FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/halfrun.md',
 	'.claude/skills/workflow-commands/queue.md',
 	'.claude/skills/workflow-commands/epicrun.md',
-	'.claude/skills/workflow-commands/eval-gate.md',
 ]
 
 describe('no document still puts a version bump in the child flow', () => {

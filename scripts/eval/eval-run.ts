@@ -98,8 +98,8 @@ function report_startup_problem(message: string): boolean {
 // started the run, and the lint rule that says so is right.
 // Recorded before the first session starts, so a `/code-review` running alongside can afterwards be
 // checked against exactly the tree the suite read (joshuafolkken/kit#1152). Best-effort on
-// purpose: a record that could not be written leaves `josh eval:scope --since-eval` with nothing,
-// which answers `required` — measure again rather than trust a result nothing vouches for. Failing
+// purpose: a record that could not be written leaves a reader of the per-checkout record with
+// nothing, so it must measure again rather than trust a result nothing vouches for. Failing
 // the run instead would turn a temp-directory problem into a lost measurement.
 function record_measured_tree(): void {
 	try {
@@ -111,9 +111,9 @@ function record_measured_tree(): void {
 
 // The other half of the record, written once the run has returned a verdict (joshuafolkken/kit#1164).
 // A run interrupted at the keyboard, or one whose scenarios threw, never reaches this line, and the
-// record it leaves says only that a run started — which `--since-eval` reads as `required`, the same
-// answer no record at all gets. Best-effort for the same reason the write is: an unrecorded
-// completion costs a re-measurement, and re-measuring is the safe direction.
+// record it leaves says only that a run started — an incomplete record a reader must treat as
+// `required`, the same answer no record at all gets. Best-effort for the same reason the write is: an
+// unrecorded completion costs a re-measurement, and re-measuring is the safe direction.
 function complete_measured_tree(): void {
 	try {
 		eval_stamp.complete_stamp()
@@ -135,8 +135,8 @@ async function run_selection(
 	)
 
 	const verdicts = await eval_runner.run_all(chosen, runner_dependencies(model, concurrency))
-	// The count first, then what it means for a merge: the verdict line is what `josh eval:scope`
-	// sent the run here for, so it is the last thing printed rather than something to scroll back to.
+	// The count first, then what it means for a merge: the verdict line is what a reader reads, so it
+	// is the last thing printed rather than something to scroll back to.
 	const is_held = eval_report.report_summary(verdicts)
 
 	const verdict = eval_report.merge_verdict(verdicts)
@@ -185,7 +185,7 @@ async function main(): Promise<boolean> {
 
 	// **Only a whole-suite run leaves a record.** A named re-run — what a `blocked` verdict asks for —
 	// would otherwise overwrite the record with a newer timestamp and the tree as it is now, and
-	// `--since-eval` would then compare that tree against itself and answer `skip`: a one-scenario
+	// a reader would then compare that tree against itself and see nothing changed: a one-scenario
 	// reading standing in for the suite's measurement. The record says what the suite measured, so it
 	// is written only where the suite is what ran — and, since joshuafolkken/kit#1164, the completion
 	// it later takes is written under the same condition rather than a second one. The run of verdicts

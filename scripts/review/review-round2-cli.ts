@@ -8,8 +8,8 @@ import { review_tree } from './review-tree'
 
 // `josh review:round2` — say whether the second review round is due (joshuafolkken/kit#1433).
 //
-// A command rather than a paragraph in `prompts/review.md`, for the reason `josh review:level` and
-// `josh eval:scope` are commands: a rule an agent applies from memory is a rule an agent can talk
+// A command rather than a paragraph in `prompts/review.md`, for the reason `josh review:level` is a
+// command: a rule an agent applies from memory is a rule an agent can talk
 // itself out of, and this one is argued against every time it is reached, because the round it asks
 // for costs a forked agent and a few minutes. The question and the evidence behind the answer are in
 // `review-round2.ts`; everything here is the invocation.
@@ -62,7 +62,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		is_round_one_closed: options.is_round_one_closed,
 		snapshot: review_stamps.round_one_stamp.read(),
 		// No paths argument: `read_changed_tree` reads them itself, from the one definition of
-		// "changed" `josh review:level`, `josh eval:scope` and `josh review:brief` all decide from.
+		// "changed" `josh review:level` and `josh review:brief` all decide from.
 		// Passing our own reading would be a second definition, which is the drift that module exists
 		// to prevent.
 		tree: await review_tree.read_changed_tree(),

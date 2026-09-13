@@ -12,9 +12,8 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 //
 // **The condition is elapsed time, not judgement.** "The deps are probably still fresh" is a call
 // made under time pressure, and time pressure resolves it toward `skip` exactly when a stale
-// dependency is most likely to matter — the same reason `pnpm josh review:level` and
-// `pnpm josh eval:scope` take their answers off a mechanical input rather than out of an agent's
-// head. The record here is that input.
+// dependency is most likely to matter — the same reason `pnpm josh review:level` takes its answer
+// off a mechanical input rather than out of an agent's head. The record here is that input.
 
 const STAMP_PREFIX = 'josh-latest-stamp-'
 // Twelve hours rather than a day. The issue's own measurement is that a day's worth of runs get

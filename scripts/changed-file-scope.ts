@@ -63,7 +63,7 @@ async function repository_root_or_cwd(): Promise<string> {
 	}
 }
 
-// The same reading `josh review:level`, `josh eval:scope` and `josh review:brief` decide from — the
+// The same reading `josh review:level` and `josh review:brief` decide from — the
 // branch diff plus the untracked files — so what these commands narrow by is what those commands
 // call the change, rather than a further definition of it.
 //

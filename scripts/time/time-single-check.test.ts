@@ -45,18 +45,14 @@ describe('check_key — the signature', () => {
 	})
 })
 
-// **`josh gate` and `josh eval:scope` are the two that must not be here**, and for opposite reasons:
-// one *is* the gate this counts the probing in front of, and the other is a call the completion gate
-// prescribes exactly once per run.
+// **`josh gate` must not be here**: it *is* the gate this counts the probing in front of, not a
+// single check probing ahead of it. The mutation commands (`josh git`, `josh followup`) are kept out
+// for the other reason — they change state rather than read it, so counting them as checks would
+// measure something else.
 describe('check_key — what is not a single check', () => {
-	it.each(['josh gate', 'josh eval:scope', 'josh git', 'josh followup', ''])(
-		'answers NO_CHECK for %j',
-		(command) => {
-			expect(time_single_check.check_key(command, `pnpm ${command}`)).toBe(
-				time_single_check.NO_CHECK,
-			)
-		},
-	)
+	it.each(['josh gate', 'josh git', 'josh followup', ''])('answers NO_CHECK for %j', (command) => {
+		expect(time_single_check.check_key(command, `pnpm ${command}`)).toBe(time_single_check.NO_CHECK)
+	})
 })
 
 // The span carries the key, because a span keeps no input and nothing downstream could recover it.

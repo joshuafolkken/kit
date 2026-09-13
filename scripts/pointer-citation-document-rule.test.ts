@@ -131,15 +131,12 @@ describe('a canonical topic file that has become a pointer', () => {
 		expect(() => byte_size(pointer.skill)).not.toThrow()
 	})
 
-	// The two conversions the convention was decided over. Named rather than counted, so the suite
-	// keeps covering them as joshuafolkken/kit#1176 adds the remaining topics — `arrayContaining`
+	// A conversion the convention was decided over. Named rather than counted, so the suite
+	// keeps covering it as joshuafolkken/kit#1176 adds the remaining topics — `arrayContaining`
 	// because a rollout that grows this list must not have to edit the test that guards it.
-	it('sees the two topics converted so far', () => {
+	it('sees the topics converted so far', () => {
 		expect(pointer_topics().map((pointer) => pointer.topic)).toEqual(
-			expect.arrayContaining([
-				'prompts/collaboration-workflow/eval-gate.md',
-				'prompts/collaboration-workflow/split-assessment.md',
-			]),
+			expect.arrayContaining(['prompts/collaboration-workflow/split-assessment.md']),
 		)
 	})
 

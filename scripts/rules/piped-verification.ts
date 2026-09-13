@@ -20,7 +20,7 @@ import { shell_segments } from './shell-segments'
 // one row per rule — and a row's predicate and refusal text are that rule's own.
 
 // The josh subcommands whose result means pass or fail — the whole reach of the rule, and no more.
-// **The read-only answers are absent deliberately.** `eval:scope`, `latest:scope`, `review:level`,
+// **The read-only answers are absent deliberately.** `latest:scope`, `review:level`,
 // `review:brief` and `issue:state` print an answer rather than a verdict, and `git log | head` or
 // `gh issue list | head` are not josh calls at all — narrowing a listing is the ordinary way to read
 // one. A trigger wide enough to reach those would refuse on the commonest shape in the transcript,

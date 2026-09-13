@@ -17,10 +17,7 @@ import { time_shell } from './time-shell'
 //
 // **The set is an allow-list of the checks a run may issue on its own**, never "every josh command
 // that verifies something". `josh gate` is deliberately absent: it *is* the gate, and the count this
-// module feeds is about what ran in front of one. `josh eval:scope` is absent too — the completion
-// gate prescribes exactly one call of it per run, so it is a step of the procedure rather than
-// probing between edits, and folding it in would put a required call under a rule about avoidable
-// ones (joshuafolkken/kit#1383 → the `eval:scope` question).
+// module feeds is about what ran in front of one.
 //
 // **A consumer project's type check is invisible here, and that is an under-report rather than a
 // zero.** kit type-checks with `josh check`, but `@joshuafolkken/app-kit` answers `josh-app check:ci`

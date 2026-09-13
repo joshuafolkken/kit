@@ -129,6 +129,24 @@ describe('entry_read_set — background-commands.md is point-of-use (joshuafolkk
 	})
 })
 
+describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkken/kit#1922)', () => {
+	const EVAL_GATE = 'eval-gate.md'
+
+	// The rule-compliance measurement left the completion gate, so `eval-gate.md` was deleted and is no
+	// longer read at any point of a run. It must be neither an entry file nor a classified point-of-use
+	// document — acceptance criterion of joshuafolkken/kit#1922.
+	it('is not a classified point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).not.toContain(EVAL_GATE)
+	})
+
+	it.each([...IMPLEMENTING, PLAN_ONLY])('does not appear in the read set of %s', (entry) => {
+		const { files, sections } = entry_read_set.read_set(ROOT, entry)
+
+		expect(files).not.toContain(EVAL_GATE)
+		expect(sections.map((reference) => reference.file)).not.toContain(EVAL_GATE)
+	})
+})
+
 describe('entry_read_set.read_set — which sections', () => {
 	it('collects the sections its own documents point at, out of the set', () => {
 		expect(entry_read_set.read_set(ROOT, QUEUE).sections).toEqual(
@@ -179,13 +197,19 @@ describe('entry_read_set.costed', () => {
 
 	// **A file cited more than once is charged once between its references** — summing them instead
 	// double-counts, and with two unresolved headings it could push `scoped` above `whole` and print a
-	// negative saving (joshuafolkken/kit#1776 review round 1).
+	// negative saving (joshuafolkken/kit#1776 review round 1). `scoped` joins that file's cited sections
+	// into one span, so it can exceed the per-reference sum only by the single newline joining each pair
+	// — never by a whole section, which is what a real double-count would add. Compared in bytes,
+	// because a token estimate rounds each side independently; the separator budget is one byte per
+	// section (joshuafolkken/kit#1922).
 	it('charges a file cited more than once only once between its references', () => {
 		const report = entry_read_set.costed(ROOT, QUEUE)
 		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
 		const own = entry_read_set.total(report.files.map((file) => file.cost))
 
-		expect(report.scoped.tokens - own.tokens).toBeLessThanOrEqual(per_reference.tokens)
+		expect(report.scoped.bytes - own.bytes).toBeLessThanOrEqual(
+			per_reference.bytes + report.sections.length,
+		)
 	})
 
 	// **A file cited at non-adjacent sections fabricates no boundary token** (joshuafolkken/kit#1934).

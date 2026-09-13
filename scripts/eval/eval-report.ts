@@ -144,7 +144,7 @@ const VERDICT_SENTENCES: Record<MergeVerdict, string> = {
 	// **Says what one refused session proves, not what two of them cause.** The word is reached by a
 	// single unreachable scenario while the suite only stops starting sessions at two, so a sentence
 	// asserting that nothing was measured and that the rest were never started is false on the
-	// one-refusal run — and both CLAUDE.md and `eval-gate.md` tell an agent to carry this sentence into
+	// one-refusal run — and both CLAUDE.md and `docs/eval.md` tell an agent to carry this sentence into
 	// the completion report verbatim, which is exactly how a falsehood here would travel.
 	[VERDICT_UNREACHABLE]:
 		'a session could not reach the API, so not every scenario was measured; once two are refused the suite starts no more. Fix the connection and re-run. It does not block the merge, and it is not evidence that anything held',

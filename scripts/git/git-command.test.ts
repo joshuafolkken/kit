@@ -66,7 +66,7 @@ describe('the status reading names its untracked-files mode', () => {
 
 // joshuafolkken/kit#907: with git's default quoting, a path containing a non-ASCII byte comes back
 // C-quoted, and a classifier matching a path prefix answers no for a file it should have matched.
-// `josh eval:scope` fails toward `skip` there — a change it exists to measure would go unmeasured.
+// `josh review:level` reads these same paths, so a dropped match would misjudge the review depth.
 describe('the path listings turn git path quoting off', () => {
 	it.each(['diff_main_names', 'diff_cached_names', 'untracked_names'] as const)(
 		'%s asks git for unquoted paths',

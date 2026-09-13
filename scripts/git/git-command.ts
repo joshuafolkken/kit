@@ -155,8 +155,8 @@ async function diff_main(file_path: string): Promise<string> {
 // `core.quotePath=false` is not cosmetic. With git's default, a path containing any non-ASCII byte
 // comes back C-quoted — `"prompts/\343\202\263.md"` — and a classifier testing `startsWith('prompts/')`
 // against a string that begins with a quote character answers no. `review:level` fails safe there
-// (non-inert wins), but `josh eval:scope` would answer `skip` for a change it is meant to measure,
-// so the quoting is turned off at the source all three readers share (joshuafolkken/kit#907).
+// (non-inert wins), but a classifier that answered `skip` would drop a change it is meant to catch,
+// so the quoting is turned off at the source every reader shares (joshuafolkken/kit#907).
 const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
 
 // Repository-root-relative paths, whatever the checkout is configured to prefer. `diff.relative` is
@@ -185,7 +185,7 @@ const NO_RELATIVE_PATHS = '--no-relative'
 // two trees compare unequal. `review-tree.ts` already records a listed path the tree does not hold
 // as `ABSENT_DIGEST` rather than dropping it, which is exactly the entry this flag produces.
 //
-// **Every other reader moves in the safe direction.** `josh review:level` and `josh eval:scope` see
+// **Every other reader moves in the safe direction.** `josh review:level` sees
 // one more path and can only widen; `josh lint:related` and `josh test:related` drop what the tree
 // no longer holds through `changed-file-scope.ts`, which they already had to do for a plain delete.
 const NO_RENAME_DETECTION = '--no-renames'

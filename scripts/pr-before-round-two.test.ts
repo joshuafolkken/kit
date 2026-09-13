@@ -26,12 +26,10 @@ const CHAIN_RULE = '.claude/skills/workflow-commands/chain-rule.md'
 const FULLRUN = '.claude/skills/workflow-commands/fullrun.md'
 const QUEUE = '.claude/skills/workflow-commands/queue.md'
 const HALFRUN = '.claude/skills/workflow-commands/halfrun.md'
-const EVAL_GATE = '.claude/skills/workflow-commands/eval-gate.md'
 const CLAUDE_DOC = 'CLAUDE.md'
 const WORKFLOW_TOPIC = 'prompts/collaboration-workflow/plan-comment.md'
 const BUNDLE_TOPIC = 'prompts/collaboration-workflow/epic-bundle.md'
 const COMMANDS_DOC = 'docs/josh-commands.md'
-const EVAL_DOC = 'docs/eval.md'
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'### The pull request opens between the rounds, so CI runs beside round 2',
@@ -99,24 +97,6 @@ describe('a second-round fix is a follow-up commit on the same branch', () => {
 describe(`${HALFRUN} — the stop before commit is untouched`, () => {
 	it('never claims a pull request opens between the rounds', () => {
 		expect(read_unwrapped(HALFRUN)).not.toContain(BETWEEN_THE_ROUNDS)
-	})
-})
-
-// The rule-compliance measurement re-anchored. Its verdict has always stopped the merge rather than
-// the commit, and the commit is no longer the last step before the merge — so a document still
-// naming `bump minor` would have the run read a verdict about a draft.
-const EVAL_ANCHOR = 'before `pnpm josh followup`'
-const EVAL_ANCHOR_FILES: ReadonlyArray<string> = [CLAUDE_DOC, EVAL_GATE, EVAL_DOC]
-
-describe('the eval verdict is read before the merge, not before the bump', () => {
-	it.each(EVAL_ANCHOR_FILES)('%s anchors it to the merge', (path) => {
-		expect(read_unwrapped(path)).toContain(EVAL_ANCHOR)
-	})
-
-	it.each(EVAL_ANCHOR_FILES)('%s no longer anchors it to the bump', (path) => {
-		expect(read_unwrapped(path)).not.toContain(
-			'before `pnpm josh bump minor`, and never inside `pnpm josh gate`',
-		)
 	})
 })
 

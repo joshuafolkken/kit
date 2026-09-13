@@ -13,8 +13,8 @@ import { managed_config_scope } from './managed-config-scope'
 // appear in any list textually, so the reader is solving a prefix match by hand.
 //
 // Everything but the question itself — reading the changed paths, the flags, the printing — is
-// `path_decision`'s, shared with `josh review:level` and `josh eval:scope`, which ask different
-// questions of the same tree.
+// `path_decision`'s, shared with `josh review:level`, which asks a different question of the same
+// tree.
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh sync:scope [--staged] [--json]'

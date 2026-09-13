@@ -10,7 +10,6 @@ import { describe, expect, it } from 'vitest'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CHAIN_RULE = '.claude/skills/workflow-commands/chain-rule.md'
 const FOLLOWUP = '.claude/skills/workflow-commands/followup.md'
-const EVAL_GATE = '.claude/skills/workflow-commands/eval-gate.md'
 const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 // Shared by the two marker suites, so neither can pass under a title the other does not use.
 const CARRIES = 'carries %j'
@@ -56,13 +55,9 @@ const POINTERS: ReadonlyArray<[string, string]> = [
 	],
 	[CHAIN_RULE, '**Ending the turn at the push is the same violation as ending it at the review**'],
 	[FOLLOWUP, `**It is the deliberate exception to ${SECTION_REFERENCE}**`],
-	[
-		EVAL_GATE,
-		'A command that can take minutes is issued in the background", applied to one command',
-	],
 ]
 
-const POINTER_DOCUMENTS: ReadonlyArray<string> = [CHAIN_RULE, FOLLOWUP, EVAL_GATE]
+const POINTER_DOCUMENTS: ReadonlyArray<string> = [CHAIN_RULE, FOLLOWUP]
 
 describe(`${BACKGROUND_COMMANDS} is the single source`, () => {
 	it.each(SINGLE_SOURCE_MARKERS)(CARRIES, (marker) => {

@@ -188,7 +188,6 @@ const READ_JOSH_SUBCOMMANDS: ReadonlySet<string> = new Set([
 	'epic:bundle',
 	'epic:check',
 	'epic:next',
-	'eval:scope',
 	'issue:read',
 	'issue:scout',
 	'issue:state',

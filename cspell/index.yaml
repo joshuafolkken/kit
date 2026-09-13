@@ -163,8 +163,8 @@ words:
   # add <dir> <existing-branch>`, the restore no `josh lane:*` command reaches (joshuafolkken/kit#1587).
   - worktree
   - evals
-  # How `background-commands.md` (the §2h body since joshuafolkken/kit#1873) and `eval-gate.md` name a
-  # command already sent to the background (joshuafolkken/kit#1510), and the gate as the first command
-  # a run can send there. All are skills `josh sync` copies, so the words have to resolve here.
+  # How `background-commands.md` (the §2h body since joshuafolkken/kit#1873) names a command already
+  # sent to the background (joshuafolkken/kit#1510), and the gate as the first command a run can send
+  # there. It is a skill `josh sync` copies, so the words have to resolve here.
   - backgrounded
   - backgroundable

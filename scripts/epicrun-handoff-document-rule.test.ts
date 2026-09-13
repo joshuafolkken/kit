@@ -239,8 +239,8 @@ describe.each(SINGLE_SOURCE)('%s — each child runs in a delegated unit', (docu
 // while leaving the hand-off a rule to be written twice — the state joshuafolkken/kit#1188 removed.
 // What must be absent is the directive prose, not the command name. Every pointer written under
 // joshuafolkken/kit#1176 lists what the skill holds, and naming the command in that list is a
-// signpost a reader follows — `eval-gate.md` names `pnpm josh eval:scope` the same way. Excluding it
-// is what keeps this suite checking for a body left behind rather than for a contents list.
+// signpost a reader follows. Excluding it is what keeps this suite checking for a body left behind
+// rather than for a contents list.
 const POINTER_MUST_NOT_RESTATE = REQUIRED.filter((marker) => !SIGNPOSTS.has(marker))
 
 describe(`${POINTER} — keeps none of the hand-off body`, () => {

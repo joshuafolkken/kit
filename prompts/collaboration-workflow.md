@@ -43,7 +43,6 @@
 | 独立した呼び出しは同じターンに載せる                                           | [`turn-batching.md`](./collaboration-workflow/turn-batching.md)                         |
 | `gh` は REST（`gh api`）で書く — 散文の指示も含む                              | [`gh-rest.md`](./collaboration-workflow/gh-rest.md)                                     |
 | 委譲 — 機械的な工程を安価な実行単位へ回す                                      | [`delegation.md`](./collaboration-workflow/delegation.md)                               |
-| `josh eval` をいつ回すか（配布物の変更を測る）                                 | [`eval-gate.md`](./collaboration-workflow/eval-gate.md)                                 |
 | 依存更新（`josh latest`）をいつ回すか                                          | [`latest-gate.md`](./collaboration-workflow/latest-gate.md)                             |
 | 常駐ドキュメントと skill の分担（何を常駐に残すか）                            | [`residency.md`](./collaboration-workflow/residency.md)                                 |
 | 引き金つき配送 — 規則を効く瞬間に届ける                                        | [`rule-delivery.md`](./collaboration-workflow/rule-delivery.md)                         |

@@ -243,9 +243,8 @@ are written out, and the brief hands them to the unit.
 
 1. **`Cause` / `Fix` / `Result`**, the three plain lines — the parent's orientation, so it does not
    have to open the pull request to know what happened.
-2. **Every verification result the run did not close in the ordinary way**, and **`josh eval`
-   answering `skip`, `unmeasured` or `unreachable` is one of them**, named as such. A measurement
-   nobody made must never reach the parent as a run that passed.
+2. **Every verification result the run did not close in the ordinary way**, named as such. A result
+   nobody obtained must never reach the parent as a run that passed.
 3. **Observations that could bite later** — something noticed and not filed, a flaky check, a
    surprising diff, work a later child will collide with. **This is the only route a child's
    discretionary observation has** (joshuafolkken/kit#1698): a child files `route:tier-a` and
@@ -1534,25 +1533,6 @@ per child, and treat a single non-numeric line as the verdict.
    in with `auto-ok`" below, and finish.
 6. **Exit code 1** — `epic:next` refused a cyclic or contradictory graph, or could not read a child.
    Report and finish.
-
-## The rule-compliance measurement is per child, not per epic
-
-Each child's verification gate runs `pnpm josh eval:scope` and, on `required`, `pnpm josh eval`
-(`eval-gate.md`). **`complete` does not run the suite again**, and a drop from the run's starting
-measurement is therefore not something this loop computes.
-
-The reason is not the cost. Every child that touched the distribution ran **all** the scenarios and
-blocked on a failure, so the gradual degradation an epic-completion run would look for has already
-been measured — at `complete` the tree is the one the last document-touching child measured, and a
-second measurement of the same state is all that would be bought. It would also need a baseline
-carried across children and sessions, which this run keeps nowhere but GitHub, and two `n/m` figures
-compared in a suite where `?` is routine would fail an epic on the shared budget rather than on a
-regression (joshuafolkken/kit#907).
-
-**So the answer to "an unattended run has no instrument for output quality" is that it has one, and
-it fires per child** — on the whole distribution, at merge-blocking strength. An epic that never
-touches a distributed document runs it at neither point, which is correct: nothing changed what an
-agent reads.
 
 ## After the epic — issues opted in with `auto-ok`
 
