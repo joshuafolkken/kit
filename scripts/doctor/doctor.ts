@@ -8,11 +8,13 @@ import { gh_spawn } from '#scripts/gh-spawn'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { security_updates } from '#scripts/security-updates'
 import { running_binary } from '#scripts/version/running-binary'
+import { doctor_consumer } from './doctor-consumer'
 import { doctor_io, type GitTopLevel } from './doctor-io'
 import { doctor_logic } from './doctor-logic'
 import { doctor_ports } from './doctor-ports'
 
 const FIX_FLAG = '--fix'
+const PORTS_FLAG = '--ports'
 const UNKNOWN = '(unknown)'
 const NOT_ON_PATH = '(not on PATH)'
 const SELF_DIR = path.dirname(fileURLToPath(import.meta.url))
@@ -173,8 +175,34 @@ function report_port_seeds(git: GitTopLevel): void {
 	console.info(doctor_ports.report_port_seeds(map))
 }
 
+interface DoctorOptions {
+	is_fix: boolean
+	show_ports: boolean
+}
+
+function parse_options(argv: ReadonlyArray<string>): DoctorOptions {
+	return { is_fix: argv.includes(FIX_FLAG), show_ports: argv.includes(PORTS_FLAG) }
+}
+
+// The consumer checks run against the repository root when inside one, and against the working
+// directory otherwise — the same best-available root the settings gate falls back to.
+function consumer_root(git: GitTopLevel): string {
+	return git.state === 'inside' ? git.top_level : PROJECT_ROOT
+}
+
+// The port seed table is opt-in since joshuafolkken/kit#1930: it discovers every sibling repository
+// and was the slowest, least diagnostic part of the default output. `--ports` brings it back.
+function run_reports(ctx: DoctorContext, git: GitTopLevel, options: DoctorOptions): void {
+	print_report(ctx)
+	report_path_diagnosis(ctx, options.is_fix)
+	doctor_consumer.report_consumer_setup(consumer_root(git))
+	report_repository_map(git)
+	if (options.show_ports) report_port_seeds(git)
+	report_repository_settings(git)
+}
+
 function main(): void {
-	const is_fix = process.argv.includes(FIX_FLAG)
+	const options = parse_options(process.argv)
 	const ctx = gather_context()
 
 	// Resolved once and shared: `doctor` is what a user runs when things are already broken, and a
@@ -182,11 +210,7 @@ function main(): void {
 	// responsive when git itself is hanging (joshuafolkken/kit#805).
 	const git = doctor_io.resolve_git_top_level()
 
-	print_report(ctx)
-	report_path_diagnosis(ctx, is_fix)
-	report_repository_map(git)
-	report_port_seeds(git)
-	report_repository_settings(git)
+	run_reports(ctx, git, options)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
@@ -196,6 +220,9 @@ const doctor = {
 	print_report,
 	reclaim_shim,
 	handle_shadow,
+	parse_options,
+	consumer_root,
+	run_reports,
 	report_repository_map,
 	report_port_seeds,
 	main,

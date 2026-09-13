@@ -64,6 +64,10 @@ words:
   # names it and `josh sync` copies that skill. cspell derives neither this nor "re-askable" from
   # "ask".
   - askable
+  # The single-process guard command wired to the distributed `.claude/settings.json` PreToolUse hook
+  # (`josh pretool:guard`). Distributed, because `josh sync` copies that settings file and the docs
+  # that name the command.
+  - pretool
   - delegatable
   - backgrounding
   - unretried

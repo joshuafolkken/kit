@@ -8,17 +8,20 @@ import { gh_spawn } from '#scripts/gh-spawn'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
+import { plugin_install_hint_module } from '#scripts/init/plugin-install-hint'
 import { security_updates } from '#scripts/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { skill_migration, type MigrationResult } from './skill-migration'
 import { sync_configs } from './sync-configs'
+import { sync_hook_safety } from './sync-hook-safety'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const PACKAGE_JSON = 'package.json'
 const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
 const CLAUDE_MD_FILENAME = 'CLAUDE.md'
+const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -27,7 +30,23 @@ function sync_ai_file(source_path: string, destination_path: string): void {
 	writeFileSync(destination_path, transform_copied_content(destination_path, content))
 }
 
+// The hook file is the one AI-copied file whose commands the consumer's *installed* bundle has to be
+// able to run. When sync is run from a newer source than that install, writing it would leave hooks
+// that fail every prompt (joshuafolkken/kit#1930); skip it and print how to update instead.
+function should_skip_hook_file(filename: string): boolean {
+	if (filename !== CLAUDE_SETTINGS_FILE) return false
+	const warning = sync_hook_safety.hook_write_warning(
+		PROJECT_ROOT,
+		sync_hook_safety.read_version_at(path.join(PACKAGE_DIR, PACKAGE_JSON)),
+	)
+	if (warning === undefined) return false
+	console.warn(warning)
+
+	return true
+}
+
 function sync_file(filename: string): void {
+	if (should_skip_hook_file(filename)) return
 	sync_ai_file(path.join(PACKAGE_DIR, filename), path.join(PROJECT_ROOT, filename))
 	console.info(`  ✔ synced    ${filename}`)
 }
@@ -360,6 +379,7 @@ function main(): void {
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	sync_project_artifacts(is_force)
+	plugin_install_hint_module.report_plugin_install_hint()
 	console.info('\n✅ Done.\n')
 }
 

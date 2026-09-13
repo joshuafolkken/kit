@@ -36,10 +36,10 @@
 配送はすべて `scripts/josh/hook-decision.ts` の `create_transcript_guard` の上に載る。バッチガード（joshuafolkken/kit#1390）と調査ガード（joshuafolkken/kit#1460）が既に共有している唯一の土台であり、ペイロードのスキーマ、`deny` の封筒、環境変数のスイッチ、`.env` の読み込み、ラン 1 回だけ発火させる記録の 5 つを持つ。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**であり、しかも 2 本が「配送したかどうか」で食い違いうる唯一の場所である。
 
 - **列挙表**: `scripts/rules/delivered-rules.ts`。1 規則 = 1 行（`id` ／ 引き金 ／ 配送文）。
-- **入口**: `scripts/rules/rule-guard.ts` ＝ `pnpm josh rule:guard`。`.claude/settings.json` の `PreToolUse` に `Bash` だけを指定して配線されている。
-- **停止スイッチ**: `JOSH_RULE_GUARD`（既定で有効。`off` / `0` / `false` / `no` で無効）。
+- **入口**: `scripts/pretool-guard.ts` ＝ `pnpm josh pretool:guard`。3 つの `PreToolUse` ガード（バッチング ／ 調査 ／ 規則）を 1 プロセスにまとめ、`.claude/settings.json` の `PreToolUse` に**単一エントリ**として `Bash|Edit|Read|Write` のマッチャで配線されている。拒否の優先順位はバッチングの理由が先、次に調査、最後に規則であり、各ガードは内部で従来どおり自分の環境変数スイッチを尊重する。
+- **停止スイッチ**: `JOSH_RULE_GUARD`（規則ガードのぶん。既定で有効。`off` / `0` / `false` / `no` で無効）。バッチング・調査の各ガードも同じく自前のスイッチを持つ。
 
-**`Edit` と `Write` には配線しない。** Claude Code は 1 ターンのうち 1 件だけを拒否して残りを実行するため、拒否された `Edit` は兄弟の編集だけが適用された状態を残す（joshuafolkken/kit#1390）。したがって**列挙表に載るのは、効く瞬間がシェル呼び出しである規則に限られる**。
+**規則ガードの列挙表に載るのは、効く瞬間がシェル呼び出しである規則に限られる。** Claude Code は 1 ターンのうち 1 件だけを拒否して残りを実行するため、拒否された `Edit` は兄弟の編集だけが適用された状態を残す（joshuafolkken/kit#1390）。単一の `pretool:guard` プロセスは `Bash|Edit|Read|Write` を受け取るが、規則ガードが拒否理由を返すのはシェル呼び出しに限られる。
 
 ## 配送されている規則
 
