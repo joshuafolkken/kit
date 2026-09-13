@@ -49,7 +49,7 @@ Prefer wiring up individual configs without `josh init`? See [manual-config.md](
 
 ### Version-command library (`@joshuafolkken/kit/version`)
 
-A package-name-parameterized implementation of the `version` (show) and `version:upgrade`
+A package-name-parameterized implementation of the `version` (show) and `version --upgrade`
 commands, so a consuming package (e.g. `@joshuafolkken/game-kit`, `@joshuafolkken/app-kit`) drives
 both commands through kit instead of copying the scripts. Each consumer's thin CLI wrapper passes
 only its own package name + GitHub Packages versions endpoint:
@@ -67,7 +67,7 @@ const config = create_version_command_config({
 })
 
 version_commands.run_check(config) // version (show)
-// process.exit(version_commands.run_upgrade(config)) // version:upgrade
+// process.exit(version_commands.run_upgrade(config)) // version --upgrade
 ```
 
 `create_version_command_config` derives the lockfile-repair (`fix-gh-packages`) path from the
@@ -76,7 +76,7 @@ package name. The optional `self_directory` enables the running-binary line; an 
 compiled `.js` + `.d.ts` (built from `scripts/version/index.ts`), so consumers can keep
 `@joshuafolkken/kit/version` **external** — node loads the `.js` at runtime and resolves `execa` /
 `zod` from kit's own `node_modules` rather than bundling kit's transitive graph, while `tsc` reads
-the bundled `.d.ts`. kit's own `version` / `version:upgrade` consume this same library via
+the bundled `.d.ts`. kit's own `version` / `version --upgrade` consume this same library via
 [`scripts/version/kit-version-config.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/version/kit-version-config.ts).
 
 The library also exports `resolve_effective_upstream_version(base_url, package_name, options?)`, the
@@ -102,7 +102,7 @@ command as a no-op once every version it pins is already installed. Leave the fl
 that forces a fresh resolve (e.g. `pnpm remove -g <pkg> && pnpm add -g <pkg>@<latest>`) — such a
 command changes the resolved graph even when its pin matches what is installed, and must never be
 suppressed. Identical upgrade commands returned by several upstreams are emitted once, and after
-`version:upgrade` runs, each stale effective install is re-read so an upgrade that advanced but still
+`version --upgrade` runs, each stale effective install is re-read so an upgrade that advanced but still
 trails `latest` (a minimum-release-age hold, say) is reported as an advance rather than silence.
 
 ### Config-merge library (`@joshuafolkken/kit/config-merge`)

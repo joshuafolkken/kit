@@ -107,7 +107,6 @@ const UNCONDITIONAL_SCRIPTS: ReadonlyArray<string> = [
 	'scripts-ai/git-workflow.ts',
 	'scripts/eval/eval-run.ts',
 	'scripts/version/version-check.ts',
-	'scripts/version/version-update.ts',
 ]
 const GUARDED_SCRIPTS = IN_PROCESS_SCRIPTS.filter(
 	(script) => !UNCONDITIONAL_SCRIPTS.includes(script),

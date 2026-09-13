@@ -103,7 +103,7 @@ pressure, and `run:hold` — the one boundary step that never gets missed — is
   runs that obeyed.
 - **`--resume`, `--end` and `--json` do not count as taking the cut**, because they ask about one
   rather than take it. Counting them would have credited four of the six measured children.
-- **The denominator `pnpm josh rule:value` scores the row over asks two things, not one**
+- **The denominator `rule:value` scores the row over asks two things, not one**
   (joshuafolkken/kit#1867). The cut relaunches a *new session*, which the measurement reads as a run
   of its own and which issues the byte-identical entry check while having no cut left to take — so
   scored on the asking alone, ten perfectly obedient children read as ten kept out of twenty. The row

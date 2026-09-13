@@ -7,9 +7,12 @@ const ARGV_OFFSET = 2
 // routing that path to stderr for #825 would otherwise have left `josh --help` printing nothing a
 // pipe could read.
 const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
+// `josh --all` (and `josh --help --all`) lists the kit-maintenance commands the default help hides
+// (joshuafolkken/kit#1928). A bare `--all` in the command slot is a help request, not a command.
+const ALL_FLAG = '--all'
 
-function print_help(): void {
-	console.info(josh_logic.format_help())
+function print_help(is_all: boolean): void {
+	console.info(josh_logic.format_help(is_all))
 }
 
 // Both halves go to stderr. The help listing is a diagnosis here, not the answer, and a shell
@@ -36,9 +39,10 @@ function record_exit_code(exit_code: number): void {
 // before it because the in-process branch replaces `process.argv` with the script's own.
 async function main(): Promise<void> {
 	const cmd = process.argv[ARGV_OFFSET]
+	const is_all = process.argv.includes(ALL_FLAG)
 
-	if (!cmd || HELP_COMMANDS.has(cmd)) {
-		print_help()
+	if (!cmd || cmd === ALL_FLAG || HELP_COMMANDS.has(cmd)) {
+		print_help(is_all)
 
 		return
 	}

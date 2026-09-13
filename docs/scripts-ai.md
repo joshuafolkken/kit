@@ -1,6 +1,6 @@
 # scripts-ai/ — AI Workflow Automation
 
-The `scripts-ai/` directory contains automation scripts for AI-assisted development workflows. These scripts power the `josh followup`, `josh notify`, `josh prep`, and `josh issue` commands.
+The `scripts-ai/` directory contains automation scripts for AI-assisted development workflows. These scripts power the `josh followup` and `josh notify` commands.
 
 ## Required Environment Variables
 
@@ -40,8 +40,6 @@ Identifies the chat or user that receives notifications.
 | --------------- | -------------------------- | ------------------------------------------------------------- |
 | `josh followup` | `git-followup-workflow.ts` | Wait for CI, scan AI reviews, notify, and optionally merge PR |
 | `josh notify`   | `telegram-test-logic.ts`   | Send a one-off Telegram notification with a task-type header  |
-| `josh prep`     | `prep.ts`                  | Switch to main, pull, update dependencies, verify overrides   |
-| `josh issue`    | `issue-prep.ts`            | Fetch GitHub issue details for AI context                     |
 | `josh git`      | `git-workflow.ts`          | AI-assisted commit, push, and PR creation workflow            |
 
 ## Notification Behavior

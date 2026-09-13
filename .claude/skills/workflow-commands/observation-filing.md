@@ -25,7 +25,7 @@ it — read off the subject rather than judged**:
 | --- | --- | --- |
 | **0** | What a consumer of this package touches | A `josh` command's behavior, a distributed document or config, the published package |
 | **1** | The run orchestration that executes an Issue | `fullrun` / `epicrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
-| **2** | What measures a run | `diag`, `josh time`, `josh eval`, `josh cost`, `josh rule:value` |
+| **2** | What measures a run | `diag`, `josh time`, `josh eval`, `josh cost` |
 
 **The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed**
 (joshuafolkken/kit#1729). `depth:0`, `depth:1` and `depth:2` are the three, defined once in
@@ -91,18 +91,13 @@ filings whose subject is the epic tooling, which the table above puts at depth 1
 lost, and nothing about it says which findings were worth having. This changes what counts as a
 finding at all, so what it excludes is excluded for a reason a reader can check.
 
-### The depth-0 share — what is counted, and the command that counts it
+### The depth-0 share — what is counted
 
-**joshuafolkken/kit#1698 set a measurable target and left nothing that measures it**
-(joshuafolkken/kit#1729). Its acceptance criteria named the share of open Issues at depth 0 — 3/23
-≈ 13% on 2026-09-09 — and no Issue recorded a depth, so the only way to obtain the number was to open
-every open Issue and classify it by eye. Done again on 2026-09-10 that produced 3/14 ≈ 21%, and the
-two figures **are not comparable**: they took different denominators, and neither said which.
-
-```bash
-pnpm josh depth:share          # → <depth-0>/<denominator> = <n>% ; alias: josh dsh
-pnpm josh depth:share --json   # the same figures as one JSON object
-```
+**joshuafolkken/kit#1698 set a measurable target: the share of open Issues at depth 0** — 3/23
+≈ 13% on 2026-09-09 (joshuafolkken/kit#1729). Counted by eye it is not reproducible: done again on
+2026-09-10 it produced 3/14 ≈ 21%, and the two figures **are not comparable**: they took different
+denominators, and neither said which. So the denominator is fixed here as a rule rather than left to
+the counter.
 
 **The denominator is a rule, not a choice, and this is it:**
 
@@ -112,16 +107,14 @@ pnpm josh depth:share --json   # the same figures as one JSON object
 - **`route:tier-a` and `route:interrupt` are counted like anything else.** The depth test above
   exempts them from its *citation* requirement; it never said they are not work. Excluded, a run
   could improve the share by choosing a filing route.
-- **An Issue with no depth label is in the denominator**, and the command reports it separately as
-  `unlabelled`. Left out, the share would improve every time a filing skipped the label — the one
-  direction a measurement must never be able to move on its own.
+- **An Issue with no depth label is in the denominator**, counted separately as `unlabelled`. Left
+  out, the share would improve every time a filing skipped the label — the one direction a
+  measurement must never be able to move on its own.
 - **The numerator is what is left**: open, non-epic Issues carrying `depth:0`.
 
 **Two readings of the same backlog give the same number**, which is what the hand counts could not
-do: nothing in the path is sampled or judged, and `scripts/issue/issue-depth-share.test.ts` pins it.
-**A listing that hit the scan ceiling is reported as capped** rather than presented as the whole, and
-a listing that could not be read at all answers `unknown` — never a share of zero, which would be a
-measurement invented out of a failed fetch.
+do: the denominator is a rule rather than a choice, so nothing in the count is left to the counter's
+judgement.
 
 **What the number is for is not decided here.** Changing what `backlog:next` offers on the strength
 of it, and setting a target value, are both deliberately out of scope until the current value has

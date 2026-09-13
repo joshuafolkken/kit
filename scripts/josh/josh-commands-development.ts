@@ -29,16 +29,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: "Print a file's code lines against the max-lines limit and the headroom left",
 		category: 'Development',
 	},
-	'lint:prettier': {
-		shell: [...PE, 'prettier', '--check', '.'],
-		description: 'Check formatting with prettier',
-		category: 'Development',
-	},
-	'lint:eslint': {
-		shell: [...PE, 'eslint', '.', ...ESLINT_CACHE_FLAGS],
-		description: 'Check code with eslint',
-		category: 'Development',
-	},
 	format: {
 		// prettier first here, unlike `format:edited`, and deliberately: `eslint --fix` exits 1
 		// whenever a non-autofixable error remains, so putting it first behind `&&` would mean one
@@ -49,17 +39,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			`pnpm exec prettier --write . && pnpm exec eslint . --fix ${ESLINT_CACHE_FLAGS.join(' ')}`,
 		],
 		description: 'Format code with prettier and eslint',
-		category: 'Development',
-		argument_targets: ['format:prettier', 'format:eslint'],
-	},
-	'format:prettier': {
-		shell: [...PE, 'prettier', '--write', '.'],
-		description: 'Format code with prettier',
-		category: 'Development',
-	},
-	'format:eslint': {
-		shell: [...PE, 'eslint', '.', '--fix', ...ESLINT_CACHE_FLAGS],
-		description: 'Fix eslint issues',
 		category: 'Development',
 	},
 	'format:edited': {
@@ -98,18 +77,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
 		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
 	},
-	cspell: {
-		shell: [
-			...PE,
-			'cspell',
-			'lint',
-			'--no-must-find-files',
-			'--no-progress',
-			'**/*.{ts,js,md,yaml,yml,json}',
-		],
-		description: 'Run spell check',
-		category: 'Development',
-	},
 	'cspell:dot': {
 		shell: [...PE, 'cspell', '.', '--dot', ...CSPELL_CACHE_FLAGS],
 		description: 'Run spell check including dotfiles',
@@ -124,16 +91,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'test:related': {
 		script: 'scripts/test-related.ts',
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
-		category: 'Development',
-	},
-	'test:watch': {
-		shell: [...PE, 'vitest', 'watch'],
-		description: 'Run unit tests in watch mode',
-		category: 'Development',
-	},
-	'test:ui': {
-		shell: [...PE, 'vitest', '--ui'],
-		description: 'Run unit tests with browser UI',
 		category: 'Development',
 	},
 	'e2e:retry-check': {
@@ -160,11 +117,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	port: {
 		script: 'scripts/ports/port-command.ts',
 		description: 'Print the PORT_SEED-resolved dev or preview port',
-		category: 'Development',
-	},
-	health: {
-		script: 'scripts/health-check.ts',
-		description: 'Show project health status',
 		category: 'Development',
 	},
 }

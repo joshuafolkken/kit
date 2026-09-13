@@ -136,13 +136,8 @@ The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries ba
 
 | Command              | Runs                                                                                   |
 | -------------------- | -------------------------------------------------------------------------------------- |
-| `lint`               | `pnpm lint:prettier && pnpm lint:eslint`                                               |
-| `lint:prettier`      | `prettier --check .`                                                                   |
-| `lint:eslint`        | `eslint . --cache --cache-strategy content`                                            |
-| `format`             | `pnpm format:prettier && pnpm format:eslint`                                           |
-| `format:prettier`    | `prettier --write .`                                                                   |
-| `format:eslint`      | `eslint . --fix --cache --cache-strategy content`                                      |
-| `cspell`             | `cspell lint ...`                                                                      |
+| `lint`               | `prettier --check .` then `eslint . --cache --cache-strategy content`                  |
+| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`            |
 | `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`        |
 | `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file) |
 | `lefthook:install`   | `lefthook install`                                                                     |
@@ -204,7 +199,7 @@ git config --get core.hooksPath                 # prints the path when one is se
 git config --unset-all --local core.hooksPath   # restores git's default — the same directory
 ```
 
-The value is almost always redundant: it names `<repo>/.git/hooks`, which is git's default, so unsetting it changes nothing except that lefthook will install again. Re-run `pnpm install` (or `pnpm josh hook:install`) afterwards.
+The value is almost always redundant: it names `<repo>/.git/hooks`, which is git's default, so unsetting it changes nothing except that lefthook will install again. Re-run `pnpm install` (or `pnpm lefthook:install`) afterwards.
 
 `lefthook install --reset-hooks-path` does the same unset for you, and `lefthook install --force` installs into the path without touching the setting. **Neither is wired into `prepare` on purpose**: rewriting a developer's git configuration as a side effect of `pnpm install` would break the setup of anyone who set that path deliberately.
 

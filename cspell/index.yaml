@@ -59,10 +59,10 @@ words:
   # (joshuafolkken/kit#1607). Distributed, because the `diag` skill reads that block and now explains
   # why its per-tool breakdown always balances — only a bundleable call enters a sequence.
   - bundleable
-  # What `josh run:preflight` is and `josh run:hold` is not (joshuafolkken/kit#926): a question that
-  # may be put again once the tree it read has been reclaimed. Distributed, because `epicrun.md`
-  # names it and `josh sync` copies that skill. cspell derives neither this nor "re-askable" from
-  # "ask".
+  # What a re-runnable tree-state check is and `josh run:hold` is not (joshuafolkken/kit#926): a
+  # question that may be put again once the tree it read has been reclaimed. Distributed, because
+  # `epicrun.md` names it and `josh sync` copies that skill. cspell derives neither this nor
+  # "re-askable" from "ask".
   - askable
   # The single-process guard command wired to the distributed `.claude/settings.json` PreToolUse hook
   # (`josh pretool:guard`). Distributed, because `josh sync` copies that settings file and the docs
