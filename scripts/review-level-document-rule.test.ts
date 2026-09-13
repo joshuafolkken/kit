@@ -124,23 +124,33 @@ describe('documentation is stated as not inert', () => {
 	})
 })
 
-// The rule is only real if the procedures use it.
-describe.each(FLOW_DOCUMENTS)('%s — reviews at the level the command decides', (document_path) => {
-	const content = read_repo_file(document_path)
+// The rule is only real if the procedures use it. joshuafolkken/kit#1925 deduplicates the
+// gate → review → merge narrative into one canonical home and turns the others into references, so the
+// positive is aggregated — the command is routed somewhere in the flow — while the negatives that
+// caught joshuafolkken/kit#966 (a procedure typing a fixed level of its own) stay per document, since
+// a referencing doc must not type a level either.
+describe('the review flow routes to the command, never a typed level', () => {
+	it('names the level command in at least one flow document', () => {
+		const is_routed = FLOW_DOCUMENTS.some((document_path) => {
+			const content = read_repo_file(document_path)
 
-	it('routes to the command instead of typing a level', () => {
-		expect(ROUTED_FORMS.some((form) => content.includes(form))).toBe(true)
+			return ROUTED_FORMS.some((form) => content.includes(form))
+		})
+
+		expect(is_routed).toBe(true)
 	})
 
-	it('types no fixed level of its own', () => {
+	it.each(FLOW_DOCUMENTS)('%s types no fixed level of its own', (document_path) => {
+		const content = read_repo_file(document_path)
+
 		expect(content).not.toContain('/code-review medium')
 		expect(content).not.toContain('/code-review low')
 	})
 
 	// Markdown cannot express a code span inside a code span; the first attempt at the routed form
 	// nested them and rendered as two spans with bare text between (joshuafolkken/kit#966).
-	it('nests no code span inside another', () => {
-		expect(content).not.toContain('`/code-review <the level `')
+	it.each(FLOW_DOCUMENTS)('%s nests no code span inside another', (document_path) => {
+		expect(read_repo_file(document_path)).not.toContain('`/code-review <the level `')
 	})
 })
 

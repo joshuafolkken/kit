@@ -7,13 +7,13 @@ import { describe, expect, it } from 'vitest'
 // rule the tool will not — and the direction that matters is a document promising `delegate` for
 // something the command keeps.
 //
-// joshuafolkken/kit#1183: the rule body is single-sourced into the skill and the canonical topic file
-// is now a pointer to it (the joshuafolkken/kit#1174 pattern, rolled out under
-// joshuafolkken/kit#1176). The canonical was formerly a Japanese full copy asserted here beside the
-// skill, marker for marker; those paired assertions become skill-only ones, plus the folded-in suites
-// that pin what the canonical alone used to carry and the pointer suite at the bottom.
+// joshuafolkken/kit#1959: the rule's history and measurement moved out of the always-read skill —
+// joshuafolkken/kit#1925 trims SKILL.md and queue.md down to rules, and deletes the delegation.md
+// pointer stub. So this suite no longer pins issue-number stories, the measured cost, or the pointer
+// body; the rule's presence is held by the code-versus-policy table equality, the delegation_policy
+// verdicts, the rule sentences the command reference keeps, and the §2b anchor in
+// `document-markers.test.ts`.
 
-const CANONICAL = 'prompts/collaboration-workflow/delegation.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const COMMAND_DOC = 'docs/josh-commands.md'
 // The skill is the rule; `docs/` is the command's own reference and carries the enumeration a person
@@ -153,66 +153,11 @@ describe.each(RULE_DOCS)('%s — states the condition a step must meet', (docume
 	})
 })
 
-// joshuafolkken/kit#984 reuses this mechanism with a different unit. Said in only one place, the
-// next implementer builds a second one.
+// The mechanism is one thing and the unit another; a document that fused them would have the next
+// implementer build a second mechanism. A rule, so it stays pinned.
 describe.each(RULE_DOCS)('%s — separates the mechanism from the unit', (document_path) => {
 	it('says the two are not the same thing', () => {
 		expect(read_unwrapped(document_path)).toContain('mechanism is not the unit')
-	})
-
-	it('names the other unit that shares the mechanism', () => {
-		expect(read_repo_file(document_path)).toContain('984')
-	})
-})
-
-// What the canonical alone used to carry. `SKILL.md` → "Trimming is moving, never deleting.": each
-// of these had to exist in the single source before the Japanese full copy was cut, so they are
-// pinned by name rather than left to be noticed missing later.
-describe(`${SKILL} — carries the origin only the canonical used to give`, () => {
-	const unwrapped = read_unwrapped(SKILL)
-
-	// Every step of a run executed at the same depth, so judgement and mechanics were billed alike.
-	// Dropped, the enumeration reads as a cost tweak rather than as the correction it is.
-	it('names the origin and what was wrong before it', () => {
-		expect(unwrapped).toContain('joshuafolkken/kit#969')
-		expect(unwrapped).toContain('billed at the same rate')
-	})
-
-	// The judgement is taken out of an agent's hands for the same reason the review level is, and the
-	// direction of the failure — cheap enough, exactly when a mistake is likeliest — is the argument.
-	it('refuses the judgement and names the precedent for refusing it', () => {
-		expect(unwrapped).toContain('Never decide it yourself')
-		expect(unwrapped).toContain('cost pressure')
-		expect(unwrapped).toContain('pnpm josh review:level')
-	})
-
-	// Three conditions with the second load-bearing. Stated as one condition, a candidate that is
-	// merely unlikely to be wrong reads as qualifying.
-	it('states the three conditions and which one is substantive', () => {
-		expect(unwrapped).toContain('the substantive one of three conditions')
-	})
-
-	// Both arms of the rejection, neither presented as the exception. Several rejected steps name a
-	// verifier perfectly well and are kept because a wrong result propagates; stated as "no verifier"
-	// alone, the single source would refuse none of them and `design` would read as qualifying.
-	it('records both arms a candidate is rejected on', () => {
-		expect(unwrapped).toContain('names no verifier')
-		expect(unwrapped).toContain('a wrong result propagates too far')
-		expect(unwrapped).toContain('Neither arm is the exception')
-	})
-
-	// A rejected candidate is recorded rather than omitted, and the command tells the two apart. The
-	// distinction is what stops the same proposal being re-derived.
-	it('distinguishes a deliberate keep from an unlisted one', () => {
-		expect(unwrapped).toContain(KEPT_DELIBERATELY)
-		expect(unwrapped).toContain('kept by default')
-	})
-
-	// The verifier is what makes `epic-child` delegatable at all; a loop advancing on the summary has
-	// discarded it, and the child it reported done is still open.
-	it('names the verifier the parent owes a delegated child', () => {
-		expect(unwrapped).toContain("`epic-child`'s verifier is not the child's own completion report")
-		expect(unwrapped).toContain(STATE_READ)
 	})
 })
 
@@ -226,9 +171,6 @@ const DELEGATION_COMMAND = `${COMMAND} ${EPIC_CHILD}`
 
 const QUEUE_UNIT_MARKERS: ReadonlyArray<[string, string]> = [
 	[SKILL, "an epic's child under `epicrun` and one issue of a `queue` alike"],
-	// The widening is the row's reach, never a second row — said in the single source now that the
-	// canonical no longer carries it.
-	[SKILL, 'no second row like `queue-child` is added'],
 	[COMMAND_DOC, 'One row covers both batch entry points'],
 ]
 
@@ -275,11 +217,9 @@ describe(`${QUEUE_SKILL} — each issue runs in the delegated unit`, () => {
 	})
 
 	// Pointing rather than restating is the single-source half: a second copy of the mechanism drifts
-	// from the first edit onward, and `CLAUDE.md` prohibits it by name. Since
-	// joshuafolkken/kit#1183 the pointer is the skill, not the topic file that became one.
+	// from the first edit onward, and `CLAUDE.md` prohibits it by name.
 	it('points at the one definition instead of restating it', () => {
 		expect(unwrapped).toContain('2b. Delegating a step to a cheaper tier')
-		expect(unwrapped).not.toContain(CANONICAL)
 	})
 })
 
@@ -324,14 +264,12 @@ describe(`${QUEUE_SKILL} — what the parent keeps when the issue is delegated`,
 	)
 })
 
-// joshuafolkken/kit#1426: the pre-implementation reading is delegated too, and its threshold is a
-// number both rule documents have to carry. A document that stated the line without the number leaves
-// the count to judgement, which is the one thing this whole rule refuses — and one that omitted the
-// return shape would have a unit hand back the file text, which puts the cost back where it was.
-const INVESTIGATION_ISSUE = '1426'
+// The pre-implementation reading is delegated too, and its threshold is a number both rule documents
+// have to carry. A document that stated the line without the number leaves the count to judgement,
+// which is the one thing this whole rule refuses — and one that omitted the return shape would have a
+// unit hand back the file text, which puts the cost back where it was.
 const THRESHOLD_SENTENCE = `the threshold is ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files, and it is a count, not a forecast`
-// joshuafolkken/kit#1460: the half #1426 left unsaid — what a delegation does to the count.
-const RESET_ISSUE = '1460'
+// What a delegation does to the count.
 const RESET_SENTENCE = 'a delegation resets the counter rather than spending it'
 const READ_GUARD_COMMAND = 'josh investigation:guard'
 
@@ -358,66 +296,12 @@ describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (
 		expect(unwrapped).not.toContain(`${COMMAND} investigation prints it`)
 	})
 
-	it('names the origin', () => {
-		expect(read_repo_file(document_path)).toContain(INVESTIGATION_ISSUE)
-	})
-
-	// joshuafolkken/kit#1460: a document that states the count without saying what a delegation does to
-	// it leaves the threshold as a one-shot judgement — which is how run #1441 asked the question once
-	// and then read 8 more unedited files without asking again. The command has to be named too: the
-	// counting moved out of the agent's head, and a document that omits where it went sends a reader
-	// back to counting by hand.
+	// A document that states the count without saying what a delegation does to it leaves the
+	// threshold as a one-shot judgement. The command has to be named too: the counting moved out of
+	// the agent's head, and a document that omits where it went sends a reader back to counting by
+	// hand.
 	it('says a delegation resets the counter, and names what counts', () => {
 		expect(unwrapped.toLowerCase()).toContain(RESET_SENTENCE)
 		expect(unwrapped).toContain(READ_GUARD_COMMAND)
-	})
-
-	it('names the origin of the reset', () => {
-		expect(read_repo_file(document_path)).toContain(RESET_ISSUE)
-	})
-})
-
-// joshuafolkken/kit#1183: the canonical topic file is a pointer to the skill single source, not a
-// second copy. The pointer test names the source; the body test proves the Japanese full copy that
-// used to live here — asserted marker for marker above until this rollout — has not crept back.
-describe('the canonical topic file is a pointer to the skill single source', () => {
-	const POINTER_MARKERS: ReadonlyArray<string> = [SKILL, 'クローン禁止・単一ソース化']
-	// One marker per section the Japanese body used to carry, not merely a couple. The generic size
-	// check in `pointer-citation-document-rule.test.ts` compares this pointer against the whole of
-	// `SKILL.md`, so a single paragraph creeping back would stay far under it and pass — the
-	// paragraph-level guard has to live here.
-	const REMOVED_BODY_MARKERS: ReadonlyArray<string> = [
-		'同じ単価で処理されている',
-		'費用の圧力の下で下される判断であり',
-		'見落としは**品質**として現れ',
-		'条件 2（誤りが検証で捕まる）を満たさない',
-		'機構を単位に癒着させない',
-		'1 つのコンテキストに積み上げ',
-		'親が読むのは GitHub 上の子の状態であり',
-		'`epic:next` の次の答えに任せない',
-	]
-
-	const pointer = read_unwrapped(CANONICAL)
-
-	it('names the skill as the single source', () => {
-		for (const marker of POINTER_MARKERS) expect(pointer).toContain(marker)
-	})
-
-	it('does not duplicate the rule body', () => {
-		for (const marker of REMOVED_BODY_MARKERS) expect(pointer).not.toContain(marker)
-	})
-
-	// joshuafolkken/kit#1147: the verifier line used to stop at "the parent reads GitHub state",
-	// which a reader completes as "anything but CLOSED failed". Naming the exception here keeps the
-	// index honest about what the single source actually says.
-	it('names that the state read is not a blanket CLOSED-or-failure', () => {
-		expect(pointer).toContain('`CLOSED` 以外を一律に失敗と読むことではない')
-		expect(pointer).toContain('`needs-human-review`')
-	})
-
-	// A back-reference from the single source itself costs no second hop, and it is what tells a
-	// reader who landed on the skill that the topic file holds no body.
-	it('is named as a pointer by the skill that now holds the body', () => {
-		expect(read_unwrapped(SKILL)).toContain(`\`${CANONICAL}\` is a pointer to it`)
 	})
 })

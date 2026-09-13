@@ -25,53 +25,27 @@ const DELIVERY_TOPIC = 'prompts/collaboration-workflow/rule-delivery.md'
 const GUARD_DOC = 'docs/josh-commands.md'
 
 const ENTRY_POINTS = [FULLRUN_SKILL, HALFRUN_SKILL, KICKOFF_SKILL]
-// The phrase each entry point owes. It is the read itself, not a reminder about it.
-const ENTRY_MARKER = 'every comment on it'
 // The portable spelling. `gh issue view <N> --comments` is GraphQL-backed and a cloud session is
 // answered 403, which `scripts/gh-document-guard.test.ts` enforces for runnable blocks — so the REST
-// call is what the procedure has to name.
+// call is what the procedure has to name. It is the read itself, so a trim keeps it.
 const REST_READ = 'gh api repos/{owner}/{repo}/issues/<N>/comments'
-// The one sentence that decides a contradiction, and the two answers that are not the run's to make.
-// Without them the delivery hands the deciding back to judgement at the moment nothing else is open
-// to read — the failure joshuafolkken/kit#1518 corrected for the WIP cap.
-const CONFLICT_RULE = 'The later text is the agreement in force'
+// The stop answer that is not the run's to make. Stated once, in §2g, so an entry point that restated
+// it would be the clone `CLAUDE.md` prohibits.
 const STOP_ANSWER = 'no longer has a reason to exist'
 
-const PROCEDURE_MARKERS: ReadonlyArray<string> = [
-	"An Issue's comments are part of the Issue",
-	REST_READ,
-	CONFLICT_RULE,
-	'reassigns part of the scope to another Issue',
-	STOP_ANSWER,
-	'`confirmation` Telegram',
-	// Why the reading is made, so it is not skimmed into a formality.
-	'the boundary of the scope',
-	'joshuafolkken/kit#1304',
-]
-
+// joshuafolkken/kit#1959: §2g's story and rationale moved out (joshuafolkken/kit#1925 trims the
+// section to its rule). The section's existence is held by the heading anchor in
+// `document-markers.test.ts`; here the doc half is the one command the read cannot lose, and the
+// entry points still point at the single source rather than restating it.
 describe('SKILL.md §2g — the procedure every `#N` entry point owes', () => {
-	const content = read_unwrapped(WORKFLOW_SKILL)
-
-	it.each(PROCEDURE_MARKERS)('states %j', (marker) => {
-		expect(content).toContain(marker)
-	})
-
-	// A long thread is answered by the delegation rule already in §2b rather than by a second rule,
-	// and the projection is what keeps the fetch from being carried whole on every later turn.
-	it('says what a long thread costs and where it goes', () => {
-		expect(content).toContain('§2b')
-		expect(content).toContain('the comment URLs that')
+	it('names the portable comment read', () => {
+		expect(read_unwrapped(WORKFLOW_SKILL)).toContain(REST_READ)
 	})
 })
 
-describe('the `#N` entry points carry the step and point at the procedure', () => {
-	it.each(ENTRY_POINTS)('%s makes the comments part of the read', (document) => {
-		expect(read_unwrapped(document)).toContain(ENTRY_MARKER)
-	})
-
-	// **The counter-assertion, because three copies of a procedure is the clone `CLAUDE.md`
-	// prohibits.** An entry point owes the step and the pointer; the conflict rule and its two stop
-	// answers are stated once, in §2g, so a change to them cannot leave two files disagreeing.
+describe('the `#N` entry points point at the procedure', () => {
+	// An entry point owes the pointer, not a second copy: the conflict rule and its stop answers are
+	// stated once, in §2g, so a change to them cannot leave two files disagreeing.
 	it.each(ENTRY_POINTS)('%s points at §2g rather than restating it', (document) => {
 		const content = read_unwrapped(document)
 

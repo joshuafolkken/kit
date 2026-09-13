@@ -50,6 +50,7 @@ const RESIDENT_ANCHORS: ReadonlyArray<Anchor> = [
 	{ file: SKILL_MD, heading: '1. Which file to read' },
 	{ file: SKILL_MD, heading: '2. What every one of them shares' },
 	{ file: SKILL_MD, heading: '2b. Delegating a step to a cheaper tier' },
+	{ file: SKILL_MD, heading: "2g. An Issue's comments are part of the Issue" },
 	{ file: SKILL_MD, heading: '3. What stays resident, and what is read from here' },
 	{ file: FULLRUN_MD, heading: '`fullrun`' },
 	{ file: EPICRUN_MD, heading: 'The hand-off' },

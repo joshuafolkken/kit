@@ -25,7 +25,6 @@ import {
 // not fail a test for a reason that has nothing to do with the rule.
 
 const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
-const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const REVIEW_PROMPT = 'prompts/review.md'
 const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
 const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
@@ -249,14 +248,13 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 	})
 })
 
-// The entry summary is what a run reads before it opens the shared file. A default raised in the
-// single source and left unraised here is the softening `split-assessment-document-rule.test.ts` was
-// written to prevent, one document further out.
 // A rule written only in `wip-cap.md` fires only for a run that opens `wip-cap.md`, and nothing in
 // the batch entry points sent a reader there — `epicrun` fills every free lane from
-// `epic:next --lanes` without ever reading the cap. That is the same "written where it never fires"
-// failure this whole issue is about, so the solo-run rule is asserted reachable from both documents
-// that dispatch children (joshuafolkken/kit#1518).
+// `epic:next --lanes` without ever reading the cap. So the solo-run rule is asserted reachable from
+// `epicrun.md`, which dispatches children (joshuafolkken/kit#1518). joshuafolkken/kit#1959 dropped the
+// SKILL.md §2 restatement of both the solo-run rule and the split default, since
+// joshuafolkken/kit#1925 deduplicates §2 into the single sources — the split default stays pinned on
+// `split-assessment.md` above and anchored in `document-markers.test.ts`.
 // `read_unwrapped` collapses whitespace, so every marker here is written as the single line the
 // wrapped source reads as — which is also why a hard-wrapped sentence can be pinned at all.
 const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
@@ -270,23 +268,10 @@ const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
 			'the verification gate (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge checks?',
 	},
 	{ doc: EPICRUN_SKILL, marker: 'It runs alone, and the batch resumes only once it has merged.' },
-	{
-		doc: WORKFLOW_SKILL,
-		marker:
-			'**An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes only once it has merged',
-	},
 ]
 
-describe('the solo-run rule is reachable from the documents that dispatch children', () => {
+describe('the solo-run rule is reachable from the document that dispatches children', () => {
 	it.each(SOLO_RUN_REACH)('$doc states $marker', ({ doc, marker }) => {
 		expect(read_unwrapped(doc)).toContain(marker)
-	})
-})
-
-describe(`${WORKFLOW_SKILL} — the entry summary carries the raised default`, () => {
-	const content = read_unwrapped(WORKFLOW_SKILL)
-
-	it.each(['**The default is not to split**', SPLIT_GUIDE])('states %j', (marker) => {
-		expect(content).toContain(marker)
 	})
 })

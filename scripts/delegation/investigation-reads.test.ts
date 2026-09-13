@@ -229,7 +229,9 @@ describe('investigation_reads.tally_of — what a delegation does to the count',
 describe('investigation_reads — the run’s own instructions are not the subject', () => {
 	it.each([
 		'prompts/refactoring.md',
-		'prompts/collaboration-workflow/delegation.md',
+		// A surviving collaboration-workflow topic file — joshuafolkken/kit#1925 deletes the pointer
+		// stubs (delegation.md among them), so the case exercises one that stays.
+		'prompts/collaboration-workflow/residency.md',
 		'.claude/skills/workflow-commands/SKILL.md',
 		'CLAUDE.md',
 	])(NOT_COUNTED, (target) => {
