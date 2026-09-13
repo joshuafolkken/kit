@@ -289,8 +289,8 @@ describe('cost_transcript.missing_message', () => {
 // writes the newer file — the parent is waiting while it works — so the head of the listing would
 // answer a no-argument run with one child of a batch.
 describe('cost_transcript.latest_own_index', () => {
-	const own = { session_id: 'a', path: 'a', modified_ms: 2, is_delegated: false }
-	const unit = { session_id: 'a/agent-1', path: 'b', modified_ms: 3, is_delegated: true }
+	const own = { session_id: 'a', path: 'a', modified_ms: 2, is_delegated: false, depth: 0 }
+	const unit = { session_id: 'a/agent-1', path: 'b', modified_ms: 3, is_delegated: true, depth: 1 }
 
 	it('skips a delegated unit that sorted ahead of the session', () => {
 		expect(cost_transcript.latest_own_index([unit, own])).toBe(1)
@@ -322,6 +322,7 @@ describe('cost_transcript.read_session', () => {
 			path: absent_path('missing.jsonl'),
 			modified_ms: 0,
 			is_delegated: false,
+			depth: 0,
 		}
 		const first = cost_transcript.read_session(missing)
 		const second = cost_transcript.read_session(missing)

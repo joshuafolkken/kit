@@ -16,6 +16,7 @@ function session_file(session_id: string, modified_ms: number): SessionFile {
 		path: `/tmp/${session_id.replaceAll('/', '-')}.jsonl`,
 		modified_ms,
 		is_delegated: session_id.includes('/'),
+		depth: session_id.includes('/') ? 1 : 0,
 	}
 }
 

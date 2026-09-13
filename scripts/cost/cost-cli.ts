@@ -9,6 +9,8 @@ import { cost_document_sources } from './cost-document-sources'
 import type { DocumentBreakdown } from './cost-documents'
 import { cost_report, type CostReport, type Measurement, type MissingData } from './cost-report'
 import { cost_resident } from './cost-resident'
+import { cost_run_report } from './cost-run-report'
+import { cost_run_scope } from './cost-run-scope'
 import { cost_sessions } from './cost-sessions'
 import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
 import { cost_usage } from './cost-usage'
@@ -21,13 +23,16 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
 const USAGE =
-	'Usage: josh cost [--session <id>] [--issue <number>] [--all] [--json] [--over <tokens-per-request>] [--cap <tokens-per-request>]'
+	'Usage: josh cost [--run] [--session <id>] [--issue <number>] [--all] [--json] [--over <tokens-per-request>] [--cap <tokens-per-request>]'
 
 interface Options {
 	session?: string
 	issue?: number
 	is_all: boolean
 	is_json: boolean
+	// Whether the run-tree scope was named. It is also the bare no-argument default — `josh cost` with
+	// no scope reports the last run tree rather than the newest single transcript (joshuafolkken/kit#1937).
+	is_run: boolean
 	over?: number
 	cap?: number
 }
@@ -37,6 +42,7 @@ interface RawValues {
 	issue?: string | undefined
 	all?: boolean | undefined
 	json?: boolean | undefined
+	run?: boolean | undefined
 	over?: string | undefined
 	cap?: string | undefined
 }
@@ -145,8 +151,20 @@ function is_refused(
 	over: number | undefined,
 	cap: number | undefined,
 ): boolean {
+	const competing = [issue !== undefined, values.session !== undefined, values.all === true]
+
 	if (has_unparsed(values, issue, over, cap)) return true
 	if (over !== undefined && is_scoped(values, issue)) return true
+
+	if (
+		cost_run_scope.is_conflict(values.run === true, [
+			...competing,
+			over !== undefined,
+			cap !== undefined,
+		])
+	) {
+		return true
+	}
 
 	return is_cap_conflict(values, over, cap)
 }
@@ -165,6 +183,7 @@ function to_options(values: RawValues): Options | undefined {
 		...optional_cap(cap),
 		is_all: values.all ?? false,
 		is_json: values.json ?? false,
+		is_run: values.run ?? false,
 	}
 }
 
@@ -173,6 +192,7 @@ const PARSE_ARGS_OPTIONS = {
 	issue: { type: 'string' },
 	all: { type: 'boolean', default: false },
 	json: { type: 'boolean', default: false },
+	run: { type: 'boolean', default: false },
 	over: { type: 'string' },
 	cap: { type: 'string' },
 } as const
@@ -381,6 +401,8 @@ function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 
 		return FAILURE_EXIT_CODE
 	}
+
+	if (cost_run_scope.wants(options)) return cost_run_report.run(cwd, undefined, options.is_json)
 
 	const reports = build_reports(options, cost_corpus.load_corpus(cwd, options.session), cwd)
 
