@@ -2035,7 +2035,7 @@ across that hour — a saturated context re-read to write two lines. **At the de
 interval the watcher can account for at most three of those 24**, because it cannot exit more often
 than its interval; every remaining call is a turn the parent woke itself for. That is the whole
 separation, and it needs no second reading of the transcript — which matters, because the transcript
-parsing that produced these figures is what `.claude/skills/diag/SKILL.md` forbids, and the
+parsing that produced these figures is what the `diag` skill forbids, and the
 re-measurement belongs to `pnpm josh cost` and `pnpm josh time`.
 
 **So the parent starts no wait of its own.** While something of this run's own is in flight, the next

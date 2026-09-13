@@ -1,4 +1,5 @@
 import { init_logic } from '#scripts/init/init-logic'
+import { PLUGIN_SKILL_DIRECTORIES } from './plugin-skill-directories'
 import { synced_paths } from './synced-paths'
 
 // The three lists `josh sync` distributes from, spelled exactly as they are declared in
@@ -11,6 +12,11 @@ const AI_COPY_DIRECTORIES_LIST = 'AI_COPY_DIRECTORIES'
 // The fourth source, named for the module that enumerates it rather than for an array in
 // `init-logic.ts`: these destinations are written by `sync.ts` directly and appear on no list there.
 const SYNCED_PATHS_LIST = 'SYNCED_PATHS'
+
+// The fifth source: the skill directories that ship as the `kit` plugin rather than as a copy
+// (joshuafolkken/kit#1879). They are no longer in `AI_COPY_DIRECTORIES`, but a change to one still
+// reaches consumers through the package, so the gate keeps flagging it.
+const PLUGIN_SKILL_DIRECTORIES_LIST = 'PLUGIN_SKILL_DIRECTORIES'
 
 const PATH_SEPARATOR = '/'
 
@@ -45,6 +51,10 @@ function matches_directory(path: string): boolean {
 	return init_logic.get_ai_copy_directories().some((directory) => is_inside(path, directory))
 }
 
+function matches_plugin_skill(path: string): boolean {
+	return PLUGIN_SKILL_DIRECTORIES.some((directory) => is_inside(path, directory))
+}
+
 // The paths `josh sync` writes outside the three `AI_COPY_*` lists — `playwright.config.ts` and the
 // rest. Reading only those three made the gate **narrower than the instruction it replaced**, whose
 // own worked example was a file none of them holds (joshuafolkken/kit#1578).
@@ -60,6 +70,7 @@ const MATCHERS: ReadonlyArray<{ list: string; matches: (path: string) => boolean
 	{ list: AI_COPY_FILES_LIST, matches: matches_file },
 	{ list: AI_COPY_FILE_MAPPINGS_LIST, matches: matches_mapping },
 	{ list: AI_COPY_DIRECTORIES_LIST, matches: matches_directory },
+	{ list: PLUGIN_SKILL_DIRECTORIES_LIST, matches: matches_plugin_skill },
 	{ list: SYNCED_PATHS_LIST, matches: matches_synced_path },
 ]
 
@@ -106,6 +117,7 @@ export {
 	AI_COPY_FILES_LIST,
 	AI_COPY_FILE_MAPPINGS_LIST,
 	AI_COPY_DIRECTORIES_LIST,
+	PLUGIN_SKILL_DIRECTORIES_LIST,
 	SYNCED_PATHS_LIST,
 }
 export type { ManagedHit }

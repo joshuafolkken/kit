@@ -86,7 +86,7 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	BUDGET_MARKER,
 	'**`backlogrun` and `queue` alone**',
 	SCOPE_MARKER,
-	'`.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation"',
+	'`backlogrun.md` → "The session cut is inside the invocation"',
 ]
 
 // The procedure. Every marker here is a step a run would otherwise have to invent: where the record

@@ -176,15 +176,10 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
-.claude/skills/verify-ui/   (directory)
-.claude/skills/workflow-commands/   (directory)
-.claude/skills/dependency-update/   (directory)
-.claude/skills/epic-commands/   (directory)
-.claude/skills/diag/   (directory)
 sonar-project.properties  (generated from GitHub repo name)
 ```
 
-`CLAUDE.md` carries every agent rule; `AGENTS.md` and `GEMINI.md` are short pointers to it and hold no rules of their own ([#963](https://github.com/joshuafolkken/kit/issues/963)). All three have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/kit/prompts/` so they work correctly in the consuming project — the pointers included, since each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one. The same rewrite runs over the markdown inside every copied `.claude/skills/` directory, so a skill may cite the prompt it extends and have the path resolve in a consumer.
+`CLAUDE.md` carries every agent rule; `AGENTS.md` and `GEMINI.md` are short pointers to it and hold no rules of their own ([#963](https://github.com/joshuafolkken/kit/issues/963)). All three have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/kit/prompts/` so they work correctly in the consuming project — the pointers included, since each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one. The five skills are no longer copied: they ship as the `kit` Claude Code plugin and load from the package (joshuafolkken/kit#1879). `.claude/settings.json` still carries the `permissions.deny` rules a plugin cannot provide, and now also declares the `kit` marketplace and enables the `kit` plugin; the CLI needs a one-time `claude plugin install kit@kit` (settings alone do not auto-install it). `josh sync` removes any stale copied skill directory whose content still matches the shipment.
 
 `sonar-project.properties` is generated from the GitHub repo name fetched via `gh api repos/{owner}/{repo}`. If `gh` is not available or the repo cannot be identified, the file is skipped with a warning.
 

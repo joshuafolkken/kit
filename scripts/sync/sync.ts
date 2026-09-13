@@ -12,6 +12,7 @@ import { security_updates } from '#scripts/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
+import { skill_migration, type MigrationResult } from './skill-migration'
 import { sync_configs } from './sync-configs'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
@@ -184,6 +185,29 @@ function sync_sonar_with_template(name_with_owner: string | undefined, is_force 
 	console.info(`  ✔ synced    ${destination}`)
 }
 
+// The five skill directories kit no longer copies now ship as the `kit` plugin, so a consumer's
+// stale copy is removed once it still matches the shipment and kept with a warning once it does not
+// (joshuafolkken/kit#1879). `absent` — the consumer never had the copy — prints nothing.
+function report_migration_result(result: MigrationResult): void {
+	if (result.action === 'absent') return
+
+	if (result.action === 'removed') {
+		console.info(`  ✔ removed   ${result.directory}/ (now provided by the kit plugin)`)
+
+		return
+	}
+
+	console.warn(
+		`  ⚠ kept      ${result.directory}/ (modified or consumer-authored — remove by hand once on the kit plugin)`,
+	)
+}
+
+function migrate_removed_skills(): void {
+	const results = skill_migration.migrate_removed_skill_directories(PACKAGE_DIR, PROJECT_ROOT)
+
+	for (const result of results) report_migration_result(result)
+}
+
 function sync_ai_copy_all(is_force: boolean): void {
 	console.info('AI files:')
 
@@ -198,6 +222,8 @@ function sync_ai_copy_all(is_force: boolean): void {
 	for (const directory_name of init_logic.get_ai_copy_directories()) {
 		sync_directory(directory_name)
 	}
+
+	migrate_removed_skills()
 }
 
 function sync_config_files(): void {

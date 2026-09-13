@@ -414,7 +414,7 @@ describe.each(AI_DOCS)('%s — routes the diag keyword to the shipped skill', (d
 	})
 
 	it('points the row at the skill this package distributes', () => {
-		expect(content).toContain(SKILL_PATH)
+		expect(content).toContain('`diag` skill')
 	})
 
 	// The row is a pointer, not a second copy of the procedure. The steps live in the skill, and a

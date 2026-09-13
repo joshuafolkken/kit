@@ -12,8 +12,10 @@
 // references those files actually carry. A hand-written copy of either would be the clone
 // `CLAUDE.md` prohibits, and it would drift the first time a row moved.
 
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { cost_tokens } from '#scripts/cost/cost-tokens'
+import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { document_section, type Section } from './document-section'
 
 const SKILL_DIRECTORY = path.join('.claude', 'skills', 'workflow-commands')
@@ -121,8 +123,22 @@ interface ReadSetCost {
 	scoped: Cost
 }
 
+// **Resolved against the consumer's tree first, then against the package's own copy.** Before the
+// plugin migration a consumer received the skill bodies copied under its own `.claude/skills/`, so
+// the project path was the only one that could exist. Now the bodies ship in the package and load as
+// the `kit` plugin — they are no longer copied into the consumer's tree — so `josh doc:section
+// fullrun.md` and `josh read:set` fall back to `node_modules/@joshuafolkken/kit/.claude/skills/…`.
+// In the kit repo the project path always exists, so the fallback fires only at a consumer, and the
+// last branch keeps the original path when neither exists so a missing file reports against the tree
+// the caller named (joshuafolkken/kit#1879).
 function document_path(root: string, name: string): string {
-	return path.join(root, SKILL_DIRECTORY, name)
+	const in_project = path.join(root, SKILL_DIRECTORY, name)
+
+	if (existsSync(in_project)) return in_project
+
+	const in_package = path.join(PACKAGE_DIR, SKILL_DIRECTORY, name)
+
+	return existsSync(in_package) ? in_package : in_project
 }
 
 function read_document(root: string, name: string): string {

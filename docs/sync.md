@@ -29,13 +29,18 @@ SECURITY.md         tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
-.claude/skills/verify-ui/   (directory)
-.claude/skills/workflow-commands/   (directory)
-.claude/skills/dependency-update/   (directory)
-.claude/skills/epic-commands/   (directory)
-.claude/skills/diag/   (directory)
 ```
 
+> **The five distributed skills ship as the `kit` Claude Code plugin, not as copies
+> (joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file — it
+> carries the `permissions.deny` rules a plugin cannot provide — and now also declares the `kit`
+> marketplace and enables the `kit` plugin. The skill bodies load from the package
+> (`node_modules/@joshuafolkken/kit/.claude/skills/`). The CLI does not auto-install a plugin from
+> settings alone, so a consumer runs a one-time `claude plugin marketplace add
+./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). `josh sync`
+> removes a stale copied skill directory only when its content still matches the shipment, and keeps —
+> with a warning — one the consumer edited or authored.
+>
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
 > (`ci.yml`, `auto-tag.yml`, `production.yml`, `sonar-qube.yml`) is overwritten on
 > each `josh sync`, so action SHA pins are bumped once in the kit and propagated to all consumers —

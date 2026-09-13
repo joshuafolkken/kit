@@ -634,7 +634,7 @@ pnpm josh issue:state 1262 1222 1176
 **Attribute each block by its `issue:` line, never by position.** A number that produced no state
 prints no block, so counting blocks off against the numbers you passed misreads every row after the
 gap. A single number is unchanged — the three lines below, with no `issue:` heading — which is the
-form `.claude/skills/workflow-commands/SKILL.md` §2z reads.
+form the `workflow-commands` skill §2z reads.
 
 **Pass bare numbers, not the `#N` the table prints.** A token carrying the `#` refuses the whole
 call with the usage line rather than being dropped from it — which is the answer you want, since a
@@ -657,7 +657,7 @@ someone to start a run that is already going — the failure this whole step exi
 
 Which epic to name for a filed row comes from `pnpm josh epic:bundle <N>`, which names the epic that
 already tracks it rather than only reporting that one exists. **Read
-`.claude/skills/epic-commands/SKILL.md` before running that or any other `epic:*` command**, as
+the `epic-commands` skill before running that or any other `epic:*` command**, as
 `CLAUDE.md` requires — this skill routes to it rather than restating it.
 
 ## 4. File only through `pnpm josh issue:scout`

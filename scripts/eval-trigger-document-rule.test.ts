@@ -17,6 +17,9 @@ import { describe, expect, it } from 'vitest'
 
 const COMMAND = 'pnpm josh eval:scope'
 const SKILL_GATE = '.claude/skills/workflow-commands/eval-gate.md'
+// The source file named by filename rather than by the full `.claude/skills/…` path: since the
+// skills ship as the `kit` plugin (joshuafolkken/kit#1879), CLAUDE.md names the file, not a path.
+const GATE_FILE = 'eval-gate.md'
 const PROMPT_GATE = 'prompts/collaboration-workflow/eval-gate.md'
 const EVAL_DOC = 'docs/eval.md'
 const COMMAND_DOC = 'docs/josh-commands.md'
@@ -202,7 +205,7 @@ describe('a blocked verdict is attributed before it blocks', () => {
 		const content = read_unwrapped(document_path)
 
 		expect(content).toContain('attribute it first')
-		expect(content).toContain('eval-gate.md')
+		expect(content).toContain(GATE_FILE)
 	})
 
 	// joshuafolkken/kit#1071: one scenario is one real Claude session, so a single reading either side
@@ -273,7 +276,7 @@ describe('the canonical topic file is a pointer to the skill single source', () 
 	// A pointer file only helps while the documents that send a reader to the procedure name the
 	// source rather than it. Both of these named the topic file until this rollout moved the body.
 	it.each([...AI_DOCS, EVAL_DOC])('%s names the source', (document_path) => {
-		expect(read_unwrapped(document_path)).toContain(SKILL_GATE)
+		expect(read_unwrapped(document_path)).toContain(GATE_FILE)
 	})
 
 	// Only `docs/eval.md` is held to the stronger form. It sent the reader to the topic file *for the

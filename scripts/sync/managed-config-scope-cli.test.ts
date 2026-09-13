@@ -38,7 +38,7 @@ describe('managed_config_scope_cli.format_reason', () => {
 		const reason = managed_config_scope_cli.format_reason([DISTRIBUTED_SKILL_FILE], MANAGED_ANSWER)
 
 		expect(reason).toContain(DISTRIBUTED_SKILL_FILE)
-		expect(reason).toContain('AI_COPY_DIRECTORIES')
+		expect(reason).toContain('PLUGIN_SKILL_DIRECTORIES')
 	})
 
 	it('lists only the distributed paths, not the whole change', () => {
