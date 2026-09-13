@@ -123,7 +123,8 @@ pnpm josh run:cut --resume <N>
 | --------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `fresh`   | 0    | No cut record — this is an ordinary run. Proceed with the normal entry: claim the hold, ask the session boundary, read the issue, implement |
 | `resume`  | 0    | A declared cut whose tree matches was verified and taken over. **Skip the title, the plan, the fresh hold claim and the implementation**; re-read the issue body and comments for the plan and the recorded decisions, then go straight to `pnpm josh gate` |
-| `stale`   | 1    | The record does not match the tree — wrong branch, a clean tree (the implementation is gone), an expired record, or no declared cut. **A resume failure**: send a `confirmation` Telegram and stop; never gate the wrong tree |
+| `handed-off` | 0 | A successor has already adopted this cut — `is_handed_off` is spent (joshuafolkken/kit#1935). This process was woken **after** its own cut — a background task's notification, or an interactive session that never ended — and the run is being carried on elsewhere. **End the turn quietly and do nothing**: it is a benign stop, not a failure, so no Telegram is owed and the tree is left for the successor that owns it |
+| `stale`   | 1    | The record does not match the tree — wrong branch, a clean tree (the implementation is gone), an expired record, or a record whose hand-off state is unknown. **A resume failure**: send a `confirmation` Telegram and stop; never gate the wrong tree |
 | `busy`    | 1    | Another process already owns the resume — a double launch. Send a `confirmation` Telegram and stop                                        |
 
 **A resume is never reported as a success it did not earn.** `stale` and `busy` stop the run rather
@@ -169,8 +170,11 @@ run — removed.
 - **The cut is exclusive.** `run:cut` writes the record with an exclusive create, so a second cut on
   the same tree is refused `busy` and never relaunches a second process.
 - **The resume is unique.** Taking the hand-off over spends it — a second `run:cut --resume` reads a
-  record whose hand-off is already spent and is answered `stale` — and the take-over itself is an
-  exclusive create, so two resumes racing cannot both win.
+  record whose hand-off is already spent and is answered `handed-off` (joshuafolkken/kit#1935), a
+  benign stop that tells a process woken after its own cut to do nothing rather than investigate — and
+  the take-over itself is an exclusive create, so two resumes racing cannot both win. A resumed
+  process that reaches the boundary again and reissues `run:cut <N>` is likewise refused `busy` by that
+  exclusive create, so one lane crosses the pre-gate boundary exactly once.
 
 ## Consistency with the chain rule
 

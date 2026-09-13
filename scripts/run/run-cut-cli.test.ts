@@ -148,6 +148,20 @@ describe('refusing to cut a lane child before the gate', () => {
 		expect(launch).not.toHaveBeenCalled()
 	})
 
+	// joshuafolkken/kit#1935: a resumed process must not take a second cut. Once the first cut was
+	// adopted the record is still on disk, so `run:cut` finds it and refuses rather than relaunching a
+	// third process — the double-cut the incident produced.
+	it('refuses a second cut after the first was already resumed', async () => {
+		existing_cut()
+		await run_cut_cli.run(['--resume', ISSUE])
+
+		const code = await run_cut_cli.run([ISSUE])
+
+		expect(code).toBe(1)
+		expect(verdict()).toBe(run_cut_cli.BUSY_VERDICT)
+		expect(launch).not.toHaveBeenCalled()
+	})
+
 	it('clears the record on a relaunch failure so the current process can carry on', async () => {
 		launch.mockReturnValue({ kind: 'failed', note: 'spawn refused' })
 
@@ -167,7 +181,10 @@ describe('a fresh process checking whether to resume', () => {
 		expect(verdict()).toBe(run_cut_cli.FRESH_VERDICT)
 	})
 
-	it('resumes a declared cut whose tree matches, and spends it', async () => {
+	// joshuafolkken/kit#1935: the first resume adopts and spends the hand-off; a second resume — a
+	// process woken after its own cut — reads `is_handed_off: false` and is answered `handed-off`, a
+	// benign stop, so it does nothing rather than investigating a tree that is not wrong.
+	it('resumes a declared cut once, then answers a second resume handed-off', async () => {
 		existing_cut()
 
 		const first = await run_cut_cli.run(['--resume', ISSUE])
@@ -176,8 +193,8 @@ describe('a fresh process checking whether to resume', () => {
 
 		expect(first).toBe(0)
 		expect(first_verdict).toBe(run_cut_cli.RESUME_VERDICT)
-		expect(second).toBe(1)
-		expect(verdict()).toBe(run_cut_cli.STALE_VERDICT)
+		expect(second).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.HANDED_OFF_VERDICT)
 	})
 
 	it('refuses to resume when the tree is clean', async () => {

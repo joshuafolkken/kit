@@ -188,13 +188,15 @@ describe('an owner that is still running', () => {
 		expect(run_carry.classify_claim(carry, request)).toBe('busy')
 	})
 
-	// The hand-off is read *after* liveness, or a second parent naming the same invocation would take
-	// over a record whose owner is still running — the string comparison, surviving on one path.
-	it.skipIf(!has_start_probe)('refuses even a record its own cut handed off', () => {
+	// joshuafolkken/kit#1935: the hand-off is read *before* liveness now, so a record its own cut handed
+	// off is carried to a foreign successor even while the cutting process is still running — the
+	// interactive-session and woken-lane-child cases the earlier liveness-first order stalled forever. A
+	// crash still cannot inherit here, because a hand-off needs the `--cut` a crash never reaches.
+	it.skipIf(!has_start_probe)('carries a record its cut handed off to a foreign successor', () => {
 		const cut = run_carry.apply_change(target(), begun(live_owner()), { cuts: 1 })
 		const request = claim_of(INVOCATION, dead_owner())
 
-		expect(run_carry.classify_claim(cut, request)).toBe('busy')
+		expect(run_carry.classify_claim(cut, request)).toBe('resume')
 	})
 
 	// The same record, asked for by the process that owns it: a session cut that kept its process —
@@ -276,6 +278,45 @@ describe('a cut declares the hand-off', () => {
 			owner_start: undefined,
 			is_handed_off: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#1935: only the record's live owner advances the budget, so a session whose record
+// was handed off — or taken over by a successor — cannot count into a budget that is no longer its own.
+// This keeps joshuafolkken/kit#1722's single writer across a cut.
+describe('a budget count guarded by ownership', () => {
+	it('refuses a count while the record is handed off and awaiting its successor', () => {
+		const cut = run_carry.apply_change(target(), begun(), { cuts: 1 })
+
+		expect(run_carry.is_count_refused(cut, run_carry.NO_OWNER)).toBe(true)
+	})
+
+	it.skipIf(!has_start_probe)('refuses a count from a session whose ownership was taken', () => {
+		const cut = run_carry.apply_change(target(), begun(live_owner()), { cuts: 1 })
+		const adopted = run_carry.adopt_carry(target(), cut, live_owner())
+
+		if (adopted === undefined) throw new Error('the adoption lost the exclusive create')
+
+		// The successor now owns the live record; the original session, a foreign owner, is refused.
+		expect(adopted.is_handed_off).toBe(false)
+		expect(run_carry.is_count_refused(adopted, dead_owner())).toBe(true)
+	})
+
+	it.skipIf(!has_start_probe)('lets the live owner advance its own budget', () => {
+		const owner = live_owner()
+		const carry = begun(owner)
+
+		expect(run_carry.is_count_refused(carry, owner)).toBe(false)
+	})
+
+	it('lets a record that declares no owner be counted', () => {
+		expect(run_carry.is_count_refused(begun(), run_carry.NO_OWNER)).toBe(false)
+	})
+
+	it('explains that a handed-off budget is waiting for its successor', () => {
+		const cut = run_carry.apply_change(target(), begun(), { cuts: 1 })
+
+		expect(run_carry.count_refused_message(cut)).toContain('waiting for its successor')
 	})
 })
 

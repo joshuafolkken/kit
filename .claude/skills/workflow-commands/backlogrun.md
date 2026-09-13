@@ -180,7 +180,7 @@ is `docs/josh-commands.md` → "`josh run:carry`"; what this loop does with each
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `began`      | Nothing was carried. This is the invocation's first session: report the plan and run the decision pass as written below                                                                                                     |
 | `resumed`    | **This session is continuing a run that was cut** — a `--cut` handed the record off, or a `--resume` adopted it. Read the record with `--json` and take the budget figures from it, never from this session's own zero. Report the plan again — the pool has moved — and skip nothing else |
-| `busy`       | The record's **owner process is still running**: another parent is spending this budget right now. **Stop; do not open a lane.** Counting into it would put two parents on one record. Nothing here is yours to end — either that run finishes and ends its own record, or a person decides it is over |
+| `busy`       | The record's **owner process is still running and no cut handed it off**: another parent is spending this budget right now. **Stop; do not open a lane.** Counting into it would put two parents on one record. (A record a `--cut` _did_ hand off answers `resumed` here even with its owner still alive — joshuafolkken/kit#1935.) Nothing here is yours to end — either that run finishes and ends its own record, or a person decides it is over |
 | `standing`   | A record is here that **no cut handed off** — the crashed run, and the same command retyped over it. **Stop; do not open a lane**, and do not guess: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. The `--owner` belongs to the resume as much as to the begin: adopt without it and the record declares no owner, so `busy` degrades to `standing` for every parent after |
 | `mismatch`   | A record is here for a **different** invocation — a run that never reached `--end`. **Stop; do not open a lane.** Resuming into it would spend that run's `--max` and its hours. End it deliberately, with `pnpm josh run:carry --end`, once you know that run is over |
 | `expired`    | The 8-hour whole-run bound is spent. **Where a `--cut` handed the record off it is this run's own bound**, so this is the verdict on standard output and the run ends: report it and stop, and clear the record with `pnpm josh run:carry --end` once it is genuinely over. Where nothing handed it off it is printed on standard error ahead of a `began` instead — a person typing the keyword again over a spent record is starting a new run, and the record is replaced. A `--resume` over a spent record answers `expired` and adopts nothing |
@@ -196,21 +196,29 @@ rather than only stated** (joshuafolkken/kit#1722): `--begin` claims the record 
 the owning process, so a second parent is answered `busy` instead of being allowed to count into a
 budget somebody else is spending.
 
-**Count into the record rather than into your head** — `--merged 1` at every child's merge, `--filed 1`
-at every Issue this run files, and `--cut` immediately before the cut. Every counter is an increment
-and the command owns the sum, because a run sending a total would be sending arithmetic it had done in
-its head — the one-shot judgement joshuafolkken/kit#1460 measured a run walking straight past.
+**Count into the record rather than into your head** — `--merged 1 --owner "$PPID"` at every child's
+merge, `--filed 1 --owner "$PPID"` at every Issue this run files, and `--cut --owner "$PPID"`
+immediately before the cut. Every counter is an increment and the command owns the sum, because a run
+sending a total would be sending arithmetic it had done in its head — the one-shot judgement
+joshuafolkken/kit#1460 measured a run walking straight past. **`--owner "$PPID"` is not optional on a
+count** (joshuafolkken/kit#1935): the record names its owning process, and a count that does not name
+that same one is refused, so a session whose record a successor took over cannot advance a budget that
+is no longer its own — the single writer joshuafolkken/kit#1722 established, now kept across the cut.
 
 **`--cut` is also what hands the record off, and it is the only thing that does.** A crash never
 reaches it, which is exactly why a declared cut is the one standing record the next session carries
 without anybody deciding: `--cut`, then the next `--begin` naming the same invocation answers
-`resumed`. Skip it and the resumed session is answered `standing` and stops for the person — the
-budget is safe either way, but the run is not unattended any more.
+`resumed` — **and it does so even while the cutting process is still running** (joshuafolkken/kit#1935),
+so a `backlogrun` cut from an interactive session that never ends, or a lane child woken by a
+background task's notification, is still handed to exactly one successor rather than stalling every
+resume with `busy`. Skip the `--cut` and the resumed session is answered `standing` and stops for the
+person — the budget is safe either way, but the run is not unattended any more.
 
-**So `--cut` is the session's last write to the record, and "immediately before" is literal.** Any
-later `--merged` or `--filed` spends the hand-off — the run said it was carrying on, and the command
-takes it at its word — so a lane's merge counted after the cut costs the next session its unattended
-resumption. Count everything the session has, then cut.
+**So `--cut` is the session's last write to the record, and "immediately before" is literal.** Count
+everything the session has, then cut. A `--merged` or `--filed` issued after the `--cut` is now
+**refused** rather than obeyed (joshuafolkken/kit#1935): the record is handed off and awaiting its
+successor, so the cutting session can no longer advance it. The hand-off is protected instead of being
+silently spent, which is what used to cost the next session its unattended resumption.
 
 **`backlog:budget` is then fed from the record, never from a count kept in the conversation:**
 `--started` takes the record's `started_at` and `--merged` its `merged`. That one substitution is what

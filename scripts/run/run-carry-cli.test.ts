@@ -230,6 +230,39 @@ describe('counting into a carried run', () => {
 	})
 })
 
+// joshuafolkken/kit#1935: only the record's live owner advances the budget. A count declares its owner
+// with `--owner "$PPID"`; a session handed off at a cut, or whose record a successor took over, is
+// refused so the single writer joshuafolkken/kit#1722 established survives the cut.
+describe('counting guarded by ownership', () => {
+	it.skipIf(!has_start_probe)('lets the recorded live owner advance the budget', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
+		out.length = 0
+
+		expect(await run_carry_cli.run(['--merged', '1', '--owner', String(process.pid)])).toBe(0)
+		expect(out).toStrictEqual([run_carry_cli.COUNTED_VERDICT])
+	})
+
+	it.skipIf(!has_start_probe)(
+		'refuses a count from a session whose ownership was taken',
+		async () => {
+			await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
+			out.length = 0
+
+			expect(await run_carry_cli.run(['--merged', '1', '--owner', String(DEAD_PID)])).toBe(1)
+			expect(out).toStrictEqual([run_carry_cli.BUSY_VERDICT])
+		},
+	)
+
+	it('refuses a count once the record was handed off at a cut', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		await run_carry_cli.run(['--cut'])
+		out.length = 0
+
+		expect(await run_carry_cli.run(['--merged', '1'])).toBe(1)
+		expect(out).toStrictEqual([run_carry_cli.BUSY_VERDICT])
+	})
+})
+
 describe('reading the record back after a cut', () => {
 	it('prints the whole record as one JSON line', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION])

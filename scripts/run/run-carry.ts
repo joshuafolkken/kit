@@ -325,21 +325,41 @@ function is_handed_off_to(carry: RunCarry, invocation: string): boolean {
 	return carry.is_handed_off === true && carry.invocation === invocation
 }
 
-// **The order is the rule, and liveness comes first.** A hand-off read ahead of it would let a second
-// parent naming the same invocation take over a record whose owner is still running — the string
-// comparison joshuafolkken/kit#1722 removes, surviving on one path, since a `--cut` is issued while
-// the cutting process is still alive. A record's *own* owner is not foreign, so the session that
-// declared the cut still resumes when the cut kept its process. Then: a declared hand-off is carried,
-// a different invocation is named as such, and what is left — the same command retyped over a record
-// no cut handed off — is `standing`, which is the one answer that used to read `resumed`.
+// **The order is the rule, and a declared hand-off comes first** (joshuafolkken/kit#1935). Liveness
+// used to be checked ahead of it, on the assumption that the cutting process dies right after `--cut`,
+// so a live owner over a handed-off record could only be a second parent racing in. That assumption
+// fails twice: a `backlogrun` cut from an interactive session never ends its process, and a lane child
+// cut before the gate can be woken again by a background task's notification — and in both the live
+// owner *is* the session that cut, so liveness-first answered `busy` forever and no successor could
+// ever take over. Reading the hand-off first hands the record to exactly one successor regardless of
+// whether the cutting process is still alive, and it is safe because a hand-off requires the explicit
+// `--cut` flag a crash never reaches, so the cross-run inheritance joshuafolkken/kit#1722 removes still
+// cannot arise: a retyped command over a crashed record has no hand-off to match. Uniqueness is
+// `adopt_carry`'s — it spends `is_handed_off` and rewrites the owner, so the *second* would-be
+// successor reads a record no longer handed off, owned by a live foreign process, and is answered
+// `busy`. Then: a live foreign owner over a record no cut handed off is refused, a different invocation
+// is named as such, and what is left — the same command retyped over a record no cut handed off — is
+// `standing`, which is the one answer that used to read `resumed`.
 function classify_claim(carry: RunCarry, request: CarryClaimRequest): CarryClaim {
-	if (is_foreign_live_owner(carry, request.owner)) return 'busy'
-
 	if (is_handed_off_to(carry, request.invocation)) return 'resume'
+
+	if (is_foreign_live_owner(carry, request.owner)) return 'busy'
 
 	if (carry.invocation !== request.invocation) return 'mismatch'
 
 	return request.is_adoption ? 'resume' : 'standing'
+}
+
+// **A budget count is refused unless this session is the record's live owner**
+// (joshuafolkken/kit#1935). Two records reach here that are not this session's to advance: one the
+// cutting session handed off but no successor has adopted yet — `is_handed_off` still set, so a stray
+// count from the cutting session would spend the hand-off back to `false` and strand the successor —
+// and one a successor has already adopted, now owned by a live foreign process, whose budget is that
+// successor's. Both keep joshuafolkken/kit#1722's single writer: only the owner advances the counters.
+// The hand-off is read first because a cut does not change the owner, so the cutting session is still
+// its *own* owner between the cut and the adoption, and the foreign check would let it through.
+function is_count_refused(carry: RunCarry, owner: CarryOwner): boolean {
+	return carry.is_handed_off === true || is_foreign_live_owner(carry, owner)
 }
 
 function end_carry(target: string): void {
@@ -404,6 +424,17 @@ function standing_message(carry: RunCarry): string {
 	return `A run record is standing here that no cut handed off — ${describe_carry(carry)}. Nothing was established. Carry that budget with \`${RESUME_COMMAND} "${carry.invocation}" ${OWNER_ARGUMENT}\`, or discard it with \`${END_COMMAND}\` and begin again.`
 }
 
+// The count refusal reads differently by cause: a record awaiting its successor, or one a successor
+// already holds. Both say nothing was counted, so a loop that believed it was advancing a budget stops
+// rather than keeping its own tally over a record it does not own (joshuafolkken/kit#1935).
+function count_refused_message(carry: RunCarry): string {
+	if (carry.is_handed_off === true) {
+		return `This budget was handed off at a cut and is waiting for its successor — ${describe_carry(carry)}. Nothing was counted; the cutting session must not advance a handed-off budget.`
+	}
+
+	return `A live run owns this budget — ${describe_carry(carry)}, owner pid ${String(carry.owner_pid)} still running. Nothing was counted; only its owner advances the budget.`
+}
+
 // The exclusive create lost: another process established the record between this one's read and its
 // write. That is `busy` by definition, and it is said without re-reading a record this caller does
 // not own.
@@ -438,11 +469,13 @@ const run_carry = {
 	carry_path,
 	classify,
 	classify_claim,
+	count_refused_message,
 	describe_carry,
 	end_carry,
 	expired_message,
 	mismatch_message,
 	fresh_carry,
+	is_count_refused,
 	is_expired,
 	is_foreign_live_owner,
 	is_owner_live,

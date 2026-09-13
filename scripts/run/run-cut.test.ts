@@ -24,6 +24,8 @@ const INVOCATION = 'fullrun #1839'
 const START = new Date('2026-09-12T00:00:00.000Z')
 const WITHIN_BOUND = new Date('2026-09-12T07:59:00.000Z')
 const PAST_BOUND = new Date('2026-09-12T08:00:01.000Z')
+// The `classify_resume` verdict a successor's adoption leaves for a process woken after its own cut.
+const HANDED_OFF = 'handed-off'
 
 function target(): string {
 	return run_cut.cut_path(REPOSITORY)
@@ -142,10 +144,19 @@ describe('a fresh process deciding whether to resume', () => {
 		expect(run_cut.classify_resume(begun(), resume_request({ issue: OTHER_ISSUE }))).toBe('stale')
 	})
 
-	it('refuses a record no cut handed off', () => {
-		const crashed = { ...begun(), is_handed_off: false }
+	// joshuafolkken/kit#1935: a record a successor already adopted — `is_handed_off` spent to `false` —
+	// answers `handed-off`, so a process woken after its own cut is told to stop rather than sent to
+	// investigate a tree that is not wrong.
+	it('answers handed-off for a record a successor already adopted', () => {
+		const adopted = { ...begun(), is_handed_off: false }
 
-		expect(run_cut.classify_resume(crashed, resume_request())).toBe('stale')
+		expect(run_cut.classify_resume(adopted, resume_request())).toBe(HANDED_OFF)
+	})
+
+	it('refuses a record whose hand-off state is unknown', () => {
+		const unknown: RunCut = { ...begun(), is_handed_off: undefined }
+
+		expect(run_cut.classify_resume(unknown, resume_request())).toBe('stale')
 	})
 })
 
@@ -154,14 +165,15 @@ describe('the adoption that carries a cut', () => {
 		expect(run_cut.adopt_cut(target(), begun())).toMatchObject({ is_handed_off: false })
 	})
 
-	// The uniqueness guarantee: once the hand-off is spent, a second resume reads `is_handed_off:
-	// false` and is refused, so two processes cannot resume the same cut.
-	it('leaves a spent cut that no second resume can take', () => {
+	// The uniqueness guarantee: once the hand-off is spent, a second resume reads `is_handed_off: false`
+	// and is answered `handed-off` (joshuafolkken/kit#1935) — a process woken after its own cut stops,
+	// so two processes cannot resume the same cut.
+	it('answers a second resume handed-off, so the woken cutter stops', () => {
 		run_cut.adopt_cut(target(), begun())
 		const read = run_cut.read_cut(target(), WITHIN_BOUND)
 		const carried = read.kind === 'carried' ? read.cut : begun()
 
-		expect(run_cut.classify_resume(carried, resume_request())).toBe('stale')
+		expect(run_cut.classify_resume(carried, resume_request())).toBe(HANDED_OFF)
 	})
 })
 
