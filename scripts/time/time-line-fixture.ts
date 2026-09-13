@@ -76,6 +76,14 @@ function tool_result_body(minute: number, id: string, content: string): string {
 	return result_line(minute, result_block(id, content))
 }
 
+// The errored result the harness writes back for a call a guard denied: `is_error` true carrying the
+// refusal's own body, which is what `refusal_guard` is read from (joshuafolkken/kit#1913). A refusal
+// is both — `tool_result` carries the reason and `tool_result_body` carries no `is_error` — so the
+// suite about which guard spoke needs a builder that writes both.
+function error_body(minute: number, id: string, content: string): string {
+	return result_line(minute, result_block(id, content, true))
+}
+
 // The notice the harness writes when a task it took into the background ends
 // (joshuafolkken/kit#1696). Only the two tags the reading needs are written: the harness adds an
 // output-file line and a summary, and a fixture that restated them would fix its wording in a test
@@ -134,6 +142,7 @@ const time_line_fixture = {
 	attached_notification,
 	queued_notification,
 	task_notification,
+	error_body,
 	tool_result,
 	tool_result_body,
 	tool_use,

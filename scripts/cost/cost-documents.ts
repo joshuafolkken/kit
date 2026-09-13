@@ -1,9 +1,14 @@
 import path from 'node:path'
 import { json_value } from '#scripts/json-value'
+import {
+	cost_document_reads,
+	type DocumentRead,
+	type DocumentReadPoint,
+	type ReadContext,
+} from './cost-document-reads'
 import { cost_format } from './cost-format'
-import { cost_pricing, type ModelPrice } from './cost-pricing'
-import { cost_tokens } from './cost-tokens'
-import type { UsageRecord, UsageTotals } from './cost-usage'
+import { cost_pricing } from './cost-pricing'
+import { cost_usage, type UsageRecord } from './cost-usage'
 
 // Attributing the carried cost of the run's entry-read instruction documents, one row per document
 // (joshuafolkken/kit#1871).
@@ -52,6 +57,13 @@ interface DocumentRow {
 	// not be measured. The row is reported rather than dropped: a known read of unknown size is not a
 	// document that cost nothing (joshuafolkken/kit#1871).
 	is_measured: boolean
+	// How many times the scope read this document, the dollars every read past the first added, and each
+	// read as a point on the timeline (joshuafolkken/kit#1913). The four fields above are the earliest
+	// read's carry, unchanged; these are what re-reading a large document at a late, large context costs
+	// on top of it — the waste the single-carry model could not see.
+	read_count: number
+	duplicate_cost_usd: number
+	reads: Array<DocumentReadPoint>
 }
 
 interface DocumentBreakdown {
@@ -70,27 +82,9 @@ interface DocumentSource {
 	scope_ids?: ReadonlySet<string>
 }
 
-interface DocumentRead {
-	tool_use_id: string
-	short: string
-	// The request that issued the read, identified as `cost-usage.ts` identifies a billed request — so
-	// the read's position is found in the record set the rest of the report bills, not in a second
-	// count of the raw lines that could drift from it (joshuafolkken/kit#1871).
-	request_id: string | undefined
-}
-
 interface Scan {
 	reads: Array<DocumentRead>
 	results: Map<string, string>
-}
-
-// What every row of one session reads: the results to size, the request order a read is placed in, the
-// scope positions the carry is counted over, and the price.
-interface SessionContext {
-	results: Map<string, string>
-	order: ReadonlyMap<string, number>
-	scope_positions: Array<number>
-	price: ModelPrice | undefined
 }
 
 function record_of(value: unknown): Record<string, unknown> | undefined {
@@ -245,16 +239,6 @@ function scope_positions(
 	})
 }
 
-// The scope requests that came after the read — its carry. A read whose request is outside the scope
-// (the document was read during other work) carries nothing, which is how an issue scope charges only
-// its own requests rather than the whole session's.
-function carried_after(read: DocumentRead, context: SessionContext): number {
-	const at = read.request_id === undefined ? undefined : context.order.get(read.request_id)
-	if (at === undefined) return 0
-
-	return context.scope_positions.filter((position) => position > at).length
-}
-
 function dominant_model(records: ReadonlyArray<UsageRecord>): string {
 	const counts = new Map<string, number>()
 	for (const record of records) counts.set(record.model, (counts.get(record.model) ?? 0) + 1)
@@ -266,85 +250,45 @@ function dominant_model(records: ReadonlyArray<UsageRecord>): string {
 	return best
 }
 
-function carry_totals(cache_read_tokens: number): UsageTotals {
-	return {
-		input_tokens: 0,
-		cache_write_5m_tokens: 0,
-		cache_write_1h_tokens: 0,
-		cache_read_tokens,
-		output_tokens: 0,
-		thinking_tokens: 0,
-	}
+// The conversation size at each request — cache reads, cache writes and input — so a read carries how
+// big the context was when it happened (joshuafolkken/kit#1913).
+function context_tokens_of(records: ReadonlyArray<UsageRecord>): Map<string, number> {
+	return new Map(
+		records.map((record) => [record.request_id, cost_usage.billed_input(record.totals)]),
+	)
 }
 
-// The ongoing carry is a cache read every request, so it is priced at the read rate; an unpriced
-// model contributes no dollars, the same floor `cost_usd` takes elsewhere for an unknown model.
-function carry_cost(tokens: number, carried: number, price: ModelPrice | undefined): number {
-	if (price === undefined) return 0
-
-	return cost_pricing.estimate_cost(carry_totals(tokens * carried), price)
-}
-
-function unmeasured_row(short: string, carried: number): DocumentRow {
-	return { path: short, tokens: 0, carried_requests: carried, cost_usd: 0, is_measured: false }
-}
-
-function to_row(read: DocumentRead, context: SessionContext): DocumentRow {
-	const content = context.results.get(read.tool_use_id)
-	const carried = carried_after(read, context)
-	if (content === undefined || content === '') return unmeasured_row(read.short, carried)
-
-	const tokens = cost_tokens.estimate(content)
-
-	return {
-		path: read.short,
-		tokens,
-		carried_requests: carried,
-		cost_usd: carry_cost(tokens, carried, context.price),
-		is_measured: true,
-	}
-}
-
-// A read's request position in this session's order — a read whose request is not in the record set
-// has no position and sorts last, since it carries nothing anyway.
-function read_position(read: DocumentRead, order: ReadonlyMap<string, number>): number {
-	const at = read.request_id === undefined ? undefined : order.get(read.request_id)
-
-	return at ?? Infinity
-}
-
-// Within one session a document read more than once is one continuous presence, not two carries: once
-// it is in context every later request re-reads it, and reading it again — or a fork copying the first
-// read's line into a resumed session that reads it afresh — adds none. Keep the earliest read per
-// document; the cross-session merge then sums the disjoint per-session carries (joshuafolkken/kit#1871).
-function earliest_reads(
-	reads: ReadonlyArray<DocumentRead>,
-	order: ReadonlyMap<string, number>,
-): Array<DocumentRead> {
-	const by_path = new Map<string, DocumentRead>()
+// Every read of one document, gathered so `build_reads` can count the re-reads and price the
+// duplicates — where the earliest-read carry keeps only the first.
+function group_by_path(reads: ReadonlyArray<DocumentRead>): Map<string, Array<DocumentRead>> {
+	const groups = new Map<string, Array<DocumentRead>>()
 
 	for (const read of reads) {
-		const kept = by_path.get(read.short)
+		const kept = groups.get(read.short) ?? []
 
-		if (kept === undefined || read_position(read, order) < read_position(kept, order)) {
-			by_path.set(read.short, read)
-		}
+		kept.push(read)
+		groups.set(read.short, kept)
 	}
 
-	return [...by_path.values()]
+	return groups
 }
 
 function session_rows(source: DocumentSource): Array<DocumentRow> {
 	const scanned = scan_transcript(source.raw)
 	const order = request_order(source.records)
-	const context: SessionContext = {
-		results: scanned.results,
+	const context: ReadContext = {
 		order,
 		scope_positions: scope_positions(source.records, order, source.scope_ids),
+		results: scanned.results,
+		context_tokens: context_tokens_of(source.records),
 		price: cost_pricing.resolve_price(dominant_model(source.records)),
+		scope_ids: source.scope_ids,
 	}
 
-	return earliest_reads(scanned.reads, order).map((read) => to_row(read, context))
+	return [...group_by_path(scanned.reads)].map((entry) => ({
+		path: entry[0],
+		...cost_document_reads.build_reads(entry[1], context),
+	}))
 }
 
 // The same document read in two of an issue's sessions is one row: its carry counts add and its cost
@@ -359,6 +303,9 @@ function combine(existing: DocumentRow | undefined, row: DocumentRow): DocumentR
 		carried_requests: existing.carried_requests + row.carried_requests,
 		cost_usd: existing.cost_usd + row.cost_usd,
 		is_measured: existing.is_measured || row.is_measured,
+		read_count: existing.read_count + row.read_count,
+		duplicate_cost_usd: existing.duplicate_cost_usd + row.duplicate_cost_usd,
+		reads: [...existing.reads, ...row.reads],
 	}
 }
 
@@ -384,11 +331,24 @@ const PATH_WIDTH = 50
 const TOKEN_WIDTH = 12
 const COUNT_WIDTH = 6
 
+const FIRST_READ = 1
+
+// A document read more than once carries the count and what the duplicates cost, so a whole-document
+// re-read at a late context reads as the waste it is (joshuafolkken/kit#1913). Silent for a document
+// read once, which is nearly all of them — a note that appears every time is one nobody reads.
+function reads_note(row: DocumentRow): string {
+	if (row.read_count <= FIRST_READ) return ''
+
+	const cost = row.is_measured ? ` (dup ${cost_format.format_usd(row.duplicate_cost_usd)})` : ''
+
+	return `  read ${String(row.read_count)}x${cost}`
+}
+
 function format_row(row: DocumentRow): string {
 	const tokens = row.is_measured ? cost_format.format_tokens(row.tokens) : 'not measured'
 	const cost = row.is_measured ? cost_format.format_usd(row.cost_usd) : ''
 
-	return `  ${row.path.padEnd(PATH_WIDTH)}${tokens.padStart(TOKEN_WIDTH)}  ${String(row.carried_requests).padStart(COUNT_WIDTH)}  ${cost}`
+	return `  ${row.path.padEnd(PATH_WIDTH)}${tokens.padStart(TOKEN_WIDTH)}  ${String(row.carried_requests).padStart(COUNT_WIDTH)}  ${cost}${reads_note(row)}`
 }
 
 function format_documents(breakdown: DocumentBreakdown): Array<string> {
@@ -409,3 +369,5 @@ const cost_documents = {
 
 export type { DocumentBreakdown, DocumentRow, DocumentSource }
 export { cost_documents }
+
+export { type DocumentReadPoint } from './cost-document-reads'

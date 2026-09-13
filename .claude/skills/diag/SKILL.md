@@ -434,8 +434,39 @@ Read from the JSON, in this order:
   count on purpose: a `josh` subcommand is a `Bash` call under another name, so its round trips are
   already the `Bash` row's. These are two of the four tables `--top`
   caps, so read the `notes` line beside them before saying a command is absent from the run
+- **which guard refused, how often, and what re-issuing cost** — `guard_refusals`
+  ([#1913](https://github.com/joshuafolkken/kit/issues/1913)). The `Failure re-runs:` block counts
+  every errored call and cannot say which guard spoke; this one ranks the guards and marks the false
+  positives the run re-issued the same call past. Each `by_guard[]` row is one guard: `refusal_count`,
+  the wall clock and `cost_usd` that re-issuing cost, and `same_args_reissue_count` — a refusal the run
+  answered with the identical call, the false-positive hint. **Rank a guard by `cost_usd` and read
+  `same_args_reissue_count` as the false-positive signal**: a pre-gate-cut refusing a gate the run then
+  re-issued unchanged is the cut that stopped a session, and it shows here as one same-args re-issue.
+  **The block is absent for a run that walked through no refusals** — the ordinary case — and
+  `is_cost_measured: false` on a batch scope prices none, so read the counts, say the cost was not
+  measured, and never rank off a zero
+- **the entry-read documents, now with re-reads** — `rows[].read_count` / `reads[]` /
+  `duplicate_cost_usd` ([#1913](https://github.com/joshuafolkken/kit/issues/1913)). The carry columns
+  are unchanged; what is added is how many times the scope read each document, the context size at each
+  read (`reads[].context_tokens`), and what the reads past the first cost (`duplicate_cost_usd`). **A
+  whole-document re-read at a late, large context is the waste to name** — a 32 KB `followup.md` read
+  twice near a run's tail is `read_count: 2` with a non-zero `duplicate_cost_usd` — so rank a document
+  by `duplicate_cost_usd`, and read `reads[].context_tokens` to say whether the re-read fell where the
+  context was largest. Sort the non-first reads by `context_tokens` to find the dearest
+  re-materialization; the rendered row appends `read Nx (dup $…)` when a document was read more than once
 
 ## 2. Say whether the last speedup actually worked
+
+**Before judging, confirm what the run actually shipped — never from the commit title**
+([#1913](https://github.com/joshuafolkken/kit/issues/1913)). Read the merged diff's size
+(`rework.size` — `changed_file_count` / `additions` / `deletions`, which step 1 already read) and the
+Issue's completion comment, and say whether the run **shipped a speedup** or was **analysis only**.
+`diag #1876` read "Cut the duplicate verification runs…" off the commit title and reported #1876 as a
+shipped speedup whose effect "cannot yet be told"; #1876 was an analysis-only Issue — its conclusion
+was "the mechanism has no hole", its change two files and six lines — so there was no speedup to verify
+and the phase comparison below was the wrong question asked of it. **A run whose merged diff is a
+handful of lines, or whose completion comment reports analysis rather than a change, has no speedup to
+verify**: say so and skip the phase comparison rather than inventing a verdict from the title.
 
 Re-measure the earlier run with `pnpm josh time --issue <M> --json` and compare it against step 1 on
 the phase the speedup issue named. State the verdict in one line — worked, did not, or cannot tell —
@@ -512,6 +543,24 @@ in the report itself — say so and do not rank off the table beneath it.
 **A proposal to stop delegating a step is ranked on `delegated_cost`, not on wall clock** ([#1882](https://github.com/joshuafolkken/kit/issues/1882)). The launch's fixed cost is `per_unit_cost_usd` in dollars, and a step whose own work is cheaper than that saves money by staying in the main line — so the row states its saving in dollars with `—` in the minutes column, since folding one subagent back moves the wall clock by an amount no run can resolve. Where `delegated_cost.is_measured` is `false` the block was not read for this scope, so say so rather than ranking off a zero.
 
 **Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.** Dollars per request multiplied by the requests a change removes is a saving; a percentage of the total is not, because the total covers work the change leaves exactly where it is — the same error as ranking a phase off a run's `elapsed_ms`. A change that removes carried tokens rather than requests is ranked on the resident and history shares instead, which is the arithmetic the round-trip price above already does for minutes. **Where `missing` was non-zero, a row that has a dollar saving still prints one and is never blanked.** Withholding it there would be the wrong reading of the same rule: on an `--issue` scope those counters are the whole corpus's, so a single malformed line in any unrelated session would empty the dollar column of every row and reproduce exactly the missing cost row this reading was added to end. **Label such a figure approximate rather than as a bound.** The run total `cost_usd` is a floor because it can only fall short of the true figure, but the dollars per request derived from it is an average over the priced subset alone and can sit either side of the true one — so a `≥` on a per-row saving claims more than the arithmetic gives. `not measured` is kept for the case that earns it, a scope with no priced record at all, and **a row that saves no money keeps the `—` the rule above gives it** — none of this reaches a cell that was empty by design.
+
+**Rank a run's `cost_usd` against its change size, and flag an outlier in one line**
+([#1913](https://github.com/joshuafolkken/kit/issues/1913)). A run's dollars mean nothing without the
+change they bought: $15.68 on a six-line merged diff is the signal #1876 gave and `diag` did not
+surface. Put the run's `cost_usd` beside the merged diff's line count (`rework.size`), compare it
+against the distribution of the last N runs (`pnpm josh time --last <N> --json`), and where this run
+sits outside that distribution say so in one line — **the figures only, never a cause named from
+them**. "This run cost $X over Y changed lines, against a median of $Z over the last N" is the row; "the
+review was wasteful" is a cause the numbers do not carry and is not one.
+
+**Read the observation ledger for the run's window, and add the un-filed ones as candidates**
+([#1913](https://github.com/joshuafolkken/kit/issues/1913)). `docs/observations.md` records
+observations a run made but did not file, one line each; the ones recorded in the measured run's time
+window are ranking candidates the backlog enumeration below never returns, because an un-filed
+observation has no Issue to list. Read the ledger, carry the lines whose window overlaps the run into
+the table as un-filed rows — step 4 files them through the scout — and say which you carried, the same
+audit line the enumeration gets. #1876's own speedup observation sat in this ledger as a first sighting
+and never reached a `diag` table, which is the miss this reading ends.
 
 **Do not drop an item because it is already filed.** Avoiding duplicates means not filing a second
 issue for the same work; it does not mean leaving the work out of the ranking. **A filed but
