@@ -69,10 +69,10 @@ interface UsageRecord {
 	request_id: string
 	model: string
 	branch: string
-	// When the request was sent, as epoch milliseconds — `undefined` where the line carried no
-	// readable timestamp (joshuafolkken/kit#1606). The transcript has always carried it and the
-	// schema has always parsed it; only the dedupe fallback key used it, so a priced request could
-	// not be placed anywhere in time and cost had no axis to be attributed along.
+	// The request's instant, as epoch milliseconds — `undefined` where no line of the request carried
+	// a readable timestamp (joshuafolkken/kit#1606). On a single line it is that line's timestamp;
+	// after `dedupe` folds the request's several lines into one record it is the *latest* of them,
+	// which is the response-completion instant a cost window is keyed to (joshuafolkken/kit#1899).
 	//
 	// **`undefined` rather than a sentinel, for the reason `time_instant` exists**: a request whose
 	// instant cannot be read belongs in the unattributed bucket, and a `0` would place it at the
@@ -185,21 +185,37 @@ function parse_line(line: string): LineOutcome {
 	return parsed.success ? classify(parsed.data) : { kind: 'malformed' }
 }
 
+// The later of two request instants, treating `undefined` as no reading rather than as an early one:
+// a line that carried no timestamp must not pull a request's instant back to nothing when a sibling
+// line of the same request does carry one (joshuafolkken/kit#1899).
+function later_instant(left: number | undefined, right: number | undefined): number | undefined {
+	if (left === undefined) return right
+	if (right === undefined) return left
+
+	return Math.max(left, right)
+}
+
 // One record per request, in first-seen order. Order matters downstream: issue attribution reads
 // the branch sequence, so a Map (which preserves insertion order) is the right container and a Set
 // of ids plus a filter would be the same thing written twice.
+//
+// **`at_ms` is folded to the request's latest line, not its first (joshuafolkken/kit#1899).** One
+// response is written thinking → text → `tool_use` (see the file header), all sharing one request id,
+// and a round trip's cost window opens at the `tool_use` line — the last of them. Keeping the first
+// line's instant put every tool-issuing request *before* its own window, where it fell to the
+// `no_tool_call` bucket; the latest instant is the response-completion time, which is where the window
+// begins. Every other field stays the first-seen record's, so the branch sequence is untouched.
 function dedupe(records: ReadonlyArray<UsageRecord>): Array<UsageRecord> {
-	const seen = new Set<string>()
-	const unique: Array<UsageRecord> = []
+	const by_id = new Map<string, UsageRecord>()
 
 	for (const record of records) {
-		if (seen.has(record.request_id)) continue
+		const seen = by_id.get(record.request_id)
+		const at_ms = later_instant(seen?.at_ms, record.at_ms)
 
-		seen.add(record.request_id)
-		unique.push(record)
+		by_id.set(record.request_id, { ...(seen ?? record), at_ms })
 	}
 
-	return unique
+	return [...by_id.values()]
 }
 
 function add_totals(left: UsageTotals, right: UsageTotals): UsageTotals {

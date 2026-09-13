@@ -1,3 +1,4 @@
+import { cost_usage } from '#scripts/cost/cost-usage'
 import { describe, expect, it } from 'vitest'
 import { time_contributor_costs, type ContributorCostFacts } from './time-contributor-costs'
 import { time_parent_turns } from './time-parent-turns'
@@ -118,5 +119,74 @@ describe('time_contributor_costs.cost_lines', () => {
 		const lines = time_contributor_costs.cost_lines(build(EDIT_RUN, undefined)).join('\n')
 
 		expect(lines).toContain(time_region_costs.NOT_MEASURED_NOTE)
+	})
+})
+
+// joshuafolkken/kit#1899: one response is written thinking → tool_use, sharing a request id, and the
+// round trip's cost window opens at the tool_use line — the later of the two. Passed through both the
+// cost parser and the span parser, the request has to land in its round trip's contributor rather
+// than the no-tool-call bucket; folding its instant to the latest line is what puts it there.
+const THINK_AT = '2026-09-09T01:00:00.000Z'
+const TOOL_AT = '2026-09-09T01:00:30.000Z'
+const RESULT_AT = '2026-09-09T01:01:00.000Z'
+const CALL_ID = 'call-x'
+const INTEGRATION_COST = 7
+
+function assistant_line(timestamp: string, block: Record<string, unknown>): string {
+	return JSON.stringify({
+		type: 'assistant',
+		requestId: 'req-x',
+		timestamp,
+		gitBranch: 'main',
+		message: {
+			id: 'msg-x',
+			model: 'claude-opus-5',
+			content: [block],
+			usage: { input_tokens: 1, output_tokens: 1 },
+		},
+	})
+}
+
+function result_line(): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp: RESULT_AT,
+		message: { content: [{ type: 'tool_result', tool_use_id: CALL_ID, content: 'ok' }] },
+	})
+}
+
+const THINKING_FIRST_TRANSCRIPT = [
+	assistant_line(THINK_AT, { type: 'thinking', thinking: 'weighing it' }),
+	assistant_line(TOOL_AT, { type: 'tool_use', name: EDIT_LABEL, id: CALL_ID, input: {} }),
+	result_line(),
+].join('\n')
+
+function priced_from_transcript(): ReadonlyArray<PricedRequest> {
+	const records = THINKING_FIRST_TRANSCRIPT.split('\n').flatMap((raw) => {
+		const outcome = cost_usage.parse_line(raw)
+
+		return outcome.kind === 'record' ? [outcome.record] : []
+	})
+
+	return cost_usage
+		.dedupe(records)
+		.map((record) => ({ at_ms: record.at_ms, cost_usd: INTEGRATION_COST, is_priced: true }))
+}
+
+function integration_facts(): ContributorCostFacts {
+	return time_contributor_costs.build({
+		spans: time_spans.parse_timeline(THINKING_FIRST_TRANSCRIPT).spans,
+		requests: priced_from_transcript(),
+		round_trip_count: 1,
+	})
+}
+
+describe('time_contributor_costs.build — a thinking-first response through both parsers', () => {
+	it('charges the tool-issuing request to its round trip, not the no-tool-call bucket', () => {
+		expect(usd_of(integration_facts(), time_parent_turns.IMPLEMENTATION)).toBe(INTEGRATION_COST)
+	})
+
+	it('leaves the no-tool-call bucket empty', () => {
+		expect(integration_facts().no_tool_call.request_count).toBe(0)
 	})
 })
