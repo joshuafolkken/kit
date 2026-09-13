@@ -3,8 +3,10 @@
 **This is `SKILL.md` → §3's procedure, and it is read when a rule is being placed, moved or
 retired — not at the entry** (joshuafolkken/kit#1797). §3 keeps the two questions that decide
 *whether* a rule is resident; what follows decides *how much of it* is, and carries the enumeration
-of every resident rule that has an on-demand counterpart, the retirement route and its three tests,
-and the readings of `pnpm josh rule:value` that have refused every candidate so far.
+of every resident rule that has an on-demand counterpart and the retirement route and its three tests.
+The `pnpm josh rule:value` readings it used to carry no longer gate reduction — that gating was
+retracted on 2026-09-13 (joshuafolkken/kit#1931 → `## Decisions`) and they are retained below only as
+history.
 
 **Nothing in a run reaches it.** The moment it binds is a turn spent editing `CLAUDE.md` or one of
 these documents, which is why it costs a workflow entry nothing to leave it here — and why the two
@@ -163,6 +165,17 @@ opens none of them is a turn on which the label is never reached, so residency w
 **The criterion is not advisory.** `scripts/workflow-skills.test.ts` caps each document at
 `RESIDENT_CEILING_BYTES` and requires headroom under it, so a procedure restated resident costs
 budget that the next genuinely-resident rule then has to take back out of existing prose.
+
+**The freeze on reducing resident text was lifted on 2026-09-13** (joshuafolkken/kit#1931 →
+`## Decisions`, carried out in joshuafolkken/kit#1924). Until then `pnpm josh rule:value` was read as a
+gate on reduction: three successive readings each retired nothing, and `CLAUDE.md` stayed at ~56 KB
+while its duplicated procedure bodies — the completion gate, the pre-commit self-review, the Step 0
+report format, the upstream-interrupt procedure — sat resident beside pointers that already held them.
+**That gating is retracted.** `rule:value` remains a *measurement* — a low unaided-keep ratio is still
+evidence a resident copy earns its place — but a reading that retires nothing no longer freezes the
+document, and a resident copy whose body is duplicated at a declared pointer is trimmed to its trigger
+under **Trimming is moving** above, without waiting for a reading to license it. **The readings below
+are retained as history of how the gate was applied, not as a live constraint.**
 
 **What leaves when the budget binds is decided by measurement, not by which sentence a marker
 happened to pin** (joshuafolkken/kit#1525). The old order was the reverse: a rule edited to keep a

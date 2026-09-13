@@ -21,7 +21,11 @@ const JOSH_COMMANDS_DOC = 'docs/josh-commands.md'
 // (`.claude/skills/workflow-commands/SKILL.md` → §3) leaves the row resident and moves the body to
 // the command reference the section lead already links to. Nothing was deleted; the assertions moved
 // with the text.
-const AI_DOC_MARKERS: ReadonlyArray<string> = ['| `JOSH_REPO_PATHS`']
+//
+// joshuafolkken/kit#1924 slimmed the Environment Variables table to prose, so the resident mention is
+// now the variable name in the `.env` sentence rather than a table row — the rule still names it, and
+// the owner-restriction body stays at the command reference below.
+const AI_DOC_MARKERS: ReadonlyArray<string> = ['`JOSH_REPO_PATHS`']
 
 const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
 	'#### The discovered repository map',

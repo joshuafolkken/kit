@@ -10,7 +10,11 @@ import { describe, expect, it } from 'vitest'
 const REVIEW_PROMPT = 'prompts/review.md'
 const COMMAND = 'pnpm josh review:level'
 const COMMAND_DOC = 'docs/josh-commands.md'
-const INERT_DOCUMENTS: ReadonlyArray<string> = [...AI_DOCS, REVIEW_PROMPT, COMMAND_DOC]
+// joshuafolkken/kit#1924 slimmed `CLAUDE.md` to the resident review-level trigger — it names the
+// command and caps the rounds at two, while the inert enumeration, the "never by judgement" phrasing
+// and "documentation is not inert" moved to `prompts/review.md` and `docs/josh-commands.md`, which
+// still carry and pin them. So the detailed set is asserted at those two, not resident.
+const INERT_DOCUMENTS: ReadonlyArray<string> = [REVIEW_PROMPT, COMMAND_DOC]
 
 // Every file that tells a run which level to review at. The first version of this suite read only
 // `CLAUDE.md` and `prompts/review.md`, so the rule could be — and was — documented in two places
@@ -38,7 +42,10 @@ describe('the review level is routed to the command', () => {
 		expect(read_repo_file(document_path)).toContain(COMMAND)
 	})
 
-	it.each([...AI_DOCS, REVIEW_PROMPT])('%s says the level is not a judgement', (document_path) => {
+	// The "never by judgement" phrasing is `prompts/review.md`'s; `CLAUDE.md` carries the mechanical
+	// rule as its resident trigger (the level comes from the command) rather than this sentence
+	// (joshuafolkken/kit#1924).
+	it.each([REVIEW_PROMPT])('%s says the level is not a judgement', (document_path) => {
 		expect(read_unwrapped(document_path)).toContain('never by judgement')
 	})
 })
@@ -108,12 +115,11 @@ describe('the documented inert set is the one the command uses', () => {
 })
 
 describe('documentation is stated as not inert', () => {
-	it.each([...AI_DOCS, REVIEW_PROMPT])(
-		'%s says documentation stays at the default level',
-		(document_path) => {
-			expect(read_unwrapped(document_path)).toContain('documentation')
-		},
-	)
+	// `CLAUDE.md` no longer restates "documentation is not inert" — that consequence lives at
+	// `prompts/review.md` with its measurement (joshuafolkken/kit#1924).
+	it.each([REVIEW_PROMPT])('%s says documentation stays at the default level', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('documentation')
+	})
 
 	// The evidence, not just the claim: a reader who disagrees needs to be able to check it.
 	it('the review prompt cites the measurement the rule rests on', () => {

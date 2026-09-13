@@ -79,11 +79,8 @@ describe.each(AI_DOCS)('%s — UI gate names the shipped skill', (document_path)
 		expect(content).not.toContain('the `/verify` or `/run` skill')
 	})
 
-	it('keeps the gate reachable where no toolkit ships the command', () => {
-		expect(content).toContain('adding a `page.screenshot()` to the relevant `*.e2e.ts`')
-	})
-
-	it('says a report of no capture is never a pass', () => {
-		expect(content).toContain('That report is the answer, never a pass.')
-	})
+	// joshuafolkken/kit#1924 slimmed `CLAUDE.md`'s UI-verification gate to its resident trigger — the
+	// `/verify-ui` capture, and that a passing test is not proof the UI is right. The screenshot
+	// fallback (`page.screenshot()` in an `*.e2e.ts`) and "a no-capture report is never a pass" are the
+	// skill's own body, pinned by the `refuses to pass without a capture` suite above.
 })
