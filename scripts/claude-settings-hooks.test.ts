@@ -90,6 +90,11 @@ const PROVISION_HOOK_COMMAND = 'pnpm josh audit:provision'
 const MINIMUM_PROVISION_TIMEOUT_SECONDS =
 	security_audit_provision_logic.SESSION_DOWNLOAD_TIMEOUT_MS / MS_PER_SECOND +
 	STARTUP_ALLOWANCE_SECONDS
+// The session-language hook (joshuafolkken/kit#1903): resolves JOSH_SESSION_LANG and prints it to
+// stdout, so a SessionStart / UserPromptSubmit hook injects the value into context every turn. It
+// starts no download and reads no large file, so one script start is its whole budget.
+const SESSION_LANG_HOOK_COMMAND = 'pnpm josh session:lang'
+const MINIMUM_SESSION_LANG_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.
@@ -216,6 +221,29 @@ describe_session_hook('.claude/settings.json — session-start audit provisionin
 	event: 'SessionStart',
 	command: PROVISION_HOOK_COMMAND,
 	minimum_timeout_seconds: MINIMUM_PROVISION_TIMEOUT_SECONDS,
+})
+
+describe_session_hook('.claude/settings.json — session-start language resolution', {
+	event: 'SessionStart',
+	command: SESSION_LANG_HOOK_COMMAND,
+	minimum_timeout_seconds: MINIMUM_SESSION_LANG_TIMEOUT_SECONDS,
+})
+
+// `UserPromptSubmit` carries no tool matcher either, so it shares the session hook's three checks and
+// the empty-matcher assertion. The language hook rides both events; this is the per-turn half, wired
+// beside the two work-summary echoes rather than replacing them.
+describe('.claude/settings.json — per-turn language resolution', () => {
+	const wiring: HookWiring = {
+		event: 'UserPromptSubmit',
+		command: SESSION_LANG_HOOK_COMMAND,
+		minimum_timeout_seconds: MINIMUM_SESSION_LANG_TIMEOUT_SECONDS,
+	}
+
+	describe_shared_hook_properties(wiring)
+
+	it('matches every prompt rather than one matcher variant', () => {
+		expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual([''])
+	})
 })
 
 describe_tool_hook('.claude/settings.json — post-edit formatting hook', {

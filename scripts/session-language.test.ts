@@ -18,7 +18,7 @@ const CANONICAL_SECTION = '出力の言語（`JOSH_SESSION_LANG`）'
 const RESOLUTION_MARKERS: ReadonlyArray<string> = [
 	'- **Output language follows `JOSH_SESSION_LANG` (personal, optional).**',
 	'Issue bodies, Issue/PR comments (plan comments and completion comments alike), and Telegram notification bodies',
-	'while artifact prose defaults to **`ja`**',
+	'When it is unset (empty, or no `.env`), both default to `ja`.',
 ]
 
 // Without the exceptions the rule reads as "translate everything", and the title-normalization
@@ -114,7 +114,7 @@ describe('output language — resolution rule in the AI docs', () => {
 
 	it.each(AI_DOCS)('%s documents the new scope in the environment table', (ai_document) => {
 		expect_present(ai_document, [
-			'When unset, dialogue matches the conversation and artifact prose defaults to `ja`.',
+			'When unset, both default to `ja` (a hook injects the value each turn).',
 		])
 	})
 

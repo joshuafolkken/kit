@@ -49,6 +49,7 @@ const ALIASES: Record<string, string> = {
 	te: 'test:e2e',
 	er: 'e2e:retry-check',
 	he: 'health',
+	sl: 'session:lang',
 	c: 'check',
 	pt: 'port',
 	i: 'init',

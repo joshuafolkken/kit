@@ -437,6 +437,18 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 
 **One delivery per run — except for a row whose subject is a recurring act** ([#1570](https://github.com/joshuafolkken/kit/issues/1570)). Once is right where the refusal changes what the run _knows_: read the comments, count the Issues, put the body in a file. It is wrong where the refusal has to stop the same act happening again, because refused once and free afterwards is self-restraint with extra steps — and self-restraint is what failed. A row supplies its own `decide` to opt out, is still put behind the batching stand-aside, and says in its own text that it will fire again. Everything else is recorded by the same stamp the other two guards use, and the refusal text says so. Set `JOSH_RULE_GUARD` to `off`, `0`, `false` or `no` to switch it off; unset is **on**.
 
+### `josh session:lang`
+
+Print, on stdout, the language this session writes in, resolved from `JOSH_SESSION_LANG` ([#1903](https://github.com/joshuafolkken/kit/issues/1903)). Like the other hooks it is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `SessionStart` and `UserPromptSubmit` events so the resolved value is injected into context at session start and on every turn. The handler is added beside the existing hooks in each event's `matcher: ""` entry:
+
+```json
+{ "type": "command", "command": "pnpm josh session:lang", "timeout": 10 }
+```
+
+`JOSH_SESSION_LANG` is a personal, non-committed setting kept in `.env`, which the harness never loads into the process environment — so before this the value was invisible unless the agent read the file itself, and a one-word prompt like `diag` had nothing to infer a language from and drifted to the surrounding English. The `.env` read reuses the one loader (`process.loadEnvFile`, keeping node's precedence: a value already in the process environment wins over the file's), never a second parser. **Unset, empty and no-`.env` all resolve to `ja`** — the state a worktree without a `.env`, a cloud session and a consumer repository land in — and the printed line names the `JOSH_SESSION_LANG=en` opt-in for English. The line itself is a script-fixed string, so it stays English by the same rule that pins the Telegram header labels.
+
+**Wired to both events rather than one.** The drift happens on a session's first turn and is overwritten each turn by the English hook text, so a single `SessionStart` injection is too weak; `UserPromptSubmit` repeats it every turn. It declares no `tsx_arguments`, so it stays eligible for in-process dispatch rather than paying a second tsx start on every prompt.
+
 ### `josh cspell`
 
 Run spell check.
