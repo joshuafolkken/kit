@@ -144,11 +144,15 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 // lane — but its output is going nowhere, so a message naming the path would point at a file that will
 // never grow, and a poll of that file would book a working child as stopped.
 function log_sentence(outcome: Dispatched, issue: string): string {
-	// **The process trace is what a poll now turns on, so the message names the command that reads
-	// it.** `run:liveness` takes `--process` as what the caller *saw*, never as a property of the
-	// child's kind — told to pass `alive`, a parent that never ran `pgrep` would answer `alive` for a
-	// child that crashed an hour ago and poll it for ever.
-	const poll = `run \`pgrep -laf ${outcome.lane.directory}\` and pass what it found to \`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\` — or \`--process none\` where it found nothing`
+	// **The pattern matches the child's own command line, not the lane it runs in**
+	// (joshuafolkken/kit#1948). The child is `claude … ${outcome.invocation}` and its argv carries no
+	// path, so `pgrep -laf <lane directory>` found nothing for a living child and a poll booked it
+	// stopped. The invocation is the last argument, so it sits at the end of the command line; the `$`
+	// anchor is what keeps `fullrun #12` from matching a running `fullrun #123`. `run:liveness` takes
+	// `--process` as what the caller *saw*, never as a property of the child's kind — told to pass
+	// `alive`, a parent that never ran `pgrep` would answer `alive` for a child that crashed an hour ago
+	// and poll it for ever.
+	const poll = `run \`pgrep -laf "${outcome.invocation}$"\` and pass what it found to \`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\` — or \`--process none\` where it found nothing`
 
 	if (outcome.notes.length > 0) {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`

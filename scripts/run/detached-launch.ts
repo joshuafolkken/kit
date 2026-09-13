@@ -33,7 +33,15 @@ const UNSAFE_NOTE =
 // would take that decision away from the person, silently, on a machine nobody is watching.
 const AGENT_COMMAND = 'claude'
 // `-p` is a headless session: the invocation is the prompt, and nothing waits on a terminal.
-const AGENT_FLAGS: ReadonlyArray<string> = ['-p']
+//
+// **`--output-format stream-json` is what makes the log grow while the child works**
+// (joshuafolkken/kit#1948). Without it a headless session prints nothing until it exits, so a
+// detached child's log holds only the launch header for the whole run — and `run:liveness` reads a
+// frozen log as a stopped unit, booking a working child `stopped` once the silent window passes.
+// Streaming emits a JSON event per turn and tool call, so the file grows steadily and the size-and-mtime
+// sample sees a live child move. `--verbose` is not optional: the agent CLI refuses
+// `--output-format stream-json` under `--print` without it.
+const AGENT_FLAGS: ReadonlyArray<string> = ['-p', '--verbose', '--output-format', 'stream-json']
 
 // **The inputs that reach `spawn` are validated rather than trusted, and that is a control rather than
 // a formality.** Two things already bound this — the argument vector never goes through a shell, so

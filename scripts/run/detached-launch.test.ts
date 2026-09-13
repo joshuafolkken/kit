@@ -9,6 +9,23 @@ import { run_wake_session } from './run-wake-session'
 const INVOCATION = 'fullrun #1932'
 const FIRST_ARGUMENT = 0
 const LAST_ARGUMENT = -1
+const VERBOSE_FLAG = '--verbose'
+const OUTPUT_FORMAT_FLAG = '--output-format'
+const STREAM_JSON = 'stream-json'
+
+// The whole vector a dispatch composes when nothing is overridden, kept in one place so the flag
+// literals are asserted rather than repeated across the tests below.
+const DEFAULT_ARGS: ReadonlyArray<string> = [
+	'-p',
+	VERBOSE_FLAG,
+	OUTPUT_FORMAT_FLAG,
+	STREAM_JSON,
+	'--model',
+	detached_launch.DEFAULT_MODEL,
+	'--effort',
+	detached_launch.DEFAULT_EFFORT,
+	INVOCATION,
+]
 
 // The model and effort are resolved from the environment, so the tests pass one explicitly rather than
 // mutating `process.env`; an empty object is a run with neither override set.
@@ -56,18 +73,22 @@ describe('detached_launch.agent_argv — where the invocation goes', () => {
 	it('asks for a headless session, so nothing waits on a terminal', () => {
 		expect(built(INVOCATION).args).toContain('-p')
 	})
+
+	// Without streaming a headless session writes nothing until it exits, so a detached child's log stays
+	// frozen and `run:liveness` books a working child as stopped (joshuafolkken/kit#1948).
+	it('streams the child output as JSON events, so its log grows while it works', () => {
+		const argv = built(INVOCATION)
+		const format_index = argv.args.indexOf(OUTPUT_FORMAT_FLAG)
+
+		expect(argv.args).toContain(VERBOSE_FLAG)
+		expect(format_index).not.toBe(-1)
+		expect(argv.args[format_index + 1]).toBe(STREAM_JSON)
+	})
 })
 
 describe('detached_launch.agent_argv — the model and effort it makes explicit', () => {
 	it('passes the default model and effort when neither is overridden', () => {
-		expect(built(INVOCATION).args).toStrictEqual([
-			'-p',
-			'--model',
-			detached_launch.DEFAULT_MODEL,
-			'--effort',
-			detached_launch.DEFAULT_EFFORT,
-			INVOCATION,
-		])
+		expect(built(INVOCATION).args).toStrictEqual(DEFAULT_ARGS)
 	})
 
 	it('takes the model and effort from the environment when they are set', () => {
