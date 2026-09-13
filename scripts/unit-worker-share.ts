@@ -1,7 +1,8 @@
 import { readdirSync } from 'node:fs'
-import { availableParallelism, tmpdir } from 'node:os'
+import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
+import { PLATFORM_TEMP_ROOT } from './josh/platform-temporary'
 import { process_identity } from './josh/process-identity'
 import { stamp_file } from './josh/stamp-file'
 
@@ -92,7 +93,7 @@ function read_marker(source: string): RunMarker | undefined {
 // An unreadable temp directory answers "no other run", which is the direction that leaves behavior
 // as it was rather than throttling a run on a guess. Unlike the network guard, being wrong here costs
 // wall time and never a false result.
-function marker_files(directory: string = tmpdir()): Array<string> {
+function marker_files(directory: string = PLATFORM_TEMP_ROOT): Array<string> {
 	try {
 		return readdirSync(directory).filter((name) => name.startsWith(RUN_PREFIX))
 	} catch {
@@ -133,7 +134,7 @@ function is_marker_live(source: string): boolean {
 
 // Every marker in the temp directory whose process is still alive. This run's own is deliberately not
 // among them: both callers count *before* writing theirs, so the `+ 1` at the call site adds it.
-function live_run_count(directory: string = tmpdir()): number {
+function live_run_count(directory: string = PLATFORM_TEMP_ROOT): number {
 	return marker_files(directory).filter((name) => is_marker_live(path.join(directory, name))).length
 }
 

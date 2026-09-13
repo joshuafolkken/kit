@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { afterAll, describe, expect, it } from 'vitest'
 import { eval_stamp } from './eval-stamp'
 import {
@@ -116,7 +117,7 @@ describe('eval_stamp.stamp_path', () => {
 	it('is a json file in the temp directory keyed to this checkout', () => {
 		const target = eval_stamp.stamp_path()
 
-		expect(path.dirname(target)).toBe(tmpdir())
+		expect(path.dirname(target)).toBe(PLATFORM_TEMP_ROOT)
 		expect(path.basename(target)).toMatch(/^josh-eval-stamp-[\da-f]+\.json$/u)
 	})
 

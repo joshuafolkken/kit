@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { test_unit_guard } from '#scripts/test-unit-guard'
 import { verification_gate, type GateStepResult } from '#scripts/verification-gate'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -94,7 +95,7 @@ describe('review_stamps — the three records are kept apart', () => {
 	})
 
 	it.each(RECORDS)('puts the %s record in the temp directory', (_label, access) => {
-		expect(access.stamp_path()).toContain(tmpdir())
+		expect(access.stamp_path()).toContain(PLATFORM_TEMP_ROOT)
 	})
 })
 

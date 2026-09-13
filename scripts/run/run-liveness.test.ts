@@ -2,12 +2,12 @@ import { mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSy
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
 	ALIVE_VERDICT,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
-	PLATFORM_TEMP_ROOT,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,

@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -70,7 +71,7 @@ describe('lane_dispatch.default_log_path — the log the dispatch owns', () => {
 	})
 
 	it('is in the temp directory, so it survives `lane:close`', () => {
-		expect(DERIVED_LOG.startsWith(os.tmpdir())).toBe(true)
+		expect(DERIVED_LOG.startsWith(PLATFORM_TEMP_ROOT)).toBe(true)
 	})
 
 	it('names the issue, so a person can find the file by eye', () => {
