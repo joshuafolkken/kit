@@ -324,21 +324,14 @@ describe('docs/sync.md — deny rationale', () => {
 
 // The deny list only holds while every copy of the prose says the same thing: a doc that still
 // reads "ask first" without naming the deny sends an agent looking for an exception that the tool
-// no longer grants.
+// no longer grants. joshuafolkken/kit#1924 slimmed `CLAUDE.md`'s Git Rules to the resident trigger and
+// moved the pattern enumeration and the loophole explanation to `docs/sync.md` and the Japanese
+// workflow prompt (both pinned by the suites below); what stays resident in `CLAUDE.md` is the
+// criterion a no-hook agent cannot infer from the deny list — the deny is narrower than the rule, and
+// the tool letting a command through is not permission.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
-	'denies `gh pr merge` outright',
-	PR_MERGE_DENY,
-	'The deny carries no per-turn exception',
-	'ask the user to run it in their own terminal',
-	'**Refused and forbidden are not the same set**',
-	'Never read "the tool let me" as permission.',
-	...INDEX_DENY_PATTERNS,
-	// joshuafolkken/kit#1054 replaced an overstated claim with an understated one — the REST merge
-	// is denied now, and saying it is not sends an agent looking for a hole that was closed. The
-	// pair below has to stay pinned together: the entry that closed it, and the sentence saying the
-	// list is still not the boundary of what is forbidden.
-	REST_MERGE_DENY,
-	'**The deny is still narrower than the rule**',
+	'the deny is narrower than the rule',
+	'never read "the tool let me" as permission',
 ]
 
 const WORKFLOW_MARKERS: ReadonlyArray<string> = [

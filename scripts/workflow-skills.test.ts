@@ -39,10 +39,12 @@ const RESIDENCY_SKILL = `${WORKFLOW_SKILL}/rule-residency.md`
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
 const MINIMUM_DESCRIPTION_LENGTH = 80
 
-// The documents sat at ~83 KB each before the split and ~49 KB after. The ceiling is deliberately
-// slack: it is a guard against a procedure being inlined back into the always-loaded surface, not a
-// budget anyone should tune prose against.
-const RESIDENT_CEILING_BYTES = 60_000
+// The documents sat at ~83 KB each before the joshuafolkken/kit#854 split and ~49 KB after, then
+// crept back to ~56 KB as duplicated procedure bodies returned. joshuafolkken/kit#1924 lifted the
+// reduction freeze and moved those bodies to their pointers, cutting CLAUDE.md below 30 KB. Minus the
+// two headrooms below, the re-inline floor lands at 30 KB, so the always-loaded documents cannot
+// creep back past that target. It is a guard against re-inlining, not a budget to tune prose against.
+const RESIDENT_CEILING_BYTES = 33_000
 
 // joshuafolkken/kit#951: the ceiling alone stops the wrong thing. Reached, it does not block the
 // next rule — it makes that rule pay for itself by deleting a neighboring sentence, and the
@@ -64,8 +66,7 @@ const RESIDENT_HEADROOM_BYTES = 2000
 // exactly on the conversion and the two ceilings coincide there.
 // Converted once, from the budget the documents are actually measured against. Converting the
 // ceiling and the headroom separately and subtracting would agree with this only by rounding
-// coincidence — at 60,000 and 2,000 it happens to, and at 61,000 it is off by one, which would fail
-// the equality below on a constant bump that touched no document at all.
+// coincidence, so a constant bump that touched no document at all could fail the equality below.
 const EFFECTIVE_CEILING_BYTES = RESIDENT_CEILING_BYTES - RESIDENT_HEADROOM_BYTES
 const EFFECTIVE_CEILING_TOKENS = cost_tokens.ascii_bytes_to_tokens(EFFECTIVE_CEILING_BYTES)
 // joshuafolkken/kit#1275: what `CLAUDE.md` had left under the effective ceiling once the procedures
