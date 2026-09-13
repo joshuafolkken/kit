@@ -12,6 +12,11 @@ This file is the single source of the boundary. `run:cut` is the command that ta
 **during** a lane child's run, after the workflow skill has been read, so it is not an entry read —
 `fullrun.md`, `chain-rule.md` and `epicrun.md` name it with a plain mention and route here.
 
+**A second boundary is added below** — the implementation-phase cut (joshuafolkken/kit#1933), which
+takes the same `run:cut` record and relaunch at a context threshold _during_ implementation.
+Everything through "What is carried" describes the pre-gate cut; the implementation-phase section
+states only what differs.
+
 ## Where the boundary is
 
 **After implementation and the refactor, before `pnpm josh gate`.** It is the same boundary
@@ -123,6 +128,7 @@ pnpm josh run:cut --resume <N>
 | --------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `fresh`   | 0    | No cut record — this is an ordinary run. Proceed with the normal entry: claim the hold, ask the session boundary, read the issue, implement |
 | `resume`  | 0    | A declared cut whose tree matches was verified and taken over. **Skip the title, the plan, the fresh hold claim and the implementation**; re-read the issue body and comments for the plan and the recorded decisions, then go straight to `pnpm josh gate` |
+| `resume-impl` | 0 | Like `resume`, but the cut was taken **during** implementation (joshuafolkken/kit#1933). Skip the title, the plan, the fresh hold claim and the split assessment; re-read the plan and the recorded decisions, then **continue implementation** — implementation is not finished, so do **not** go straight to the gate |
 | `handed-off` | 0 | A successor has already adopted this cut — `is_handed_off` is spent (joshuafolkken/kit#1935). This process was woken **after** its own cut — a background task's notification, or an interactive session that never ended — and the run is being carried on elsewhere. **End the turn quietly and do nothing**: it is a benign stop, not a failure, so no Telegram is owed and the tree is left for the successor that owns it |
 | `stale`   | 1    | The record does not match the tree — wrong branch, a clean tree (the implementation is gone), an expired record, or a record whose hand-off state is unknown. **A resume failure**: send a `confirmation` Telegram and stop; never gate the wrong tree |
 | `busy`    | 1    | Another process already owns the resume — a double launch. Send a `confirmation` Telegram and stop                                        |
@@ -176,6 +182,94 @@ run — removed.
   process that reaches the boundary again and reissues `run:cut <N>` is likewise refused `busy` by that
   exclusive create, so one lane crosses the pre-gate boundary exactly once.
 
+## The implementation-phase cut — a lane child cuts before the gate too
+
+**The pre-gate cut drops the thinking accumulated _before_ the gate; it does nothing about the
+thinking accumulated _during_ implementation** (joshuafolkken/kit#1933). A lane child re-reads its
+whole conversation on every request, so a long implementation is billed the way a long `epicrun`
+parent is: the 2026-09-13 `backlogrun` measured lane bodies at **208k / 240k / 283k / 386k** median
+context per request, the second half of a run costing about twice the first. The pre-gate boundary
+fires only once implementation is done, so it never caps that growth. The **implementation-phase
+cut** does — the child ends its process mid-implementation, at a consistent boundary, and a fresh one
+resumes the same lane **back into implementation** carrying none of the thinking.
+
+### The measurement is the parent hand-off's, never a second one
+
+The child decides whether to cut with the same measurement the parent uses between children —
+`pnpm josh cost --over <threshold>` (`cost_verdict.per_request_cost`, billed input tokens per
+request), whose single source is `epicrun.md` → "The hand-off". **Only the threshold differs**: the
+parent's seam is 300_000, the child's is `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` — **200_000
+initially**. No separate measurement is built for the lane child.
+
+```bash
+pnpm josh cost --over 200000     # over → cut ; under → keep implementing
+```
+
+**200_000 is the initial value, and its derivation is recorded here.** The lane bodies above ran at
+208k–386k while implementing, and joshuafolkken/kit#1837's cap simulation put a 200k per-request cap
+at 71% of the final 427k (300k at 89%) — so cutting at 200k during implementation caps an
+accumulation the pre-gate boundary alone left uncapped. The value is a single constant,
+`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD`, so this figure and the test cannot drift.
+
+### Where the boundary is
+
+**At a consistent working-tree boundary, never mid-edit.** The cut leaves the uncommitted
+implementation on disk for the fresh process to verify against, so it may be taken only where the
+tree is coherent — the natural one is **right after a single check (`lint:related` / `test:related`)
+has gone green**, between edit batches. A cut taken in the middle of an `Edit` sequence would hand
+the fresh process a half-written tree, which the resume verification would reject.
+
+### Taking it
+
+At such a boundary, when `pnpm josh cost --over 200000` answers `over`, issue:
+
+```bash
+pnpm josh run:cut --impl <N>
+```
+
+The verdicts are the pre-gate cut's exactly — `cut` ends the turn (the fresh process owns the run
+from here), and `not-a-lane`, `unready`, `busy`, `failed` and `unknown` each leave this process to
+carry on implementing. The only thing that differs is what the record stores: the implementation
+phase, which the resume reads.
+
+### Resuming continues implementation
+
+A fresh process's `pnpm josh run:cut --resume <N>` answers **`resume-impl`** for an
+implementation-phase cut rather than `resume`. **Skip the title, the plan, the fresh hold claim and
+the split assessment** — the entry a resumed child has already done — re-read the issue body and
+comments for the plan and the recorded decisions, and **continue implementation**; do not go to the
+gate, because implementation is not finished. Everything else — the tree verification, the kept hold,
+the re-applied dispatch mark, and the `stale` / `busy` / `handed-off` failures — is the pre-gate
+resume's, unchanged.
+
+### One cut per boundary, one successor across all of them
+
+The exclusive create and the spent hand-off (joshuafolkken/kit#1935) hold across the
+implementation-phase cut exactly as across the pre-gate one: a second cut on the same tree is refused
+`busy`, and a second resume of the same cut is answered `handed-off`. A lane may cross the
+implementation boundary several times over a long implementation — each crossing dropping the
+thinking — and each one has exactly one successor.
+
+### It is procedure, not a guard — and why
+
+The pre-gate cut is enforced by a `PreToolUse` refusal because it fires unconditionally at one place.
+The implementation cut cannot be: its trigger is the per-request cost, and that is read from the
+transcript **asynchronously** (`cost --over` loads the corpus), while a `PreToolUse` guard answers
+synchronously or not at all — and a synchronous approximation would be the very "separate measurement
+for the lane child" joshuafolkken/kit#1933 forbids. So the child runs `pnpm josh cost --over 200000`
+at each boundary itself, and whether the run held to it is read from `pnpm josh time` and
+`pnpm josh cost` on a real dispatched run (see "Measurement" below) — the same feedback loop the
+pre-gate cut's own measurement uses.
+
+### Edit in bulk, then check once
+
+**A single check (`lint:related` / `test:related`) is run after a batch of edits, not after each
+one.** Every check is a boundary this cut can be taken at, but it is also a request, and running one
+after every small edit grows the context this cut exists to bound. This is consistent with
+joshuafolkken/kit#1383 — a single check answers once per tree — and observable in `pnpm josh time`'s
+`Single checks:` block, whose repeat and unchanged-call counts rise when checks outnumber edit
+batches.
+
 ## Consistency with the chain rule
 
 `chain-rule.md` and `background-commands.md` forbid ending a turn at the push, because there the review and
@@ -186,6 +280,12 @@ runs gate → review → commit → push → merge **without ending** — so the
 ends at the push" holds for it exactly as for an uncut run. The cut adds one earlier turn boundary; it
 removes none of the later prohibitions.
 
+**The implementation-phase cut is the same sanctioned pattern, one boundary earlier still**
+(joshuafolkken/kit#1933). It ends the turn _during_ implementation and relaunches a fresh process in
+the same act, so the run continues rather than stalling — and the resumed process implements on to
+the gate, review, commit, push and merge without ending. It adds turn boundaries and removes no
+prohibition.
+
 ## Measurement
 
 The mechanism is what makes the per-call context drop possible; the drop itself is measured on a real
@@ -193,5 +293,10 @@ dispatched lane run with `pnpm josh cost` and `pnpm josh time`, comparing the av
 request before and after. **Until that run is measured it is reported as unmeasured** — the bytes a
 record holds, the cache a session keeps and the billed cost are distinct, and only a measured run
 tells whether the average fell.
+
+**The implementation-phase cut's drop is measured the same way, and is likewise unmeasured until
+then** (joshuafolkken/kit#1933): one changed `backlogrun` compares the average and maximum context
+per request of each lane against the 2026-09-13 run recorded in the issue, and until that run exists
+the effect of the 200_000 threshold is reported as unmeasured.
 
 This file is the single source of the rule.

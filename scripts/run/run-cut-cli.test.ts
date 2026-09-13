@@ -60,8 +60,8 @@ function verdict(): string {
 }
 
 // A declared cut already on disk, as a fresh process would find one at its entry.
-function existing_cut(): void {
-	run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH })
+function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
+	run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH, phase })
 }
 
 beforeEach(() => {
@@ -205,6 +205,46 @@ describe('a fresh process checking whether to resume', () => {
 
 		expect(code).toBe(1)
 		expect(verdict()).toBe(run_cut_cli.STALE_VERDICT)
+	})
+})
+
+// joshuafolkken/kit#1933: the implementation-phase cut. `--impl` cuts at a mid-implementation boundary
+// and records that phase, its resume continues implementing rather than going to the gate, and the
+// one-successor guarantee holds across it exactly as for the pre-gate cut.
+describe('cutting a lane child during implementation', () => {
+	it('cuts and records the implementation phase', async () => {
+		const code = await run_cut_cli.run(['--impl', ISSUE])
+		const read = run_cut.read_cut(target())
+
+		expect(code).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+		expect(read.kind === 'carried' ? read.cut.phase : undefined).toBe(run_cut.IMPLEMENTATION_PHASE)
+	})
+
+	it('resumes into implementation, not the gate, on a matching tree', async () => {
+		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+
+		const code = await run_cut_cli.run(['--resume', ISSUE])
+
+		expect(code).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.RESUME_IMPL_VERDICT)
+	})
+
+	it('keeps one successor across repeated implementation cuts', async () => {
+		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+		await run_cut_cli.run(['--resume', ISSUE])
+		const second = await run_cut_cli.run(['--resume', ISSUE])
+		const second_verdict = verdict()
+		const third = await run_cut_cli.run(['--impl', ISSUE])
+
+		expect([second, second_verdict]).toStrictEqual([0, run_cut_cli.HANDED_OFF_VERDICT])
+		expect([third, verdict()]).toStrictEqual([1, run_cut_cli.BUSY_VERDICT])
+	})
+
+	it('refuses --impl alongside a mode flag that asks about a cut', async () => {
+		const code = await run_cut_cli.run(['--impl', '--resume', ISSUE])
+
+		expect(code).toBe(1)
 	})
 })
 

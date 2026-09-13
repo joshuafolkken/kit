@@ -1736,6 +1736,20 @@ moment is the only one where **this** child's work is all written down: the PR i
 tree is on the default branch and clean, and the epic's state on GitHub is complete. A hand-off taken
 anywhere else would have to carry work that is not written down yet.
 
+### The lane child reuses this measurement mid-implementation
+
+**The same `pnpm josh cost --over` measurement bounds a lane child's context _during_ implementation,
+not only the parent's between children** (joshuafolkken/kit#1933). A dispatched lane child accumulates
+thinking as it implements — the 2026-09-13 `backlogrun` measured lane bodies at 208k–386k median
+context per request — and the pre-gate cut alone never caps that, because it fires only once
+implementation is done. So the child measures its own per-request context with **this command** at a
+threshold of its own — `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD`, 200_000 — and cuts with
+`pnpm josh run:cut --impl <N>`. **The measurement is single-sourced here**: `cost_verdict.per_request_cost`
+is what both seams compare, and only the threshold differs (the parent's 300_000 above, the child's
+200_000). The boundary, the resume that continues implementation rather than going to the gate, and
+why 200_000 is the initial value are `pre-gate-cut.md` → "The implementation-phase cut", its single
+source.
+
 **A merge is not by itself a safe seam, because another lane may still be running — and until
 joshuafolkken/kit#1713 that was a reason to wait.** The session held the reference to every unit it
 dispatched, so cutting it while one was in flight did not pause that child: the work stayed in its
