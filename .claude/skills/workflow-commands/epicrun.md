@@ -732,8 +732,11 @@ pid=$(pnpm josh lane:dispatch "$n") || exit 1   # the child's pid on stdout, not
 without reporting" above applied N times rather than once, and
 `pnpm josh run:liveness <N> --output <path> --process alive` is read **in that child's lane** — the
 case that section already names when it says the traces are read in the checkout the unit was given.
-**Run `pgrep -laf "<the lane's directory>"` first and pass what it found** — `alive` where the child
+**Run `pgrep -laf "fullrun #<N>$"` first and pass what it found** — `alive` where the child
 is there, `none` where it is not, and never `alive` merely because the child was dispatched. The
+child's command line is `claude … fullrun #<N>` and carries no path, so a `pgrep` on the lane's
+directory finds nothing for a live child; the invocation is its last argument, and the `$` anchor is
+what keeps `#12` from matching a running `#123`. The
 writer is a real process now, so a log that stopped moving is a session thinking rather than one that
 died, and the trace is what tells the two apart.
 
@@ -1426,7 +1429,7 @@ per child, and treat a single non-numeric line as the verdict.
    whole of "A delegated unit that stopped without reporting" above. **Start no wait of your own** —
    the next turn is the one the progress watcher's exit delivers ("The parent keeps no clock of its
    own" above) — and on that wake ask
-   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "<the lane's directory>"`
+   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "fullrun #<N>$"`
    found>` where that file has been unchanged for the silent-unit window. **The flag is what you saw,
    never what kind of child it is**: passing `alive` without running `pgrep` answers `alive` for ever,
    including for a child that died an hour ago.
@@ -1753,8 +1756,10 @@ unit_output=$(pnpm josh lane:output <N>) &&
 ```
 
 **`--process` carries what `pgrep` found, and with a dispatched child that is the whole answer**
-(joshuafolkken/kit#1749). Run `pgrep -laf "<the lane's directory>"` first and pass `alive` where it
+(joshuafolkken/kit#1749). Run `pgrep -laf "fullrun #<N>$"` first and pass `alive` where it
 found the child and `none` where it did not — **never `alive` because the child was dispatched.** The
+child's command line is `claude … fullrun #<N>` and holds no path, so a `pgrep` on the lane's directory
+never matches a live child (joshuafolkken/kit#1948). The
 flag has always been what the caller *saw* (`docs/josh-commands.md` → "`josh run:liveness`"), and a
 parent that passed `alive` without looking would answer `alive` for a child that crashed an hour ago
 and poll it for ever. What changed is that the trace is now the deciding input rather than a

@@ -201,10 +201,11 @@ describe('lane_dispatch.describe — what a reader is told to do next', () => {
 		expect(lane_dispatch.describe(no_lane, ISSUE)).toContain(`pnpm josh lane:open ${ISSUE}`)
 	})
 
-	it('sends the caller to the process trace, because a frozen log no longer means dead', async () => {
+	it('matches the child’s command line, not the lane directory its argv omits', async () => {
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
-		expect(message).toContain(`pgrep -laf ${LANE_DIRECTORY}`)
+		expect(message).toContain(`pgrep -laf "fullrun #${ISSUE}$"`)
+		expect(message).not.toContain(`pgrep -laf ${LANE_DIRECTORY}`)
 		expect(message).toContain(ALIVE_PROCESS)
 	})
 
