@@ -44,6 +44,10 @@ const REVIEW_PROMPT_MARKERS: ReadonlyArray<string> = [
 	// The floor is a result, not a target. Without this a reader takes "one gate per commit" as
 	// something to drive the count to, and the way to drive it there is to skip one.
 	FLOOR_IS_NOT_A_TARGET,
+	// joshuafolkken/kit#1876: run #1864 paid one gate above the model, and the excess was a piped
+	// `josh gate` the `piped-verification` guard refused and forced a bare re-run — a piping mistake
+	// rather than a model cost. Pinned so the one avoidable inflation stays named beside the count.
+	'**Beyond that count, the one avoidable way a run inflates its gate tally is a piped verification command — and it is already guarded**',
 ]
 
 describe(`${REVIEW_PROMPT} — the count rule is defined`, () => {
