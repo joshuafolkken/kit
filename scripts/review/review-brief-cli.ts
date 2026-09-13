@@ -15,12 +15,13 @@ import { review_tree } from './review-tree'
 // `josh review:brief` — print the whole `/code-review` invocation, not just the level
 // (joshuafolkken/kit#1241).
 //
-// `josh review:level` still answers the level and is unchanged; this command reuses it rather than
-// deciding again, so the two can never disagree. What it adds is everything else the forked review
-// agent cannot find out for itself: whether the gate has passed **or is running** on this tree
-// (joshuafolkken/kit#1242 — the two are started together, so "still running" is the usual answer at
-// this point), how this project runs its unit tests, and — on round 2 — which files the first
-// round's fixes touched.
+// The level is decided in-process by the `review_level` module and is also exposed on its own as
+// `--level-only` (joshuafolkken/kit#1927 folded the former `josh review:level` command in here), so
+// the level a brief prints and the level `--level-only` answers can never disagree. What the full
+// brief adds is everything else the forked review agent cannot find out for itself: whether the gate
+// has passed **or is running** on this tree (joshuafolkken/kit#1242 — the two are started together,
+// so "still running" is the usual answer at this point), how this project runs its unit tests, and —
+// on round 2 — which files the first round's fixes touched.
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
