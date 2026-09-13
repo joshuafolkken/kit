@@ -342,17 +342,68 @@ describe('epic_classify.classify_children — the cross-repository resolver', ()
 	})
 })
 
-// The last acceptance criterion of joshuafolkken/kit#1126: a relation the graph cannot place is
-// reported rather than dropped in silence. Whether it should hold the child back is a separate
-// question, and it belongs to joshuafolkken/kit#1123.
+const OUTSIDE = 999
+
+function outside_child(state?: 'OPEN' | 'CLOSED', repo = REPO): EpicChild {
+	const blocker = state === undefined ? { repo, number: OUTSIDE } : { repo, number: OUTSIDE, state }
+
+	return child(2, { blockers: [blocker] })
+}
+
+function outside_key(repo = REPO): string {
+	return `${repo}#${String(OUTSIDE)}`
+}
+
+// joshuafolkken/kit#1943: a blocker no graph in this invocation tracks is weighed rather than ignored.
+// Ignored, a child waiting on another epic's open issue was offered as runnable.
 describe('epic_classify.classify_children — a blocker the epic does not track', () => {
-	it('names the relation it could not weigh', () => {
+	it('waits when the open blocker is something this run also runs', () => {
+		const running = new Set([outside_key(), `${REPO}#2`])
+		const result = epic_classify.classify_children([outside_child('OPEN')], undefined, running)
+
+		expect(numbers(result.time)).toEqual([2])
+		expect(result.runnable).toEqual([])
+	})
+
+	it('goes to a person, naming the blocker, when this run does not run it', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		epic_classify.classify_children([child(2, { blocked_by: [999] })])
+		epic_classify.reset_reported()
 
-		expect(warn.mock.calls.join('\n')).toContain('#999')
-		expect(warn.mock.calls.join('\n')).toContain('does not track')
+		const result = epic_classify.classify_children([outside_child('OPEN')])
+
+		expect(numbers(result.human)).toEqual([2])
+		expect(warn.mock.calls.join('\n')).toContain(`#${String(OUTSIDE)}`)
+		expect(warn.mock.calls.join('\n')).toContain('this run will not finish')
+		warn.mockRestore()
+	})
+})
+
+describe('epic_classify.classify_children — a closed or unread blocker the epic does not track', () => {
+	it('runs the child once the outside blocker is closed', () => {
+		const result = epic_classify.classify_children([outside_child('CLOSED')])
+
+		expect(numbers(result.runnable)).toEqual([2])
+	})
+
+	it('still waits for the release of a closed outside blocker in another repository', () => {
+		const result = epic_classify.classify_children(
+			[outside_child('CLOSED', CONSUMER)],
+			() => 'time',
+		)
+
+		expect(numbers(result.time)).toEqual([2])
+	})
+
+	it('waits rather than runs when the blocker state was never read', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		epic_classify.reset_reported()
+
+		const result = epic_classify.classify_children([outside_child()])
+
+		expect(numbers(result.time)).toEqual([2])
+		expect(warn.mock.calls.join('\n')).toContain('could not be read')
 		warn.mockRestore()
 	})
 

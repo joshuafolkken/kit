@@ -14,6 +14,7 @@ import { epic_issue, type EpicReference } from './epic-issue'
 import { epic_lane_offer, type LaneOffer, type LaneRequest } from './epic-lane-offer'
 import { epic_next_read, type EpicRead, type SnapshotReads } from './epic-next-read'
 import { epic_next_views, type EpicView } from './epic-next-views'
+import { epic_outside_blocker } from './epic-outside-blocker'
 import { epic_report, type EpicNextResult, type EpicVerdict } from './epic-report'
 
 // `josh epic:next <E…>` — which of the named epics' children can be started right now, bundled per
@@ -174,6 +175,7 @@ function is_order_declared(body: string | undefined, links: ReadonlyArray<unknow
 function decide(
 	snapshot: EpicSnapshot,
 	paths: ReadonlyMap<string, string> = new Map(),
+	running?: ReadonlySet<string>,
 ): EpicNextResult {
 	const links = git_epic_parse.parse_dependency_links(snapshot.body)
 	const unreadable = body_anomaly(snapshot) ?? unreadable_anomaly(snapshot)
@@ -191,6 +193,7 @@ function decide(
 	const classification = epic_classify.classify_children(
 		snapshot.children,
 		epic_cross_repo.resolve_cross_repo,
+		running,
 	)
 
 	return epic_report.build_result(classification, anomalies, paths)
@@ -363,8 +366,13 @@ async function report_epics(views: ReadonlyArray<EpicView>, options: NextOptions
 	})
 }
 
-// One view per named epic, classified against one shared registry read.
-function views_of(reads: ReadonlyArray<EpicRead>): ReadonlyArray<EpicView> {
+// One view per named epic, classified against one shared registry read. `running` is every named
+// epic's children unless a caller that runs more — `backlog:next` — passes its own set, so a blocker
+// in another named epic waits rather than stops (joshuafolkken/kit#1943).
+function views_of(
+	reads: ReadonlyArray<EpicRead>,
+	running = epic_outside_blocker.running_keys(reads.flatMap((read) => read.snapshot.children)),
+): ReadonlyArray<EpicView> {
 	const paths = repo_discovery.discover_repositories(PROJECT_ROOT)
 
 	// One registry answer per repository per invocation. A polling `epicrun` calls this command
@@ -372,7 +380,13 @@ function views_of(reads: ReadonlyArray<EpicRead>): ReadonlyArray<EpicView> {
 	epic_cross_repo.reset_publish_cache()
 	epic_classify.reset_reported()
 
-	return reads.map((read) => ({ ...read, result: decide(read.snapshot, paths) }))
+	return epic_next_views.settle_views(running, (settled) =>
+		reads.map((read) => ({
+			...read,
+			running: settled,
+			result: decide(read.snapshot, paths, settled),
+		})),
+	)
 }
 
 // What the read walk produced, or nothing when there is still work to report. A skipped epic is

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { IssueReference } from './git-epic-reference'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-json-array'
 import { blocking_issue_schema } from './schemas'
@@ -203,9 +204,26 @@ function to_field_text(value: unknown): string {
 	return value === undefined || value === null ? EMPTY_BODY : JSON.stringify(value)
 }
 
+const CLOSED = 'CLOSED'
+
+// One blocker node as a reference, keeping the state the relation response carried
+// (joshuafolkken/kit#1943). Single-sourced here because the snapshot read and the candidate re-read
+// both unwrap the same node, and the state is omitted rather than guessed when REST did not send it.
+function reference_of_blocker(
+	node: z.infer<typeof blocking_issue_schema>,
+	fallback_repo: string,
+): IssueReference {
+	const repo = repo_of_url(node.repository_url) ?? fallback_repo
+
+	if (node.state === undefined) return { repo, number: node.number }
+
+	return { repo, number: node.number, state: node.state.toUpperCase() === CLOSED ? CLOSED : 'OPEN' }
+}
+
 const git_gh_issue_rest = {
 	empty_blocked_by,
 	repo_of_url,
+	reference_of_blocker,
 	split_fields,
 	is_pull_request,
 	parse_rest_issue,

@@ -22,9 +22,14 @@ const REFERENCE_SEPARATOR = ', '
 // layer and carry a repository of their own (joshuafolkken/kit#1126) — a second declaration there
 // would be the clone `CLAUDE.md` prohibits, and an import the other way would point the lower layer
 // at the higher one. `epic-graph` re-exports it, so every existing importer is unchanged.
+//
+// `state` is present only on a reference read from a `blocked-by` relation whose response carried it
+// (joshuafolkken/kit#1943). The classifier needs it for a blocker no named graph tracks, where there is
+// no child record to read the state from; every other reference leaves it out.
 interface IssueReference {
 	repo: string
 	number: number
+	state?: 'OPEN' | 'CLOSED'
 }
 
 function to_issue_reference(issue_number: number): string {

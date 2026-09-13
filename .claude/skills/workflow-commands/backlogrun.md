@@ -445,6 +445,13 @@ said. An epic that **is** opted in still owns its children entirely — it seque
 one beside it would skip that order and hand the same issue over twice. Ordering survives the
 standalone route on the children's own `blocked-by` relations, which is what `--ordered` records.
 
+**An order between two epics holds too** (joshuafolkken/kit#1943). A `blocked-by` relation whose
+blocker sits in another opted-in epic — or is an opted-in standalone issue — makes the child wait on
+time, so one `backlogrun` runs both epics in that order without the person sequencing the commands. A
+blocker outside the opted-in backlog, or one inside it that itself waits on a person, makes the child
+wait on a person instead, and a cycle across epics
+answers `error`. The table is `docs/josh-commands.md` → "`josh epic:next`".
+
 **New work is picked up without restarting anything.** The command re-derives its pool from GitHub
 labels on every ask, so an issue filed and opted in while the run is going is offered on the next
 iteration.

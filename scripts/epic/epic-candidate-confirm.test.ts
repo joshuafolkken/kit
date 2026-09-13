@@ -115,34 +115,61 @@ describe('epic_candidate_confirm.answer_for_repo — what the recovered blocker 
 	})
 })
 
-// `classify_children` drops a blocker the epic does not track, so the candidate is still offered —
-// the standing rule, applied here to a relation the confirmation just paid a request to recover.
-describe('epic_candidate_confirm.answer_for_repo — a blocker outside the epic', () => {
-	const OUTSIDER = 999
+// `classify_children` weighs a blocker the epic does not track since joshuafolkken/kit#1943, and the
+// confirmation applies the same rule to a relation it just paid a request to recover.
+const OUTSIDER = 999
 
-	it('still offers the candidate, as it does for a relation the summary counted', async () => {
+function outsider_context(
+	children: ReadonlyArray<EpicChild>,
+	state: 'OPEN' | 'CLOSED',
+	running?: ReadonlySet<string>,
+): ConfirmContext {
+	const outsider = { repo: REPO, number: OUTSIDER, state }
+
+	return { ...context(children), read_blockers: vi.fn(async () => [outsider]), running }
+}
+
+describe('epic_candidate_confirm.answer_for_repo — a blocker outside the epic', () => {
+	it('offers the candidate once the outside blocker is closed, naming the relation', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 		const children = [child(2)]
 		const answer = await epic_candidate_confirm.answer_for_repo(
 			children,
-			context(children, new Map([[2, [OUTSIDER]]])),
+			outsider_context(children, 'CLOSED'),
 		)
 
 		expect(answer.children.map((entry) => entry.number)).toEqual([2])
+		expect(warn.mock.calls.join('\n')).toContain(`#${String(OUTSIDER)}`)
+		expect(warn.mock.calls.join('\n')).toContain('does not track those')
+		warn.mockRestore()
+	})
+})
+
+describe('epic_candidate_confirm.answer_for_repo — an open blocker outside the epic', () => {
+	it('withholds for a person when the open outside blocker is not run by this invocation', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+		const children = [child(2)]
+		const answer = await epic_candidate_confirm.answer_for_repo(
+			children,
+			outsider_context(children, 'OPEN'),
+		)
+
+		expect(answer.children).toEqual([])
+		expect(answer.verdict).toBe('stop')
 		warn.mockRestore()
 	})
 
-	it('names the relation it discarded rather than offering the child silently', async () => {
+	it('withholds to wait when this invocation also runs the open outside blocker', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 		const children = [child(2)]
-
-		await epic_candidate_confirm.answer_for_repo(
+		const running = new Set([`${REPO}#2`, `${REPO}#${String(OUTSIDER)}`])
+		const answer = await epic_candidate_confirm.answer_for_repo(
 			children,
-			context(children, new Map([[2, [OUTSIDER]]])),
+			outsider_context(children, 'OPEN', running),
 		)
 
-		expect(warn.mock.calls.join('\n')).toContain(`#${String(OUTSIDER)}`)
-		expect(warn.mock.calls.join('\n')).toContain('does not track those')
+		expect(answer.children).toEqual([])
+		expect(answer.verdict).toBe('wait')
 		warn.mockRestore()
 	})
 

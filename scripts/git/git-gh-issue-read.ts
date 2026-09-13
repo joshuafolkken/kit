@@ -417,10 +417,7 @@ async function issue_blocked_by_references(
 	try {
 		const listing = await read_blocked_by_listing(issue_number, repo)
 
-		return listing.nodes.map((blocker) => ({
-			repo: git_gh_issue_rest.repo_of_url(blocker.repository_url) ?? own_repo,
-			number: blocker.number,
-		}))
+		return listing.nodes.map((blocker) => git_gh_issue_rest.reference_of_blocker(blocker, own_repo))
 	} catch (error) {
 		if (await has_no_relations_endpoint(issue_number, repo)) return []
 

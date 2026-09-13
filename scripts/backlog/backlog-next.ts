@@ -132,26 +132,32 @@ function report(result: EpicNextResult, context: PoolContext): number {
 // half is classified here; the verdict is decided from the merge, so a backlog with a runnable epic
 // child and nothing else says `run` exactly as one with a runnable standalone issue does.
 function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNextResult {
+	const graphs = views.map((view) => view.snapshot.children)
+	const standalone = backlog_pool.standalone_rows(context.opted_in.issues)
 	const from_epics = backlog_pool.drop_excluded(
 		backlog_pool.epic_classification(views),
 		context.exclude,
 		context.repo,
 	)
-	const from_standalone = backlog_pool.classify_standalone(
-		backlog_pool.standalone_rows(context.opted_in.issues),
-		{
-			tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-			exclude: context.exclude,
-			repo: context.repo,
-		},
-	)
+	const from_standalone = backlog_pool.classify_standalone(standalone, {
+		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
+		exclude: context.exclude,
+		repo: context.repo,
+		// The settled set the views were classified against, so a standalone row and an epic child weigh
+		// the same blocker the same way.
+		running:
+			views[0]?.running ?? backlog_pool.running_set(graphs, context.opted_in.issues, context.repo),
+	})
 
 	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads
 	// `(no local checkout)`, including this repository's own — the misreport joshuafolkken/kit#864
 	// fixed on that path.
 	return epic_report.build_result(
 		backlog_pool.merge_classifications(from_epics, from_standalone),
-		views.flatMap((view) => view.result.anomalies),
+		[
+			...views.flatMap((view) => view.result.anomalies),
+			...backlog_pool.cross_epic_cycles(graphs, backlog_pool.to_children(standalone, context.repo)),
+		],
 		repo_discovery.discover_repositories(PROJECT_ROOT),
 	)
 }
@@ -159,8 +165,18 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 // Nothing to classify means no epic was read, so `views_of`'s registry resets and its own checkout
 // discovery are not needed. `combine` builds the map either way, so what this saves is the second
 // walk rather than the only one.
-function views_from(reads: ReadonlyArray<EpicRead>): ReadonlyArray<EpicView> {
-	return reads.length === 0 ? [] : epic_next.views_of(reads)
+//
+// The running set covers the standalone rows as well as every read graph, so an epic child waiting on
+// an opted-in standalone issue waits rather than stops (joshuafolkken/kit#1943).
+function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): ReadonlyArray<EpicView> {
+	if (reads.length === 0) return []
+
+	const graphs = reads.map((read) => read.snapshot.children)
+
+	return epic_next.views_of(
+		reads,
+		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo),
+	)
 }
 
 // The reads and the classification, with none of the printing `backlog:next` then does with them.
@@ -183,7 +199,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		return undefined
 	}
 
-	return combine(views_from(reads), context)
+	return combine(views_from(reads, context), context)
 }
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.
