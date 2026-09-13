@@ -106,12 +106,19 @@ function session_lines(report: RunCostReport): Array<string> {
 	return ['', 'Sessions (cost-heaviest first):', ...report.sessions.map((row) => session_line(row))]
 }
 
-function format_report(report: RunCostReport): string {
-	return [...header_lines(report), ...role_lines(report), ...session_lines(report)].join('\n')
+// **`lead` is prepended, not built here.** The run-state block the no-argument `josh time` leads with
+// is a caller's concern — `josh cost --run` passes none — so this report stays a cost report and only
+// the lines it is handed sit above it (joshuafolkken/kit#1939).
+function format_report(report: RunCostReport, lead: ReadonlyArray<string> = []): string {
+	const body = [...header_lines(report), ...role_lines(report), ...session_lines(report)]
+
+	return (lead.length === 0 ? body : [...lead, '', ...body]).join('\n')
 }
 
-function print_report(report: RunCostReport, is_json: boolean): void {
-	console.info(is_json ? JSON.stringify(report, undefined, JSON_INDENT) : format_report(report))
+function print_report(report: RunCostReport, is_json: boolean, lead: ReadonlyArray<string>): void {
+	console.info(
+		is_json ? JSON.stringify(report, undefined, JSON_INDENT) : format_report(report, lead),
+	)
 }
 
 // The empty message is `cost_transcript`'s, so the `--run` scope names the same directories the
@@ -126,12 +133,17 @@ function report_empty(cwd: string): number {
 
 // The `--run` scope end to end: load the tree the command ran in, roll it up by role, print it. An
 // absent transcript store is reported in words, never priced at zero.
-function run(cwd: string, run_id: string | undefined, is_json: boolean): number {
+function run(
+	cwd: string,
+	run_id: string | undefined,
+	is_json: boolean,
+	lead: ReadonlyArray<string> = [],
+): number {
 	const tree = cost_run_tree.load(cwd, run_id)
 
 	if (tree === undefined) return report_empty(cwd)
 
-	print_report(build(tree.run_count, tree.unattributed_count, tree.nodes), is_json)
+	print_report(build(tree.run_count, tree.unattributed_count, tree.nodes), is_json, lead)
 
 	return OK_EXIT_CODE
 }
