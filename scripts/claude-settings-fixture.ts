@@ -30,6 +30,8 @@ interface HooksBlock {
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	SessionStart?: ReadonlyArray<HookMatcher>
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
+	UserPromptSubmit?: ReadonlyArray<HookMatcher>
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	PreToolUse?: ReadonlyArray<HookMatcher>
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	PostToolUse?: ReadonlyArray<HookMatcher>

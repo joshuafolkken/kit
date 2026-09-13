@@ -46,6 +46,11 @@
 						"type": "command",
 						"command": "pnpm josh audit:provision",
 						"timeout": 180
+					},
+					{
+						"type": "command",
+						"command": "pnpm josh session:lang",
+						"timeout": 10
 					}
 				]
 			}
@@ -61,6 +66,11 @@
 					{
 						"type": "command",
 						"command": "echo 'Deleting a git-tracked file is reversible, so it is NOT Tier C — do not ask for confirmation on reversibility grounds. Still inspect the target first and surface anything that contradicts the task.'"
+					},
+					{
+						"type": "command",
+						"command": "pnpm josh session:lang",
+						"timeout": 10
 					}
 				]
 			}

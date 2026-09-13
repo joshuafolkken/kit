@@ -79,6 +79,15 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// second ~0.16 s tsx start off. The script calls `process.loadEnvFile` itself instead, which is
 		// node's own `--env-file` parser with node's own precedence.
 	},
+	'session:lang': {
+		script: 'scripts/josh/session-language-cli.ts',
+		description:
+			'Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the session context',
+		category: 'Development',
+		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this runs on every
+		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
+		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
+	},
 	cspell: {
 		shell: [
 			...PE,
