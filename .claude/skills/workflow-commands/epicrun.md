@@ -1254,6 +1254,18 @@ a result nobody read must never be printed as one.
 **It goes to the session only.** No Telegram: the existing `confirmation` and `completion` messages
 are what interrupt a person, and a heartbeat every twenty minutes beside them would cheapen both.
 
+**Across a `backlogrun` session cut it is still session-only, but the session is no longer the
+person's** (joshuafolkken/kit#1910). After a cut the parent is a headless `claude -p backlogrun` the
+`run:wake` supervisor started, so its heartbeat reaches only its own transcript — the person watching
+in their editor stopped being the parent at the cut, and no channel carried the line to them. So the
+watcher persists each line it prints into the report record, and `pnpm josh run:wake --list` relays
+the last one verbatim beside the supervisor's own state. **It stays a pull, never a push**: no
+heartbeat goes to Telegram, so the reason above holds unchanged — `confirmation` and `completion`
+remain the only messages that interrupt a person, and one who wants the current progress reads it
+from the one command they already run to check on the woken run. The relayed line is the watcher's
+own output unaltered, which is why `--mark` keeps rather than blanks it: between a run's real reports
+`--list` still shows the most recent heartbeat.
+
 **A heartbeat is emitted from the moment a run has started, even before any child carries
 `in-progress`** (joshuafolkken/kit#1900). "A run has started" is read from a mechanical record rather
 than from the label — a registered lane, a held work tree, or a carried budget — so the window

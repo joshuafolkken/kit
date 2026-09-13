@@ -280,6 +280,15 @@ anywhere to say why.
 `--stop` ends it; the full contract, what it launches and why that is a constant rather than a
 setting are `docs/josh-commands.md` → "`josh run:wake`".
 
+**And it relays the woken parent's progress, because a cut cuts the one channel the person watched
+across** (joshuafolkken/kit#1910). Before the cut the parent was the person's own session and its
+twenty-minute heartbeat appeared on their screen; after it the parent is a headless `claude -p
+backlogrun`, whose heartbeat reaches only its own transcript. So the watcher persists each line into
+the report record and `pnpm josh run:wake --list` relays the last one verbatim beside the
+supervisor's state — a **pull**, never a Telegram push, so the heartbeat stays session-only and does
+not cheapen `confirmation` / `completion` (`epicrun.md` → "It goes to the session only" is the single
+source of both the line's shape and this exception).
+
 **The completion report names how many sessions were woken beside the record's `cuts`**, and the two
 being equal is the invariant — one wake per cut. `pnpm josh run:wake --list` prints them together, so
 a run that woke fewer sessions than it took cuts is visible rather than argued about. **What is

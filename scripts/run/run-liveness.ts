@@ -5,6 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
 import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { issue_state } from '#scripts/issue/issue-state'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { run_hold } from './run-hold'
 import { run_issue_number } from './run-issue-number'
 
@@ -173,21 +174,6 @@ function decide(traces: Traces): LivenessDecision {
 		verdict,
 	}
 }
-
-const POSIX_TEMP_ROOT = '/tmp'
-const WINDOWS_PLATFORM = 'win32'
-
-// The temp directory in the spelling `os.tmpdir()` cannot reach. **`os.tmpdir()` is not "the temp
-// directory"**: it honors `TMPDIR`, which on macOS names a per-user `/var/folders/…/T`, so a harness
-// writing its transcript under `/tmp` lands somewhere `os.tmpdir()` never names
-// (joshuafolkken/kit#1501).
-//
-// **It is decided by platform rather than written as a bare `/tmp`, because a POSIX literal is not
-// inert on Windows.** `path.relative` resolves a rooted path against the current drive, so `/tmp`
-// there becomes `C:\tmp` and would admit anything under it — a root nobody declared, on the one
-// platform where `os.tmpdir()` already is the whole answer. Windows therefore contributes
-// `os.tmpdir()` again, which the set below collapses away.
-const PLATFORM_TEMP_ROOT = process.platform === WINDOWS_PLATFORM ? tmpdir() : POSIX_TEMP_ROOT
 
 // A root that does not resolve is simply not a second spelling — never a reason to fail this module's
 // load. `realpathSync` throws for a path that does not exist, and it has no `throwIfNoEntry` option
@@ -372,7 +358,6 @@ export {
 	DEFAULT_SILENT_MINUTES,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
-	PLATFORM_TEMP_ROOT,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,

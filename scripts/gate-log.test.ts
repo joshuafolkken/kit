@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
@@ -111,7 +111,7 @@ describe('gate_log.gate_log_path', () => {
 	it('keeps the log in the temp directory, named as a log rather than as JSON', () => {
 		const resolved = gate_log.gate_log_path()
 
-		expect(path.dirname(resolved)).toBe(tmpdir())
+		expect(path.dirname(resolved)).toBe(PLATFORM_TEMP_ROOT)
 		expect(path.basename(resolved).startsWith(gate_log.GATE_LOG_PREFIX)).toBe(true)
 		expect(resolved.endsWith(gate_log.GATE_LOG_SUFFIX)).toBe(true)
 	})

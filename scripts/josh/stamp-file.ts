@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { lstatSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // A small record one josh command writes and another reads, kept per checkout in the temp directory.
 //
@@ -28,6 +28,7 @@ const STAMP_WRITE_FLAG = 'wx'
 // the contract rather than a defense, because no unlink precedes it.
 const STAMP_CREATE_FLAG = STAMP_WRITE_FLAG
 const EXISTS_ERROR_CODE = 'EEXIST'
+const ACCOUNT_KEY_SEPARATOR = ':'
 
 // Bytes rather than a decoded string. UTF-8 decoding is lossy — every invalid sequence collapses to
 // the same replacement character — so hashing the decoded form would let two different files agree,
@@ -36,9 +37,27 @@ function digest(content: Buffer | string): string {
 	return createHash(HASH_ALGORITHM).update(content).digest('hex')
 }
 
+// **The account is part of the key, because `/tmp` is shared between accounts where `TMPDIR` was not.**
+// A root such as a globally installed `PACKAGE_DIR` is the same path for every account on the host, so
+// without this two accounts would name one file — and the second one's unlink of a file the first owns
+// fails on the sticky directory, ending its command. Folding the account in keeps accidental
+// collisions apart; a hostile local account can still pre-create a predictable name, which fails the
+// write rather than redirecting it (joshuafolkken/kit#1909). Windows has no `getuid` and keeps the
+// per-user `os.tmpdir()`, so it contributes an empty account.
+function account_key(): string {
+	return String(process.getuid?.() ?? '')
+}
+
 // The temp directory rather than the repository: this is a handoff between two commands of one
 // loop, and a file in the tree would have to be gitignored in kit and in every consumer `josh sync`
 // reaches — a distributed ignore entry bought for something nobody is meant to keep.
+//
+// **`PLATFORM_TEMP_ROOT` rather than `os.tmpdir()`, because the two commands need not share a
+// `TMPDIR`.** A record this module keeps is read by a *different* process than wrote it — the second
+// half of a handoff — and `os.tmpdir()` honors each process's own `TMPDIR`, so a session a
+// `run:wake` or a `lane:dispatch` launched resolves a different directory than its launcher and the
+// handoff is lost (joshuafolkken/kit#1909). The keyed digest below already keeps one checkout apart
+// from another; the root is what has to stop moving per process, which `platform-temporary.ts` pins.
 //
 // **`root` is what the record is keyed to, and the right answer differs per caller.** `PACKAGE_DIR`
 // is the default because `josh eval` measures the kit package's own files. A record about the
@@ -54,9 +73,9 @@ function stamp_path(
 	root: string = PACKAGE_DIR,
 	suffix: string = STAMP_SUFFIX,
 ): string {
-	const key = digest(root).slice(0, STAMP_KEY_LENGTH)
+	const key = digest(`${account_key()}${ACCOUNT_KEY_SEPARATOR}${root}`).slice(0, STAMP_KEY_LENGTH)
 
-	return path.join(tmpdir(), `${prefix}${key}${suffix}`)
+	return path.join(PLATFORM_TEMP_ROOT, `${prefix}${key}${suffix}`)
 }
 
 // **The write unlinks first, then creates exclusively.** `rmSync` removes a symlink rather than
