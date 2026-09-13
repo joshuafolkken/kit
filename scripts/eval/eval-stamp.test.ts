@@ -34,7 +34,7 @@ describe('eval_stamp.files_under', () => {
 	it('expands a directory entry to the files beneath it', () => {
 		const files = eval_stamp.files_under(SKILL_ENTRY)
 
-		expect(files).toContain('.claude/skills/workflow-commands/eval-gate.md')
+		expect(files).toContain('.claude/skills/workflow-commands/fullrun.md')
 		expect(files.every((file) => file.startsWith(`${SKILL_ENTRY}/`))).toBe(true)
 	})
 

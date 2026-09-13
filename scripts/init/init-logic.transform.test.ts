@@ -61,8 +61,8 @@ describe('transform_prompt_paths', () => {
 	})
 
 	// The glob case: `prompts/**` names a set of paths, not a file a consumer can open. Rewriting it
-	// would print a path a consumer's diff can never contain, while `josh eval:scope` matches the
-	// original (joshuafolkken/kit#907).
+	// would print a path a consumer's diff can never contain, while the eval trigger set
+	// (`eval-trigger.ts`) matches the original (joshuafolkken/kit#907).
 	it.each([
 		['no references here', 'content with no prompts/ reference'],
 		['the measured set is `CLAUDE.md`, `prompts/**`, `.claude/settings.json`', 'a glob'],

@@ -29,8 +29,6 @@ completion *delivered* rather than something to remember to poll for.
 - **`pnpm josh gate` — background, and already so.** It is *started* when `/code-review` starts and
   *joined* before the commit (`SKILL.md` → §2, joshuafolkken/kit#1242); that is backgrounding under
   an older name, and nothing about it changes here.
-- **`pnpm josh eval` — background**, started with the review and read after it, on `required` only
-  (`eval-gate.md`).
 - **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nearly
   every step after it reads its result — the one that does not is named below — so detaching it
   would move the reading rather than overlap anything, and would buy an empty turn. **`followup.md`
@@ -79,7 +77,7 @@ with. Applied to the three waits a run actually has:
 
 | While this runs | Do this beside it |
 | --------------- | ----------------- |
-| `pnpm josh gate` | a subagent running `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
+| `pnpm josh gate` | a subagent running `/code-review` with the brief `pnpm josh review:brief` prints |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
 | CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
 | `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 300000` |
@@ -100,5 +98,5 @@ act, so the run continues rather than stalling — the sanctioned boundary disti
 turn-end this section forbids. The boundary, its two commands and the resume verification are the
 `pre-gate-cut.md` skill document, its single source.
 
-This section is the single source of the rule. `followup.md`, `eval-gate.md`, `chain-rule.md` and
+This section is the single source of the rule. `followup.md`, `chain-rule.md` and
 `epicrun.md` → "Progress while the run is quiet" route here for it rather than restating it.

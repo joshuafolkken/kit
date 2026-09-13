@@ -22,7 +22,6 @@ const REVIEW_PROMPT_MARKERS: ReadonlyArray<string> = [
 	`### ${SECTION_POINTER}`,
 	'**The line is narrow, and only one class of call falls on the wrong side of it.**',
 	'**No cap is placed on how many single checks a run makes**',
-	'**`pnpm josh eval:scope` is not one of these calls.**',
 	'**This document carries the rule, and `pnpm josh time` is what says whether it held.**',
 	'**On the run the issue was filed from, that last figure is zero**',
 ]

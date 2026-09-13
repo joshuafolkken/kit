@@ -135,7 +135,6 @@ const ALIASES: Record<string, string> = {
 	rug: 'rule:guard',
 	ruv: 'rule:value',
 	ev: 'eval',
-	es: 'eval:scope',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

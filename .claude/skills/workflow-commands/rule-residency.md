@@ -88,10 +88,6 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
   epic. A pre-commit self-review runs outside any workflow as readily as inside one, and the Issue it
   files is orphaned just the same; the step has to be readable on a turn that never typed a keyword.
   Its full form is in `prompts/review.md` → "Review round cap" (joshuafolkken/kit#946).
-- **The rule-compliance measurement's trigger** — `pnpm josh eval:scope`, and `pnpm josh eval` when
-  it answers `required`. A change to a distributed document is reported finished on turns that typed
-  no workflow keyword at all — "fix this wording in `CLAUDE.md`" is the common one — so the trigger
-  has to be readable there. The procedure it routes to is `eval-gate.md`.
 - **The UI-verification gate** — a rendered change is not done until the screen has been looked at,
   and the procedure for capturing it is `verify-ui`. The gate binds whenever a UI change is reported
   finished, which is routinely a turn with no workflow keyword typed and no skill loaded.

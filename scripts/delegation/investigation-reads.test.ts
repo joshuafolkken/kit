@@ -53,7 +53,7 @@ const SESSION_FILES = [TASK_OUTPUT, TOOL_RESULT, TRANSCRIPT]
 // What `SKILL.md` → §1 specifies a `queue` entry to read. Obeying the procedure must not trip the guard.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands'
 const ENTRY_SET = [
-	...['SKILL', 'fullrun', 'chain-rule', 'followup', 'split-assessment', 'eval-gate'].map(
+	...['SKILL', 'fullrun', 'chain-rule', 'followup', 'split-assessment'].map(
 		(name) => `${WORKFLOW_SKILL}/${name}.md`,
 	),
 	'prompts/review.md',

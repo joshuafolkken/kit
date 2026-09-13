@@ -24,9 +24,9 @@ const GITHUB_REPO_TREE_BASE = 'https://github.com/joshuafolkken/kit/tree/main/'
 const CLAUDE_MD_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
 
 // A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
-// open. `josh eval:scope`'s trigger set is written `prompts/**` in the distributed documents, and
-// rewriting it to `node_modules/@joshuafolkken/kit/prompts/**` would print a path that can never
-// appear in a consumer's diff and is not what the command matches (joshuafolkken/kit#907).
+// open. A distributed document that writes a directory set as `prompts/**` means "anything beneath
+// it", and rewriting that to `node_modules/@joshuafolkken/kit/prompts/**` would print a path that can
+// never appear in a consumer's diff and is not what the set matches (joshuafolkken/kit#907).
 function transform_prompt_paths(content: string): string {
 	return content.replaceAll(
 		/`prompts\/([^`*]+)`/gu,

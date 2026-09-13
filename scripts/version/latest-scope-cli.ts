@@ -4,14 +4,13 @@ import { latest_stamp, type LatestStamp } from './latest-stamp'
 
 // `josh latest:scope` — say whether this run has to update dependencies (joshuafolkken/kit#1215).
 //
-// A command rather than a paragraph in a procedure, for the reason `josh review:level` and
-// `josh eval:scope` are commands: a rule an agent applies from memory is a rule an agent can talk
-// itself out of, and this one is argued against every time it is reached — once because the update
-// costs a minute or two, and once because skipping it is invisible until something ships against a
-// stale dependency.
+// A command rather than a paragraph in a procedure, for the reason `josh review:level` is a command:
+// a rule an agent applies from memory is a rule an agent can talk itself out of, and this one is
+// argued against every time it is reached — once because the update costs a minute or two, and once
+// because skipping it is invisible until something ships against a stale dependency.
 //
-// It does not share `path_decision` with those two: they decide from the *changed paths*, and this
-// decides from *when the last run happened*. The flag parsing and the printing are the small half;
+// It does not share `path_decision` with that command: `josh review:level` decides from the *changed
+// paths*, and this decides from *when the last run happened*. The flag parsing and the printing are the small half;
 // the read of the diff is what that module exists for, and this command never makes one.
 
 const ARGV_OFFSET = 2
@@ -66,8 +65,8 @@ function decide(): Decision {
 }
 
 // The answer alone on stdout so `$(pnpm josh latest:scope)` reads it, and the reason on stderr so a
-// person sees why without a shell having to parse around it — the same split `josh review:level` and
-// `josh eval:scope` print in.
+// person sees why without a shell having to parse around it — the same split `josh review:level`
+// prints in.
 function print_decision(decision: Decision, is_json: boolean): void {
 	if (is_json) {
 		console.info(JSON.stringify({ [JSON_KEY]: decision.scope, reason: decision.reason }))

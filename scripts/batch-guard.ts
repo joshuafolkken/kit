@@ -24,9 +24,9 @@ import { time_batch_guard, type GuardedCall } from './time/time-batch-guard'
 // guard's own rule and its own two names, and the seven exports below are unchanged so nothing that
 // reads them had to move.
 
-// The escape hatch. **On by default**, unlike `JOSH_EVAL`: this is a distributed convention rather
-// than an opt-in measurement, and a guard nobody enables would leave the Issue exactly where it
-// started. What the variable buys is a way to switch a refusing hook off without editing the settings
+// The escape hatch. **On by default**: this is a distributed convention, and a guard nobody enables
+// would leave the Issue exactly where it started. What the variable buys is a way to switch a
+// refusing hook off without editing the settings
 // file — a machine debugging the guard itself, or a session where a run of genuinely dependent single
 // calls is expected.
 const SWITCH_ENV_KEY = 'JOSH_BATCH_GUARD'

@@ -2,10 +2,9 @@ import { git_command } from './git-command'
 
 // The set of changed paths a mechanical, path-driven decision is made from.
 //
-// Two commands ask this same question of the same tree — `josh review:level` (which level to review
-// at) and `josh eval:scope` (whether the rule-compliance suite has to run) — and a second copy would
-// let them disagree about what "changed" means. joshuafolkken/kit#907: the second command was the
-// moment the reading stopped being one command's private helper.
+// `josh review:level` asks this same question of the same tree (which level to review at), and a
+// second copy would let a caller disagree about what "changed" means. joshuafolkken/kit#907: sharing
+// this reading is the moment it stopped being one command's private helper.
 
 function to_paths(raw: string): Array<string> {
 	return raw

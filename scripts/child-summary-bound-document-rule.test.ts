@@ -35,7 +35,7 @@ const FRAME: ReadonlyArray<string> = [
 // Each of these is somewhere only the child was: cut, it is gone rather than fetched.
 const KEPT: ReadonlyArray<string> = [
 	'`Cause` / `Fix` / `Result`',
-	'`josh eval` answering `skip`, `unmeasured` or `unreachable` is one of them',
+	'Every verification result the run did not close in the ordinary way',
 	'Observations that could bite later',
 	'Decisions taken and why',
 	'What was left undone',

@@ -11,7 +11,7 @@ import { review_level, type ReviewLevel } from './review-level'
 // answers the same way every time.
 //
 // Everything but the question itself — reading the changed paths, the flags, the printing — is
-// `path_decision`'s, shared with `josh eval:scope`, which asks a different question of the same tree
+// `path_decision`'s, shared with `josh review:round2`, which asks a different question of the same tree
 // (joshuafolkken/kit#907).
 
 const ARGV_OFFSET = 2

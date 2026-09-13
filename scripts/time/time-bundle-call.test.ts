@@ -300,7 +300,6 @@ describe('time_bundle_call.bash_facts — read-only josh bookkeeping', () => {
 	it.each([
 		'pnpm josh issue:state 1875',
 		'pnpm josh release:scope',
-		'pnpm josh eval:scope',
 		'pnpm josh epic:bundle 1875',
 		'pnpm josh cost --over 300000',
 	])('reads a full-name josh bookkeeping command as bundleable: %s', (command) => {
