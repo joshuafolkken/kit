@@ -105,8 +105,10 @@ interface EmitContext {
 type DeclineKind = Exclude<ObservationRead['kind'], 'observed'>
 
 // A union rather than an optional field, so a caller that wants the reason has to establish that
-// there is one — the reason exists exactly when no line went out.
-type EmitResult = { kind: DeclineKind } | { kind: 'observed'; state: ProgressState }
+// there is one — the reason exists exactly when no line went out. `line` is the exact string printed,
+// handed back so the caller can persist it verbatim for `josh run:wake --list` to relay
+// (joshuafolkken/kit#1910).
+type EmitResult = { kind: DeclineKind } | { kind: 'observed'; state: ProgressState; line: string }
 
 interface WatchLoop {
 	// When the run last reported anything. Only a printed line moves it.
@@ -169,16 +171,16 @@ async function emit(options: WatchOptions, context: EmitContext): Promise<EmitRe
 	// The interval reaches the line from the options rather than being resolved a second time, so the
 	// schedule printed and the clock `step` consults are one number (joshuafolkken/kit#1726). Both
 	// reporting forms come through here, which is what puts the field on `--wait` and `--once` alike.
-	console.info(
-		run_progress.format_line(read.observations, {
-			interval_ms: options.interval_ms,
-			now_ms: context.now_ms,
-			quiet_since_ms: context.last_ms,
-			unchanged_since_ms: state.unchanged_since_ms,
-		}),
-	)
+	const line = run_progress.format_line(read.observations, {
+		interval_ms: options.interval_ms,
+		now_ms: context.now_ms,
+		quiet_since_ms: context.last_ms,
+		unchanged_since_ms: state.unchanged_since_ms,
+	})
 
-	return { kind: 'observed', state }
+	console.info(line)
+
+	return { kind: 'observed', state, line }
 }
 
 /**
@@ -217,7 +219,7 @@ async function attempt(
 
 	if (result.kind !== 'observed') return decline(loop, now_ms, DECLINE_NOTICES[result.kind])
 
-	run_progress_read.mark(target, now_ms)
+	run_progress_read.mark(target, now_ms, result.line)
 
 	return { ...FRESH_LOOP, last_ms: now_ms, state: result.state }
 }
@@ -346,7 +348,7 @@ async function once(options: WatchOptions): Promise<number> {
 
 	if (result.kind !== 'observed') return report_decline(result.kind)
 
-	run_progress_read.mark(target, now_ms)
+	run_progress_read.mark(target, now_ms, result.line)
 
 	return SUCCESS_EXIT_CODE
 }

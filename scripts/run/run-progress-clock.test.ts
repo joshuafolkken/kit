@@ -67,3 +67,42 @@ describe('the liveness record is a separate file from the report clock', () => {
 		expect(run_progress_clock.LIFE_PREFIX).toBe('josh-run-progress-life-')
 	})
 })
+
+// joshuafolkken/kit#1910: a headless `backlogrun` parent woken after a cut prints its progress only to
+// its own transcript, so the clock also carries the last heartbeat line for `josh run:wake --list` to
+// relay verbatim. The relayed value being identical to the watcher's own output is the acceptance
+// criterion, and it is pinned by the round-trip here.
+describe('the report clock also carries the last heartbeat line', () => {
+	const LINE =
+		'⏳ at 2026-09-13 15:30+09:00 / 06:30Z · quiet 3m · #1904 in-progress PR:open · lanes none · load 1.0 · record unread · unchanged 3m · next later'
+	const WHEN = Date.parse('2026-09-13T06:30:00.000Z')
+
+	it('persists a heartbeat line and reads it back unchanged', () => {
+		const target = path.join(TEMPORARY, 'line.json')
+
+		run_progress_clock.mark(target, WHEN, LINE)
+
+		expect(run_progress_clock.read_last_line(target)).toBe(LINE)
+	})
+
+	// A bare `--mark` moves the clock on a run's real report without a heartbeat line; blanking the last
+	// one there would leave `--list` empty on every real report, so it is kept.
+	it('keeps the last line when a bare mark only moves the clock', () => {
+		const target = path.join(TEMPORARY, 'kept.json')
+
+		run_progress_clock.mark(target, WHEN, LINE)
+		run_progress_clock.mark(target, WHEN)
+
+		expect(run_progress_clock.read_last_line(target)).toBe(LINE)
+	})
+
+	// An absent record and one written before this field existed both carry no line.
+	it('reads no line from an absent or line-less record', () => {
+		const target = path.join(TEMPORARY, 'no-line.json')
+
+		expect(run_progress_clock.read_last_line(target)).toBeUndefined()
+
+		run_progress_clock.mark(target, WHEN)
+		expect(run_progress_clock.read_last_line(target)).toBeUndefined()
+	})
+})
