@@ -32,10 +32,11 @@ describe('the dependency update is routed to the command', () => {
 		expect(read_repo_file(document_path)).toContain(COMMAND)
 	})
 
-	// The point of a command is that the answer is not an agent's to reach; a procedure that names it
-	// without saying so invites the reading it exists to remove.
-	it.each(FLOW_DOCUMENTS)('%s says the trigger is not a judgement', (document_path) => {
-		expect(read_unwrapped(document_path)).toContain('judgement')
+	// The point of a command is that the answer is not an agent's to reach. joshuafolkken/kit#1925
+	// deduplicates the gate → procedure narrative into the single source, so the procedures invoke the
+	// command and the gate document is where the "not a judgement" phrasing is pinned.
+	it('says the trigger is not a judgement in the single source', () => {
+		expect(read_unwrapped(GATE)).toContain('judgement')
 	})
 
 	// The old wording is what a re-edit would restore, and it is the exact instruction the change

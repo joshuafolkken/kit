@@ -3,65 +3,26 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { read_unwrapped } from './ai-document-fixture'
 import { claude_settings_fixture } from './claude-settings-fixture'
 import { entry_read_set } from './document/entry-read-set'
 import { read_set_cli } from './document/read-set-cli'
 
-// joshuafolkken/kit#1797. Two halves of one entry read, both measured on `fullrun #1783`.
-//
-// **The fetch was truncating and nobody could tell.** The entry issued `cat fullrun.md
-// split-assessment.md` and `cat chain-rule.md followup.md latest-gate.md eval-gate.md`; both
-// exceeded the Bash output cap, so 1,725 and 2,034 characters of preview came back and five of the
-// files were then read again individually. Two wasted requests, and about 3.7k tokens of dead
-// preview resident for the rest of the run. **Reading the preview and carrying on is the failure,
-// not the workaround** — it produces a run that has read its instructions partly and cannot say
-// which part — so the fix is a fetch that cannot truncate, stated where the entry reads it and
-// printed beside the figures by the command that measures them.
-//
-// **And some documents were being read long before their first use.** `followup.md` cost 10,326
-// tokens and rode 55 requests before `pnpm josh followup` was issued. They are
-// read at the point of use now — whole, in the same turn, by the command that has to obey them —
-// which is the opposite of the "read it later" demotion joshuafolkken/kit#1344 and
-// joshuafolkken/kit#1460 each measured firing exactly never. This suite pins that distinction,
-// because a later reword that softened it into "read it when convenient" would pass everything else.
+// joshuafolkken/kit#1797 gave the entry read two properties this suite guards: the point-of-use files
+// stay out of every entry's read set, and the Bash output cap the fetch cannot exceed is read from
+// the settings rather than restated. joshuafolkken/kit#1959 removed what used to sit beside them —
+// the §1 "how to fetch" and "read at the point of use" prose that joshuafolkken/kit#1925 trims out of
+// the always-read skill. Both properties are held here structurally, off `entry_read_set` and the
+// settings file, so trimming that prose leaves them untouched.
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CAP_KEY = 'BASH_MAX_OUTPUT_LENGTH'
 const ENV_KEY = 'env'
 const FULLRUN = 'fullrun'
 const NOTHING = 0
-const STATES_CASE = 'states: %j'
 
 const OUTPUT_BOUNDS_DOC = fileURLToPath(
 	new URL('../prompts/collaboration-workflow/output-bounds.md', import.meta.url),
 )
-
-const FETCH_MARKERS: ReadonlyArray<string> = [
-	'### The fetch is one `Read` call per file',
-	'Fetch each file above with one `Read` call of its own — never `cat`, and never two of them in one command',
-	'every document in this set is larger than that cap',
-	// The refusal the Issue is emphatic about: a preview is not a shorter read, it is a partial one.
-	'Reading the preview and carrying on is refused',
-	'a fetch that cannot truncate, never a judgement about whether enough of it came back',
-]
-
-const POINT_OF_USE_MARKERS: ReadonlyArray<string> = [
-	'### Four documents are read at the point of use, not at the entry',
-	'Each is fetched **in full, in the same turn, by the step that has to obey it**',
-	// The half that separates this from a demotion, kept verbatim because it is the half a reword loses.
-	'This is "read it at the point of use", not "read it later", and the difference is what makes it safe',
-	'nothing here is demoted, deferred past its own call, or summarized',
-]
-
-const POINT_OF_USE_TRIGGERS: ReadonlyArray<[string, string]> = [
-	['latest-gate.md', '`pnpm josh latest:scope` answers `required`'],
-	['followup.md', 'Before issuing `pnpm josh followup`'],
-	// joshuafolkken/kit#1856: governed by a named step — `/code-review` — not a `:scope` command.
-	['chain-rule.md', 'Before running the `/code-review` step'],
-	// joshuafolkken/kit#1873: §2h's body, read before the first backgroundable command (the gate).
-	['background-commands.md', 'Before backgrounding `pnpm josh gate`'],
-]
 
 // **The subsection table's rows parse as entry rows, and one edit is all it takes.** Its first column
 // holds a document name, from which `ENTRY_KEYWORD` reads `followup`; until the parse learned to stop
@@ -103,10 +64,6 @@ afterAll(() => {
 	for (const root of temporary_roots) rmSync(root, { force: true, recursive: true })
 })
 
-function skill_text(): string {
-	return read_unwrapped(SKILL)
-}
-
 function declared_cap(): number {
 	return Number(claude_settings_fixture.load_settings().env[CAP_KEY])
 }
@@ -123,24 +80,9 @@ function printed_report(): string {
 	return lines.join('\n')
 }
 
-describe(`${SKILL} states how the entry read is fetched`, () => {
-	it.each(FETCH_MARKERS)(STATES_CASE, (marker) => {
-		expect(skill_text()).toContain(marker)
-	})
-})
-
-describe(`${SKILL} names the documents read at the point of use`, () => {
-	it.each(POINT_OF_USE_MARKERS)(STATES_CASE, (marker) => {
-		expect(skill_text()).toContain(marker)
-	})
-
-	// The trigger is a named command in every row, so nothing about *when* is left to judgement — the
-	// failure mode a "read it later" rule has and this one must not.
-	it.each(POINT_OF_USE_TRIGGERS)('names %s beside its trigger', (file, trigger) => {
-		expect(skill_text()).toContain(`\`${file}\``)
-		expect(skill_text()).toContain(trigger)
-	})
-
+describe(`${SKILL} keeps the point-of-use documents out of the entry read`, () => {
+	// The rule is which documents are read later, not the prose that explains why. It is held off the
+	// `entry_read_set.POINT_OF_USE_FILES` constant, so the §1 explanation being trimmed changes nothing.
 	it('leaves every point-of-use document out of the read set of every entry point', () => {
 		const root = process.cwd()
 

@@ -115,29 +115,21 @@ function cites_pointer(document_path: string, pointer: PointerTopic): boolean {
 }
 
 describe('a canonical topic file that has become a pointer', () => {
-	// The detection is the suite. Matching nothing would make every assertion below vacuous, and the
-	// convention would read as enforced while nothing was checked.
-	it('is found by the marker the convention is written around', () => {
-		expect(pointer_topics().length).toBeGreaterThan(0)
-	})
+	// The convention binds only on pointer files that still exist. joshuafolkken/kit#1925 deletes the
+	// pointer stubs outright, so the count is no longer pinned above zero and no individual pointer is
+	// named — an empty set runs the rules below over nothing and stays green, exactly the robustness
+	// the conversion (joshuafolkken/kit#1959) requires, while any pointer that survives is still held
+	// to the rules.
 
 	// A near-miss has to be louder than a drop-out. Every file that reads as a conversion must match
-	// the declaration the convention names, or the rule below silently stops applying to it.
+	// the declaration the convention names, or the rule below silently stops applying to it. Both
+	// sides are empty once the stubs are gone, which still agrees.
 	it('declares itself in the one form the detection reads', () => {
 		expect(candidate_topics()).toEqual(pointer_topics().map((pointer) => pointer.topic))
 	})
 
 	it.each(pointer_topics())('$topic names a skill file that exists', (pointer) => {
 		expect(() => byte_size(pointer.skill)).not.toThrow()
-	})
-
-	// A conversion the convention was decided over. Named rather than counted, so the suite
-	// keeps covering it as joshuafolkken/kit#1176 adds the remaining topics — `arrayContaining`
-	// because a rollout that grows this list must not have to edit the test that guards it.
-	it('sees the topics converted so far', () => {
-		expect(pointer_topics().map((pointer) => pointer.topic)).toEqual(
-			expect.arrayContaining(['prompts/collaboration-workflow/split-assessment.md']),
-		)
 	})
 
 	// A pointer that grew a body back would satisfy every citation rule below while re-creating the
