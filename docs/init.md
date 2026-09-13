@@ -204,7 +204,7 @@ git config --get core.hooksPath                 # prints the path when one is se
 git config --unset-all --local core.hooksPath   # restores git's default — the same directory
 ```
 
-The value is almost always redundant: it names `<repo>/.git/hooks`, which is git's default, so unsetting it changes nothing except that lefthook will install again. Re-run `pnpm install` (or `pnpm josh lefthook:install`) afterwards.
+The value is almost always redundant: it names `<repo>/.git/hooks`, which is git's default, so unsetting it changes nothing except that lefthook will install again. Re-run `pnpm install` (or `pnpm josh hook:install`) afterwards.
 
 `lefthook install --reset-hooks-path` does the same unset for you, and `lefthook install --force` installs into the path without touching the setting. **Neither is wired into `prepare` on purpose**: rewriting a developer's git configuration as a side effect of `pnpm install` would break the setup of anyone who set that path deliberately.
 

@@ -18,7 +18,7 @@
 
 **範囲の外にある常駐規則はこの一覧に載らないのが正常である。** 命名規約、品質上限、Code Change Rules、Package-First などには移す先が存在せず、判定基準が問う「skill がロードされていないターンでも効くか」という問い自体が成り立たない。一覧に無いことは欠落ではない（joshuafolkken/kit#955）。
 
-範囲の中で常駐に残る規則は次で全部であり、いずれも `CLAUDE.md` に残っていることをマーカーテストが表明している（大半は `scripts/workflow-skills.test.ts`、UI 検証ゲートは `scripts/verify-ui-skill.test.ts`、後追い起票は `scripts/review-followup-bundle-document-rule.test.ts`、ファイル編集の禁止は `scripts/inline-edit-rule.test.ts`）。**引き金つき配送へ移した規則は、常駐にあることではなく発火することで固定される** — ターン内バッチングは `scripts/turn-batching-rule.test.ts`、WIP 上限は `scripts/backlog-manufacturing-rule.test.ts`、機構そのものは `scripts/rules/delivered-rules.test.ts` である。
+範囲の中で常駐に残る規則は次で全部であり、いずれも `CLAUDE.md` に残っていることをマーカーテストが表明している（大半は `scripts/workflow-skills.test.ts`、UI 検証ゲートは `scripts/verify-ui-skill.test.ts`、後追い起票は `scripts/document/document-markers.test.ts`、ファイル編集の禁止は `scripts/document/document-markers.test.ts`）。**引き金つき配送へ移した規則は、常駐にあることではなく発火することで固定される** — ターン内バッチングは `scripts/turn-batching-rule.test.ts`、WIP 上限は `scripts/backlog-manufacturing-rule.test.ts`、機構そのものは `scripts/rules/delivered-rules.test.ts` である。
 
 - **明示起動の必須**（「指示されていない行動は取らない」）— そもそもワークフローを開始してよいかを決める規則なので、ユーザーがキーワードを打った瞬間、つまり skill を読むより前に効く必要がある
 - **停止時の `confirmation` 通知** — これを要する停止の大半（別パッケージ起因の割り込み、Tier C の確認）は、ワークフローのキーワードが一度も打たれていないターンで起きる

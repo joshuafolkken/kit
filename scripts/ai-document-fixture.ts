@@ -90,6 +90,21 @@ function read_index(): string {
 	return readFileSync(package_file(WORKFLOW_PROMPT), 'utf8')
 }
 
+// Every prose document a reader can be routed to, plus the two pointers. This is the corpus the
+// structural scans walk — the command-name, label-name and link-resolution checks that replaced the
+// per-phrase marker suites (joshuafolkken/kit#1923). The pointers are included because a broken link
+// or a stale command name in `AGENTS.md` / `GEMINI.md` is as wrong as one in the rules.
+function all_documents(): ReadonlyArray<string> {
+	return [...routing_documents(), ...POINTER_DOCS]
+}
+
+// The file exactly as it sits on disk. `read_repo_file` answers the workflow index with the whole
+// concatenated corpus, which a scan reporting *which* file carries a defect must not see — it would
+// attribute every topic file's reference to the index. The scans read each path for itself.
+function read_document(relative_path: string): string {
+	return readFileSync(package_file(relative_path), 'utf8')
+}
+
 // Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
 // a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
 // column they landed in. Every marker suite needs this, which is why it lives here rather than being
@@ -148,10 +163,12 @@ function read_unwrapped_rule_surface(document_path: string): string {
 
 export {
 	AI_DOCS,
+	all_documents,
 	CANONICAL_DOC,
 	CLAUDE_SETTINGS,
 	ENV_EXAMPLE,
 	PROMPT_ROOT,
+	read_document,
 	read_index,
 	read_repo_file,
 	routing_documents,

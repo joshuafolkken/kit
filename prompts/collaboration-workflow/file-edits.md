@@ -113,7 +113,7 @@ residency 基準（`residency.md`）は 1 問で決まる。
 
 ### マーカーテスト
 
-`scripts/inline-edit-rule.test.ts` が次を固定する。
+`scripts/document/document-markers.test.ts` が次を固定する。
 
 - `CLAUDE.md` に規則のトリガ文と判断基準の一文が resident で存在すること
 - `CLAUDE.md` に全文書き直しの禁止（「Edit を全文へ広げない」）が resident で存在すること

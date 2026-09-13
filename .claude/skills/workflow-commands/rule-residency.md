@@ -71,8 +71,8 @@ their absence here is correct rather than an omission (joshuafolkken/kit#955).
 Within that scope, every rule that passes the test is resident in full, and a marker suite asserts
 each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most of them,
 `scripts/verify-ui-skill.test.ts` for the UI gate,
-`scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step, and
-`scripts/inline-edit-rule.test.ts` for the file-editing prohibition. **A trigger-delivered rule
+`scripts/document/document-markers.test.ts` for the follow-up filing step, and
+`scripts/document/document-markers.test.ts` for the file-editing prohibition. **A trigger-delivered rule
 is pinned differently** — by what its refusal says and by the trigger firing, in
 `scripts/turn-batching-rule.test.ts`, `scripts/backlog-manufacturing-rule.test.ts` and
 `scripts/rules/delivered-rules.test.ts`, with only its one-line trigger asserted resident:

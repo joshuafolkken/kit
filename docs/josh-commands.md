@@ -1085,7 +1085,7 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 
 Release everything main has taken since the version last changed — one command, run by a person ([#1169](https://github.com/joshuafolkken/kit/issues/1169)).
 
-**When it is typed is `josh release:scope`'s answer, not a judgement** ([#1582](https://github.com/joshuafolkken/kit/issues/1582)). A run asks that command once, after the last merge its invocation authorized, and reports the release rather than cutting one; the rule is `.claude/skills/workflow-commands/followup.md` → "When `pnpm josh release` runs", its single source.
+**When it is typed is `josh release:scope`'s answer, not a judgement** ([#1582](https://github.com/joshuafolkken/kit/issues/1582)). A run asks that command once, after the last merge its invocation authorized, and reports the release rather than cutting one; the rule is `.claude/skills/workflow-commands/followup-reference.md` → "When `pnpm josh release` runs", its single source.
 
 ```bash
 pnpm josh release

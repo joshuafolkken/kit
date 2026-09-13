@@ -224,7 +224,36 @@ function depth_label_of(labels: ReadonlyArray<LabelReference> | undefined): stri
 	return DEPTH_LABEL_ORDER.find((name) => names.has(name))
 }
 
+// Every workflow label this package manages. The label-reference scan
+// (`scripts/document/label-reference.test.ts`, joshuafolkken/kit#1923) reads this to check that no
+// document operates on a label name that does not exist here — a stale or mistyped `labels[]=…`
+// otherwise fails silently at run time. One source, so a label added above joins the scan without a
+// second edit.
+// Applied to an Issue whose second review round was skipped, so the condition stays auditable
+// (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not"). Provisioned inline
+// by the run that applies it rather than through `FILING_ROUTE_LABELS`, but still a managed label the
+// documents operate on, so the label-reference scan has to know it.
+const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
+
+const ALL_LABELS: ReadonlySet<string> = new Set([
+	EPIC_LABEL,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	AUTO_OK_LABEL,
+	NEEDS_HUMAN_REVIEW_LABEL,
+	ALREADY_DONE_LABEL,
+	INTERRUPT_ROUTE_LABEL,
+	REVIEW_CAP_ROUTE_LABEL,
+	REVIEW_ROUND2_SKIPPED_LABEL,
+	SPLIT_ROUTE_LABEL,
+	TIER_A_ROUTE_LABEL,
+	DEPTH_0_LABEL,
+	DEPTH_1_LABEL,
+	DEPTH_2_LABEL,
+])
+
 export {
+	ALL_LABELS,
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	depth_label_of,
@@ -244,6 +273,7 @@ export {
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
+	REVIEW_ROUND2_SKIPPED_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
 }
