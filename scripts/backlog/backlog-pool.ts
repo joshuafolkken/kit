@@ -53,17 +53,37 @@ function is_epic_row(issue: OpenIssueData): boolean {
 // Whether a row is waiting on an open issue this backlog will never run. Only a blocker whose state
 // was read counts: one with no state stays `time`, the fail-safe `auto_ok_cli.is_runnable` already
 // applies to it.
-function waits_outside(issue: OpenIssueData, context: StandaloneContext): boolean {
+function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo: string): boolean {
 	return epic_issue
-		.blocker_references_of(issue, context.repo)
-		.some(
-			(blocker) =>
-				blocker.state === 'OPEN' && !context.running.has(epic_graph.blocker_key(blocker)),
-		)
+		.blocker_references_of(issue, repo)
+		.some((blocker) => blocker.state === 'OPEN' && !running.has(epic_graph.blocker_key(blocker)))
 }
 
 function needs_person(issue: OpenIssueData, context: StandaloneContext): boolean {
-	return has_any_label(issue.labels, DECISION_LABELS) || waits_outside(issue, context)
+	return (
+		has_any_label(issue.labels, DECISION_LABELS) ||
+		waits_outside(issue, context.running, context.repo)
+	)
+}
+
+// The running set with every standalone row a person has to resolve taken out, repeated until a pass
+// removes nothing — a row waiting on such a row waits on that person too, however long the chain.
+function settle_standalone(
+	running: ReadonlySet<string>,
+	issues: ReadonlyArray<OpenIssueData>,
+	repo: string,
+): ReadonlySet<string> {
+	const settled = new Set(running)
+
+	// An epic row is never in the set, so deleting its key changes nothing and it needs no filter.
+	for (const issue of issues) {
+		const is_stuck =
+			has_any_label(issue.labels, DECISION_LABELS) || waits_outside(issue, running, repo)
+
+		if (is_stuck) settled.delete(epic_graph.key_of({ repo, number: issue.number }))
+	}
+
+	return settled.size === running.size ? running : settle_standalone(settled, issues, repo)
 }
 
 // An opted-in row as the graph's node type. Both halves of the pool are then the same shape, so one
@@ -158,11 +178,12 @@ function running_set(
 	issues: ReadonlyArray<OpenIssueData>,
 	repo: string,
 ): ReadonlySet<string> {
-	const rows = standalone_rows(issues).filter(
-		(issue) => !has_any_label(issue.labels, DECISION_LABELS),
-	)
+	const running = epic_outside_blocker.running_keys([
+		...graphs.flat(),
+		...to_children(standalone_rows(issues), repo),
+	])
 
-	return epic_outside_blocker.running_keys([...graphs.flat(), ...to_children(rows, repo)])
+	return settle_standalone(running, issues, repo)
 }
 
 // A cycle no single epic can see, because its links cross from one graph into another. Each epic's own
@@ -175,9 +196,12 @@ function cross_epic_cycles(
 	const within = new Set(
 		[...graphs, standalone].flatMap((children) => epic_graph.find_stuck_children(children)),
 	)
-	const stuck = epic_graph
-		.find_stuck_children([...epic_graph.index_children([...graphs.flat(), ...standalone]).values()])
-		.filter((key) => !within.has(key))
+	// The loops already known are left out before the walk rather than filtered from its answer, so what
+	// only sits downstream of one peels away instead of being named as a loop of its own.
+	const union = [...epic_graph.index_children([...graphs.flat(), ...standalone]).values()]
+	const stuck = epic_graph.find_stuck_children(
+		union.filter((child) => !within.has(epic_graph.key_of(child))),
+	)
 
 	if (stuck.length === 0) return []
 
@@ -276,6 +300,7 @@ const backlog_pool = {
 	classify_standalone,
 	cross_epic_cycles,
 	running_set,
+	settle_standalone,
 	drop_excluded,
 	epic_classification,
 	is_epic_row,

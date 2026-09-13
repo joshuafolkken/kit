@@ -103,6 +103,7 @@ describe('backlog_pool.classify_standalone — the rows a person has to resolve'
 // joshuafolkken/kit#1943: a blocker outside every graph is weighed against what the backlog runs.
 const EPIC_CHILD = 20
 const OTHER_EPIC_CHILD = 30
+const THIRD_CHILD = 40
 
 function epic_child(number: number, blockers: ReadonlyArray<number> = []): EpicChild {
 	return {
@@ -197,5 +198,34 @@ describe('backlog_pool.cross_epic_cycles', () => {
 		]
 
 		expect(backlog_pool.cross_epic_cycles([], rows)).toEqual([])
+	})
+})
+
+describe('backlog_pool.cross_epic_cycles — what only waits behind a loop', () => {
+	// A child downstream of a loop already known is not a loop of its own.
+	it('does not name an epic child that only waits behind a standalone loop', () => {
+		const rows = [
+			epic_child(EPIC_CHILD, [OTHER_EPIC_CHILD]),
+			epic_child(OTHER_EPIC_CHILD, [EPIC_CHILD]),
+		]
+
+		expect(backlog_pool.cross_epic_cycles([[epic_child(THIRD_CHILD, [EPIC_CHILD])]], rows)).toEqual(
+			[],
+		)
+	})
+})
+
+describe('backlog_pool.settle_standalone', () => {
+	// A row blocked from outside the backlog needs a person, and so does the row waiting on it.
+	it('takes out a row waiting on a row that is blocked from outside, however long the chain', () => {
+		const outside_blocked = auto_ok_fixture.blocked_issue(ROW_NUMBER, CREATED_EARLIER, [
+			{ number: BLOCKER_NUMBER, state: 'OPEN' },
+		])
+		const behind = auto_ok_fixture.blocked_issue(THIRD_CHILD, CREATED_EARLIER, [
+			{ number: ROW_NUMBER, state: 'OPEN' },
+		])
+		const running = backlog_pool.running_set([], [outside_blocked, behind], READING_REPO)
+
+		expect(running.size).toBe(0)
 	})
 })

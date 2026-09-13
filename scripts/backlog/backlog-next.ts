@@ -162,6 +162,25 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 	)
 }
 
+// The epic half and the standalone half settled against each other: an epic child a person has to
+// resolve can make a standalone row wait on that person, and that row can in turn hold an epic child.
+// Each pass only shrinks the set, so the walk ends at the first pass that removes nothing
+// (joshuafolkken/kit#1943).
+function settled_views(
+	reads: ReadonlyArray<EpicRead>,
+	running: ReadonlySet<string>,
+	context: PoolContext,
+): ReadonlyArray<EpicView> {
+	const views = epic_next.views_of(reads, running)
+	const settled = backlog_pool.settle_standalone(
+		views[0]?.running ?? running,
+		context.opted_in.issues,
+		context.repo,
+	)
+
+	return settled.size === running.size ? views : settled_views(reads, settled, context)
+}
+
 // Nothing to classify means no epic was read, so `views_of`'s registry resets and its own checkout
 // discovery are not needed. `combine` builds the map either way, so what this saves is the second
 // walk rather than the only one.
@@ -173,9 +192,10 @@ function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): Reado
 
 	const graphs = reads.map((read) => read.snapshot.children)
 
-	return epic_next.views_of(
+	return settled_views(
 		reads,
 		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo),
+		context,
 	)
 }
 
