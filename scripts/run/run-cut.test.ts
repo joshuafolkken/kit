@@ -37,7 +37,11 @@ function target(): string {
 function begun(now: Date = START): RunCut {
 	run_cut.end_cut(target())
 
-	const cut = run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH }, now)
+	const cut = run_cut.begin_cut(
+		target(),
+		{ issue: ISSUE, branch: BRANCH, phase: run_cut.PRE_GATE_PHASE },
+		now,
+	)
 
 	if (cut === undefined) throw new Error('the scratch record was claimed by something else')
 
@@ -117,7 +121,13 @@ describe('a cut is claimed exclusively', () => {
 	it('refuses a second cut over a record already there', () => {
 		begun()
 
-		expect(run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH }, START)).toBeUndefined()
+		expect(
+			run_cut.begin_cut(
+				target(),
+				{ issue: ISSUE, branch: BRANCH, phase: run_cut.PRE_GATE_PHASE },
+				START,
+			),
+		).toBeUndefined()
 	})
 })
 

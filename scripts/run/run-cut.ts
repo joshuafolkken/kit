@@ -36,6 +36,24 @@ import { run_hold } from './run-hold'
 
 const CUT_PREFIX = 'josh-run-cut-'
 const PRE_GATE_PHASE = 'pre-gate'
+// The second boundary a cut can be taken at (joshuafolkken/kit#1933). The pre-gate cut drops the
+// thinking accumulated *before* the gate; this one drops it *during* implementation, when a lane
+// child's context has already grown past the threshold below and every later request re-reads it. The
+// two phases share this whole record and the relaunch — only the resume differs, because an
+// implementation cut resumes into more implementation rather than into the gate.
+const IMPLEMENTATION_PHASE = 'implementation'
+// **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
+// child decides whether to take this cut with `pnpm josh cost --over <IMPLEMENTATION_CONTEXT_THRESHOLD>`
+// — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
+// `pnpm josh cost --over 300000` hand-off uses (`epicrun.md` → "The hand-off"). Only the threshold
+// differs, and this constant is its single source so the procedure doc and the test cannot drift.
+//
+// **200_000 is the initial value.** The 2026-09-13 `backlogrun` measured lane bodies at 386k / 283k /
+// 240k / 208k median context per request while implementing — the second half of a run costing about
+// twice the first over the same requests — and joshuafolkken/kit#1837's cap simulation put a 200k
+// per-request cap at 71% of the final 427k and 300k at 89%. Cutting at 200k during implementation caps
+// the accumulation the pre-gate boundary alone never reached.
+const IMPLEMENTATION_CONTEXT_THRESHOLD = 200_000
 // **The whole-run bound is `backlog-budget.ts`'s, imported rather than restated** — the same reuse
 // `run-carry.ts` makes. A resume is expected within seconds of the cut, so this age is only a backstop
 // against a fresh process that never started; an expired record is cleared and replaced by the next
@@ -74,10 +92,14 @@ interface CutState {
 	is_held: boolean
 }
 
-// The two fields a cut is written from, bundled so `begin_cut` stays within the parameter limit.
+// The fields a cut is written from, bundled so `begin_cut` stays within the parameter limit. `phase`
+// is which boundary the cut was taken at — `PRE_GATE_PHASE` or `IMPLEMENTATION_PHASE` — and it is what
+// the resume reads to decide whether the fresh process continues to the gate or back into
+// implementation (joshuafolkken/kit#1933).
 interface CutSpec {
 	issue: string
 	branch: string
+	phase: string
 }
 
 // What the resume classifier is asked about, gathered from the fresh process's own git state so the
@@ -219,7 +241,7 @@ function fresh_cut(spec: CutSpec, now: Date): RunCut {
 		invocation: invocation_for(spec.issue),
 		issue: spec.issue,
 		branch: spec.branch,
-		phase: PRE_GATE_PHASE,
+		phase: spec.phase,
 		cut_at: now.toISOString(),
 		is_handed_off: true,
 	}
@@ -341,6 +363,8 @@ const run_cut = {
 	CUT_MAX_AGE_HOURS,
 	CUT_MAX_AGE_MS,
 	END_COMMAND,
+	IMPLEMENTATION_CONTEXT_THRESHOLD,
+	IMPLEMENTATION_PHASE,
 	PRE_GATE_PHASE,
 	adopt_cut,
 	begin_cut,

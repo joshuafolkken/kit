@@ -1,3 +1,4 @@
+import { run_cut } from '#scripts/run/run-cut'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cost_report, type CostReport, type MissingData } from './cost-report'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
@@ -80,6 +81,32 @@ describe('cost_verdict.report_over', () => {
 
 	it('reports an empty session rather than a verdict', () => {
 		expect(cost_verdict.report_over([report_of([])], 0)).toBe(FAILURE_EXIT_CODE)
+	})
+})
+
+// joshuafolkken/kit#1933: the implementation-phase cut of a lane child is decided by this same
+// `report_over` measurement — `pnpm josh cost --over <IMPLEMENTATION_CONTEXT_THRESHOLD>` — not by a
+// second decision function. This pins the boundary against the real path: over the threshold a lane
+// child cuts, at or below it it keeps implementing, and the threshold's initial value is the
+// documented 200k, single-sourced from `run_cut` so this test and the doc cannot drift.
+describe("cost_verdict.report_over at the lane child's implementation threshold", () => {
+	const INITIAL_THRESHOLD = 200_000
+	const threshold = run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD
+
+	it('starts at the documented 200k initial value', () => {
+		expect(run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD).toBe(INITIAL_THRESHOLD)
+	})
+
+	it('answers over — the lane child cuts — above the threshold', () => {
+		cost_verdict.report_over([report_of([record(threshold + 1)])], threshold)
+
+		expect(stdout()).toBe(cost_verdict.OVER_VERDICT)
+	})
+
+	it('answers under — the lane child keeps implementing — at or below the threshold', () => {
+		cost_verdict.report_over([report_of([record(threshold)])], threshold)
+
+		expect(stdout()).toBe(cost_verdict.UNDER_VERDICT)
 	})
 })
 

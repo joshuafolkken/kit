@@ -25,6 +25,10 @@ const FAILURE_EXIT_CODE = 1
 
 const CUT_VERDICT = 'cut'
 const RESUME_VERDICT = 'resume'
+// An implementation-phase resume: the fresh process continues implementing rather than going to the
+// gate (joshuafolkken/kit#1933). It is a distinct token so the resuming child branches on it without
+// re-reading the record.
+const RESUME_IMPL_VERDICT = 'resume-impl'
 const FRESH_VERDICT = 'fresh'
 const STALE_VERDICT = 'stale'
 const HANDED_OFF_VERDICT = 'handed-off'
@@ -147,7 +151,7 @@ function clear_expired(target: string): void {
 	if (run_cut.read_cut(target).kind === 'expired') run_cut.end_cut(target)
 }
 
-async function cut(target: string, issue: string): Promise<number> {
+async function cut(target: string, issue: string, phase: string): Promise<number> {
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
@@ -157,7 +161,7 @@ async function cut(target: string, issue: string): Promise<number> {
 	if (!(await is_lane_branch(state))) return refuse_unready(state)
 
 	clear_expired(target)
-	const started = run_cut.begin_cut(target, { issue, branch: state.branch })
+	const started = run_cut.begin_cut(target, { issue, branch: state.branch, phase })
 
 	if (started === undefined) return report_cut_exists(target)
 
@@ -166,12 +170,19 @@ async function cut(target: string, issue: string): Promise<number> {
 
 // **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two
 // racing resumes only one wins the create and the loser is answered `busy`.
+// An implementation-phase cut resumes back into implementation; a pre-gate one into the gate. The
+// resuming child is told which by the verdict rather than reconstructing it from the record
+// (joshuafolkken/kit#1933).
+function resume_verdict_for(cut_record: RunCut): string {
+	return cut_record.phase === run_cut.IMPLEMENTATION_PHASE ? RESUME_IMPL_VERDICT : RESUME_VERDICT
+}
+
 function adopt(target: string, cut_record: RunCut): number {
 	const adopted = run_cut.adopt_cut(target, cut_record)
 
 	if (adopted === undefined) return report_busy(cut_record)
 
-	return report(RESUME_VERDICT, SUCCESS_EXIT_CODE)
+	return report(resume_verdict_for(cut_record), SUCCESS_EXIT_CODE)
 }
 
 async function verify_and_adopt(
@@ -221,8 +232,15 @@ function end(target: string): number {
 	return report(ENDED_VERDICT, SUCCESS_EXIT_CODE)
 }
 
+// A bare cut is the pre-gate boundary; `--impl` is the implementation-phase one (joshuafolkken/kit#1933).
+function cut_phase(is_implementation: boolean): string {
+	return is_implementation ? run_cut.IMPLEMENTATION_PHASE : run_cut.PRE_GATE_PHASE
+}
+
 async function act(target: string, request: Request): Promise<number> {
-	if (request.kind === 'cut') return await cut(target, request.issue)
+	if (request.kind === 'cut') {
+		return await cut(target, request.issue, cut_phase(request.is_implementation))
+	}
 
 	if (request.kind === 'resume') return await resume(target, request.issue)
 
@@ -276,6 +294,7 @@ const run_cut_cli = {
 	FRESH_VERDICT,
 	HANDED_OFF_VERDICT,
 	NOT_A_LANE_VERDICT,
+	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
 	STALE_VERDICT,
 	UNKNOWN_VERDICT,
