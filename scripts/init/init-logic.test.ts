@@ -109,10 +109,12 @@ describe('generate_playwright_config - CI detection helper', () => {
 })
 
 describe('get_ai_copy_files - AI and community files', () => {
-	it('includes all AI markdown and community files', () => {
+	// CLAUDE.md is deliberately absent: since joshuafolkken/kit#1878 it is distributed by import, not
+	// byte-copied (its own guard lives in init-logic.transform.test.ts).
+	it('includes the AI markdown and community files it still byte-copies', () => {
 		const result = init_logic.get_ai_copy_files()
 
-		expect(result).toContain('CLAUDE.md')
+		expect(result).not.toContain('CLAUDE.md')
 		expect(result).toContain('AGENTS.md')
 		expect(result).toContain('GEMINI.md')
 		expect(result).toContain('CODE_OF_CONDUCT.md')

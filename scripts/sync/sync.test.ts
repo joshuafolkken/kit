@@ -284,6 +284,44 @@ describe('sync_playwright_config', () => {
 
 const NO_REFERENCES_CONTENT = 'no references here\n'
 
+const CLAUDE_MD_DEST = path.join(TEST_DIR, 'dest', 'CLAUDE.md')
+const CLAUDE_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
+
+// CLAUDE.md is distributed by import, not byte-copied (joshuafolkken/kit#1878): `josh sync` ensures
+// the one-line import is present while never disturbing a consumer's own additions below it.
+describe('sync_claude_md', () => {
+	it('writes the one-line import when the consumer has no CLAUDE.md', () => {
+		sync.sync_claude_md(CLAUDE_MD_DEST)
+
+		expect(readFileSync(CLAUDE_MD_DEST, 'utf8')).toBe(`${CLAUDE_IMPORT_LINE}\n`)
+	})
+
+	it('prepends the import while preserving project-specific additions', () => {
+		const additions = '## Project rules\n- do the thing\n'
+
+		writeFileSync(CLAUDE_MD_DEST, additions)
+		sync.sync_claude_md(CLAUDE_MD_DEST)
+
+		const result = readFileSync(CLAUDE_MD_DEST, 'utf8')
+
+		expect(result).toBe(`${CLAUDE_IMPORT_LINE}\n\n${additions}`)
+	})
+
+	it('leaves a file already carrying the import unchanged', () => {
+		const content = `${CLAUDE_IMPORT_LINE}\n\n## Project rules\n`
+
+		writeFileSync(CLAUDE_MD_DEST, content)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+
+		sync.sync_claude_md(CLAUDE_MD_DEST)
+
+		expect(readFileSync(CLAUDE_MD_DEST, 'utf8')).toBe(content)
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('unchanged'))
+	})
+})
+
 describe('sync_ai_file', () => {
 	it('writes file content to destination', () => {
 		writeFileSync(SRC_PATH, NO_REFERENCES_CONTENT)

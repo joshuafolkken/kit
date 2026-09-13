@@ -635,13 +635,16 @@ kit's base layer for `tsconfig.json`, `cspell.config.yaml`, and `lefthook.yml` i
 
 ## Path transformation
 
-`CLAUDE.md` and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`. The `AGENTS.md` / `GEMINI.md` pointers are rewritten by the same pass ([#963](https://github.com/joshuafolkken/kit/issues/963)): each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one, and that citation has to resolve in a consumer like any other:
+The AI files kit distributes carry backtick path references that must resolve in a consumer. The same transform is applied in two places: `prepack` bakes it into the published `CLAUDE.md` (`scripts/build-claude-md.ts`), and `josh sync` applies it to the pointer files it still byte-copies — `AGENTS.md`, `GEMINI.md`, `.cursorrules` ([#963](https://github.com/joshuafolkken/kit/issues/963)):
 
 ```text
-`prompts/foo.md`  →  `node_modules/@joshuafolkken/kit/prompts/foo.md`
+`prompts/foo.md`             →  `node_modules/@joshuafolkken/kit/prompts/foo.md`     (bundled)
+`eslint/rules/foo.js`        →  `node_modules/@joshuafolkken/kit/eslint/rules/foo.js` (bundled)
+`scripts/foo.test.ts`        →  `https://github.com/joshuafolkken/kit/blob/main/scripts/foo.test.ts`  (not bundled)
+`docs/`                      →  `https://github.com/joshuafolkken/kit/tree/main/docs/`  (not bundled)
 ```
 
-This transformation is applied to backtick-quoted paths matching the pattern `` `prompts/<path>` ``.
+Bundled directories (`prompts/`, `eslint/`) point into `node_modules`; paths the package does not ship (tests, `docs/`) become full GitHub URLs, since a consumer never receives them. Globs such as `` `prompts/**` `` are left alone. **`CLAUDE.md` itself is no longer byte-copied** ([#1878](https://github.com/joshuafolkken/kit/issues/1878)): the package ships the transformed copy at `dist/CLAUDE.md`, and a consumer's `CLAUDE.md` is a one-line `@import` of it plus the project's own additions — so `josh sync` only ensures that import line is present, never overwriting the additions, and a package update keeps the rules current on its own.
 
 ## Refused inside the distribution package's own repository
 

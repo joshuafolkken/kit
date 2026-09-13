@@ -6,8 +6,10 @@
 // They are deliberately not stubs. The defect this gate exists for was a real path failing to be
 // matched, so a suite that only ever saw synthetic entries would have passed throughout.
 
-// On `AI_COPY_FILES`: matched by equality, and the one a reader would find by eye.
-const DISTRIBUTED_ROOT_FILE = 'CLAUDE.md'
+// On `AI_COPY_FILES`: matched by equality, and the one a reader would find by eye. Not CLAUDE.md —
+// since joshuafolkken/kit#1878 that is distributed by import rather than byte-copied, so it sits on
+// no AI_COPY list; a consumer's own additions to it are theirs to edit.
+const DISTRIBUTED_ROOT_FILE = 'AGENTS.md'
 
 // On `AI_COPY_DIRECTORIES` only — it equals no list entry, so it is matched through the directory it
 // sits under. This is the path the run that skipped the gate had changed.
