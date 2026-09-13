@@ -80,7 +80,7 @@ describe('handle_managed_config_changes — a distributed file', () => {
 	it('names the list that claimed the path', async () => {
 		given_changed([DISTRIBUTED_SKILL_FILE])
 
-		expect(joined(await run_report())).toContain('AI_COPY_DIRECTORIES')
+		expect(joined(await run_report())).toContain('PLUGIN_SKILL_DIRECTORIES')
 	})
 })
 

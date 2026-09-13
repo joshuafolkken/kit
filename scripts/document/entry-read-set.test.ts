@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { entry_read_set } from './entry-read-set'
 
@@ -31,6 +33,25 @@ const EXPECTED_ENTRIES: ReadonlyArray<string> = [
 function alphabetical(left: string, right: string): number {
 	return left.localeCompare(right)
 }
+
+// joshuafolkken/kit#1879: the skill bodies are no longer copied into a consumer's tree — they ship as
+// the `kit` plugin — so `josh doc:section` and `josh read:set` resolve a bare filename against the
+// package's own copy when the project has no skill tree. In the kit repo the project path always
+// exists, so the fallback never fires here.
+describe('entry_read_set.document_path — consumer fallback', () => {
+	it('resolves against the project when the project has the file', () => {
+		expect(entry_read_set.document_path(ROOT, EPICRUN)).toBe(
+			path.join(ROOT, entry_read_set.SKILL_DIRECTORY, EPICRUN),
+		)
+	})
+
+	it('falls back to the package copy when the project has no skill tree', () => {
+		const resolved = entry_read_set.document_path(path.join(ROOT, 'no-such-consumer'), EPICRUN)
+
+		expect(existsSync(resolved)).toBe(true)
+		expect(resolved).toContain(path.join(entry_read_set.SKILL_DIRECTORY, EPICRUN))
+	})
+})
 
 describe('entry_read_set.read_set — which files', () => {
 	it('reads every keyword out of the table, and no more', () => {

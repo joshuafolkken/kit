@@ -1260,7 +1260,7 @@ those commands' park-and-continue rule exists to avoid.
 - **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
   tracks is one `epic:next` never offers, so an unbundled observation is parked rather than recorded.
   **Where that epic's root carries `auto-ok` the filing joins the backlog's pool**, which is admitted
-  and bounded rather than denied: `.claude/skills/workflow-commands/backlogrun.md` → "What one
+  and bounded rather than denied: `backlogrun.md` → "What one
   invocation approves" is the single source of how this obligation and that authorization boundary
   meet (joshuafolkken/kit#1675).
 - **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent, and the Issue in

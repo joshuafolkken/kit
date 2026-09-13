@@ -1,0 +1,15 @@
+{
+	"name": "kit",
+	"description": "The joshuafolkken/kit plugin marketplace — ships kit's distributed Claude Code skills to consumer projects.",
+	"owner": {
+		"name": "joshuafolkken",
+		"url": "https://github.com/joshuafolkken"
+	},
+	"plugins": [
+		{
+			"name": "kit",
+			"source": "./.claude",
+			"description": "joshuafolkken/kit distributed skills: Issue-driven workflow commands, epic:* commands, post-dependency-update verification, the UI-verification gate and run-time diagnostics."
+		}
+	]
+}

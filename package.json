@@ -36,6 +36,8 @@
 		"lefthook",
 		".claude/settings.json",
 		".claude/skills",
+		".claude/.claude-plugin",
+		".claude-plugin",
 		".vscode",
 		".github",
 		"CLAUDE.md",

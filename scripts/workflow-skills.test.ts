@@ -128,14 +128,15 @@ function distributed_skill_directories(): Array<string> {
 		.toSorted((left, right) => left.localeCompare(right))
 }
 
-// Enumerated from disk rather than listed here: a skill added to the repository and forgotten in
-// `AI_COPY_DIRECTORIES` reaches consumers as a pointer to a file they do not have, and a hardcoded
-// list is exactly what let that happen (joshuafolkken/kit#873).
+// Enumerated from disk rather than listed here: every skill in the repository now ships to consumers
+// as the `kit` Claude Code plugin (joshuafolkken/kit#1879), auto-discovered from the package's
+// `.claude/skills` directory, so none is copied into a consumer's tree and a skill added and
+// forgotten cannot reach a consumer as a pointer to a file they do not have.
 describe.each(distributed_skill_directories())('%s — distribution', (skill_directory) => {
 	const content = read_skill_file(skill_directory)
 
-	it('is copied into consumers as a directory', () => {
-		expect(init_logic.get_ai_copy_directories()).toContain(skill_directory)
+	it('ships as the kit plugin rather than a copied directory', () => {
+		expect(init_logic.get_ai_copy_directories()).not.toContain(skill_directory)
 	})
 
 	it('opens with YAML frontmatter Claude Code can read', () => {
@@ -344,8 +345,10 @@ describe.each(AI_DOCS)('%s — stays inside the resident budget', (document_path
 describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (document_path) => {
 	const content = read_repo_file(document_path)
 
-	it.each([WORKFLOW_SKILL, DEPENDENCY_SKILL])('names %s', (skill_directory) => {
-		expect(content).toContain(skill_directory)
+	// The skills now ship as the `kit` plugin (joshuafolkken/kit#1879), so the document routes to them
+	// by skill name rather than by a `.claude/skills/…` path that would not resolve at a consumer.
+	it.each(['workflow-commands', 'dependency-update'])('names the %s skill', (skill_name) => {
+		expect(content).toContain(`\`${skill_name}\` skill`)
 	})
 
 	// Asserted absent, not merely "not required": a document that both routes to the skill and keeps

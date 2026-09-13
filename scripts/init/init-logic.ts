@@ -118,27 +118,13 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	},
 ]
 
-// Copied whole rather than file by file: a skill is a directory by definition, and one that grows a
-// supporting file would otherwise ship without it. `cpSync` copies bytes, so the walk is followed by
-// a transform pass over the copied markdown (directory-copy-guard.ts → transform_copied_tree) — the
-// same rewrite the file copies get, which is what lets a skill cite a `prompts/…` path and have it
-// resolve inside a consumer. Only markdown is rewritten, so a `.github/workflows` path still may not
-// live under one of these directories: it would arrive unpinned and unstamped.
-const AI_COPY_DIRECTORIES: ReadonlyArray<string> = [
-	'.claude/skills/verify-ui',
-	// joshuafolkken/kit#854: the workflow procedures and the post-dependency-update checks left the
-	// always-loaded AI documents for these two skills, so a consumer that does not receive them is
-	// left with the trigger and none of the procedure it points at.
-	'.claude/skills/workflow-commands',
-	'.claude/skills/dependency-update',
-	// joshuafolkken/kit#873: the `josh epic:*` procedures left the always-loaded documents for the
-	// same reason, and the documents now route to this skill instead of carrying them.
-	'.claude/skills/epic-commands',
-	// joshuafolkken/kit#1270: reading `josh time`'s output and deciding what to cut was pasted in as
-	// a prompt every time, so the wording drifted and with it the analysis. The procedure is a skill
-	// the shorthand table routes to, like every other one here.
-	'.claude/skills/diag',
-]
+// Empty since joshuafolkken/kit#1879: the five skill directories kit used to copy whole
+// (`workflow-commands`, `epic-commands`, `dependency-update`, `verify-ui`, `diag`) now ship as the
+// `kit` Claude Code plugin and load from the package, so nothing is copied into a consumer's tree.
+// The copy-and-transform machinery (directory-copy-guard.ts → transform_copied_tree) is kept intact
+// for any future distributed directory; the migration that removes a consumer's stale skill copies
+// lives in `scripts/sync/skill-migration.ts`.
+const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
 
 const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
 

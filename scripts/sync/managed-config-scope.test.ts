@@ -7,10 +7,10 @@ import {
 } from '#scripts/managed-config-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-	AI_COPY_DIRECTORIES_LIST,
 	AI_COPY_FILE_MAPPINGS_LIST,
 	AI_COPY_FILES_LIST,
 	managed_config_scope,
+	PLUGIN_SKILL_DIRECTORIES_LIST,
 	SYNCED_PATHS_LIST,
 } from './managed-config-scope'
 
@@ -31,16 +31,16 @@ describe('managed_config_scope.find_managed_paths', () => {
 	// The acceptance criterion of joshuafolkken/kit#1578: the run that skipped the gate changed this
 	// exact file, and no eye-comparison against the array finds it, because the array holds the
 	// directory rather than the file.
-	it('claims a file under an AI_COPY_DIRECTORIES entry it does not textually equal', () => {
+	it('claims a file under a PLUGIN_SKILL_DIRECTORIES entry it does not textually equal', () => {
 		const hits = managed_config_scope.find_managed_paths([DISTRIBUTED_SKILL_FILE])
 
-		expect(hits).toEqual([{ path: DISTRIBUTED_SKILL_FILE, list: AI_COPY_DIRECTORIES_LIST }])
+		expect(hits).toEqual([{ path: DISTRIBUTED_SKILL_FILE, list: PLUGIN_SKILL_DIRECTORIES_LIST }])
 	})
 
-	it('claims the distributed directory itself', () => {
+	it('claims the distributed skill directory itself', () => {
 		const hits = managed_config_scope.find_managed_paths([SKILL_DIRECTORY])
 
-		expect(hits).toEqual([{ path: SKILL_DIRECTORY, list: AI_COPY_DIRECTORIES_LIST }])
+		expect(hits).toEqual([{ path: SKILL_DIRECTORY, list: PLUGIN_SKILL_DIRECTORIES_LIST }])
 	})
 
 	it('leaves a path on none of the three lists alone', () => {
@@ -122,7 +122,7 @@ describe('managed_config_scope.format_hits', () => {
 
 		expect(managed_config_scope.format_hits(hits)).toBe(
 			`${DISTRIBUTED_ROOT_FILE} (${AI_COPY_FILES_LIST})\n` +
-				`${DISTRIBUTED_SKILL_FILE} (${AI_COPY_DIRECTORIES_LIST})`,
+				`${DISTRIBUTED_SKILL_FILE} (${PLUGIN_SKILL_DIRECTORIES_LIST})`,
 		)
 	})
 

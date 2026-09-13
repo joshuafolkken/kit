@@ -89,7 +89,7 @@ const PATHS_HEADING = 'Distributed paths in this diff:'
 // What `format_hit` actually writes: the path, then the list that claimed it, in brackets. Asserted
 // as one string rather than two `toContain` calls, so a report that named the path and dropped the
 // list would fail here.
-const EXPECTED_HIT = `${DISTRIBUTED_SKILL_FILE} (AI_COPY_DIRECTORIES)`
+const EXPECTED_HIT = `${DISTRIBUTED_SKILL_FILE} (PLUGIN_SKILL_DIRECTORIES)`
 
 const BASE_INPUT: FollowupInput = {
 	branch_name: 'test-branch',

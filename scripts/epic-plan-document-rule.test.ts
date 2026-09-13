@@ -106,7 +106,7 @@ describe('what only the canonical carried now lives at the single source', () =>
 	// The label-clearing rule is defined by `epicrun`, and the fold-in says so rather than restating
 	// it. A citation naming a file that no longer defines it would send the reader nowhere.
 	it('cites the file that defines the label-clearing rule', () => {
-		expect(read_unwrapped(SKILL)).toContain(EPICRUN_SKILL)
+		expect(read_unwrapped(SKILL)).toContain('epicrun.md')
 		expect(read_unwrapped(EPICRUN_SKILL)).toContain('Removing the label is Tier A')
 	})
 })

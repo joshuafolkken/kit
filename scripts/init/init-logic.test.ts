@@ -271,8 +271,10 @@ describe('merge_package_scripts retired scripts', () => {
 })
 
 describe('get_ai_copy_directories', () => {
-	it('distributes the verify-ui skill', () => {
-		expect(init_logic.get_ai_copy_directories()).toContain('.claude/skills/verify-ui')
+	// The skill directories moved to plugin distribution (joshuafolkken/kit#1879), so nothing is copied
+	// as a directory any more; the list is kept as the seam for any future distributed directory.
+	it('no longer copies the verify-ui skill, which now ships as the kit plugin', () => {
+		expect(init_logic.get_ai_copy_directories()).not.toContain('.claude/skills/verify-ui')
 	})
 })
 

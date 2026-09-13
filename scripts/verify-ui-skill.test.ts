@@ -17,8 +17,8 @@ function read_skill(): string {
 }
 
 describe(`${SKILL_PATH} — distribution`, () => {
-	it('is copied into consumers as a directory', () => {
-		expect(init_logic.get_ai_copy_directories()).toContain(SKILL_DIRECTORY)
+	it('ships as the kit plugin rather than a copied directory', () => {
+		expect(init_logic.get_ai_copy_directories()).not.toContain(SKILL_DIRECTORY)
 	})
 
 	it('opens with YAML frontmatter Claude Code can read', () => {

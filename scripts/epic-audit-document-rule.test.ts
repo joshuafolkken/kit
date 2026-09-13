@@ -57,7 +57,7 @@ describe('epic:audit documentation', () => {
 	})
 
 	it.each(AI_DOCS)('routes %s to the skill rather than inlining it', (document_name) => {
-		expect(read_repo_file(document_name)).toContain('.claude/skills/epic-commands/SKILL.md')
+		expect(read_repo_file(document_name)).toContain('`epic-commands` skill')
 	})
 
 	it('has a canonical section in the workflow prompt', () => {

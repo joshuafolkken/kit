@@ -125,5 +125,11 @@ function copy_directory_failure(source_path: string, destination_path: string): 
 	return undefined
 }
 
-export { classify_path, copy_directory_failure, directory_copy_blocker, transform_copied_tree }
+export {
+	classify_path,
+	copy_directory_failure,
+	directory_copy_blocker,
+	is_transformable,
+	transform_copied_tree,
+}
 export type { DestinationKind }

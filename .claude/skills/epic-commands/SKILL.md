@@ -68,7 +68,7 @@ several times; and the answers end up only in a conversation nobody can read bac
   has nothing to do with it — and `#A` and `#B` would still get nothing from that call.
 - **Recording a decision removes that child's `needs-decision` label** (Tier A). Without it the child
   stays parked after the answer arrived. The label-clearing rule itself is defined by
-  `.claude/skills/workflow-commands/epicrun.md` → "park and continue"; what this section adds is the
+  `epicrun.md` → "park and continue"; what this section adds is the
   moment it fires — the answer being written down.
 
 ```md
