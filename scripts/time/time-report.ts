@@ -18,6 +18,7 @@ import { time_heading } from './time-heading'
 import { time_investigation, type InvestigationTotals } from './time-investigation'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_josh_commands } from './time-josh-commands'
+import { time_label_totals, type LabelTotal } from './time-label-totals'
 import { time_model_gaps } from './time-model-gaps'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import type { PhaseCostFacts } from './time-phase-costs'
@@ -63,12 +64,6 @@ const { format_minutes, format_seconds, format_share, format_columns, format_row
 // below under the names they always had. The four category labels went to `time-format.ts` in the same
 // move, because that block's price row prints one of them and cannot import this file.
 const { MODEL_LABEL, TOOL_LABEL, HUMAN_LABEL, CI_LABEL, NO_CALLS } = time_format
-
-interface LabelTotal {
-	label: string
-	duration_ms: number
-	call_count: number
-}
 
 // A per-tool row, which carries two counts the per-`josh <cmd>` table does not
 // (joshuafolkken/kit#1385). **The two tables are deliberately different shapes here**: a `josh`
@@ -284,45 +279,6 @@ function category_ms(spans: ReadonlyArray<Span>, category: SpanCategory): number
 	return of_category(spans, category).reduce((sum, span) => sum + span.duration_ms, 0)
 }
 
-// An empty label is not a bucket. Every span carries a category, but only tool spans carry a tool
-// name, and only a Bash span running `pnpm josh <cmd>` carries a command — printing the rest under
-// a blank row would invent a total nobody measured.
-//
-// **A continuation adds neither a call nor a duration** (joshuafolkken/kit#1304, joshuafolkken/kit#1591).
-// One call bracketing a delegated unit comes back from `time_overlap.trim` as two spans, and counting
-// both as calls reported a run as having made more than it did — leaving this table disagreeing with
-// the round-trip block, which counts the same calls. Its duration is skipped for the same reason it is
-// counted once: the head already carries the whole call in `own_duration_ms`, so adding the tail's
-// share on top would price one call twice.
-//
-// **This is a per-call table, so it reports what the call took** — `own_duration_ms`, which the
-// delegated subtraction never touches. The share of the run's wall clock is `duration_ms`, and that
-// is what the categories, the phases and the segments go on reading, because those have to
-// reconstruct `elapsed_ms` and this table does not.
-function accumulate(totals: Map<string, LabelTotal>, label: string, span: Span): void {
-	if (label === '' || span.is_continuation) return
-
-	const existing = totals.get(label) ?? { label, duration_ms: 0, call_count: 0 }
-
-	totals.set(label, {
-		label,
-		duration_ms: existing.duration_ms + span.own_duration_ms,
-		call_count: existing.call_count + 1,
-	})
-}
-
-function totals_by(spans: ReadonlyArray<Span>, key_of: (span: Span) => string): Array<LabelTotal> {
-	const totals = new Map<string, LabelTotal>()
-	const rows: Array<LabelTotal> = []
-
-	for (const span of spans) accumulate(totals, key_of(span), span)
-	// Drained with a loop rather than a spread: `Iterator#toArray` is not in this project's TS lib,
-	// and the spread form the linter would otherwise demand does not type-check.
-	for (const [, row] of totals) rows.push(row)
-
-	return rows.toSorted((left, right) => right.duration_ms - left.duration_ms)
-}
-
 function category_totals(spans: ReadonlyArray<Span>, ci_ms: number): CategoryTotals {
 	return {
 		model_ms: category_ms(spans, time_spans.MODEL_CATEGORY),
@@ -391,10 +347,10 @@ function report_tables(input: ReportInput, turns: TurnTotals): ReportWalks {
 		ci_cycles: time_cycles.build_cycles(spans, input.ci),
 		segments: time_segments.build_segments(spans),
 		by_tool: time_tool_turns.with_turn_counts(
-			totals_by(spans, (span) => span.label),
+			time_label_totals.totals_by(spans, (span) => span.label),
 			turns.by_label,
 		),
-		by_josh_command: totals_by(josh_spans, (span) => span.josh_command),
+		by_josh_command: time_label_totals.totals_by(josh_spans, (span) => span.josh_command),
 		by_invocation: time_invocations.build_invocations(josh_spans),
 		by_check: [...input.by_check],
 	}
@@ -566,5 +522,7 @@ const time_report = {
 // Re-exported from where the category block now lives, so every caller keeps asking this module for
 // the type it always asked for (joshuafolkken/kit#1465).
 export type { CategoryTotals } from './time-category-table'
-export type { LabelTotal, ReportInput, RowTotal, TimeReport, ToolTotal }
+export type { ReportInput, RowTotal, TimeReport, ToolTotal }
 export { time_report }
+
+export { type LabelTotal } from './time-label-totals'
