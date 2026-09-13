@@ -16,21 +16,12 @@
 | Step 1: Issue 作成テンプレ                                                     | [`issue-template.md`](./collaboration-workflow/issue-template.md)                       |
 | Step 2: 提案依頼（AI 共通）                                                    | [`proposal-request.md`](./collaboration-workflow/proposal-request.md)                   |
 | Step 3: 計画コメントを記録して通知する                                         | [`plan-comment.md`](./collaboration-workflow/plan-comment.md)                           |
-| `/code-review` → `followup` の連鎖規則                                         | [`chain-rule.md`](./collaboration-workflow/chain-rule.md)                               |
 | 報告フォーマット（平易な概要 ＋ 技術詳細）                                     | [`report-format.md`](./collaboration-workflow/report-format.md)                         |
 | セッション向け出力で Issue はリンク＋短い日本語要約で参照する                  | [`issue-citation.md`](./collaboration-workflow/issue-citation.md)                       |
-| Step 5: PR結果確認 + 完了通知（別スクリプト）                                  | [`completion-notify.md`](./collaboration-workflow/completion-notify.md)                 |
 | 後から関連が判明した Issue を epic に束ねる                                    | [`epic-bundle.md`](./collaboration-workflow/epic-bundle.md)                             |
-| `into <target>` — 作った Issue をその場で EPIC へ入れる                        | [`into-epic.md`](./collaboration-workflow/into-epic.md)                                 |
-| `owner/repo#` — 対象リポジトリを入口で指定する                                 | [`target-repo.md`](./collaboration-workflow/target-repo.md)                             |
-| 分割判定は全入口で共通（`kickoff epic` は作らない）                            | [`split-assessment.md`](./collaboration-workflow/split-assessment.md)                   |
 | オープン Issue の WIP 上限（30 件）                                            | [`wip-cap.md`](./collaboration-workflow/wip-cap.md)                                     |
-| 実行中に前提 Issue が判明した場合                                              | [`prerequisite-issue.md`](./collaboration-workflow/prerequisite-issue.md)               |
 | リポジトリをまたぐ EPIC                                                        | [`cross-repo-epic.md`](./collaboration-workflow/cross-repo-epic.md)                     |
-| `josh epic:plan` — EPIC の判断を計画段階に前倒しする                           | [`epic-plan.md`](./collaboration-workflow/epic-plan.md)                                 |
 | `josh epic:audit` — 子 Issue 群を横断して矛盾を検出する                        | [`epic-audit.md`](./collaboration-workflow/epic-audit.md)                               |
-| `epicrun` — EPIC 配下の子 Issue を無人で実行する                               | [`epicrun.md`](./collaboration-workflow/epicrun.md)                                     |
-| 実行の波を依存宣言で組む（と、組んではいけないとき）                           | [`execution-waves.md`](./collaboration-workflow/execution-waves.md)                     |
 | 別パッケージ起因の問題は割り込み Issue で対応する                              | [`upstream-interrupt.md`](./collaboration-workflow/upstream-interrupt.md)               |
 | クローン禁止・単一ソース化（パッケージ境界を越えても）                         | [`no-clones.md`](./collaboration-workflow/no-clones.md)                                 |
 | 相談と実行を区別する（議論中にファイルを編集しない）                           | [`consultation-vs-execution.md`](./collaboration-workflow/consultation-vs-execution.md) |
@@ -42,11 +33,8 @@
 | 本文をシェルの二重引用符に載せない                                             | [`shell-body.md`](./collaboration-workflow/shell-body.md)                               |
 | 独立した呼び出しは同じターンに載せる                                           | [`turn-batching.md`](./collaboration-workflow/turn-batching.md)                         |
 | `gh` は REST（`gh api`）で書く — 散文の指示も含む                              | [`gh-rest.md`](./collaboration-workflow/gh-rest.md)                                     |
-| 委譲 — 機械的な工程を安価な実行単位へ回す                                      | [`delegation.md`](./collaboration-workflow/delegation.md)                               |
-| 依存更新（`josh latest`）をいつ回すか                                          | [`latest-gate.md`](./collaboration-workflow/latest-gate.md)                             |
 | 常駐ドキュメントと skill の分担（何を常駐に残すか）                            | [`residency.md`](./collaboration-workflow/residency.md)                                 |
 | 引き金つき配送 — 規則を効く瞬間に届ける                                        | [`rule-delivery.md`](./collaboration-workflow/rule-delivery.md)                         |
-| `needs-human-review` — 成果物を人が見るまで出荷させない                        | [`human-review-label.md`](./collaboration-workflow/human-review-label.md)               |
 | コマンド出力が文脈へ持ち込む量の上限                                           | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)                         |
 | 運用ルール                                                                     | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)                     |
 

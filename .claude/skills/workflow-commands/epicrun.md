@@ -1519,5 +1519,4 @@ only the consecutive-failure guard can turn it into a stop.
 
 ---
 
-This file is the single source of the `epicrun` procedure; `prompts/collaboration-workflow/epicrun.md` is
-a pointer to it.
+This file is the single source of the `epicrun` procedure.
