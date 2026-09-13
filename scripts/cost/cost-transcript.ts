@@ -170,15 +170,28 @@ interface SessionFile {
 	// side, whose no-argument scope means "the session that just finished" rather than one of its
 	// units.
 	is_delegated: boolean
+	// How many `subagents/` levels down from a session's own transcript this was found: `0` for a
+	// session's own file, `1` for a unit it delegated, `2` for a unit that unit delegated, and so on
+	// (joshuafolkken/kit#1937). The filesystem is the only record of it — no transcript line carries a
+	// parent link — so the run-tree scope reads depth and the immediate parent from where the file sat.
+	depth: number
 }
+
+const OWN_DEPTH = 0
 
 function to_session_file(
 	full_path: string,
 	session_id: string,
-	is_delegated: boolean,
+	depth: number,
 ): SessionFile | undefined {
 	try {
-		return { session_id, path: full_path, modified_ms: statSync(full_path).mtimeMs, is_delegated }
+		return {
+			session_id,
+			path: full_path,
+			modified_ms: statSync(full_path).mtimeMs,
+			is_delegated: depth > OWN_DEPTH,
+			depth,
+		}
 	} catch {
 		return undefined
 	}
@@ -195,7 +208,7 @@ function without_extension(name: string): string {
 function own_files(directory: string, names: ReadonlyArray<string>): Array<SessionFile> {
 	return names
 		.filter((name) => is_transcript(name))
-		.map((name) => to_session_file(path.join(directory, name), without_extension(name), false))
+		.map((name) => to_session_file(path.join(directory, name), without_extension(name), OWN_DEPTH))
 		.filter((file): file is SessionFile => file !== undefined)
 }
 
@@ -206,22 +219,55 @@ function unit_directory(directory: string, session_id: string): string {
 	return path.join(directory, session_id, UNIT_DIRECTORY)
 }
 
-// The units one session delegated. An entry with no `subagents/` yields nothing rather than
-// throwing, so a session that never delegated — and the `memory/` and `tool-results/` directories
-// Claude Code keeps beside the transcripts — cost one failed read each.
-function unit_files(directory: string, session_name: string): Array<SessionFile> {
-	const found = unit_directory(directory, session_name)
+const UNIT_DEPTH = 1
 
-	return read_directory(found)
+// The `.jsonl` transcripts written directly under one `subagents/` directory, each a unit at this
+// level.
+function level_units(
+	subagents_directory: string,
+	prefix: string,
+	depth: number,
+): Array<SessionFile> {
+	return read_directory(subagents_directory)
 		.filter((name) => is_transcript(name))
 		.map((name) =>
 			to_session_file(
-				path.join(found, name),
-				`${session_name}${UNIT_ID_SEPARATOR}${without_extension(name)}`,
-				true,
+				path.join(subagents_directory, name),
+				`${prefix}${UNIT_ID_SEPARATOR}${without_extension(name)}`,
+				depth,
 			),
 		)
 		.filter((file): file is SessionFile => file !== undefined)
+}
+
+// The units under one `subagents/` directory, and — recursively — the units those units delegated in
+// a `subagents/` of their own (joshuafolkken/kit#1937). A subdirectory beside the transcripts is an
+// agent that itself delegated, so its own `subagents/` is walked one level deeper and the qualified
+// id gains another segment. Nested units do not occur today — a subagent has no `Agent` tool to
+// dispatch with — but the run-tree scope's depth is defined by this walk rather than by what exists.
+function collect_units(
+	subagents_directory: string,
+	prefix: string,
+	depth: number,
+): Array<SessionFile> {
+	const nested = read_directory(subagents_directory)
+		.filter((name) => !is_transcript(name))
+		.flatMap((name) =>
+			collect_units(
+				unit_directory(subagents_directory, name),
+				`${prefix}${UNIT_ID_SEPARATOR}${name}`,
+				depth + 1,
+			),
+		)
+
+	return [...level_units(subagents_directory, prefix, depth), ...nested]
+}
+
+// The units one session delegated, at any depth. An entry with no `subagents/` yields nothing rather
+// than throwing, so a session that never delegated — and the `memory/` and `tool-results/`
+// directories Claude Code keeps beside the transcripts — cost one failed read each.
+function unit_files(directory: string, session_name: string): Array<SessionFile> {
+	return collect_units(unit_directory(directory, session_name), session_name, UNIT_DEPTH)
 }
 
 // Newest first, so "the run that just finished" is the default with no argument.
@@ -274,6 +320,17 @@ function owning_session_id(file: SessionFile): string {
 	const [owner] = file.session_id.split(UNIT_ID_SEPARATOR)
 
 	return owner ?? file.session_id
+}
+
+// The immediate parent a delegated unit was written under: everything before the *last* separator of
+// its qualified id (joshuafolkken/kit#1937). `owning_session_id` returns the *root* session — the id
+// before the first separator — which the overlap reader needs; the run-tree scope needs the direct
+// parent instead, so a depth-2 unit links to the depth-1 unit that spawned it rather than to the
+// session at the top. A session's own file has no separator and is its own parent.
+function parent_session_id(file: SessionFile): string {
+	const separator = file.session_id.lastIndexOf(UNIT_ID_SEPARATOR)
+
+	return separator === NOT_FOUND ? file.session_id : file.session_id.slice(0, separator)
 }
 
 // Which of a listing is "the run that just finished": the newest transcript that is a session's own
@@ -453,6 +510,7 @@ const cost_transcript = {
 	list_sessions_across,
 	searched_directories,
 	owning_session_id,
+	parent_session_id,
 	latest_own_index,
 	tally,
 	read_session,

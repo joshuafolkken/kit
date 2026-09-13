@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { cost_run_report } from '#scripts/cost/cost-run-report'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
 import { cost_usage } from '#scripts/cost/cost-usage'
 import { time_batch, type RunTiming } from './time-batch'
@@ -37,7 +38,7 @@ const FAILURE_EXIT_CODE = 1
 const NO_INSTANT = 0
 const JSON_INDENT = 2
 const USAGE =
-	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--instructions] [--json]'
+	'Usage: josh time [--run] [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--instructions] [--json]'
 const NO_MERGED_RUN =
 	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
 const ONE_SCOPE =
@@ -100,6 +101,7 @@ const PARSE_ARGS_OPTIONS = {
 	top: { type: 'string' },
 	instructions: { type: 'boolean', default: false },
 	json: { type: 'boolean', default: false },
+	run: { type: 'boolean', default: false },
 } as const
 
 // The flags that name a scope, in both the spelling `parseArgs` reports and the spelling a person
@@ -129,6 +131,9 @@ interface RawValues {
 	// `SCOPE_KEYS` — what it needs is a scope already named, which `is_refused` checks against
 	// `session` directly (joshuafolkken/kit#1477).
 	instructions?: boolean
+	// Whether the run-tree scope was named. Like the bare no-argument default it selects the last run
+	// tree, so it may not accompany any of the `SCOPE_KEYS` (joshuafolkken/kit#1937).
+	run?: boolean
 }
 
 // The four flags that carry a number, parsed. Grouped so the refusal below asks one question of one
@@ -164,9 +169,20 @@ function named_scopes(values: RawValues): number {
 // `--top 0` and `--top abc` are refused on the same rule the scope numbers are: a cap that did not
 // parse must not quietly become "carry every row", which is the opposite of what was asked for.
 // `--last 0` goes the same way: a distribution over no run is not a smaller answer, it is none.
+// `--instructions` reports on one transcript, so it is refused without a named session.
+function refuses_instructions(values: RawValues): boolean {
+	return values.instructions === true && values.session === undefined
+}
+
+// `--run` is the whole-tree scope, so it may not accompany a scope flag that names one run.
+function refuses_run(values: RawValues): boolean {
+	return values.run === true && named_scopes(values) > 0
+}
+
 function is_refused(values: RawValues, parsed: ParsedNumbers): boolean {
 	if (has_unparsed(values, parsed)) return true
-	if (values.instructions === true && values.session === undefined) return true
+	if (refuses_instructions(values)) return true
+	if (refuses_run(values)) return true
 
 	return named_scopes(values) > 1
 }
@@ -412,15 +428,29 @@ function run_period(days: number, cwd: string, output: Output): number {
 	return 0
 }
 
-async function dispatch(options: Options, cwd: string): Promise<number> {
-	const { session, epic, last, period } = options
+// The bare no-argument default is the last run tree, not the last merged run — under a batch that
+// merged run is one lane child, which answers for a twelfth of the work (joshuafolkken/kit#1937). An
+// explicit `--issue` still reports one issue's run; `--run` reaches the tree the same way the bare
+// invocation does.
+// The number-named scopes, or `undefined` when none was given so the caller falls through to the
+// run-tree default. Split from `dispatch` so each stays within the branch limit.
+async function dispatch_scoped(options: Options, cwd: string): Promise<number | undefined> {
+	const { epic, last, period, issue } = options
 
-	if (session !== undefined) return run_session(session, cwd, options)
 	if (epic !== undefined) return await run_epic(epic, cwd, options)
 	if (last !== undefined) return await run_last(last, cwd, options)
 	if (period !== undefined) return run_period(period, cwd, options)
+	if (issue !== undefined) return await run_issue(issue, cwd, options)
 
-	return await run_issue(options.issue, cwd, options)
+	return undefined
+}
+
+async function dispatch(options: Options, cwd: string): Promise<number> {
+	if (options.session !== undefined) return run_session(options.session, cwd, options)
+
+	const scoped = await dispatch_scoped(options, cwd)
+
+	return scoped ?? cost_run_report.run(cwd, undefined, options.is_json)
 }
 
 // **The default is this process's own working directory, searched at both slugs.** A dispatched lane

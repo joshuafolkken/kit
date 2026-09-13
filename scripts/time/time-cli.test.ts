@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'
 import { time_cli_fixture } from './time-cli-fixture'
 import { time_instructions } from './time-instructions'
-import { time_request_costs } from './time-request-costs'
 import { time_run } from './time-run'
 
 // The console capture, the temporary transcript home and the one run report are
@@ -251,23 +250,19 @@ describe('time_cli.run — one run', () => {
 		expect(output()).toContain('CI wait')
 	})
 
-	it('resolves the most recently merged run when no scope was named', async () => {
-		const build = vi.spyOn(time_run, 'build_latest_run_report').mockResolvedValue(RUN_REPORT)
+	// joshuafolkken/kit#1937: the bare default is the run tree, not the last merged run — which under a
+	// batch is one lane child.
+	it('reports the run tree when no scope was named', async () => {
+		write_session()
 
 		expect(await time_cli.run([], CWD)).toBe(0)
-		// The third argument is what opts the single-run paths into the cost read that the phase
-		// attribution needs (joshuafolkken/kit#1606); the batch paths pass nothing.
-		expect(build).toHaveBeenCalledWith(CWD, undefined, time_request_costs.RUN_COST_SOURCES)
-		expect(output()).toContain(RUN_SCOPE)
+		expect(output()).toContain('run tree')
 	})
 
-	// Never silent: a repository with nothing merged is told so and pointed at the two flags that
-	// name a scope explicitly.
-	it('says so rather than reporting some other scope when nothing merged', async () => {
-		vi.spyOn(time_run, 'build_latest_run_report').mockResolvedValue(undefined)
-
+	// An empty store is reported in words, never as a zero-cost run.
+	it('reports the empty run tree in words when nothing was found', async () => {
 		expect(await time_cli.run([], CWD)).toBe(1)
-		expect(errors()).toContain(time_cli.NO_MERGED_RUN)
+		expect(errors()).toContain('No transcripts found')
 	})
 
 	// `--issue=5 --session=abc` is the same mistake as the space-separated form, and naming the

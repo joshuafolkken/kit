@@ -139,7 +139,15 @@ describe('time_request_costs.delegated_units — reading model and purpose', () 
 
 		const corpus: Corpus = {
 			...NO_CORPUS,
-			files: [{ session_id: 'agent-c', path: transcript_path, modified_ms: 0, is_delegated: true }],
+			files: [
+				{
+					session_id: 'agent-c',
+					path: transcript_path,
+					modified_ms: 0,
+					is_delegated: true,
+					depth: 1,
+				},
+			],
 		}
 		const units = time_request_costs.delegated_units([delegated('agent-c', 100, 100)], corpus)
 

@@ -71,7 +71,13 @@ function session(session_id: string): SessionUsage {
 }
 
 function file(session_id: string): SessionFile {
-	return { session_id, path: `/tmp/${session_id}.jsonl`, modified_ms: 0, is_delegated: false }
+	return {
+		session_id,
+		path: `/tmp/${session_id}.jsonl`,
+		modified_ms: 0,
+		is_delegated: false,
+		depth: 0,
+	}
 }
 
 function pair(request_id: string, session_id: string): AttributedRecord {

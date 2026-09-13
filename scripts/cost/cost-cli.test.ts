@@ -1,7 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cost_cli } from './cost-cli'
 import { cost_transcript } from './cost-transcript'
@@ -113,20 +112,6 @@ function thinking_row(json: string): { tokens: number } | undefined {
 	return report?.measurement?.composition.rows.find((row) => row.category === 'thinking')
 }
 
-describe('josh cost registration', () => {
-	it('is registered as a josh command', () => {
-		const { cost } = COMMAND_MAP
-
-		expect(cost?.script).toBe('scripts/cost/cost-cli.ts')
-	})
-
-	it('has a short alias', () => {
-		const { co } = ALIASES
-
-		expect(co).toBe('cost')
-	})
-})
-
 describe('cost_cli.parse_options', () => {
 	it('reads an issue number', () => {
 		expect(cost_cli.parse_options([ISSUE_FLAG, ISSUE_NUMBER])?.issue).toBe(962)
@@ -140,17 +125,29 @@ describe('cost_cli.parse_options', () => {
 		expect(cost_cli.parse_options([BAD_FLAG])).toBeUndefined()
 	})
 
-	it('defaults to the newest session with no flags', () => {
-		expect(cost_cli.parse_options([])).toStrictEqual({ is_all: false, is_json: false })
+	it('defaults to no narrow scope with no flags', () => {
+		expect(cost_cli.parse_options([])).toStrictEqual({
+			is_all: false,
+			is_json: false,
+			is_run: false,
+		})
 	})
 })
 
 describe('cost_cli.run on one session', () => {
-	it('reports the newest session by default', () => {
+	it('reports a named session with --session', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
+		expect(cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
+		expect(output()).toContain(`session ${SESSION_A}`)
+	})
+
+	// joshuafolkken/kit#1937: the bare default is the run tree, not the newest single session.
+	it('reports the run tree by default', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
 		expect(cost_cli.run([], CWD)).toBe(0)
-		expect(output()).toContain(`session ${SESSION_A}`)
+		expect(output()).toContain('run tree')
 	})
 
 	// The failure this command exists to remove: reading nothing and reporting it as a free run.
@@ -174,7 +171,7 @@ describe('cost_cli.run on one session', () => {
 	it('emits machine-readable output for --json', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--json'], CWD)).toBe(0)
+		expect(cost_cli.run(['--session', SESSION_A, '--json'], CWD)).toBe(0)
 		expect(JSON.parse(output())).toMatchObject([{ request_count: 1 }])
 	})
 })
@@ -328,7 +325,7 @@ describe('cost_cli.run — the resident and context decompositions', () => {
 	it('prints both on the session scope', () => {
 		write_populated()
 
-		expect(cost_cli.run([], CWD)).toBe(0)
+		expect(cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
 		expect(output()).toContain(RESIDENT_HEADING)
 		expect(output()).toContain(COMPOSITION_HEADING)
 	})
@@ -337,7 +334,7 @@ describe('cost_cli.run — the resident and context decompositions', () => {
 	// from here rather than write its own script.
 	it('carries them in --json under measurement', () => {
 		write_populated()
-		cost_cli.run(['--json'], CWD)
+		cost_cli.run(['--session', SESSION_A, '--json'], CWD)
 
 		const thinking = thinking_row(stdout())
 
@@ -348,7 +345,7 @@ describe('cost_cli.run — the resident and context decompositions', () => {
 	// made — "this could not be read" dressed as a reading.
 	it('omits them for a session with no readable request', () => {
 		write_session(SESSION_A, [BAD_LINE])
-		cost_cli.run(['--json'], CWD)
+		cost_cli.run(['--session', SESSION_A, '--json'], CWD)
 
 		expect(thinking_row(stdout())).toBeUndefined()
 	})
