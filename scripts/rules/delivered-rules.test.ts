@@ -8,11 +8,13 @@ import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import {
+	BODY_JQ_COMMAND,
 	BODY_READ_API_COMMAND,
 	BODY_READ_COMMAND,
 	COMMENTED_READ_COMMAND,
 	FILING_API_COMMAND,
 	FILING_COMMAND,
+	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
@@ -78,6 +80,15 @@ function unbatched_text(): string {
 		...target_turn_lines(1, ['b.ts']),
 		...open_turn_lines(2, ['c.ts']),
 	].join('\n')
+}
+
+// A transcript tail whose one Bash call opened an Issue with `pnpm josh issue:read`, which prints its
+// body and every comment — so the run has read the comments before any later body read of that Issue
+// (joshuafolkken/kit#1905).
+function comment_read_tail(issue: number): string {
+	const command = `pnpm josh issue:read ${String(issue)}`
+
+	return time_transcript_fixture.josh_call_line(1, time_transcript_fixture.BRANCH, command)
 }
 
 // **Only one refusal can leave a `PreToolUse` hook**, so a call two rows both claim would deliver
@@ -184,6 +195,39 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 		const payload = payload_of('body-obeyed', COMMENTED_READ_COMMAND)
 
 		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+	})
+})
+
+// The two stand-downs added in joshuafolkken/kit#1905: a state-only projection is not a body read,
+// and a body read the run has already earned by reading the comments is not refused a second time.
+describe('rule_delivery — the comments rule stands down when it should', () => {
+	// **A `--jq`/`--json` projection that never names the body is a state check, not the body read this
+	// rule guards** (joshuafolkken/kit#1905) — while one that still names the body stays a body read.
+	it('says nothing about a read that projects the body away', () => {
+		const payload = payload_of('state-check', STATE_CHECK_COMMAND)
+
+		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+	})
+
+	it('still delivers on a `--jq` read that names the body', () => {
+		const payload = payload_of('body-jq', BODY_JQ_COMMAND)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+	})
+
+	// **A body read the run has already earned is not refused** (joshuafolkken/kit#1905): the tail
+	// carries an `issue:read` of the same Issue, so its comments are already in hand.
+	it('says nothing when the run already read that Issue comments', () => {
+		const payload = payload_of('already-read', BODY_READ_COMMAND, 'Bash', comment_read_tail(1319))
+
+		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+	})
+
+	// A comment read of a *different* Issue leaves this body read refused.
+	it('still delivers when the earlier comment read was another Issue', () => {
+		const payload = payload_of('other-read', BODY_READ_COMMAND, 'Bash', comment_read_tail(1900))
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 })
 

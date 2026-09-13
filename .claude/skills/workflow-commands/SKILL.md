@@ -123,6 +123,13 @@ they are read when it arrives rather than conditionally. Either way **the trigge
 of the five is resident in §2 and in the command's own file**, so a run that never opens these
 documents still calls the right command at the right moment.
 
+**`followup.md` itself was split** (joshuafolkken/kit#1905): the half a run needs *before* it issues
+`pnpm josh followup` stays in `followup.md`, and the post-execution reference — the stage-timing block
+the command prints, the AI-reviewer comment scan, the config-file report and the release ask — moved
+to `followup-reference.md`, read through a section pointer when a run reaches it rather than at the
+point of use, so the turn that issues the command reads less. `followup-reference.md` is therefore
+**not** a sixth point-of-use file: it is reached only from `followup.md`, which already is one.
+
 ### A section reference is read as a section
 
 **A pointer written `` `X.md` → "Heading" `` is read as that section, never by opening `X.md` whole**

@@ -227,7 +227,7 @@ source for every entry point that runs more than one issue in one session.
 ## The release ask, once at the end
 
 **After the last issue of the queue has merged, ask `pnpm josh release:scope` once** — not once per
-issue. `followup.md` → "When `pnpm josh release` runs" is the single source: the position, the three
+issue. `followup-reference.md` → "When `pnpm josh release` runs" is the single source: the position, the three
 answers, and why the run reports the release rather than cutting one (joshuafolkken/kit#1582). A queue
 stopped at a failure has still merged whatever ran before it, so the ask happens at that stop too.
 

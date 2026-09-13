@@ -6,6 +6,7 @@ import {
 	COMMENTED_READ_COMMAND,
 	FILING_API_COMMAND,
 	FILING_COMMAND,
+	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
 
 // The two command classifiers, judged from the command alone. Split off delivered-rules.test.ts in
@@ -95,4 +96,16 @@ describe('is_body_only_issue_read', () => {
 	])(LEAVES_ALONE, (command) => {
 		expect(delivered_rules.is_body_only_issue_read(command)).toBe(false)
 	})
+})
+
+// A `--jq` / `--json` projection that never names the body is a state check, not the body read this
+// rule guards (joshuafolkken/kit#1905) — while one that still names the body stays a body read, which
+// the `--jq .body` and `--json title,body` cases in the describe above pin.
+describe('is_body_only_issue_read — a non-body projection', () => {
+	it.each([STATE_CHECK_COMMAND, 'gh issue view 1319 --json state,labels'])(
+		LEAVES_ALONE,
+		(command) => {
+			expect(delivered_rules.is_body_only_issue_read(command)).toBe(false)
+		},
+	)
 })

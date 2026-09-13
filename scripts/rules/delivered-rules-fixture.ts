@@ -15,11 +15,18 @@ const COMMENTED_READ_COMMAND = 'gh issue view 1319 --comments'
 // needs the second row's trigger to match.
 const BODY_READ_COMMAND = 'gh issue view 1319'
 const BODY_READ_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues/1319'
+// A read that fetches the same Issue only to project its state or labels — a state check, not the body
+// read the rule guards, so it is not a trigger (joshuafolkken/kit#1905).
+const STATE_CHECK_COMMAND = "gh api repos/joshuafolkken/kit/issues/1319 --jq '{state, labels}'"
+// The `--jq` spelling that still names the body, so it stays a body read.
+const BODY_JQ_COMMAND = "gh api repos/joshuafolkken/kit/issues/1319 --jq '.body'"
 
 export {
+	BODY_JQ_COMMAND,
 	BODY_READ_API_COMMAND,
 	BODY_READ_COMMAND,
 	COMMENTED_READ_COMMAND,
 	FILING_API_COMMAND,
 	FILING_COMMAND,
+	STATE_CHECK_COMMAND,
 }

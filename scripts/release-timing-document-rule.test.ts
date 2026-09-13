@@ -13,7 +13,9 @@ import { read_unwrapped } from './ai-document-fixture'
 // never reaches; a rule restated in each entry is the clone `CLAUDE.md` prohibits — hence one
 // section and three pointers.
 
-const SINGLE_SOURCE = '.claude/skills/workflow-commands/followup.md'
+// The release-timing section moved out of `followup.md` into its post-execution reference
+// (joshuafolkken/kit#1905); it is still the single source of the rule.
+const SINGLE_SOURCE = '.claude/skills/workflow-commands/followup-reference.md'
 const DOCS = 'docs/josh-commands.md'
 const SCOPE_COMMAND = 'release:scope'
 const SCOPE_ALIAS = 'res'
@@ -56,7 +58,7 @@ const DOCS_MARKERS: ReadonlyArray<string> = [
 	'A run asks that command once, after the last merge its invocation authorized',
 ]
 
-describe('the release-timing rule is stated once, in followup.md', () => {
+describe('the release-timing rule is stated once, in followup-reference.md', () => {
 	const content = read_unwrapped(SINGLE_SOURCE)
 
 	it.each(SINGLE_SOURCE_MARKERS)('states %j', (marker) => {
