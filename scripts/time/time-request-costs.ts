@@ -1,10 +1,12 @@
 import { cost_cli } from '#scripts/cost/cost-cli'
-import type { AttributedRecord } from '#scripts/cost/cost-corpus'
+import type { AttributedRecord, Corpus } from '#scripts/cost/cost-corpus'
 import { cost_pricing } from '#scripts/cost/cost-pricing'
+import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { cost_usage, type UsageRecord } from '#scripts/cost/cost-usage'
 import type { DelegatedUnit } from './time-delegated-cost'
 import type { PricedRequest } from './time-phase-costs'
 import type { RunSources } from './time-run'
+import { time_unit_purpose, type UnitPurpose } from './time-unit-purpose'
 
 // One issue's cost corpus, read once for the two things the run report attributes from
 // (joshuafolkken/kit#1606, joshuafolkken/kit#1882): each billed request as an instant and a price for
@@ -47,10 +49,25 @@ function to_priced_none(): PricedRequest {
 	return { at_ms: undefined, cost_usd: NO_COST, is_priced: false }
 }
 
-function attributed_for(cwd: string, issue_number: number): Array<AttributedRecord> {
-	return cost_cli
-		.attributed(cost_cli.load_corpus(cwd))
-		.filter((pair) => pair.issue === issue_number)
+function attributed_for(corpus: Corpus, issue_number: number): Array<AttributedRecord> {
+	return cost_cli.attributed(corpus).filter((pair) => pair.issue === issue_number)
+}
+
+// A delegated unit's own transcript, for reading what it was launched to do (joshuafolkken/kit#1912).
+// Found by session id among the corpus files already loaded, so no second directory walk; a unit whose
+// file is not among them reads as unknown purpose rather than failing the whole read.
+function raw_of_session(corpus: Corpus, session_id: string): string | undefined {
+	const file = corpus.files.find((one) => one.session_id === session_id)
+
+	return file === undefined ? undefined : cost_transcript.read_raw(file)
+}
+
+function purpose_of(raw: string | undefined): UnitPurpose {
+	return raw === undefined ? time_unit_purpose.UNKNOWN_PURPOSE : time_unit_purpose.classify(raw)
+}
+
+function model_of(construction: AttributedRecord | undefined): string {
+	return construction?.record.model ?? cost_usage.UNKNOWN_MODEL
 }
 
 // The delegated sessions this issue's records came from, each session's records kept together so its
@@ -74,10 +91,22 @@ function delegated_by_session(
 // by the same `to_priced` a phase request is, so the two dollar figures cannot drift. Its own records
 // are non-empty by construction; the `records[0]` fallback is what `noUncheckedIndexedAccess` asks of
 // the read rather than a state that can occur.
-function unit_of(session_id: string, records: ReadonlyArray<AttributedRecord>): DelegatedUnit {
-	const baseline = records[0]?.baseline_tokens ?? NO_TOKENS
+function construction_of(
+	records: ReadonlyArray<AttributedRecord>,
+	baseline: number,
+): AttributedRecord | undefined {
 	const found = records.find((pair) => cost_usage.billed_input(pair.record.totals) === baseline)
-	const construction = found ?? records[0]
+
+	return found ?? records[0]
+}
+
+function unit_of(
+	session_id: string,
+	records: ReadonlyArray<AttributedRecord>,
+	corpus: Corpus,
+): DelegatedUnit {
+	const baseline = records[0]?.baseline_tokens ?? NO_TOKENS
+	const construction = construction_of(records, baseline)
 	const priced = construction === undefined ? to_priced_none() : to_priced(construction.record)
 
 	return {
@@ -85,12 +114,17 @@ function unit_of(session_id: string, records: ReadonlyArray<AttributedRecord>): 
 		baseline_tokens: baseline,
 		cost_usd: priced.cost_usd,
 		is_priced: priced.is_priced,
+		model: model_of(construction),
+		purpose: purpose_of(raw_of_session(corpus, session_id)),
 	}
 }
 
-function delegated_units(attributed: ReadonlyArray<AttributedRecord>): Array<DelegatedUnit> {
+function delegated_units(
+	attributed: ReadonlyArray<AttributedRecord>,
+	corpus: Corpus,
+): Array<DelegatedUnit> {
 	return [...delegated_by_session(attributed)].map(([session_id, records]) =>
-		unit_of(session_id, records),
+		unit_of(session_id, records, corpus),
 	)
 }
 
@@ -102,11 +136,12 @@ interface RunCostReading {
 }
 
 function run_cost_for(cwd: string, issue_number: number): RunCostReading {
-	const attributed = attributed_for(cwd, issue_number)
+	const corpus = cost_cli.load_corpus(cwd)
+	const attributed = attributed_for(corpus, issue_number)
 
 	return {
 		priced: attributed.map((pair) => to_priced(pair.record)),
-		units: delegated_units(attributed),
+		units: delegated_units(attributed, corpus),
 	}
 }
 

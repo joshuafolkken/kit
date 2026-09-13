@@ -10,7 +10,14 @@ function unit(
 	cost_usd: number,
 	is_priced = true,
 ): DelegatedUnit {
-	return { session_id, baseline_tokens, cost_usd, is_priced }
+	return {
+		session_id,
+		baseline_tokens,
+		cost_usd,
+		is_priced,
+		model: 'claude-opus-5',
+		purpose: 'unknown',
+	}
 }
 
 describe('time_delegated_cost.build', () => {
@@ -41,6 +48,20 @@ describe('time_delegated_cost.build', () => {
 		const facts = time_delegated_cost.build([unit('priced', 1, 1), unit('bare', 1, 0, false)])
 
 		expect(facts.unpriced_unit_count).toBe(1)
+	})
+})
+
+describe('time_delegated_cost.cost_lines — unit line', () => {
+	it('renders the model and purpose on a unit line', () => {
+		const model = 'claude-haiku-4-5'
+		const purpose = 'review' as const
+		const facts = time_delegated_cost.build([
+			{ session_id: 'agent-x', baseline_tokens: 1, cost_usd: 1, is_priced: true, model, purpose },
+		])
+		const rendered = time_delegated_cost.cost_lines(facts).join('\n')
+
+		expect(rendered).toContain(model)
+		expect(rendered).toContain(purpose)
 	})
 })
 

@@ -168,6 +168,26 @@ Read from the JSON, in this order:
   — a measured run with `unit_count: 0` did its work in the main line, which is a real answer. **A
   unit on a model the price table does not carry contributes tokens and no dollars** —
   `unpriced_unit_count` makes `cost_usd` a floor, said in words beside the launch total.
+  **Each unit now names its `model` and `purpose`** (joshuafolkken/kit#1912): read the model before
+  crediting a delegation with a saving — a unit on the parent's own tier saved nothing by being
+  cheaper — and the purpose (`review` / `investigation` / `unknown`) to rank a "stop delegating
+  reviews" proposal against the review launches alone.
+- **`by_session` — the run broken down by the main-line session it was spent in**
+  (joshuafolkken/kit#1912). Present on both `josh time` and `josh cost` under `--issue` and the
+  latest-run scope, keyed by the same session id so the two read side by side. The time rows carry
+  elapsed, model and tool wait, round trips, `end_state` (`merged` / `stopped` naming the last failed
+  command / `not_detected`, read mechanically from the spans) and a resumed session's time to first
+  progress; the cost rows carry request count, output tokens, `cost_usd`, `cost_usd_with_delegated`
+  (the units that session spawned folded in), the per-type `composition`, the session's own
+  `output_turns`, and a resume's `preamble_tokens`. **The stopped session's cost is a ranking row —
+  step 3.** A single-session scope carries none, which is a real answer rather than a withheld one.
+- **`cost_composition` and `output_turns` — where the dollars and the output went**
+  (joshuafolkken/kit#1912). `cost_composition` splits `cost_usd` into uncached input / cache-write 5m
+  / cache-write 1h / cache-read / output dollars that sum to the total, so a "cut the cache-read
+  carry" or "cut output" proposal is ranked on the term it acts on rather than on the whole bill.
+  `output_turns` is the per-turn output distribution — median, p90, max — and the count and output
+  **share** of turns over 5,000 tokens; a high share is long deliberation, the same signal
+  `no_tool_call` points at from the cost side. Both are `not measured` on an empty scope, never zero.
 - **the two review rounds against each other** — `segments`, read as one pair rather than as two rows
   ([#1412](https://github.com/joshuafolkken/kit/issues/1412)). The listing already carries both rounds
   of a two-round run, and a report that prints them as two numbers converts nothing into a reading: on
@@ -510,6 +530,8 @@ in the report itself — say so and do not rank off the table beneath it.
 **A row against one stage takes its dollars from that stage's own `phase_costs` row, not from the run total** ([#1606](https://github.com/joshuafolkken/kit/issues/1606)). A proposal that cuts work out of `review` is worth what `review` cost, exactly as it is ranked on what `review` took in minutes; taking a share of `cost_usd` instead re-imports the error the next paragraph names. **A stage carrying no row was not free** — it had no billed request of its own inside it — and a scope whose `phase_costs.is_measured` is `false` was never priced at all, so both take `not measured` rather than a zero. **The unattributed bucket is never spread across the rows to make them add up**: it is quoted as its own figure where it is large enough to matter, and no row is ranked off it.
 
 **A proposal to stop delegating a step is ranked on `delegated_cost`, not on wall clock** ([#1882](https://github.com/joshuafolkken/kit/issues/1882)). The launch's fixed cost is `per_unit_cost_usd` in dollars, and a step whose own work is cheaper than that saves money by staying in the main line — so the row states its saving in dollars with `—` in the minutes column, since folding one subagent back moves the wall clock by an amount no run can resolve. Where `delegated_cost.is_measured` is `false` the block was not read for this scope, so say so rather than ranking off a zero.
+
+**The stopped session's cost is its own row** ([#1912](https://github.com/joshuafolkken/kit/issues/1912)). Where `by_session` shows a run that stopped and resumed, the stopped session — the one whose `end_state` is `stopped` rather than `merged` — is a row of its own, weighted by that session's `cost_usd` in dollars, because it is the work that produced no merge. On `fullrun #1876` that row was 76% of the run, the single largest line, and reading it off `by_session` is exactly what this axis was added for: before it, the figure existed only in a hand count the SKILL.md forbids reconstructing. A run with one session, or one that merged its first session, has no such row — which is a real answer, not a withheld one.
 
 **Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.** Dollars per request multiplied by the requests a change removes is a saving; a percentage of the total is not, because the total covers work the change leaves exactly where it is — the same error as ranking a phase off a run's `elapsed_ms`. A change that removes carried tokens rather than requests is ranked on the resident and history shares instead, which is the arithmetic the round-trip price above already does for minutes. **Where `missing` was non-zero, a row that has a dollar saving still prints one and is never blanked.** Withholding it there would be the wrong reading of the same rule: on an `--issue` scope those counters are the whole corpus's, so a single malformed line in any unrelated session would empty the dollar column of every row and reproduce exactly the missing cost row this reading was added to end. **Label such a figure approximate rather than as a bound.** The run total `cost_usd` is a floor because it can only fall short of the true figure, but the dollars per request derived from it is an average over the priced subset alone and can sit either side of the true one — so a `≥` on a per-row saving claims more than the arithmetic gives. `not measured` is kept for the case that earns it, a scope with no priced record at all, and **a row that saves no money keeps the `—` the rule above gives it** — none of this reaches a cell that was empty by design.
 

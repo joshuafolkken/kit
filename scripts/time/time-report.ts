@@ -1,4 +1,5 @@
 import { time_bundles, type BundleTotals } from './time-bundles'
+import { time_by_session, type SessionTime } from './time-by-session'
 import { time_category_table, type CategoryTotals } from './time-category-table'
 import type { CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
@@ -148,6 +149,10 @@ interface TimeReport extends TurnSplit {
 	// corpus, so absent means the question was never asked and a present record with `is_measured:
 	// false` means it was asked and the corpus could not answer.
 	delegated_cost?: DelegatedCostFacts
+	// One row per main-line session the run spanned — elapsed, round trips, how it ended, and a resume's
+	// time to first progress (joshuafolkken/kit#1912). Optional like `delegated_cost`: only the run scopes
+	// build it, so a single-session or epic report carries none.
+	by_session?: Array<SessionTime>
 	// The same model wait as `model_ms_per_round_trip`, as the spread it was a mean of
 	// (joshuafolkken/kit#1386). The mean above says what a trip cost typically; only this says whether
 	// a run was slow everywhere or slow once — and the two need opposite fixes, since batching removes
@@ -506,6 +511,7 @@ function format_report(report: TimeReport): string {
 		...time_single_checks.single_check_lines(report.single_checks, report),
 		...time_gate_runs.gate_run_lines(report.gate_runs),
 		...turn_blocks(report),
+		...time_by_session.session_lines(report.by_session),
 		...time_ranked_tables.ranked_tables(report),
 	].join('\n')
 }

@@ -75,6 +75,39 @@ function estimate_cost(totals: UsageTotals, price: ModelPrice): number {
 	return (weighted_input * price.input + totals.output_tokens * price.output) / TOKENS_PER_MILLION
 }
 
+// The five dollar terms `estimate_cost` sums, kept apart so a report can say what a run's dollars
+// were spent on rather than only their total (joshuafolkken/kit#1912). Each is priced by the same
+// multipliers `estimate_cost` uses — the exported constants above — so the five always sum to
+// `estimate_cost(totals, price)`. It is a decomposition of the same arithmetic, not a second price
+// list, which is why the weights live in the constants both read rather than in either function.
+interface CostComposition {
+	input_usd: number
+	cache_write_5m_usd: number
+	cache_write_1h_usd: number
+	cache_read_usd: number
+	output_usd: number
+}
+
+function priced(tokens: number, rate: number): number {
+	return (tokens * rate) / TOKENS_PER_MILLION
+}
+
+function estimate_composition(totals: UsageTotals, price: ModelPrice): CostComposition {
+	return {
+		input_usd: priced(totals.input_tokens, price.input),
+		cache_write_5m_usd: priced(
+			totals.cache_write_5m_tokens * CACHE_WRITE_5M_MULTIPLIER,
+			price.input,
+		),
+		cache_write_1h_usd: priced(
+			totals.cache_write_1h_tokens * CACHE_WRITE_1H_MULTIPLIER,
+			price.input,
+		),
+		cache_read_usd: priced(totals.cache_read_tokens * CACHE_READ_MULTIPLIER, price.input),
+		output_usd: priced(totals.output_tokens, price.output),
+	}
+}
+
 interface ModelCost {
 	model: string
 	totals: UsageTotals
@@ -126,9 +159,10 @@ const cost_pricing = {
 	MODEL_PRICES,
 	resolve_price,
 	estimate_cost,
+	estimate_composition,
 	cost_by_model,
 	total_cost,
 }
 
-export type { ModelCost, ModelPrice, ModelUsage }
+export type { CostComposition, ModelCost, ModelPrice, ModelUsage }
 export { cost_pricing }

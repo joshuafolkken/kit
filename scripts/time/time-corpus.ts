@@ -75,6 +75,13 @@ function absorb(seen: Map<string, Span>, spans: ReadonlyArray<Span>): boolean {
 	return seen.size > before
 }
 
+// One kept main-line session's resolved spans, before the cross-session fold — the split a per-session
+// breakdown reads (joshuafolkken/kit#1912).
+interface SessionTimeline {
+	session_id: string
+	spans: Array<Span>
+}
+
 interface IssueSpans {
 	spans: Array<Span>
 	session_count: number
@@ -97,6 +104,10 @@ interface IssueSpans {
 	// The delegation windows this run waited on, read at the resolve site because the fold that follows
 	// erases which spans were the units' (joshuafolkken/kit#1881).
 	delegated_wait: DelegatedWaitTotals
+	// One entry per kept main-line session, its spans resolved against its own units but not folded
+	// across sessions (joshuafolkken/kit#1912). It is the split `spans` above discards — `time-by-session.ts`
+	// builds the per-session rows from it, so a run that stopped and resumed reads as two rows.
+	by_session: Array<SessionTimeline>
 }
 
 // Drained with a loop rather than a spread of `Map#values()`: `Iterator#toArray` is not in this
@@ -274,6 +285,22 @@ function absorb_session(
 	return delegated.length > NO_SPANS
 }
 
+// Each kept session's spans, resolved against its own units but kept apart rather than folded together
+// (joshuafolkken/kit#1912). Duplicates are assigned first, so a resumed transcript's copy is counted
+// under exactly one session — the same `assign_duplicates` the fold uses, applied without the fold.
+function per_session(kept: ReadonlyMap<string, SessionSpans>): Array<SessionTimeline> {
+	const timelines: Array<SessionTimeline> = []
+
+	for (const [session_id, collected] of time_duplicate.assign_duplicates(kept)) {
+		const own = values_of(collected.own)
+		const delegated = values_of(collected.delegated)
+
+		timelines.push({ session_id, spans: time_overlap.resolve_delegated(own, delegated) })
+	}
+
+	return timelines
+}
+
 function resolved_spans(by_session: ReadonlyMap<string, SessionSpans>): ResolvedSpans {
 	const seen = new Map<string, Span>()
 	const waits: Array<DelegatedWait> = []
@@ -322,6 +349,7 @@ function to_issue_spans(collector: Collector, issue_number: number): IssueSpans 
 			collector.unread.size === NO_SESSIONS,
 			resolved.has_delegation || collector.has_unread_unit,
 		),
+		by_session: per_session(split.kept),
 	}
 }
 
@@ -337,6 +365,7 @@ function empty_spans(): IssueSpans {
 		attributed_count: NO_SESSIONS,
 		unread_count: NO_SESSIONS,
 		delegated_wait: time_delegated_wait.NO_WAITS,
+		by_session: [],
 	}
 }
 
@@ -424,5 +453,5 @@ const time_corpus = {
 	collect_issue_spans,
 }
 
-export type { IssueSpans }
+export type { IssueSpans, SessionTimeline }
 export { time_corpus }

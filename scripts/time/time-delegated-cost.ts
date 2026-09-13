@@ -1,4 +1,5 @@
 import { time_format } from './time-format'
+import type { UnitPurpose } from './time-unit-purpose'
 
 // What launching each delegated subagent cost, and what one launch's fixed context construction came
 // to (joshuafolkken/kit#1882).
@@ -37,6 +38,13 @@ interface DelegatedUnit {
 	baseline_tokens: number
 	cost_usd: number
 	is_priced: boolean
+	// The model the unit ran on, read from its context-construction request (joshuafolkken/kit#1912).
+	// A subagent may run a cheaper tier than its parent, which is what makes a launch's cost readable
+	// only once the model is named beside it.
+	model: string
+	// What the unit was launched to do, read from its own transcript — `unknown` where the transcript
+	// carried no marker, which is the honest default for a best-effort reading.
+	purpose: UnitPurpose
 }
 
 // **`is_measured: false` is not "no subagent ran".** The batch scopes and the history recorder do not
@@ -121,12 +129,11 @@ function session_label(session_id: string): string {
 
 function unit_line(unit: DelegatedUnit): string {
 	const cost = time_format.usd(unit.cost_usd, COST_DECIMALS)
-
-	return time_format.format_columns(
-		session_label(unit.session_id),
-		cost,
-		tokens_text(unit.baseline_tokens),
+	const suffix = [tokens_text(unit.baseline_tokens), unit.model, unit.purpose].join(
+		time_format.SUFFIX_SEPARATOR,
 	)
+
+	return time_format.format_columns(session_label(unit.session_id), cost, suffix)
 }
 
 function total_line(facts: DelegatedCostFacts): string {
