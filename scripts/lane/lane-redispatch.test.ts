@@ -51,12 +51,14 @@ describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', (
 	// Behavior 2: the released child is delegated, never implemented in the parent's context.
 	it('delegates the released child as `fullrun #<N>` in the lane, not in the parent', async () => {
 		const outcome = await lane_dispatch.dispatch_child(RELEASED_CHILD)
+		// The lane child now launches with the explicit model and effort (joshuafolkken/kit#1932), so the
+		// expected vector is derived from the launcher rather than spelled out with the flags inline.
+		const built = detached_launch.agent_argv(`fullrun #${RELEASED_CHILD}`)
 
 		expect(outcome.kind).toBe('dispatched')
-		expect(launch.mock.calls[0]?.[0].argv).toStrictEqual({
-			command: 'claude',
-			args: ['-p', `fullrun #${RELEASED_CHILD}`],
-		})
+		expect(launch.mock.calls[0]?.[0].argv).toStrictEqual(
+			built.kind === 'argv' ? built.argv : undefined,
+		)
 		expect(launch.mock.calls[0]?.[0].cwd).toBe(LANE_DIRECTORY)
 	})
 

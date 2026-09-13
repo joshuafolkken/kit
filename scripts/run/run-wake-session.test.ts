@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { detached_launch } from './detached-launch'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // joshuafolkken/kit#1719. What the supervisor spawns is the one place it could widen what may be run,
@@ -19,19 +20,22 @@ const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
 const LOOPBACK_PROXY = 'http://localhost:52554'
 
 describe('run_wake_session.wake_argv — what the woken session is asked to do', () => {
-	it('runs the agent CLI headless with the recorded invocation as its prompt', () => {
-		expect(run_wake_session.wake_argv(INVOCATION)).toStrictEqual({
-			command: run_wake_session.WAKE_COMMAND,
-			args: ['-p', INVOCATION],
-		})
+	// The woken session goes through the same launcher as a dispatched child, so it carries the same
+	// explicit model and effort defaults (joshuafolkken/kit#1932) with the invocation still last.
+	it('runs the agent CLI headless with the recorded invocation as its prompt and the default model and effort', () => {
+		expect(run_wake_session.wake_argv(INVOCATION)).toStrictEqual(
+			detached_launch.agent_argv(INVOCATION),
+		)
 	})
 
-	// The person typed the invocation; nothing between the record and the session may add to it.
+	// The person typed the invocation; nothing between the record and the session may split it on its
+	// spaces, so it stays exactly one element however many flags precede it.
 	it('appends the invocation as one argument, never split on its spaces', () => {
-		const argv = run_wake_session.wake_argv(INVOCATION)
+		const built = run_wake_session.wake_argv(INVOCATION)
+		const argv = built?.kind === 'argv' ? built.argv : undefined
 
 		expect(argv?.args.at(-1)).toBe(INVOCATION)
-		expect(argv?.args).toHaveLength(2)
+		expect(argv?.args.filter((argument) => argument === INVOCATION)).toHaveLength(1)
 	})
 
 	// `auto-ok` decides what may be run unattended and is a person's to apply. A waker that could
@@ -106,7 +110,9 @@ describe('run_wake_session — what may reach the operating system', () => {
 })
 
 function prompt_of(invocation: string): string | undefined {
-	return run_wake_session.wake_argv(invocation)?.args.at(-1)
+	const built = run_wake_session.wake_argv(invocation)
+
+	return built?.kind === 'argv' ? built.argv.args.at(-1) : undefined
 }
 
 // The recorded invocation is taken apart and composed again out of this file's own constants and the
@@ -447,7 +453,7 @@ describe('run_wake_session.launch — each launch is delimited', () => {
 // on when it does not.
 describe('run_wake_session.wake_argv — a queue invocation', () => {
 	it('hands on the list the record holds, unchanged', () => {
-		expect(run_wake_session.wake_argv(QUEUE_INVOCATION)?.args.at(-1)).toBe(QUEUE_INVOCATION)
+		expect(prompt_of(QUEUE_INVOCATION)).toBe(QUEUE_INVOCATION)
 	})
 
 	// A queue with no issue names nothing to do, and a repository-qualified reference is a grammar this

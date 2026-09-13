@@ -7,6 +7,10 @@ words:
   # read as a dependency declaration anywhere in an epic body (joshuafolkken/kit#1711) — the code and
   # the docs both have to say why the span is there.
   - backticked
+  # The highest-but-one effort level the agent CLI accepts, between `high` and `max`. It is one of the
+  # `--effort` values a dispatched lane child is allowed (joshuafolkken/kit#1932), so `detached-launch.ts`
+  # names it in its allowlist and the docs quote the full set verbatim.
+  - xhigh
   # The system call that replaces a process image, which is what `spawn` reaches without a shell.
   # `run-wake-session.ts` names it to say why a NUL byte in an argument is the one character that has
   # to be rejected: it terminates the string there, so the argument that runs is a prefix of the one

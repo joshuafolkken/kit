@@ -107,12 +107,79 @@ function is_safe_argv(argv: LaunchArgv): boolean {
 	return is_safe_value(argv.command) && argv.args.every((value) => is_safe_value(value))
 }
 
+// **Model and effort are made explicit at launch rather than left to the person's own settings**
+// (joshuafolkken/kit#1932). A dispatched child ran on whatever `~/.claude/settings.json` happened to
+// hold, so a run's lanes could disagree with its parent session on the model and no two runs were
+// comparable. The defaults live in one place — model `opus`, the latest-version alias so it matches the
+// parent, and effort `medium` — and the person's `.env` overrides each within the same validation the
+// invocation itself passes.
+const DEFAULT_MODEL = 'opus'
+const DEFAULT_EFFORT = 'medium'
+const MODEL_ENV_KEY = 'JOSH_LANE_MODEL'
+const EFFORT_ENV_KEY = 'JOSH_LANE_EFFORT'
+const MODEL_FLAG = '--model'
+const EFFORT_FLAG = '--effort'
+
+// **Effort is an allowlist; the model is not** (joshuafolkken/kit#1932). The agent CLI takes exactly
+// these five levels, so a value outside them is a typo that would fail the session minutes in — it is
+// refused at launch instead. A model name is open-ended, since the CLI grows aliases, so it passes the
+// same control-character and length gate every argument passes and no further one.
+const ALLOWED_EFFORTS: ReadonlyArray<string> = ['low', 'medium', 'high', 'xhigh', 'max']
+
+type LaunchEnvironment = Readonly<Record<string, string | undefined>>
+
+type EffortResult = { kind: 'ok'; effort: string } | { kind: 'rejected'; note: string }
+
+// **The launch is composed and validated, then returned as one of two answers**
+// (joshuafolkken/kit#1932). A rejected effort override stops the session rather than falling back to the
+// default, so the answer carries a note rather than always being a vector; every caller already reports
+// a failed launch the same way. `model` and `effort` ride along so the launch log can record what ran.
+type AgentArgv =
+	| { kind: 'argv'; argv: LaunchArgv; model: string; effort: string }
+	| { kind: 'rejected'; note: string }
+
+// A blank or whitespace-only override is not a value: it is treated as unset, so an `.env` line left as
+// `JOSH_LANE_MODEL=` falls back to the default rather than launching with an empty model name.
+function trimmed_override(value: string | undefined): string | undefined {
+	const trimmed = value?.trim()
+
+	return trimmed !== undefined && trimmed.length > EMPTY_LENGTH ? trimmed : undefined
+}
+
+function resolved_model(environment: LaunchEnvironment): string {
+	return trimmed_override(environment[MODEL_ENV_KEY]) ?? DEFAULT_MODEL
+}
+
+function effort_rejection(value: string): EffortResult {
+	return {
+		kind: 'rejected',
+		note: `${EFFORT_ENV_KEY}=${value} is not one of ${ALLOWED_EFFORTS.join(', ')}, so the session was not started`,
+	}
+}
+
+function resolved_effort(environment: LaunchEnvironment): EffortResult {
+	const override = trimmed_override(environment[EFFORT_ENV_KEY])
+
+	if (override === undefined) return { kind: 'ok', effort: DEFAULT_EFFORT }
+	if (!ALLOWED_EFFORTS.includes(override)) return effort_rejection(override)
+
+	return { kind: 'ok', effort: override }
+}
+
 // **The invocation goes on the command line last and as one argument**, never interpolated into a
 // command string: it is the prompt the headless session is given, not a list of arguments to the agent
-// CLI. Each caller is responsible for composing that one string out of its own constants and validated
-// values — this function only places it.
-function agent_argv(invocation: string): LaunchArgv {
-	return { command: AGENT_COMMAND, args: [...AGENT_FLAGS, invocation] }
+// CLI. The model and effort flags sit between the headless flag and that invocation, resolved from the
+// environment or the defaults. Each caller composes the invocation string out of its own constants and
+// validated values; this function only places it and refuses a disallowed effort.
+function agent_argv(invocation: string, environment: LaunchEnvironment = process.env): AgentArgv {
+	const effort = resolved_effort(environment)
+
+	if (effort.kind === 'rejected') return { kind: 'rejected', note: effort.note }
+
+	const model = resolved_model(environment)
+	const args = [...AGENT_FLAGS, MODEL_FLAG, model, EFFORT_FLAG, effort.effort, invocation]
+
+	return { kind: 'argv', argv: { command: AGENT_COMMAND, args }, model, effort: effort.effort }
 }
 
 function note_of(error: unknown): string {
@@ -137,13 +204,37 @@ function launched(pid: number): LaunchResult {
 const LOG_FLAGS = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW
 const LOG_MODE = 0o600
 
+const NEXT_OFFSET = 1
+const NOT_FOUND = -1
+
+// The value that follows a flag in an argument vector, or undefined when the flag is absent. Used to
+// read the model and effort back out of what `agent_argv` composed, so the log records them without a
+// second source that could drift from what was actually launched.
+function flag_value(args: ReadonlyArray<string>, flag: string): string | undefined {
+	const index = args.indexOf(flag)
+
+	return index === NOT_FOUND ? undefined : args[index + NEXT_OFFSET]
+}
+
+// **The model and effort are logged when the vector carries them, and nothing is added when it does
+// not** (joshuafolkken/kit#1932). A dispatched child and a woken session carry both; the supervisor
+// relaunching itself carries neither, so its header stays exactly what it was.
+function model_effort_suffix(argv: LaunchArgv): string {
+	const model = flag_value(argv.args, MODEL_FLAG)
+	const effort = flag_value(argv.args, EFFORT_FLAG)
+
+	if (model === undefined || effort === undefined) return ''
+
+	return ` · model=${model} effort=${effort}`
+}
+
 // One line in front of each launch, so the sessions started into one file can be told apart. The
 // child's own pid is not known until `spawn` returns, and a header written afterwards would race the
 // child's first output; the time and the launching process separate the runs.
 function log_header(argv: LaunchArgv): string {
 	const stamp = new Date().toISOString()
 
-	return `\n=== ${stamp} · started by process ${String(process.pid)} · ${argv.command} ===\n`
+	return `\n=== ${stamp} · started by process ${String(process.pid)} · ${argv.command}${model_effort_suffix(argv)} ===\n`
 }
 
 function opened_log(log_path: string, on_error: (note: string) => void): number | undefined {
@@ -319,15 +410,21 @@ function launch(request: LaunchRequest, on_error: (note: string) => void): Launc
 const detached_launch = {
 	AGENT_COMMAND,
 	AGENT_FLAGS,
+	ALLOWED_EFFORTS,
+	DEFAULT_EFFORT,
+	DEFAULT_MODEL,
+	EFFORT_ENV_KEY,
 	MAX_ARGUMENT_LENGTH,
+	MODEL_ENV_KEY,
 	UNSAFE_NOTE,
 	agent_argv,
 	ensure_log,
 	is_safe_argv,
 	is_safe_value,
 	launch,
+	log_header,
 	note_of,
 }
 
-export type { LaunchArgv, LaunchRequest, LaunchResult }
+export type { AgentArgv, LaunchArgv, LaunchRequest, LaunchResult }
 export { detached_launch }

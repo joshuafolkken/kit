@@ -86,8 +86,10 @@ describe('cutting a lane child before the gate', () => {
 
 		expect(code).toBe(0)
 		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+		const built = detached_launch.agent_argv(INVOCATION)
+
 		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
-			argv: { command: 'claude', args: ['-p', INVOCATION] },
+			argv: built.kind === 'argv' ? built.argv : undefined,
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
 			env: { [lane_child_marker.KEY]: ISSUE },
