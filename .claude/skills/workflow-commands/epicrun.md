@@ -187,6 +187,15 @@ and only its summary comes back (joshuafolkken/kit#984). The measurement is why:
 requests and 698,928 over the last twenty, and the same 490 requests broken every 50 — about one
 child — would have billed 33% of what they did.
 
+**The parent orchestrates and never implements a child in its own context.** *Every* child takes a
+delegated unit — a fresh one, an `auto-ok` pickup, and **a child just released from
+`needs-decision`** alike. A parent that reads a released child's diff, edits its files and runs its
+gate has stopped being the orchestrator and become the k-th child whose accumulated context every
+later turn re-reads; measured on 2026-09-13, a parent that implemented one released child inline ran
+from about 290k to 380k of context and carried that weight through every remaining watch of the run
+(joshuafolkken/kit#1934). The rule is one sentence: **whatever offers a child — the loop, a pickup,
+or a person clearing a label — the child is handed to a lane, never to the parent.**
+
 **The mechanism is not new.** It is the one joshuafolkken/kit#969 defined — the enumeration plus
 `pnpm josh delegate` — with the unit changed from one step of a run to one child of an epic.
 Building a second is the clone `CLAUDE.md` prohibits. Ask the command rather than deciding:
@@ -1870,6 +1879,38 @@ start those processes, so it reports `none` unless it has looked for one itself.
 hand rather than polled to a merge. Nothing else about the loop changes: `epic:next --lanes` is asked
 as usual, and a lane still in flight is a seat that is taken.
 
+### A carried-over merge does not stand in front of the next lane
+
+**A carried-over child finishes in its own detached unit, and the resumed parent does not stand in
+front of its merge.** A lane handed over at the cut is still running its own `fullrun` — the
+foreground `pnpm josh followup` and the CI wait inside it included — in a process of its own
+(background-commands.md → "`pnpm josh followup` — foreground": foreground is *within the unit*, which
+from the parent is the background). **So the parent never runs a carried-over child's `followup`
+itself.** It polls the handed-over lane, and it opens new work beside it — it does not spend the run's
+opening finishing carried-over merges one after another before a single new lane is opened, which is
+exactly what joshuafolkken/kit#1934 measured: 18 minutes of a run's first stretch serialized behind
+one foreground `followup`, though the carried-over PRs and the new children had no dependency between
+them.
+
+**The reads and the dispatches go out together, in one turn.** Reading the handed-over lanes
+(`pnpm josh lane:list`), polling each (`pnpm josh run:liveness`), asking `epic:next --lanes`, and
+opening a lane for a child it offers are calls **none of which takes another's result**, so they are
+one turn of the parent's, never a chain — the turn-batching rule this file already states for a
+merge event ("A merge is one event, and it is one turn of the parent's" below), applied at the
+resume.
+
+**Independence is the offer command's answer, never a judgement.** A new child that is `blocked-by` a
+carried-over Issue is withheld by that relation and `epic:next` does not offer it; one that is not is
+offered, and it is dispatched into a free lane beside the carried-over merge. The parent decides
+nothing about which carried-over work a new child may run beside — it dispatches whatever the command
+hands back.
+
+**A carried-over child that did not survive the cut is re-dispatched, never adopted.** Where a
+handed-over lane's process is gone before it merged, its work is finished as a detached unit again —
+`pnpm josh lane:open <N>` re-attaches to the pushed branch, `pnpm josh lane:dispatch <N>` restarts it
+— and never picked up into the parent's own context ("The parent orchestrates and never implements a
+child in its own context" above).
+
 ### The counters live in the conversation
 
 **Write the run's counters into the epic progress comment at every child's merge, and read them back
@@ -1982,15 +2023,23 @@ only open question being where a follow-up Issue was filed (joshuafolkken/kit#13
 park is a genuine toss-up between two epics that are equally apt, and that is rare.
 
 **Removing the label is Tier A — do it without asking.** When the decision is recorded (joshuafolkken/kit#862
-writes it to the epic's `## Decisions`), remove the label and re-run `epicrun`; the state is on
-GitHub, so the run picks up where it left off.
+writes it to the epic's `## Decisions`), remove the label; the state is on GitHub, so the run picks up
+where it left off.
 
 ```bash
 gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-decision 2>/dev/null || true
 ```
 
-Without this the parked child never runs again — it is the second half of the human-in-the-loop
-cycle, not an optional tidy-up.
+**The released child goes back to a lane, never into the parent's own context.** Re-running
+`epicrun` reaches that dispatch by the ordinary loop; a parent that is *already* running, and clears
+a label mid-run because a person just answered, dispatches it the same way rather than picking up its
+diff itself — `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`, exactly as a fresh child.
+A parent that implements the released child inline is the failure joshuafolkken/kit#1934 was filed
+for; the orchestrator rule is "The parent orchestrates and never implements a child in its own
+context" above.
+
+Without removing the label the parked child never runs again — it is the second half of the
+human-in-the-loop cycle, not an optional tidy-up.
 
 ## `in-progress` is removed by whoever finds it stale
 

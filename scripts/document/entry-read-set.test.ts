@@ -180,21 +180,27 @@ describe('entry_read_set.costed', () => {
 	// **A file cited more than once is charged once between its references** — summing them instead
 	// double-counts, and with two unresolved headings it could push `scoped` above `whole` and print a
 	// negative saving (joshuafolkken/kit#1776 review round 1).
-	//
-	// The comparison carries a rounding allowance of one token per reference (joshuafolkken/kit#1932).
-	// `scoped` estimates a file's cited lines as one reconstructed block — the lines joined by `\n`,
-	// which inserts a separator between every disjoint range — while `per_reference` sums each section's
-	// own estimate. `cost_tokens.estimate` rounds (`Math.round(chars / 3)`), so a single block can round
-	// up to a token past the sum of its separately-rounded parts. Real double-counting inflates `scoped`
-	// by whole sections, far past this allowance.
 	it('charges a file cited more than once only once between its references', () => {
 		const report = entry_read_set.costed(ROOT, QUEUE)
 		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
 		const own = entry_read_set.total(report.files.map((file) => file.cost))
 
-		expect(report.scoped.tokens - own.tokens).toBeLessThanOrEqual(
-			per_reference.tokens + report.sections.length,
-		)
+		expect(report.scoped.tokens - own.tokens).toBeLessThanOrEqual(per_reference.tokens)
+	})
+
+	// **A file cited at non-adjacent sections fabricates no boundary token** (joshuafolkken/kit#1934).
+	// The queue entry cites four disjoint, non-adjacent `epicrun.md` sections; costing their union by
+	// joining the skipped-gap lines into one string fabricated a token at every gap, drifting `scoped`
+	// a token above the per-reference sum and printing a false negative saving. Costed as contiguous
+	// runs instead, the deduped figure equals the per-reference sum exactly — none of these references
+	// overlaps, so no line is dropped and none is fabricated. A regression to the join would break the
+	// equality upward, which the `<=` guard above would also catch; this pins the exact expected value.
+	it('fabricates no boundary token for a file cited at non-adjacent sections', () => {
+		const report = entry_read_set.costed(ROOT, QUEUE)
+		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
+		const own = entry_read_set.total(report.files.map((file) => file.cost))
+
+		expect(report.scoped.tokens - own.tokens).toBe(per_reference.tokens)
 	})
 
 	// The whole point of the measurement: the sections a `queue` entry cites are a fraction of the
