@@ -276,6 +276,31 @@ describe('run_wake_session.launch — the child’s output is kept', () => {
 	})
 })
 
+// joshuafolkken/kit#1904: the caller hands the child a fact the inherited environment does not carry
+// — a dispatched lane child's mark among them — so a launch that dropped the extra environment would
+// leave the mark unset and the pre-gate cut unmade. The child echoes the variable back through the log
+// the same way every other case here reads its result.
+describe('run_wake_session.launch — extra environment reaches the child', () => {
+	it('sets a variable the caller passed on the spawned child', async () => {
+		const argv = {
+			command: process.execPath,
+			args: ['-e', 'console.log(process.env.JOSH_LAUNCH_TEST_KEY ?? "")'],
+		}
+
+		run_wake_session.launch(
+			{
+				argv,
+				cwd: log_scratch.directory,
+				log_path: log_scratch.target,
+				env: { JOSH_LAUNCH_TEST_KEY: MARKER },
+			},
+			() => undefined,
+		)
+
+		expect(await logged_text()).toContain(MARKER)
+	})
+})
+
 // joshuafolkken/kit#1759. The regression these pin is not a wrong path — the displayed one and the
 // written one were always the same value — but a file whose existence depended on something having
 // launched into it, which left `--list` naming a path that was never created.

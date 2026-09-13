@@ -23,10 +23,29 @@ commit → push → merge) is verification the fresh process runs on the tree th
 ## It applies to a dispatched lane child, and to nothing else
 
 The cut is for a **detached** `fullrun` a lane dispatched — a process whose turn end is its process
-end. A person's interactive `fullrun` is driven by that person and must not relaunch itself, so the
-command decides mechanically rather than by judgement: `run:cut` looks for an **open lane** for the
-issue, and a checkout with none is answered `not-a-lane` and changes nothing. So the command is safe
-to issue unconditionally at the boundary — in the main checkout it is a no-op, and in a lane it cuts.
+end. A person's interactive `fullrun` is driven by that person and must not relaunch itself, so a
+dispatched child is told apart from a person **mechanically, by a mark the dispatch sets** — never by
+the model reading the shape of its own prompt (joshuafolkken/kit#1904).
+
+### The dispatch mark
+
+`lane:dispatch` and the `run:cut` relaunch both start the child with the environment variable
+**`JOSH_LANE_CHILD`** set to the lane's issue number. `scripts/lane/lane-child-marker.ts` is its one
+definition.
+
+- **Meaning**: "this session was launched for issue `<N>`, not typed by a person."
+- **Lifetime**: the child process. It is set at launch, read at the gate, and never written by the run
+  itself — a mark a run could set for itself would be no mark at all.
+- **Trust**: only where its value equals the lane's own issue. A mark that leaked in from a parent
+  session — naming another issue, or none — is read as a person, so a leak cannot make the guard fire
+  on a checkout it does not belong to.
+
+The name, the meaning and the lifetime are documented here and nowhere else.
+
+`run:cut`, the command that takes the cut, decides the same fact its own way: it looks for an **open
+lane** for the issue, and a checkout with none is answered `not-a-lane` and changes nothing. So the
+command is safe to issue unconditionally at the boundary — in the main checkout it is a no-op, and in
+a lane it cuts.
 
 ## Taking the cut
 
@@ -63,14 +82,14 @@ conclusion joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each reached after 
 moved the number not at all: a step a run is free to skip is the step that gets skipped under time
 pressure, and `run:hold` — the one boundary step that never gets missed — is the one that refuses.
 
-- **It fires in a lane and nowhere else.** An interactive `fullrun` in the main checkout runs its gate
-  untouched. **The line it draws is not the same one `run:cut` draws**, and the difference matters: a
-  `PreToolUse` hook answers synchronously, so the guard reads the working directory's shape —
-  `<lane root>/<issue number>` — where `run:cut` asks `git worktree list` whether an **open lane**
-  exists. The path test is the looser of the two, and a **person** working inside a lane checkout is
-  on its firing side. That costs them one round trip rather than a wrong action: the refusal tells
-  them not to take the cut — it would launch a detached run behind them — and the row is delivered
-  once per run, so reissuing the gate passes.
+- **It fires for a marked child and nowhere else** (joshuafolkken/kit#1904). The `PreToolUse` hook
+  answers synchronously, so it reads two facts off the world: the working directory is a lane —
+  `<lane root>/<issue number>` — **and** `JOSH_LANE_CHILD` names that same issue. An interactive
+  `fullrun`, in the main checkout or inside a lane a person is working in, carries no mark and runs its
+  gate untouched — so a person is **no longer on the firing side**, and the wasted round trip the old
+  path-only test cost them is gone. `run:cut` draws its own line its own way — an open-lane lookup —
+  which is why the guard and the command need not agree byte for byte; the mark is what makes the
+  guard's half mechanical rather than a judgement left to the model.
 - **It is silent once the cut is carried**, so the resumed process goes straight to the gate as this
   file says it should. `adopt_cut` leaves the record in place, and that record is what says the cut
   already happened.
@@ -111,6 +130,17 @@ pnpm josh run:cut --resume <N>
 than gating, so a cut that lost its work, or one two processes reached at once, is caught rather than
 merged.
 
+### The stage is passed to the resumed child
+
+**It is not reconstructed by it** (joshuafolkken/kit#1904). A resumed child arrives with
+`JOSH_LANE_CHILD` still set — the relaunch re-applies it — and `run:cut --resume` reads the record the
+cut left, so the child learns *where to resume from* at its entry. **Skip the entry it has already
+done**: do not re-read the workflow skill to work out its own situation, do not repeat the split
+assessment, and do not re-normalize the title. The `resume` verdict is the stage, and the plan and the
+recorded decisions are read back from the issue. This is the reconstruction a stopped child used to
+redo on every resume — measured at 2.6 minutes and about 150K tokens on the joshuafolkken/kit#1876
+run — removed.
+
 ## What is carried, and what is not
 
 - **The working tree is not in the record, because it never left the disk.** Ending the process does
@@ -123,6 +153,9 @@ merged.
 - **The hold is kept, not released.** The uncommitted work is exactly what a second run would
   trample, so the cut leaves the `run:hold` record standing; the resumed process adopts it rather than
   claiming a fresh one, and `pnpm josh followup` releases it at the merge as it always has.
+- **The dispatch mark is re-applied, not inherited** (joshuafolkken/kit#1904). The relaunch strips the
+  parent session's environment on the way in, so it sets `JOSH_LANE_CHILD` afresh from the lane's
+  issue; the resumed child is a dispatched child to the pre-gate cut exactly as the first one was.
 
 ## Verification, uniqueness and double-launch
 

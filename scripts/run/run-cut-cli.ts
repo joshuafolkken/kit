@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { detached_launch } from './detached-launch'
@@ -104,6 +105,10 @@ function relaunch(target: string, lane: LaneInfo, invocation: string): number {
 			argv: detached_launch.agent_argv(invocation),
 			cwd: lane.directory,
 			log_path: lane_dispatch.default_log_path(lane),
+			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
+			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
+			// since the parent-session strip runs on the way in.
+			env: lane_child_marker.env_for(lane.issue),
 		},
 		(note) => {
 			notes.push(note)

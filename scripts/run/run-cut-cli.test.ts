@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -89,8 +90,18 @@ describe('cutting a lane child before the gate', () => {
 			argv: { command: 'claude', args: ['-p', INVOCATION] },
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
+			env: { [lane_child_marker.KEY]: ISSUE },
 		})
 		expect(run_cut.read_cut(target()).kind).toBe('carried')
+	})
+
+	// **The relaunch keeps the mark, so the resumed child is still a dispatched child to the pre-gate
+	// cut** (joshuafolkken/kit#1904); the inherited environment is stripped on the way in, so the
+	// relaunch must set it rather than rely on it carrying across.
+	it('marks the relaunched child as dispatched for this issue', async () => {
+		await run_cut_cli.run([ISSUE])
+
+		expect(launch.mock.calls[0]?.[0].env).toStrictEqual({ [lane_child_marker.KEY]: ISSUE })
 	})
 
 	it('does nothing when there is no open lane for the issue', async () => {
