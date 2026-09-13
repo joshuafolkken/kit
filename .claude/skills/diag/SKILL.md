@@ -170,9 +170,9 @@ Read from the JSON, in this order:
   is missing**. Two `review` rows with no `pr` between them are ambiguous: report that the pair could
   not be identified rather than a ratio built on a guess. **Take the ratio round 2 ÷ round 1, and
   report it at 0.95 or above** — round 2 is a verification pass over the fix delta, so a round 2 that
-  costs what round 1 cost is worth flagging. **The threshold rests on a distribution recorded in
-  `prompts/review.md` → "The re-derivation round 2 does is real, and it is not what round 2 costs" —
-  read the figures there, never a copy here.** Name no cause; a single ratio near 1.00 is the tail of
+  costs what round 1 cost is worth flagging. **The threshold rests on a distribution measured in
+  joshuafolkken/kit#1418 (round 2 ÷ round 1 at a median 0.66 over 61 pairs) — read the figures in that
+  Issue, never a copy here.** Name no cause; a single ratio near 1.00 is the tail of
   that distribution, not evidence about the mechanism, readable only from the forked agents' own
   transcripts (`pnpm josh time --session <session-id>/agent-<agent-id>`). **Five states are not a
   pair**: one `review` row (a clean round 1, or a two-round run whose `pr` was absorbed), more than
@@ -193,7 +193,7 @@ Read from the JSON, in this order:
   evidences disagreeing, an unidentifiable pair, a `--top` listing, `ci` reading `not detected`, or a
   `failures` chain that makes the commit someone else's). Frequency comes from `--last <N>` applying
   the detector per run — **report the three counts, not a rate**. Rank a proposal to cut the cycle
-  against `prompts/review.md` → "What a round-2 fix-in-place costs, and how often it is paid".
+  against the measurement in joshuafolkken/kit#1382 (its lower-bound CI reading corrected in joshuafolkken/kit#1465).
 - **the round trips** — `tool_call_count` and `round_trip_count`, and the density between them. **A
   density near 1.00 is the finding, not a detail** — it says independent calls went out one per turn.
   It rests on the same transcript the shares do.
@@ -356,13 +356,13 @@ work a week later.
 **A phase whose earlier measurement is recorded is ranked against that record, not from the tables
 alone.** A large phase invites a proposal every time it is measured, so the same measure gets
 re-filed against a phase already found not to move. **`review` is the phase that has such a record** —
-`prompts/review.md` → "The narrowing is real in scope and does not show in the wall clock", **three
-sibling sections** ("The re-derivation round 2 does is real, and it is not what round 2 costs" and
-"Round 1's cost does track the change size, and splitting is still not how to cut it" follow it).
-**Read all three before ranking `review`, and quote no figure you have not read there.** A proposal
+measured across joshuafolkken/kit#1305 (round-2 narrowing does not show in the wall clock),
+joshuafolkken/kit#1418 (round 2's cost tracks its turn count, not how much of round 1 it repeats) and
+joshuafolkken/kit#1436 (round 1's cost is dominated by a fixed part that splitting pays twice).
+**Read those Issues before ranking `review`, and quote no figure you have not read there.** A proposal
 one already covers is not forbidden but is **required to say why the recorded data does not reach it**,
 and the row still appears in the table. The second recorded reading is the round-2 disposition cost —
-`prompts/review.md` → "What a round-2 fix-in-place costs, and how often it is paid" — which reads the
+measured in joshuafolkken/kit#1382 (corrected in joshuafolkken/kit#1465) — which reads the
 `ci`, `pr` and `merge` stretches rather than the `review` phase.
 
 **Enumerate the backlog before ranking it — never from memory.** A candidate set drawn from what a

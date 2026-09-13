@@ -150,9 +150,11 @@ describe('the completion instruction reports a count, not a version', () => {
 })
 
 // The replacement has to be named somewhere a run reads, or a child that no longer bumps looks like
-// a version that never moves.
+// a version that never moves. joshuafolkken/kit#1927 moved the gate → commit orchestration out of
+// `prompts/review.md` (now the review policy alone) and into `chain-rule.md`, which is where the
+// version fact now lives.
 describe('the documents name what raises the version instead', () => {
-	it.each([REVIEW_PROMPT, CHAIN_RULE])('%s names `pnpm josh release`', (relative_path) => {
+	it.each([CHAIN_RULE])('%s names `pnpm josh release`', (relative_path) => {
 		expect(read_unwrapped(relative_path)).toContain('pnpm josh release')
 	})
 })

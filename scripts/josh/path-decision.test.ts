@@ -25,8 +25,8 @@ describe('path_decision.parse_options', () => {
 })
 
 describe('path_decision.print_decision', () => {
-	// The split is what lets `$(pnpm josh review:level)` capture the answer while a person still
-	// sees the reason.
+	// The split is what lets `$(pnpm josh review:brief --level-only)` capture the answer while a person
+	// still sees the reason.
 	it('puts the answer on stdout and the reason on stderr', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -40,8 +40,8 @@ describe('path_decision.print_decision', () => {
 		error.mockRestore()
 	})
 
-	// The key is the caller's, so `review:level --json` keeps saying `level` rather than a name
-	// invented by the shared helper.
+	// The key is the caller's, so `review:brief --level-only --json` keeps saying `level` rather than a
+	// name invented by the shared helper.
 	it('names the answer with the calling command own key in json form', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 

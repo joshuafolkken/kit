@@ -18,7 +18,7 @@ pnpm josh latest:scope   # → required | skip ; the reason on stderr
 **The input is when `josh latest` last finished in this checkout, and nothing else.** "The
 dependencies are probably still fresh" is a judgement made under time pressure, and time pressure
 resolves it toward `skip` exactly when a stale dependency is most likely to matter — the same reason
-`pnpm josh review:level` took the review level out of an agent's hands.
+`pnpm josh review:brief --level-only` took the review level out of an agent's hands.
 
 - **No record answers `required`.** A fresh checkout, a cleared temp directory, a run that fell over
   halfway — every one of them lands there, and none of them is evidence that anything is current.

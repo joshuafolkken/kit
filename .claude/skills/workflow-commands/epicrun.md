@@ -493,7 +493,7 @@ lane is cut from.
 
 **The child merges `origin/main` into its lane before its gate now, so this path is the fallback rather
 than the first line.** Every `fullrun` runs `pnpm josh main:merge` ahead of the gate
-(`prompts/review.md` → "origin/main is merged in before the gate", the single source), so an overlap
+(`chain-rule.md` → "origin/main is merged in before the gate", the single source), so an overlap
 already on `main` is resolved before the gate reads the tree. What this section covers is an overlap
 that lands on `main` *after* it, which `followup` still reports as a conflict.
 

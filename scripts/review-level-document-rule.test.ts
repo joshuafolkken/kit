@@ -8,7 +8,10 @@ import { describe, expect, it } from 'vitest'
 // the tool does not.
 
 const REVIEW_PROMPT = 'prompts/review.md'
-const COMMAND = 'pnpm josh review:level'
+// joshuafolkken/kit#1927 retired the standalone `review:level` command and folded the level into
+// `review:brief --level-only`, so the documents now name that spelling. The rule is unchanged: the
+// level comes from a command, never from a typed judgement.
+const COMMAND = 'pnpm josh review:brief --level-only'
 const COMMAND_DOC = 'docs/josh-commands.md'
 // joshuafolkken/kit#1924 slimmed `CLAUDE.md` to the resident review-level trigger — it names the
 // command and caps the rounds at two, while the inert enumeration, the "never by judgement" phrasing

@@ -149,7 +149,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   tree holding the previous child's already-merged code, find nothing wrong, and have that silence
   read as a clean round. `pnpm josh review:brief` names the checkout and prints the nonce the review
   attests with; `missing` and `mismatch` are both refusals, and `pnpm josh followup` refuses the merge
-  on either (`prompts/review.md` → "The brief names the checkout, and a review that read another one is
+  on either (`chain-rule.md` → "The brief names the checkout, and a review that read another one is
   refused").
 - **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
   only once it has merged — decided from an enumeration (the verification gate, the code review, the
@@ -335,7 +335,7 @@ pnpm josh delegate --list   # the enumeration, and what was rejected and why
 
 **Never decide it yourself.** "This one is simple enough for the cheap tier" is a judgement made under
 cost pressure, and cost pressure resolves it toward *cheap enough* exactly when a mistake is most
-likely — the same reason `pnpm josh review:level` takes the review level off an agent's hands.
+likely — the same reason `pnpm josh review:brief --level-only` takes the review level off an agent's hands.
 
 **Anything not on the list is `keep`.** A step nobody classified must not be delegated because nobody
 said it could not be — the default is the rule, not a fallback. A missed entry costs money, and a

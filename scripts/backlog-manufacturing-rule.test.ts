@@ -53,7 +53,7 @@ const REVIEW_MARKERS: ReadonlyArray<string> = [
 	// The narrowing is in what *confirmed* means, never in what *reaching* means. Without this the
 	// bar reads as excluding distributed documents, which would contradict the severity test and the
 	// level rule in a repository whose product is its documents.
-	'**Reaching is read exactly as test 1 of "Severity" above reads it**',
+	"**Reaching is read exactly as the rubric's Severity test 1 reads it**",
 	'**"It needs a decision" is no longer a branch-2 condition on its own**',
 	'**This is the default, and it takes everything the other two branches did not**',
 	'**The note is not optional**',
