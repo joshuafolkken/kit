@@ -32,8 +32,10 @@ const SLACK_BYTES = 512
 // enforced. Its recorded size plus `SLACK_BYTES` must stay at or below this, pinned by a dedicated
 // test so a careless bump cannot push it over silently. joshuafolkken/kit#1988 raised it one slack
 // unit (80,000 → 80,512) for the kit-only annotation on `josh eval`, the mandated doc update landing
-// against a document #1978 had already filled to the 80,000 mark.
-const JOSH_COMMANDS_CEILING_BYTES = 80_512
+// against a document #1978 had already filled to the 80,000 mark. joshuafolkken/kit#2002 raised it a
+// further slack unit (80,512 → 81,024) for the mandated `josh lane:dispatch` update documenting the
+// dispatch-time `in-progress` apply, again landing against a document already at its mark.
+const JOSH_COMMANDS_CEILING_BYTES = 81_024
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -49,8 +51,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 18_031 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
-	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 14_267 },
-	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 10_129 },
+	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 15_332 },
+	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 11_117 },
 	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 7528 },
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_245 },
@@ -58,7 +60,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 29_528 },
-	{ path: 'docs/josh-commands.md', bytes: 80_000 },
+	{ path: 'docs/josh-commands.md', bytes: 80_512 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

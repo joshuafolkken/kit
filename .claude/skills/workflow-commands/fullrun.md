@@ -19,6 +19,18 @@ carrying what the command printed on stderr and stop: file nothing, branch nothi
 `needs-human-review` stop keeps the hold, because its tree carries uncommitted work. `SKILL.md` → §2f
 is the single source.
 
+**`in-progress` is applied the moment `run:hold` answers `hold`** — ahead of the title normalization
+and before implementation, so a `#N` counts as holding its lane from the claim rather than only once the
+work begins (the apply command is in the `fullrun #<N>` / `fullrun new` steps below; a `fullrun new` has
+no issue yet and applies it right after filing, step 3). **Every stop that leaves the tree clean removes
+the label in the same turn as `pnpm josh run:release`, with `gh api -X DELETE
+repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`** — the `cost --over` `over`
+stop, a split, a prerequisite discovered mid-run, and a third-party target (a `new` entry that stops
+before it files has nothing to remove). A `needs-human-review` stop keeps both the hold and the label,
+because the tree still carries uncommitted work. A lane child dispatched by `backlogrun` finds the label
+already applied by the parent at dispatch (`backlogrun.md` → "Concurrency"), so re-applying it here is
+idempotent.
+
 **A dispatched lane child asks whether it is a resume before any of the above — `pnpm josh run:cut
 --resume <N>`.** On `fresh` it proceeds exactly as this file describes, `run:hold` first. On `resume`
 it skips the title, the plan, the hold claim and the implementation, re-reads the issue body and
@@ -112,12 +124,13 @@ The procedure, in order:
 
 **Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.
 
-- `fullrun #<N>`: Read Issue #N → **normalize the title** (if not in English or can be phrased more
-  clearly, derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f
-  title="<title>"`) → **add `in-progress` label** (create if missing: `gh api
-  repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is actively in
-  progress" --silent 2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues/<N>/labels -f
-  'labels[]=in-progress'`) → post the agreed plan only if the Issue body is blank (`gh api -X PATCH
+- `fullrun #<N>`: **add `in-progress` label the moment `run:hold` answered `hold`** (create if missing:
+  `gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is
+  actively in progress" --silent 2>/dev/null || true`, then `gh api
+  repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`) → Read Issue #N → **normalize the
+  title** (if not in English or can be phrased more clearly, derive a better English title and `gh api -X
+  PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`) → post the agreed plan only if the Issue
+  body is blank (`gh api -X PATCH
   repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
   plan-posting step → implement → run the **verification gate** (the full procedure is `chain-rule.md`;
   in outline: refactor → `pnpm josh main:merge` → start `pnpm josh gate` and a subagent `/code-review`
