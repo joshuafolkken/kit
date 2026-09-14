@@ -1277,29 +1277,19 @@ Report where a run's wall clock went, read from the same transcripts `josh cost`
 ```bash
 pnpm josh time                  # the last run tree, wall clock and cost by role; alias: josh tm
 pnpm josh time --run            # the same run-tree scope, named explicitly
-pnpm josh time --issue <number> # one issue's whole run, from invocation to merge
-pnpm josh time --session <id>   # one named session
-pnpm josh time --epic <number>  # a whole epic run, child by child, with the per-turn trend
-pnpm josh time --last <runs>    # the last N merged runs as a distribution (min, median, max)
-pnpm josh time --period <days>  # the backlog over N days — lanes, idle, serialization, throughput
-pnpm josh time --top <rows>     # cap the per-tool/command/segment/invocation tables at N rows
-pnpm josh time --session <id> --instructions  # weight of the session's loaded rules and procedures
 pnpm josh time --json           # the same figures, machine-readable
 pnpm josh time --path <dir>     # read another project's transcripts from this checkout
 ```
 
 **Options:**
 
-- `--run` (default) — the whole run tree, wall clock led beside dollars. Refused beside `--issue`/`--session`/`--epic`/`--last`/`--period`.
-- `--issue`/`--session`/`--epic`/`--last`/`--period` — one run, one session, a batch, a distribution, or the backlog; naming more than one is refused.
-- `--instructions` — sizes the instruction documents the session carried and their upper-bound share of model wait; requires `--session`.
-- `--path <dir>` — aim the read at another project (absolute path); rides beside any scope, keeps the `cwd` behavior when absent.
-- `--top <rows>` — caps the ranked tables (by_tool, by_josh_command, segments, by_invocation, rework.files) and notes what it withheld; leaves shares, phases and `by_check` uncapped.
-- `--json` — every row uncapped unless `--top` narrows it.
+- `--run` (default) — the whole run tree, wall clock led beside dollars. The additional report scopes (`--issue`/`--session`/`--epic`/`--last`/`--period`) and the `--instructions`/`--top` modifiers they carried were retired with no rule or decision reading them (#2017).
+- `--path <dir>` — aim the read at another project (absolute path); keeps the `cwd` behavior when absent.
+- `--json` — the run tree, machine-readable.
 
-**Output:** wall clock is split into model wait / tool execution / human wait / CI wait (reconstructing the elapsed total exactly), then a phase breakdown (`plan`/`setup`/`implement`/`gate`/`rework`/`review`/`pr`/`wrapup`/`ci`/`merge`/`wait`/`other`), round-trip and bundling counts, per-session and per-child breakdowns, and cost-by-phase where the cost corpus was read. `josh followup` appends each merged run to `.time-history.jsonl`, which `--period` reads. An unreadable row prints `not measured` / `not detected` rather than a zero.
+**Output:** wall clock is split into model wait / tool execution / human wait / CI wait (reconstructing the elapsed total exactly), then a phase breakdown (`plan`/`setup`/`implement`/`gate`/`rework`/`review`/`pr`/`wrapup`/`ci`/`merge`/`wait`/`other`), round-trip and bundling counts, and cost-by-phase where the cost corpus was read. An unreadable row prints `not measured` / `not detected` rather than a zero.
 
-**Output / exit codes:** an absent or untimed transcript exits non-zero and says where it looked; a scope with nothing to report exits non-zero and names the scope flags.
+**Output / exit codes:** an absent or untimed transcript exits non-zero and says where it looked.
 
 ### `josh eval`
 
