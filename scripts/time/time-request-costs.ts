@@ -128,11 +128,55 @@ function delegated_units(
 	)
 }
 
+// One session's requests, projected to just the token facts the per-session signals join against
+// (joshuafolkken/kit#1970): the billed input as the context size, the output tokens, and the instant
+// the request completed. Sorted oldest first, so a lookup by instant can take the nearest.
+interface RequestTokens {
+	at_ms: number | undefined
+	billed_input: number
+	output_tokens: number
+}
+
+interface SessionRequests {
+	session_id: string
+	requests: ReadonlyArray<RequestTokens>
+}
+
+function to_request_tokens(record: UsageRecord): RequestTokens {
+	return {
+		at_ms: record.at_ms,
+		billed_input: cost_usage.billed_input(record.totals),
+		output_tokens: record.totals.output_tokens,
+	}
+}
+
+// The same attributed records grouped by their session, reusing this reader's one corpus walk rather
+// than reading the attribution a second time (joshuafolkken/kit#1970). `time-session-signals.ts` joins
+// these against the time-side spans.
+function session_requests_of(attributed: ReadonlyArray<AttributedRecord>): Array<SessionRequests> {
+	const groups = new Map<string, Array<RequestTokens>>()
+
+	for (const pair of attributed) {
+		const requests = groups.get(pair.session_id) ?? []
+
+		requests.push(to_request_tokens(pair.record))
+		groups.set(pair.session_id, requests)
+	}
+
+	return [...groups].map(([session_id, requests]) => ({
+		session_id,
+		requests: requests.toSorted(
+			(left, right) => (left.at_ms ?? NO_TOKENS) - (right.at_ms ?? NO_TOKENS),
+		),
+	}))
+}
+
 // Both projections of one issue's cost corpus, so the reader is walked once and the phase costs and
 // the launch costs cannot disagree about which requests belonged to the run.
 interface RunCostReading {
 	priced: ReadonlyArray<PricedRequest>
 	units: ReadonlyArray<DelegatedUnit>
+	session_requests: ReadonlyArray<SessionRequests>
 }
 
 function run_cost_for(cwd: string, issue_number: number): RunCostReading {
@@ -142,6 +186,7 @@ function run_cost_for(cwd: string, issue_number: number): RunCostReading {
 	return {
 		priced: attributed.map((pair) => to_priced(pair.record)),
 		units: delegated_units(attributed, corpus),
+		session_requests: session_requests_of(attributed),
 	}
 }
 
@@ -175,5 +220,5 @@ const time_request_costs = {
 	delegated_units,
 }
 
-export type { RunCostReader, RunCostReading }
+export type { RequestTokens, RunCostReader, RunCostReading, SessionRequests }
 export { time_request_costs }

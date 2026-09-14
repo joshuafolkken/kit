@@ -30,7 +30,11 @@ function cost_reader(asked: Array<string>, units: RunCostReading['units']): RunC
 	return (cwd: string, issue_number: number) => {
 		asked.push(`${cwd}#${String(issue_number)}`)
 
-		return { priced: [{ at_ms: undefined, cost_usd: ONE_DOLLAR, is_priced: true }], units }
+		return {
+			priced: [{ at_ms: undefined, cost_usd: ONE_DOLLAR, is_priced: true }],
+			units,
+			session_requests: [],
+		}
 	}
 }
 

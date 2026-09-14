@@ -6,8 +6,16 @@ import { time_transcript_fixture } from './time-transcript-fixture'
 
 const { span } = time_transcript_fixture
 
+const MINUTE_MS = 60_000
+const CONTEXT_TOKENS = 100
+const OUTPUT_TOKENS = 50
+
 function model(ended_minute: number): Span {
 	return { ...span('model', ended_minute, 1), category: 'model' }
+}
+
+function check(ended_minute: number): Span {
+	return { ...span('Bash', ended_minute, 1), check_key: 'josh lint:related a.ts' }
 }
 
 function edit(ended_minute: number): Span {
@@ -69,5 +77,30 @@ describe('time_by_session.build', () => {
 
 		expect(rows[1]?.to_first_progress_ms).toBeGreaterThan(0)
 		expect(rows[0]?.to_first_progress_ms).toBeUndefined()
+	})
+})
+
+describe('time_by_session.build — token signals', () => {
+	const SESSION_C: SessionTimeline = { session_id: 'session-c', spans: [edit(1), check(2)] }
+
+	it('joins per-session signals when requests are supplied', () => {
+		const session_requests = [
+			{
+				session_id: 'session-c',
+				requests: [
+					{ at_ms: 2 * MINUTE_MS, billed_input: CONTEXT_TOKENS, output_tokens: OUTPUT_TOKENS },
+				],
+			},
+		]
+
+		const [row] = time_by_session.build([SESSION_C], session_requests)
+
+		expect(row?.signals?.check_loop?.count).toBe(1)
+	})
+
+	it('withholds signals when no requests are supplied', () => {
+		const [row] = time_by_session.build([SESSION_A])
+
+		expect(row?.signals).toBeUndefined()
 	})
 })
