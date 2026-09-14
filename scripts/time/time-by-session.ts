@@ -9,7 +9,7 @@ import { time_session_signals, type SessionSignals, type Stall } from './time-se
 
 // One issue's wall clock broken down by the main-line session it was spent in (joshuafolkken/kit#1912).
 //
-// The cost axis (`cost-sessions.ts`) says what each session cost; this says how long each took and how
+// This says how long each main-line session took and how
 // it ended. A run that stopped and resumed reads here as two rows — the first `stopped`, the second
 // `merged` — where the pooled figures showed one run of unattributable minutes. The resume row also
 // carries how long the resumed session spent before its first forward progress, which is the

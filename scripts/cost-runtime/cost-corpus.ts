@@ -1,7 +1,19 @@
-import type { MissingData } from '#scripts/cost/cost-report'
 import { cost_attribute } from './cost-attribute'
 import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
 import type { UsageRecord } from './cost-usage'
+
+// The counters a corpus read could not account for, kept beside the sessions it read. Defined here
+// because `accumulate_missing` is the only producer left once the readerless report modules that
+// once rendered it were retired (#2016).
+interface MissingData {
+	no_usage_lines: number
+	malformed_lines: number
+	unreadable_sessions: number
+	// Delegated units whose owning session's issue could not be determined, so their cost is charged
+	// to no issue at all (joshuafolkken/kit#1812). Filled by the attribution, which is the only step
+	// that knows a unit could not follow its parent; zero from a per-session tally.
+	unattributed_sessions: number
+}
 
 // The corpus of a project's session transcripts, and how each request in it attributes to an issue
 // (joshuafolkken/kit#962, joshuafolkken/kit#1812). Split out of `cost-cli.ts` when that file passed
@@ -28,15 +40,13 @@ function accumulate_missing(sessions: ReadonlyArray<SessionUsage>): MissingData 
 	}
 }
 
-// Every session for this project, newest first. A `--session` narrows it here rather than in each
-// caller, so "that session does not exist" is one answer instead of three.
-function load_corpus(cwd: string, session_id?: string): Corpus {
+// Every session for this project, newest first. Once the readerless `--session` scope was retired
+// (#2016) no caller narrows the set, so the whole corpus is read.
+function load_corpus(cwd: string): Corpus {
 	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
-	const wanted =
-		session_id === undefined ? files : files.filter((file) => file.session_id === session_id)
-	const sessions = wanted.map((file) => cost_transcript.read_session(file))
+	const sessions = files.map((file) => cost_transcript.read_session(file))
 
-	return { sessions, files: wanted, missing: accumulate_missing(sessions) }
+	return { sessions, files, missing: accumulate_missing(sessions) }
 }
 
 interface AttributedRecord {
@@ -264,5 +274,5 @@ const cost_corpus = {
 	mainline_records,
 }
 
-export type { AttributedRecord, Corpus }
+export type { AttributedRecord, Corpus, MissingData }
 export { cost_corpus }

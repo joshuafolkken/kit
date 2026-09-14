@@ -30,7 +30,7 @@
 //
 // **The residual error runs in one direction, and the report says where it lands.** If 3 is too
 // generous for some content, the rows sized from repository files are *under*-counted and the
-// difference falls into `cost-resident.ts`'s harness remainder — which is therefore an upper bound
+// difference falls into the harness remainder that absorbs what cannot be sized — which is therefore an upper bound
 // on what the transcript cannot decompose, and the sized rows a lower bound on what it can. That is
 // why the remainder is one named row rather than a figure distributed over the others.
 

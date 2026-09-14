@@ -261,8 +261,8 @@ function sum_totals(records: ReadonlyArray<UsageRecord>): UsageTotals {
 	return total
 }
 
-// Everything the run paid to send, whatever rate each part was billed at. The breakdown between
-// resident preamble and conversation history is computed from this in `cost-report.ts`.
+// Everything the run paid to send, whatever rate each part was billed at. `josh cost --over` reads
+// this per request; `josh time` breaks it into resident preamble and conversation history.
 function billed_input(totals: UsageTotals): number {
 	return (
 		totals.input_tokens +

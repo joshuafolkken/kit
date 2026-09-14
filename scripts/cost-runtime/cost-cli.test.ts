@@ -4,192 +4,33 @@ import { cost_cli_fixture } from './cost-cli-fixture'
 
 // The console capture, the temporary transcript home and the transcript writers are
 // `cost-cli-fixture.ts`'s, shared with the `--path` suite (joshuafolkken/kit#1987).
-const { CWD, MAIN, SESSION_A, ISSUE_BRANCH, THINKING_TOKENS } = cost_cli_fixture
-const { usage_line, write_session, write_populated, output, stdout } = cost_cli_fixture
+const { CWD, MAIN, SESSION_A, usage_line, write_session, output, stdout } = cost_cli_fixture
 
 cost_cli_fixture.capture_console()
 
 const FAILURE_EXIT_CODE = 1
-const SESSION_B = 'session-b'
-const BAD_LINE = '{ not json'
-const ISSUE_FLAG = '--issue'
 const BAD_FLAG = '--nonsense'
 const NO_TRANSCRIPTS = 'No transcripts found'
-const ONE_REQUEST_FOR_962 = 'issue #962 — 1 request(s)'
-const ISSUE_NUMBER = '962'
-const ALL_FLAG = '--all'
-const RESIDENT_HEADING = 'Resident breakdown'
-const COMPOSITION_HEADING = 'Context composition'
-
-interface JsonReport {
-	measurement?: { composition: { rows: Array<{ category: string; tokens: number }> } }
-}
-
-function thinking_row(json: string): { tokens: number } | undefined {
-	const [report] = JSON.parse(json) as Array<JsonReport>
-
-	return report?.measurement?.composition.rows.find((row) => row.category === 'thinking')
-}
+// The readerless report scopes retired in #2016: now unknown flags, so each is refused rather than
+// silently parsed into a report that no longer exists.
+const RETIRED_FLAGS: ReadonlyArray<ReadonlyArray<string>> = [
+	['--session', 'x'],
+	['--issue', '962'],
+	['--all'],
+	['--run'],
+	['--json'],
+	['--cap', '1'],
+]
 
 describe('cost_cli.parse_options', () => {
-	it('reads an issue number', () => {
-		expect(cost_cli.parse_options([ISSUE_FLAG, ISSUE_NUMBER])?.issue).toBe(962)
-	})
-
-	it('refuses an issue that is not a number', () => {
-		expect(cost_cli.parse_options([ISSUE_FLAG, 'abc'])).toBeUndefined()
-	})
-
-	it('refuses an unknown flag rather than ignoring it', () => {
-		expect(cost_cli.parse_options([BAD_FLAG])).toBeUndefined()
-	})
-
-	it('defaults to no narrow scope with no flags', () => {
-		expect(cost_cli.parse_options([])).toStrictEqual({
-			is_all: false,
-			is_json: false,
-			is_run: false,
-		})
-	})
-})
-
-describe('cost_cli.run on one session', () => {
-	it('reports a named session with --session', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-
-		expect(await cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
-		expect(output()).toContain(`session ${SESSION_A}`)
-	})
-
-	// joshuafolkken/kit#1937: the bare default is the run tree, not the newest single session.
-	it('reports the run tree by default', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-
-		expect(await cost_cli.run([], CWD)).toBe(0)
-		expect(output()).toContain('run tree')
-	})
-
-	// The failure this command exists to remove: reading nothing and reporting it as a free run.
-	it('reports a missing transcript as an error, not as a zero-cost run', async () => {
-		expect(await cost_cli.run([], CWD)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).toContain(NO_TRANSCRIPTS)
-		expect(output()).not.toContain('$0.0000')
-	})
-
-	it('reports a named session that does not exist as missing', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-
-		expect(await cost_cli.run(['--session', 'absent'], CWD)).toBe(FAILURE_EXIT_CODE)
-	})
-
-	it('prints the usage line for a bad invocation', async () => {
-		expect(await cost_cli.run([BAD_FLAG], CWD)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).toContain(cost_cli.USAGE)
-	})
-
-	it('emits machine-readable output for --json', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-
-		expect(await cost_cli.run(['--session', SESSION_A, '--json'], CWD)).toBe(0)
-		expect(JSON.parse(output())).toMatchObject([{ request_count: 1 }])
-	})
-})
-
-describe('cost_cli.run across sessions', () => {
-	it('rolls an issue up across every session that touched it', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10), usage_line('r2', ISSUE_BRANCH, 10)])
-		write_session(SESSION_B, [usage_line('r3', ISSUE_BRANCH, 10)])
-
-		expect(await cost_cli.run([ISSUE_FLAG, ISSUE_NUMBER], CWD)).toBe(0)
-		expect(output()).toContain('issue #962 — 3 request(s)')
-	})
-
-	it('lists every issue and a grand total under --all', async () => {
-		write_session(SESSION_A, [
-			usage_line('r1', ISSUE_BRANCH, 10),
-			usage_line('r2', '963-next-one', 10),
-		])
-
-		expect(await cost_cli.run(['--all'], CWD)).toBe(0)
-		expect(output()).toContain('issue #962')
-		expect(output()).toContain('issue #963')
-		expect(output()).toContain('Total across 2 scope(s)')
-	})
-})
-
-// `--all` and `--issue` used to answer an absent transcript directory with an empty listing and a
-// zero-cost issue — exit 0 either way, which is the silent zero this command exists to remove.
-describe('cost_cli.run on an absent transcript directory', () => {
-	it('exits non-zero for --all rather than printing nothing', async () => {
-		expect(await cost_cli.run(['--all'], CWD)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).toContain(NO_TRANSCRIPTS)
-	})
-
-	it('exits non-zero for --issue rather than blaming attribution', async () => {
-		expect(await cost_cli.run([ISSUE_FLAG, ISSUE_NUMBER], CWD)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).not.toContain('No requests are attributed')
-	})
-
-	it('names the session that was asked for when one was named', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-
-		expect(await cost_cli.run(['--session', 'absent'], CWD)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).toContain('No transcript named absent')
-	})
-})
-
-// Resuming or forking a session copies the earlier lines into a new transcript file, so one billed
-// request appears in several — 152 such request ids in this repository's own transcripts.
-describe('cost_cli.run across sessions that share requests', () => {
-	it('counts a request copied into a second transcript once', async () => {
-		write_session(SESSION_A, [usage_line('r1', ISSUE_BRANCH, 10)])
-		write_session(SESSION_B, [usage_line('r1', ISSUE_BRANCH, 10)])
-
-		expect(await cost_cli.run([ISSUE_FLAG, ISSUE_NUMBER], CWD)).toBe(0)
-		expect(output()).toContain(ONE_REQUEST_FOR_962)
-	})
-
-	it('keeps the attributed copy when the other copy has no branch to attribute it to', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-		write_session(SESSION_B, [usage_line('r1', ISSUE_BRANCH, 10)])
-
-		expect(await cost_cli.run(['--all'], CWD)).toBe(0)
-		expect(output()).toContain(ONE_REQUEST_FOR_962)
-		expect(output()).not.toContain('unattributed')
-	})
-})
-
-// A malformed line in an unrelated session is not missing data about the session being reported;
-// summing the whole corpus into a single-session report blamed one run for another's defect.
-describe('cost_cli.run missing-data scoping', () => {
-	it("reports only the named session's own missing lines", async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-		write_session(SESSION_B, [BAD_LINE, BAD_LINE])
-
-		expect(await cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
-		expect(output()).not.toContain('Missing data')
-	})
-
-	// A line that could not be read carries no branch, so there is no way to rule out that it belonged
-	// to the issue being rolled up.
-	it('still reports the corpus-wide missing lines for an issue rollup', async () => {
-		write_session(SESSION_A, [usage_line('r1', ISSUE_BRANCH, 10)])
-		write_session(SESSION_B, [BAD_LINE])
-
-		expect(await cost_cli.run([ISSUE_FLAG, ISSUE_NUMBER], CWD)).toBe(0)
-		expect(output()).toContain('unparseable lines: 1')
-	})
-})
-
-// joshuafolkken/kit#968: a session that runs several epic children pays for every earlier child on
-// every later turn. The hand-off is decided by the billed-input ratio, not by whether the run feels
-// long.
-describe('cost_cli.parse_options — the hand-off threshold', () => {
-	// Deliberately not the figure the documents ship (joshuafolkken/kit#1775 moved it to 300,000): the
-	// parser has no dependency on the threshold, so coupling this case to it would fail a parsing test
-	// for a non-parsing reason the next time the line moves.
 	it('reads a threshold', () => {
 		expect(cost_cli.parse_options(['--over', '123456'])?.over).toBe(123_456)
+	})
+
+	it('reads a target path', () => {
+		const target = '/Users/someone/Development/other-project'
+
+		expect(cost_cli.parse_options(['--over', '1', '--path', target])?.path).toBe(target)
 	})
 
 	it('refuses a threshold that is not a number', () => {
@@ -201,98 +42,21 @@ describe('cost_cli.parse_options — the hand-off threshold', () => {
 	it('refuses rather than ignoring a mistyped threshold', () => {
 		expect(cost_cli.parse_options(['--over', '-5'])).toBeUndefined()
 	})
-})
 
-describe('cost_cli.run --over', () => {
-	// The fixture request bills one input token, so zero is the only limit it exceeds. Chosen
-	// deliberately: the first version of this test asserted against a limit the fixture did *not*
-	// exceed and still passed, because it read stderr — where the word "over" always appears.
-	it('answers over when the marginal cost exceeds the limit', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-
-		expect(await cost_cli.run(['--over', '0'], CWD)).toBe(0)
-		expect(stdout().trim()).toBe('over')
+	it('refuses an unknown flag rather than ignoring it', () => {
+		expect(cost_cli.parse_options([BAD_FLAG])).toBeUndefined()
 	})
 
-	it('answers under when it does not', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-
-		expect(await cost_cli.run(['--over', '99999999'], CWD)).toBe(0)
-		expect(stdout().trim()).toBe('under')
+	it.each(RETIRED_FLAGS)('refuses the retired report flag %s', (...argv) => {
+		expect(cost_cli.parse_options(argv)).toBeUndefined()
 	})
 
-	it('says what the measured cost was, not only the verdict', async () => {
-		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-		await cost_cli.run(['--over', '0'], CWD)
-
-		expect(output()).toContain('per request')
-	})
-
-	// The word "under" appears in the missing-transcript message too, so the verdict is checked by the
-	// exit code and the message, not by a substring that both share.
-	it('reports a missing transcript rather than answering a verdict', async () => {
-		expect(await cost_cli.run(['--over', '0'], CWD)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).toContain(NO_TRANSCRIPTS)
+	it('reads no scope from an empty argv', () => {
+		expect(cost_cli.parse_options([])).toStrictEqual({})
 	})
 })
 
-// joshuafolkken/kit#1151. Both decompositions are read from one transcript's own lines, so they
-// belong to the whole-session scope and to no other — an issue's slice and a `--all` corpus have no
-// single session to read them from.
-describe('cost_cli.run — the resident and context decompositions', () => {
-	it('prints both on the session scope', async () => {
-		write_populated()
-
-		expect(await cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
-		expect(output()).toContain(RESIDENT_HEADING)
-		expect(output()).toContain(COMPOSITION_HEADING)
-	})
-
-	// The half another run consumes: joshuafolkken/kit#1159 has to read the Bash command-body share
-	// from here rather than write its own script.
-	it('carries them in --json under measurement', async () => {
-		write_populated()
-		await cost_cli.run(['--session', SESSION_A, '--json'], CWD)
-
-		const thinking = thinking_row(stdout())
-
-		expect(thinking?.tokens).toBe(THINKING_TOKENS)
-	})
-
-	// A breakdown against a baseline of 0 is a table of estimates beside a measurement that was never
-	// made — "this could not be read" dressed as a reading.
-	it('omits them for a session with no readable request', async () => {
-		write_session(SESSION_A, [BAD_LINE])
-		await cost_cli.run(['--session', SESSION_A, '--json'], CWD)
-
-		expect(thinking_row(stdout())).toBeUndefined()
-	})
-
-	it.each([[ALL_FLAG], [ISSUE_FLAG]])('omits them from the %s scope', async (flag) => {
-		write_populated()
-
-		const argv = flag === ALL_FLAG ? [ALL_FLAG] : [ISSUE_FLAG, ISSUE_NUMBER]
-
-		expect(await cost_cli.run(argv, CWD)).toBe(0)
-		expect(output()).not.toContain(RESIDENT_HEADING)
-		expect(output()).not.toContain(COMPOSITION_HEADING)
-	})
-})
-
-describe('cost_cli.run --over — what it refuses', () => {
-	// The verdict is about this session. Scoped to an issue it would answer for one slice, which is a
-	// different number from the one the hand-off rule is written against.
-	it.each([['--all'], [ISSUE_FLAG]])('refuses to combine the threshold with %s', async (flag) => {
-		const argv = flag === '--all' ? ['--over', '1', '--all'] : ['--over', '1', flag, ISSUE_NUMBER]
-
-		expect(await cost_cli.run(argv, CWD)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).toContain(cost_cli.USAGE)
-	})
-
-	it('refuses to combine the threshold with --json', async () => {
-		expect(await cost_cli.run(['--over', '1', '--json'], CWD)).toBe(FAILURE_EXIT_CODE)
-	})
-
+describe('cost_cli.to_threshold', () => {
 	// A threshold of zero means "hand off after any request at all" — a limit, not a typo.
 	it('accepts a threshold of zero', () => {
 		expect(cost_cli.to_threshold('0')).toBe(0)
@@ -309,30 +73,49 @@ describe('cost_cli.run --over — what it refuses', () => {
 	})
 })
 
-// joshuafolkken/kit#1838: `--cap` is a whole-run counterfactual the session-scoped `--over` could not
-// express; the verdict math itself is unit-tested in cost-verdict.test.ts.
-describe('cost_cli.parse_options — the cap flag', () => {
-	it('reads a cap', () => {
-		expect(cost_cli.parse_options(['--cap', '200000'])?.cap).toBe(200_000)
-	})
-
-	// A non-number is a typo, `--all` gives many reports (which ratio?), and `--over` is a second
-	// verdict on one run.
-	it.each([
-		['--cap', 'x'],
-		['--cap', '1', ALL_FLAG],
-		['--cap', '1', '--over', '1'],
-	])('refuses %s', (...argv) => {
-		expect(cost_cli.parse_options(argv)).toBeUndefined()
-	})
-})
-
-describe('cost_cli.run --cap', () => {
-	// The fixture request bills one input token, so a cap of 5 keeps it — the whole cost.
-	it('prints the share of cost at or under the cap', async () => {
+describe('cost_cli.run --over', () => {
+	// The fixture request bills one input token, so zero is the only limit it exceeds. Chosen
+	// deliberately: an earlier test asserted against a limit the fixture did *not* exceed and still
+	// passed, because it read stderr — where the word "over" always appears.
+	it('answers over when the marginal cost exceeds the limit', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(await cost_cli.run(['--cap', '5'], CWD)).toBe(0)
-		expect(stdout().trim()).toBe('100.0%')
+		expect(cost_cli.run(['--over', '0'], CWD)).toBe(0)
+		expect(stdout().trim()).toBe('over')
+	})
+
+	it('answers under when it does not', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
+		expect(cost_cli.run(['--over', '99999999'], CWD)).toBe(0)
+		expect(stdout().trim()).toBe('under')
+	})
+
+	it('says what the measured cost was, not only the verdict', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+		cost_cli.run(['--over', '0'], CWD)
+
+		expect(output()).toContain('per request')
+	})
+
+	// The word "under" appears in the missing-transcript message too, so the verdict is checked by the
+	// exit code and the message, not by a substring that both share.
+	it('reports a missing transcript rather than answering a verdict', () => {
+		expect(cost_cli.run(['--over', '0'], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(NO_TRANSCRIPTS)
+	})
+
+	it('prints the usage line for a bad invocation', () => {
+		expect(cost_cli.run([BAD_FLAG], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(cost_cli.USAGE)
+	})
+
+	// With the report scopes gone, an invocation that names no threshold has nothing to do and prints
+	// the usage rather than a report.
+	it('prints the usage line when no threshold is given', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
+		expect(cost_cli.run([], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(cost_cli.USAGE)
 	})
 })

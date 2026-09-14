@@ -9,6 +9,8 @@ const { usage_line, write_session, write_session_under, output } = cost_cli_fixt
 // A project other than the process cwd, so `--path` is seen to read a directory it was not already in.
 const TARGET = '/Users/someone/Development/other-project'
 const FAILURE_EXIT_CODE = 1
+const NO_TRANSCRIPTS = 'No transcripts found'
+const PER_REQUEST = 'per request'
 
 cost_cli_fixture.capture_console()
 
@@ -17,36 +19,35 @@ describe('cost_cli.parse_options — the target project path', () => {
 		expect(cost_cli.parse_options(['--path', TARGET])?.path).toBe(TARGET)
 	})
 
-	it('reads --path beside a scope rather than as a competing one', () => {
-		expect(cost_cli.parse_options(['--session', SESSION_A, '--path', TARGET])).toMatchObject({
-			session: SESSION_A,
+	it('reads --path beside the threshold rather than as a competing flag', () => {
+		expect(cost_cli.parse_options(['--over', '1', '--path', TARGET])).toMatchObject({
+			over: 1,
 			path: TARGET,
 		})
 	})
 })
 
 describe('cost_cli.run — the target project path', () => {
-	it('reads the transcripts of the project named by --path', async () => {
+	it('reads the transcripts of the project named by --path', () => {
 		write_session_under(TARGET, SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(await cost_cli.run(['--session', SESSION_A, '--path', TARGET], CWD)).toBe(0)
-		expect(output()).toContain(`session ${SESSION_A}`)
+		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD)).toBe(0)
+		expect(output()).toContain(PER_REQUEST)
 	})
 
 	// Given --path, the read does not fall back to the process cwd, even though it has a transcript.
-	it('does not read the process cwd when --path names another project', async () => {
+	it('does not read the process cwd when --path names another project', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(await cost_cli.run(['--session', SESSION_A, '--path', TARGET], CWD)).toBe(
-			FAILURE_EXIT_CODE,
-		)
+		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(NO_TRANSCRIPTS)
 	})
 
 	// Unspecified --path keeps the former behavior: this process's own working directory.
-	it('reads the process cwd when --path is absent', async () => {
+	it('reads the process cwd when --path is absent', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(await cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
-		expect(output()).toContain(`session ${SESSION_A}`)
+		expect(cost_cli.run(['--over', '0'], CWD)).toBe(0)
+		expect(output()).toContain(PER_REQUEST)
 	})
 })

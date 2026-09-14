@@ -14,7 +14,7 @@ import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 // preamble is about 15% of billed input and the conversation is the other 85% — and this answers the
 // wall-clock half, which is the one the reduction was ever argued from.
 //
-// **`cost-resident.ts` deliberately stops where this starts.** It sizes what is resident before any
+// **The resident-token sizing deliberately stops where this starts.** It sizes what is resident before any
 // work happens — `CLAUDE.md`, the hooks, the skills *index* — and says in so many words that a
 // skill's **body** is read only on invocation and is therefore not resident. That body is most of
 // what a workflow run carries: `workflow-commands/SKILL.md` alone is larger than `CLAUDE.md`. So the

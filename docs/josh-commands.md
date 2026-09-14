@@ -1213,23 +1213,16 @@ The child runs `claude -p --model <model> --effort <effort> fullrun #<N>` with `
 
 ### `josh cost`
 
-Report what a run actually spent, read from Claude Code's session transcripts.
+Answer whether the next turn of a run will cost more than a threshold, read from Claude Code's session transcripts. Since #2016 this is the `--over` hand-off verdict alone: the readerless report scopes (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were retired because no rule or decision read them. The `josh time` run-timing report keeps the hand-off aggregates (median billed input per request, median context) the 300,000 experiment is judged against.
 
 ```bash
-pnpm josh cost                  # the last run tree, broken down by role; alias: josh co
-pnpm josh cost --run            # the same run-tree scope, named explicitly
-pnpm josh cost --session <id>   # one named session
-pnpm josh cost --issue 962      # one issue, across every session that touched it
-pnpm josh cost --all            # every issue in this project, plus a grand total
-pnpm josh cost --json           # the same figures, machine-readable
-pnpm josh cost --over <tokens>  # print `over`/`under` for billed input per request vs the limit
-pnpm josh cost --cap <tokens>   # share of the run's cost incurred at or under this per-request cap
+pnpm josh cost --over <tokens>  # print `over`/`under` for billed input per request vs the limit; alias: josh co
 pnpm josh cost --path <dir>     # read another project's transcripts from this checkout
 ```
 
-**Options:** `--run` (default) breaks the whole run tree down by role; `--session <id>` accepts the `<session-id>/agent-<agentId>` form for delegated units; `--over` and `--cap` each refuse `--all` and each other, printing their verdict on stdout with the figure on stderr; `--json` carries the full composition (`cost_composition`, `by_session`, per-document reads, the cost curve); `--path <dir>` aims the read at another project (absolute path), rides beside any scope, and keeps the `cwd` behavior when absent.
+**Options:** `--over <tokens>` prints its verdict (`over` / `under`) on stdout with the measured billed-input-per-request figure on stderr — the entry judgment `fullrun` / `backlogrun` / `halfrun` / `pre-gate-cut` ask; `--path <dir>` aims the read at another project (absolute path), rides beside the threshold, and keeps the `cwd` behavior when absent.
 
-**Output / exit codes:** an absent transcript exits non-zero and says where it looked; a model with no pricing data is labelled a floor; a scope with no requests says so rather than printing zeroes.
+**Output / exit codes:** an invocation naming no `--over` threshold prints the usage line; an absent transcript exits non-zero and says where it looked; a session with no requests says so rather than answering a verdict.
 
 ### `josh doc:section`
 

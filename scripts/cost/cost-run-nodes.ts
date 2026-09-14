@@ -73,7 +73,7 @@ function branch_issue(records: ReadonlyArray<UsageRecord>): number | undefined {
 
 // A session's own start, so the earliest main-checkout session can be told from the wakes that
 // resumed it. One with no readable timestamp sorts last, the honest place for one whose order is
-// unknown — the same rule `cost-sessions.ts` orders its rows by.
+// unknown.
 function started_ms(records: ReadonlyArray<UsageRecord>): number {
 	const stamps = records.map((record) => record.at_ms).filter((ms) => ms !== undefined)
 
