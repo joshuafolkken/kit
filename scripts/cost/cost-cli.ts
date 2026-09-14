@@ -7,6 +7,7 @@ import { cost_composition } from './cost-composition'
 import { cost_corpus, type AttributedRecord, type Corpus } from './cost-corpus'
 import { cost_document_sources } from './cost-document-sources'
 import type { DocumentBreakdown } from './cost-documents'
+import { cost_optional } from './cost-optional'
 import { cost_report, type CostReport, type Measurement, type MissingData } from './cost-report'
 import { cost_resident } from './cost-resident'
 import { cost_run_report } from './cost-run-report'
@@ -15,6 +16,7 @@ import { cost_sessions } from './cost-sessions'
 import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
 import { cost_usage } from './cost-usage'
 import { cost_verdict } from './cost-verdict'
+import { transcript_cwd } from './transcript-cwd'
 
 // `josh cost` — what a run actually spent, read from Claude Code's own session transcripts
 // (joshuafolkken/kit#962).
@@ -35,6 +37,10 @@ interface Options {
 	is_run: boolean
 	over?: number
 	cap?: number
+	// The target project whose transcripts to read, or absent for this process's own working directory
+	// (joshuafolkken/kit#1987). Not a scope: it says *where* to read, so it narrows nothing and is
+	// refused alongside no flag. From the kit checkout, `--path <dir>` reads another project's cost.
+	path?: string
 }
 
 interface RawValues {
@@ -45,6 +51,7 @@ interface RawValues {
 	run?: boolean | undefined
 	over?: string | undefined
 	cap?: string | undefined
+	path?: string | undefined
 }
 
 // `exactOptionalPropertyTypes` rejects `{ issue: undefined }`, so an absent flag contributes no key
@@ -75,36 +82,6 @@ function to_threshold(raw: string | undefined): number | undefined {
 	const parsed = Number(raw)
 
 	return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined
-}
-
-function optional_session(session: string | undefined): { session?: string } {
-	return session === undefined ? {} : { session }
-}
-
-function optional_issue(issue: number | undefined): { issue?: number } {
-	return issue === undefined ? {} : { issue }
-}
-
-function optional_over(over: number | undefined): { over?: number } {
-	return over === undefined ? {} : { over }
-}
-
-function optional_cap(cap: number | undefined): { cap?: number } {
-	return cap === undefined ? {} : { cap }
-}
-
-// The token cap threaded into a report so the simulation is computed where the records are. Kept
-// apart from `optional_cap`: that one carries the parsed CLI flag, this one the report-input field.
-function optional_cap_tokens(cap: number | undefined): { cap_tokens?: number } {
-	return cap === undefined ? {} : { cap_tokens: cap }
-}
-
-// Same absent-key idiom the optional flags use: a scope built with no document breakdown carries no
-// key rather than an undefined one, which `exactOptionalPropertyTypes` rejects.
-function optional_documents(documents: DocumentBreakdown | undefined): {
-	documents?: DocumentBreakdown
-} {
-	return documents === undefined ? {} : { documents }
 }
 
 // A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
@@ -177,10 +154,11 @@ function to_options(values: RawValues): Options | undefined {
 	if (is_refused(values, issue, over, cap)) return undefined
 
 	return {
-		...optional_session(values.session),
-		...optional_issue(issue),
-		...optional_over(over),
-		...optional_cap(cap),
+		...cost_optional.session(values.session),
+		...cost_optional.issue(issue),
+		...cost_optional.over(over),
+		...cost_optional.cap(cap),
+		...cost_optional.target_path(values.path),
 		is_all: values.all ?? false,
 		is_json: values.json ?? false,
 		is_run: values.run ?? false,
@@ -195,6 +173,7 @@ const PARSE_ARGS_OPTIONS = {
 	run: { type: 'boolean', default: false },
 	over: { type: 'string' },
 	cap: { type: 'string' },
+	path: { type: 'string' },
 } as const
 
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
@@ -263,8 +242,8 @@ function report_session(
 		missing: cost_corpus.accumulate_missing([session]),
 		resident_billed_tokens: session.baseline_tokens * session.records.length,
 		...optional_measurement(cwd, file, session),
-		...optional_documents(cost_document_sources.for_session(file, session)),
-		...optional_cap_tokens(cap),
+		...cost_optional.documents(cost_document_sources.for_session(file, session)),
+		...cost_optional.cap_tokens(cap),
 	})
 }
 
@@ -295,8 +274,8 @@ function to_scope_report(
 		resident_billed_tokens: pairs.reduce((sum, pair) => sum + pair.baseline_tokens, 0),
 		curve_sessions: cost_corpus.mainline_records(pairs),
 		by_session: cost_sessions.build(pairs),
-		...optional_cap_tokens(extras.cap),
-		...optional_documents(extras.documents),
+		...cost_optional.cap_tokens(extras.cap),
+		...cost_optional.documents(extras.documents),
 	})
 }
 
@@ -402,11 +381,14 @@ function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 		return FAILURE_EXIT_CODE
 	}
 
-	if (cost_run_scope.wants(options)) return cost_run_report.run(cwd, undefined, options.is_json)
+	// `--path <dir>` reads the target project instead of the process cwd (joshuafolkken/kit#1987).
+	const target = transcript_cwd.resolve(options.path, cwd)
 
-	const reports = build_reports(options, cost_corpus.load_corpus(cwd, options.session), cwd)
+	if (cost_run_scope.wants(options)) return cost_run_report.run(target, undefined, options.is_json)
 
-	if (reports === undefined) return report_empty(cwd, options.session)
+	const reports = build_reports(options, cost_corpus.load_corpus(target, options.session), target)
+
+	if (reports === undefined) return report_empty(target, options.session)
 
 	return dispatch_reports(options, reports)
 }

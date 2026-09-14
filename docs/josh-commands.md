@@ -1218,9 +1218,10 @@ pnpm josh cost --all            # every issue in this project, plus a grand tota
 pnpm josh cost --json           # the same figures, machine-readable
 pnpm josh cost --over <tokens>  # print `over`/`under` for billed input per request vs the limit
 pnpm josh cost --cap <tokens>   # share of the run's cost incurred at or under this per-request cap
+pnpm josh cost --path <dir>     # read another project's transcripts from this checkout
 ```
 
-**Options:** `--run` (default) breaks the whole run tree down by role; `--session <id>` accepts the `<session-id>/agent-<agentId>` form for delegated units; `--over` and `--cap` each refuse `--all` and each other, printing their verdict on stdout with the figure on stderr; `--json` carries the full composition (`cost_composition`, `by_session`, per-document reads, the cost curve).
+**Options:** `--run` (default) breaks the whole run tree down by role; `--session <id>` accepts the `<session-id>/agent-<agentId>` form for delegated units; `--over` and `--cap` each refuse `--all` and each other, printing their verdict on stdout with the figure on stderr; `--json` carries the full composition (`cost_composition`, `by_session`, per-document reads, the cost curve); `--path <dir>` aims the read at another project (absolute path), rides beside any scope, and keeps the `cwd` behavior when absent.
 
 **Output / exit codes:** an absent transcript exits non-zero and says where it looked; a model with no pricing data is labelled a floor; a scope with no requests says so rather than printing zeroes.
 
@@ -1283,6 +1284,7 @@ pnpm josh time --period <days>  # the backlog over N days — lanes, idle, seria
 pnpm josh time --top <rows>     # cap the per-tool/command/segment/invocation tables at N rows
 pnpm josh time --session <id> --instructions  # weight of the session's loaded rules and procedures
 pnpm josh time --json           # the same figures, machine-readable
+pnpm josh time --path <dir>     # read another project's transcripts from this checkout
 ```
 
 **Options:**
@@ -1290,6 +1292,7 @@ pnpm josh time --json           # the same figures, machine-readable
 - `--run` (default) — the whole run tree, wall clock led beside dollars. Refused beside `--issue`/`--session`/`--epic`/`--last`/`--period`.
 - `--issue`/`--session`/`--epic`/`--last`/`--period` — one run, one session, a batch, a distribution, or the backlog; naming more than one is refused.
 - `--instructions` — sizes the instruction documents the session carried and their upper-bound share of model wait; requires `--session`.
+- `--path <dir>` — aim the read at another project (absolute path); rides beside any scope, keeps the `cwd` behavior when absent.
 - `--top <rows>` — caps the ranked tables (by_tool, by_josh_command, segments, by_invocation, rework.files) and notes what it withheld; leaves shares, phases and `by_check` uncapped.
 - `--json` — every row uncapped unless `--top` narrows it.
 
