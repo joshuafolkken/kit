@@ -148,6 +148,17 @@ function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<Sibli
 // and a close the API refused (joshuafolkken/kit#1039).
 const CLOSE_MANUALLY = 'close it manually.'
 
+// The nesting cascade's safety valve. A closed child epic is itself a completed child, so the same
+// completion check is re-run for the epics that list *it*, closing a nested parent in the same pass
+// (joshuafolkken/kit#2008). `evaluated` already terminates a cycle or a shared child; this is the
+// backstop for a nesting so deep it is likelier a mistake than a plan. On reaching it the cascade
+// stops and asks for a manual close, exactly as an unreadable or refused child close does.
+const MAX_CASCADE_DEPTH = 10
+
+const CASCADE_DEPTH_NOTE = `⚠️  Epic auto-close cascade reached its ${String(
+	MAX_CASCADE_DEPTH,
+)}-level cap; ${CLOSE_MANUALLY}`
+
 // **An unreadable comment listing does not stop the close.** It is announced and closed exactly as
 // it was before the duplicate check existed, because refusing here would strand the epic: nothing
 // re-triggers the auto-close once every child is closed — `resolve_and_close` only evaluates epics
@@ -169,7 +180,7 @@ const UNREADABLE_COMMENTS_NOTE =
 // The comment-first ordering inside `issue_close` is what produces that half-succeeded state, and it
 // is left exactly as it is: it is what keeps a `false` meaning "the epic is still open" in every
 // branch, which is the answer the second message here is written against (joshuafolkken/kit#1026).
-async function close_epic_with(epic_number: string, comment: string | undefined): Promise<void> {
+async function close_epic_with(epic_number: string, comment: string | undefined): Promise<boolean> {
 	const is_closed = await git_gh_command.issue_close(epic_number, comment)
 
 	console.info(
@@ -177,11 +188,13 @@ async function close_epic_with(epic_number: string, comment: string | undefined)
 			? `🏁 Closed epic #${epic_number} — every child issue is complete.`
 			: `⚠️  Could not close epic #${epic_number}; ${CLOSE_MANUALLY}`,
 	)
+
+	return is_closed
 }
 
 // The comment listing is read **once**: only `present` skips the announcement, so an answer of
 // `absent` and one of `unreadable` both post it, and the second says so.
-async function close_epic(epic: EpicIssue): Promise<void> {
+async function close_epic(epic: EpicIssue): Promise<boolean> {
 	const epic_number = String(epic.number)
 	const state = await git_epic_close_comment.read_close_comment_state(epic_number, epic)
 
@@ -189,7 +202,7 @@ async function close_epic(epic: EpicIssue): Promise<void> {
 
 	const comment = state === 'present' ? undefined : git_epic_close_comment.build_close_comment(epic)
 
-	await close_epic_with(epic_number, comment)
+	return await close_epic_with(epic_number, comment)
 }
 
 // The cross-repository children's states, and whether every one of them could be read. An epic with
@@ -211,7 +224,7 @@ async function inspect_external_children(
 	}
 }
 
-async function close_epic_when_complete(epic: EpicIssue, merged_number: number): Promise<void> {
+async function close_epic_when_complete(epic: EpicIssue, merged_number: number): Promise<boolean> {
 	const external = await inspect_external_children(epic)
 
 	if (!external.is_complete) {
@@ -219,28 +232,98 @@ async function close_epic_when_complete(epic: EpicIssue, merged_number: number):
 			`ℹ️  Epic #${String(epic.number)} has a child in another repository whose state could not be read; ${CLOSE_MANUALLY}`,
 		)
 
-		return
+		return false
 	}
 
 	const states = [...(await inspect_siblings(epic, merged_number)), ...external.states]
 
 	warn_when_order_unrecorded(epic, states)
 
-	if (states.some((state) => !state.is_closed)) return
+	if (states.some((state) => !state.is_closed)) return false
 
-	await close_epic(epic)
+	return await close_epic(epic)
 }
 
 // Each epic is isolated: one that cannot be read or closed must not stop the others from being
-// evaluated, since they are independent batches that merely share this child.
-async function close_epic_isolated(epic: EpicIssue, merged_number: number): Promise<void> {
+// evaluated, since they are independent batches that merely share this child. `false` — the epic did
+// not close, whether because a sibling is still open, a read failed or the close was refused — is
+// what stops the cascade from walking past it to a parent (joshuafolkken/kit#2008).
+async function close_epic_isolated(epic: EpicIssue, merged_number: number): Promise<boolean> {
 	try {
-		await close_epic_when_complete(epic, merged_number)
+		return await close_epic_when_complete(epic, merged_number)
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
 
 		console.info(`⚠️  Skipped epic #${String(epic.number)}: ${message}`)
+
+		return false
 	}
+}
+
+function parents_of(open_epics: ReadonlyArray<EpicIssue>, child_number: number): Array<EpicIssue> {
+	return open_epics.filter((epic) => git_epic_parse.has_child(epic.children, child_number))
+}
+
+// Closes one epic unless a cycle or a shared child already reached it — the closed number, or
+// `undefined`. `evaluated` is marked before the close, so a refused close is not retried by a later
+// path either.
+async function close_if_unseen(
+	epic: EpicIssue,
+	child_number: number,
+	evaluated: Set<number>,
+): Promise<number | undefined> {
+	if (evaluated.has(epic.number)) return undefined
+	evaluated.add(epic.number)
+
+	return (await close_epic_isolated(epic, child_number)) ? epic.number : undefined
+}
+
+// The epics that list `child_number` and close because of it. The numbers returned are the next
+// cascade frontier: each is a closed epic, itself a completed child of whatever lists it.
+async function close_parents_of(
+	open_epics: ReadonlyArray<EpicIssue>,
+	child_number: number,
+	evaluated: Set<number>,
+): Promise<Array<number>> {
+	const closed: Array<number> = []
+
+	for (const epic of parents_of(open_epics, child_number)) {
+		const number = await close_if_unseen(epic, child_number, evaluated)
+		if (number !== undefined) closed.push(number)
+	}
+
+	return closed
+}
+
+async function close_next_level(
+	open_epics: ReadonlyArray<EpicIssue>,
+	frontier: ReadonlyArray<number>,
+	evaluated: Set<number>,
+): Promise<Array<number>> {
+	const next: Array<number> = []
+
+	for (const child_number of frontier) {
+		next.push(...(await close_parents_of(open_epics, child_number, evaluated)))
+	}
+
+	return next
+}
+
+// Breadth-first up the nesting: level 0 closes the epics holding the merged issue, and each closed
+// epic becomes the next level's completed child, so a fully-finished parent closes in the same pass.
+async function cascade_close(
+	open_epics: ReadonlyArray<EpicIssue>,
+	merged_number: number,
+): Promise<void> {
+	const evaluated = new Set<number>()
+	let frontier: ReadonlyArray<number> = [merged_number]
+
+	for (let depth = 0; depth < MAX_CASCADE_DEPTH; depth++) {
+		if (frontier.length === 0) return
+		frontier = await close_next_level(open_epics, frontier, evaluated)
+	}
+
+	if (frontier.length > 0) console.info(CASCADE_DEPTH_NOTE)
 }
 
 const UNREADABLE_EPIC_LIST_MESSAGE =
@@ -255,11 +338,7 @@ async function resolve_and_close(merged_number: number): Promise<void> {
 		return
 	}
 
-	const epics = open_epics.filter((epic) => git_epic_parse.has_child(epic.children, merged_number))
-
-	for (const epic of epics) {
-		await close_epic_isolated(epic, merged_number)
-	}
+	await cascade_close(open_epics, merged_number)
 }
 
 // Runs after the PR has already merged, so nothing here may reject: it would make `followup` exit
@@ -302,6 +381,8 @@ export {
 	close_completed_epics,
 	truncated_epic_list_note,
 	EPIC_LIST_LIMIT,
+	MAX_CASCADE_DEPTH,
+	CASCADE_DEPTH_NOTE,
 	UNREADABLE_EPIC_LIST_MESSAGE,
 	UNREADABLE_COMMENTS_NOTE,
 }
