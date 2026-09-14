@@ -167,7 +167,7 @@ describe.each(RULE_DOCS)('%s — separates the mechanism from the unit', (docume
 const EPIC_CHILD = 'epic-child'
 
 const BATCH_UNIT_MARKERS: ReadonlyArray<[string, string]> = [
-	[SKILL, "an epic's child under `epicrun` and one named issue of a `backlogrun` alike"],
+	[SKILL, "an epic's child and a named issue of a `backlogrun` alike"],
 	[COMMAND_DOC, 'One row covers both batch entry points'],
 ]
 
@@ -192,7 +192,7 @@ describe('the widened unit is one row, not a second', () => {
 	})
 })
 
-// The delegated-unit procedure a batch child runs is `epicrun.md`'s single source, and
+// The delegated-unit procedure a batch child runs is `backlogrun.md`'s single source, and
 // `backlogrun.md` → "Named issues run first, in order" points at it rather than restating it
 // (joshuafolkken/kit#1984 removed queue.md, which used to carry a second copy). So the markers that
 // were pinned against queue.md are not re-pinned against backlogrun.md — restating them there would be

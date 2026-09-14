@@ -112,7 +112,7 @@ this is not hypothetical:
 - `pnpm josh epic:next` exits 1.
 - `pnpm josh pr` and `pnpm josh followup` cannot finalize anything.
 
-So `fullrun` and `epicrun` do not complete in an environment without `gh`, even though `git push`
+So `fullrun` and `backlogrun` do not complete in an environment without `gh`, even though `git push`
 over HTTPS succeeds and `GH_TOKEN` authenticates fine against `api.github.com`.
 
 **The failure is easy to misread.** `check_gh_installed` says so plainly —

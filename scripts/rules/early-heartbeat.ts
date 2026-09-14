@@ -10,7 +10,7 @@ import { shell_segments } from './shell-segments'
 // (joshuafolkken/kit#1570).
 //
 // **The promise was kept and the interval was not.** `josh run:progress --mark` was called at every
-// real report exactly as `epicrun.md` requires, and reports still arrived 3–5 minutes apart on a
+// real report exactly as `backlogrun.md` requires, and reports still arrived 3–5 minutes apart on a
 // 15-minute setting. The clock was never the problem: the parent armed a wait timer of its own on the
 // turn a timer fired **and** on the turn a delegated child's completion woke it, so two timers ran at
 // once and each produced a report the other knew nothing about. Nothing read the marked clock before
@@ -195,7 +195,7 @@ const EARLY_HEARTBEAT_REASON =
 	'early ones. **An explicit ask is not a heartbeat**: if the person asked for progress now, run ' +
 	'`pnpm josh run:progress --once`, which prints one line whatever the clock says. If you are ' +
 	'waiting on something rather than on a clock, wait on the thing itself — `pnpm josh followup` ' +
-	'waits for CI. The procedure is `.claude/skills/workflow-commands/epicrun.md` → "Progress while ' +
+	'waits for CI. The procedure is `.claude/skills/workflow-commands/backlogrun.md` → "Progress while ' +
 	'the run is quiet". **This rule fires on every early arm, not once per run**, so reissuing the ' +
 	'same sleep will be refused again.'
 

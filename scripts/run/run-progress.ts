@@ -232,7 +232,7 @@ interface LineTiming {
  * When the next line is due if the silence holds — printed, never left for a reader to work out.
  *
  * **The two inputs were both here already and only one of them was printed** (joshuafolkken/kit#1726).
- * `epicrun.md` asked the run to derive this from the `at` stamp plus the interval in force, and a run
+ * `backlogrun.md` asked the run to derive this from the `at` stamp plus the interval in force, and a run
  * that derives a time by hand eventually derives it wrong: one report reached a person as `20:1x`,
  * placeholder digits and all. Every comparable judgement in this repository has moved to the command
  * that already holds the inputs — `run:hold`, `delegate`, `review:level`, `latest:scope` — and

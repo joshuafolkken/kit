@@ -27,7 +27,7 @@ const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
 // file to be listed, so a conversion that splits a section into its own topic file
 // (joshuafolkken/kit#1186 is the first) owes it one — while the joshuafolkken/kit#1176 rollout
 // shrinks the corpus, each conversion replacing a body with a pointer of a few KB. Converting
-// `epicrun.md` alone takes the corpus from 220 KB to about 174 KB; with `operating-rules.md` after
+// `backlogrun.md` alone takes the corpus from 220 KB to about 174 KB; with `operating-rules.md` after
 // it, a 5% share falls under the index's current size and the assertion fails on a change that
 // never touched the index.
 //
@@ -129,7 +129,7 @@ describe('the canonical workflow document is split by topic', () => {
 	})
 })
 
-// A citation may name a section as well as a file: `` `…/epicrun.md` → "EPIC でない Issue も受け取る" ``.
+// A citation may name a section as well as a file: `` `…/backlogrun.md` → "EPIC でない Issue も受け取る" ``.
 // Checking only that the file exists is what let three pointers name the wrong file and stay green —
 // the files existed, the sections were in other ones (joshuafolkken/kit#965).
 // Both quote styles: the documents use `"…"` and `「…」` interchangeably, and matching only the
@@ -196,7 +196,7 @@ describe('the split lost nothing', () => {
 	// index — a marker the index also carries would pass however empty the topic file became.
 	//
 	// The sample taken from the `epicrun` section was replaced under joshuafolkken/kit#1188. Its body
-	// moved into `.claude/skills/workflow-commands/epicrun.md` and the topic file became a pointer,
+	// moved into `.claude/skills/workflow-commands/backlogrun.md` and the topic file became a pointer,
 	// which this suite deliberately does not read — so sampling it would have asserted the opposite
 	// of what the suite is for. A sentence from a topic that still holds a body took its place.
 	it.each([

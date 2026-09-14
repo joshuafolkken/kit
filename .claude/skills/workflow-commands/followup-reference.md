@@ -6,7 +6,7 @@ report it runs, and the release ask that closes the completion summary. `followu
 run needs **before** it issues the command and points here for the rest, so the read that lands in the
 turn that issues `pnpm josh followup` stays small (joshuafolkken/kit#1905).
 
-This file is the single source of the sections below; `followup.md`, `fullrun.md`, `epicrun.md` and
+This file is the single source of the sections below; `followup.md`, `fullrun.md`, `backlogrun.md` and
 `backlogrun.md` point here rather than restating them.
 
 ## Reading the stage-timing block
@@ -82,7 +82,7 @@ pnpm josh notify --task-type failure --issue-url "<issue-url>" --body "<the reas
 
 **There is deliberately no branch on which repository this is.** Stopping in a consumer project — where editing a distributed file really is the mistake `CLAUDE.md` → "Route distributed-doc / config changes upstream to kit" names, since the next `josh sync` overwrites it silently — while staying quiet in kit was weighed and rejected on joshuafolkken/kit#1592: it needs a distribution-source test this package does not have, no case is recorded of the gate having saved a consumer's work, and the report below reaches a consumer's reader just as well.
 
-**The matching itself is unchanged, and so is the reason it is mechanical.** The instruction the mechanical read replaced was skipped in two runs out of three on the day it was measured, and one of those two could not have succeeded by eye at all: `AI_COPY_DIRECTORIES` holds directories, so a distributed path such as `.claude/skills/workflow-commands/epicrun.md` appears in no list textually.
+**The matching itself is unchanged, and so is the reason it is mechanical.** The instruction the mechanical read replaced was skipped in two runs out of three on the day it was measured, and one of those two could not have succeeded by eye at all: `AI_COPY_DIRECTORIES` holds directories, so a distributed path such as `.claude/skills/workflow-commands/backlogrun.md` appears in no list textually.
 
 ```bash
 pnpm josh sync:scope    # managed | clean, naming which list claimed each path; alias: josh sys
@@ -95,7 +95,7 @@ pnpm josh sync:scope    # managed | clean, naming which list claimed each path; 
 
 **The release point is a position plus a command's answer, never a judgement** (joshuafolkken/kit#1582). joshuafolkken/kit#1169 took the version off the branch and put it behind one command a person types; nothing said *when* to type it, and because nothing fails when nobody does — CI green, every pull request merged, every Issue closed — 53 merges reached main unreleased and no consumer of this package saw one of them.
 
-**The position: once per invocation, after the last merge.** Ask when `pnpm josh followup` has merged the last pull request *this invocation* authorized — a lone `fullrun`'s only one, an `epicrun`'s or a `backlogrun`'s **last** child, never once per child. In a lane the parent asks it, in the primary checkout, after the last lane is closed. Asked per child it would cut a release in the middle of a batch whose remaining children are still moving main.
+**The position: once per invocation, after the last merge.** Ask when `pnpm josh followup` has merged the last pull request *this invocation* authorized — a lone `fullrun`'s only one, a `backlogrun`'s **last** child, never once per child. In a lane the parent asks it, in the primary checkout, after the last lane is closed. Asked per child it would cut a release in the middle of a batch whose remaining children are still moving main.
 
 **The answer: `pnpm josh release:scope`.**
 
@@ -116,4 +116,4 @@ pnpm josh release:scope --json   # the same answer as one JSON object
 
 **`pnpm josh release --dry-run` was checked first and does not answer this.** It refuses off the default branch and on a dirty working tree, and it counts against `HEAD` rather than `origin/<default>` — and every position above is a feature branch or a lane, which is exactly where it throws. So `release:scope` adds **no counting of its own**: it reads `git_followup_pending.read_pending`, the same fetch-then-count `pnpm josh followup` already uses for the Telegram line, and the two therefore cannot disagree.
 
-**This section is the single source.** `fullrun.md`, `epicrun.md` and `backlogrun.md` point here rather than restating it, and `docs/josh-commands.md` → "`josh release:scope`" documents the command itself.
+**This section is the single source.** `fullrun.md`, `backlogrun.md` and `backlogrun.md` point here rather than restating it, and `docs/josh-commands.md` → "`josh release:scope`" documents the command itself.

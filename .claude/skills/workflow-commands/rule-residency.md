@@ -152,8 +152,8 @@ again (joshuafolkken/kit#1525).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in
-`fullrun.md` / `halfrun.md` / `epicrun.md`), `epicrun`'s acceptance
-of an Issue that is not an epic and its park-and-continue behavior (`epicrun.md`), the whole
+`fullrun.md` / `halfrun.md` / `backlogrun.md`), a named `backlogrun` item's acceptance
+of an Issue that is not an epic and its park-and-continue behavior (`backlogrun.md`), the whole
 verification gate and merge chain (`chain-rule.md` / `followup.md`), and the post-update verification
 procedure (`.claude/skills/dependency-update/`) that the two prohibitions above route to.
 

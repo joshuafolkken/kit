@@ -128,7 +128,7 @@ describe('epic-child is a second unit on the one mechanism', () => {
 		const step = delegation_policy.find_step(EPIC_CHILD)
 
 		expect(step?.does).toContain(BACKLOGRUN_LABEL)
-		expect(step?.does).toContain('`epicrun`')
+		expect(step?.does).toContain("epic's child")
 	})
 
 	// The single-source half. A second row would be a second mechanism in everything but name — same

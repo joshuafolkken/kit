@@ -11,7 +11,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 //
 // **The premise the session cut rests on was not true, and this is what makes it true.** A delegated
 // child used to be an in-process subagent of the parent session, so cutting the parent killed every
-// child still implementing: `epicrun.md` → "The hand-off" says "nothing has to finish, because nothing
+// child still implementing: `backlogrun.md` → "The hand-off" says "nothing has to finish, because nothing
 // is being abandoned", and what actually happened was that the next session polled a file whose writer
 // was dead, waited out the silent-unit window, booked each lane `stopped`, and aborted the whole run on
 // the third one. Launched detached, the child survives the cut and the sentence holds as written.
@@ -22,7 +22,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // What was missing was the one command that puts the three together.
 //
 // **The recording happens inside the dispatch, so "the lane records no path" stops being a state.**
-// `epicrun.md`'s hand-off has an exception for a lane nobody could poll, and it exists because the
+// `backlogrun.md`'s hand-off has an exception for a lane nobody could poll, and it exists because the
 // recording used to be a separate step a run could forget. A lane dispatched through here is recorded
 // by the same call that starts it.
 

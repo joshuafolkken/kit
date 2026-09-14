@@ -94,7 +94,7 @@ third is the review chasing its own tail.
 in its own lane and reviews the resolution — and that round does not count against the cap**
 (joshuafolkken/kit#1623). The cap bounds re-reading _the change under review_; a resolution review reads
 a different subject — not the change, but what merging a moved `main` into it did.
-`.claude/skills/workflow-commands/epicrun.md` → "Conflicts are not predicted" is the single source of
+`.claude/skills/workflow-commands/backlogrun.md` → "Conflicts are not predicted" is the single source of
 the procedure and of the four conditions under which the run steps back instead of resolving.
 `pnpm josh review:attest --check` must answer `ok` before the merge is re-issued, and a confirmed High
 parks the child rather than buying it a further round.
@@ -177,9 +177,9 @@ Only branch 2 files an Issue. What follows applies to that branch.
   current Issue completes.** (A confirmed High is not a branch-2 finding: it blocks the merge rather
   than being deferred — see below.)
 - **Filing does not end at the Issue.** `epic:next` only ever offers a child the task list of an epic
-  names, so an Issue in no epic is never handed to a running `epicrun` — the deferred finding is parked
+  names, so an Issue in no epic is never handed to a running `backlogrun` — the deferred finding is parked
   forever, which reads the same from the backlog. **The three steps run inside the CI wait, not before
-  the commit.** Where the run opens a pull request — `fullrun`, `epicrun`, `backlogrun` — they go after
+  the commit.** Where the run opens a pull request — `fullrun`, `backlogrun` — they go after
   `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
   pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
   delegated unit** — `pnpm josh delegate followup-filing` (joshuafolkken/kit#1892).

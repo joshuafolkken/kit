@@ -116,7 +116,7 @@ const SETTLED_ADVICE =
 const STOPPED_CLEAN_ADVICE =
 	'Book the child as a failed one: remove `in-progress`, park it with `needs-decision` naming what was observed, count it against the consecutive-failure guard, and go back to step 1. The checkout is clean, so there is nothing to stash.'
 const STOPPED_DIRTY_ADVICE =
-	'Stash the half-finished work with `git stash push -u -m "epicrun: stopped unit for #<N>"` and record it on the Issue, then remove `in-progress`, park the child with `needs-decision`, count it against the consecutive-failure guard, and go back to step 1.'
+	'Stash the half-finished work with `git stash push -u -m "backlogrun: stopped unit for #<N>"` and record it on the Issue, then remove `in-progress`, park the child with `needs-decision`, count it against the consecutive-failure guard, and go back to step 1.'
 const UNDETERMINED_ADVICE =
 	'Read the trace that failed and ask again. Where the process trace was never given, run the `pgrep` against the checkout the unit was given and pass `--process alive` or `--process none`. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
 

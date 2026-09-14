@@ -22,7 +22,7 @@ describe(`${SKILL_PATH} — keeps already-filed issues in the ranking`, () => {
 		'| Filed, not started |',
 		'| In progress |',
 		'| Done |',
-		'`fullrun #N`, or `epicrun #E`',
+		'`fullrun #N`, or `backlogrun #E --only`',
 		'Never a second filing',
 	])('states %j', (marker) => {
 		expect(read_skill()).toContain(marker)

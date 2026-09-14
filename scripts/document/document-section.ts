@@ -2,9 +2,9 @@
 // cross-reference each other in (joshuafolkken/kit#1776).
 //
 // **The reference form was already a section reference, and only the reader was missing.** Every
-// workflow document points at another one as `` `epicrun.md` → "The hand-off" `` — a file *and* a
+// workflow document points at another one as `` `backlogrun.md` → "The hand-off" `` — a file *and* a
 // heading. A reader with no way to fetch a heading has one move left, which is to open the file, so
-// a pointer at 249 lines was costing 2,121. Measured at the `queue` entry point, `epicrun.md` is
+// a pointer at 249 lines was costing 2,121. Measured at the `queue` entry point, `backlogrun.md` is
 // opened for four such references and is the single largest item in everything the entry reads.
 //
 // **Nothing here defers a read.** The section is fetched in the same turn, in the main line, by the

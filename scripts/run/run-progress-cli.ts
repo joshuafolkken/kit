@@ -385,7 +385,7 @@ async function once(options: WatchOptions): Promise<number> {
  *
  * **One at a time is the caller's part rather than this loop's.** The record is read before the `gh`
  * reads and written after them, so two of these running at once could both find the same silence due
- * and both print; `epicrun.md` starts exactly one, which is where that is guaranteed.
+ * and both print; `backlogrun.md` starts exactly one, which is where that is guaranteed.
  *
  * **A decline is not an exit.** A decline now means no run has started here at all — no hold, no
  * carried budget, no lane, and no `in-progress` child — so a genuinely idle repository keeps the loop

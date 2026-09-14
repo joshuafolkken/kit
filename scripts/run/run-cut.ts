@@ -45,7 +45,7 @@ const IMPLEMENTATION_PHASE = 'implementation'
 // **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
 // child decides whether to take this cut with `pnpm josh cost --over <IMPLEMENTATION_CONTEXT_THRESHOLD>`
 // — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
-// `pnpm josh cost --over 300000` hand-off uses (`epicrun.md` → "The hand-off"). Only the threshold
+// `pnpm josh cost --over 300000` hand-off uses (`backlogrun.md` → "The hand-off"). Only the threshold
 // differs, and this constant is its single source so the procedure doc and the test cannot drift.
 //
 // **200_000 is the initial value.** The 2026-09-13 `backlogrun` measured lane bodies at 386k / 283k /

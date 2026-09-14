@@ -787,7 +787,7 @@ pnpm josh epic "Epic: ..." 101 102 --rationale-file rationale.md
 - `--rationale-file <path|->` — split rationale prose (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
 
-The `Execution` section prints `epicrun #<E>`. A `blocked-by` write that fails is reported as a count while the epic and task list stay correct.
+The `Execution` section prints `backlogrun #<E> --only`. A `blocked-by` write that fails is reported as a count while the epic and task list stay correct.
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
@@ -874,7 +874,7 @@ pnpm josh epic:audit 858   # alias: josh ea
 | Orphan search        | **error** | The open-backlog search could not be read — re-run the audit.                                                  |
 | Unjustified order    | **error** | The body declares an order between two open children and nothing records why.                                  |
 
-Only errors change the exit code. Run it at the start of an `epicrun` and after a child or dependency changes. Fixing what it finds is Tier A; park with `needs-decision` only when the contradiction is an unmade design choice.
+Only errors change the exit code. Run it at the start of a `backlogrun` epic run and after a child or dependency changes. Fixing what it finds is Tier A; park with `needs-decision` only when the contradiction is an unmade design choice.
 
 ### `josh epic:check`
 
@@ -1056,7 +1056,7 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it** — the counting moved into `josh investigation:guard`.
 
-**The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child under `epicrun` and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
+**The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
 ### `josh run:hold` / `josh run:release`
 
@@ -1235,7 +1235,7 @@ Print one section of a markdown document, so a `` `X.md` → "Heading" `` pointe
 
 ```bash
 pnpm josh doc:section <file.md> "<heading>"   # alias: josh ds
-pnpm josh doc:section epicrun.md "The hand-off"
+pnpm josh doc:section backlogrun.md "The hand-off"
 ```
 
 **Options / behavior:**
@@ -1282,7 +1282,7 @@ pnpm josh time                  # the last run tree, wall clock and cost by role
 pnpm josh time --run            # the same run-tree scope, named explicitly
 pnpm josh time --issue <number> # one issue's whole run, from invocation to merge
 pnpm josh time --session <id>   # one named session
-pnpm josh time --epic <number>  # a whole epicrun, child by child, with the per-turn trend
+pnpm josh time --epic <number>  # a whole epic run, child by child, with the per-turn trend
 pnpm josh time --last <runs>    # the last N merged runs as a distribution (min, median, max)
 pnpm josh time --period <days>  # the backlog over N days — lanes, idle, serialization, throughput
 pnpm josh time --top <rows>     # cap the per-tool/command/segment/invocation tables at N rows

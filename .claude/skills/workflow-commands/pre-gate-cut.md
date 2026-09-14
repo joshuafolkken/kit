@@ -10,7 +10,7 @@ carrying none of the thinking.
 This file is the single source of the boundary. `run:cut` is the command that takes it, and
 `run:cut --resume` is the check a fresh process makes at its own entry. The rule is reached only
 **during** a lane child's run, after the workflow skill has been read, so it is not an entry read —
-`fullrun.md`, `chain-rule.md` and `epicrun.md` name it with a plain mention and route here.
+`fullrun.md`, `chain-rule.md` and `backlogrun.md` name it with a plain mention and route here.
 
 **A second boundary is added below** — the implementation-phase cut (joshuafolkken/kit#1933), which
 takes the same `run:cut` record and relaunch at a context threshold _during_ implementation.
@@ -186,7 +186,7 @@ run — removed.
 
 **The pre-gate cut drops the thinking accumulated _before_ the gate; it does nothing about the
 thinking accumulated _during_ implementation** (joshuafolkken/kit#1933). A lane child re-reads its
-whole conversation on every request, so a long implementation is billed the way a long `epicrun`
+whole conversation on every request, so a long implementation is billed the way a long `backlogrun`
 parent is: the 2026-09-13 `backlogrun` measured lane bodies at **208k / 240k / 283k / 386k** median
 context per request, the second half of a run costing about twice the first. The pre-gate boundary
 fires only once implementation is done, so it never caps that growth. The **implementation-phase
@@ -197,7 +197,7 @@ resumes the same lane **back into implementation** carrying none of the thinking
 
 The child decides whether to cut with the same measurement the parent uses between children —
 `pnpm josh cost --over <threshold>` (`cost_verdict.per_request_cost`, billed input tokens per
-request), whose single source is `epicrun.md` → "The hand-off". **Only the threshold differs**: the
+request), whose single source is `backlogrun.md` → "The hand-off". **Only the threshold differs**: the
 parent's seam is 300_000, the child's is `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` — **200_000
 initially**. No separate measurement is built for the lane child.
 

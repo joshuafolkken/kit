@@ -141,7 +141,7 @@ describe('--wait — one interval, one line, and then it exits', () => {
 
 describe('--wait — nothing to report is not something to exit on', () => {
 	// Returning on a decline would hand the caller an instant answer, and the documented restart turns
-	// that into a poll: `epicrun.md` says to start the next one in the same turn.
+	// that into a poll: `backlogrun.md` says to start the next one in the same turn.
 	it('keeps waiting while no child is in flight, and reports nothing', async () => {
 		read_observations.mockResolvedValue({ kind: 'idle' })
 

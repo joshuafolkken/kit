@@ -23,13 +23,13 @@ not answer for — **stop here**, before the title is normalized and before a `n
 send a `confirmation` Telegram carrying the figure printed on standard error and the resume command (the
 invocation as it was typed, in a fresh session — `halfrun #<N>` for a `#N` entry, `halfrun new` for a
 `new` one), run `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run
-was dispatched by a batch entry point.** `epicrun.md` → "The hand-off" is the single source of the check
+was dispatched by a batch entry point.** `backlogrun.md` → "The hand-off" is the single source of the check
 and of where 300,000 comes from.
 
 **Start the progress step once the hold is claimed, and start it without being asked**, exactly as
 `fullrun` does — `pnpm josh run:progress --wait` in the background, presented in labelled form when it
 exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
-every real report. `epicrun.md` → "Progress while the run is quiet" is the single source, including
+every real report. `backlogrun.md` → "Progress while the run is quiet" is the single source, including
 that this command's stop before commit keeps `in-progress` on and so has to end the watcher itself.
 
 **Read Issue `#N` and every comment on it before implementing** — `pnpm josh issue:read <N>`. A
@@ -48,15 +48,15 @@ split: separability and a scope that clearly exceeds what one verification gate 
 (the guide is about 10 changed files and about 400 changed lines) have to hold **together**. Where both
 hold, two or more separately-mergeable deliverables always means an epic. **When it finds a split, file
 the children (each carrying the `route:split` label) and the epic and then STOP** — do not implement,
-and do not continue as an `epicrun`. Report what was filed and end with "Please run `epicrun #<E>` to
+and do not continue as a `backlogrun`. Report what was filed and end with "Please run `backlogrun #<E> --only` to
 execute this epic."
 
 **A prerequisite Issue discovered mid-run stops this command too — but files everything first.** The
 three-way distinction, the `route:tier-a` filing command and the filing ceiling are `SKILL.md` → §2d,
 the single source; what follows is this entry's branch. Typing `halfrun` approved implementing **one**
 Issue and stopping for manual verification — it never authorized a commit, a push or a merge; a batch
-is a different authorization again, so the stop stays. Inside an `epicrun` the same discovery is
-recorded as a dependency and **not** parked (`epicrun.md` → "A prerequisite discovered mid-run"). The
+is a different authorization again, so the stop stays. Inside a `backlogrun` the same discovery is
+recorded as a dependency and **not** parked (`backlogrun.md` → "A prerequisite discovered mid-run"). The
 procedure, in order:
 
 1. **File the prerequisite `#<P>` without asking** (Tier A, first-party), tagging it `route:tier-a`. It
@@ -73,14 +73,14 @@ procedure, in order:
    | Answer | What to do |
    | --- | --- |
    | An epic `#<E>` already tracks `#N` | `pnpm josh epic --add <E> <P> --before <N>` — insert into **that** epic. **Do not create a second one** |
-   | No epic tracks it | `pnpm josh epic "<title>" <P> <N> --ordered` — `#N` is itself a deliverable, so it is kept as a child rather than promoted. **`--ordered` is required, not stylistic**: without it no `blocked-by` relation is recorded and the follow-up `epicrun` can hand back `#N` before its prerequisite |
+   | No epic tracks it | `pnpm josh epic "<title>" <P> <N> --ordered` — `#N` is itself a deliverable, so it is kept as a child rather than promoted. **`--ordered` is required, not stylistic**: without it no `blocked-by` relation is recorded and the follow-up `backlogrun` can hand back `#N` before its prerequisite |
    | **The command could not answer** — a non-zero exit, `Could not confirm which epic already tracks these …`, or a ⚠ truncation warning (`⚠ The epic listing …`) above a `Nothing to bundle.` verdict | Stop and report, naming what it said. **Do not fall through to creating an epic**. A definitive answer stands even beside a `⚠ Could not read #N.` warning |
 
    The command declares a new chain `#<P> -> #N` beside any existing ones rather than refusing. It still
    refuses a target the epic does not track at all — there the refusal *is* the report.
 
 4. **Remove `in-progress` from `#N`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
-5. Send the `confirmation` Telegram and **stop** with "Please run `epicrun #<E>` to execute this epic."
+5. Send the `confirmation` Telegram and **stop** with "Please run `backlogrun #<E> --only` to execute this epic."
 
 **Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.
 

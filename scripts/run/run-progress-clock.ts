@@ -172,7 +172,7 @@ function stamp_target_sync(): string | undefined {
  *
  * It answers about the work tree the caller is standing in. A watcher started in another repository's
  * checkout keeps its record there, so a hook running in the session's own tree finds none and the rule
- * stays silent rather than guessing; that is the same limit `epicrun.md` records for `--mark`.
+ * stays silent rather than guessing; that is the same limit `backlogrun.md` records for `--mark`.
  */
 function read_last_report_sync(): number | undefined {
 	const target = stamp_target_sync()

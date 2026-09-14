@@ -22,7 +22,7 @@ interface Anchor {
 const CLAUDE_MD = 'CLAUDE.md'
 const SKILL_MD = '.claude/skills/workflow-commands/SKILL.md'
 const FULLRUN_MD = '.claude/skills/workflow-commands/fullrun.md'
-const EPICRUN_MD = '.claude/skills/workflow-commands/epicrun.md'
+const BACKLOGRUN_MD = '.claude/skills/workflow-commands/backlogrun.md'
 const SPLIT_MD = '.claude/skills/workflow-commands/split-assessment.md'
 
 const RESIDENT_ANCHORS: ReadonlyArray<Anchor> = [
@@ -53,10 +53,10 @@ const RESIDENT_ANCHORS: ReadonlyArray<Anchor> = [
 	{ file: SKILL_MD, heading: "2g. An Issue's comments are part of the Issue" },
 	{ file: SKILL_MD, heading: '3. What stays resident, and what is read from here' },
 	{ file: FULLRUN_MD, heading: '`fullrun`' },
-	{ file: EPICRUN_MD, heading: 'The hand-off' },
-	{ file: EPICRUN_MD, heading: 'park and continue' },
-	{ file: EPICRUN_MD, heading: 'When `#N` is not an epic' },
-	{ file: EPICRUN_MD, heading: 'Lanes' },
+	{ file: BACKLOGRUN_MD, heading: 'The hand-off' },
+	{ file: BACKLOGRUN_MD, heading: 'park and continue' },
+	{ file: BACKLOGRUN_MD, heading: 'When `#N` is not an epic' },
+	{ file: BACKLOGRUN_MD, heading: 'Lanes' },
 	{ file: SPLIT_MD, heading: 'The question' },
 	{ file: SPLIT_MD, heading: 'Two or more always means an epic' },
 	{ file: 'prompts/review.md', heading: 'Review round cap' },

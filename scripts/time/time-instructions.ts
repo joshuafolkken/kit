@@ -28,7 +28,7 @@ import { time_spans, type Span } from './time-spans'
 //     turns the transcript records rather than assumed. **The first reading is why that is measured
 //     and not assumed**: charging every document to every request after the first put one `epicrun`
 //     parent's instruction text at 80.7% of its billed input, which is not a ceiling anyone can
-//     decide from — a run reads its procedure partway through, and `epicrun.md` is a third of that
+//     decide from — a run reads its procedure partway through, and `backlogrun.md` is a third of that
 //     session's instruction weight on its own. Where a transcript carries no message ids to count
 //     turns by, it still falls back to every request after the first, which is that same ceiling.
 //   - The share of billed input is carried across to model wait unchanged, which assumes wait grows

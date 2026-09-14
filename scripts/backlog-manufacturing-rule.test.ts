@@ -27,7 +27,7 @@ import {
 const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
 const REVIEW_PROMPT = 'prompts/review.md'
 const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
-const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
+const EPICRUN_SKILL = '.claude/skills/workflow-commands/backlogrun.md'
 // The guide, written once: the single source and the entry summary have to state the same numbers,
 // and a guide that drifted between them would be two different thresholds under one rule.
 const SPLIT_GUIDE = 'about 10 changed files and about 400 changed lines'
@@ -251,7 +251,7 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 // A rule written only in `wip-cap.md` fires only for a run that opens `wip-cap.md`, and nothing in
 // the batch entry points sent a reader there — `epicrun` fills every free lane from
 // `epic:next --lanes` without ever reading the cap. So the solo-run rule is asserted reachable from
-// `epicrun.md`, which dispatches children (joshuafolkken/kit#1518). joshuafolkken/kit#1959 dropped the
+// `backlogrun.md`, which dispatches children (joshuafolkken/kit#1518). joshuafolkken/kit#1959 dropped the
 // SKILL.md §2 restatement of both the solo-run rule and the split default, since
 // joshuafolkken/kit#1925 deduplicates §2 into the single sources — the split default stays pinned on
 // `split-assessment.md` above and anchored in `document-markers.test.ts`.

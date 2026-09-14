@@ -1,6 +1,6 @@
 ---
 name: diag
-description: The procedure behind `diag fullrun` / `diag epicrun` / `diag #<N>` (and `/diag`) — measure where a run's wall clock went with `pnpm josh time` and what it cost in dollars with `pnpm josh cost`, say whether the last speedup worked, and rank what to cut next as one table that keeps the already-filed issues in it. Read this whenever asked how long a run took, what a run cost, why `fullrun` is slow, what to do to make it faster, or to check whether a speedup landed.
+description: The procedure behind `diag fullrun` / `diag backlogrun` / `diag #<N>` (and `/diag`) — measure where a run's wall clock went with `pnpm josh time` and what it cost in dollars with `pnpm josh cost`, say whether the last speedup worked, and rank what to cut next as one table that keeps the already-filed issues in it. Read this whenever asked how long a run took, what a run cost, why `fullrun` is slow, what to do to make it faster, or to check whether a speedup landed.
 ---
 
 # `diag` — read the timing report, propose the next speedup
@@ -28,7 +28,7 @@ explicitly. Measure one issue on its own **only** when `diag #<N>` was typed.
 | --- | --- | --- |
 | `diag` / `diag fullrun` | The last run tree — every session of the run | `pnpm josh time --run --top 5 --json` and `pnpm josh cost --run --json` |
 | `diag #<N>` | Issue `#N`'s whole run, from the `fullrun` invocation to the merge | `pnpm josh time --issue <N> --top 5 --json` |
-| `diag epicrun` / `diag #<E>` where `#<E>` is an epic | Every child of the epic, in execution order | `pnpm josh time --epic <E> --top 5 --json` |
+| `diag backlogrun` / `diag #<E>` where `#<E>` is an epic | Every child of the epic, in execution order | `pnpm josh time --epic <E> --top 5 --json` |
 | `diag backlog` / `diag <N> days` | The backlog over a period — lanes, idle, serialization, throughput | `pnpm josh time --period <N> --top 5 --json` |
 
 **`--period` answers a different question from the three above it.** Those three report where **one
@@ -110,7 +110,7 @@ the reading a batch's speed turns on.
   row names its `command` (`josh followup` or a `sleep`) and its `duration_ms`.
 - **`implementation`** — the parent's own work: `request_count`, `cost_usd`, `median_context_tokens`
   and the `issues[]` it implemented itself.
-- **For a `backlogrun` / `epicrun` parent, read `contributor_costs.by_contributor` first.** A parent
+- **For a `backlogrun` parent, read `contributor_costs.by_contributor` first.** A parent
   barely implements, so its durations rank tools rather than work; the block keys the dollars by what
   the turn was _for_ (`child dispatch`, `progress polling`, `child confirmation`, `loop asks`, …),
   with `no_tool_call` a bucket that is never prorated. A large contributor is a reason to look;
@@ -429,7 +429,7 @@ gh api --paginate "repos/{owner}/{repo}/issues?state=open&per_page=100" \
 | State | What the row prints |
 | --- | --- |
 | Un-filed | The proposal, and the estimated saving. Go to the filing section |
-| Filed, not started | `#N`, and **the command to run next** — `fullrun #N`, or `epicrun #E` for the epic that tracks it. Never a second filing |
+| Filed, not started | `#N`, and **the command to run next** — `fullrun #N`, or `backlogrun #E --only` for the epic that tracks it. Never a second filing |
 | In progress | `#N` and that it is in progress. Do not propose running it again |
 | Done | The verdict from the speedup section — whether it worked, with both figures |
 
@@ -501,7 +501,7 @@ pnpm josh issue:scout "<title>" --body "<one line, citing the issue this follows
 ## What `diag` does not do
 
 - It does not implement anything, and it opens no pull request.
-- It does not run `fullrun` / `epicrun` on what it ranks. It prints the command; the person types it.
+- It does not run `fullrun` / `backlogrun` on what it ranks. It prints the command; the person types it.
 - It does not measure anything itself. **Every figure came out of one of two commands**, and none is
   re-derived here: the wall clock from `pnpm josh time` and the dollars from `pnpm josh cost` — two
   readings of the same recorded sessions, which is why they can be quoted side by side.

@@ -63,9 +63,12 @@ function without_only(argv: ReadonlyArray<string>): ReadonlyArray<string> {
 }
 
 // The one start-time refusal: `--only` with no named issues has nothing to run. `backlog_named` is the
-// single source of that decision, so the plan and the run refuse it alike.
+// single source of that decision, so the plan and the run refuse it alike. The refusal turns only on
+// whether anything was named, so the items are built with `is_epic: false` — which item is an epic is
+// decided by the run at dispatch time, not here (joshuafolkken/kit#1985).
 function only_refusal(named: ReadonlyArray<number>, is_only: boolean): string | undefined {
-	const startup = backlog_named.startup(named, is_only)
+	const items = named.map((issue) => ({ issue, is_epic: false }))
+	const startup = backlog_named.startup(items, is_only)
 
 	return startup.kind === 'refused' ? startup.reason : undefined
 }
