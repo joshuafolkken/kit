@@ -21,7 +21,16 @@ vi.mock('./josh-logic', () => ({
 		run_command: async (_cmd: string, _arguments: Array<string>): Promise<number> =>
 			josh_mock.state.run_command_return,
 	},
+	// The consumer check resolves the project root by ascending to the nearest package.json; the
+	// identity stand-in is enough for the doctor mock below (joshuafolkken/kit#1988).
+	find_package_directory: (start: string): string => start,
 	UNKNOWN_COMMAND_EXIT_CODE: josh_mock.UNKNOWN_COMMAND_EXIT_CODE,
+}))
+
+// This process runs in kit itself, so the consumer check is false — every command stays listed and
+// runnable, which is the behavior every case below asserts (joshuafolkken/kit#1988).
+vi.mock('#scripts/doctor/doctor-consumer', () => ({
+	doctor_consumer: { is_kit_consumer: (): boolean => false },
 }))
 
 const PROCESS_EXIT_CALLED = 'process.exit called'

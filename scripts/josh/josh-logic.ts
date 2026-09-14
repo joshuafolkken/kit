@@ -15,6 +15,7 @@ import {
 } from './josh-command-map'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 import { josh_in_process } from './josh-in-process'
+import { kit_only } from './kit-only'
 
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
@@ -139,13 +140,29 @@ function format_category_section(
 	return [`${category}:`, ...lines].join('\n')
 }
 
-function collect_visible(is_all: boolean): Map<CommandCategory, Array<[string, CommandEntry]>> {
+// A consumer never sees a kit-only command; inside kit the maintenance split (`--help` vs `--all`) is
+// all that hides anything (joshuafolkken/kit#1988).
+function is_visible_command(
+	cmd: string,
+	entry: CommandEntry,
+	is_all: boolean,
+	is_consumer: boolean,
+): boolean {
+	if (is_consumer && kit_only.is_kit_only(entry)) return false
+
+	return is_all || !MAINTENANCE_COMMANDS.has(cmd)
+}
+
+function collect_visible(
+	is_all: boolean,
+	is_consumer: boolean,
+): Map<CommandCategory, Array<[string, CommandEntry]>> {
 	const by_category = new Map<CommandCategory, Array<[string, CommandEntry]>>(
 		CATEGORY_ORDER.map((cat) => [cat, []]),
 	)
 
 	for (const [cmd, entry] of Object.entries(COMMAND_MAP)) {
-		if (is_all || !MAINTENANCE_COMMANDS.has(cmd)) {
+		if (is_visible_command(cmd, entry, is_all, is_consumer)) {
 			by_category.get(entry.category)?.push([cmd, entry])
 		}
 	}
@@ -156,8 +173,8 @@ function collect_visible(is_all: boolean): Map<CommandCategory, Array<[string, C
 // `josh --help` lists the day-to-day commands; `josh --all` adds the kit-maintenance ones. A category
 // left empty once the maintenance commands are filtered out is dropped rather than printed as a bare
 // heading (joshuafolkken/kit#1928).
-function format_help(is_all = false): string {
-	const by_category = collect_visible(is_all)
+function format_help(is_all = false, is_consumer = false): string {
+	const by_category = collect_visible(is_all, is_consumer)
 	const alias_lookup = build_alias_lookup()
 	const sections = CATEGORY_ORDER.map((cat) => [cat, by_category.get(cat) ?? []] as const)
 		.filter(([, entries]) => entries.length > 0)
@@ -245,27 +262,55 @@ async function run_script_entry(
 	return spawn_script_entry(entry, script_path, script_arguments)
 }
 
-async function run_command(cmd: string, subcommand_arguments: Array<string>): Promise<number> {
-	const resolved = resolve_alias(cmd)
-	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
+// The exit a command answers with before it runs, or `undefined` to go ahead: a consumer is refused a
+// kit-only command with guidance, and a composite command rejects extra arguments
+// (joshuafolkken/kit#1988).
+function pre_dispatch_exit(
+	resolved: string,
+	entry: CommandEntry,
+	subcommand_arguments: Array<string>,
+	is_consumer: boolean,
+): number | undefined {
+	if (is_consumer && kit_only.is_kit_only(entry)) {
+		console.error(kit_only.notice(resolved))
 
-	if (!entry) return UNKNOWN_COMMAND_EXIT_CODE
+		return USAGE_ERROR_EXIT_CODE
+	}
 
 	const rejection = composite_arguments.reject_extra_arguments(
 		resolved,
 		entry,
 		subcommand_arguments,
 	)
+	if (rejection === undefined) return undefined
+	console.error(rejection)
 
-	if (rejection !== undefined) {
-		console.error(rejection)
+	return USAGE_ERROR_EXIT_CODE
+}
 
-		return USAGE_ERROR_EXIT_CODE
-	}
-
+async function dispatch_entry(
+	entry: CommandEntry,
+	subcommand_arguments: Array<string>,
+): Promise<number> {
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
 	return await run_script_entry(entry, subcommand_arguments)
+}
+
+async function run_command(
+	cmd: string,
+	subcommand_arguments: Array<string>,
+	is_consumer = false,
+): Promise<number> {
+	const resolved = resolve_alias(cmd)
+	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
+
+	if (!entry) return UNKNOWN_COMMAND_EXIT_CODE
+
+	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
+	if (early_exit !== undefined) return early_exit
+
+	return await dispatch_entry(entry, subcommand_arguments)
 }
 
 const josh_logic = {
@@ -282,6 +327,7 @@ export type { TsxRunner }
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {
+	find_package_directory,
 	josh_logic,
 	resolve_alias,
 	resolve_tsx_executable,

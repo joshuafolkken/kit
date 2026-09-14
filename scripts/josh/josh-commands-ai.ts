@@ -222,6 +222,9 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',
 		category: 'AI tools',
+		// Kit-only: it replays kit's own distributed rules against real Claude sessions, so it means
+		// nothing in a consumer project and is dropped from a consumer's help (joshuafolkken/kit#1988).
+		is_kit_only: true,
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

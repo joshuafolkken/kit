@@ -1306,6 +1306,8 @@ pnpm josh time --path <dir>     # read another project's transcripts from this c
 
 ### `josh eval`
 
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository.
+
 Run the agent rule-compliance scenarios and report how many held.
 
 ```bash
