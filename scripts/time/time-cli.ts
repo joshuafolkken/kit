@@ -400,8 +400,8 @@ async function run_state_lead(cwd: string, is_json: boolean): Promise<Array<stri
 }
 
 // The bare no-argument default and `--run`: the run tree, led by the run-state block when the run has
-// not finished. The tree report is `cost-run-report.ts`'s, shared with `josh cost`; only this entry
-// prepends the lead, so `josh cost --run` is unchanged.
+// not finished. The tree report is `cost-run-report.ts`'s, kept for `josh time` after `josh cost`'s
+// readerless run-tree scopes were retired (#2016); only this entry prepends the run-state lead.
 async function run_tree(cwd: string, options: Options): Promise<number> {
 	const lead = await run_state_lead(cwd, options.is_json)
 

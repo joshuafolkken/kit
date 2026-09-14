@@ -1,7 +1,6 @@
-// The three figures `josh cost` prints — a dollar amount, a token count, a percentage share — and
-// the precision each uses. Shared because cost-report.ts and cost-curve.ts both render them, and
-// cost-report.ts imports cost-curve.ts, so a formatter living in cost-report could not be called from
-// cost-curve without a cycle (joshuafolkken/kit#1838).
+// The three figures a cost report prints — a dollar amount, a token count, a percentage share — and
+// the precision each uses. Shared by the run-tree report modules and by `josh time`'s reports, which
+// render the same figures.
 
 const USD_DECIMALS = 4
 const PERCENT_SCALE = 100

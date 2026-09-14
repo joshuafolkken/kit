@@ -1,11 +1,9 @@
 import { run_cut } from '#scripts/run/run-cut'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cost_curve, type CapSimulation } from './cost-curve'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 import { cost_verdict, type OverMeasurement } from './cost-verdict'
 
 const OPUS = 'claude-opus-5'
-const IMAGINARY = 'claude-imaginary-9'
 const FAILURE_EXIT_CODE = 1
 const state = { out: [] as Array<string> }
 
@@ -26,12 +24,6 @@ function over_of(records: ReadonlyArray<UsageRecord>): OverMeasurement {
 		request_count: records.length,
 		billed_input_tokens: cost_usage.billed_input(cost_usage.sum_totals(records)),
 	}
-}
-
-// The `--cap` verdict reads a cap simulation; an empty scope has none, exactly as the report path's
-// `optional_cap` withholds one for no records.
-function cap_of(records: ReadonlyArray<UsageRecord>, cap: number): CapSimulation | undefined {
-	return records.length === 0 ? undefined : cost_curve.simulate_cap(records, cap)
 }
 
 beforeEach(() => {
@@ -106,28 +98,5 @@ describe("cost_verdict.report_over at the lane child's implementation threshold"
 		cost_verdict.report_over(over_of([record(threshold)]), threshold)
 
 		expect(stdout()).toBe(cost_verdict.UNDER_VERDICT)
-	})
-})
-
-describe('cost_verdict.report_cap', () => {
-	// context 200K (cost $1) and 800K (cost $4); a 500K cap keeps only the first — 20% of the cost.
-	const two = [record(200_000), record(800_000)]
-
-	it('prints the share of cost at or under the cap', () => {
-		expect(cost_verdict.report_cap(cap_of(two, 500_000), 500_000)).toBe(0)
-		expect(stdout()).toBe('20.0%')
-	})
-
-	// The withheld convention: nothing priced is "not measured", never a ratio of 0.
-	it('prints "not measured" when nothing could be priced', () => {
-		const unpriced = [{ ...record(100), model: IMAGINARY }]
-
-		cost_verdict.report_cap(cap_of(unpriced, 500_000), 500_000)
-
-		expect(stdout()).toBe('not measured')
-	})
-
-	it('reports an empty scope rather than a ratio', () => {
-		expect(cost_verdict.report_cap(cap_of([], 500_000), 500_000)).toBe(FAILURE_EXIT_CODE)
 	})
 })

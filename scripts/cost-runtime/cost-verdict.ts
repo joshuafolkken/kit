@@ -1,13 +1,7 @@
-import { cost_curve, type CapSimulation } from './cost-curve'
-
-// The hand-off flags of `josh cost`, kept apart from the CLI wiring because each turns a run into a
-// one-line verdict rather than a table (joshuafolkken/kit#1838). `--over` answers what the next turn
-// of a session will cost; `--cap` answers what share of a run's cost fell at or under a per-request
-// context cap.
-//
-// Each takes only the figures its verdict needs — an over measurement, a cap simulation — never a
-// whole CostReport, so the distributed `--over` / `--cap` path stays clear of the report modules that
-// build one (joshuafolkken/kit#1996).
+// The `--over` hand-off flag of `josh cost`, kept apart from the CLI wiring because it turns a run
+// into a one-line verdict rather than a table (joshuafolkken/kit#1838). It answers what the next turn
+// of a session will cost, and takes only the figures its verdict needs — an over measurement — never
+// a whole report. The `--cap` counterfactual it once sat beside was retired in #2016 as readerless.
 
 const FAILURE_EXIT_CODE = 1
 const OVER_VERDICT = 'over'
@@ -52,29 +46,11 @@ function report_over(measurement: OverMeasurement | undefined, limit: number): n
 	return 0
 }
 
-// The cap counterfactual as a ratio rather than a table: what share of this run's priced cost was
-// incurred by requests at or under the cap. `not measured` when nothing could be priced, never 0.
-function report_cap(simulation: CapSimulation | undefined, cap: number): number {
-	if (simulation === undefined) {
-		console.error('No requests in this scope; there is nothing to cap.')
-
-		return FAILURE_EXIT_CODE
-	}
-
-	console.info(cost_curve.ratio_text(simulation))
-	console.error(
-		`${String(simulation.within_cap_requests)} of ${String(simulation.total_requests)} request(s) at or under ${String(cap)} tokens/request`,
-	)
-
-	return 0
-}
-
 const cost_verdict = {
 	OVER_VERDICT,
 	UNDER_VERDICT,
 	per_request_cost,
 	report_over,
-	report_cap,
 }
 
 export type { OverMeasurement }

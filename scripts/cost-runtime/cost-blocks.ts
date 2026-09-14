@@ -13,7 +13,7 @@ import { z } from 'zod'
 // with its `signature` but with `thinking` set to `''` — 118 blocks, 0 bytes, in the transcript this
 // was measured on, and the same in every other session checked. The thinking count therefore comes
 // from `usage.output_tokens_details.thinking_tokens`, which is a real API-reported number rather
-// than an estimate; `cost-composition.ts` is where the two sources are joined.
+// than an estimate.
 
 const CONTENT_ITEM_SCHEMA = z.object({ text: z.string().nullish() })
 const RESULT_CONTENT_SCHEMA = z.union([z.string(), z.array(CONTENT_ITEM_SCHEMA)])
