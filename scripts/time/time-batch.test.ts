@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { time_batch } from './time-batch'
-import { time_epic_fixture } from './time-epic-fixture'
+import { time_batch_fixture } from './time-batch-fixture'
 
 // What a run is worth measuring, in the four states a batch reports it in (joshuafolkken/kit#1312).
 //
-// The cases were `time-epic.test.ts`'s until `--last` needed the same classification: two scopes now
-// read these answers, so the suite sits beside the module rather than beside one of its callers. The
-// fan-out itself is covered where a batch drives it — `time-epic-children.test.ts` for `--epic` and
-// `time-last.test.ts` for `--last`.
+// The report builder is `time-batch-fixture.ts`'s: the classification is the core batch module's
+// rather than a scope's, so the suite sits beside the module and reads the same shaped report every
+// caller does.
 
-const { MINUTE_MS, report_of } = time_epic_fixture
+const { MINUTE_MS, report_of } = time_batch_fixture
 
 describe('time_batch.status_of', () => {
 	// The acceptance criterion: a run that never ran is not a run that took no time.

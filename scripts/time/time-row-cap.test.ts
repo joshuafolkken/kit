@@ -1,10 +1,8 @@
 import { time_bundles } from '#scripts/time-runtime/time-bundles'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { CheckTotal } from './time-checks'
-import { time_cli } from './time-cli'
 import { time_cycles } from './time-cycles'
 import { time_delegated_wait } from './time-delegated-wait'
-import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
@@ -12,25 +10,21 @@ import { time_gate_runs } from './time-gate-runs'
 import { time_investigation } from './time-investigation'
 import type { InvocationTotal } from './time-invocations'
 import { time_parent_turns } from './time-parent-turns'
-import { time_period_fixture } from './time-period-fixture'
 import type { TimeReport, ToolTotal } from './time-report'
 import { time_rework } from './time-rework'
 import { time_row_cap } from './time-row-cap'
-import { time_run } from './time-run'
 import type { Segment } from './time-segments'
 import { time_single_checks } from './time-single-checks'
 import { time_tool_turns } from './time-tool-turns'
 import { time_windows } from './time-windows'
 
-// The cap as a module and as the flag that reaches it, in one suite (joshuafolkken/kit#1301). The
-// command tests sit here rather than in `time-cli.test.ts` so the tables a cut report is built from
-// are declared once — a second copy of them beside the second suite is where the two would come to
-// disagree about what a capped report looks like.
+// The row cap as a module (joshuafolkken/kit#1301). The command that reached it — `josh time --top`
+// on a run and on an epic — was retired with `josh time`'s additional report scopes
+// (joshuafolkken/kit#2017), so the capper itself is what remains, exercised directly rather than
+// through a scope.
 
 const MINUTE_MS = 60_000
 const ISSUE = 1301
-const EPIC = 1262
-const CWD = '/Users/someone/Development/kit'
 const TOOL_ROWS = 5
 const JOSH_ROWS = 3
 // The two tables joshuafolkken/kit#1311 added, sized between the other two so a cap equal to one of
@@ -77,14 +71,6 @@ function segment_rows(count: number): Array<Segment> {
 		duration_ms: (index === count - 1 ? LONG_SEGMENT_MINUTES : 1) * MINUTE_MS,
 		lead_label: `segment-${String(index)}`,
 	}))
-}
-
-// What a cut of `CAP` keeps: the longest segment, and the first of the rows tied behind it, put back
-// in the order the run made them.
-function kept_segments(): Array<Segment> {
-	const all = segment_rows(SEGMENT_ROWS)
-
-	return all.filter((row) => row.lead_label === 'segment-0' || row.lead_label === 'segment-3')
 }
 
 function invocation_rows(count: number): Array<InvocationTotal> {
@@ -137,31 +123,12 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 	}
 }
 
-function epic_report(): EpicTimeReport {
-	return {
-		scope: `epic #${String(EPIC)}`,
-		epic_number: EPIC,
-		children: [
-			{ issue_number: ISSUE, status: 'measured', ms_per_turn: MINUTE_MS, report: report() },
-		],
-		total_ms: MINUTE_MS,
-		categories: { model_ms: MINUTE_MS, tool_ms: 0, human_ms: 0, ci_ms: 0 },
-		has_transcript_data: true,
-		has_ci_data: false,
-		timed_count: 1,
-		measured_count: 1,
-		unmeasured_count: 0,
-		trend: { is_comparable: false, first_ms_per_turn: 0, last_ms_per_turn: 0, child_count: 1 },
-		notes: [],
-	}
-}
-
 function tool_note(kept: number): string {
 	return time_row_cap.truncation_note(time_row_cap.TOOL_TABLE, kept, TOOL_ROWS)
 }
 
-// Every note a cut of `CAP` produces, in the order the tables are cut — written once so the two
-// suites below assert against the same list rather than two that could drift apart.
+// Every note a cut of `CAP` produces, in the order the tables are cut — written once so the cases
+// below assert against the same list rather than several that could drift apart.
 function all_notes(kept: number): Array<string> {
 	return [
 		tool_note(kept),
@@ -253,145 +220,5 @@ describe('time_row_cap.cap_report — a cap above the row count', () => {
 			tool_note(JOSH_ROWS),
 			time_row_cap.truncation_note(time_row_cap.SEGMENT_TABLE, JOSH_ROWS, SEGMENT_ROWS),
 		])
-	})
-})
-
-describe('time_row_cap.cap_epic_report', () => {
-	it('returns the very epic report it was given when no cap was named', () => {
-		const built = epic_report()
-
-		expect(time_row_cap.cap_epic_report(built, undefined)).toBe(built)
-	})
-
-	// Where an epic's size actually is: both tables are paid for once per child, so the cap has to
-	// reach each child's own report rather than the batch's headline fields.
-	it('caps each child’s own tables and notes the truncation there', () => {
-		const capped = time_row_cap.cap_epic_report(epic_report(), CAP)
-		const [child] = capped.children
-
-		expect(child?.report.by_tool).toHaveLength(CAP)
-		expect(child?.report.by_josh_command).toHaveLength(CAP)
-		expect(child?.report.notes).toContain(tool_note(CAP))
-	})
-
-	it('leaves the batch’s own fields alone', () => {
-		const capped = time_row_cap.cap_epic_report(epic_report(), CAP)
-
-		expect(capped.notes).toEqual([])
-		expect(capped.total_ms).toBe(MINUTE_MS)
-	})
-})
-
-const state = { printed: [] as Array<string> }
-
-function capture(message: unknown): void {
-	state.printed.push(String(message))
-}
-
-beforeEach(() => {
-	state.printed = []
-	vi.spyOn(console, 'info').mockImplementation(capture)
-})
-
-afterEach(() => {
-	vi.restoreAllMocks()
-})
-
-function output(): string {
-	return state.printed.join('\n')
-}
-
-function stub_run(): void {
-	vi.spyOn(time_run, 'build_run_report').mockResolvedValue(report([SESSION_NOTE]))
-}
-
-describe('josh time --top — one run', () => {
-	// The acceptance criterion, read through the command: without the flag the JSON is what it was
-	// before the cap existed, field for field and row for row.
-	it('carries every row when no --top was named', async () => {
-		stub_run()
-		await time_cli.run(['--issue', String(ISSUE), '--json'], CWD)
-
-		expect(JSON.parse(output())).toEqual(report([SESSION_NOTE]))
-	})
-
-	it('cuts both tables and says how many rows it withheld', async () => {
-		stub_run()
-		await time_cli.run(['--issue', String(ISSUE), '--top', String(CAP), '--json'], CWD)
-
-		expect(JSON.parse(output())).toMatchObject({
-			by_tool: rows(TOOL_ROWS, 'tool').slice(0, CAP),
-			by_josh_command: rows(JOSH_ROWS, 'josh').slice(0, CAP),
-			segments: kept_segments(),
-			by_invocation: invocation_rows(INVOCATION_ROWS).slice(0, CAP),
-			notes: [SESSION_NOTE, ...all_notes(CAP)],
-		})
-	})
-
-	// A cap above the row count is not a truncation, and a note there would report rows withheld that
-	// nobody withheld.
-	it('says nothing about truncation when the cap exceeds the row count', async () => {
-		stub_run()
-		await time_cli.run(['--issue', String(ISSUE), '--top', String(TOOL_ROWS), '--json'], CWD)
-
-		expect(JSON.parse(output())).toEqual(report([SESSION_NOTE]))
-		expect(output()).not.toContain(WITHHELD)
-	})
-
-	// The cap shapes the record both renderings are made from, so `--top` means the same thing with
-	// and without `--json`.
-	it('applies to the text report too', async () => {
-		stub_run()
-		await time_cli.run(['--issue', String(ISSUE), '--top', String(CAP)], CWD)
-
-		expect(output()).toContain(WITHHELD)
-		expect(output()).not.toContain('tool-4')
-	})
-})
-
-describe('josh time --top — one epic', () => {
-	it('caps each child’s tables under --epic', async () => {
-		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(epic_report())
-		await time_cli.run(['--epic', String(EPIC), '--top', String(CAP), '--json'], CWD)
-
-		expect(JSON.parse(output())).toMatchObject({
-			children: [{ report: { by_tool: rows(TOOL_ROWS, 'tool').slice(0, CAP) } }],
-		})
-	})
-
-	// The epic's text output renders no per-tool table at all, and a child's note block is the one
-	// place it explains why a child's GitHub half is missing — so a truncation note printed there
-	// would dilute exactly the signal that block exists for.
-	it('keeps the truncation note out of the epic’s text output', async () => {
-		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(epic_report())
-		await time_cli.run(['--epic', String(EPIC), '--top', String(CAP)], CWD)
-
-		expect(output()).toContain(`#${String(ISSUE)}`)
-		expect(output()).not.toContain(WITHHELD)
-	})
-})
-
-// The one table a period grows unboundedly — the stretches it serialized on (joshuafolkken/kit#1470).
-const PERIOD_CAP = 1
-const HOUR_MS = 60 * MINUTE_MS
-const { record, built, BASE_MS, ISSUE_A, ISSUE_B } = time_period_fixture
-// One long run passed by a one-minute run, which leaves a serialized stretch on either side of it.
-const CONTENDED = [
-	record(ISSUE_A, BASE_MS, HOUR_MS),
-	record(ISSUE_B, BASE_MS + MINUTE_MS, MINUTE_MS),
-]
-
-describe('time_row_cap.cap_period_report', () => {
-	it('carries the report untouched when no cap was asked for', () => {
-		const period = built(CONTENDED)
-
-		expect(time_row_cap.cap_period_report(period, undefined)).toBe(period)
-	})
-
-	it('keeps the longest stretches and says how many it withheld', () => {
-		const capped = time_row_cap.cap_period_report(built(CONTENDED), PERIOD_CAP)
-
-		expect(capped.serialization).toHaveLength(PERIOD_CAP)
-		expect(capped.notes.some((note) => time_row_cap.is_truncation_note(note))).toBe(true)
 	})
 })

@@ -1,25 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
-import { cost_usage } from '#scripts/cost-runtime/cost-usage'
 import { transcript_cwd } from '#scripts/cost-runtime/transcript-cwd'
 import { cost_run_report } from '#scripts/cost/cost-run-report'
-import { time_spans, type Span, type Timeline } from '#scripts/time-runtime/time-spans'
-import { time_batch, type RunTiming } from './time-batch'
-import { time_cli_refuse } from './time-cli-refuse'
-import { time_epic } from './time-epic'
-import { time_epic_report } from './time-epic-report'
-import { time_family } from './time-family'
-import { time_instructions, type InstructionLoad } from './time-instructions'
-import { time_last } from './time-last'
-import { time_last_report } from './time-last-report'
-import { time_period } from './time-period'
-import { time_period_report } from './time-period-report'
-import { time_report, type TimeReport } from './time-report'
-import { time_request_costs } from './time-request-costs'
-import { time_row_cap } from './time-row-cap'
-import { time_run } from './time-run'
 import { time_run_state } from './time-run-state'
 import { time_run_state_collect } from './time-run-state-collect'
 
@@ -30,364 +13,42 @@ import { time_run_state_collect } from './time-run-state-collect'
 // reading come from `cost-transcript.ts` unchanged — a second copy of the slug rule is how one of
 // the two commands quietly stops finding a project's transcripts.
 //
-// **The default scope is a run, not a session** (joshuafolkken/kit#1268). A `fullrun` is measured
-// from its invocation to the merge, which spans sessions and reaches past the last transcript line;
-// `--session <id>` still reports one session on its own, and `--epic <number>` reports a whole
-// `epicrun` child by child (joshuafolkken/kit#1271).
+// **The only scope is the run tree** (joshuafolkken/kit#2017). The additional report scopes
+// (`--epic` / `--last` / `--period` / `--session` / `--issue`) and the `--instructions` / `--top`
+// modifiers they carried were retired with no rule or decision reading them; `--run` names the same
+// default tree explicitly, while `--json` shapes it and `--path` redirects the read.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-// What a timeline's ends are when nothing was parsed — the same zero `parse_timeline` yields for a
-// transcript with no event, so an empty family reports exactly as an empty file already did.
-const NO_INSTANT = 0
-const JSON_INDENT = 2
-const USAGE =
-	'Usage: josh time [--run] [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--instructions] [--json] [--path <dir>]'
-const NO_MERGED_RUN =
-	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
-const ONE_SCOPE =
-	'Give one of --issue, --session, --epic, --last or --period: they name different things.'
-// **`--instructions` needs a named session, and is refused rather than ignored without one**
-// (joshuafolkken/kit#1477). The share it reports divides one transcript's carried instruction text by
-// that same transcript's own billed input; the run scopes assemble spans from several transcripts and
-// never read the usage lines to divide by. A flag silently dropped there would print a report that
-// reads as "this run carries no instruction text", which is the one answer that is never true.
-const INSTRUCTIONS_SCOPE =
-	'--instructions reports on one transcript, so name it with --session <id>.'
-const INSTRUCTIONS_FLAG = '--instructions'
-const SESSION_FLAG = '--session'
-// Two causes, and naming only the first sent a reader looking for a file that is sitting right
-// there: a checkout upgraded to joshuafolkken/kit#1470 has a full history in which no record yet
-// carries the wall-clock window the lane table is built from.
-const NO_PERIOD =
-	'No run in .time-history.jsonl carries a wall-clock window, so there is no period to report on. The file is written by josh followup — a fresh checkout legitimately has none, and records written before the window was stored carry none either.'
-const NO_EPIC =
-	'The epic could not be read, so there is no batch to report on. Check the number, and that gh is authenticated.'
-const NO_RUNS =
-	'No merged run could be resolved, so there is no distribution to report. Check that the repository has merged pull requests whose branches name an issue, and that gh is authenticated.'
+const USAGE = 'Usage: josh time [--run] [--json] [--path <dir>]'
 
-// Every scope is a present key whose value may be `undefined`, rather than a key that is absent.
-// Under `exactOptionalPropertyTypes` an optional key rejects `{ session: undefined }`, so one shim
-// per field would be needed to build this — three near-identical functions differing only in the key
-// they name, which is the duplication a third scope would have made unmistakable.
 interface Options {
-	session: string | undefined
-	issue: number | undefined
-	epic: number | undefined
-	// How many of the most recently merged runs to report the distribution across
-	// (joshuafolkken/kit#1312). A scope like the three above, and refused alongside them.
-	last: number | undefined
-	// How many days back from the newest recorded run to report the backlog's throughput across
-	// (joshuafolkken/kit#1470). A scope like the four above, and refused alongside them: it is the one
-	// scope whose unit is a period rather than a run.
-	period: number | undefined
-	// How many rows of the per-tool and per-`josh <cmd>` tables to carry, or `undefined` for all of
-	// them (joshuafolkken/kit#1301). It is not a scope: it narrows whichever scope was asked for.
-	top: number | undefined
-	// Whether to report what the run's loaded rules and procedures weigh, and what share of its model
-	// wait they account for (joshuafolkken/kit#1477). Off by default because it re-reads the transcript
-	// and sizes every instruction document from disk, which the wall-clock tables need none of.
-	is_instructions: boolean
 	is_json: boolean
 	// The target project whose transcripts to read, or `undefined` for this process's own working
-	// directory (joshuafolkken/kit#1987). It is not a scope: it says *where* to read, orthogonally to
-	// *which* run the scope flags name, so it is refused alongside none of them. From the kit checkout,
-	// `--path <dir>` points every read at another project's transcripts, history and config.
+	// directory (joshuafolkken/kit#1987). From the kit checkout, `--path <dir>` points the read at
+	// another project's transcripts, history and config.
 	path: string | undefined
 }
 
-// What `print_scope` needs to know, which is how to render and how much to carry — never which scope
-// produced the payload. Kept as a slice of `Options` rather than a second pair of parameters, so a
-// third output-shaping flag reaches every scope by being added once.
-type Output = Pick<Options, 'top' | 'is_json' | 'is_instructions'>
-
 const PARSE_ARGS_OPTIONS = {
-	session: { type: 'string' },
-	issue: { type: 'string' },
-	epic: { type: 'string' },
-	last: { type: 'string' },
-	period: { type: 'string' },
-	top: { type: 'string' },
-	instructions: { type: 'boolean', default: false },
 	json: { type: 'boolean', default: false },
 	run: { type: 'boolean', default: false },
 	path: { type: 'string' },
 } as const
 
-// The scope flags in the spelling a person types, derived from the shared scope-key list.
-const SCOPE_FLAGS = time_cli_refuse.SCOPE_KEYS.map((key) => `--${key}`)
-
-// Only a positive number is an issue number, the rule `cost-cli.ts` states: a non-positive value
-// would collide with `cost_attribute`'s unattributed sentinel and report that bucket as though it
-// were an issue's run. An epic is named the same way, so both go through this.
-function to_number(raw: string | undefined): number | undefined {
-	if (raw === undefined) return undefined
-
-	const parsed = Number(raw)
-
-	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
-}
-
-// An unknown flag is a refusal rather than a default: a misspelled `--session` must not quietly
-// report some other scope's time as though it were the one that was asked for.
+// An unknown flag is a refusal rather than a default: a misspelled or retired flag must not quietly
+// report the run tree as though the mistake had been understood.
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	try {
 		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
-		const parsed = {
-			issue: to_number(values.issue),
-			epic: to_number(values.epic),
-			last: to_number(values.last),
-			period: to_number(values.period),
-			top: to_number(values.top),
-		}
 
-		if (time_cli_refuse.is_refused(values, parsed)) return undefined
-
-		return {
-			session: values.session,
-			...parsed,
-			is_instructions: values.instructions,
-			is_json: values.json,
-			path: values.path,
-		}
+		return { is_json: values.json, path: values.path }
 	} catch {
 		return undefined
 	}
 }
 
-// `--issue 5` and `--issue=5` are the same flag. Matching only the space-separated form named the
-// grammar instead of the mistake for the half of the users who write the other one.
-function has_flag(argv: ReadonlyArray<string>, name: string): boolean {
-	return argv.some((argument) => argument === name || argument.startsWith(`${name}=`))
-}
-
-// Why the options were refused, so the message names the mistake rather than only the grammar.
-function usage_lines(argv: ReadonlyArray<string>): Array<string> {
-	const named = SCOPE_FLAGS.filter((flag) => has_flag(argv, flag)).length
-
-	if (named > 1) return [ONE_SCOPE]
-
-	if (has_flag(argv, INSTRUCTIONS_FLAG) && !has_flag(argv, SESSION_FLAG)) {
-		return [INSTRUCTIONS_SCOPE]
-	}
-
-	return [USAGE]
-}
-
-function pick_session(cwd: string, session_id: string): SessionFile | undefined {
-	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
-
-	return files.find((file) => file.session_id === session_id)
-}
-
-// An absent transcript is reported, never timed at zero. "No transcript was found" and "this run
-// took no time" are different answers, and only one of them is ever true. The wording is
-// `cost_transcript`'s — the same directory, so the same sentence.
-function report_empty(cwd: string, session_id: string | undefined): number {
-	const searched = cost_transcript.searched_directories(cost_transcript.transcript_directories(cwd))
-
-	for (const line of cost_transcript.missing_message(searched, session_id)) console.error(line)
-
-	return FAILURE_EXIT_CODE
-}
-
-// The window the union occupies, which `build_report` takes as a `Timeline`. Read from the spans
-// rather than from one transcript's first and last line: the family's ends are the run's, and the
-// named file is only part of it.
-function to_timeline(spans: ReadonlyArray<Span>): Timeline {
-	const window = time_family.window_of(spans)
-
-	return {
-		spans: [...spans],
-		started_ms: window?.started_ms ?? NO_INSTANT,
-		ended_ms: window?.ended_ms ?? NO_INSTANT,
-	}
-}
-
-// **A session scope reports the named transcript's family, not the file alone**
-// (joshuafolkken/kit#1439). Naming the session adds the units it delegated; naming one unit adds the
-// handoff and the teardown the session ran around it. Without both, `--session` and `--issue` read
-// different corpora of the same run and disagree about how long its review took.
-function build_session_report(cwd: string, file: SessionFile): TimeReport {
-	const files = cost_transcript.list_sessions_across(cost_transcript.transcript_directories(cwd))
-	const found = time_family.for_session(files, file)
-
-	return time_report.build_report(
-		file.session_id,
-		to_timeline(found.spans),
-		time_run.unread_lines(found.unread.length),
-		found.delegated_wait,
-	)
-}
-
-// The one place a report reaches stdout, whichever scope produced it. `--json` prints the whole
-// record, so a scope that carries more than the text table shows — an epic's per-child breakdown —
-// needs nothing of its own here.
-function print_scope(payload: unknown, text: () => string, is_json: boolean): void {
-	console.info(is_json ? JSON.stringify(payload, undefined, JSON_INDENT) : text())
-}
-
-// **The cap is applied to the record both outputs are made from, not to one of them.** Printing the
-// whole report as JSON while the text table showed a capped one would make `--top` mean two different
-// things depending on `--json`, and the note that says how many rows were withheld rides in `notes`,
-// which both renderings already print.
-function report_text(report: TimeReport, load: InstructionLoad | undefined): string {
-	const text = time_report.format_report(report)
-
-	return load === undefined ? text : `${text}\n${time_instructions.format_instructions(load)}`
-}
-
-function print_report(report: TimeReport, output: Output, load: InstructionLoad | undefined): void {
-	const capped = time_row_cap.cap_report(report, output.top)
-	const payload = load === undefined ? capped : { ...capped, instructions: load }
-
-	print_scope(payload, () => report_text(capped, load), output.is_json)
-}
-
-// **The named transcript alone, not the family the wall-clock report is built from.** A delegated
-// unit carries its own context, so folding its requests in would divide one session's instruction
-// weight by another session's billed input and report a share belonging to neither.
-function instructions_of(file: SessionFile, output: Output): InstructionLoad | undefined {
-	if (!output.is_instructions) return undefined
-
-	const content = cost_transcript.read_raw(file)
-	const usage = cost_transcript.tally(content)
-	const { spans } = time_spans.parse_timeline(content)
-
-	return time_instructions.build({
-		spans,
-		resident_tokens: usage.baseline_tokens,
-		billed_input_tokens: usage.records.reduce(
-			(total, record) => total + cost_usage.billed_input(record.totals),
-			time_instructions.NO_TOKENS,
-		),
-		request_count: usage.records.length,
-		model_wait_ms: time_report.category_ms(spans, time_spans.MODEL_CATEGORY),
-	})
-}
-
-function run_session(session_id: string, cwd: string, output: Output): number {
-	const file = pick_session(cwd, session_id)
-
-	if (file === undefined) return report_empty(cwd, session_id)
-
-	print_report(build_session_report(cwd, file), output, instructions_of(file, output))
-
-	return 0
-}
-
-// The named issue, or the most recently merged run when none was named. The fallback is a real read
-// rather than a guess — a repository with nothing merged is told so instead of being handed some
-// other scope's figures — and it resolves the pull request and the report in one pass, so the pulls
-// listing is paged once rather than twice.
-async function build(issue: number | undefined, cwd: string): Promise<TimeReport | undefined> {
-	const sources = time_request_costs.RUN_COST_SOURCES
-
-	if (issue === undefined) return await time_run.build_latest_run_report(cwd, undefined, sources)
-
-	return await time_run.build_run_report(issue, cwd, undefined, sources)
-}
-
-async function run_issue(issue: number | undefined, cwd: string, output: Output): Promise<number> {
-	const report = await build(issue, cwd)
-
-	if (report === undefined) {
-		console.error(NO_MERGED_RUN)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	print_report(report, output, undefined)
-
-	return 0
-}
-
-// **A batch holding a row whose report failed to build exits non-zero, and still prints the table**
-// (joshuafolkken/kit#1352). The rows that *were* measured are what the command is run for, so
-// withholding them would trade one silent failure for another; what must not happen is a regression
-// that makes every row throw exiting 0 beneath a table of plausible `not run` lines. A child the batch
-// simply never reached is not this — that is an ordinary answer, and it keeps the exit code at 0.
-function exit_code_of(rows: ReadonlyArray<RunTiming>): number {
-	return time_batch.count_status(rows, time_batch.FAILED) === 0 ? 0 : FAILURE_EXIT_CODE
-}
-
-// An epic's whole batch, child by child. Two things fail here: the epic itself being unreadable, and
-// — since joshuafolkken/kit#1352 — a child whose report could not be built. A child with no run of
-// its own is neither: it is reported as `not run` inside the table and keeps the exit code at 0.
-async function run_epic(epic_number: number, cwd: string, output: Output): Promise<number> {
-	const report = await time_epic.build_epic_report(epic_number, cwd)
-
-	if (report === undefined) {
-		console.error(NO_EPIC)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	const capped = time_row_cap.cap_epic_report(report, output.top)
-
-	print_scope(capped, () => time_epic_report.format_epic_report(capped), output.is_json)
-
-	return exit_code_of(report.children)
-}
-
-// The last N merged runs as a distribution. Two things fail here: no merged run could be resolved at
-// all, and — since joshuafolkken/kit#1352 — a run whose report could not be built. A run that merged
-// with no transcript attributed is neither: it is reported as such inside the table, exactly as an
-// epic's child is, and keeps the exit code at 0.
-async function run_last(count: number, cwd: string, output: Output): Promise<number> {
-	const report = await time_last.build_last_report(count, cwd)
-
-	if (report === undefined) {
-		console.error(NO_RUNS)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	const capped = time_row_cap.cap_last_report(report, output.top)
-
-	print_scope(capped, () => time_last_report.format_last_report(capped), output.is_json)
-
-	return exit_code_of(report.runs)
-}
-
-// The backlog over a period, read from the run history `josh followup` accumulates rather than from
-// GitHub: the question is how fast a batch of runs emptied the queue, and the records are already
-// what every merged run leaves behind. A checkout with no history is told so — an absent file is not
-// a period in which nothing happened.
-function run_period(days: number, cwd: string, output: Output): number {
-	const report = time_period.build_period_report(days, cwd)
-
-	if (report === undefined) {
-		console.error(NO_PERIOD)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	const capped = time_row_cap.cap_period_report(report, output.top)
-
-	print_scope(capped, () => time_period_report.format_period_report(capped), output.is_json)
-
-	return 0
-}
-
-// The bare no-argument default is the last run tree, not the last merged run — under a batch that
-// merged run is one lane child, which answers for a twelfth of the work (joshuafolkken/kit#1937). An
-// explicit `--issue` still reports one issue's run; `--run` reaches the tree the same way the bare
-// invocation does.
-// The number-named scopes, or `undefined` when none was given so the caller falls through to the
-// run-tree default. Split from `dispatch` so each stays within the branch limit.
-async function dispatch_scoped(options: Options, cwd: string): Promise<number | undefined> {
-	const { epic, last, period, issue } = options
-
-	if (epic !== undefined) return await run_epic(epic, cwd, options)
-	if (last !== undefined) return await run_last(last, cwd, options)
-	if (period !== undefined) return run_period(period, cwd, options)
-	if (issue !== undefined) return await run_issue(issue, cwd, options)
-
-	return undefined
-}
-
-// The run-state lead the no-argument path prepends: the run this checkout is carrying, read from the
+// The run-state lead the run-tree path prepends: the run this checkout is carrying, read from the
 // `run:carry` / `run:wake` records so a stopped run is surfaced at the front rather than left for the
 // run-tree report to bury (joshuafolkken/kit#1939). Text only — `--json` prints the structured
 // run-tree record alone.
@@ -399,40 +60,28 @@ async function run_state_lead(cwd: string, is_json: boolean): Promise<Array<stri
 	return [...time_run_state.lead_lines(facts)]
 }
 
-// The bare no-argument default and `--run`: the run tree, led by the run-state block when the run has
-// not finished. The tree report is `cost-run-report.ts`'s, kept for `josh time` after `josh cost`'s
-// readerless run-tree scopes were retired (#2016); only this entry prepends the run-state lead.
-async function run_tree(cwd: string, options: Options): Promise<number> {
-	const lead = await run_state_lead(cwd, options.is_json)
+// The run tree, led by the run-state block when the run has not finished. The tree report is
+// `cost-run-report.ts`'s, kept for `josh time` after `josh cost`'s readerless run-tree scopes were
+// retired (#2016).
+async function run_tree(cwd: string, is_json: boolean): Promise<number> {
+	const lead = await run_state_lead(cwd, is_json)
 
-	return cost_run_report.run(cwd, undefined, options.is_json, lead)
-}
-
-async function dispatch(options: Options, cwd: string): Promise<number> {
-	if (options.session !== undefined) return run_session(options.session, cwd, options)
-
-	const scoped = await dispatch_scoped(options, cwd)
-
-	return scoped ?? (await run_tree(cwd, options))
+	return cost_run_report.run(cwd, undefined, is_json, lead)
 }
 
 // **The default is this process's own working directory, searched at both slugs.** A dispatched lane
-// child writes its transcript under the lane's own slug (joshuafolkken/kit#1749), while a session that
-// stayed in the main checkout and only prefixed its commands with the lane path writes under the main
-// slug (joshuafolkken/kit#1617). `list_sessions_across` and `searched_directories` cover both from the
-// raw cwd, so pre-rewriting to `session_cwd` here would drop the lane's own slug and hide the child
-// (joshuafolkken/kit#1825).
+// child writes its transcript under the lane's own slug (joshuafolkken/kit#1749); `--path <dir>` reads
+// the target project instead of the process cwd (joshuafolkken/kit#1987).
 async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
 	const options = parse_options(argv)
 
 	if (options === undefined) {
-		for (const line of usage_lines(argv)) console.error(line)
+		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	// `--path <dir>` reads the target project instead of the process cwd (joshuafolkken/kit#1987).
-	return await dispatch(options, transcript_cwd.resolve(options.path, cwd))
+	return await run_tree(transcript_cwd.resolve(options.path, cwd), options.is_json)
 }
 
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and
@@ -444,15 +93,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const time_cli = {
 	USAGE,
-	NO_MERGED_RUN,
-	NO_EPIC,
-	NO_RUNS,
-	NO_PERIOD,
-	ONE_SCOPE,
-	INSTRUCTIONS_SCOPE,
 	parse_options,
-	pick_session,
-	report_empty,
 	run,
 	main,
 }
