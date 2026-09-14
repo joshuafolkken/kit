@@ -58,7 +58,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 21_661 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
-	{ path: 'CLAUDE.md', bytes: 29_528 },
+	{ path: 'CLAUDE.md', bytes: 26_355 },
 	{ path: 'docs/josh-commands.md', bytes: 80_512 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
