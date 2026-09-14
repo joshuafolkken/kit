@@ -21,7 +21,10 @@ import { time_spans, type Span } from './time-spans'
 
 const UNNAMED_KEY = ''
 
-function command_key(span: Span): string {
+// **The parameter is the two fields it reads, not the whole `Span`.** A full span satisfies it, and so
+// does a `ToolCall` the batching guard builds for a live call (joshuafolkken/kit#1979) — the key has
+// to mean the same thing whether it is read off a recorded span or the call about to repeat it.
+function command_key(span: Pick<Span, 'label' | 'josh_command'>): string {
 	if (span.label === time_spans.UNKNOWN_TOOL) return UNNAMED_KEY
 
 	return span.josh_command === '' ? span.label : span.josh_command

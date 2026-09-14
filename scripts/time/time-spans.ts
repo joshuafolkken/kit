@@ -534,6 +534,7 @@ const time_spans = {
 	bash_label: time_shell.bash_label,
 	josh_command_of: time_shell.josh_command_of,
 	josh_commands_of: time_shell.josh_commands_of,
+	to_tool_call,
 	parse_line,
 	parse_timeline,
 }

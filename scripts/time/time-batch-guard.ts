@@ -1,6 +1,8 @@
 import { time_bundle_call, type BundleFacts } from './time-bundle-call'
 import { time_bundles } from './time-bundles'
+import { time_call_identity } from './time-call-identity'
 import { time_spans, type Span } from './time-spans'
+import { time_transcript_line } from './time-transcript-line'
 
 // Whether the call about to go out should be refused because the run has stopped batching
 // (joshuafolkken/kit#1390).
@@ -251,36 +253,75 @@ function is_sequence_at_limit(
 	return sequence_started_ms(sequence) > refused_at_ms
 }
 
-// `text` is the transcript tail the caller read, `refused_at_ms` the instant it last refused — zero
-// where it never has, which makes the first sequence of a run eligible.
-//
 // **Nothing here reads the turn the call belongs to**, because nothing can: see "What it cannot know"
 // above. The two call-shaped tests are asked of the call in hand, and everything else of the turns
 // behind it.
-// The sequence test both dispositions share: is the open run of single-call turns at the limit, for a
-// call that began after the last time this disposition fired. Shared so the refusal and the notice
-// cannot drift apart on what "three in a row" means (joshuafolkken/kit#1848).
-function is_at_limit(text: string, call: GuardedCall, last_fired_ms: number): boolean {
+// The sequence test both dispositions share, over spans the caller has already parsed: is the open run
+// of single-call turns at the limit, for a call that began after the last time this disposition fired.
+// Shared so the refusal and the notice cannot drift apart on what "three in a row" means
+// (joshuafolkken/kit#1848), and taking spans rather than the tail so a disposition that also asks
+// `is_reissued_refusal` parses the transcript once (joshuafolkken/kit#1979).
+function is_at_limit(
+	spans: ReadonlyArray<Span>,
+	call: GuardedCall,
+	last_fired_ms: number,
+): boolean {
 	return is_sequence_at_limit(
-		time_bundles.open_sequence(time_spans.parse_timeline(text).spans),
+		time_bundles.open_sequence(spans),
 		time_bundle_call.call_facts(call.name, call.input),
 		last_fired_ms,
+	)
+}
+
+// This guard's own refusal label, as `time-transcript-line.ts` reads it back off a refused result: the
+// token after the ⛔ and before the first colon of REASON. Derived from REASON rather than written a
+// second time, so the two can never disagree about which refusals in the transcript are this guard's
+// (joshuafolkken/kit#1979).
+const GUARD_LABEL = time_transcript_line.guard_from_refusal(REASON)
+
+// **A call the guard has already refused, found in the tail by the same identity the report compares
+// re-issues on** (joshuafolkken/kit#1979). A refused call the run answered by re-issuing it unchanged
+// is one that had nothing to batch — refusing the re-issue again buys a round trip and no batching,
+// which is the waste `time-guard-refusals.ts`'s `same_args_reissue` counts. The identity is built
+// through the same `to_tool_call` the transcript parse uses, so a refused span and the live call about
+// to repeat it produce the identical string.
+//
+// **This is what the timestamp alone could not do.** `refused_at_ms` withholds the immediate
+// re-refusal, but an unbroken run of single-call turns longer than the read window presents a sequence
+// start that has moved forward and is refused again (see "What it cannot know" above). The refused span
+// is still in the tail even when that start has scrolled out of view, so its identity is what survives.
+// The first refusal of a novel call still fires — only a call already on a refused span of this guard's
+// is let through, so a genuinely bundleable single call is refused exactly as before.
+function is_reissued_refusal(spans: ReadonlyArray<Span>, call: GuardedCall): boolean {
+	const identity = time_call_identity.identity_of(
+		time_spans.to_tool_call(call.name, call.input, time_spans.NO_MESSAGE_ID),
+	)
+
+	return spans.some(
+		(span) =>
+			span.refusal_guard === GUARD_LABEL && time_call_identity.identity_of(span) === identity,
 	)
 }
 
 function should_block(text: string, call: GuardedCall, refused_at_ms: number): boolean {
 	if (!is_guarded_call(call)) return false
 
-	return is_at_limit(text, call, refused_at_ms)
+	const { spans } = time_spans.parse_timeline(text)
+
+	if (is_reissued_refusal(spans, call)) return false
+
+	return is_at_limit(spans, call, refused_at_ms)
 }
 
 // The notice's rule: the same sequence test, gated on the whole-file write rather than on a refusable
 // call. `notified_at_ms` is read from the notice's **own** record, so a notice never spends the
-// refusal's stamp and cannot silence a genuine refusal of a later read or edit on the same run.
+// refusal's stamp and cannot silence a genuine refusal of a later read or edit on the same run. A
+// whole-file write is never refused, so it has no re-issue to detect — the reissue test is the
+// refusal's alone.
 function should_notify(text: string, call: GuardedCall, notified_at_ms: number): boolean {
 	if (!is_notice_call(call)) return false
 
-	return is_at_limit(text, call, notified_at_ms)
+	return is_at_limit(time_spans.parse_timeline(text).spans, call, notified_at_ms)
 }
 
 // **This guard's own name for its once-per-run record.** It lives beside the rule rather than in
@@ -296,6 +337,7 @@ const NOTICE_STAMP_PREFIX = 'josh-batch-guard-notice-'
 
 const time_batch_guard = {
 	CONSECUTIVE_LIMIT,
+	GUARD_LABEL,
 	NOTICE,
 	NOTICE_STAMP_PREFIX,
 	REASON,

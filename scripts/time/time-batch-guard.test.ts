@@ -9,7 +9,7 @@ import { time_transcript_fixture } from './time-transcript-fixture'
 //
 // The minute grid is the fixture's: turn `n` issues on minute `2n + 1` and is answered on `2n + 2`.
 
-const { open_turn_lines, target_turn_lines, ms } = time_transcript_fixture
+const { open_turn_lines, target_turn_lines, refused_turn_lines, ms } = time_transcript_fixture
 
 const NEVER_REFUSED = 0
 const FRESH_PATH = 'scripts/fresh.ts'
@@ -305,6 +305,48 @@ describe('time_batch_guard.should_block — one refusal per sequence', () => {
 		const before_the_new_sequence = ms(3)
 
 		expect(time_batch_guard.should_block(text, FRESH_CALL, before_the_new_sequence)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#1979. A call the run answered a refusal with by re-issuing it unchanged is one
+// that had nothing to batch — refusing the re-issue again buys a round trip and no batching, the waste
+// `time-guard-refusals.ts`'s `same_args_reissue` counts. The guard reads the earlier refusal off the
+// tail by the same identity the report compares on, so it does not refuse the same call twice.
+describe('time_batch_guard.should_block — a re-issued refusal', () => {
+	// The label the guard writes into its own refusal is the one `time-transcript-line.ts` reads back off
+	// a refused result. Pinned so the re-issue test below cannot pass while the two drift apart — a guard
+	// whose refusals carried a different token would find none of them in the tail.
+	it('reads its refusal label back as the token a refused result carries', () => {
+		expect(time_batch_guard.GUARD_LABEL).toBe('batching')
+	})
+
+	// The batched turn breaks the run, so the refused read of FRESH_PATH sits *outside* the open
+	// sequence — the target veto cannot be what admits it. The identical earlier refusal is: the run
+	// answered that refusal by re-issuing the same read, so refusing it again would batch nothing.
+	it('allows a call whose identical refusal is already in the transcript', () => {
+		const text = transcript(
+			refused_turn_lines(0, [FRESH_PATH]),
+			target_turn_lines(1, ['x.ts', 'y.ts']),
+			target_turn_lines(2, ['a.ts']),
+			target_turn_lines(3, ['b.ts']),
+			open_turn_lines(4, ['c.ts']),
+		)
+
+		expect(time_batch_guard.should_block(text, FRESH_CALL, NEVER_REFUSED)).toBe(false)
+	})
+
+	// The re-issue test is scoped to the call's own identity, not a blanket off-switch: a *different*
+	// call was refused earlier, so a novel bundleable call at the limit is refused exactly as before.
+	it('refuses a novel call at the limit when only a different call was refused earlier', () => {
+		const text = transcript(
+			refused_turn_lines(0, ['other.ts']),
+			target_turn_lines(1, ['x.ts', 'y.ts']),
+			target_turn_lines(2, ['a.ts']),
+			target_turn_lines(3, ['b.ts']),
+			open_turn_lines(4, ['c.ts']),
+		)
+
+		expect(time_batch_guard.should_block(text, FRESH_CALL, NEVER_REFUSED)).toBe(true)
 	})
 })
 
