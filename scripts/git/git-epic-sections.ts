@@ -64,7 +64,7 @@ function is_section_end(input: BodyLines, index: number, level: number): boolean
 
 // Where the named section runs: the lines after its heading, up to the next heading **of the same or a
 // higher level**. Not "the next heading of any level" — `## Decisions` is written as one `###` entry per
-// decision, the template `epic:plan` documents, so ending at any heading would make the section one
+// decision, the template the epic body documents, so ending at any heading would make the section one
 // line long and place every appended record after its first entry (joshuafolkken/kit#1350). A `##`
 // section running to the next `##` is what a reader of the body already takes it to mean.
 //

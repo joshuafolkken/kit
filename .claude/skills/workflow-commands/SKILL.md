@@ -680,8 +680,8 @@ command takes no `--repo`.
 form.
 
 **This repository writes its agreements into comments and then reads only bodies.** A Tier A decision
-is logged as an Issue comment; the review round cap records a dropped finding's disposition; `epic:plan`
-writes each decision to a comment on the child; a stash left behind is recorded on the Issue. **The
+is logged as an Issue comment; the review round cap records a dropped finding's disposition; the
+backlog's decision pass writes each decision to a comment on the child; a stash left behind is recorded on the Issue. **The
 place a run is told to write is the place it was never told to read**, and nothing in a body says it
 has been superseded, so the mistake is silent.
 

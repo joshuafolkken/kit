@@ -129,9 +129,9 @@ reference is named, the refusal is the whole answer. Where several are, a task-l
 ## What one invocation approves
 
 **One `epicrun` approves every merge in the epic**, plus pushes to more than one repository and the
-issues the run files itself. It does **not** approve anything outside the epic, **except the issues a
-person has opted in with `auto-ok`** — that label is the person's act, not the run's (see "After the
-epic" below). A Tier C action still stops — for that child.
+issues the run files itself. It does **not** approve anything outside the epic — running a standalone
+`auto-ok` Issue is `backlogrun`'s job, not `epicrun`'s (joshuafolkken/kit#1965). A Tier C action still
+stops — for that child.
 
 ## Each child runs in a delegated unit
 
@@ -139,9 +139,9 @@ epic" below). A Tier C action still stops — for that child.
 and only its summary comes back.
 
 **The parent orchestrates and never implements a child in its own context.** *Every* child takes a
-delegated unit — a fresh one, an `auto-ok` pickup, and **a child just released from `needs-decision`**
-alike. The rule is one sentence: **whatever offers a child — the loop, a pickup, or a person clearing
-a label — the child is handed to a lane, never to the parent.**
+delegated unit — a fresh one and **a child just released from `needs-decision`** alike. The rule is
+one sentence: **whatever offers a child — the loop, or a person clearing a label — the child is handed
+to a lane, never to the parent.**
 
 **The mechanism is the one `pnpm josh delegate` defines** — the enumeration plus the command — with
 the unit changed from one step of a run to one child of an epic. Building a second is the clone
@@ -267,7 +267,7 @@ by hand needs `-L` (`run:liveness` follows the link itself).
 
 **A clean checkout is not evidence that the unit is alive** — a stop can come while the unit is still
 reading the skill and the issue. The checkout is read only for whether there is work to stash before
-the child is parked; **"nothing was ever opened for the child" is `pnpm josh run:preflight`'s question
+the child is parked; **"nothing was ever opened for the child" is `pnpm josh run:hold`'s preflight check
 at the start of the next child, not this one's.**
 
 **What follows is what a failed child already gets.** Re-read the child first with
@@ -442,7 +442,7 @@ pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, 
 - **Nothing switches the lane's branch** — the registry identifies a lane by that branch, so a switch
   costs it its seat, listing and isolation, and `<N>-lane` is already a name `pnpm josh git` commits
   from.
-- **`pnpm josh run:preflight` is not asked in a lane; `lane:open`'s own answer replaces it.** A fresh
+- **`pnpm josh run:hold`'s preflight check is not asked in a lane; `lane:open`'s own answer replaces it.** A fresh
   lane is clean by construction, preflight's `reclaim` arm (HEAD != default branch) is true of every
   lane, and its recovery (`git switch <default>`) cannot run in a linked work tree. What a leftover
   looks like here is `lane:open` answering `already-open`.
@@ -680,18 +680,23 @@ opens every child with `git switch main && git pull`, which refuses over a dirty
 may not reach for `git stash` on its own judgement. So an unattended batch could not recover from its
 own crash.
 
-**Ask, the moment `epic:next` hands back a number and before the child is started:**
+**The child's claim is what asks it.** `pnpm josh run:hold <N>` — the first call of the child's
+`fullrun` procedure — now runs the preflight check before it takes the tree
+(joshuafolkken/kit#1965): it hands back a hold **only on a clean tree**, and returns
+`reclaim` / `resume` / `park` without claiming otherwise. There is no separate command to ask first;
+the two-step "preflight, then hold" is one call.
 
 ```bash
-answer=$(pnpm josh run:preflight 926)   # alias: josh rp ; one token on stdout, prose on stderr
+answer=$(pnpm josh run:hold 926)   # alias: josh rh ; one token on stdout, prose on stderr
 ```
 
 | Answer    | What it found                                                         | What to do                                                                                                                                                                                                                                                                       |
 | --------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `clean`   | Nothing left behind                                                   | Start the child. This is the ordinary answer.                                                                                                                                                                                                                                     |
-| `reclaim` | Uncommitted changes, or HEAD off the default branch                   | Run what stderr printed: `git stash push -u -m "run:preflight reclaimed before #<N>"`, then `git switch <default> && git pull`. **`-u` is not optional** (a new `*.test.ts` is untracked). **Then record the stash on `#<N>` as a comment, and ask again** — the command is re-askable. |
+| `hold`    | Nothing left behind; the tree is claimed                             | Start the child. This is the ordinary answer.                                                                                                                                                                                                                                     |
+| `reclaim` | Uncommitted changes, or HEAD off the default branch                   | Run what stderr printed: `git stash push -u -m "run:hold reclaimed before #<N>"`, then `git switch <default> && git pull`. **`-u` is not optional** (a new `*.test.ts` is untracked). **Then record the stash on `#<N>` as a comment, and ask `run:hold` again** — the check is re-askable. |
 | `resume`  | A branch for `#<N>`, or an open pull request, is still here           | **Reuse it and run the whole verification gate from the start** — never only the part the interrupted run had not reached. The tools are idempotent; what was missing was that **nobody had verified what the dead run already committed**.                                          |
 | `park`    | The pull request for `#<N>` is **merged** or **closed**               | **Park the child** — `needs-decision` plus a comment naming what was found — and continue. Carrying on over a merged PR duplicates work; over a closed one revives rejected work. Do not delete the branch, reopen the PR, or commit on top of it.                                   |
+| `busy`    | Another **live** run holds this tree                                  | Stop before filing anything — `run:hold`'s own answer, unchanged.                                                                                                                                                                                                                 |
 | `unknown` | The tree could not be read                                            | Stop the session and report. It is not "the tree is clean".                                                                                                                                                                                                                       |
 
 **The rule answers, so the run does not judge.** "There is a branch, I will carry on" and "there is a
@@ -705,16 +710,18 @@ comment is the only thing that can bring it back**.
 **Report what was reclaimed** — a child that started from a `reclaim` or a `resume` says so, with the
 stash reference where there was one.
 
-**It is not `run:hold`, and neither replaces the other.** `run:hold` asks *whether another live run owns
-this tree* (claimed once, per child); this asks *what a dead run left in it* and is a read that writes
-nothing, so it is **re-askable**. Ask this one first: a tree holding an interrupted run's work makes
-`run:hold` answer `busy`, and the preflight is what turns that into something the batch can act on.
+**The claim and the preflight are one call now** (joshuafolkken/kit#1965). `run:hold` used to ask only
+*whether another live run owns this tree* — claimed once, per child — while a separate `run:preflight`
+asked *what a dead run left in it*. The claim now does both, taking the tree only when the preflight
+reads `clean`. The `reclaim` arm stays re-askable, because the check writes nothing: recover what it
+named and ask `run:hold` once more, and the now-clean tree is claimed.
 
-**It is not asked in a lane.** Every lane's HEAD is on `<N>-lane`, so the `reclaim` arm fires on all of
-them and its recovery cannot run in a linked work tree. `lane:open`'s own answer replaces it. **Asked in
-the primary checkout while a lane for that child is open, it answers `resume`, which is correct** — the
-branch read `git branch --list '<N>-*'` matches `<N>-lane`. The loop never reaches it that way, because
-`epic:next` does not offer a child already carrying `in-progress`.
+**It is not asked in a lane.** Every lane's HEAD is on `<N>-lane`, so the `reclaim` arm would fire on
+all of them and its recovery cannot run in a linked work tree — so `run:hold` claimed inside a lane
+skips the check, and `lane:open`'s own answer covers an interrupted lane instead. **Asked in the
+primary checkout while a lane for that child is open, `run:hold` would read `resume`, which is
+correct** — the branch read `git branch --list '<N>-*'` matches `<N>-lane`. The loop never reaches it
+that way, because `epic:next` does not offer a child already carrying `in-progress`.
 
 ## Progress while the run is quiet
 
@@ -876,11 +883,12 @@ a child handed a lane runs the whole `fullrun` procedure inside it. Read a line 
 single non-numeric line as the verdict.
 
 1. Run the command above.
-2. **One or more numbers** — where the child runs in this session's own checkout, **first ask
-   `pnpm josh run:preflight <N>` and obey it**: `reclaim` is recovered and the command asked again,
-   `park` parks this child and returns to step 1, `unknown` stops the session, and `resume` starts the
-   child on the branch that is there with the whole verification gate re-run. **In a lane it is not
-   asked at all**, and `lane:open`'s own answer replaces it. **Everything from here on is per child**:
+2. **One or more numbers** — where the child runs in this session's own checkout, its `fullrun` claim
+   `pnpm josh run:hold <N>` **now runs the preflight check itself** and is obeyed: `reclaim` is
+   recovered and `run:hold` asked again, `park` parks this child and returns to step 1, `unknown` stops
+   the session, `resume` starts the child on the branch that is there with the whole verification gate
+   re-run, and `hold` starts it. **In a lane the check is skipped**, and `lane:open`'s own answer
+   replaces it. **Everything from here on is per child**:
    with several in flight each is confirmed, counted and closed on its own, and step 1 is asked again
    once a lane comes free rather than once the last child returns. Either way the child runs as
    `fullrun #<N>` does, **in a delegated unit where one is available** (`pnpm josh delegate epic-child`
@@ -943,7 +951,7 @@ single non-numeric line as the verdict.
    progress report, is the shape this forbids.**
 
    **The counters go into the epic progress comment in that acting turn** — children run, Issues filed,
-   **consecutive failures**, `auto-ok` pickups, and the time the run started — at **every** child's
+   **consecutive failures**, and the time the run started — at **every** child's
    merge (see "The counters live in the conversation" below). Their **values** are counted inside the
    run, so only the write waits for the merge (`background-commands.md`).
 
@@ -961,93 +969,20 @@ single non-numeric line as the verdict.
    one does not", and for a cross-repository publish wait. The table in "The wake exists only while
    something is in flight" below decides which.
 4. **`stop`** — report the parked children and finish.
-5. **`complete`** — post the epic summary, then run the pickup in "After the epic" below, and finish.
+5. **`complete`** — post the epic summary and finish.
 6. **Exit code 1** — `epic:next` refused a cyclic or contradictory graph, or could not read a child.
    Report and finish.
 
-## After the epic — issues opted in with `auto-ok`
+## After the epic
 
-An epic's task list is not the whole backlog. An Issue small enough to need no human judgment sits there
-forever unless somebody puts it in an epic, and as execution capacity grows the entrance — what is
-eligible to be run at all — becomes the bottleneck. `auto-ok` is the opt-in that widens it.
+**When the epic completes, `epicrun` sends the summary and finishes.** It does not go on to pick up
+standalone `auto-ok` Issues (joshuafolkken/kit#1965): running the opted-in backlog outside an epic is
+`backlogrun`'s job, and an `epicrun` approves that epic's children and nothing else. A run that began
+from a bare, non-epic Issue reaches the same point when that Issue merges without a prerequisite or a
+split turning up ("Nothing found means no epic").
 
-**Only a person applies `auto-ok`. Never apply it on your own judgement.** This label is the only way a
-person extends `epicrun`'s approval past the epic's edge; a label an agent could apply to itself would
-let an unattended run widen its own authorization. **Typing the command for the person is not applying
-it**: an explicit instruction in the current turn is their decision and yours only to execute.
-Everything else, "this one is obviously trivial" included, is a proposal — written as an Issue comment.
-
-**The pickup happens once the epic's children are done, and nowhere else.**
-
-| `epic:next` answered | What happens to the pickup |
-| --- | --- |
-| a number | Run the child. No pickup — the epic's own children come first |
-| `wait` | Wait. No pickup: the epic is still resolving |
-| `stop` | Report the parked children and finish. **No pickup** — the epic needs a person |
-| `error` | Report and finish. No pickup |
-| `complete` | Post the epic summary, then pick up below |
-
-A run that began from a bare, non-epic Issue reaches the same point when that Issue merges without a
-prerequisite or a split turning up ("Nothing found means no epic").
-
-**Ask the command which Issue, never `gh` directly.** The label name is single-sourced in
-`scripts/git/issue-labels.ts`.
-
-```bash
-answer=$(pnpm josh auto-ok:next)                 # the first time
-answer=$(pnpm josh auto-ok:next --exclude <N>)   # every time after, naming the one just merged
-answer=$(pnpm josh auto-ok:next --exclude <N>,<M>) # or every one this session has already run
-```
-
-**`--exclude` is not optional after the first pickup.** GitHub applies the `closes #N` side effect
-asynchronously, so for a few seconds after the merge the issue you just finished is still listed as open;
-without the flag the loop can be handed that number back and re-implement work that already shipped.
-
-| Answer | What to do |
-| --- | --- |
-| A number | Run it exactly as `fullrun #<N>` does, then ask again. **Unless it carries `needs-human-review`**, which degrades it exactly as it degrades a child: the gate runs, nothing is committed, and the run ends there (§2z) |
-| `none` | Nothing is opted in. Finish the run |
-| **Exit 1** — the listing could not be read | Report that the pickup could not be attempted, and finish. "Could not tell" is not `none` |
-
-**An issue whose prerequisite is unresolved is never handed over.** The pickup reads the same
-GitHub-native `blockedBy` relations `epic:next` builds its dependency graph from. `auto-ok` says "this
-issue needs no decision" and says nothing about order.
-
-**The order is the one the person was just shown** — `auto-ok:next` ranks with the same function the
-`🗒 Next issues (newest first)` display uses (newest first, skipping `epic`, `in-progress` and
-`needs-decision`). **The same ordering is not the same set**: the dependency check exists only on the
-pickup side, so `auto-ok:next` can refuse an issue `🗒 Next issues` is showing at the top — a person may
-start a blocked issue anyway, an unattended run may not.
-
-**An epic's child is never picked up standalone while that epic is the one offering it**, whatever labels
-the child carries — `auto-ok` widens execution past an epic's edge, not past its *order*:
-
-> An issue is run through the epic that is going to offer it, and never beside it.
-
-**An epic that did not opt in is offering nothing, and there the child's own `auto-ok` decides.** The
-order it does have still holds — `josh epic --ordered` records it as native `blocked-by` relations on
-the children, and the standalone path refuses a candidate whose prerequisite is still open, so **opting
-in says nothing about order.** **Membership is whether an epic's task list names the issue, not the
-issue's own labels**: `auto-ok:next` reads the open epics (only when something is opted in) and **refuses
-to answer when that listing cannot be read**. An epic that never received the `epic` label is invisible,
-and `pnpm josh epic:audit` is what surfaces that.
-
-**Everything a child gets, a picked-up Issue gets**: the split assessment, the two-layer work summary,
-`josh latest` staying hoisted to the session, park-and-continue, and the hand-off check — **on the same
-condition, that `pnpm josh delegate epic-child` answered `keep`**. One that needs a decision is parked
-exactly as a child is, and one carrying `needs-human-review` stops the run exactly as a child does.
-
-**The cap is 5 per run**, in the Guards table below. These issues went through no split assessment as a
-batch, no `epic:audit` and no dependency graph — the label alone is the whole authorization, so the cap
-is the only structural guard on them, deliberately tighter than the epic's 30. On reaching it, finish
-and report.
-
-**The label has to exist before anyone can apply it**, and a missing one is not an error: `auto-ok:next`
-says `none` and the run finishes. Create it once per repository that wants it:
-
-```bash
-gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
-```
+**A person who wants the standalone `auto-ok` Issues run types `backlogrun`.** That command owns the
+opted-in pool — its membership, its ordering and its guards — and `backlogrun.md` is its single source.
 
 ## The hand-off — one session does not have to run the whole epic
 
@@ -1213,8 +1148,8 @@ survive the cut is re-dispatched, never adopted** — `pnpm josh lane:open <N>` 
 ### The counters live in the conversation
 
 **Write the run's counters into the epic progress comment at every child's merge, and read them back
-after a compaction** — children run, Issues filed, **consecutive failures**, `auto-ok` pickups, and the
-time the run started, counted in the conversation and nowhere else. **It is every merge and not only an
+after a compaction** — children run, Issues filed, **consecutive failures**, and the time the run
+started, counted in the conversation and nowhere else. **It is every merge and not only an
 `over` reading**, because a compaction happens under context pressure at whatever moment it arrives, so
 counters persisted only where the run expected to stop are taken anyway. **The consecutive-failure count
 is the one that matters** — it is what the stopped-unit section leans on to notice the environment is at
@@ -1417,7 +1352,7 @@ Waiting is decided by `epic:next`'s classification, never by reading labels:
 | Something is runnable | Run it |
 | Nothing runnable, something resolves on its own | **Wait** |
 | Nothing runnable, nothing resolves on its own, children remain | **Stop and report the parked children** |
-| No open child | Post the epic summary, pick up the `auto-ok` issues ("After the epic" above), then finish |
+| No open child | Post the epic summary and finish |
 
 The distinction is not academic. When kit's child has closed and app-kit's child is waiting for the
 release to publish, there is no runnable child, nothing carries `in-progress` and nothing carries
@@ -1476,7 +1411,6 @@ Use the same split criteria as `kickoff`. If what remains of the original child 
 | Children per run | 30 | Stop and report; an epic this large should be split. |
 | Issues filed per run | 10 | Stop and report; a run filing more than this has lost the plot. |
 | Consecutive child failures | 3 | Stop and report; something is wrong with the environment, not the children. |
-| `auto-ok` issues per run | 5 | Finish and report; the epic is done, and the rest keeps until the person asks again. |
 
 A failure that is not consecutive parks its child and the run continues.
 
@@ -1501,8 +1435,7 @@ says `unknown`, never `skip`.
 
 `epicrun` stops only here:
 
-1. `epic:next` reports `complete`, the summary has been sent, and the `auto-ok` pickup has answered
-   `none`, reached its cap, or reported that it could not read the listing.
+1. `epic:next` reports `complete`, and the summary has been sent.
 2. `epic:next` reports `stop` — every remaining child needs a person; report them.
 3. `epic:next` reports `error` — a cyclic or contradictory graph.
 4. A guard above was reached.

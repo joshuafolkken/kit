@@ -7,8 +7,9 @@ ordered by dependency and grouped into waves that may run beside one another
 (joshuafolkken/kit#1631).
 
 **Before it existed the backlog could only be reached after something else had finished.** The
-`auto-ok` pickup runs when `epic:next` answers `complete`, or once a bare-Issue `epicrun` has merged;
-there was no door that started *from* the backlog. So a person who wanted the opted-in issues run in
+`auto-ok` pickup ran only when `epic:next` answered `complete`, or once a bare-Issue `epicrun` had
+merged (that standalone pickup has since moved here entirely — joshuafolkken/kit#1965); there was no
+door that started *from* the backlog. So a person who wanted the opted-in issues run in
 the best order had to create an epic first, and creating one was itself the bottleneck this entry
 point removes.
 
@@ -69,9 +70,9 @@ be executed unattended, and that is the one thing a run must not leave ambiguous
 have made the two declarations differ only by whether a number happened to follow the keyword.
 
 **Which issues may be opted in stays a person's decision.** `auto-ok` is applied only by a person —
-`epicrun.md` → "After the epic — issues opted in with `auto-ok`" is that rule's single source — and a
-run that labelled its own inputs would be widening its own authorization, which is exactly the
-self-widening `split-assessment.md` refuses. The split is: **which ones carry the label, a person; in
+this file is that rule's single source, now that `backlogrun` owns the opted-in pool
+(joshuafolkken/kit#1965) — and a run that labelled its own inputs would be widening its own
+authorization, which is exactly the self-widening `split-assessment.md` refuses. The split is: **which ones carry the label, a person; in
 what order and how many at once, the run.** **What a run does move is the pool's contents**, and that
 is now stated rather than denied: an issue it files and bundles into an already opted-in epic is
 offered from the next ask onwards. The brake below is what bounds that, and it bounds a quantity
@@ -658,7 +659,7 @@ All of these are `epicrun.md`'s, and are reached here in the same order and for 
 | --- | --- |
 | `git switch main && git pull`, then `pnpm josh latest:scope`, then `pnpm josh lane:prune` — in the primary checkout, before the first lane opens | `epicrun.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, asked once at the first child and never in a lane | `epicrun.md` → "`josh latest` runs once per session, not once per child" |
-| `pnpm josh run:preflight <N>` before each child that is not in a lane | `epicrun.md` → "Preflight" |
+| `pnpm josh run:hold <N>`'s preflight check, before each child that is not in a lane | `epicrun.md` → "Preflight" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `epicrun.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup-reference.md` → "When `pnpm josh release` runs" |
 

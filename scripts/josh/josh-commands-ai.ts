@@ -37,11 +37,6 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: "List an epic's runnable children, bundled per repository",
 		category: 'AI tools',
 	},
-	'epic:plan': {
-		script: 'scripts/epic/epic-plan-cli.ts',
-		description: 'Print every child of an epic as JSON, for one batch of decisions',
-		category: 'AI tools',
-	},
 	'epic:bundle': {
 		script: 'scripts/epic/epic-bundle-cli.ts',
 		description: 'Say whether a newly filed issue belongs with ones already in the backlog',
@@ -150,11 +145,6 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/run-cut-cli.ts',
 		description:
 			'Cut a lane child before the gate and resume a fresh process from the persisted state',
-		category: 'AI tools',
-	},
-	'run:preflight': {
-		script: 'scripts/run/run-preflight-cli.ts',
-		description: 'Say what an interrupted run left in this tree, and what to do about it',
 		category: 'AI tools',
 	},
 	'run:liveness': {

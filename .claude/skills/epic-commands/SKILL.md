@@ -1,14 +1,13 @@
 ---
 name: epic-commands
-description: The procedures for the `josh epic:*` commands that make an epic runnable without a person watching — `epic:plan` (front-load every decision into one batch), `epic:audit` (find contradictions across the children), `epic:next` (what is runnable, per repository), and `epic:bundle` (does a newly filed issue belong with one already in the backlog). Also how an epic spans repositories and why a cross-repository dependency waits for a publish. Read this before running any of those commands, before writing an epic that tracks a child in another repository, and right after filing an issue.
+description: The procedures for the `josh epic:*` commands that make an epic runnable without a person watching — `epic:audit` (find contradictions across the children), `epic:next` (what is runnable, per repository), and `epic:bundle` (does a newly filed issue belong with one already in the backlog). Also how an epic spans repositories and why a cross-repository dependency waits for a publish. Read this before running any of those commands, before writing an epic that tracks a child in another repository, and right after filing an issue.
 ---
 
 # The `josh epic:*` commands
 
-These four commands are what turn an epic from a list of issue numbers into something a run can
+These three commands are what turn an epic from a list of issue numbers into something a run can
 execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
-skill is the operational procedure, and the two must agree. **`epic:plan`'s body is single-sourced
-here.**
+skill is the operational procedure, and the two must agree.
 
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` — live in the
 `workflow-commands` skill.
@@ -16,59 +15,36 @@ The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `queue`, `
 ## The order they run in
 
 ```
-epic:plan  phase 0 → epic:audit, and fix what it finds (Tier A)
-           phase 1 → read the plan, triage every decision: auto / ask / defer
-           phase 2 → put every `ask` as ONE question for the whole epic
-           phase 3 → epicrun, which calls epic:next each round
+epic:audit → find contradictions across the children, and fix what it finds (Tier A)
+epicrun    → which calls epic:next each round
 ```
 
-## `josh epic:plan <E>` — one batch of decisions
+Front-loading every `needs-decision` in one pass is `backlogrun`'s job, not a command of this skill:
+`backlogrun.md` → "Resolve what the plan can resolve, before starting". A standalone `epicrun`'s
+pre-check is `epic:audit`.
 
-Prints every child's number, title, body, labels, `blockedBy` and state as one JSON document. The
-alias is `pnpm josh el <E>`.
+## Front-loading the decisions — now `backlogrun`'s
 
-Most of the stops an implementation makes could have been answered before it started. Arriving
-scattered is what forces a person to wait through the run; asking per child asks the same question
-several times; and the answers end up only in a conversation nobody can read back.
+`epic:plan` once printed every child as one JSON document so a person could answer every
+`needs-decision` in one batch before the run started. That front-loading is retired as a command of
+its own (joshuafolkken/kit#1965): **`backlogrun` does it at the start of every run**, and
+`backlogrun.md` → "Resolve what the plan can resolve, before starting" is its single source. A
+standalone `epicrun`'s only pre-check is `epic:audit` below, run without being asked.
 
-- **Phase 0 is not optional.** A batch decision made on a plan that contradicts itself has to be made
-  again once the contradiction surfaces. Run `pnpm josh epic:audit <E>` before phase 1 and let it
-  surface the four things a hand read misses — a dependency cycle, an ordering contradiction, an
-  implicit dependency, and a child no task list tracks. **Fix what it finds as Tier A, without asking,
-  and record the reasoning on the Issue**; only a contradiction that needs a person's judgement joins
-  phase 2's `ask`.
-- **Phase 0 is a step of the procedure, not a confirmation that may be skipped.** An epic whose
-  contradictions surface only once a person says "go find the bugs" has no unattended execution to
-  speak of — the run stalls at the first one, and nobody is watching. That is what phase 0 is for.
-- **Triage** — every decision the plan surfaces goes into one of three classes. **What separates the
-  first two is the margin, not the difficulty**: a class read off how hard a decision feels is what
-  sends an `auto` into phase 2 and doubles the question a person is asked.
+**A decision is still recorded in two places, and one without the other loses half of it.** The epic's
+`## Decisions` log carries the decision; a comment on each child it applies to carries the reasoning
+for that child's reader. **Recording a decision removes that child's `needs-decision` label** (Tier A);
+the label-clearing rule itself is `epicrun.md` → "park and continue".
 
-  | Class | What it is | What happens to it |
-  | --- | --- | --- |
-  | `auto` | Tier A — one option is clearly better on the merits | Decide it, and record it when the child is implemented |
-  | `ask` | Tier B/C — the top options are close, or the action is irreversible | Collect it for phase 2 |
-  | `defer` | Out of scope for this epic | File it as a follow-up Issue |
-- **Phase 2 is one question for the whole epic**, never one per child.
-- Record each answer in **both** the epic's `## Decisions` and a comment on each child it applies to.
-  One without the other leaves either the child's reader without the reasoning or the epic without
-  the decision.
-- **Which command writes them depends on whether the child is being inserted.** A decision taken *as* a
-  child joins the epic goes through `pnpm josh epic --add … --decision-file` — the `epic:bundle` section
-  below is that flag's single source. Phase 2's answers are about children the epic **already tracks**,
-  which that flag cannot serve: an insertion with nothing to add is refused outright. Until
-  joshuafolkken/kit#1162 adds an entry point for already-tracked children, write the child comments with
+- **A decision taken *as* a child joins the epic** goes through `pnpm josh epic --add … --decision-file`
+  — the `epic:bundle` section below is that flag's single source, and it writes both halves at once.
+- **A decision about a child the epic already tracks** cannot use that flag: an insertion with nothing
+  to add is refused outright. Until joshuafolkken/kit#1162 adds an entry point for already-tracked
+  children, write the child comments with
   `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` on each child the answer
-  applies to, and **say in the report that the epic's
-  `## Decisions` entry is still pending** — the entry going unwritten is exactly how two of the four most
-  recent placements in joshuafolkken/kit#1262 ended up with a child comment and nothing on the epic.
-  **Do not carry it on the next unrelated `--add --decision-file`**: that call posts the record as a
-  comment on the child it is *inserting*, so a decision about `#A` and `#B` would arrive on `#C`, which
-  has nothing to do with it — and `#A` and `#B` would still get nothing from that call.
-- **Recording a decision removes that child's `needs-decision` label** (Tier A). Without it the child
-  stays parked after the answer arrived. The label-clearing rule itself is defined by
-  `epicrun.md` → "park and continue"; what this section adds is the
-  moment it fires — the answer being written down.
+  applies to, and **say in the report that the epic's `## Decisions` entry is still pending** — the
+  entry going unwritten is how two of the four most recent placements in joshuafolkken/kit#1262 ended
+  up with a child comment and nothing on the epic.
 
 ```md
 ## Decisions
@@ -82,16 +58,13 @@ several times; and the answers end up only in a conversation nobody can read bac
 - 決定日: <YYYY-MM-DD>
 ```
 
-An epic whose task list tracks nothing is an empty plan, not a failure. An epic whose *body could not
-be read* is a failure — an empty plan there is indistinguishable from a finished one.
-
 ## `josh epic:audit <E>` — contradictions across the children
 
 `epic:check` verifies one epic's *format*. Nothing verified that the children agree, and a hand audit
 of a real epic found two contradictions that would have stalled the implementation while
 `epic:check` reported every requirement as passing.
 
-Run it **without being asked**: at the start of an `epicrun`, as `epic:plan`'s phase 0, and right
+Run it **without being asked**: at the start of an `epicrun`, and right
 after a child is added or a dependency changed.
 
 The cycle and declaration-mismatch checks are `epic:next`'s, reused rather than re-derived. What this
@@ -474,8 +447,8 @@ skipped. Two constraints on the record's own text, both refused before anything 
   `--decision-file` with no usable path — otherwise the insertion lands, no record is written anywhere,
   and the command still exits 0.
 
-`epic:plan` phase 2's answers are about children the epic already tracks and cannot use this flag; that
-section says what to do instead.
+Answers about children the epic already tracks cannot use this flag; the "Front-loading the
+decisions" section above says what to do instead.
 
 **Its sibling runs before the filing, not after it: `pnpm josh issue:scout "<title>"`.** That command
 answers the same epic question for an issue that does not exist yet — this decision, called rather

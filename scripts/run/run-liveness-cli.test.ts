@@ -11,8 +11,8 @@ import {
 } from './run-liveness'
 import { run_liveness_cli } from './run-liveness-cli'
 
-// The module is spied rather than mocked, for the reason `run-preflight-cli.test.ts` records: a
-// module mock would blank out the constants the argument parsing reads.
+// The module is spied rather than mocked: a module mock would blank out the constants the argument
+// parsing reads.
 
 const OUTPUT_FLAG = '--output'
 const PROCESS_FLAG = '--process'

@@ -112,7 +112,7 @@ describe('epic_next_read.read_snapshots', () => {
 		expect(result.notices).toHaveLength(1)
 	})
 
-	// The whole point of skipping rather than refusing: an `epic:plan` epic whose task list is not
+	// The whole point of skipping rather than refusing: an epic whose task list is not
 	// filled in yet must not stop the other named epic's children being offered.
 	it('skips a childless epic rather than refusing the walk', async () => {
 		fetch_returning({ [SECOND_EPIC]: snapshot([child(FIRST_CHILD)]) })

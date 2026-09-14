@@ -39,6 +39,12 @@ words:
   # What `josh review:attest` calls a review that read a checkout other than the one it was briefed
   # on (joshuafolkken/kit#1522). cspell derives "targeted" but not the "mis-" compound.
   - mistargeted
+  # To price something wrongly. `cost-dollar-composition.ts` uses it to say why one blended rate over
+  # models of different prices would misprice both — cspell derives "price" but not the "mis-" compound.
+  - misprice
+  # The things that depend on a given one — British spelling of "dependents". `epic-next-views.ts` uses
+  # it for the issues a blocked or parked issue holds up for a person to resolve.
+  - dependants
   # `git rev-parse --show-toplevel`, quoted in `docs/josh-commands.md` as the source of the checkout
   # root the review brief prints. git's own spelling of the flag.
   - toplevel

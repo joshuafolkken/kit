@@ -51,15 +51,15 @@ One question decides each step, and it is asked of the step rather than judged: 
 merge result?**
 
 - **It does — the step stays after `followup`.** `pnpm josh ms`, `pnpm josh issue:state <N>`,
-  `pnpm josh epic:next`, `pnpm josh auto-ok:next --exclude <N>`, and `pnpm josh lane:close` /
+  `pnpm josh epic:next`, `pnpm josh backlog:next --exclude <N>`, and `pnpm josh lane:close` /
   `pnpm josh lane:list`. Each is a verifier or is keyed to a merge that has to have happened, and
   bringing one forward would have it read a state nobody has reached yet. **De-duplicating a step is
   not removing it**: the parent reads the child's state from GitHub *because* a summary is not a
   verifier ("Each child runs in a delegated unit"), so none of these may be dropped or answered from
   memory.
 - **It does not — the step is composed in the turn that issues `followup`.** The epic progress
-  comment's counter *values* (children run, Issues filed, consecutive failures, `auto-ok` pickups,
-  the run's start time) are all counted inside the run, and the completion report body is already
+  comment's counter *values* (children run, Issues filed, consecutive failures, the run's start time)
+  are all counted inside the run, and the completion report body is already
   placed beside `pnpm josh git -y` in the table below. **Only the write follows the merge.** The
   comment exists because a compaction takes the counters at a moment nobody chooses (`epicrun.md` →
   "The counters live in the conversation"), so composing the values earlier moves no write and loses

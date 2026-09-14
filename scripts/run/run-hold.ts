@@ -66,6 +66,17 @@ async function worktree_directory(): Promise<string | undefined> {
 	return directories[0]
 }
 
+// A linked work tree — a lane — reports its own git directory as the first path and the common
+// directory every work tree of the repository shares as the second; the primary checkout reports one
+// path for both. Comparing the two detects a lane without assuming the git directory is named `.git`:
+// a `--separate-git-dir` clone or a bare repository defeats any `.git`-segment match
+// (joshuafolkken/kit#1106).
+async function is_linked_worktree(): Promise<boolean> {
+	const directories = await git_command.git_directories()
+
+	return directories[0] !== undefined && directories[0] !== directories[1]
+}
+
 const run_hold_schema = z.object({
 	issue: z.string(),
 	taken_at: z.string(),
@@ -233,6 +244,7 @@ const run_hold = {
 	forced_release_message,
 	held_message,
 	hold_path,
+	is_linked_worktree,
 	is_own_hold,
 	is_tree_dirty,
 	own_release_command,

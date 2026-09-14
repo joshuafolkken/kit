@@ -18,7 +18,7 @@ import {
 // `josh run:liveness <N> --output <path> --process <alive|none>` — one verdict about the delegated
 // unit running child `<N>` (joshuafolkken/kit#1485).
 //
-// The stdout/stderr split is the contract, as it is for `run:hold` and `run:preflight`: exactly one
+// The stdout/stderr split is the contract, as it is for `run:hold`: exactly one
 // verdict token on stdout on every path, the reason and the advice on stderr. `undetermined` exits
 // non-zero, because a caller that read nothing must not proceed as though it had.
 

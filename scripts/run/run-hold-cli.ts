@@ -1,9 +1,18 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
+import { run_preflight, type PreflightDecision } from './run-preflight'
 
 // `josh run:hold [<N>]` and `josh run:release [<N> | --force]` — the working-tree guard the typed
 // entry points ask before they start (joshuafolkken/kit#1091).
+//
+// **A numbered claim asks the preflight question first** (joshuafolkken/kit#1965). `run:preflight`
+// was a separate command a run had to ask before this one; the two-step "preflight, then hold" was
+// one call too many, so the claim now runs the check itself and hands back a hold only on a `clean`
+// tree. A `reclaim` / `resume` / `park` tree is returned as that verdict without a record being
+// written, and the read-only check stays re-askable — clean up what it named, ask `run:hold` again.
+// The decision logic itself lives on in `run-preflight.ts` for `run:progress` to reuse; only its CLI
+// went away.
 //
 // **A release names the run it belongs to, exactly as the claim did** (joshuafolkken/kit#1799). The
 // record carries no owner until then, so `run:release` removed whatever was there — and the `busy`
@@ -138,7 +147,35 @@ function replace_stale(target: string, issue: string, hold: RunHold): number {
 	return take_free_tree(target, issue)
 }
 
-async function claim(target: string, issue: string): Promise<number> {
+// A non-clean preflight verdict is not an error: it is an answer a loop branches on, exactly as
+// `busy` is, so it prints the reason and advice the check composed and exits zero. Only an unreadable
+// tree is `unknown`, and that reaches `report_unknown` through `run`'s catch, as it always did.
+function report_preflight(decision: PreflightDecision): number {
+	console.error(`${decision.reason}\n${decision.advice}`)
+	console.info(decision.verdict)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// **The tree is checked before it is claimed.** A numbered claim carries a child whose branch and
+// pull request the check reads; a non-`clean` verdict stops the claim and is returned as-is, so no
+// record is written over work a run left behind. Two claims skip it: the unnumbered `new` claim has
+// no child to preflight, and a lane claim is covered by `lane:open` instead.
+async function preflight_gate(issue: string, is_linked: boolean): Promise<number | undefined> {
+	if (is_linked || issue === run_hold.UNNUMBERED_ISSUE) return undefined
+
+	const decision = await run_preflight.check(issue)
+
+	if (decision.verdict === run_preflight.CLEAN_VERDICT) return undefined
+
+	return report_preflight(decision)
+}
+
+async function claim(target: string, issue: string, is_linked: boolean): Promise<number> {
+	const gate = await preflight_gate(issue, is_linked)
+
+	if (gate !== undefined) return gate
+
 	const read = run_hold.read_hold(target)
 	const blocked = await blocking_message(read)
 
@@ -216,8 +253,8 @@ async function read_worktree(): Promise<string | undefined> {
 	}
 }
 
-async function dispatch(request: HoldRequest, target: string): Promise<number> {
-	if (request.kind === 'claim') return await claim(target, request.issue)
+async function dispatch(request: HoldRequest, target: string, is_linked: boolean): Promise<number> {
+	if (request.kind === 'claim') return await claim(target, request.issue, is_linked)
 
 	if (request.kind === FORCE_RELEASE_KIND) return force_release(target)
 
@@ -229,7 +266,9 @@ async function answer(request: HoldRequest): Promise<number> {
 
 	if (directory === undefined) return report_unknown()
 
-	return await dispatch(request, run_hold.hold_path(directory))
+	const is_linked = await run_hold.is_linked_worktree()
+
+	return await dispatch(request, run_hold.hold_path(directory), is_linked)
 }
 
 // **Every path out of here prints exactly one token**, including the ones nobody planned: a permission

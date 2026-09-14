@@ -5,13 +5,27 @@ import { git_command } from '#scripts/git/git-command'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
+import { run_preflight } from './run-preflight'
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
 }))
 
+// The claim now runs the preflight check before it takes the tree (joshuafolkken/kit#1965), so the
+// check is mocked here and defaulted to `clean`; the suite below drives the other verdicts.
+vi.mock('./run-preflight', () => ({
+	run_preflight: { CLEAN_VERDICT: 'clean', check: vi.fn() },
+}))
+
 const git_directories = vi.mocked(git_command.git_directories)
 const git_status = vi.mocked(git_command.status)
+const preflight_check = vi.mocked(run_preflight.check)
+const CLEAN_DECISION = { advice: '', reason: '', verdict: 'clean' } as const
+const RECLAIM_DECISION = {
+	advice: 'Stash with -u, switch back, then ask again',
+	reason: 'Uncommitted changes are still in the tree',
+	verdict: 'reclaim',
+} as const
 const CLEAN_TREE = ''
 const DIRTY_TREE = ' M scripts/run/run-hold.ts'
 
@@ -20,6 +34,8 @@ const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
 const WORKTREE = path.join(scratch, '.git')
 const OTHER_WORKTREE = path.join(scratch, '.git', 'worktrees', 'second')
 const COMMON = path.join(scratch, '.git')
+const SEPARATE_COMMON = path.join(scratch, 'custom-git-dir')
+const SEPARATE_WORKTREE = path.join(SEPARATE_COMMON, 'worktrees', 'lane')
 const ISSUE = '1091'
 const OTHER_ISSUE = '1090'
 const NOT_A_NUMBER = 'not-a-number'
@@ -44,6 +60,7 @@ beforeEach(() => {
 	})
 	git_directories.mockResolvedValue([WORKTREE, COMMON])
 	git_status.mockResolvedValue(CLEAN_TREE)
+	preflight_check.mockResolvedValue(CLEAN_DECISION)
 })
 
 afterEach(() => {
@@ -95,6 +112,67 @@ describe('claiming a free work tree', () => {
 		const read = run_hold.read_hold(run_hold.hold_path(WORKTREE))
 
 		expect(read.kind === 'held' ? read.hold.issue : undefined).toBe(run_hold.UNNUMBERED_ISSUE)
+	})
+})
+
+// joshuafolkken/kit#1965: `run:preflight` folded into the claim, so a numbered claim reads what an
+// interrupted run left before it takes the tree, and takes it only on a clean one.
+describe('the preflight check before a claim', () => {
+	it('returns a non-clean preflight verdict without claiming', async () => {
+		preflight_check.mockResolvedValue(RECLAIM_DECISION)
+
+		expect(await run_hold_cli.run([ISSUE])).toBe(SUCCESS_EXIT_CODE)
+		expect(out).toEqual([RECLAIM_DECISION.verdict])
+		expect(run_hold.read_hold(run_hold.hold_path(WORKTREE)).kind).toBe('free')
+	})
+
+	it('prints the reason and advice the check composed on standard error', async () => {
+		preflight_check.mockResolvedValue(RECLAIM_DECISION)
+
+		await run_hold_cli.run([ISSUE])
+
+		expect(errors.join('\n')).toContain(RECLAIM_DECISION.reason)
+		expect(errors.join('\n')).toContain(RECLAIM_DECISION.advice)
+	})
+
+	it('claims and answers hold only when the check reads clean', async () => {
+		expect(await run_hold_cli.run([ISSUE])).toBe(SUCCESS_EXIT_CODE)
+		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
+		expect(preflight_check).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('does not run the check for an unnumbered claim', async () => {
+		await run_hold_cli.run([])
+
+		expect(preflight_check).not.toHaveBeenCalled()
+		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
+	})
+})
+
+// A lane is a linked work tree whose HEAD is on `<N>-lane`, so the preflight `reclaim` arm would fire
+// on every one; `lane:open`'s own answer covers an interrupted lane instead. A lane is detected by its
+// git directory differing from the common one, not by a `.git` segment.
+describe('a lane skips the preflight check', () => {
+	beforeEach(() => {
+		preflight_check.mockResolvedValue(RECLAIM_DECISION)
+	})
+
+	it('claims directly in a lane under a .git directory', async () => {
+		git_directories.mockResolvedValue([OTHER_WORKTREE, COMMON])
+
+		expect(await run_hold_cli.run([ISSUE])).toBe(SUCCESS_EXIT_CODE)
+		expect(preflight_check).not.toHaveBeenCalled()
+		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
+	})
+
+	// A `--separate-git-dir` clone or a bare repository (joshuafolkken/kit#1106) has a git directory
+	// not named `.git`; comparing it to the common directory still detects the lane.
+	it('claims directly in a lane whose git directory is not named .git', async () => {
+		git_directories.mockResolvedValue([SEPARATE_WORKTREE, SEPARATE_COMMON])
+
+		expect(await run_hold_cli.run([ISSUE])).toBe(SUCCESS_EXIT_CODE)
+		expect(preflight_check).not.toHaveBeenCalled()
+		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
 	})
 })
 

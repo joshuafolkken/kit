@@ -320,7 +320,7 @@ function is_unreachable_read(failure: IssueReadFailure): boolean {
 	return failure.kind === 'unreadable' && failure.reason === 'unreachable'
 }
 
-// Everything `epic:plan` puts in front of the batch decision. Read separately from the poll above
+// Everything the batch decision reads in front of it. Read separately from the poll above
 // because it carries the bodies, which a `wait` poll never looks at.
 //
 // `epic:bundle` reads a referenced issue through the same call rather than adding a helper for its
