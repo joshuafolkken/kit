@@ -1,9 +1,9 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import type { CiFacts } from './time-ci'
-import { time_format } from './time-format'
 import { time_lead, type Cover } from './time-lead'
 import { time_overlap, type Interval } from './time-overlap'
 import { time_phases } from './time-phases'
-import { time_spans, type Span } from './time-spans'
 
 // Whether each CI cycle was hidden behind other work or ran naked (joshuafolkken/kit#1465).
 //

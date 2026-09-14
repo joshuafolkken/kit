@@ -1,5 +1,5 @@
-import { time_format } from './time-format'
-import { time_spans } from './time-spans'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans } from '#scripts/time-runtime/time-spans'
 
 // The three transcript shares and the CI row — the block printed under `Where the wall clock went:`.
 //

@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost/cost-transcript'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type { GhReader } from './time-github'
 import type { TimeReport } from './time-report'

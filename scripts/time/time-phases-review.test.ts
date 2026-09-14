@@ -1,5 +1,5 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
 import { describe, expect, it } from 'vitest'
-import { time_markers } from './time-markers'
 import { time_overlap } from './time-overlap'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_phases } from './time-phases'

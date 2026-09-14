@@ -1,5 +1,5 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { time_checks, type CheckTotal } from './time-checks'
-import { time_format } from './time-format'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import type { LabelTotal, RowTotal, ToolTotal } from './time-report'
 

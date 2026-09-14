@@ -1,8 +1,8 @@
 import type { CarryRead, RunCarry } from '#scripts/run/run-carry'
 import type { RunWake } from '#scripts/run/run-wake'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_run_state, type RunStateInput, type WhiffSession } from './time-run-state'
-import { time_spans, type Span } from './time-spans'
 import { time_transcript_fixture } from './time-transcript-fixture'
 
 const { span } = time_transcript_fixture

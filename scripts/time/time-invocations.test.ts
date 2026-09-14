@@ -1,8 +1,8 @@
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_invocations, type InvocationTotal } from './time-invocations'
-import { time_shell } from './time-shell'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 // What each call of a repeated command cost (joshuafolkken/kit#1311).
 //

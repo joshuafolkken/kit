@@ -1,5 +1,9 @@
-import { cost_format } from './cost-format'
-import { cost_pricing, type CostComposition, type ModelCost } from './cost-pricing'
+import { cost_format } from '#scripts/cost-runtime/cost-format'
+import {
+	cost_pricing,
+	type CostComposition,
+	type ModelCost,
+} from '#scripts/cost-runtime/cost-pricing'
 
 // A run's dollars split by what they were spent on — fresh input, the two cache-write TTLs, cache
 // reads, and output (joshuafolkken/kit#1912). `josh cost` already prints the *tokens* under each of

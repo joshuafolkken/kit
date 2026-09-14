@@ -1,5 +1,5 @@
 import { json_value } from '#scripts/json-value'
-import { time_instant } from '#scripts/time/time-instant'
+import { time_instant } from '#scripts/time-runtime/time-instant'
 import { z } from 'zod'
 
 // Reading Claude Code's own session transcripts for what a run actually cost

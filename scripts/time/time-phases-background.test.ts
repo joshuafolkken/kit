@@ -1,8 +1,8 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_markers } from './time-markers'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_phases } from './time-phases'
-import type { Span } from './time-spans'
 
 // What a phase counts once a command has been taken into the background (joshuafolkken/kit#1662).
 //

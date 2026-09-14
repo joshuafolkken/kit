@@ -1,7 +1,7 @@
+import { time_span_fixture } from '#scripts/time/time-span-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_agent_bundles } from './time-agent-bundles'
 import { time_bundles } from './time-bundles'
-import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span } from './time-spans'
 
 const MODEL = time_span_fixture.span(time_spans.MODEL_CATEGORY)

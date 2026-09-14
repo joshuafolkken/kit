@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost/cost-transcript'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'

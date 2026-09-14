@@ -1,7 +1,7 @@
+import type { UsageRecord, UsageTotals } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
 import type { RunNode, RunRole } from './cost-run-nodes'
 import { cost_run_roles } from './cost-run-roles'
-import type { UsageRecord, UsageTotals } from './cost-usage'
 
 const EMPTY: UsageTotals = {
 	input_tokens: 0,

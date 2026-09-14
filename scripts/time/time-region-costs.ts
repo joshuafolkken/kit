@@ -1,4 +1,4 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
 
 // The attribution, arithmetic and row layout two cost blocks share (joshuafolkken/kit#1872).
 //

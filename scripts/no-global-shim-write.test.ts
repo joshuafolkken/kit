@@ -41,7 +41,7 @@ const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = [...SHARED_PATH_MARKERS,
 // It only reads the directory listing and never puts a byte on disk, which is the price of the
 // exemption (joshuafolkken/kit#1930).
 const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
-	path.join('cost', 'cost-transcript.ts'),
+	path.join('cost-runtime', 'cost-transcript.ts'),
 	path.join('run', 'run-liveness.ts'),
 	path.join('init', 'plugin-install-hint.ts'),
 ]

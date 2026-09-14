@@ -1,11 +1,11 @@
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
-import { time_background, type BackgroundRun } from './time-background'
-import { time_command_key } from './time-command-key'
-import { time_format } from './time-format'
+import { time_background, type BackgroundRun } from '#scripts/time-runtime/time-background'
+import { time_command_key } from '#scripts/time-runtime/time-command-key'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_spans, type Span, type SpanOutcome } from '#scripts/time-runtime/time-spans'
 import { time_overlap, type Interval } from './time-overlap'
-import { time_round_trips } from './time-round-trips'
-import { time_shell } from './time-shell'
-import { time_spans, type Span, type SpanOutcome } from './time-spans'
 
 // How many times a run started the verification gate, and how many of those the procedure accounts
 // for (joshuafolkken/kit#1786).

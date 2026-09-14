@@ -1,9 +1,9 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_markers } from './time-markers'
 import { time_phase_costs, type PhaseCostFacts, type PricedRequest } from './time-phase-costs'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_phases } from './time-phases'
-import type { Span } from './time-spans'
 
 // joshuafolkken/kit#1606: `josh time` knew the phases and `josh cost` knew the money, and no reading
 // put the two together — so a proposal could be ranked in minutes and never in dollars.

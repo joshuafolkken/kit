@@ -1,10 +1,10 @@
-import { cost_usage } from '#scripts/cost/cost-usage'
+import { cost_usage } from '#scripts/cost-runtime/cost-usage'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_contributor_costs, type ContributorCostFacts } from './time-contributor-costs'
 import { time_parent_turns } from './time-parent-turns'
 import { time_region_costs, type PricedRequest } from './time-region-costs'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 // joshuafolkken/kit#1872: what a run's turns cost, keyed by what they were for — with the billed
 // turns that issued no tool counted on their own. The purpose of a trip is the count block's own

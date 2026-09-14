@@ -1,4 +1,4 @@
-import { time_transcript_line } from '#scripts/time/time-transcript-line'
+import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { rule_value, type RuleReading } from './rule-value'
 
 // The transcript shapes `rule_value.measure` reads, built once for every suite that scores a rule

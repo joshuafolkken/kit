@@ -474,7 +474,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: the answer is written with `console.info`, and on
 // macOS a write to a pipe is asynchronous — `process.exit()` can tear the process down before it has
 // drained, and this command's whole contract is `answer=$(pnpm josh auto-ok:next)`. The same shape
-// is already in `scripts/cost/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#996).
+// is already in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#996).
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

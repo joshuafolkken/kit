@@ -7,7 +7,7 @@ import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
 import { execa } from 'execa'
 import { z } from 'zod'
 import { ESLINT_EDIT_CACHE_FLAGS } from './josh/josh-command-types'
-import { time_density_hook } from './time/time-density-hook'
+import { time_density_hook } from './time-runtime/time-density-hook'
 
 // Claude Code hands a `PostToolUse` hook the tool call as JSON on stdin; for `Edit` and `Write` the
 // edited path is `tool_input.file_path`. Everything else in the payload is ignored, and a payload

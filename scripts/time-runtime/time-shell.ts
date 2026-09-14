@@ -1,4 +1,4 @@
-import { cost_blocks } from '#scripts/cost/cost-blocks'
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { canonical_command } from '#scripts/josh/josh-command-map'
 import { json_value } from '#scripts/json-value'
 

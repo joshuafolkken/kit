@@ -1,11 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { time_density } from './time-density'
 import { time_density_hook } from './time-density-hook'
 import { time_hook_transcript } from './time-hook-transcript'
-import { time_transcript_fixture } from './time-transcript-fixture'
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'density-hook-'))
 const ENOUGH_TURNS = time_transcript_fixture.DENSITY_TURNS

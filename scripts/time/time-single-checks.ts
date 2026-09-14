@@ -1,9 +1,9 @@
-import type { TripPrice } from './time-bundles'
-import { time_format } from './time-format'
+import type { TripPrice } from '#scripts/time-runtime/time-bundles'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_single_check } from '#scripts/time-runtime/time-single-check'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { time_phases, type PhaseName } from './time-phases'
 import { time_placed, type Placed } from './time-placed'
-import { time_single_check } from './time-single-check'
-import { time_spans, type Span } from './time-spans'
 
 // How much of a run was spent re-verifying file by file between edits, when the gate re-ran the same
 // four checks minutes later (joshuafolkken/kit#1383).

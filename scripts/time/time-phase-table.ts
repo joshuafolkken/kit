@@ -1,4 +1,4 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
 import type { PhaseTotal } from './time-phases'
 
 // The phase breakdown's own rendering, and the one line that says what the table does not show

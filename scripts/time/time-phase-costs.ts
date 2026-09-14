@@ -1,5 +1,7 @@
-import { time_format } from './time-format'
-import type { PhaseName } from './time-phase-names'
+import { time_format } from '#scripts/time-runtime/time-format'
+import type { PhaseName } from '#scripts/time-runtime/time-phase-names'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_phases } from './time-phases'
 import {
 	time_region_costs,
@@ -7,8 +9,6 @@ import {
 	type LabeledRegion,
 	type PricedRequest,
 } from './time-region-costs'
-import { time_round_trips } from './time-round-trips'
-import type { Span } from './time-spans'
 
 // What each stage of a run cost, and what one round trip cost (joshuafolkken/kit#1606).
 //

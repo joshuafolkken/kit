@@ -1,8 +1,8 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_markers } from './time-markers'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_segments, type Segment } from './time-segments'
-import { time_spans, type Span } from './time-spans'
 
 // The run read as timed segments (joshuafolkken/kit#1311).
 //

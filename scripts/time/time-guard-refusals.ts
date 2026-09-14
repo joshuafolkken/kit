@@ -1,13 +1,13 @@
-import { time_call_identity } from './time-call-identity'
-import { time_format } from './time-format'
+import { time_call_identity } from '#scripts/time-runtime/time-call-identity'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import {
 	time_region_costs,
 	type Bucket,
 	type LabeledRegion,
 	type PricedRequest,
 } from './time-region-costs'
-import { time_round_trips } from './time-round-trips'
-import { time_spans, type Span } from './time-spans'
 
 // Which guard refused how often, what re-issuing cost, and how many of those refusals the run
 // answered by re-issuing the very same call (joshuafolkken/kit#1913).

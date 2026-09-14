@@ -1,5 +1,5 @@
-import { time_round_trips } from './time-round-trips'
-import type { Span } from './time-spans'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import type { Span } from '#scripts/time-runtime/time-spans'
 
 // Which tool a run's round trips actually belong to (joshuafolkken/kit#1385).
 //

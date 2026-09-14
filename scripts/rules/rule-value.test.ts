@@ -1,6 +1,6 @@
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
-import { time_batch_guard } from '#scripts/time/time-batch-guard'
-import { time_transcript_line } from '#scripts/time/time-transcript-line'
+import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
+import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'

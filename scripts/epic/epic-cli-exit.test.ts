@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#1005: every one of these commands writes its answer with a single `console.info`
 // and is read as `answer=$(pnpm josh …)`. On macOS a write to a pipe is asynchronous, so
-// `process.exit()` can tear the process down before it drains — `scripts/cost/cost-cli.ts` met that
+// `process.exit()` can tear the process down before it drains — `scripts/cost-runtime/cost-cli.ts` met that
 // first and switched to `process.exitCode`.
 //
 // Asserted against the source because the defect has no observable behavior in a unit test: a

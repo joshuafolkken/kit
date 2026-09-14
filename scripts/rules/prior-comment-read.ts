@@ -1,7 +1,7 @@
-import { cost_blocks } from '#scripts/cost/cost-blocks'
-import type { GuardedCall } from '#scripts/time/time-batch-guard'
-import { time_shell } from '#scripts/time/time-shell'
-import { time_transcript_line, type Block } from '#scripts/time/time-transcript-line'
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
 
 // The stand-down that keeps the `issue-comments` rule from refusing a body read the run has already
 // earned (joshuafolkken/kit#1905). The rule exists so a run reads an Issue's comments before building

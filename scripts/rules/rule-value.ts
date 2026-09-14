@@ -1,5 +1,8 @@
-import { cost_blocks } from '#scripts/cost/cost-blocks'
-import { time_transcript_line, type TranscriptLine } from '#scripts/time/time-transcript-line'
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import {
+	time_transcript_line,
+	type TranscriptLine,
+} from '#scripts/time-runtime/time-transcript-line'
 import { delivered_rules, type MeasuredRule } from './delivered-rules'
 
 // What a rule is worth on the channel that carries it when its delivery has not fired

@@ -2,8 +2,8 @@ import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { run_progress } from '#scripts/run/run-progress'
 import { run_progress_clock } from '#scripts/run/run-progress-clock'
 import { run_progress_config } from '#scripts/run/run-progress-config'
-import type { GuardedCall } from '#scripts/time/time-batch-guard'
-import { time_shell } from '#scripts/time/time-shell'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
 // The trigger and the decision behind the `early-heartbeat` row of `delivered-rules.ts`

@@ -1,6 +1,6 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import type { PullFile } from './time-pull-files'
-import { time_spans, type Span } from './time-spans'
 
 // The edits a run made that never reached its merged diff, and the size of the diff that did
 // (joshuafolkken/kit#1387).

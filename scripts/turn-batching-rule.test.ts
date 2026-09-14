@@ -1,4 +1,4 @@
-import { time_batch_guard } from '#scripts/time/time-batch-guard'
+import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { describe, expect, it } from 'vitest'
 import {
 	AI_DOCS,

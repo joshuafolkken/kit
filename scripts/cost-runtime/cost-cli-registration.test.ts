@@ -9,7 +9,7 @@ describe('josh cost registration', () => {
 	it('is registered as a josh command', () => {
 		const { cost } = COMMAND_MAP
 
-		expect(cost?.script).toBe('scripts/cost/cost-cli.ts')
+		expect(cost?.script).toBe('scripts/cost-runtime/cost-cli.ts')
 	})
 
 	it('has a short alias', () => {

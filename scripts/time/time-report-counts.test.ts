@@ -1,9 +1,9 @@
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_phases } from './time-phases'
 import { time_report_fixture } from './time-report-fixture'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 // How many turns a run had, and where the CI it waited on inside the merge command lands
 // (joshuafolkken/kit#1406) — the two figures a hand read of run #1399 disagreed with.

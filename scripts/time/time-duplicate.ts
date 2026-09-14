@@ -1,5 +1,5 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_overlap, type Interval } from './time-overlap'
-import type { Span } from './time-spans'
 
 // Which session a span that appears in more than one transcript is counted under
 // (joshuafolkken/kit#1287).

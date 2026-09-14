@@ -1,6 +1,6 @@
-import { cost_pricing, type ModelPrice } from './cost-pricing'
-import { cost_tokens } from './cost-tokens'
-import type { UsageTotals } from './cost-usage'
+import { cost_pricing, type ModelPrice } from '#scripts/cost-runtime/cost-pricing'
+import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
+import type { UsageTotals } from '#scripts/cost-runtime/cost-usage'
 
 // The reads of one entry-read document: the earliest one's carry, and every read as a point on the
 // run's timeline (joshuafolkken/kit#1913).

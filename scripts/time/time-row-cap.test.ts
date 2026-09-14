@@ -1,5 +1,5 @@
+import { time_bundles } from '#scripts/time-runtime/time-bundles'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
 import { time_cli } from './time-cli'
 import { time_cycles } from './time-cycles'

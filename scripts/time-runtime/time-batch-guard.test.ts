@@ -1,6 +1,6 @@
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_batch_guard } from './time-batch-guard'
-import { time_transcript_fixture } from './time-transcript-fixture'
 
 // The guard reads a transcript rather than a span list, because the run of single-call turns it asks
 // about is a shape only the raw lines carry: the turn in flight has issued no result yet, so it has no

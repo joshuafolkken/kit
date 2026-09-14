@@ -1,6 +1,6 @@
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_phases, type PhaseName } from './time-phases'
-import { time_round_trips } from './time-round-trips'
-import type { Span } from './time-spans'
 
 // A run's spans in time order with the phase each belongs to beside it (joshuafolkken/kit#1383).
 //

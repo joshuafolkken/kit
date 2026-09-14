@@ -1,4 +1,4 @@
-import type { Span } from './time-spans'
+import type { Span } from '#scripts/time-runtime/time-spans'
 
 // Expanding a chained call so every josh command it ran is counted (joshuafolkken/kit#1883).
 //

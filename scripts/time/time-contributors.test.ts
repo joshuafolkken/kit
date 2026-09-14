@@ -1,6 +1,6 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { describe, expect, it } from 'vitest'
 import { time_contributors } from './time-contributors'
-import { time_format } from './time-format'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 
 // The turn breakdown aggregated across runs (joshuafolkken/kit#1763).

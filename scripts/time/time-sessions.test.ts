@@ -1,8 +1,8 @@
+import { time_markers, type PhaseMarker } from '#scripts/time-runtime/time-markers'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import type { SessionSpans } from './time-duplicate'
-import { time_markers, type PhaseMarker } from './time-markers'
 import { time_sessions, type SessionSplit } from './time-sessions'
-import type { Span } from './time-spans'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 const { MINUTE_MS } = fixture

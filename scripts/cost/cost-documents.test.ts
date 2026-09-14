@@ -1,6 +1,6 @@
+import type { UsageRecord, UsageTotals } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
 import { cost_documents } from './cost-documents'
-import type { UsageRecord, UsageTotals } from './cost-usage'
 
 const EMPTY_TOTALS: UsageTotals = {
 	input_tokens: 0,
@@ -16,7 +16,7 @@ const MODEL = 'claude-opus-4-8'
 const SKILL = '/repo/.claude/skills/workflow-commands/SKILL.md'
 const REVIEW = '/repo/prompts/review.md'
 const ROOT = '/repo/CLAUDE.md'
-const SOURCE = '/repo/scripts/cost/cost-cli.ts'
+const SOURCE = '/repo/scripts/cost-runtime/cost-cli.ts'
 const OTHER_MD = '/repo/docs/guide.md'
 const SKILL_SHORT = '.claude/skills/workflow-commands/SKILL.md'
 const REVIEW_SHORT = 'prompts/review.md'

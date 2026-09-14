@@ -1,8 +1,8 @@
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_josh_commands } from './time-josh-commands'
 import { time_report_fixture } from './time-report-fixture'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 const { span, MINUTE_MS } = time_span_fixture
 const { build } = time_report_fixture

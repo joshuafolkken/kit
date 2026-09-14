@@ -1,11 +1,11 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import { time_report } from './time-report'
 import { time_report_fixture } from './time-report-fixture'
-import { time_shell } from './time-shell'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 // What a run's turns were spent on (joshuafolkken/kit#1715).
 //

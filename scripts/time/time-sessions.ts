@@ -1,7 +1,7 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import type { SessionSpans } from './time-duplicate'
-import { time_markers } from './time-markers'
 import { time_overlap } from './time-overlap'
-import type { Span } from './time-spans'
 
 // Which of the sessions attributed to an issue actually ran it (joshuafolkken/kit#1428).
 //

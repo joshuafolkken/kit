@@ -1,7 +1,7 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_contributors } from './time-contributors'
 import { time_distribution, type LabeledDistribution } from './time-distribution'
-import { time_format } from './time-format'
 import type { LastTimeReport } from './time-last'
 import { time_report } from './time-report'
 import { time_row_notes } from './time-row-notes'

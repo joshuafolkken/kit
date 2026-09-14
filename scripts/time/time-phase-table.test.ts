@@ -1,5 +1,5 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
 import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseName, type PhaseTotal } from './time-phases'
 import { time_report } from './time-report'

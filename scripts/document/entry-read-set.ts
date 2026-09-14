@@ -14,7 +14,7 @@
 
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { cost_tokens } from '#scripts/cost/cost-tokens'
+import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { document_section, type Section } from './document-section'
 

@@ -1,4 +1,4 @@
-import type { SessionFile } from '#scripts/cost/cost-transcript'
+import type { SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import type { RunWake } from '#scripts/run/run-wake'
 import { describe, expect, it } from 'vitest'
 import { time_run_state_collect } from './time-run-state-collect'

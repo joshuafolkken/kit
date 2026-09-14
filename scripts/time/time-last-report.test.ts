@@ -1,8 +1,8 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { describe, expect, it } from 'vitest'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_distribution } from './time-distribution'
 import { time_epic_fixture } from './time-epic-fixture'
-import { time_format } from './time-format'
 import type { LastTimeReport } from './time-last'
 import { time_last_report } from './time-last-report'
 

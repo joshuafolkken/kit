@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost/cost-transcript'
-import { time_markers } from './time-markers'
-import { time_spans, type Span } from './time-spans'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 // The transcript files the timing tests measure, written once rather than in each test file
 // (joshuafolkken/kit#1284).

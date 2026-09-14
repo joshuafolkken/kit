@@ -1,6 +1,6 @@
+import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
 import { cost_output_turns } from './cost-output-turns'
-import { cost_usage, type UsageRecord } from './cost-usage'
 
 function turn(output_tokens: number): UsageRecord {
 	return {

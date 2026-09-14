@@ -1,3 +1,4 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_by_session } from './time-by-session'
 import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
@@ -18,7 +19,6 @@ import { time_report, type TimeReport } from './time-report'
 import { time_request_costs, type RunCostReader, type RunCostReading } from './time-request-costs'
 import { time_rework, type DiffFacts, type DiffState } from './time-rework'
 import { time_session_notes } from './time-session-notes'
-import type { Span } from './time-spans'
 import { time_windows, type RunWindows, type TimeWindow } from './time-windows'
 
 // One `fullrun`, from the invocation to the merge (joshuafolkken/kit#1268).

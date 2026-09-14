@@ -1,7 +1,7 @@
+import { time_markers, type PhaseMarker } from '#scripts/time-runtime/time-markers'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_markers, type PhaseMarker } from './time-markers'
 import { time_overlap } from './time-overlap'
-import type { Span } from './time-spans'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 const { MINUTE_MS, span, total_span_ms: total_ms } = fixture

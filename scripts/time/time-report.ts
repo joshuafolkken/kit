@@ -1,4 +1,12 @@
-import { time_bundles, type BundleTotals } from './time-bundles'
+import { time_bundles, type BundleTotals } from '#scripts/time-runtime/time-bundles'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import {
+	time_spans,
+	type Span,
+	type SpanCategory,
+	type Timeline,
+} from '#scripts/time-runtime/time-spans'
 import { time_by_session, type SessionTime } from './time-by-session'
 import { time_category_table, type CategoryTotals } from './time-category-table'
 import type { CheckTotal } from './time-checks'
@@ -10,7 +18,6 @@ import type { DelegatedCostFacts } from './time-delegated-cost'
 import { time_delegated_wait, type DelegatedWaitTotals } from './time-delegated-wait'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_followup_stages, type FollowupStageTotals } from './time-followup-stages'
-import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_gate_runs, type GateRunTotals } from './time-gate-runs'
 import { time_guard_refusals, type GuardRefusalFacts } from './time-guard-refusals'
@@ -27,10 +34,8 @@ import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_ranked_tables } from './time-ranked-tables'
 import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
-import { time_round_trips } from './time-round-trips'
 import { time_segments, type Segment } from './time-segments'
 import { time_single_checks, type SingleCheckTotals } from './time-single-checks'
-import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
 import {
 	time_tool_turns,
 	type ToolTurnCounts,

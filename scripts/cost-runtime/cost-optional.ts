@@ -1,4 +1,4 @@
-import type { DocumentBreakdown } from './cost-documents'
+import type { DocumentBreakdown } from '#scripts/cost/cost-documents'
 
 // The absent-key builders for `exactOptionalPropertyTypes`: a flag that was not given contributes no
 // key at all rather than an `{ x: undefined }` the type rejects. Gathered in one module so `cost-cli`

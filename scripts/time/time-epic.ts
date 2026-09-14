@@ -1,9 +1,9 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
+import { time_instant } from '#scripts/time-runtime/time-instant'
+import { time_spans } from '#scripts/time-runtime/time-spans'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_github, type GhReader } from './time-github'
-import { time_instant } from './time-instant'
 import type { CategoryTotals } from './time-report'
-import { time_spans } from './time-spans'
 
 // A whole `epicrun`, child by child (joshuafolkken/kit#1271).
 //

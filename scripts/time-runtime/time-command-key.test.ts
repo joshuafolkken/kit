@@ -1,7 +1,7 @@
+import { time_span_fixture } from '#scripts/time/time-span-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_command_key } from './time-command-key'
 import { time_shell } from './time-shell'
-import { time_span_fixture } from './time-span-fixture'
 import { time_spans } from './time-spans'
 
 // What counts as *the same command* across a run's spans (joshuafolkken/kit#1311 for the rule,

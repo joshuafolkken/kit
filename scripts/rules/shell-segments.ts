@@ -1,4 +1,4 @@
-import { time_shell } from '#scripts/time/time-shell'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 
 // **A shell line carries several commands, and each has to be judged on its own.** Every trigger in
 // this directory that reads a command string needs the same cut, so the cut lives here rather than

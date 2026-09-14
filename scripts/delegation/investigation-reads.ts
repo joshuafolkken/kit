@@ -1,11 +1,11 @@
 import path from 'node:path'
-import { cost_blocks } from '#scripts/cost/cost-blocks'
-import { cost_transcript } from '#scripts/cost/cost-transcript'
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
-import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
-import { time_bundle_call } from '#scripts/time/time-bundle-call'
-import { time_shell } from '#scripts/time/time-shell'
-import { time_spans, type Span } from '#scripts/time/time-spans'
+import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { delegation_policy } from './delegation-policy'
 
 // How many files a run has read and not edited **since its last delegated unit**

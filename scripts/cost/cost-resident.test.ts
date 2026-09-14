@@ -1,9 +1,9 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cost_resident, type ResidentRow } from './cost-resident'
-import { cost_tokens } from './cost-tokens'
 
 const BASELINE_TOKENS = 50_000
 const CLAUDE_BODY = 'rule text\n'.repeat(200)

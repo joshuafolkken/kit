@@ -1,7 +1,7 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import type { RequestTokens } from './time-request-costs'
 import { time_session_signals } from './time-session-signals'
-import type { Span } from './time-spans'
 import { time_transcript_fixture } from './time-transcript-fixture'
 
 const { span } = time_transcript_fixture

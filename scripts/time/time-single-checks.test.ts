@@ -1,9 +1,9 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
-import { time_markers } from './time-markers'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_single_checks, type SingleCheckTotals } from './time-single-checks'
-import { time_spans, type Span } from './time-spans'
 
 // How much of a run went on re-verifying file by file between edits (joshuafolkken/kit#1383).
 //

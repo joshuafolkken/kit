@@ -1,6 +1,6 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_session_end_state } from './time-session-end-state'
-import type { Span } from './time-spans'
 import { time_transcript_fixture } from './time-transcript-fixture'
 
 const { span } = time_transcript_fixture

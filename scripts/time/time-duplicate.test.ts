@@ -1,6 +1,6 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_duplicate, type SessionSpans } from './time-duplicate'
-import type { Span } from './time-spans'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 const { span } = fixture

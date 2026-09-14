@@ -1,8 +1,8 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_markers } from './time-markers'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_phases } from './time-phases'
-import { time_spans, type Span } from './time-spans'
 
 // The timeline builder is `time-phase-fixture.ts`'s, shared with the region suites that joined this
 // module in joshuafolkken/kit#1299. The whole run below stays here, because it is a timeline of bare

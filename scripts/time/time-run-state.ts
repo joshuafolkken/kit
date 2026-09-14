@@ -1,6 +1,6 @@
 import type { CarryRead } from '#scripts/run/run-carry'
 import type { RunWake } from '#scripts/run/run-wake'
-import { time_spans, type Span } from './time-spans'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 // The state of the run this checkout is *carrying*, read from the `run:carry` and `run:wake` records
 // rather than from a merged pull request (joshuafolkken/kit#1939).

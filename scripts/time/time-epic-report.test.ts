@@ -1,6 +1,6 @@
+import { time_bundles } from '#scripts/time-runtime/time-bundles'
 import { describe, expect, it } from 'vitest'
 import { time_batch, type RunTiming } from './time-batch'
-import { time_bundles } from './time-bundles'
 import { time_cycles } from './time-cycles'
 import { time_delegated_wait } from './time-delegated-wait'
 import { time_epic, type EpicTimeReport } from './time-epic'

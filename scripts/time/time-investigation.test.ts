@@ -1,11 +1,11 @@
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
 import { time_investigation } from './time-investigation'
 import { time_phases } from './time-phases'
 import { time_report_fixture } from './time-report-fixture'
-import { time_spans } from './time-spans'
 import { time_transcript_fixture } from './time-transcript-fixture'
 
 // joshuafolkken/kit#1764: what the main line's reading was, decomposed.

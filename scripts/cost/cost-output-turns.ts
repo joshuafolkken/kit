@@ -1,5 +1,5 @@
-import { cost_format } from './cost-format'
-import type { UsageRecord } from './cost-usage'
+import { cost_format } from '#scripts/cost-runtime/cost-format'
+import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 
 // How a run's output tokens were distributed across its turns, and how much of that output came from
 // a handful of long ones (joshuafolkken/kit#1912). A run's cost is dominated by output — it is priced

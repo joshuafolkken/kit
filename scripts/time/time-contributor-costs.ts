@@ -1,4 +1,6 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_parent_turns } from './time-parent-turns'
 import {
 	time_region_costs,
@@ -6,8 +8,6 @@ import {
 	type LabeledRegion,
 	type PricedRequest,
 } from './time-region-costs'
-import { time_round_trips } from './time-round-trips'
-import type { Span } from './time-spans'
 
 // What a run's turns cost, grouped by what they were for (joshuafolkken/kit#1872).
 //

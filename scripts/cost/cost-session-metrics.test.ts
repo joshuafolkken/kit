@@ -1,6 +1,6 @@
+import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
 import { cost_session_metrics } from './cost-session-metrics'
-import { cost_usage, type UsageRecord } from './cost-usage'
 
 const OPUS = 'claude-opus-4-8'
 const SONNET = 'claude-sonnet-4-6'

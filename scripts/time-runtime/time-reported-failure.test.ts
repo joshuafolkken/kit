@@ -1,5 +1,5 @@
+import { time_failures } from '#scripts/time/time-failures'
 import { describe, expect, it } from 'vitest'
-import { time_failures } from './time-failures'
 import { time_reported_failure } from './time-reported-failure'
 import { time_spans } from './time-spans'
 

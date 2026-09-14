@@ -1,5 +1,5 @@
-import { cost_blocks, type ContentBlock } from './cost-blocks'
-import { cost_tokens } from './cost-tokens'
+import { cost_blocks, type ContentBlock } from '#scripts/cost-runtime/cost-blocks'
+import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 
 // What the conversation half of the context is made of (joshuafolkken/kit#1151).
 //

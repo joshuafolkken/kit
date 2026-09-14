@@ -1,5 +1,6 @@
+import { time_bundles } from '#scripts/time-runtime/time-bundles'
+import { time_spans } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_bundles } from './time-bundles'
 import { time_failures } from './time-failures'
 import { time_invocations } from './time-invocations'
 import { time_phases } from './time-phases'
@@ -7,7 +8,6 @@ import { time_report } from './time-report'
 import { time_report_fixture } from './time-report-fixture'
 import { time_segments } from './time-segments'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans } from './time-spans'
 
 const { MINUTE_MS, MIXED, PNPM_LABEL, RUN_SCOPE, SESSION_NOTE, build, line_of, run_report } =
 	time_report_fixture

@@ -1,4 +1,4 @@
-import { cost_transcript } from '#scripts/cost/cost-transcript'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { describe, expect, it, vi } from 'vitest'
 import { time_checks } from './time-checks'
 import { time_corpus } from './time-corpus'

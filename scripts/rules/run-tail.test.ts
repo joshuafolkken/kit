@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { time_batch_guard } from '#scripts/time/time-batch-guard'
+import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'

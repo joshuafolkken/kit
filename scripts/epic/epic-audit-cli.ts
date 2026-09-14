@@ -328,7 +328,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
 // a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
 // command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#1005).
+// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#1005).
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

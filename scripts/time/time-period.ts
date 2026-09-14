@@ -1,7 +1,7 @@
+import { time_instant } from '#scripts/time-runtime/time-instant'
 import { time_contributors } from './time-contributors'
 import type { LabeledDistribution } from './time-distribution'
 import { time_history, type RunTimeRecord } from './time-history'
-import { time_instant } from './time-instant'
 import { time_lanes, type Lane, type LaneRun, type SerialInterval } from './time-lanes'
 import type { Interval } from './time-overlap'
 

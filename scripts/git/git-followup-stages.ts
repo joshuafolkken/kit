@@ -1,4 +1,4 @@
-import { time_format } from '#scripts/time/time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
 
 // Where `pnpm josh followup` spends its own wall clock (joshuafolkken/kit#1349).
 //
