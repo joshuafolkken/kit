@@ -78,3 +78,12 @@ describe('cost_sessions.build — money and output', () => {
 		expect(sessions[1]?.output_turns.over_threshold_count).toBe(1)
 	})
 })
+
+describe('cost_sessions.build — the per-session metrics', () => {
+	it('carries the model and context distribution on each row', () => {
+		const [first] = cost_sessions.build(PAIRS)
+
+		expect(first?.metrics.primary_model).toBe(OPUS)
+		expect(first?.metrics.context.sample_count).toBe(2)
+	})
+})
