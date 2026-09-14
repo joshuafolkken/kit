@@ -53,11 +53,10 @@ words:
   # because `backlogrun.md` types that command and `josh sync` copies that skill.
   - PPID
   # The phase `josh time` reports for everything a run does once its pull request is open
-  # (joshuafolkken/kit#1299). Distributed, because the `diag` skill `josh sync` copies names it.
+  # (joshuafolkken/kit#1299). Distributed, because `docs/josh-commands.md` names it in the phase list.
   - wrapup
   # What `josh time`'s bundling block calls a call that could have gone out beside another
-  # (joshuafolkken/kit#1607). Distributed, because the `diag` skill reads that block and now explains
-  # why its per-tool breakdown always balances — only a bundleable call enters a sequence.
+  # (joshuafolkken/kit#1607). Distributed, because `docs/josh-commands.md` and `turn-batching.md` name it.
   - bundleable
   # What a re-runnable tree-state check is and `josh run:hold` is not (joshuafolkken/kit#926): a
   # question that may be put again once the tree it read has been reclaimed. Distributed, because
