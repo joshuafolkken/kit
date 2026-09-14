@@ -1,4 +1,5 @@
-import { josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
+import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { find_package_directory, josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
 
 const ARGV_OFFSET = 2
 
@@ -11,8 +12,8 @@ const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
 // (joshuafolkken/kit#1928). A bare `--all` in the command slot is a help request, not a command.
 const ALL_FLAG = '--all'
 
-function print_help(is_all: boolean): void {
-	console.info(josh_logic.format_help(is_all))
+function print_help(is_all: boolean, is_consumer: boolean): void {
+	console.info(josh_logic.format_help(is_all, is_consumer))
 }
 
 // Both halves go to stderr. The help listing is a diagnosis here, not the answer, and a shell
@@ -40,15 +41,16 @@ function record_exit_code(exit_code: number): void {
 async function main(): Promise<void> {
 	const cmd = process.argv[ARGV_OFFSET]
 	const is_all = process.argv.includes(ALL_FLAG)
+	const is_consumer = doctor_consumer.is_kit_consumer(find_package_directory(process.cwd()))
 
 	if (!cmd || cmd === ALL_FLAG || HELP_COMMANDS.has(cmd)) {
-		print_help(is_all)
+		print_help(is_all, is_consumer)
 
 		return
 	}
 
 	const subcommand_arguments = process.argv.slice(ARGV_OFFSET + 1)
-	const exit_code = await josh_logic.run_command(cmd, subcommand_arguments)
+	const exit_code = await josh_logic.run_command(cmd, subcommand_arguments, is_consumer)
 
 	if (exit_code === UNKNOWN_COMMAND_EXIT_CODE) handle_unknown(cmd)
 

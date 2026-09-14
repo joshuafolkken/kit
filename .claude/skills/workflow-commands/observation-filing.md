@@ -25,7 +25,7 @@ it — read off the subject rather than judged**:
 | --- | --- | --- |
 | **0** | What a consumer of this package touches | A `josh` command's behavior, a distributed document or config, the published package |
 | **1** | The run orchestration that executes an Issue | `fullrun` / `epicrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
-| **2** | What measures a run | `diag`, `josh time`, `josh eval`, `josh cost` |
+| **2** | What measures a run | `diag`, `josh time`, `josh cost` |
 
 **The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed**
 (joshuafolkken/kit#1729). `depth:0`, `depth:1` and `depth:2` are the three, defined once in

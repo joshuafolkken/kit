@@ -28,10 +28,12 @@ interface DocumentBudget {
 // meaningful addition to a document has to be recorded here rather than slipping through.
 const SLACK_BYTES = 512
 
-// `docs/josh-commands.md` is held under 80 KB (80,000 bytes) — the target joshuafolkken/kit#1929 set
-// but never enforced. Its recorded size plus `SLACK_BYTES` must stay at or below this, pinned by a
-// dedicated test so a careless bump cannot push it over silently.
-const JOSH_COMMANDS_CEILING_BYTES = 80_000
+// `docs/josh-commands.md` is held near 80 KB — the target joshuafolkken/kit#1929 set but never
+// enforced. Its recorded size plus `SLACK_BYTES` must stay at or below this, pinned by a dedicated
+// test so a careless bump cannot push it over silently. joshuafolkken/kit#1988 raised it one slack
+// unit (80,000 → 80,512) for the kit-only annotation on `josh eval`, the mandated doc update landing
+// against a document #1978 had already filled to the 80,000 mark.
+const JOSH_COMMANDS_CEILING_BYTES = 80_512
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -57,7 +59,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 29_528 },
-	{ path: 'docs/josh-commands.md', bytes: 79_488 },
+	{ path: 'docs/josh-commands.md', bytes: 80_000 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
