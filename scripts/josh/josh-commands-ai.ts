@@ -157,6 +157,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Report an unattended run’s progress once it has gone quiet for an interval',
 		category: 'AI tools',
 	},
+	'run:prep': {
+		script: 'scripts/run/run-prep-cli.ts',
+		description:
+			'Bundle the reads a run makes before its first edit: issue body and comments, state, dependency-update scope',
+		category: 'AI tools',
+	},
 	'lane:open': {
 		...LANE_ARGUMENTS,
 		description: 'Open a lane: a linked work tree with its own branch and its own port seed',

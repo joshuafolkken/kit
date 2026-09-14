@@ -1134,6 +1134,16 @@ pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 
 
 **Output / exit codes:** stdout is one token; stderr explains. `alive`, `stopped`, `settled` exit 0; `undetermined` exits 1. Growth in the transcript answers `alive` on its own. Two `undetermined` answers in a row is a check fault; the caller stops polling rather than escalating to `stopped`.
 
+### `josh run:prep`
+
+Bundle the reads a run makes before its first edit into one call ([#1978](https://github.com/joshuafolkken/kit/issues/1978)).
+
+```bash
+pnpm josh run:prep 1978                            # alias: josh rp
+```
+
+Gathers `issue:read`'s body and comments, `issue:state`'s state/labels/`human_review`, and `latest:scope`'s dependency scope into one report — each reused, three round trips into one. The leading line carries the facts a run branches on; a failed read exits non-zero.
+
 ### `josh run:progress`
 
 Report an unattended run's progress once it has gone quiet — the one josh command meant to be started and left running in the background.

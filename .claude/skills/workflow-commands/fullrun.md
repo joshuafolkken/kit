@@ -50,6 +50,13 @@ that disagree the later text is the agreement in force. `pnpm josh rule:guard` r
 read once per run. `SKILL.md` → §2g is the single source, including the two answers that stop the run
 rather than proceed.
 
+**One call gathers the mechanical reads before the first edit — `pnpm josh run:prep <N>`**
+(joshuafolkken/kit#1978): `issue:read`'s body/comments, `issue:state`'s state/labels/`human_review`,
+and `latest:scope`'s dependency scope in one report, run beside `pnpm josh run:hold` and
+`pnpm josh cost --over 300000` in the same turn — three round trips into one. The §2g stops, the §2z
+`human_review` stop and the dependency decision are read off it. Cross-repo issues keep
+separate commands; no `--repo`.
+
 **The target repository is named in front of the Issue reference** — `fullrun joshuafolkken/app-kit#12`,
 `fullrun kit#new`. The definition is `SKILL.md` → §2c. An implementing entry needs that repository's
 checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than cloning** when there
