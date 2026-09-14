@@ -45,6 +45,12 @@ interface IssueContent {
 
 type NumberResult = { kind: 'issue'; content: IssueContent } | { kind: ReadFailureKind }
 
+// The formatted block for one issue, or the failure kind — what `run:prep` bundles beside the state
+// and the dependency-update scope (joshuafolkken/kit#1978). It reuses this file's read and the shared
+// `format_issue` rather than reproducing either, so the two `gh` reads and the block shape stay
+// single-sourced here.
+type BlockRead = { kind: 'ok'; block: string } | { kind: ReadFailureKind }
+
 interface IssueReport {
 	issue_number: string
 	result: NumberResult
@@ -89,6 +95,19 @@ async function read_issue(issue_number: string): Promise<NumberResult> {
 	if (fields === undefined) return { kind: 'unreadable' }
 
 	return { kind: 'issue', content: { fields, comments: issue_read.parse_comments(comments_json) } }
+}
+
+// One issue's block for a caller that wants the text rather than the printing — `run:prep` composes it
+// with the state block and the dependency-update line. A failed read is returned as its kind, never as
+// an empty block, so §2g's "a comment nobody read cannot win anything" holds through the bundle too.
+async function read_block(issue_number: string): Promise<BlockRead> {
+	const result = await read_issue(issue_number)
+
+	if (result.kind !== 'issue') return { kind: result.kind }
+
+	const { fields, comments } = result.content
+
+	return { kind: 'ok', block: issue_read.format_issue(issue_number, fields, comments) }
 }
 
 async function read_all(issue_numbers: ReadonlyArray<string>): Promise<ReadonlyArray<IssueReport>> {
@@ -155,8 +174,17 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_read_cli = { BLOCK_SEPARATOR, ISSUE_FIELDS, USAGE, main, parse_numbers, run }
+const issue_read_cli = {
+	BLOCK_SEPARATOR,
+	ISSUE_FIELDS,
+	USAGE,
+	main,
+	parse_numbers,
+	read_block,
+	run,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
+export type { BlockRead }
 export { issue_read_cli }

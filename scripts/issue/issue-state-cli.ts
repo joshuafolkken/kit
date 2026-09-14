@@ -55,11 +55,14 @@ interface StateRequest {
 // exactly that distinction.
 type ReadFailureKind = 'missing' | 'unreadable'
 
-type NumberResult = { kind: 'state'; state: IssueState } | { kind: ReadFailureKind }
+// One issue's state, or the failure kind. Named for export because `run:prep` reads the state beside
+// the body and the dependency-update scope (joshuafolkken/kit#1978), reusing this read rather than a
+// second one that would drift from the `human_review` decision `parse_issue_state` owns.
+type StateRead = { kind: 'state'; state: IssueState } | { kind: ReadFailureKind }
 
 interface IssueReport {
 	issue_number: string
-	result: NumberResult
+	result: StateRead
 }
 
 // `absent` and "given but with nothing usable after it" are different answers. Falling back to the
@@ -159,7 +162,7 @@ function report_failure(kind: ReadFailureKind, issue_number: string): void {
 // One number's read, reduced to what the report needs and nothing printed yet. Separating the two
 // is what lets the whole batch be in flight at once: the numbers are independent, so reading them
 // one after the other spends a round trip per number for no reason.
-async function read_issue(issue_number: string, repo?: string): Promise<NumberResult> {
+async function read_issue(issue_number: string, repo?: string): Promise<StateRead> {
 	const read = await git_gh_command.issue_view_json_classified(issue_number, STATE_FIELDS, repo)
 
 	if (read.kind !== 'read') return { kind: read.kind }
@@ -249,8 +252,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_state_cli = { STATE_FIELDS, USAGE, main, parse_request, run }
+const issue_state_cli = { STATE_FIELDS, USAGE, main, parse_request, read_issue, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
+export type { StateRead }
 export { issue_state_cli }
