@@ -60,8 +60,7 @@
 		"!**/*-fixture.ts",
 		"!scripts/eval",
 		"!scripts/time",
-		"!scripts/cost",
-		"!.claude/skills/diag"
+		"!scripts/cost"
 	],
 	"imports": {
 		"#eslint/*": "./eslint/*",

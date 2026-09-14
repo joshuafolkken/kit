@@ -8,20 +8,15 @@ import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 // The pack boundary (joshuafolkken/kit#1997): the published npm package and the `kit` plugin must
 // carry what a consumer runs — every distributed command's entry script and its static import
 // closure — and none of what only measures kit's own development: the report modules under `time/`
-// and `cost/`, the `eval` suite, `docs/eval.md`, and the `diag` skill. The list is read from an
+// and `cost/`, the `eval` suite and `docs/eval.md`. The list is read from an
 // actual `pnpm pack --dry-run`, so an exclusion pattern that stops matching is caught here rather
 // than shipping. `--config.ignore-scripts=true` skips the prepack build and its network range check;
 // neither changes which files the `files` field selects.
 
 const REPO_ROOT = path.dirname(SCRIPTS_DIR)
 
-// Kit-only measurement code and the diag skill: nothing under these may reach the published package.
-const EXCLUDED_PREFIXES = [
-	'scripts/eval/',
-	'scripts/time/',
-	'scripts/cost/',
-	'.claude/skills/diag/',
-]
+// Kit-only measurement code: nothing under these may reach the published package.
+const EXCLUDED_PREFIXES = ['scripts/eval/', 'scripts/time/', 'scripts/cost/']
 const EXCLUDED_FILES = new Set(['docs/eval.md'])
 
 interface PackedEntry {
@@ -58,7 +53,7 @@ function distributed_seeds(): Array<string> {
 describe('the published package boundary', () => {
 	const packed = packed_files()
 
-	it('ships no kit-only measurement report, eval module, or diag skill', () => {
+	it('ships no kit-only measurement report or eval module', () => {
 		const leaked = [...packed].filter(
 			(file) =>
 				EXCLUDED_PREFIXES.some((prefix) => file.startsWith(prefix)) || EXCLUDED_FILES.has(file),

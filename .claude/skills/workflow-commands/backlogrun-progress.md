@@ -471,7 +471,7 @@ or the two run side by side and the run pays for both.
 **The two are separated by arithmetic, not by inspection.** At the default twenty-minute interval the
 watcher can exit no more often than once an interval, so any parent call more frequent than that is a
 turn the parent woke itself for. That needs no second reading of the transcript — which matters, because
-the transcript parsing is what the `diag` skill forbids, and the re-measurement belongs to
+the transcript parsing is what run measurement must avoid, and the re-measurement belongs to
 `pnpm josh cost` and the run-timing report.
 
 **So the parent starts no wait of its own.** While something of this run's own is in flight, the next

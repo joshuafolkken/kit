@@ -9,7 +9,7 @@
 		{
 			"name": "kit",
 			"source": "./.claude",
-			"description": "joshuafolkken/kit distributed skills: Issue-driven workflow commands, epic:* commands, post-dependency-update verification, the UI-verification gate and run-time diagnostics."
+			"description": "joshuafolkken/kit distributed skills: Issue-driven workflow commands, epic:* commands, post-dependency-update verification, the UI-verification gate."
 		}
 	]
 }

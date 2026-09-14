@@ -42,8 +42,7 @@ SECURITY.md         tsconfig.sonar.json
 > with a warning — one the consumer edited or authored.
 >
 > **A retired skill is removed the same way, but from a frozen manifest (joshuafolkken/kit#1990).** A
-> skill dropped from distribution — `diag`, which drives kit's own run measurement and no longer ships
-> (joshuafolkken/kit#1997) — has no package source left to compare against, so `josh sync` matches a
+> skill dropped from distribution has no package source left to compare against, so `josh sync` matches a
 > consumer's leftover copy against the recorded hash of its last distributed content: an untouched
 > copy is removed, an edited one is kept with a warning.
 >

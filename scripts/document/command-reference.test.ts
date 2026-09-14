@@ -16,7 +16,6 @@ const KNOWN_EXTRA_COMMANDS: ReadonlyArray<string> = [
 	'halfrun',
 	'epicrun',
 	'backlogrun',
-	'diag',
 	'help',
 	'review',
 ]
