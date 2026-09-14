@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { is_transformable } from '#scripts/directory-copy-guard'
@@ -10,10 +11,24 @@ import { PLUGIN_SKILL_DIRECTORIES } from './plugin-skill-directories'
 // and reported, because the managed marker the other migrations rely on is never written to a skill.
 
 type MigrationAction = 'removed' | 'kept' | 'absent'
+type MigrationSource = 'plugin' | 'retired'
+
+interface RemovedSkillFile {
+	readonly path: string
+	readonly sha256: string
+}
+
+interface RemovedSkill {
+	readonly directory: string
+	readonly files: ReadonlyArray<RemovedSkillFile>
+}
+
+type RemovedSkillManifest = ReadonlyArray<RemovedSkill>
 
 interface MigrationResult {
 	directory: string
 	action: MigrationAction
+	source: MigrationSource
 }
 
 // `lstatSync` rather than `statSync`: a consumer's skill directory can hold a dangling symlink, and
@@ -63,6 +78,17 @@ function decide_action(source_root: string, destination_root: string): Migration
 	return is_unmodified_copy(source_root, destination_root) ? 'removed' : 'kept'
 }
 
+function apply_action(
+	destination_root: string,
+	relative: string,
+	action: MigrationAction,
+	source: MigrationSource,
+): MigrationResult {
+	if (action === 'removed') rmSync(destination_root, { recursive: true, force: true })
+
+	return { directory: relative, action, source }
+}
+
 function migrate_directory(
 	package_root: string,
 	project_root: string,
@@ -72,9 +98,7 @@ function migrate_directory(
 	const destination_root = path.join(project_root, relative)
 	const action = decide_action(source_root, destination_root)
 
-	if (action === 'removed') rmSync(destination_root, { recursive: true, force: true })
-
-	return { directory: relative, action }
+	return apply_action(destination_root, relative, action, 'plugin')
 }
 
 function migrate_removed_skill_directories(
@@ -86,10 +110,90 @@ function migrate_removed_skill_directories(
 	)
 }
 
+function hash_content(content: string): string {
+	return createHash('sha256').update(content).digest('hex')
+}
+
+// The hashes a fresh copy of a retired skill's files produce, in path order. Built from a source tree
+// the same way `expected_copy` builds a comparison, then frozen into `removed-skill-manifest.ts`; the
+// manifest test recomputes this and fails on drift.
+function expected_manifest(source_root: string): Array<RemovedSkillFile> {
+	return relative_files(source_root)
+		.map((relative) => {
+			const file = path.join(source_root, relative)
+
+			return { path: relative, sha256: hash_content(expected_copy(file, file)) }
+		})
+		.toSorted((left, right) => left.path.localeCompare(right.path))
+}
+
+function manifest_file_matches(destination_root: string, file: RemovedSkillFile): boolean {
+	const destination_file = path.join(destination_root, file.path)
+
+	if (!existsSync(destination_file)) return false
+
+	return hash_content(readFileSync(destination_file, 'utf8')) === file.sha256
+}
+
+// A retired skill's copy is unmodified when the consumer's directory holds exactly the manifest's set
+// of files and every one hashes to its recorded value — the manifest counterpart of `is_unmodified_copy`.
+function matches_manifest(
+	destination_root: string,
+	files: ReadonlyArray<RemovedSkillFile>,
+): boolean {
+	if (relative_files(destination_root).length !== files.length) return false
+
+	return files.every((file) => manifest_file_matches(destination_root, file))
+}
+
+function decide_manifest_action(
+	destination_root: string,
+	files: ReadonlyArray<RemovedSkillFile>,
+): MigrationAction {
+	if (!existsSync(destination_root)) return 'absent'
+
+	return matches_manifest(destination_root, files) ? 'removed' : 'kept'
+}
+
+// The retired-skill counterpart of `migrate_removed_skill_directories`: a retired skill no longer
+// ships, so its copy is compared against the frozen manifest rather than a live package source.
+function migrate_manifest_skills(
+	project_root: string,
+	manifest: RemovedSkillManifest,
+): Array<MigrationResult> {
+	return manifest.map((skill) => {
+		const destination_root = path.join(project_root, skill.directory)
+		const action = decide_manifest_action(destination_root, skill.files)
+
+		return apply_action(destination_root, skill.directory, action, 'retired')
+	})
+}
+
+function removed_note(source: MigrationSource): string {
+	return source === 'retired' ? 'retired from distribution' : 'now provided by the kit plugin'
+}
+
+function kept_note(source: MigrationSource): string {
+	return source === 'retired'
+		? 'modified or consumer-authored — remove by hand'
+		: 'modified or consumer-authored — remove by hand once on the kit plugin'
+}
+
 const skill_migration = {
 	is_unmodified_copy,
 	migrate_removed_skill_directories,
+	migrate_manifest_skills,
+	expected_manifest,
+	removed_note,
+	kept_note,
 }
 
-export type { MigrationAction, MigrationResult }
+export type {
+	MigrationAction,
+	MigrationResult,
+	MigrationSource,
+	RemovedSkill,
+	RemovedSkillFile,
+	RemovedSkillManifest,
+}
 export { skill_migration }

@@ -31,7 +31,7 @@ SECURITY.md         tsconfig.sonar.json
 .claude/settings.json
 ```
 
-> **The five distributed skills ship as the `kit` Claude Code plugin, not as copies
+> **The four distributed skills ship as the `kit` Claude Code plugin, not as copies
 > (joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file — it
 > carries the `permissions.deny` rules a plugin cannot provide — and now also declares the `kit`
 > marketplace and enables the `kit` plugin. The skill bodies load from the package
@@ -40,6 +40,12 @@ SECURITY.md         tsconfig.sonar.json
 ./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). `josh sync`
 > removes a stale copied skill directory only when its content still matches the shipment, and keeps —
 > with a warning — one the consumer edited or authored.
+>
+> **A retired skill is removed the same way, but from a frozen manifest (joshuafolkken/kit#1990).** A
+> skill dropped from distribution — `diag`, which drives kit's own run measurement and no longer ships
+> (joshuafolkken/kit#1997) — has no package source left to compare against, so `josh sync` matches a
+> consumer's leftover copy against the recorded hash of its last distributed content: an untouched
+> copy is removed, an edited one is kept with a warning.
 >
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
 > (`ci.yml`, `auto-tag.yml`, `production.yml`, `sonar-qube.yml`) is overwritten on

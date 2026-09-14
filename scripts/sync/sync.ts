@@ -13,6 +13,7 @@ import { security_updates } from '#scripts/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
+import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
 import { skill_migration, type MigrationResult } from './skill-migration'
 import { sync_configs } from './sync-configs'
 import { sync_hook_safety } from './sync-hook-safety'
@@ -205,27 +206,29 @@ function sync_sonar_with_template(name_with_owner: string | undefined, is_force 
 	console.info(`  ✔ synced    ${destination}`)
 }
 
-// The five skill directories kit no longer copies now ship as the `kit` plugin, so a consumer's
-// stale copy is removed once it still matches the shipment and kept with a warning once it does not
-// (joshuafolkken/kit#1879). `absent` — the consumer never had the copy — prints nothing.
+// A consumer's stale copy of a distributed skill is removed once it still matches the shipment and
+// kept with a warning once it does not (joshuafolkken/kit#1879). Plugin skills compare against the
+// package source; a retired skill compares against the frozen manifest (joshuafolkken/kit#1990). The
+// note distinguishes the two, and `absent` — the consumer never had the copy — prints nothing.
 function report_migration_result(result: MigrationResult): void {
 	if (result.action === 'absent') return
 
 	if (result.action === 'removed') {
-		console.info(`  ✔ removed   ${result.directory}/ (now provided by the kit plugin)`)
+		console.info(
+			`  ✔ removed   ${result.directory}/ (${skill_migration.removed_note(result.source)})`,
+		)
 
 		return
 	}
 
-	console.warn(
-		`  ⚠ kept      ${result.directory}/ (modified or consumer-authored — remove by hand once on the kit plugin)`,
-	)
+	console.warn(`  ⚠ kept      ${result.directory}/ (${skill_migration.kept_note(result.source)})`)
 }
 
 function migrate_removed_skills(): void {
-	const results = skill_migration.migrate_removed_skill_directories(PACKAGE_DIR, PROJECT_ROOT)
+	const plugin = skill_migration.migrate_removed_skill_directories(PACKAGE_DIR, PROJECT_ROOT)
+	const retired = skill_migration.migrate_manifest_skills(PROJECT_ROOT, REMOVED_SKILL_MANIFEST)
 
-	for (const result of results) report_migration_result(result)
+	for (const result of [...plugin, ...retired]) report_migration_result(result)
 }
 
 // CLAUDE.md is not byte-copied (joshuafolkken/kit#1878): a consumer's file is one @import of kit's
