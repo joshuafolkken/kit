@@ -20,6 +20,7 @@ import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_josh_commands } from './time-josh-commands'
 import { time_label_totals, type LabelTotal } from './time-label-totals'
 import { time_model_gaps } from './time-model-gaps'
+import { time_parent_timeline, type ParentTimeline } from './time-parent-timeline'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import type { PhaseCostFacts } from './time-phase-costs'
 import { time_phase_table } from './time-phase-table'
@@ -149,6 +150,12 @@ interface TimeReport extends TurnSplit {
 	// time to first progress (joshuafolkken/kit#1912). Optional like `delegated_cost`: only the run scopes
 	// build it, so a single-session or epic report carries none.
 	by_session?: Array<SessionTime>
+	// A `backlogrun` parent's own timeline: when it first dispatched a lane, what it waited on in the
+	// foreground, and the work it implemented itself (joshuafolkken/kit#1940). Optional like `by_session`:
+	// only the run scopes build it, since a single-session or epic report has no parent to time. Built by
+	// `time-parent-timeline.ts`, which also renders the three blocks; wired to the run's spans in
+	// `time-run.ts` until the run-tree scope that identifies the parent session lands.
+	parent_timeline?: ParentTimeline
 	// The same model wait as `model_ms_per_round_trip`, as the spread it was a mean of
 	// (joshuafolkken/kit#1386). The mean above says what a trip cost typically; only this says whether
 	// a run was slow everywhere or slow once — and the two need opposite fixes, since batching removes
@@ -450,6 +457,7 @@ function turn_blocks(report: TimeReport): Array<string> {
 		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
 		...time_guard_refusals.guard_refusal_lines(report.guard_refusals),
 		...time_rework.rework_lines(report.rework),
+		...time_parent_timeline.parent_timeline_lines(report.parent_timeline),
 	]
 }
 
