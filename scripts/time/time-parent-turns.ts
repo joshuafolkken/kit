@@ -88,7 +88,6 @@ const CONTRIBUTOR_KEYS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = 
 			'josh lane:open',
 			'josh lane:close',
 			'josh lane:prune',
-			'josh run:preflight',
 			'josh run:hold',
 			'josh run:release',
 			// The canonical name, not the `josh ms` a run actually types: since

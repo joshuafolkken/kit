@@ -4,7 +4,7 @@ import { read_unwrapped } from './ai-document-fixture'
 
 // joshuafolkken/kit#1319: **the place a run is told to write was the place it was never told to
 // read.** This repository records a Tier A decision, a dropped review finding, a split agreement and
-// an `epic:plan` answer as Issue *comments*, while every `#N` entry point was told only to read the
+// a batch decision's answer as Issue *comments*, while every `#N` entry point was told only to read the
 // Issue. A body never says it has been superseded, so the mistake is silent: on
 // joshuafolkken/kit#1304 neither review round, nor the verification gate, nor CI noticed that part of
 // the work had been handed to joshuafolkken/kit#1307 seventeen minutes before implementation began.

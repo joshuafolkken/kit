@@ -386,7 +386,7 @@ async function pull_fast_forward(): Promise<void> {
 }
 
 // Every local branch matching a `git branch --list` pattern, one name per line. The boolean below is
-// this same read, expressed on top of it rather than beside it: `run:preflight` needs the name
+// this same read, expressed on top of it rather than beside it: `run:hold`'s preflight check needs the name
 // itself, because the pull request an interrupted run left behind is keyed by its head branch and the
 // slug is not derivable from an issue number alone (joshuafolkken/kit#926).
 const SHORT_NAME_FORMAT = '--format=%(refname:short)'

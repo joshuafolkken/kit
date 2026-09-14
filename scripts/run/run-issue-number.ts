@@ -2,8 +2,8 @@
 // it does not (joshuafolkken/kit#1485).
 //
 // It sits in its own module because two commands need the same answer and a rule copied into two
-// files is a rule kept correct in one. `run:preflight` interpolates the number into a double-quoted
-// shell command a caller is told to paste; `run:liveness` interpolates it into the same kind of
+// files is a rule kept correct in one. `run:hold`'s preflight check interpolates the number into a
+// double-quoted shell command a caller is told to paste; `run:liveness` interpolates it into the same kind of
 // recovery advice, and reads GitHub with it. Both refuse before the interpolation rather than
 // leaving the check to whichever entry point remembered.
 

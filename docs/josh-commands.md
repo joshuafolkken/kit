@@ -1700,7 +1700,7 @@ A body edited on its own leaves the declaration and the relations disagreeing, `
 - **The record's text is the caller's**, exactly as `--rationale-file`'s is: which epic was taken, which was rejected, why and the date is a judgement. What the command contributes is the placement — appended at the **end** of the `## Decisions` section, which is a log read downwards — and the section is created at the end of the body when the epic has none.
 - **The section ends at the next heading of the same or a higher level**, not at any heading: `## Decisions` is written as one `###` entry per decision, so a `##` section that stopped at the first `###` would place every later record outside it. **The same rule now scopes the `Dependencies` rewrite**, which used to stop at a heading of any level — so a declaration line beneath a `###` subheading inside `## Dependencies` is read as part of that section rather than as a stray line outside it. That is the reading a person already gives the body; nothing else about the rewrite changed.
 - **Three inputs are refused before anything is written**: a record that says nothing, a record carrying a line that is _nothing but_ a dependency chain, and the flag given without a usable path (last on the line, followed by another flag, or repeated). The chain refusal is the load-bearing one — a bare `#890 -> #894` line is read as part of the declaration wherever it sits in the body, so such a record would add a dependency nobody declared; quote the order inside backticks, or fence it, and the same sentence is accepted. **It names the line number rather than quoting the line**: the record is a file the caller handed over, and echoing a line of it into stderr would put arbitrary file content in the console. The missing-path refusal matters because the flag is passed precisely when the record has to exist: read as "none was asked for", a shell that ate the path would land the insertion, write no record and exit 0 — success reported for half the job.
-- **It records a decision about a child being placed** — inserted or moved. A decision about an already-tracked child reaches it through a position: `--add 893 892 --after 891 --decision-file why.md` moves `#892` and comments on it, which is `epic:plan` phase 2's usual case ([#1701](https://github.com/joshuafolkken/kit/issues/1701)). Without a position there is still nothing to place, and the insertion is refused before any record is written.
+- **It records a decision about a child being placed** — inserted or moved. A decision about an already-tracked child reaches it through a position: `--add 893 892 --after 891 --decision-file why.md` moves `#892` and comments on it, the usual case for a decision about a child the epic already tracks ([#1701](https://github.com/joshuafolkken/kit/issues/1701)). Without a position there is still nothing to place, and the insertion is refused before any record is written.
 - **The record carries what the placement replaced.** Where the insertion drops a `blocked-by` relation, ``Replaced blocked-by: `#890 -> #891`.`` is appended to the caller's text — reaching the epic's `## Decisions` entry and every child comment alike, since both are written from one string rather than composed twice ([#1711](https://github.com/joshuafolkken/kit/issues/1711)). The chain is backticked for the reason the refusal above asks for backticks: a bare `#890 -> #891` line is read as part of the declaration wherever it sits in a body. An insertion that replaced nothing gains no such line, and one carrying no record gains none either — this appends to a record, it does not create one.
 - **A cross-repository refusal names the flag rather than relaying it.** The suggested command runs in another checkout, where a relative path does not exist and `-` cannot be re-read from a consumed stdin, so the refusal asks for `--decision-file` again with a path that checkout can read.
 - **Leaving the flag off writes no record and posts no comment.** The insertion itself is what it always was.
@@ -1748,7 +1748,7 @@ pnpm josh epic:next 858 909 --repo joshuafolkken/kit --lanes   # both epics into
 - **A child two epics both track enters once.** Keyed by `owner/repo#number`, because a bare number names a different issue in another repository. The epic named **earlier** keeps it, and that also settles the case where the earlier epic _withholds_ it: it stays withheld, since a `blocked-by` relation belongs to the issue rather than to the epic that lists it.
 - **One unusable graph refuses the whole answer**, whichever epic it belongs to. Handing out another epic's child in the same breath would let an unattended run walk past a graph a person has to look at.
 - **One reference that does not parse fails the read** rather than being dropped — a run told about five epics and answered from four has silently reduced its own scope, and unattended there is nobody to notice. So does one naming another owner's tracker, and it is refused before that repository is asked anything.
-- **A childless epic is skipped, not refused** — the one case that does _not_ stop the read. An `epic:plan` epic whose task list has not been filled in yet is a valid, readable epic of ours, and refusing the whole command for it would stop every other named epic's children being offered on every polling round. It is named on standard error; where no named epic survives, those notices _are_ the refusal, which is exactly the line a single childless epic printed before.
+- **A childless epic is skipped, not refused** — the one case that does _not_ stop the read. An epic whose task list has not been filled in yet is a valid, readable epic of ours, and refusing the whole command for it would stop every other named epic's children being offered on every polling round. It is named on standard error; where no named epic survives, those notices _are_ the refusal, which is exactly the line a single childless epic printed before.
 - **The same epic named twice is read once.** `858` and `joshuafolkken/kit#858` in one command are recognized as one epic, so an unattended run does not pay the duplicate fetch every polling round.
 - **Without `--repo` each epic gets its own block**, headed by the reference as it was typed. A single epic prints exactly what it printed before. **That aggregate form is also where per-epic completion is read**: the `--repo` token answers about the pool, so it says `complete` only once every named epic is.
 - **`pnpm josh latest` is unaffected.** Its once-per-repository hoist is keyed to the session and the checkout, never to an epic, so naming five epics still runs one dependency update — see [`epicrun`](https://github.com/joshuafolkken/kit/blob/main/.claude/skills/workflow-commands/epicrun.md).
@@ -1929,31 +1929,6 @@ Could not confirm which epic already tracks these — do not place this issue in
 
 The whole open backlog is scanned every time. It was thirteen issues when this was written, so there is no index and no cache; add one when the number makes it necessary, not before.
 
-### `josh epic:plan`
-
-Print every child of an epic as one JSON document, so the epic's decisions can be made in one batch ([#862](https://github.com/joshuafolkken/kit/issues/862)).
-
-```bash
-pnpm josh epic:plan 858   # alias: josh el
-```
-
-Most of the stops an implementation makes could have been answered _before_ it started. Arriving scattered through the run is what forces a person to wait through it, asking per child asks the same question several times, and the answers end up only in a conversation nobody can read back. The output carries each child's number, title, body, labels, `blockedBy` and state.
-
-| Phase      | What happens                                                         |
-| ---------- | -------------------------------------------------------------------- |
-| 0 — audit  | [`josh epic:audit`](#josh-epicaudit); fix what it finds (Tier A)     |
-| 1 — triage | Read the plan; sort each decision into `auto`, `ask` or `defer`      |
-| 2 — decide | Put every `ask` to the person **as one question for the whole epic** |
-| 3 — run    | `epicrun` runs to the end                                            |
-
-**Phase 0 is not optional.** A batch decision made on a plan that contradicts itself has to be made again once the contradiction surfaces.
-
-Answers are recorded in **both** the epic's `## Decisions` section and a comment on each child they apply to. One without the other leaves either the child's reader without the reasoning or the epic without the decision. **Recording a decision removes that child's `needs-decision` label** — without that, a child stays parked after the answer arrived.
-
-**An epic whose task list tracks nothing is an empty plan, not a failure** — a checked row is still a tracked row, so a finished epic yields closed children rather than an empty list, and an epic that genuinely tracks nothing is a real answer. An epic whose **body could not be read at all** — a bad number, a failed lookup — is a failure, because an empty plan there is indistinguishable from a finished one.
-
-**A child that could not be read makes the command exit non-zero**, not merely warn. It is named on standard error and left out of the plan, and a consumer capturing standard output would otherwise act on a plan missing a child — a decision made without knowing about it.
-
 ### `josh epic:audit`
 
 Read an epic's children against each other and report what contradicts what ([#870](https://github.com/joshuafolkken/kit/issues/870)).
@@ -2014,7 +1989,7 @@ What remains an error is a name in the acceptance criteria with **nothing orderi
 
 **An error rather than a warning, and the reasoning is the part to keep.** A warning would not be read — one real epic carries 447 of them, and the whole reason this check exists is that a false order was invisible. The counter-argument is the doctrine the demotions above rest on, that the machine warns where it cannot tell whether something is wrong; it does not reach here, because what is asserted is not "this order is wrong" but "this order's reason is not recorded", which is a fact about the repository's own rule that a placement decision is written down. What makes the level affordable is that both remedies are now one command: `josh epic --remove` deletes the order, and `--decision-file` on either command records the reason. Before [#1712](https://github.com/joshuafolkken/kit/issues/1712) the first of those did not exist, and an error would have sent the reader to the hand edit `CLAUDE.md` forbids.
 
-**Run it without being asked** — at the start of an `epicrun`, as [`josh epic:plan`](#josh-epicplan)'s phase 0, and right after a child is added or a dependency changed. **Fixing what it finds is Tier A**: re-pointing a dependency or correcting prose is reversible and will otherwise stall the work, so do it without asking and record the reasoning on the Issue. Park with `needs-decision` only when the contradiction is a design choice nobody has made.
+**Run it without being asked** — at the start of an `epicrun`, and right after a child is added or a dependency changed. **Fixing what it finds is Tier A**: re-pointing a dependency or correcting prose is reversible and will otherwise stall the work, so do it without asking and record the reasoning on the Issue. Park with `needs-decision` only when the contradiction is a design choice nobody has made.
 
 **One thing it cannot check** belongs to the planning step instead. A child introducing a new label, command, state or artifact leaves existing code referencing that concept; three such gaps were found by hand on one epic. List those references and confirm some child owns updating them — label names are single-sourced in `scripts/git/issue-labels.ts`, so consumers can be traced from there.
 
@@ -2055,9 +2030,9 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 pnpm josh auto-ok:next --exclude 906,912 --exclude 918   # skip several
 ```
 
-An epic's task list is not the whole backlog. An issue small enough to need no human judgment sits there forever unless somebody puts it in an epic, so the `auto-ok` label opts one in: [`epicrun`](../.claude/skills/workflow-commands/epicrun.md) picks up opted-in issues once the epic's own children are done.
+An epic's task list is not the whole backlog. An issue small enough to need no human judgment sits there forever unless somebody puts it in an epic, so the `auto-ok` label opts one in: [`backlogrun`](../.claude/skills/workflow-commands/backlogrun.md) runs the opted-in issues, an epic's children and standalone alike ([#1965](https://github.com/joshuafolkken/kit/issues/1965) moved the standalone pickup off `epicrun`).
 
-**Only a person applies `auto-ok`.** Typing `epicrun #<E>` approves the merges inside `#<E>` and nothing outside it, and this label is the only way a person extends that approval past the epic's edge — a label an agent could apply to itself would let an unattended run widen its own authorization, which is not a guard at all. An agent typing the command on an explicit instruction in the same turn is executing the person's decision, not making one.
+**Only a person applies `auto-ok`.** Typing `epicrun #<E>` approves the merges inside `#<E>` and nothing outside it; `auto-ok` is the separate opt-in that puts a standalone issue into `backlogrun`'s reach — a label an agent could apply to itself would let an unattended run widen its own authorization, which is not a guard at all. An agent typing the command on an explicit instruction in the same turn is executing the person's decision, not making one.
 
 `--exclude <N>` drops issues from the answer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — a pickup loop names it here so it cannot be handed back and re-implemented. It takes a comma-separated list and may be repeated, so a loop past its second pickup can name **every** issue it has already run: `closes #N` can fail to fire at all — a reference dropped from a PR body — and the `in-progress` label is not a guard the procedure itself trusts (joshuafolkken/kit#996).
 
@@ -2083,7 +2058,7 @@ The command is read-only and never applies or removes the label. It ranks candid
 
 **A child of an epic that has not opted in is a standalone candidate when it carries `auto-ok` itself** (joshuafolkken/kit#1668). That epic offers nothing — the epic half never reads an epic without the label — so withholding the child too left it unreachable from every path while the person who labelled it was told the listing cap was the reason. Its ordering survives the standalone route: `josh epic --ordered` records an epic's declared order as native `blocked-by` relations on the children, and this path already refuses a candidate whose prerequisite is still open. **Opting in still says nothing about order** — that half of joshuafolkken/kit#1633 is unchanged, and it is what the blocker check enforces. **The question is asked of every epic tracking the child, not of one of them** (joshuafolkken/kit#1694): two epics can write the same task-list row, and one opted-in tracker is enough to withhold the child here — read from a single winner instead, an opted-in epic that merely came earlier in the listing disappears, and the child is offered standalone while that epic hands it over too.
 
-**Opting in is the default absence.** Nothing creates the label, and a repository that does not have it is not an error: `gh` answers an empty listing, the command answers `none`, and an `epicrun` finishes exactly as it did before the label existed. Create it once where it is wanted:
+**Opting in is the default absence.** Nothing creates the label, and a repository that does not have it is not an error: `gh` answers an empty listing, the command answers `none`, and a `backlogrun` finishes exactly as it did before the label existed. Create it once where it is wanted:
 
 ```bash
 gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
@@ -2110,7 +2085,7 @@ Two sources feed one pool:
 | A standalone issue | It carries `auto-ok`, and no **opted-in** epic tracks it                                                                                                                 |
 | An epic's child    | **The epic's root carries `auto-ok`.** The child needs no `auto-ok` of its own, and — while that root is opted in — carrying one does not make it a standalone candidate |
 
-**An epic root's `auto-ok` stands for every child.** That is the same meaning `epicrun #<E>` already has — typing it once approves every merge inside that epic — so a per-child label is not asked for. Requiring one would (1) turn a forgotten label into a hole in the dependency graph, leaving whatever depends on that child waiting for good, (2) make bulk application the habit and the gate a rubber stamp, and (3) stack a thinner approval on top of work that has already been through `epic:plan` and `epic:audit`. A child that needs a decision or a person's eye is handled by `needs-decision` and `needs-human-review`, which are the exits; `auto-ok` is the entrance, and they are different questions.
+**An epic root's `auto-ok` stands for every child.** That is the same meaning `epicrun #<E>` already has — typing it once approves every merge inside that epic — so a per-child label is not asked for. Requiring one would (1) turn a forgotten label into a hole in the dependency graph, leaving whatever depends on that child waiting for good, (2) make bulk application the habit and the gate a rubber stamp, and (3) stack a thinner approval on top of work that has already been through `epic:audit` and the backlog's decision pass. A child that needs a decision or a person's eye is handled by `needs-decision` and `needs-human-review`, which are the exits; `auto-ok` is the entrance, and they are different questions.
 
 **Nothing here re-implements the graph or the wave.** Each `auto-ok` epic is read and classified by `epic:next`'s own pipeline, unchanged, and the verdict comes from the same `decide_verdict` — so a word this command prints cannot drift from what `epic:next` means by it. The standalone half is `auto-ok:next`'s own listing and runnability rules, ranked with the same `prioritize` the `🗒 Next issues` display uses, so there is no second ordering here either.
 
@@ -2423,7 +2398,7 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 
 ### `josh run:hold` / `josh run:release`
 
-Say whether another run already holds this working tree, and claim it when it does not ([#1091](https://github.com/joshuafolkken/kit/issues/1091)).
+Say whether another run already holds this working tree, and claim it when it does not — after checking what an interrupted run may have left in it ([#1091](https://github.com/joshuafolkken/kit/issues/1091), [#1965](https://github.com/joshuafolkken/kit/issues/1965)).
 
 ```bash
 pnpm josh run:hold 1091                            # alias: josh rh
@@ -2437,16 +2412,30 @@ pnpm josh run:release --force                      # a record left behind by a r
 
 **It exists because the guard `epicrun` has never covered the entry points a person types.** On 2026-08-30 one session held #1071 in this checkout while another `fullrun new` filed #1090 and implemented nine files in the same tree; a person noticed one command before `pnpm josh git -y` would have committed those nine files onto the other run's branch. **A guard that depends on someone watching is not a guard**, and unattended execution is the whole premise.
 
-| Answer     | Meaning                                                                  | Exit code |
-| ---------- | ------------------------------------------------------------------------ | --------- |
-| `hold`     | The tree was free (or the record had expired) and this run now holds it  | 0         |
-| `busy`     | Another run holds it — **stop before filing anything**                   | 0         |
-| `unknown`  | The work tree's git directory could not be read; nothing was established | 1         |
-| `released` | `run:release` cleared a record that was there                            | 0         |
-| `none`     | `run:release` found nothing to clear                                     | 0         |
-| `held`     | `run:release` found a record **another** run wrote — nothing was removed | 1         |
+| Answer     | Meaning                                                                                          | Exit code |
+| ---------- | ------------------------------------------------------------------------------------------------ | --------- |
+| `hold`     | The tree was clean and free (or the record had expired) and this run now holds it                | 0         |
+| `busy`     | Another run holds it — **stop before filing anything**                                           | 0         |
+| `reclaim`  | A numbered claim found uncommitted changes, or HEAD off the default branch — nothing was claimed | 0         |
+| `resume`   | A numbered claim found a branch, or an open pull request, for the issue — nothing was claimed    | 0         |
+| `park`     | A numbered claim found the issue's pull request merged or closed — nothing was claimed           | 0         |
+| `unknown`  | The work tree's git directory could not be read; nothing was established                         | 1         |
+| `released` | `run:release` cleared a record that was there                                                    | 0         |
+| `none`     | `run:release` found nothing to clear                                                             | 0         |
+| `held`     | `run:release` found a record **another** run wrote — nothing was removed                         | 1         |
 
 Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)` captures something a loop can branch on. Every explanation goes to standard error, and it names the holder, the time the record was written, the pid that wrote it, and `pnpm josh run:release --force` as the way to clear a stale one.
+
+**A numbered claim checks the tree before it takes it** ([#1965](https://github.com/joshuafolkken/kit/issues/1965)). `run:preflight` was once a separate command a run asked before this one; the two-step "preflight, then hold" was one call too many, so the claim now runs the check itself. It reads what an interrupted run may have left — uncommitted work, a branch or pull request for the issue — and hands back a hold **only on a `clean` tree**. A `reclaim` / `resume` / `park` tree is returned as that verdict and **no record is written**, so a claim never lands on top of work somebody left behind. The bare, unnumbered `run:hold` — a `new` entry point, before the issue exists — has no child branch or pull request to read, so it skips the check and claims directly.
+
+| Preflight answer | What it found                                                                   | What the caller does                                                                       |
+| ---------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `clean`          | Clean tree, HEAD on the default branch, no branch or pull request for the issue | The claim proceeds and returns `hold`                                                      |
+| `reclaim`        | Uncommitted changes, or HEAD off the default branch                             | Stash with `-u`, switch back, record the stash on the issue, then **ask `run:hold` again** |
+| `resume`         | A branch for the issue, or an open pull request, is still there                 | Reuse it and run the whole verification gate from the start                                |
+| `park`           | The pull request for the issue is merged or closed                              | Park the child with `needs-decision` and a comment                                         |
+
+**The check is re-askable, which the claim itself deliberately is not.** It reads state and writes nothing, so "reclaim, then ask again" is a procedure rather than a contradiction: clean up what `reclaim` named and ask `run:hold` once more, and the now-clean tree is claimed. **The precedence between the preflight states is fixed** — a `resume` or a `park` decided over a dirty tree would hand the next child a checkout it cannot switch, so the tree is reclaimed first and the question asked again on the clean tree. **A branch is found by pattern, not by name** (`git branch --list '<N>-*'`, remote-tracking branches included), and **an unreadable `gh` is never read as an absent pull request** — it reaches the caller as `unknown` rather than as `resume` over work somebody already merged. **The stash a `reclaim` prescribes is the one sanctioned stash that is never popped**: what it moves aside belongs to a run that has ended, so the Issue comment naming it is the only thing that can bring it back. The decision logic lives on in `run-preflight.ts` for `run:progress` to reuse; only its CLI went away.
 
 **A release names the run it belongs to** ([#1799](https://github.com/joshuafolkken/kit/issues/1799)). `pnpm josh run:release 1091` removes the record only where the record names `1091`; the bare form is the unnumbered run's own release, mirroring the bare claim that records `new`; and a record belonging to anything else answers `held` and is left exactly where it was. Until then the command removed whatever was there — and the `busy` message above is what sends a person to type it, on a judgement about staleness made from outside the run that wrote the record, so **the guard's own recovery instruction was a way to free a live run's tree**: the incident of 2026-08-30, reached through the guard written to prevent it. The identity is the issue rather than the pid for the reason the pid is never read back at all: the process that claims a tree is a short-lived `josh run:hold` that has already exited, while the issue identifies a run across every command it issues. `josh run:carry` compares a recorded owner against a declared one for the same reason; what differs is only who the owner is.
 
@@ -2606,36 +2595,6 @@ pnpm josh run:cut --end           # clear the record
 
 Standard output carries exactly one token on every acted path (`--json` prints the record as one line); a malformed command line prints usage to standard error. `run:cut <N>` answers `cut` only after the record is written and a fresh `fullrun #<N>` is relaunched, `not-a-lane` where there is no open lane, `unready` on a clean or default-branch tree, `busy` when a cut is already in flight, and `failed` — with the record cleared — when the relaunch could not start. `run:cut --resume <N>` answers `fresh`, `resume`, `stale`, `busy`, or `handed-off` — the last when a successor has already adopted the cut, so a process woken after its own cut (a background notification, an interactive session) stops quietly rather than resuming a run being carried on elsewhere ([#1935](https://github.com/joshuafolkken/kit/issues/1935)). The boundary, the verdicts and the resume verification are `.claude/skills/workflow-commands/pre-gate-cut.md`.
 
-### `josh run:preflight`
-
-Say what an interrupted run left in this working tree, and what the rule says to do about it before the next child starts ([#926](https://github.com/joshuafolkken/kit/issues/926)).
-
-```bash
-pnpm josh run:preflight 926   # alias: josh rp
-```
-
-Standard output carries exactly one token, so `answer=$(pnpm josh run:preflight 926)` captures something a loop can branch on. Every explanation goes to standard error: what was found, and the exact commands that recover it.
-
-| Answer    | What it found                                                                   | What the caller does                                                            |
-| --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `clean`   | Clean tree, HEAD on the default branch, no branch or pull request for the issue | Start the child                                                                 |
-| `reclaim` | Uncommitted changes, or HEAD off the default branch                             | Stash with `-u`, switch back, record the stash on the issue, then **ask again** |
-| `resume`  | A branch for the issue, or an open pull request, is still there                 | Reuse it and run the whole verification gate from the start                     |
-| `park`    | The pull request for the issue is merged or closed                              | Park the child with `needs-decision` and a comment                              |
-| `unknown` | The tree could not be read — exits non-zero                                     | Stop. It is not "the tree is clean"                                             |
-
-**The precedence between those states is fixed, and the first row is why it has to be.** A `resume` or a `park` decided over a dirty tree would hand the next child a checkout it cannot switch, so the tree is reclaimed first and the question asked again on the clean tree — rather than two answers being merged into one. The child is not read at all once the tree already answers `reclaim`: the verdict would be `reclaim` whatever it said, so the `gh` round trip is not spent.
-
-**It is re-askable, which `josh run:hold` deliberately is not.** A claim asked twice answers `busy`, because the second ask is a second run. This command reads state and writes nothing, so "reclaim, then ask again" is a procedure rather than a contradiction. The two guard different things and neither replaces the other: `run:hold` asks whether another **live** run owns this tree, this asks what a **dead** one left in it.
-
-**A branch is found by pattern, not by name.** `pnpm josh git` builds `<N>-<slug>`, and the slug is not derivable from an issue number, so the read is `git branch --list '<N>-*'` — which matches whatever the title was and never matches `<N><digit>-…`. **Remote-tracking branches are searched too**, with the remote name stripped back off: a run interrupted on another machine, or in a checkout since re-cloned, leaves the branch on the remote with no local counterpart, and a local-only search would answer `clean` over an open pull request. The same listing answers `git_command.branch_exists`, so there is one reading rather than two.
-
-**The pull request is reached through its head branch, which is the limit of what this command sees.** A branch that exists in neither place — deleted after a merge, say — takes its pull request out of view with it, and the answer is `clean`. Where more than one branch matches, a **decided** pull request on any of them outranks an open one on another, so a retry branch cannot hide a merged pull request behind itself. **An unreadable `gh` is never read as an absent pull request**: existence is asked through `pr_exists`, which throws on a lookup it could not complete ([#1048](https://github.com/joshuafolkken/kit/issues/1048)), and that reaches the caller as `unknown` rather than as `resume` over work somebody already merged.
-
-**The stash this command prescribes is the one sanctioned stash that is never popped.** What it moves aside belongs to a run that has ended, not to the run doing the stashing, so the Issue comment naming it is the only thing that can ever bring it back. The enumeration of flows that may stash automatically is `prompts/collaboration-workflow/operating-rules.md`.
-
-The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "Preflight — reclaim what an interrupted run left, before the next child starts".
-
 ### `josh run:liveness`
 
 Say whether the delegated unit running a child is still working, or stopped without reporting ([#1485](https://github.com/joshuafolkken/kit/issues/1485)).
@@ -2654,7 +2613,7 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:liveness 1
 | `settled`      | The child closed, or the unit parked it with `needs-decision`                          | Re-read it with `pnpm josh issue:state <N>` and take that branch        | 0         |
 | `undetermined` | A trace could not be read                                                              | Read the trace that failed and ask again. It is not "the unit is alive" | 1         |
 
-**Two traces decide it, and neither depends on whether implementation started.** The detection this replaces required a **dirty** checkout, on the reasoning that a unit which died mid-implementation leaves exactly that — so a unit that stopped seven minutes in, while still reading the skill and the issue, left a clean tree and the test could never become true. The checkout is still read, for one thing only: whether there is work to stash before the child is parked. "Nothing was ever opened for the child" is dropped outright, because it is equally the normal state of a unit that has not reached its commit yet, and `josh run:preflight` already owns that question.
+**Two traces decide it, and neither depends on whether implementation started.** The detection this replaces required a **dirty** checkout, on the reasoning that a unit which died mid-implementation leaves exactly that — so a unit that stopped seven minutes in, while still reading the skill and the issue, left a clean tree and the test could never become true. The checkout is still read, for one thing only: whether there is work to stash before the child is parked. "Nothing was ever opened for the child" is dropped outright, because it is equally the normal state of a unit that has not reached its commit yet, and `josh run:hold`'s preflight check already owns that question.
 
 **Which way an error falls is the design.** A live unit booked as stopped has its working work killed; a stopped one booked as alive costs waiting. So a trace that could not be read answers `undetermined` rather than `stopped`, and a `--process` nobody gave is an unasked question rather than an answer of "no process".
 

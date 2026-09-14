@@ -31,7 +31,7 @@ function matches(text: string, pattern: RegExp): Array<RegExpMatchArray> {
 }
 
 // A trailing colon is a placeholder for the sub-command that follows — `` `josh epic:` `` stands for
-// `epic:plan`, `epic:audit` and the rest — so it names no command of its own.
+// `epic:audit`, `epic:next` and the rest — so it names no command of its own.
 function command_references(text: string): Array<string> {
 	return matches(text, COMMAND_PATTERN)
 		.map((match) => match[1] ?? '')

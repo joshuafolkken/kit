@@ -4,8 +4,11 @@ import { z } from 'zod'
 import { run_hold } from './run-hold'
 import { run_issue_number } from './run-issue-number'
 
-// `josh run:preflight <N>` — what an interrupted run left in this working tree, and what the rule
-// says to do about it before the next child starts (joshuafolkken/kit#926).
+// The preflight check — what an interrupted run left in this working tree, and what the rule says to
+// do about it before the next child starts (joshuafolkken/kit#926). It once had its own
+// `josh run:preflight` CLI; joshuafolkken/kit#1965 folded the check into `run:hold`, which now runs it
+// before it claims the tree, so this module is the shared logic behind that claim and behind
+// `run:progress`, and no longer a command of its own.
 //
 // joshuafolkken/kit#1091 gave a run a way to say "this tree is mine". This is the sibling question,
 // and it is about the run that never said anything again: an unattended run ends abnormally — a
@@ -19,9 +22,9 @@ import { run_issue_number } from './run-issue-number'
 // exactly why the choice is not left to the moment — the same reason `josh delegate` and
 // `josh review:level` refuse to leave their answers to an agent.
 //
-// **It is re-askable, which `run:hold` deliberately is not.** A claim asked twice answers `busy`,
-// because the second ask is a second run. This one reads state and writes nothing, so the reclaim
-// recovery ends by asking again on the tree it just cleaned.
+// **The check is re-askable, which the claim it now gates deliberately is not.** A claim asked twice
+// answers `busy`, because the second ask is a second run. This check reads state and writes nothing,
+// so the reclaim recovery ends by asking `run:hold` again on the tree it just cleaned.
 
 const CLEAN_VERDICT = 'clean'
 const RECLAIM_VERDICT = 'reclaim'
@@ -79,7 +82,7 @@ const RESUME_ADVICE =
 const PARK_ADVICE =
 	'Park the child: add `needs-decision` and comment what was found. Do not delete the branch, do not reopen the pull request, and do not commit on top of it.'
 
-const STASH_LABEL_PREFIX = 'run:preflight reclaimed before #'
+const STASH_LABEL_PREFIX = 'run:hold reclaimed before #'
 
 // The issue number reaches the advice inside a double-quoted shell command a caller is told to paste,
 // so the shape it may take is pinned beside the interpolation rather than only in the CLI that

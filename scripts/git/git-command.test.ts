@@ -300,7 +300,7 @@ describe('git_command.pull_fast_forward', () => {
 	})
 })
 
-// joshuafolkken/kit#926: `run:preflight` needs the branch an interrupted run left, not merely whether
+// joshuafolkken/kit#926: `run:hold`'s preflight check needs the branch an interrupted run left, not merely whether
 // one exists, so the boolean is expressed on top of the listing rather than beside it.
 describe('git_command.branch_names', () => {
 	const ISSUE_BRANCH_PATTERN = '926-*'

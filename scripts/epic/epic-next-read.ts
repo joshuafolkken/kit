@@ -87,7 +87,7 @@ function is_childless(snapshot: EpicSnapshot): boolean {
 // **A childless epic is skipped; a foreign one refuses.** The distinction is what each says about
 // the caller. A reference naming another owner's tracker is a read we must not make at all, so it
 // stops the command. An epic that is simply not populated yet is a valid, readable epic of ours — an
-// `epic:plan` epic whose task list has not been filled in is the ordinary case — and refusing the
+// epic whose task list has not been filled in is the ordinary case — and refusing the
 // whole command for it would stop every *other* named epic's children being offered, on every
 // polling round, until a person noticed (joshuafolkken/kit#1493).
 async function read_one(reference: EpicReference, current_repo: string): Promise<ReadOutcome> {

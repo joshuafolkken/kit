@@ -235,7 +235,7 @@ interface LineTiming {
  * `epicrun.md` asked the run to derive this from the `at` stamp plus the interval in force, and a run
  * that derives a time by hand eventually derives it wrong: one report reached a person as `20:1x`,
  * placeholder digits and all. Every comparable judgement in this repository has moved to the command
- * that already holds the inputs — `run:preflight`, `delegate`, `review:level`, `latest:scope` — and
+ * that already holds the inputs — `run:hold`, `delegate`, `review:level`, `latest:scope` — and
  * this is that same move for one value.
  *
  * **It is a schedule rather than an observation, and the two conditions on it are said in prose**

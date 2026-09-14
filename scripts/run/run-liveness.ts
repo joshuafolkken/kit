@@ -25,7 +25,7 @@ import { run_issue_number } from './run-issue-number'
 // demoted from the test to an input of the recovery — it says whether there is anything to stash,
 // which is a different question from whether the unit is alive. "Nothing was ever opened for the
 // child" is dropped outright: it is also the normal state of a unit that has not reached its commit
-// yet, and the branch-and-pull-request question already has an owner in `josh run:preflight`.
+// yet, and the branch-and-pull-request question already has an owner in `josh run:hold`'s preflight check.
 //
 // **The binding constraint is the direction of the error.** A live unit booked as stopped has its
 // working work killed; a stopped unit booked as alive costs waiting. So the ladder reads the one

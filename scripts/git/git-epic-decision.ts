@@ -61,7 +61,7 @@ function to_record_lines(record: string): Array<string> {
 }
 
 // A body with no `## Decisions` section at all: the section is created at the end, which is where
-// every epic that has one carries it (`epic:plan` writes it there, after `## Progress`).
+// every epic that has one carries it (`epic --add --decision-file` writes it there, after `## Progress`).
 function to_new_section(lines: ReadonlyArray<string>, record: string): Array<string> {
 	return [...lines, BLANK_LINE, DECISIONS_HEADING, ...to_record_lines(record)]
 }
