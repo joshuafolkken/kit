@@ -1,8 +1,8 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_markers } from './time-markers'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_phases } from './time-phases'
-import type { Span } from './time-spans'
 
 // joshuafolkken/kit#1299: `other` printed with `is_detected: true`, so it ranked as a measured block
 // nobody could propose a cut against — 19–63% of each of the four runs the issue was filed from, and

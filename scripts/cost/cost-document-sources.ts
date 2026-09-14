@@ -1,6 +1,10 @@
-import type { AttributedRecord, Corpus } from './cost-corpus'
+import type { AttributedRecord, Corpus } from '#scripts/cost-runtime/cost-corpus'
+import {
+	cost_transcript,
+	type SessionFile,
+	type SessionUsage,
+} from '#scripts/cost-runtime/cost-transcript'
 import { cost_documents, type DocumentBreakdown, type DocumentSource } from './cost-documents'
-import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
 
 // Turning a cost scope's sessions into the raw transcripts and records the document breakdown reads
 // (joshuafolkken/kit#1871).

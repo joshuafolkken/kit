@@ -1,7 +1,7 @@
-import { cost_blocks } from '#scripts/cost/cost-blocks'
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { json_value } from '#scripts/json-value'
-import type { GuardedCall } from '#scripts/time/time-batch-guard'
-import { time_shell } from '#scripts/time/time-shell'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
 // The trigger and the decision behind the `run-tail` row of `delivered-rules.ts`

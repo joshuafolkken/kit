@@ -1,4 +1,4 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
 import type { UnitPurpose } from './time-unit-purpose'
 
 // What launching each delegated subagent cost, and what one launch's fixed context construction came

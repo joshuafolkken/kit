@@ -1,7 +1,7 @@
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_density, type DensityReading } from './time-density'
 import { time_round_trips } from './time-round-trips'
-import { time_transcript_fixture } from './time-transcript-fixture'
 
 const { density_text, turn_lines, turn_call_line, prompt_line, BRANCH } = time_transcript_fixture
 

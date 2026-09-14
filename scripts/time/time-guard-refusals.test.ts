@@ -1,9 +1,9 @@
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
+import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { time_guard_refusals, type GuardRefusalFacts } from './time-guard-refusals'
 import { time_line_fixture } from './time-line-fixture'
 import type { PricedRequest } from './time-region-costs'
-import { time_spans, type Span } from './time-spans'
-import { time_transcript_line } from './time-transcript-line'
 
 const { at, error_body, prompt, tool_result, tool_use } = time_line_fixture
 const { MINUTE_MS } = time_line_fixture

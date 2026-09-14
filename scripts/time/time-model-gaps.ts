@@ -1,5 +1,5 @@
-import { time_round_trips } from './time-round-trips'
-import type { Span } from './time-spans'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import type { Span } from '#scripts/time-runtime/time-spans'
 
 // The model wait one round trip was composed over, as the stretch it actually was
 // (joshuafolkken/kit#1386).

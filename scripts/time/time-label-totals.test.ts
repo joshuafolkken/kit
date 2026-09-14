@@ -1,7 +1,7 @@
+import { time_spans } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_label_totals } from './time-label-totals'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans } from './time-spans'
 
 const { span, MINUTE_MS } = time_span_fixture
 const { TOOL_CATEGORY } = time_spans

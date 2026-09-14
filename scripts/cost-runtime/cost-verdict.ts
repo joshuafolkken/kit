@@ -1,14 +1,23 @@
-import { cost_curve } from './cost-curve'
-import type { CostReport } from './cost-report'
+import { cost_curve, type CapSimulation } from './cost-curve'
 
 // The hand-off flags of `josh cost`, kept apart from the CLI wiring because each turns a run into a
 // one-line verdict rather than a table (joshuafolkken/kit#1838). `--over` answers what the next turn
 // of a session will cost; `--cap` answers what share of a run's cost fell at or under a per-request
 // context cap.
+//
+// Each takes only the figures its verdict needs — an over measurement, a cap simulation — never a
+// whole CostReport, so the distributed `--over` / `--cap` path stays clear of the report modules that
+// build one (joshuafolkken/kit#1996).
 
 const FAILURE_EXIT_CODE = 1
 const OVER_VERDICT = 'over'
 const UNDER_VERDICT = 'under'
+
+// What `--over` reads of a session: how many requests paid, and the billed input they paid for.
+interface OverMeasurement {
+	request_count: number
+	billed_input_tokens: number
+}
 
 // What a turn costs is decided by the accumulated preamble, not by what the turn does, so the
 // marginal cost of a session is its billed input divided by the requests that paid for it. Measured
@@ -17,31 +26,27 @@ const UNDER_VERDICT = 'under'
 //
 // Per request rather than in total, because the total only says the session was long. The ratio
 // says what the *next* turn will cost, which is the thing a hand-off decision turns on.
-function per_request_cost(report: CostReport): number {
-	if (report.request_count === 0) return 0
+function per_request_cost(measurement: OverMeasurement): number {
+	if (measurement.request_count === 0) return 0
 
-	return Math.round(report.breakdown.billed_input_tokens / report.request_count)
+	return Math.round(measurement.billed_input_tokens / measurement.request_count)
 }
 
 // A verdict, not a table: the point of the flag is that the hand-off is decided by a number rather
 // than by whether the run feels long, which is a judgement made under exactly the pressure that
 // resolves it the wrong way.
-function report_over(reports: ReadonlyArray<CostReport>, limit: number): number {
-	const [report] = reports
-
-	if (report === undefined) return FAILURE_EXIT_CODE
-
-	if (report.request_count === 0) {
+function report_over(measurement: OverMeasurement | undefined, limit: number): number {
+	if (measurement === undefined || measurement.request_count === 0) {
 		console.error('No requests in this session; there is nothing to hand off.')
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const cost = per_request_cost(report)
+	const cost = per_request_cost(measurement)
 
 	console.info(cost > limit ? OVER_VERDICT : UNDER_VERDICT)
 	console.error(
-		`${String(cost)} billed input tokens per request over ${String(report.request_count)} request(s); limit ${String(limit)}`,
+		`${String(cost)} billed input tokens per request over ${String(measurement.request_count)} request(s); limit ${String(limit)}`,
 	)
 
 	return 0
@@ -49,10 +54,7 @@ function report_over(reports: ReadonlyArray<CostReport>, limit: number): number 
 
 // The cap counterfactual as a ratio rather than a table: what share of this run's priced cost was
 // incurred by requests at or under the cap. `not measured` when nothing could be priced, never 0.
-function report_cap(reports: ReadonlyArray<CostReport>, cap: number): number {
-	const [report] = reports
-	const simulation = report?.cap_simulation
-
+function report_cap(simulation: CapSimulation | undefined, cap: number): number {
 	if (simulation === undefined) {
 		console.error('No requests in this scope; there is nothing to cap.')
 
@@ -75,4 +77,5 @@ const cost_verdict = {
 	report_cap,
 }
 
+export type { OverMeasurement }
 export { cost_verdict }

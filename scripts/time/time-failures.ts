@@ -1,7 +1,7 @@
-import { time_command_key } from './time-command-key'
-import { time_format } from './time-format'
-import { time_round_trips } from './time-round-trips'
-import { time_spans, type Span, type SpanOutcome } from './time-spans'
+import { time_command_key } from '#scripts/time-runtime/time-command-key'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import { time_spans, type Span, type SpanOutcome } from '#scripts/time-runtime/time-spans'
 
 // How much of a run's clock went on doing something a second time because it failed the first
 // (joshuafolkken/kit#1309).

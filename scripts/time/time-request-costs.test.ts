@@ -1,8 +1,8 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { AttributedRecord, Corpus } from '#scripts/cost/cost-corpus'
-import { cost_usage, type UsageRecord } from '#scripts/cost/cost-usage'
+import type { AttributedRecord, Corpus } from '#scripts/cost-runtime/cost-corpus'
+import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
 import { time_request_costs } from './time-request-costs'
 

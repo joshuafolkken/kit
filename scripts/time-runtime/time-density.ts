@@ -1,4 +1,4 @@
-import { cost_blocks } from '#scripts/cost/cost-blocks'
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { time_round_trips } from './time-round-trips'
 import { time_spans, type TranscriptLine } from './time-spans'
 

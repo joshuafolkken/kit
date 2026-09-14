@@ -1,7 +1,7 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_instructions, type InstructionsInput } from './time-instructions'
 import { time_span_fixture } from './time-span-fixture'
-import type { Span } from './time-spans'
 
 // The cases use this repository's own documents rather than temporary files, because the subject is
 // which paths count as instructions — a rule anchored at the repository root, which a file written

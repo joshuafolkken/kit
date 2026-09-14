@@ -1,9 +1,9 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_spans, type Span, type SpanOutcome } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
 import { time_gate_runs } from './time-gate-runs'
 import { time_phase_fixture } from './time-phase-fixture'
-import { time_shell } from './time-shell'
-import { time_spans, type Span, type SpanOutcome } from './time-spans'
 
 // joshuafolkken/kit#1786: `prompts/review.md` allows one gate per commit plus one wherever an edit
 // landed after a gate, and nothing counted against it — run #1749 printed `josh gate — 4 call(s)`

@@ -1,9 +1,9 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { time_distribution, type Distribution } from './time-distribution'
-import { time_format } from './time-format'
 import { time_model_gaps, type ModelGap } from './time-model-gaps'
 import { time_phases, type PhaseName } from './time-phases'
 import { time_placed, type Placed } from './time-placed'
-import { time_spans, type Span } from './time-spans'
 
 // The model wait a run spends per round trip, read as a distribution rather than as a mean
 // (joshuafolkken/kit#1386).

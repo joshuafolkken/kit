@@ -1,9 +1,9 @@
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import { time_single_check } from '#scripts/time-runtime/time-single-check'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_distribution } from './time-distribution'
 import { time_model_gaps, type ModelGap } from './time-model-gaps'
 import type { RequestTokens } from './time-request-costs'
-import { time_round_trips } from './time-round-trips'
-import { time_single_check } from './time-single-check'
-import type { Span } from './time-spans'
 
 // The two per-session signals that need the time axis and the cost axis joined (joshuafolkken/kit#1970,
 // a child of joshuafolkken/kit#1938).

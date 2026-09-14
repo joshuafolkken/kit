@@ -1,4 +1,4 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
 import { time_windows, type RunWindows } from './time-windows'
 
 // What sits under the scope line in every report, and the empty-report page. Lifted out of

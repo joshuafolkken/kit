@@ -1,5 +1,5 @@
+import { time_line_fixture } from '#scripts/time/time-line-fixture'
 import { describe, expect, it } from 'vitest'
-import { time_line_fixture } from './time-line-fixture'
 import { time_markers } from './time-markers'
 import { time_spans, type Span } from './time-spans'
 

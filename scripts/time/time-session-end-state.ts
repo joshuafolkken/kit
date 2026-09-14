@@ -1,4 +1,4 @@
-import { time_spans, type Span } from './time-spans'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 // How a run's session ended, decided mechanically from its spans (joshuafolkken/kit#1912).
 //

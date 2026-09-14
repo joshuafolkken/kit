@@ -1,6 +1,6 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { time_batch, type RunTiming } from './time-batch'
 import type { EpicTimeReport, EpicTrend } from './time-epic'
-import { time_format } from './time-format'
 import { time_report } from './time-report'
 import { time_row_notes } from './time-row-notes'
 

@@ -1,6 +1,6 @@
-import { cost_curve } from './cost-curve'
-import { cost_format } from './cost-format'
-import type { UsageRecord } from './cost-usage'
+import { cost_curve } from '#scripts/cost-runtime/cost-curve'
+import { cost_format } from '#scripts/cost-runtime/cost-format'
+import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 
 // The requests the totals and the curve both hide: a single round trip whose cache write dominated
 // the run (joshuafolkken/kit#1853). `josh cost` reads a run as a flat set and a four-quartile curve,

@@ -2,7 +2,7 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { time_batch_guard, type GuardedCall } from './time/time-batch-guard'
+import { time_batch_guard, type GuardedCall } from './time-runtime/time-batch-guard'
 
 // The disk half of the batching guard (joshuafolkken/kit#1390): find the transcript, read enough of
 // its end, remember when a call was last refused, and write the refusal Claude Code understands.

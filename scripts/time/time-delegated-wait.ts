@@ -1,7 +1,7 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_lead, type Cover } from './time-lead'
 import { time_overlap, type Interval } from './time-overlap'
-import type { Span } from './time-spans'
 
 // The idle the main line spent waiting on a delegated unit, broken out of model wait
 // (joshuafolkken/kit#1881).

@@ -1,7 +1,7 @@
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { json_value } from '#scripts/json-value'
+import { time_instant } from '#scripts/time-runtime/time-instant'
 import { z } from 'zod'
-import { time_instant } from './time-instant'
 
 // The half of a run's wall clock that no transcript records (joshuafolkken/kit#1268).
 //

@@ -1,6 +1,6 @@
-import { time_format } from './time-format'
-import { time_round_trips } from './time-round-trips'
-import { time_spans } from './time-spans'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import { time_spans } from '#scripts/time-runtime/time-spans'
 
 // The round-trip block, as it is printed (joshuafolkken/kit#1304, joshuafolkken/kit#1307,
 // joshuafolkken/kit#1385).

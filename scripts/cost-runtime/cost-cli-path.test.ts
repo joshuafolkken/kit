@@ -26,25 +26,27 @@ describe('cost_cli.parse_options — the target project path', () => {
 })
 
 describe('cost_cli.run — the target project path', () => {
-	it('reads the transcripts of the project named by --path', () => {
+	it('reads the transcripts of the project named by --path', async () => {
 		write_session_under(TARGET, SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--session', SESSION_A, '--path', TARGET], CWD)).toBe(0)
+		expect(await cost_cli.run(['--session', SESSION_A, '--path', TARGET], CWD)).toBe(0)
 		expect(output()).toContain(`session ${SESSION_A}`)
 	})
 
 	// Given --path, the read does not fall back to the process cwd, even though it has a transcript.
-	it('does not read the process cwd when --path names another project', () => {
+	it('does not read the process cwd when --path names another project', async () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--session', SESSION_A, '--path', TARGET], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(await cost_cli.run(['--session', SESSION_A, '--path', TARGET], CWD)).toBe(
+			FAILURE_EXIT_CODE,
+		)
 	})
 
 	// Unspecified --path keeps the former behavior: this process's own working directory.
-	it('reads the process cwd when --path is absent', () => {
+	it('reads the process cwd when --path is absent', async () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
+		expect(await cost_cli.run(['--session', SESSION_A], CWD)).toBe(0)
 		expect(output()).toContain(`session ${SESSION_A}`)
 	})
 })

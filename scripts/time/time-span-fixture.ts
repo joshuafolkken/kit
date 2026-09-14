@@ -1,5 +1,5 @@
-import { time_markers } from './time-markers'
-import { time_spans, type Span, type SpanOutcome } from './time-spans'
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span, type SpanOutcome } from '#scripts/time-runtime/time-spans'
 
 // A span built by category, for the suites that measure how spans are *classified* rather than when
 // they happened (joshuafolkken/kit#1304).

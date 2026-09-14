@@ -1,7 +1,7 @@
+import { time_phase_fixture } from '#scripts/time/time-phase-fixture'
+import { time_phases } from '#scripts/time/time-phases'
 import { describe, expect, it } from 'vitest'
 import { time_background } from './time-background'
-import { time_phase_fixture } from './time-phase-fixture'
-import { time_phases } from './time-phases'
 import type { Span } from './time-spans'
 
 // joshuafolkken/kit#1662: a command taken into the background was recorded as its launch call and

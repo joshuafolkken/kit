@@ -1,5 +1,5 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
 import { time_windows, type RunWindows } from './time-windows'
 
 // joshuafolkken/kit#1409: one run is three nested windows, and a window nobody could read has to be

@@ -1,4 +1,4 @@
-import type { Span } from './time-spans'
+import type { Span } from '#scripts/time-runtime/time-spans'
 
 // The per-label totals behind the per-tool and per-`josh <cmd>` tables, moved out of `time-report.ts`
 // when that file passed its length limit (joshuafolkken/kit#1921). `time-report.ts` re-exports

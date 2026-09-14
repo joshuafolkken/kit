@@ -1,7 +1,7 @@
+import { cost_pricing, type ModelCost } from '#scripts/cost-runtime/cost-pricing'
+import type { UsageTotals } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
 import { cost_dollar_composition } from './cost-dollar-composition'
-import { cost_pricing, type ModelCost } from './cost-pricing'
-import type { UsageTotals } from './cost-usage'
 
 const ONE_MILLION = 1_000_000
 // claude-opus-4-8 is priced input 5 / output 25 per million; the multipliers are 1.25 / 2 / 0.1.

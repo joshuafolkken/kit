@@ -18,7 +18,7 @@ import {
 	type CommandRunner,
 	type FormatCommand,
 } from './format-edited-file'
-import { time_density_hook } from './time/time-density-hook'
+import { time_density_hook } from './time-runtime/time-density-hook'
 import { time_transcript_fixture } from './time/time-transcript-fixture'
 
 // Under the OS temp directory for the reason yaml-config-fixture.test.ts gives: several suites here

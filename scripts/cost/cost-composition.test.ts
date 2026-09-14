@@ -1,7 +1,7 @@
+import type { ContentBlock } from '#scripts/cost-runtime/cost-blocks'
+import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { describe, expect, it } from 'vitest'
-import type { ContentBlock } from './cost-blocks'
 import { cost_composition, type CompositionRow } from './cost-composition'
-import { cost_tokens } from './cost-tokens'
 
 const THINKING_TOKENS = 1234
 const RESULT_TEXT = 'a'.repeat(300)

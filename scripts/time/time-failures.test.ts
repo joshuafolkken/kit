@@ -1,8 +1,8 @@
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_failures } from './time-failures'
-import { time_shell } from './time-shell'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 const { MINUTE_MS, span, outcome_span } = time_span_fixture
 const { OK_OUTCOME, FAILED_OUTCOME, UNKNOWN_OUTCOME } = time_spans

@@ -1,5 +1,5 @@
-import { time_format } from './time-format'
-import { time_instant } from './time-instant'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_instant } from '#scripts/time-runtime/time-instant'
 
 // The three nested windows one run sits in (joshuafolkken/kit#1409).
 //

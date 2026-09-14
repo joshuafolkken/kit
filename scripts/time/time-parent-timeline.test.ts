@@ -1,3 +1,4 @@
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import {
 	time_parent_timeline,
@@ -6,7 +7,6 @@ import {
 } from './time-parent-timeline'
 import type { PricedRequest } from './time-region-costs'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 // joshuafolkken/kit#1940: a `backlogrun` parent's own timeline — when it first dispatched a lane, what
 // it waited on in the foreground, and the work it implemented itself. The synthetic run below is the

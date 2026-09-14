@@ -1,3 +1,4 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_cycles } from './time-cycles'
@@ -5,7 +6,6 @@ import type { Interval } from './time-overlap'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_report } from './time-report'
 import { time_report_fixture } from './time-report-fixture'
-import type { Span } from './time-spans'
 
 const { MERGE_COMMAND, GATE_COMMAND, span } = time_phase_fixture
 const { line_of, run_report_of } = time_report_fixture

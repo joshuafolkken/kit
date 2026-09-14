@@ -1,7 +1,7 @@
 import { git_followup_stages, type FollowupStage } from '#scripts/git/git-followup-stages'
-import { time_format } from './time-format'
-import { time_shell } from './time-shell'
-import type { Span } from './time-spans'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_shell } from '#scripts/time-runtime/time-shell'
+import type { Span } from '#scripts/time-runtime/time-spans'
 
 // The per-stage table `josh time` prints for the `followup` invocations in its window
 // (joshuafolkken/kit#1445).

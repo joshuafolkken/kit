@@ -1,5 +1,6 @@
-import { cost_attribute } from '#scripts/cost/cost-attribute'
-import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { cost_attribute } from '#scripts/cost-runtime/cost-attribute'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import {
 	time_delegated_wait,
 	type DelegatedWait,
@@ -9,7 +10,6 @@ import { time_duplicate, type SessionSpans } from './time-duplicate'
 import { time_family, type Family, type SpanReader } from './time-family'
 import { time_overlap } from './time-overlap'
 import { time_sessions, type SessionMinutes } from './time-sessions'
-import { time_spans, type Span } from './time-spans'
 
 // The project's transcripts, read once and attributed to every issue asked about
 // (joshuafolkken/kit#1284).

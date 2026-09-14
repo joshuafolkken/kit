@@ -1,4 +1,4 @@
-import { time_shell } from '#scripts/time/time-shell'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'
 
 // The rule delivered at the call that pipes a verification command (joshuafolkken/kit#1556).

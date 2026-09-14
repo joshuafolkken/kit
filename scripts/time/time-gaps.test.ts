@@ -1,12 +1,12 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
 import { time_gaps } from './time-gaps'
-import { time_markers } from './time-markers'
 import { time_phase_fixture } from './time-phase-fixture'
 import { time_report } from './time-report'
 import { time_report_fixture } from './time-report-fixture'
-import { time_round_trips } from './time-round-trips'
-import { time_spans, type Span } from './time-spans'
 
 // The model wait a run spends per round trip, read as a distribution rather than as a mean
 // (joshuafolkken/kit#1386).

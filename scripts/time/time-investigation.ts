@@ -1,7 +1,7 @@
 import { investigation_reads, type ClassifiedRead } from '#scripts/delegation/investigation-reads'
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { time_phases } from './time-phases'
-import { time_spans, type Span } from './time-spans'
 
 // What the main line's reading *was*, rather than how much of it there was
 // (joshuafolkken/kit#1764).

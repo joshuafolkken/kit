@@ -1,6 +1,6 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_instant } from '#scripts/time-runtime/time-instant'
 import { time_contributors } from './time-contributors'
-import { time_format } from './time-format'
-import { time_instant } from './time-instant'
 import type { SerialInterval } from './time-lanes'
 import type { DayTotals, LaneTotals, PeriodTimeReport } from './time-period'
 

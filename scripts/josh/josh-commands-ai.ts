@@ -75,7 +75,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 	},
 	cost: {
-		script: 'scripts/cost/cost-cli.ts',
+		script: 'scripts/cost-runtime/cost-cli.ts',
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",
 		category: 'AI tools',
 	},

@@ -1,6 +1,6 @@
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_line_fixture } from './time-line-fixture'
-import { time_spans, type Span } from './time-spans'
 
 // A command the harness took into the background, read end to end from a transcript
 // (joshuafolkken/kit#1662).

@@ -1,4 +1,5 @@
 import { bounded_pool } from '#scripts/bounded-pool'
+import { time_spans } from '#scripts/time-runtime/time-spans'
 import { time_ci } from './time-ci'
 import { time_corpus } from './time-corpus'
 import type { GhReader, PullSearch } from './time-github'
@@ -6,7 +7,6 @@ import { time_pull_index } from './time-pull-index'
 import { time_report, type TimeReport } from './time-report'
 import { time_rework } from './time-rework'
 import { time_run, type RunSources } from './time-run'
-import { time_spans } from './time-spans'
 import { time_windows } from './time-windows'
 
 // Measuring several runs at once — the fan-out `--epic` and `--last` both go through

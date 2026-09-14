@@ -1,7 +1,7 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_phases, type PhaseName } from './time-phases'
 import { time_placed, type Placed } from './time-placed'
-import type { Span } from './time-spans'
 
 // The run read as a sequence of timed segments (joshuafolkken/kit#1311).
 //

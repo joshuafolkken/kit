@@ -1,7 +1,7 @@
+import { time_model_gaps } from '#scripts/time/time-model-gaps'
+import { time_span_fixture } from '#scripts/time/time-span-fixture'
 import { describe, expect, it } from 'vitest'
-import { time_model_gaps } from './time-model-gaps'
 import { time_round_trips } from './time-round-trips'
-import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span } from './time-spans'
 
 const MODEL = time_span_fixture.span(time_spans.MODEL_CATEGORY)

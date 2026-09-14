@@ -1,5 +1,5 @@
+import { time_bundles } from '#scripts/time-runtime/time-bundles'
 import { expect } from 'vitest'
-import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
 import { time_cycles } from './time-cycles'
 import { time_delegated_wait } from './time-delegated-wait'

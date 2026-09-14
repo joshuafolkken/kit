@@ -1,4 +1,7 @@
 import path from 'node:path'
+import { cost_format } from '#scripts/cost-runtime/cost-format'
+import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
+import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { json_value } from '#scripts/json-value'
 import {
 	cost_document_reads,
@@ -6,9 +9,6 @@ import {
 	type DocumentReadPoint,
 	type ReadContext,
 } from './cost-document-reads'
-import { cost_format } from './cost-format'
-import { cost_pricing } from './cost-pricing'
-import { cost_usage, type UsageRecord } from './cost-usage'
 
 // Attributing the carried cost of the run's entry-read instruction documents, one row per document
 // (joshuafolkken/kit#1871).

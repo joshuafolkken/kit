@@ -1,6 +1,6 @@
+import { cost_usage, type UsageRecord, type UsageTotals } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
 import { cost_report, type CostReport, type MissingData } from './cost-report'
-import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 
 const NO_MISSING: MissingData = {
 	no_usage_lines: 0,

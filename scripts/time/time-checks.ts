@@ -1,4 +1,4 @@
-import { time_format } from './time-format'
+import { time_format } from '#scripts/time-runtime/time-format'
 import type { CheckRun } from './time-github'
 
 // What each CI check concluded, and whether it finished in time to have held the merge up

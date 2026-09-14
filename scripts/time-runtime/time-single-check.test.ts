@@ -1,7 +1,7 @@
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_single_check } from './time-single-check'
 import { time_spans } from './time-spans'
-import { time_transcript_fixture } from './time-transcript-fixture'
 
 // What makes two calls the same verification check (joshuafolkken/kit#1383).
 //

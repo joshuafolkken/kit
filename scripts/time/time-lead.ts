@@ -1,7 +1,7 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import { time_overlap, type Interval } from './time-overlap'
 import { time_phases, type PhaseName } from './time-phases'
 import { time_segments } from './time-segments'
-import type { Span } from './time-spans'
 
 // What a window was spent behind: the phase that overlapped it longest and the busiest command inside
 // it (joshuafolkken/kit#1881).

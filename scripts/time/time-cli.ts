@@ -1,10 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { cost_usage } from '#scripts/cost-runtime/cost-usage'
+import { transcript_cwd } from '#scripts/cost-runtime/transcript-cwd'
 import { cost_run_report } from '#scripts/cost/cost-run-report'
-import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
-import { cost_usage } from '#scripts/cost/cost-usage'
-import { transcript_cwd } from '#scripts/cost/transcript-cwd'
+import { time_spans, type Span, type Timeline } from '#scripts/time-runtime/time-spans'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_cli_refuse } from './time-cli-refuse'
 import { time_epic } from './time-epic'
@@ -21,7 +22,6 @@ import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
 import { time_run_state } from './time-run-state'
 import { time_run_state_collect } from './time-run-state-collect'
-import { time_spans, type Span, type Timeline } from './time-spans'
 
 // `josh time` — where a run's wall clock went, read from Claude Code's own session transcripts and,
 // for the part no transcript records, from GitHub (joshuafolkken/kit#1267, joshuafolkken/kit#1268).
@@ -437,7 +437,7 @@ async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Pr
 
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and
 // `process.exit()` tears the process down before a pipe has drained — the same idiom, for the same
-// reason, as `scripts/cost/cost-cli.ts`.
+// reason, as `scripts/cost-runtime/cost-cli.ts`.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

@@ -1,12 +1,12 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { PHASE_ORDER, type PhaseName } from '#scripts/time-runtime/time-phase-names'
+import { time_spans } from '#scripts/time-runtime/time-spans'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_contributors } from './time-contributors'
 import { time_distribution, type Distribution, type LabeledDistribution } from './time-distribution'
-import { time_format } from './time-format'
 import { time_github, type GhReader, type PullSearch } from './time-github'
 import { time_last_select, type RunSelection } from './time-last-select'
-import { PHASE_ORDER, type PhaseName } from './time-phase-names'
 import { time_report, type TimeReport } from './time-report'
-import { time_spans } from './time-spans'
 
 // The last N merged runs, read as a distribution rather than one run at a time
 // (joshuafolkken/kit#1312).

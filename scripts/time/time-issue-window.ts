@@ -1,7 +1,7 @@
 import { json_value } from '#scripts/json-value'
+import { time_instant } from '#scripts/time-runtime/time-instant'
 import { z } from 'zod'
 import { time_github, type GhReader } from './time-github'
-import { time_instant } from './time-instant'
 import { time_windows, type TimeWindow } from './time-windows'
 
 // The outermost of the three windows: from the moment the issue was filed to the moment it closed

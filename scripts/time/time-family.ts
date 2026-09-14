@@ -1,7 +1,7 @@
-import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { time_delegated_wait, type DelegatedWaitTotals } from './time-delegated-wait'
 import { time_overlap, type Interval } from './time-overlap'
-import { time_spans, type Span } from './time-spans'
 
 // A run is a family of transcripts, not one node (joshuafolkken/kit#1439).
 //

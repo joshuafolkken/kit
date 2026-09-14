@@ -1,5 +1,5 @@
-import { time_markers } from './time-markers'
-import type { Span } from './time-spans'
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import type { Span } from '#scripts/time-runtime/time-spans'
 
 // Interval arithmetic, and the one thing it is for: not counting the same wall clock twice
 // (joshuafolkken/kit#1268, joshuafolkken/kit#1285).

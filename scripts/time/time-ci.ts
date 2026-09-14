@@ -1,3 +1,4 @@
+import type { Span } from '#scripts/time-runtime/time-spans'
 import {
 	time_github,
 	type CheckRun,
@@ -7,7 +8,6 @@ import {
 	type PullSummary,
 } from './time-github'
 import { time_overlap, type Interval } from './time-overlap'
-import type { Span } from './time-spans'
 
 // What a run actually waited for CI, and where that wait fell (joshuafolkken/kit#1384).
 //

@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost/cost-transcript'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 
 // Which transcript a Claude Code hook payload is actually about (joshuafolkken/kit#1424).
 //

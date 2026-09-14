@@ -1,4 +1,4 @@
-import { cost_attribute } from '#scripts/cost/cost-attribute'
+import { cost_attribute } from '#scripts/cost-runtime/cost-attribute'
 import {
 	time_github,
 	type GhReader,

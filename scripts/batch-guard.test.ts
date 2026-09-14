@@ -13,7 +13,7 @@ import {
 	refusal_path,
 	SWITCH_ENV_KEY,
 } from './batch-guard'
-import { time_hook_transcript } from './time/time-hook-transcript'
+import { time_hook_transcript } from './time-runtime/time-hook-transcript'
 import { time_transcript_fixture } from './time/time-transcript-fixture'
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'batch-guard-'))

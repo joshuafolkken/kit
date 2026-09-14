@@ -1,7 +1,7 @@
+import type { AttributedRecord } from '#scripts/cost-runtime/cost-corpus'
+import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
-import type { AttributedRecord } from './cost-corpus'
 import { cost_sessions } from './cost-sessions'
-import { cost_usage, type UsageRecord } from './cost-usage'
 
 const OPUS = 'claude-opus-4-8'
 const MINUTE = 60_000

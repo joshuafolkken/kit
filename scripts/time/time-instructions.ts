@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { cost_tokens } from '#scripts/cost/cost-tokens'
+import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
-import { time_format } from './time-format'
-import { time_spans, type Span } from './time-spans'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 // What the instruction text a run loads costs it in wall clock (joshuafolkken/kit#1477).
 //

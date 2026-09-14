@@ -1,8 +1,8 @@
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_report } from './time-report'
 import { time_report_fixture } from './time-report-fixture'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 import { time_tool_turns, type ToolTurnCounts } from './time-tool-turns'
 
 const { span } = time_span_fixture

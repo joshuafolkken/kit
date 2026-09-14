@@ -1,8 +1,8 @@
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { time_ci, type CiFacts } from './time-ci'
-import { time_markers } from './time-markers'
 import type { Interval } from './time-overlap'
 import type { PhaseName, PhaseTotal } from './time-phases'
-import { time_spans, type Span } from './time-spans'
 
 // A span positioned on a clock, for the suites that measure how the phase breakdown *slices* a
 // timeline (joshuafolkken/kit#1299).

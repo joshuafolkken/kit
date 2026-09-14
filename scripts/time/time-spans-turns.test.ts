@@ -1,5 +1,5 @@
+import { time_spans } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_spans } from './time-spans'
 
 // Which turn a span belongs to (joshuafolkken/kit#1406).
 //

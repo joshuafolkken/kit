@@ -1,5 +1,5 @@
+import { time_format } from '#scripts/time-runtime/time-format'
 import { time_distribution, type LabeledDistribution } from './time-distribution'
-import { time_format } from './time-format'
 import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 
 // What a *set* of runs spent its turns on, rather than what one run did (joshuafolkken/kit#1763).

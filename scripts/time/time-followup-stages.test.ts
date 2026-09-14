@@ -1,11 +1,11 @@
 import { git_followup_stages } from '#scripts/git/git-followup-stages'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
 import { time_followup_stages } from './time-followup-stages'
-import { time_format } from './time-format'
 import { time_report } from './time-report'
 import { time_report_fixture } from './time-report-fixture'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 import { time_transcript_fixture } from './time-transcript-fixture'
 
 const SECOND_MS = 1000

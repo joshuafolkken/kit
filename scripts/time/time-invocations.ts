@@ -1,7 +1,7 @@
-import { time_command_key } from './time-command-key'
-import { time_format } from './time-format'
-import { time_round_trips } from './time-round-trips'
-import { time_spans, type Span } from './time-spans'
+import { time_command_key } from '#scripts/time-runtime/time-command-key'
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 // What each call of a repeated command cost, one by one (joshuafolkken/kit#1311).
 //

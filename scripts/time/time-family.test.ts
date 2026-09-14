@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_corpus } from './time-corpus'
 import { time_family } from './time-family'

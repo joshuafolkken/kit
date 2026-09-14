@@ -1,9 +1,9 @@
+import { time_format } from '#scripts/time-runtime/time-format'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { describe, expect, it } from 'vitest'
-import { time_format } from './time-format'
 import type { PullFile } from './time-pull-files'
 import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span } from './time-spans'
 
 // Reconciling a run's edits against its merged diff, and the size of that diff
 // (joshuafolkken/kit#1387).

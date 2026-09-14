@@ -1,7 +1,5 @@
-import { time_background } from './time-background'
-import type { CiFacts } from './time-ci'
-import { time_markers } from './time-markers'
-import { time_overlap } from './time-overlap'
+import { time_background } from '#scripts/time-runtime/time-background'
+import { time_markers } from '#scripts/time-runtime/time-markers'
 import {
 	CI_PHASE,
 	COMMAND_PHASES,
@@ -23,8 +21,10 @@ import {
 	WAIT_PHASE,
 	WRAPUP_PHASE,
 	type PhaseName,
-} from './time-phase-names'
-import { time_spans, type Span } from './time-spans'
+} from '#scripts/time-runtime/time-phase-names'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
+import type { CiFacts } from './time-ci'
+import { time_overlap } from './time-overlap'
 
 // Cutting the same elapsed time by workflow phase rather than by what was waited on
 // (joshuafolkken/kit#1269).
@@ -639,4 +639,4 @@ const time_phases = {
 export type { PhaseInput, PhaseTotal }
 export { time_phases }
 
-export { type PhaseName } from './time-phase-names'
+export { type PhaseName } from '#scripts/time-runtime/time-phase-names'
