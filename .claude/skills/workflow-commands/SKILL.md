@@ -428,7 +428,7 @@ rather than assumed**: before dispatching, ask of each brief whether it could ha
 *start* of the investigation — the ones that could go out together, and only a brief that genuinely
 cannot be written until an earlier unit has answered waits for that answer. Enforcement is not
 implemented (the launches are minutes apart and independence between two free-text briefs exposes no
-mechanical target), so the rule is carried in prose and `pnpm josh time` measures whether it held.
+mechanical target), so the rule is carried in prose and the run-timing measurement shows whether it held.
 
 **Where the Issue already names the location, the reading is not delegated at all.** A body or a
 comment that names the file, the function or the rule has done the unit's job, and the reading that

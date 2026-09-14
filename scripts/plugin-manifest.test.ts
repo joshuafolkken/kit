@@ -2,12 +2,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// The five skill directories ship as the `kit` Claude Code plugin instead of being copied
+// The skill directories that ship as the `kit` Claude Code plugin instead of being copied
 // (joshuafolkken/kit#1879). These guards keep the two manifests and their package-`files` coverage in
 // place, since a consumer receives the skills only through them. Content is matched as text rather
-// than parsed to stay within the no-`any` rule the JSON parse would otherwise trip.
+// than parsed to stay within the no-`any` rule the JSON parse would otherwise trip. `diag` is absent:
+// it is kit's own run-measurement skill, dropped from the package and plugin (joshuafolkken/kit#1997).
 const ROOT = process.cwd()
-const SKILLS = ['workflow-commands', 'epic-commands', 'dependency-update', 'verify-ui', 'diag']
+const SKILLS = ['workflow-commands', 'epic-commands', 'dependency-update', 'verify-ui']
 const NAME_KIT = '"name": "kit"'
 
 function read(relative: string): string {

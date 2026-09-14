@@ -9,7 +9,7 @@ import { skill_migration } from './skill-migration'
 // sync` built it — `cpSync` then the markdown transform — and the migration must recognize it.
 const PACKAGE_DIR = process.cwd()
 const VERIFY_UI = '.claude/skills/verify-ui'
-const DIAG = '.claude/skills/diag'
+const EPIC_COMMANDS = '.claude/skills/epic-commands'
 
 // A holder rather than a bare `let`: `beforeEach` writes a property here rather than reassigning a
 // module binding, which `unicorn/no-top-level-assignment-in-function` forbids.
@@ -47,11 +47,11 @@ describe('skill_migration.migrate_removed_skill_directories', () => {
 	})
 
 	it('keeps a copy the consumer edited', () => {
-		copy_clean(DIAG)
-		writeFileSync(path.join(context.project, DIAG, 'SKILL.md'), 'edited by the consumer\n')
+		copy_clean(EPIC_COMMANDS)
+		writeFileSync(path.join(context.project, EPIC_COMMANDS, 'SKILL.md'), 'edited by the consumer\n')
 
-		expect(action_for(DIAG)).toBe('kept')
-		expect(existsSync(path.join(context.project, DIAG))).toBe(true)
+		expect(action_for(EPIC_COMMANDS)).toBe('kept')
+		expect(existsSync(path.join(context.project, EPIC_COMMANDS))).toBe(true)
 	})
 
 	it('reports absent when the consumer never received the copy', () => {

@@ -257,7 +257,7 @@ The implementation cut cannot be: its trigger is the per-request cost, and that 
 transcript **asynchronously** (`cost --over` loads the corpus), while a `PreToolUse` guard answers
 synchronously or not at all — and a synchronous approximation would be the very "separate measurement
 for the lane child" joshuafolkken/kit#1933 forbids. So the child runs `pnpm josh cost --over 200000`
-at each boundary itself, and whether the run held to it is read from `pnpm josh time` and
+at each boundary itself, and whether the run held to it is read from the run-timing report and
 `pnpm josh cost` on a real dispatched run (see "Measurement" below) — the same feedback loop the
 pre-gate cut's own measurement uses.
 
@@ -266,7 +266,7 @@ pre-gate cut's own measurement uses.
 **A single check (`lint:related` / `test:related`) is run after a batch of edits, not after each
 one.** Every check is a boundary this cut can be taken at, but it is also a request, and running one
 after every small edit grows the context this cut exists to bound. This is consistent with
-joshuafolkken/kit#1383 — a single check answers once per tree — and observable in `pnpm josh time`'s
+joshuafolkken/kit#1383 — a single check answers once per tree — and observable in the run-timing report's
 `Single checks:` block, whose repeat and unchanged-call counts rise when checks outnumber edit
 batches.
 
@@ -289,7 +289,7 @@ prohibition.
 ## Measurement
 
 The mechanism is what makes the per-call context drop possible; the drop itself is measured on a real
-dispatched lane run with `pnpm josh cost` and `pnpm josh time`, comparing the average context per
+dispatched lane run with `pnpm josh cost` and the run-timing report, comparing the average context per
 request before and after. **Until that run is measured it is reported as unmeasured** — the bytes a
 record holds, the cache a session keeps and the billed cost are distinct, and only a measured run
 tells whether the average fell.

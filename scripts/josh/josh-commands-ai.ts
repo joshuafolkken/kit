@@ -93,6 +93,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/time/time-cli.ts',
 		description: "Report where a run's wall clock went: model wait, tool execution, human wait",
 		category: 'AI tools',
+		// Kit-only: it measures kit's own development runs and its report modules live under the
+		// undistributed `scripts/time/`, so it means nothing in a consumer project and is dropped from a
+		// consumer's help (joshuafolkken/kit#1997). The runtime analysis hooks and guards rely on stays
+		// distributed under `scripts/time-runtime/`.
+		is_kit_only: true,
 	},
 	'review:brief': {
 		script: 'scripts/review/review-brief-cli.ts',

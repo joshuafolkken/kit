@@ -57,7 +57,11 @@
 		"!**/*.test.ts",
 		"!scripts/gh-subcommand-guard.ts",
 		"!**/*.spec.ts",
-		"!**/*-fixture.ts"
+		"!**/*-fixture.ts",
+		"!scripts/eval",
+		"!scripts/time",
+		"!scripts/cost",
+		"!.claude/skills/diag"
 	],
 	"imports": {
 		"#eslint/*": "./eslint/*",
