@@ -34,6 +34,8 @@ const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
 const WORKTREE = path.join(scratch, '.git')
 const OTHER_WORKTREE = path.join(scratch, '.git', 'worktrees', 'second')
 const COMMON = path.join(scratch, '.git')
+const SEPARATE_COMMON = path.join(scratch, 'custom-git-dir')
+const SEPARATE_WORKTREE = path.join(SEPARATE_COMMON, 'worktrees', 'lane')
 const ISSUE = '1091'
 const OTHER_ISSUE = '1090'
 const NOT_A_NUMBER = 'not-a-number'
@@ -145,12 +147,28 @@ describe('the preflight check before a claim', () => {
 		expect(preflight_check).not.toHaveBeenCalled()
 		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
 	})
+})
 
-	// A lane is a linked work tree whose HEAD is on `<N>-lane`, so the `reclaim` arm would fire on
-	// every one; `lane:open`'s own answer covers an interrupted lane instead.
-	it('does not run the check in a lane, and claims directly', async () => {
-		git_directories.mockResolvedValue([OTHER_WORKTREE, COMMON])
+// A lane is a linked work tree whose HEAD is on `<N>-lane`, so the preflight `reclaim` arm would fire
+// on every one; `lane:open`'s own answer covers an interrupted lane instead. A lane is detected by its
+// git directory differing from the common one, not by a `.git` segment.
+describe('a lane skips the preflight check', () => {
+	beforeEach(() => {
 		preflight_check.mockResolvedValue(RECLAIM_DECISION)
+	})
+
+	it('claims directly in a lane under a .git directory', async () => {
+		git_directories.mockResolvedValue([OTHER_WORKTREE, COMMON])
+
+		expect(await run_hold_cli.run([ISSUE])).toBe(SUCCESS_EXIT_CODE)
+		expect(preflight_check).not.toHaveBeenCalled()
+		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
+	})
+
+	// A `--separate-git-dir` clone or a bare repository (joshuafolkken/kit#1106) has a git directory
+	// not named `.git`; comparing it to the common directory still detects the lane.
+	it('claims directly in a lane whose git directory is not named .git', async () => {
+		git_directories.mockResolvedValue([SEPARATE_WORKTREE, SEPARATE_COMMON])
 
 		expect(await run_hold_cli.run([ISSUE])).toBe(SUCCESS_EXIT_CODE)
 		expect(preflight_check).not.toHaveBeenCalled()

@@ -40,11 +40,6 @@ const RELEASE_FLAG = '--release'
 const FORCE_FLAG = '--force'
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:hold [<issue-number>] | josh run:release [<issue-number> | --force]'
-// What `git rev-parse --absolute-git-dir` carries only in a linked work tree — a lane — so the claim
-// can tell one from the primary checkout without a second git call. Anchored on `.git/` so a repo
-// whose own path contains a `worktrees` segment does not read as a lane in the primary checkout: the
-// primary git dir ends `/.git`, a lane's is `/.git/worktrees/<name>`.
-const LINKED_WORKTREE_MARKER = '/.git/worktrees/'
 
 const HOLD_VERDICT = 'hold'
 const BUSY_VERDICT = 'busy'
@@ -162,14 +157,6 @@ function report_preflight(decision: PreflightDecision): number {
 	return SUCCESS_EXIT_CODE
 }
 
-// A lane is a linked work tree whose HEAD sits on `<N>-lane` by design, so the preflight `reclaim`
-// arm (HEAD off the default branch) would fire on every one of them, and its recovery cannot run in a
-// linked tree. `lane:open`'s own answer is what covers an interrupted lane, so the claim skips the
-// check there — the rule the two-command form stated as "preflight is not asked in a lane".
-function is_linked_worktree(directory: string): boolean {
-	return directory.includes(LINKED_WORKTREE_MARKER)
-}
-
 // **The tree is checked before it is claimed.** A numbered claim carries a child whose branch and
 // pull request the check reads; a non-`clean` verdict stops the claim and is returned as-is, so no
 // record is written over work a run left behind. Two claims skip it: the unnumbered `new` claim has
@@ -279,7 +266,9 @@ async function answer(request: HoldRequest): Promise<number> {
 
 	if (directory === undefined) return report_unknown()
 
-	return await dispatch(request, run_hold.hold_path(directory), is_linked_worktree(directory))
+	const is_linked = await run_hold.is_linked_worktree()
+
+	return await dispatch(request, run_hold.hold_path(directory), is_linked)
 }
 
 // **Every path out of here prints exactly one token**, including the ones nobody planned: a permission
