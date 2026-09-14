@@ -46,3 +46,39 @@ describe('every josh command a document names exists', () => {
 		expect(unknown_commands('`pnpm josh gate` then `josh rh`')).toStrictEqual([])
 	})
 })
+
+// The command reference must stay in step with the command map both ways: every command has a
+// section, and no section documents a command that no longer exists (joshuafolkken/kit#1929). A
+// section is a heading whose code span names the command, so a grouped heading
+// (`` `josh run:hold` / `josh run:release` ``) covers each command it names.
+const COMMAND_DOC = 'docs/josh-commands.md'
+
+function documented_commands(): Set<string> {
+	const headings = read_document(COMMAND_DOC)
+		.split('\n')
+		.filter((line) => /^#{2,4} /u.test(line))
+	const names = new Set<string>()
+
+	for (const heading of headings) {
+		for (const name of document_scan.command_references(heading)) names.add(name)
+	}
+
+	return names
+}
+
+describe('the command reference covers exactly the command map', () => {
+	it('gives every command map entry a section', () => {
+		const documented = documented_commands()
+		const missing = Object.keys(COMMAND_MAP).filter((name) => !documented.has(name))
+
+		expect(missing).toStrictEqual([])
+	})
+
+	it('documents no section for a command that does not exist', () => {
+		const unknown: Array<string> = []
+
+		for (const name of documented_commands()) if (!KNOWN_COMMANDS.has(name)) unknown.push(name)
+
+		expect(unknown).toStrictEqual([])
+	})
+})
