@@ -35,7 +35,7 @@ async function read_checkout(): Promise<ReviewCheckout> {
 
 // **All three, not the root alone.** A second work tree of the same repository has a different root,
 // which the root test catches on its own; a `git switch` inside the right tree does not, and that is
-// the case `backlogrun.md` → "Lanes" warns about, since a lane's branch is what its commit lands on.
+// the case `backlogrun-lanes.md` → "Lanes" warns about, since a lane's branch is what its commit lands on.
 // The head is the third: a tree that moved between the brief and the review is not the tree the
 // brief described.
 function is_same_checkout(expected: ReviewCheckout, actual: ReviewCheckout): boolean {

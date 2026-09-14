@@ -9,7 +9,7 @@ import { run_invocation } from './run-invocation'
 // whole-run bound — and then loses all of it at the session cut, because the cut ends the session and
 // the next one starts from nothing. The decision recorded on that issue is that **the cut is an
 // execution detail of the same authorization**, so the budget has to survive it. Nothing in this
-// repository persisted a run across sessions before: `backlogrun.md` → "What carries over" reads its
+// repository persisted a run across sessions before: `backlogrun-progress.md` → "What carries over" reads its
 // state back off GitHub, and there is no epic to read it off when the run began from the backlog.
 //
 // **The unit is the repository, not the working tree.** `run-hold.ts` keys on the work tree's own git

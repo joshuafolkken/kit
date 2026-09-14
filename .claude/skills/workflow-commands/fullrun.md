@@ -28,7 +28,7 @@ repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`** — th
 stop, a split, a prerequisite discovered mid-run, and a third-party target (a `new` entry that stops
 before it files has nothing to remove). A `needs-human-review` stop keeps both the hold and the label,
 because the tree still carries uncommitted work. A lane child dispatched by `backlogrun` finds the label
-already applied by the parent at dispatch (`backlogrun.md` → "Concurrency"), so re-applying it here is
+already applied by the parent at dispatch (`backlogrun-lanes.md` → "Concurrency"), so re-applying it here is
 idempotent.
 
 **A dispatched lane child asks whether it is a resume before any of the above — `pnpm josh run:cut
@@ -48,12 +48,12 @@ carrying the figure printed on standard error and the resume command (the invoca
 in a fresh session — `fullrun #<N>` for a `#N` entry, `fullrun new` for a `new` one), run
 `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run was dispatched
 by `backlogrun`** — that batch owns the same question at its own seam.
-`backlogrun.md` → "The hand-off" is the single source of the check and of where 300,000 comes from.
+`backlogrun-progress.md` → "The hand-off" is the single source of the check and of where 300,000 comes from.
 
 **Start the progress step once the hold is claimed, and start it without being asked** —
 `pnpm josh run:progress --wait` in the background, what it printed presented in labelled form when it
 exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
-every real report this run makes. The procedure is `backlogrun.md` → "Progress while the run is quiet",
+every real report this run makes. The procedure is `backlogrun-progress.md` → "Progress while the run is quiet",
 its single source; a `fullrun` running as a `backlogrun` named issue or epic child starts none.
 
 **Read Issue `#N` and every comment on it before implementing** — `pnpm josh issue:read <N>`. A
@@ -95,7 +95,7 @@ run `backlogrun #<E> --only` to execute this epic."
 three-way distinction, the `route:tier-a` filing command and the filing ceiling are `SKILL.md` → §2d,
 the single source; what follows is this entry's branch. Typing `fullrun` approved merging **one**
 Issue; a batch is a different authorization, so the stop stays. Inside a `backlogrun` the same discovery
-is recorded as a dependency and **not** parked (`backlogrun.md` → "A prerequisite discovered mid-run").
+is recorded as a dependency and **not** parked (`backlogrun-park.md` → "A prerequisite discovered mid-run").
 The procedure, in order:
 
 1. **File the prerequisite `#<P>` without asking** (Tier A, first-party), tagging it `route:tier-a`.

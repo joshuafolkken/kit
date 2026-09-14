@@ -15,7 +15,7 @@ const COMMAND_PATTERN = /`(?:pnpm )?josh ([a-z][a-z0-9:-]+)/gu
 const LABEL_PATTERN = /(?:labels\[\]=|\/labels\/|labels -f name=)([a-z][a-z0-9:_-]*)/gu
 
 // A section reference: a markdown file in a code span, an arrow, and the cited heading in straight or
-// Japanese quotes — `` `backlogrun.md` → "The hand-off" ``.
+// Japanese quotes — `` `backlogrun-progress.md` → "The hand-off" ``.
 const SECTION_PATTERN = /`([\w./-]+\.md)`\s*→\s*["「]([^"」]+)["」]/gu
 
 // A relative markdown link target, with an optional `#anchor`. External `https://…` links carry no

@@ -197,7 +197,7 @@ resumes the same lane **back into implementation** carrying none of the thinking
 
 The child decides whether to cut with the same measurement the parent uses between children —
 `pnpm josh cost --over <threshold>` (`cost_verdict.per_request_cost`, billed input tokens per
-request), whose single source is `backlogrun.md` → "The hand-off". **Only the threshold differs**: the
+request), whose single source is `backlogrun-progress.md` → "The hand-off". **Only the threshold differs**: the
 parent's seam is 300_000, the child's is `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` — **200_000
 initially**. No separate measurement is built for the lane child.
 

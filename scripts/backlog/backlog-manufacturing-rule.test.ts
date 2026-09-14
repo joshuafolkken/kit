@@ -27,7 +27,7 @@ import { describe, expect, it } from 'vitest'
 const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
 const REVIEW_PROMPT = 'prompts/review.md'
 const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
-const EPICRUN_SKILL = '.claude/skills/workflow-commands/backlogrun.md'
+const LANES_DOC = '.claude/skills/workflow-commands/backlogrun-lanes.md'
 // The guide, written once: the single source and the entry summary have to state the same numbers,
 // and a guide that drifted between them would be two different thresholds under one rule.
 const SPLIT_GUIDE = 'about 10 changed files and about 400 changed lines'
@@ -251,7 +251,9 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 // A rule written only in `wip-cap.md` fires only for a run that opens `wip-cap.md`, and nothing in
 // the batch entry points sent a reader there — `epicrun` fills every free lane from
 // `epic:next --lanes` without ever reading the cap. So the solo-run rule is asserted reachable from
-// `backlogrun.md`, which dispatches children (joshuafolkken/kit#1518). joshuafolkken/kit#1959 dropped the
+// `backlogrun-lanes.md`, the point-of-use document read before the first lane opens, which is where
+// children are dispatched (joshuafolkken/kit#1518, split out of `backlogrun.md` by joshuafolkken/kit#2010).
+// joshuafolkken/kit#1959 dropped the
 // SKILL.md §2 restatement of both the solo-run rule and the split default, since
 // joshuafolkken/kit#1925 deduplicates §2 into the single sources — the split default stays pinned on
 // `split-assessment.md` above and anchored in `document-markers.test.ts`.
@@ -259,15 +261,15 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 // wrapped source reads as — which is also why a hard-wrapped sentence can be pinned at all.
 const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
 	{
-		doc: EPICRUN_SKILL,
+		doc: LANES_DOC,
 		marker: 'an interrupt whose subject is a defect in the verification path itself',
 	},
 	{
-		doc: EPICRUN_SKILL,
+		doc: LANES_DOC,
 		marker:
 			'the verification gate (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge checks?',
 	},
-	{ doc: EPICRUN_SKILL, marker: 'It runs alone, and the batch resumes only once it has merged.' },
+	{ doc: LANES_DOC, marker: 'It runs alone, and the batch resumes only once it has merged.' },
 ]
 
 describe('the solo-run rule is reachable from the document that dispatches children', () => {

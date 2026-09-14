@@ -13,7 +13,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 //
 // **The premise the session cut rests on was not true, and this is what makes it true.** A delegated
 // child used to be an in-process subagent of the parent session, so cutting the parent killed every
-// child still implementing: `backlogrun.md` → "The hand-off" says "nothing has to finish, because nothing
+// child still implementing: `backlogrun-progress.md` → "The hand-off" says "nothing has to finish, because nothing
 // is being abandoned", and what actually happened was that the next session polled a file whose writer
 // was dead, waited out the silent-unit window, booked each lane `stopped`, and aborted the whole run on
 // the third one. Launched detached, the child survives the cut and the sentence holds as written.

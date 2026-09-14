@@ -172,7 +172,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 **`epicrun` was removed (joshuafolkken/kit#1985); its job folded into `backlogrun` too.** A named item may now be an epic, whose children all run before the next item; **`backlogrun #E --only` runs one epic's children and stops**. If a user types `epicrun`, tell them to run `backlogrun #E --only` (drop `--only` to also drain the backlog).
 
-**Three rules decide what a run does when the work turns out not to be one Issue** — the split assessment every entry point applies identically (**its default is not to split**: separability **and** a scope clearly exceeding one verification gate — about 10 changed files, about 400 changed lines — must both hold), a prerequisite discovered mid-run (a dependency, not parked), and a named `backlogrun` item that is not an epic. All bind only after a command has started, so all are read from the `workflow-commands` skill: `split-assessment.md`, `SKILL.md` → §2d, `backlogrun.md` → "When `#N` is not an epic", and `fullrun.md` / `halfrun.md` / `backlogrun.md` for the branch each entry takes.
+**Three rules decide what a run does when the work turns out not to be one Issue** — the split assessment every entry point applies identically (**its default is not to split**: separability **and** a scope clearly exceeding one verification gate — about 10 changed files, about 400 changed lines — must both hold), a prerequisite discovered mid-run (a dependency, not parked), and a named `backlogrun` item that is not an epic. All bind only after a command has started, so all are read from the `workflow-commands` skill: `split-assessment.md`, `SKILL.md` → §2d, `backlogrun-child.md` → "When `#N` is not an epic", and `fullrun.md` / `halfrun.md` / `backlogrun.md` for the branch each entry takes.
 
 **The `josh epic:*` commands have their own skill** — `epic:audit`, `epic:next`, `epic:bundle`, and how an epic spans repositories. **Read the `epic-commands` skill before running any of them, before writing an epic that tracks a child in another repository, and right after filing an issue.** Three rules stay here because they bind outside those commands: **recording a decision removes that child's `needs-decision` label** (Tier A); **fixing what the audit finds is Tier A**, park only when the contradiction is a design choice nobody has made; and **an epic in another repository is referenced as `owner/repo#N`** (a bare `#N` resolves to this repository's issue). Canonical reference: `prompts/collaboration-workflow/epic-bundle.md`.
 
@@ -187,7 +187,7 @@ Never start a `kickoff` / `halfrun` / `fullrun` / `backlogrun` workflow (includi
 
 **A session cut inside a declared budget is not a new invocation** — a `backlogrun` cut and resumed is the one invocation a person typed, and it continues rather than waiting to be retyped; **`backlogrun` alone**, though — a `fullrun` cut still waits for the keyword. Single source: `backlogrun.md` → "The session cut is inside the invocation".
 
-**A `backlogrun` parks a child instead of stopping the run**, and its procedure is read from `backlogrun.md` → "park and continue", which is that rule's single source.
+**A `backlogrun` parks a child instead of stopping the run**, and its procedure is read from `backlogrun-park.md` → "park and continue", which is that rule's single source.
 
 #### Mid-workflow stop notification (`confirmation`)
 

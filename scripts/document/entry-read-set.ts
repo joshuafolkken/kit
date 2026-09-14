@@ -39,11 +39,20 @@ const ONE_LINE = 1
 // background execution of the gate, the push and the merge tail — all after the first edit — so it
 // left `SKILL.md` for the point-of-use list. `SKILL.md` → §1, "Four documents are read at the point
 // of use", is the single source.
+// **`backlogrun`'s own per-child phase documents are point-of-use too** (joshuafolkken/kit#2010):
+// `backlogrun.md` was split so the entry read carries only what binds before the first child, and the
+// four phase documents below are read from it at the step each names — dispatching a child, opening a
+// lane, the progress watcher and the hand-off, a child that cannot finish — never at the entry. Kept
+// out of the count here, exactly as the four above are. `SKILL.md` → §1 is the human source.
 const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'latest-gate.md',
 	'followup.md',
 	'chain-rule.md',
 	'background-commands.md',
+	'backlogrun-child.md',
+	'backlogrun-lanes.md',
+	'backlogrun-progress.md',
+	'backlogrun-park.md',
 ])
 
 // **The fetch cap is read from the settings file rather than restated here.** Every document in the

@@ -150,7 +150,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 - **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
   only once it has merged — decided from an enumeration (the verification gate, the code review, the
   pre-push hook, the merge checks) rather than from how serious the defect looks. It binds wherever
-  children are dispatched, so `backlogrun.md` → "Lanes" carries it for the parallel case and
+  children are dispatched, so `backlogrun-lanes.md` → "Lanes" carries it for the parallel case and
   `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 is the single source.
 - **A command that can take minutes is issued in the background, and the turn never ends at the
   push** — §2h. `pnpm josh followup` is the one that stays in the foreground, because nearly every
@@ -158,9 +158,9 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
   §2z. It is the one *child's* stop a `backlogrun` does not turn into a park.
 - **A named epic under `backlogrun` differs on two points from a single-issue item.** A stop that
-  would otherwise end a batch parks one child and the run continues (`backlogrun.md` → "park and
+  would otherwise end a batch parks one child and the run continues (`backlogrun-park.md` → "park and
   continue"), and a named item accepts an Issue that is **not** an epic — running it as a `fullrun`,
-  and building an epic around it only if a prerequisite or a split turns up (`backlogrun.md` → "When
+  and building an epic around it only if a prerequisite or a split turns up (`backlogrun-child.md` → "When
   `#N` is not an epic"). Both follow from what the keyword authorizes: a batch, decided once at the
   start.
 - **`backlogrun` authorizes the whole opted-in pool as well as its named items.** Beyond the named
@@ -174,7 +174,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 - **The session boundary is asked at the entry as well, not only after a merge** —
   `pnpm josh cost --over 300000`, in the same turn as `pnpm josh run:hold` and before anything else is
   started, so a session already carrying an earlier Issue's whole conversation is cut before it pays
-  for one more. It is the same rule at a second application point, and `backlogrun.md` → "The hand-off" is
+  for one more. It is the same rule at a second application point, and `backlogrun-progress.md` → "The hand-off" is
   the single source of the check and of where 300,000 comes from (a temporary experiment rather than a
   settled number). `under`, and the run continues. `over` — or a run the check could not answer for —
   and the run **stops before the work starts**: send a `confirmation` Telegram carrying the figure
@@ -360,7 +360,7 @@ The units are one step of a run (`gate-fix`, `survey`) and one whole child of a 
 an epic's child and a named issue of a `backlogrun` alike. **They share one
 mechanism** — one enumeration, one command, one verifier requirement; building a second is the clone
 `CLAUDE.md` prohibits, so **no second row like `backlogrun-child` is added**. **A batch entry point
-that does not delegate is the defect**: the per-issue procedure is `backlogrun.md` → "Each child runs in a
+that does not delegate is the defect**: the per-issue procedure is `backlogrun-child.md` → "Each child runs in a
 delegated unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue.
 
 **`followup-filing` is a third unit — one whole sub-procedure of a run.** The late-run follow-up
@@ -381,7 +381,7 @@ own ending rather than an unfinished child**. A child stopped by `needs-human-re
 **by design** (§2z) — its `in-progress` stays on, and it is never counted against the
 consecutive-failure guard. Read as a failure there, the parent strips that label, releases the
 repository, and hands the next child a `git switch main && git pull` on top of that uncommitted work.
-The classification belongs to the per-entry procedure: `backlogrun.md` → "Each child runs in a delegated
+The classification belongs to the per-entry procedure: `backlogrun-child.md` → "Each child runs in a delegated
 unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue. The
 enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in readable form by
 `docs/josh-commands.md` → "`josh delegate`".
@@ -529,7 +529,7 @@ most likely to duplicate something.
 
 - **A named epic under `backlogrun`** files without confirmation, records the dependency with
   `pnpm josh epic --add <E> <N> --before <M>` — `<E>` the epic, `<N>` the prerequisite just filed,
-  `<M>` the child in hand — and the run **continues rather than parking it** (`backlogrun.md` → "A
+  `<M>` the child in hand — and the run **continues rather than parking it** (`backlogrun-park.md` → "A
   prerequisite discovered mid-run"). Parking is only for a prerequisite that *cannot* be expressed as
   a dependency — one needing a design decision nobody has made, a Tier B toss-up, or a Tier C action.
 - **`fullrun` / `halfrun`** file the same way without asking, insert the prerequisite into the epic
@@ -738,7 +738,7 @@ The procedure, in order:
    `pnpm josh run:release <N>`.
 4. **Then behave as the entry point does for a parked child.** A `fullrun` / `halfrun` a person typed
    sends a `confirmation` Telegram naming the Issue and the merge that already covers it, and stops. An
-   `backlogrun` child is park-and-continue (`backlogrun.md` → "park and continue").
+   `backlogrun` child is park-and-continue (`backlogrun-park.md` → "park and continue").
 5. **Never close the Issue.** That is Tier C at every entry point, and the label leaves the close one
    click away for the person who owns it.
 
@@ -767,7 +767,7 @@ one afterwards.** It governs issuing `pnpm josh git -y`, `pnpm josh gate` and th
 while `pnpm josh followup` stays in the foreground, the guarantee that the turn never ends at the push
 — bar a dispatched lane child's pre-gate cut (`pre-gate-cut.md`), the one sanctioned turn-end before it
 — and the tail that is emptied before `followup` rather than worked through after it. `background-commands.md`
-is the single source; `followup.md`, `chain-rule.md` and `backlogrun.md` → "Progress while the run is
+is the single source; `followup.md`, `chain-rule.md` and `backlogrun-progress.md` → "Progress while the run is
 quiet" route to it, and the run-tail guard (`prompts/collaboration-workflow/rule-delivery.md`) refuses
 a foreground push and names it.
 
@@ -775,7 +775,7 @@ a foreground push and names it.
 completion is what re-invokes the session, so a parent with children in flight already has a wake
 delivered to it and never has to time one — which is why the `backlogrun` loop starts no
 sleep of its own and reads its polling figures as floors on a re-ask rather than as a clock to keep
-(`backlogrun.md` → "The parent keeps no clock of its own", the single source).
+(`backlogrun-progress.md` → "The parent keeps no clock of its own", the single source).
 
 ## 2i. An observation worth filing is filed without asking
 
