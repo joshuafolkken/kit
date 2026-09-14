@@ -87,7 +87,6 @@ const THREE_BYTE_CHAR_BYTES = 3
 const KICKOFF_FILE = 'kickoff.md'
 const FULLRUN_FILE = 'fullrun.md'
 const HALFRUN_FILE = 'halfrun.md'
-const QUEUE_FILE = 'queue.md'
 const CHAIN_RULE_FILE = 'chain-rule.md'
 const FOLLOWUP_FILE = 'followup.md'
 const ANTI_PATTERN_MARKER = '**Anti-pattern catalog**'
@@ -112,7 +111,6 @@ const SUPPORTING_FILES: ReadonlyArray<string> = [
 	KICKOFF_FILE,
 	FULLRUN_FILE,
 	HALFRUN_FILE,
-	QUEUE_FILE,
 	CHAIN_RULE_FILE,
 	FOLLOWUP_FILE,
 ]
@@ -178,22 +176,18 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 
 	// A command that stashes the working tree and never pops it leaves the user's changes buried in
 	// the stash list with the run reporting success.
-	it.each([FULLRUN_FILE, HALFRUN_FILE, QUEUE_FILE])(
-		'%s restores everything it stashes',
-		(filename) => {
-			const content = read_skill_file(WORKFLOW_SKILL, filename)
+	it.each([FULLRUN_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
+		const content = read_skill_file(WORKFLOW_SKILL, filename)
 
-			expect(content).toContain('git stash')
-			expect(content).toContain('git stash pop')
-		},
-	)
+		expect(content).toContain('git stash')
+		expect(content).toContain('git stash pop')
+	})
 
 	// The comment-reading step every `#N` entry point owes is pinned by its own suite, beside the two
 	// other delivered rules: `scripts/issue-comments-rule.test.ts` (joshuafolkken/kit#1319).
 	it.each([
 		[FULLRUN_FILE, 'pnpm josh followup'],
 		[HALFRUN_FILE, '**Invoking `halfrun` is _not_ authorization to commit, push, or merge**'],
-		[QUEUE_FILE, 'stop immediately'],
 		[KICKOFF_FILE, 'pnpm josh epic'],
 		[CHAIN_RULE_FILE, ANTI_PATTERN_MARKER],
 		[CHAIN_RULE_FILE, 'Turn-end self-check'],
@@ -358,7 +352,6 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 		'#### `kickoff` — Planning phase only',
 		'#### `fullrun` — Full execution',
 		'#### `halfrun` — Implement + verify',
-		'#### `queue` — Sequential multi-issue fullrun',
 		'#### `/review` → `followup` chain rule (MANDATORY)',
 		ANTI_PATTERN_MARKER,
 		// joshuafolkken/kit#951: three rules that bind only after a command has started, restated

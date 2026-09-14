@@ -9,7 +9,7 @@ These three commands are what turn an epic from a list of issue numbers into som
 execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
 skill is the operational procedure, and the two must agree.
 
-The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` — live in the
+The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `epicrun`, `backlogrun` — live in the
 `workflow-commands` skill.
 
 ## The order they run in

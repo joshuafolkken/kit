@@ -1,7 +1,7 @@
 # Finishing a run — `pnpm josh followup`
 
 Everything between a green CI and a merged PR: what `followup` scans for, the gate that stops a run,
-how auto-merge is authorized, and the Telegram notifications. `fullrun` and `queue` both end here;
+how auto-merge is authorized, and the Telegram notifications. `fullrun` and `backlogrun` both end here;
 `halfrun` never reaches this file, because it stops before the commit.
 
 This file is the single source of the rule.

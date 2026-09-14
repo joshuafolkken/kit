@@ -773,7 +773,7 @@ The duplicate half scores titles by token overlap; a candidate needs ≥2 signif
 
 ### `josh epic`
 
-Create the epic issue that tracks a batch of child issues from one split. Satisfies all four mechanical requirements (`epic` label, task-list child rows, machine-readable `Dependencies`, children-only `queue`) by construction.
+Create the epic issue that tracks a batch of child issues from one split. Satisfies all four mechanical requirements (`epic` label, task-list child rows, machine-readable `Dependencies`, an `Execution` run command) by construction.
 
 ```bash
 pnpm josh epic "Epic: split the parser work" 101 102 103
@@ -1056,7 +1056,7 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it** — the counting moved into `josh investigation:guard`.
 
-**The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child under `epicrun` and one issue of a `queue` are the same unit, so the queue was wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
+**The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child under `epicrun` and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
 ### `josh run:hold` / `josh run:release`
 
@@ -1074,7 +1074,7 @@ pnpm josh run:release --force    # clear a record left by a run that has ended
 
 ### `josh run:carry`
 
-Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` or `queue` continues the authorized run instead of starting a second one.
+Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` continues the authorized run instead of starting a second one.
 
 ```bash
 pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"   # alias: josh rc
@@ -1086,13 +1086,13 @@ pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"  # adopt a rec
 **Options:**
 
 - `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A second live parent is refused with `busy`.
-- `--done <issue>` shrinks a queue's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
+- `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
 ### `josh run:wake`
 
-Continue a cut `backlogrun` or `queue` by waking the next session from outside the conversation. It reads the carry record and wakes only on `carried`, handed off by `run:carry --cut`.
+Continue a cut `backlogrun` by waking the next session from outside the conversation. It reads the carry record and wakes only on `carried`, handed off by `run:carry --cut`.
 
 ```bash
 pnpm josh run:wake --start                 # launch the detached supervisor; alias: josh rw
@@ -1253,8 +1253,8 @@ Say what a workflow entry point reads before it starts, and what that read costs
 
 ```bash
 pnpm josh read:set              # every entry point; alias: josh rs
-pnpm josh read:set queue        # one of them
-pnpm josh read:set queue --json
+pnpm josh read:set backlogrun   # one of them
+pnpm josh read:set backlogrun --json
 ```
 
 Two figures under one definition, which is what makes a before and an after comparable:

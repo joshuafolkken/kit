@@ -9,7 +9,7 @@ const ROOT = process.cwd()
 const SUCCESS = 0
 const EPICRUN = 'epicrun.md'
 const HAND_OFF = 'The hand-off'
-const QUEUE = 'queue'
+const BACKLOGRUN = 'backlogrun'
 const NO_SUCH_DOC = 'no-such-doc.md'
 const FAILURE = 1
 const MISTYPED = 'not-an-entry'
@@ -82,16 +82,16 @@ describe('josh read:set — what it refuses', () => {
 
 		expect(code).toBe(FAILURE)
 		expect(err).toContain('Known entries:')
-		expect(err).toContain(QUEUE)
+		expect(err).toContain(BACKLOGRUN)
 	})
 })
 
 describe('josh read:set', () => {
 	it('reports both figures and the saving for the entry it was given', () => {
-		const { code, out } = captured(() => read_set_cli.run([QUEUE], ROOT))
+		const { code, out } = captured(() => read_set_cli.run([BACKLOGRUN], ROOT))
 
 		expect(code).toBe(SUCCESS)
-		expect(out).toContain(`entry: ${QUEUE}`)
+		expect(out).toContain(`entry: ${BACKLOGRUN}`)
 		expect(out).toContain(read_set_cli.WHOLE_LABEL)
 		expect(out).toContain(read_set_cli.SCOPED_LABEL)
 		expect(out).toContain('saved by reading sections:')
@@ -105,7 +105,7 @@ describe('josh read:set', () => {
 	})
 
 	it('emits one JSON array under --json', () => {
-		const { out } = captured(() => read_set_cli.run([QUEUE, read_set_cli.JSON_FLAG], ROOT))
+		const { out } = captured(() => read_set_cli.run([BACKLOGRUN, read_set_cli.JSON_FLAG], ROOT))
 
 		expect(JSON.parse(out)).toHaveLength(1)
 	})

@@ -22,7 +22,6 @@ const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/SKILL.md',
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/queue.md',
 	'.claude/skills/workflow-commands/epicrun.md',
 	GATE,
 ]

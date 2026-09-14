@@ -10,9 +10,9 @@ import { run_invocation } from './run-invocation'
 // invocation parsing this supervisor needs. What stays here is the constants naming the agent CLI and
 // the two argument vectors this supervisor composes.
 //
-// **The invocation grammar is no longer this file's either** (joshuafolkken/kit#1774). `queue` is the
-// second entry point whose invocation survives a cut, and `run-carry.ts` reads the same grammar to
-// say which of a queue's issues are still outstanding — so it is `run-invocation.ts`'s, imported
+// **The invocation grammar is no longer this file's either** (joshuafolkken/kit#1774; folded into
+// `backlogrun` by joshuafolkken/kit#1984). `run-carry.ts` reads the same grammar to say which of a
+// `backlogrun`'s named issues are still outstanding — so it is `run-invocation.ts`'s, imported
 // rather than restated. What that move does **not** change is the rebuild-from-constants design: the
 // text handed to the agent CLI is still composed out of that module's own constants and validated
 // integers, and the recorded string still never reaches `spawn`.

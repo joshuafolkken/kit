@@ -56,7 +56,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "echo 'MANDATORY before writing any implementation code: present the two-layer work summary in the session language — 3 plain sentences (Now / Change / Check) a non-programmer can follow. Name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen. Then Details, then every change with its test. Ordinary markdown, never wrapped in a code fence. Required in fullrun/halfrun/queue even when the Issue body was filled; presentation only, never a confirmation stop. Completion reports lead with Cause / Fix / Result. Tests are required for ALL changes; zero tests without explicit approval is a violation. Full rule: Code Change Rules Step 0 in CLAUDE.md.'"
+						"command": "echo 'MANDATORY before writing any implementation code: present the two-layer work summary in the session language — 3 plain sentences (Now / Change / Check) a non-programmer can follow. Name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen. Then Details, then every change with its test. Ordinary markdown, never wrapped in a code fence. Required in fullrun/halfrun/backlogrun even when the Issue body was filled; presentation only, never a confirmation stop. Completion reports lead with Cause / Fix / Result. Tests are required for ALL changes; zero tests without explicit approval is a violation. Full rule: Code Change Rules Step 0 in CLAUDE.md.'"
 					},
 					{
 						"type": "command",

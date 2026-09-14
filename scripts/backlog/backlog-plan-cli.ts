@@ -6,8 +6,10 @@ import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
+import { run_invocation } from '#scripts/run/run-invocation'
+import { backlog_named } from './backlog-named'
 import { backlog_next, type OptedIn } from './backlog-next'
-import { backlog_plan } from './backlog-plan'
+import { backlog_plan, type NamedPlan } from './backlog-plan'
 import { backlog_scope } from './backlog-scope'
 
 // `josh backlog:plan` — the whole backlog as a plan a person reads before a run starts
@@ -28,7 +30,45 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
-const USAGE = 'Usage: josh backlog:plan [--exclude <issue-number>[,<issue-number>...]]...'
+// The keyword `run_invocation` parses a named-issue prefix behind, reused rather than parsing `#N`
+// again here so the `0` / leading-zero / safe-integer rules stay single-sourced (joshuafolkken/kit#1984).
+const NAMED_COMMAND = 'backlogrun'
+// The flag that runs the named list and stops, mirrored here so the plan the person reads before the
+// run shows the same scope the run will take (joshuafolkken/kit#1984).
+const ONLY_FLAG = '--only'
+
+const USAGE =
+	'Usage: josh backlog:plan [#<issue-number>...] [--only] [--exclude <issue-number>[,<issue-number>...]]...'
+
+// The leading `#N` tokens are the named prefix a `backlogrun #N1 #N2 …` runs before the pool. They are
+// read through the invocation grammar so the plan and the run agree on what counts as a named issue.
+function named_of(argv: ReadonlyArray<string>): ReadonlyArray<number> {
+	return run_invocation.issue_numbers(`${NAMED_COMMAND} ${argv.join(' ')}`) ?? []
+}
+
+// The tokens after the named prefix — what the option parser sees, so a `#N` is never read as an
+// unknown positional.
+function without_named(argv: ReadonlyArray<string>): ReadonlyArray<string> {
+	return argv.slice(named_of(argv).length)
+}
+
+function has_only_flag(argv: ReadonlyArray<string>): boolean {
+	return argv.includes(ONLY_FLAG)
+}
+
+// `--only` is stripped before the named block and the options are read, so it is never taken for a
+// positional or an unknown option; whether it was present is carried as a boolean instead.
+function without_only(argv: ReadonlyArray<string>): ReadonlyArray<string> {
+	return argv.filter((token) => token !== ONLY_FLAG)
+}
+
+// The one start-time refusal: `--only` with no named issues has nothing to run. `backlog_named` is the
+// single source of that decision, so the plan and the run refuse it alike.
+function only_refusal(named: ReadonlyArray<number>, is_only: boolean): string | undefined {
+	const startup = backlog_named.startup(named, is_only)
+
+	return startup.kind === 'refused' ? startup.reason : undefined
+}
 
 // A failed open listing is not "nothing is out of scope". Reported rather than rendered around, for
 // the reason joshuafolkken/kit#950 records: a confident absence built on a read that failed is worse
@@ -99,6 +139,7 @@ function print_plan(
 	plan: Plan,
 	open_issues: ReadonlyArray<OpenIssueData>,
 	is_capped: boolean,
+	named: NamedPlan,
 ): void {
 	const scope = { repo: plan.repo, exclude: plan.exclude, tracked: plan.tracked }
 	const rows = backlog_scope.out_of_scope(open_issues, plan.result, scope)
@@ -110,10 +151,10 @@ function print_plan(
 		open_numbers: is_capped ? undefined : backlog_scope.open_numbers_of(open_issues),
 	}
 
-	console.info(backlog_plan.format_plan(plan.result, rows, context))
+	console.info(backlog_plan.format_plan(plan.result, rows, context, named))
 }
 
-async function report(plan: Plan): Promise<number> {
+async function report(plan: Plan, named: NamedPlan): Promise<number> {
 	const listing = await fetch_open()
 
 	if (listing === undefined) {
@@ -123,13 +164,13 @@ async function report(plan: Plan): Promise<number> {
 	}
 
 	if (listing.is_capped) console.error(OPEN_TRUNCATED_MESSAGE)
-	print_plan(plan, listing.rows, listing.is_capped)
+	print_plan(plan, listing.rows, listing.is_capped, named)
 
 	return SUCCESS_EXIT_CODE
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const options = auto_ok_cli.parse_options(argv, USAGE)
+async function run_plan(rest: ReadonlyArray<string>, named: NamedPlan): Promise<number> {
+	const options = auto_ok_cli.parse_options(without_named(rest), USAGE)
 
 	if (options.usage !== undefined) {
 		console.error(options.usage)
@@ -147,7 +188,25 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const plan = await classify(opted_in, options.exclude ?? [])
 
-	return plan === undefined ? FAILURE_EXIT_CODE : await report(plan)
+	return plan === undefined ? FAILURE_EXIT_CODE : await report(plan, named)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const is_only = has_only_flag(argv)
+	const rest = without_only(argv)
+	// Read the named block from the *original* argv, so `--only` placed before the `#N` block breaks the
+	// leading block exactly as the run grammar does — the plan then refuses an ordering the run refuses,
+	// rather than promising a scope the resumed invocation would stop on (joshuafolkken/kit#1984).
+	const named = named_of(argv)
+	const refusal = only_refusal(named, is_only)
+
+	if (refusal !== undefined) {
+		console.error(refusal)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await run_plan(rest, { issues: named, only: is_only })
 }
 
 // `process.exitCode` rather than `process.exit()`, the reason `backlog:next` records: the plan is

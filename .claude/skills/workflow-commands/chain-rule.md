@@ -1,6 +1,6 @@
 # `/code-review` → `followup` chain rule (MANDATORY)
 
-Within `fullrun` / `fullrun new` / `queue`, the `/code-review` output is **not** a turn boundary. It
+Within `fullrun` / `fullrun new` / `backlogrun`, the `/code-review` output is **not** a turn boundary. It
 is a polished Markdown review with severity-tagged findings and a final recommendation — an
 intermediate step, not a finished deliverable.
 
@@ -103,7 +103,7 @@ account.
    subagent running `/code-review` with the brief `pnpm josh review:brief` prints, and do not advance
    the round counter. **A clean verdict is exactly the shape this failure takes**, so a clean round is
    the case to check hardest.
-1. **Mode check** — Is this `/code-review` part of a `fullrun` / `fullrun new` / `queue` invocation?
+1. **Mode check** — Is this `/code-review` part of a `fullrun` / `fullrun new` / `backlogrun` invocation?
    Decide by both signals: (a) the user's recent prompt contained one of those commands, AND (b) the
    implementation is finished and the verification gate has reached its review step. **A `halfrun`
    invocation never satisfies (a)** — it ends at the confirmation stop without committing. If either

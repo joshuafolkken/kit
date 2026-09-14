@@ -62,10 +62,10 @@ anyway; it was never the only net.
 
 ## Why an elapsed-time window rather than "once per batch"
 
-`queue` and `epicrun` had already hoisted the update to the head of a batch, and that hoist is
+The batch entry points had already hoisted the update to the head of a batch, and that hoist is
 correct — but it says nothing about a standalone `fullrun`, which **is** the head of its own
 one-issue batch and therefore updated on every invocation. A session that runs six issues one at a
-time paid the full cost six times while a `queue` of the same six paid it once, for no difference
+time paid the full cost six times while a batch of the same six paid it once, for no difference
 anybody chose. An elapsed-time window is the one condition that reads the same at every entry point,
 so no entry needs a rule of its own — and the batch hoists survive it unchanged, because a batch's
 second child asks the same command and is told `skip`.
@@ -76,6 +76,6 @@ window removes is the other runs carrying the same bumps; it does not make that 
 Should the issue then fail CI on a bump rather than on its own change, that is a dependency problem
 found once — fix it forward before parking the issue for it.
 
-This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `queue.md` and `epicrun.md`
+This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `epicrun.md` and `backlogrun.md`
 each name `pnpm josh latest:scope` at the point their procedure reaches it and route here for
 everything else; `docs/josh-commands.md` documents the command itself.

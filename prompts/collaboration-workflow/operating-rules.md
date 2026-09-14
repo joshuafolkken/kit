@@ -19,7 +19,7 @@
 
 ### 明示的な起動が必須（MANDATORY）
 
-`kickoff` / `halfrun` / `fullrun` / `queue` ワークフロー（`#N` および `new` バリアントを含む）は、ユーザーが**現在のターンのプロンプト**にキーワードを入力していない限り、絶対に開始してはならない。
+`kickoff` / `halfrun` / `fullrun` / `epicrun` / `backlogrun` ワークフロー（`#N` および `new` バリアントを含む）は、ユーザーが**現在のターンのプロンプト**にキーワードを入力していない限り、絶対に開始してはならない。
 
 - 「実装して」「修正して」「PR を出して」などの会話的な依頼は暗黙の起動ではない。タスクがこれらのワークフローに該当すると判断した場合でも、依頼の形状から起動を推測してはならない
 - 「`halfrun new` を実行してもよいですか？」「`fullrun` を回しますか？」のような確認質問もしてはならない。確認プロンプトは明示的な起動の代替にはならない
@@ -50,10 +50,10 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
   - **未追跡ファイルの中身**: `git diff --no-index /dev/null <new-file>`（staging 不要）。あるいは単にファイルを直接読む
 - **staging してよいのは次の 2 ケースだけ**:
   1. ユーザーが**そのターンで明示的に**ステージを指示した
-  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `queue` の起動に含まれるコミット手順。`halfrun` はコミットしないので含まれない）
+  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `backlogrun` の起動に含まれるコミット手順。`halfrun` はコミットしないので含まれない）
 - 上記以外で staging が必要だと考えたときは、**実行せずに先に確認する**
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
-- **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`queue` の手順 1、`epicrun` のラン開始時の `josh latest`（`queue` の手順 1 と同じ場面）、「別パッケージ起因の問題は割り込み Issue で対応する」、および `epicrun` の子を始める前の preflight（`pnpm josh run:hold <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926, joshuafolkken/kit#1965）。**この 5 番目だけが `git stash pop` を伴わない。前の 4 つはいずれも直後に `git stash pop` で復元することが手順に含まれている。** 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`SKILL.md` §2d）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
+- **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`backlogrun` / `epicrun` のラン開始時の `josh latest`、「別パッケージ起因の問題は割り込み Issue で対応する」、および `epicrun` の子を始める前の preflight（`pnpm josh run:hold <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926, joshuafolkken/kit#1965）。**この 5 番目だけが `git stash pop` を伴わない。前の 4 つはいずれも直後に `git stash pop` で復元することが手順に含まれている。** 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`SKILL.md` §2d）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
 - **この禁止は kit 配布の `.claude/settings.json` の `deny`（`Bash(git add*)` / `Bash(git stage*)` / `Bash(git rm*)` / `Bash(git mv*)` / `Bash(git reset*)` / `Bash(git restore --staged*)` / `Bash(git restore -S*)` / `Bash(git commit*)`）で機械的にも遮断されている。** `pnpm josh git` は node スクリプト内部から git を起動するため影響を受けず、承認済みのコミットフロー（上記ケース 2）は従来どおり動く。**deny には「そのターンでユーザーが明示指示した」という例外がないため、上記ケース 1 も AI 側では実行できない** — その場合はユーザー自身の端末で実行してもらう（ユーザーの手元では従来どおり動く）。恒久的な機械的保証のほうが、コマンド 1 本で回避できる例外より価値が高いという判断（joshuafolkken/kit#850）
 - **`Bash(git commit*)` だけはステージング操作ではないが、同じ deny に入っている。** `git add` を拒否されたエージェントが次に手を伸ばすのが `git commit -a`（追跡済みファイルをまとめてステージしてコミットする）であり、それも拒否されると素の `git commit -m` である。フラグ単位で塞いでいる限りこの退避路は最後の 1 本が残るため、joshuafolkken/kit#1075 でサブコマンド全体へ広げた。**ユーザーが明示的にコミットを指示した場合も AI 側では実行できない点は上と同じ** — 承認済みのコミットは `pnpm josh git` を通す
 - **「拒否される操作」と「禁止された操作」は同じ集合ではない。** deny に載っているのは上記の直接実行だけで、このセクションが同じく禁じている `git checkout -- <path>` / `git restore <path>` は実行できてしまう。**ツールが通したことを許可と読み替えてはならない** — 何をしてよいかを決めるのは deny ではなくこのルールである
@@ -83,7 +83,7 @@ AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎる�
 
 **自動判断の記録**: 本来確認すべき Tier A の分岐を自動判断したときは、候補と理由を記録する:
 
-- Issue 駆動ワークフロー内（`kickoff` / `halfrun` / `fullrun` / `queue`）: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="..."` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する
+- Issue 駆動ワークフロー内（`kickoff` / `halfrun` / `fullrun` / `epicrun` / `backlogrun`）: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="..."` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する
 - Issue が存在しない会話タスク: 同じ内容を「Auto-decided: `<choice>` over `<alt>` because `<reason>`」の1行として応答に明示する
 
 ### 確認待ちで停止するときの Telegram 通知（`confirmation`）

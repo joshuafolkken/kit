@@ -31,12 +31,12 @@ const INVOCATION = 'backlogrun --max 5'
 const OTHER_INVOCATION = 'backlogrun --max 10 --idle 30'
 const LONG_AGO = new Date(Date.now() - run_carry.CARRY_MAX_AGE_MS * 2)
 const START = new Date('2026-09-11T00:00:00.000Z')
-// The opening list, pinned: it is what a `queue` writes to `--begin` at every cut, including the one
-// the successor makes (joshuafolkken/kit#1774).
-const QUEUE = 'queue #1762 #1749 #1759'
+// The opening list, pinned: it is what a named-issue `backlogrun` writes to `--begin` at every cut,
+// including the one the successor makes (joshuafolkken/kit#1774, folded in by joshuafolkken/kit#1984).
+const NAMED = 'backlogrun #1762 #1749 #1759'
 
 // What `--json` puts on standard output. Only the two fields these tests read are named: `remaining`
-// is the answer a resumed queue acts on, and `started_at` is what says the whole-run bound was not
+// is the answer a resumed named-issue run acts on, and `started_at` is what says the whole-run bound was not
 // restarted by the resumption.
 interface CarryJson {
 	carry?: { started_at?: string }
@@ -315,17 +315,17 @@ describe('an invocation the command cannot act on', () => {
 	})
 })
 
-// joshuafolkken/kit#1774: the end-to-end shape a resumed `queue` rests on. The invocation string is
-// the **opening** list at every step — that is the whole design, and the reason `--begin` answers
-// `resumed` here rather than the `mismatch` a shrinking list would have produced.
-describe('a queue carried across a session cut', () => {
+// joshuafolkken/kit#1774: the end-to-end shape a resumed named-issue `backlogrun` rests on. The
+// invocation string is the **opening** list at every step — that is the whole design, and the reason
+// `--begin` answers `resumed` here rather than the `mismatch` a shrinking list would have produced.
+describe('a named-issue backlogrun carried across a session cut', () => {
 	it('resumes on the opening list and reports only what is left', async () => {
-		await run_carry_cli.run(['--begin', QUEUE])
+		await run_carry_cli.run(['--begin', NAMED])
 		await run_carry_cli.run(['--merged', '1', '--done', '1762'])
 		await run_carry_cli.run(['--cut'])
 		out.length = 0
 
-		expect(await run_carry_cli.run(['--begin', QUEUE])).toBe(0)
+		expect(await run_carry_cli.run(['--begin', NAMED])).toBe(0)
 		expect(out).toStrictEqual([run_carry_cli.RESUMED_VERDICT])
 
 		await run_carry_cli.run(['--json'])
@@ -336,9 +336,9 @@ describe('a queue carried across a session cut', () => {
 	// The whole-run bound belongs to the record, so the resumption keeps the start the first session
 	// wrote rather than beginning the eight hours again.
 	it('keeps the start time the first session recorded', async () => {
-		run_carry.begin_carry(target(), QUEUE, run_carry.NO_OWNER, START)
+		run_carry.begin_carry(target(), NAMED, run_carry.NO_OWNER, START)
 		await run_carry_cli.run(['--cut'])
-		await run_carry_cli.run(['--begin', QUEUE])
+		await run_carry_cli.run(['--begin', NAMED])
 		out.length = 0
 		await run_carry_cli.run(['--json'])
 
@@ -346,13 +346,13 @@ describe('a queue carried across a session cut', () => {
 	})
 
 	// A crash never reaches `--cut`, so the successor is refused and a person decides — the same answer
-	// `backlogrun` gets, and the reason `--cut` is the session's last write.
+	// a bare `backlogrun` gets, and the reason `--cut` is the session's last write.
 	it('stands rather than resumes when no cut declared the hand-off', async () => {
-		await run_carry_cli.run(['--begin', QUEUE])
+		await run_carry_cli.run(['--begin', NAMED])
 		await run_carry_cli.run(['--done', '1762'])
 		out.length = 0
 
-		expect(await run_carry_cli.run(['--begin', QUEUE])).toBe(1)
+		expect(await run_carry_cli.run(['--begin', NAMED])).toBe(1)
 		expect(out).toStrictEqual([run_carry_cli.STANDING_VERDICT])
 	})
 

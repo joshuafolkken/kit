@@ -1,11 +1,11 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `epicrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` and `backlogrun` are the shorthand commands this
+`kickoff`, `fullrun`, `halfrun`, `epicrun` and `backlogrun` are the shorthand commands this
 package's collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md`
 because each one applies only while its own command is running.
 
@@ -14,7 +14,7 @@ The canonical extended reference is `prompts/collaboration-workflow/` (indexed b
 
 ## 0. The rule that fires before any of them — explicit invocation
 
-**Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` / `backlogrun` workflow (including their
+**Never start a `kickoff` / `halfrun` / `fullrun` / `epicrun` / `backlogrun` workflow (including their
 `#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
 resident in the AI documents, because it has to hold when this skill has *not* been loaded.
 
@@ -28,22 +28,21 @@ resident in the AI documents, because it has to hold when this skill has *not* b
 - The rule applies even when the user authorized a related workflow in an earlier turn. Each
   invocation must be re-typed by the user in the current turn.
 
-**A session cut inside a declared budget is not a new invocation.** A `backlogrun` or `queue` that is
-cut and resumed is still the one invocation a person typed — the keyword authorized the declared
-budget, and the cut is an execution detail of spending it. What this rule forbids is _inferring_ a
-workflow from a request's shape. **The reading covers `backlogrun` and `queue`, and those two only** —
-an `epicrun` or `fullrun` cut still waits for the keyword, because an `epicrun` holds lanes in flight
-across the seam and a `fullrun` ends at one issue and has nothing to carry.
+**A session cut inside a declared budget is not a new invocation.** A `backlogrun` that is cut and
+resumed is still the one invocation a person typed — the keyword authorized the declared budget, and
+the cut is an execution detail of spending it. What this rule forbids is _inferring_ a workflow from a
+request's shape. **The reading covers `backlogrun` and it alone** — an `epicrun` or `fullrun` cut
+still waits for the keyword, because an `epicrun` holds lanes in flight across the seam and a `fullrun`
+ends at one issue and has nothing to carry.
 
 **`backlogrun.md` → "The session cut is inside the invocation" is the single source of the
-mechanism** — the record, the two commands, and what each answer means. `queue.md` → "The session
-boundary" carries the one thing that differs: **a queue's invocation is pinned to the list that was
-typed**, and the issues it has finished live in the record's `done` field rather than shrinking the
-string.
+mechanism** — the record, the two commands, and what each answer means, and how a named-issue
+`backlogrun #N1 #N2 …` pins its list to what was typed while the issues it has finished live in the
+record's `done` field rather than shrinking the string.
 
 ## 1. Which file to read
 
-Read this file, then the one for the command that was typed. `fullrun`, `queue`, `epicrun` and
+Read this file, then the one for the command that was typed. `fullrun`, `epicrun` and
 `backlogrun` also obey `chain-rule.md`, but at a point of use rather than at the entry (see "Four
 documents are read at the point of use" below). `halfrun` and `kickoff` never reach it — `halfrun`
 stops before the commit, and `kickoff` never implements.
@@ -53,7 +52,6 @@ stops before the commit, and `kickoff` never implements.
 | `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md` + `split-assessment.md`        |
 | `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md`        |
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
-| `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md`                   |
 | `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` |
 | `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` |
 
@@ -76,8 +74,8 @@ named command, so there is no judgement about when:
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
 | `followup.md`           | Before issuing `pnpm josh followup`, in that same turn                          |
-| `chain-rule.md`         | Before running the `/code-review` step (`fullrun` / `queue` / `epicrun` / `backlogrun`) |
-| `background-commands.md` | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `queue` / `epicrun` / `backlogrun`) |
+| `chain-rule.md`         | Before running the `/code-review` step (`fullrun` / `epicrun` / `backlogrun`) |
+| `background-commands.md` | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `epicrun` / `backlogrun`) |
 
 This is "read it at the point of use", not "read it later": the fetch is whole and it happens before
 the command it governs. A `skip` answer from `latest:scope` reads nothing; the other three have no
@@ -140,7 +138,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
     review:brief` refuses a brief on a tree neither has been green on.
   - `kickoff` is the exception — it never implements, so it never reaches the gate.
   - **E2E closes after the review, and never by asking the user**: where the command ends in a pull
-    request (`fullrun` / `queue` / `epicrun`) the CI E2E job is the result and `pnpm josh followup`
+    request (`fullrun` / `epicrun` / `backlogrun`) the CI E2E job is the result and `pnpm josh followup`
     enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before the stop
     (`CLAUDE.md` → "Completion gate"; `prompts/testing-guide.md` → "Closing the E2E gate without a
     human run").
@@ -161,8 +159,8 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   step after it reads its result.
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
   §2z. It is the one *child's* stop `epicrun` does not turn into a park.
-- **`epicrun` differs on two points.** A stop that would end a `queue` parks one child instead and
-  the run continues (`epicrun.md` → "park and continue"), and the keyword accepts an Issue that is
+- **`epicrun` differs on two points.** A stop that would otherwise end a batch parks one child instead
+  and the run continues (`epicrun.md` → "park and continue"), and the keyword accepts an Issue that is
   **not** an epic — running it as a `fullrun`, and building the epic around it only if a prerequisite
   or a split turns up (`epicrun.md` → "When `#N` is not an epic"). Both follow from what the keyword
   authorizes: a batch, decided once at the start.
@@ -183,7 +181,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   printed on standard error and the resume command — the invocation as it was typed, in a fresh
   session (`fullrun #<N>` / `halfrun #<N>` for a `#N` entry, `fullrun new` / `halfrun new` for a `new`
   one) — then run `pnpm josh run:release <N>` (bare where the entry is a `new` one) and stop. **A
-  dispatched child does not ask it**: `epicrun`, `queue` and `backlogrun` already own this question at
+  dispatched child does not ask it**: `epicrun` and `backlogrun` already own this question at
   their own seam. `kickoff` is exempt, because it never implements.
 - **The split assessment** runs before any work starts, at *every* entry point, from the one
   definition in `split-assessment.md`. **The default is not to split**: separability and a scope that
@@ -219,7 +217,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 ## 2z. `needs-human-review` — the child that stops before its commit
 
 An issue carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop, whichever entry
-point reached it — `epicrun`, `fullrun` or `queue`. It is `auto-ok`'s opposite: that label widens
+point reached it — `epicrun`, `fullrun` or `backlogrun`. It is `auto-ok`'s opposite: that label widens
 unattended execution past an epic's edge, this one withholds its last step, and both may be applied
 **only by a person**. It exists because some work's quality is not something a test can judge — a
 **published artifact** whose unit tests say nothing about the writing, or **a choice that was a
@@ -247,9 +245,9 @@ decision that was a person's to make.
 **Read the answer from `pnpm josh issue:state <N>`, never by matching the label string yourself.** It
 prints a `human_review: yes` / `human_review: no` line beside the state and the labels, through the
 same case-insensitive comparison every other workflow label goes through — so `Needs-Human-Review` is
-not missed. **Ask once, before implementing**: `epic:next` prints a bare issue number and `fullrun` /
-`queue` are handed one, so the check is one call of its own, made the moment the number is in hand and
-before the plan.
+not missed. **Ask once, before implementing**: `epic:next` prints a bare issue number and `fullrun`
+and a batch child are handed one, so the check is one call of its own, made the moment the number is in
+hand and before the plan.
 
 ```bash
 pnpm josh issue:state <N>                      # state, labels, and human_review
@@ -273,8 +271,8 @@ the next child would start `git switch main && git pull` on top of it. The code 
 leaving the label out of two sets: `scripts/git/issue-labels.ts` keeps it out of
 `NOT_DIRECTLY_RUNNABLE_LABELS` and `scripts/epic/epic-busy.ts` keeps it out of the parked set.
 
-Each entry point's own branch stays in its own file — `fullrun.md`, `halfrun.md`, `queue.md`,
-`epicrun.md` — and routes here for the definition.
+Each entry point's own branch stays in its own file — `fullrun.md`, `halfrun.md`,
+`epicrun.md`, `backlogrun.md` — and routes here for the definition.
 
 ## 2a. The `into <target>` suffix — where the new Issue lands
 
@@ -359,11 +357,11 @@ step that was weighed and `kept by default` for one nobody considered.
 **The mechanism is not the unit.** How a thing is delegated — an isolated execution unit, an explicit
 brief, a result the parent can verify, a failure that surfaces — is separate from what is delegated.
 The units are one step of a run (`gate-fix`, `survey`) and one whole child of a batch (`epic-child`) —
-an epic's child under `epicrun` and one issue of a `queue` alike. **They share one mechanism** — one
-enumeration, one command, one verifier requirement; building a second is the clone `CLAUDE.md`
-prohibits, so **no second row like `queue-child` is added**. **A batch entry point that does not
-delegate is the defect**: the per-issue procedure is `queue.md` → "Each issue runs in a delegated
-unit".
+an epic's child under `epicrun` and one named issue of a `backlogrun` alike. **They share one
+mechanism** — one enumeration, one command, one verifier requirement; building a second is the clone
+`CLAUDE.md` prohibits, so **no second row like `backlogrun-child` is added**. **A batch entry point
+that does not delegate is the defect**: the per-issue procedure is `epicrun.md` → "Each child runs in a
+delegated unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue.
 
 **`followup-filing` is a third unit — one whole sub-procedure of a run.** The late-run follow-up
 filing chain — `issue:scout` → file the Issue → `epic:bundle` → `epic --add` — is expensive because of
@@ -384,9 +382,9 @@ own ending rather than an unfinished child**. A child stopped by `needs-human-re
 consecutive-failure guard. Read as a failure there, the parent strips that label, releases the
 repository, and hands the next child a `git switch main && git pull` on top of that uncommitted work.
 The classification belongs to the per-entry procedure: `epicrun.md` → "Each child runs in a delegated
-unit" and `queue.md` → "Each issue runs in a delegated unit". The enumeration itself is
-`scripts/delegation/delegation-policy.ts`, printed in readable form by `docs/josh-commands.md` →
-"`josh delegate`".
+unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue. The
+enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in readable form by
+`docs/josh-commands.md` → "`josh delegate`".
 
 ### The pre-implementation reading — what goes to a unit, and from which file
 
@@ -454,7 +452,7 @@ kickoff kit#new
 kickoff kit#new "<title>"
 fullrun joshuafolkken/app-kit#12
 halfrun kit#412
-queue kit#1 kit#2
+backlogrun kit#1 kit#2
 epicrun joshuafolkken/kit#858
 ```
 
@@ -650,7 +648,7 @@ goes in the stop report and the Telegram for the person to type. **An expired re
 still has uncommitted changes does not free it**: the command answers `busy` and says to commit, stash,
 or release once the work is done; only an expired record over a clean tree is replaced.
 
-**The batch entry points claim per child, not per batch.** `epicrun`, `queue` and `backlogrun` never
+**The batch entry points claim per child, not per batch.** `epicrun` and `backlogrun` never
 call it themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh
 followup` releases it at that child's merge. The command's behavior and the answer table are
 `docs/josh-commands.md` → "`josh run:hold` / `josh run:release`"; this section is the single source of
@@ -659,7 +657,7 @@ the procedure.
 ## 2g. An Issue's comments are part of the Issue
 
 **Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun` and
-`kickoff`. A `queue` issue and an `epicrun` child inherit it rather than restate it: each runs in a
+`kickoff`. A `backlogrun` named issue and an `epicrun` child inherit it rather than restate it: each runs in a
 delegated unit executing `fullrun`'s procedure, and the hook keys its once-per-run record on the
 *fork's* transcript, so every child is delivered to in its own right. The read is one call, made in the
 same turn as whatever else the run already needs:
@@ -740,7 +738,7 @@ The procedure, in order:
    `pnpm josh run:release <N>`.
 4. **Then behave as the entry point does for a parked child.** A `fullrun` / `halfrun` a person typed
    sends a `confirmation` Telegram naming the Issue and the merge that already covers it, and stops. An
-   `epicrun` / `queue` / `backlogrun` child is park-and-continue (`epicrun.md` → "park and continue").
+   `epicrun` / `backlogrun` child is park-and-continue (`epicrun.md` → "park and continue").
 5. **Never close the Issue.** That is Tier C at every entry point, and the label leaves the close one
    click away for the person who owns it.
 

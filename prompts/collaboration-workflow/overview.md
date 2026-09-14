@@ -17,7 +17,7 @@
 
 ### 手順の置き場所（常時ロードとオンデマンドの分離）
 
-`kickoff` / `fullrun` / `halfrun` / `queue` / `epicrun` の**操作手順**は、常時ロードされる `CLAUDE.md` からは外され、`.claude/skills/workflow-commands/` に置かれている（joshuafolkken/kit#854）。`CLAUDE.md` に残るのはキーワードとスキルへの導線、およびスキルが読み込まれていない状態でも効く必要のある規則だけである。依存更新後の overrides / `devEngines` 検証手順も同様に `.claude/skills/dependency-update/` へ移した。**どの規則が「残す」側かは →「常駐ドキュメントと skill の分担（何を常駐に残すか）」が判定基準と全 4 件を定義する。**
+`kickoff` / `fullrun` / `halfrun` / `epicrun` / `backlogrun` の**操作手順**は、常時ロードされる `CLAUDE.md` からは外され、`.claude/skills/workflow-commands/` に置かれている（joshuafolkken/kit#854）。`CLAUDE.md` に残るのはキーワードとスキルへの導線、およびスキルが読み込まれていない状態でも効く必要のある規則だけである。依存更新後の overrides / `devEngines` 検証手順も同様に `.claude/skills/dependency-update/` へ移した。**どの規則が「残す」側かは →「常駐ドキュメントと skill の分担（何を常駐に残すか）」が判定基準と全 4 件を定義する。**
 
 このドキュメントは引き続き**正典の詳細版**であり、スキルは操作手順である。両者は一致していなければならないので、片方だけを更新してはならない。
 
