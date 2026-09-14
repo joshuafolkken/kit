@@ -158,6 +158,32 @@ describe('cost_usage.parse_line on the cache-write TTL', () => {
 	})
 })
 
+// joshuafolkken/kit#1969: a session row prints "not measured" when the API sent no thinking count,
+// so `thinking_measured` has to tell an absent breakdown from a genuine zero.
+describe('cost_usage.parse_line on the thinking-token count', () => {
+	it('marks the count measured when the line carried one', () => {
+		const outcome = cost_usage.parse_line(line())
+
+		expect(outcome.kind === 'record' && outcome.record.totals.thinking_tokens).toBe(10)
+		expect(outcome.kind === 'record' && outcome.record.totals.thinking_measured).toBe(true)
+	})
+
+	// A reported zero is still a measurement — the model did no thinking — not an absent field.
+	it('marks a reported zero measured rather than absent', () => {
+		const outcome = cost_usage.parse_line(
+			line({}, { output_tokens_details: { thinking_tokens: 0 } }),
+		)
+
+		expect(outcome.kind === 'record' && outcome.record.totals.thinking_measured).toBe(true)
+	})
+
+	it('marks the count not measured when the line sent no breakdown', () => {
+		const outcome = cost_usage.parse_line(NULL_FIELDS_LINE)
+
+		expect(outcome.kind === 'record' && outcome.record.totals.thinking_measured).toBe(false)
+	})
+})
+
 describe('cost_usage.parse_line on lines it does not price', () => {
 	it('skips a blank line', () => {
 		expect(cost_usage.parse_line(' '.repeat(3)).kind).toBe('skipped')

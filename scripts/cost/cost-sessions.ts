@@ -2,6 +2,7 @@ import { cost_dollar_composition, type DollarComposition } from './cost-dollar-c
 import { cost_format } from './cost-format'
 import { cost_output_turns, type OutputTurns } from './cost-output-turns'
 import { cost_pricing } from './cost-pricing'
+import { cost_session_metrics, type SessionMetrics } from './cost-session-metrics'
 import { cost_usage, type UsageRecord } from './cost-usage'
 
 // One issue's cost broken down by the main-line session it was spent in (joshuafolkken/kit#1912).
@@ -45,6 +46,8 @@ interface SessionCost {
 	// The billed input of the session's first request — the resident preamble it opened with. For a
 	// resumed session this is what re-reading the whole prior context cost before the first new turn.
 	preamble_tokens: number
+	// The session's model, thinking-share and context-size figures (joshuafolkken/kit#1969).
+	metrics: SessionMetrics
 }
 
 interface SessionGroup {
@@ -127,6 +130,7 @@ function to_session_cost(
 		composition: cost_dollar_composition.build(models),
 		output_turns: cost_output_turns.build(group.records),
 		preamble_tokens: group.baseline,
+		metrics: cost_session_metrics.build(group.records),
 	}
 }
 
@@ -149,12 +153,17 @@ function session_line(session: SessionCost): string {
 	return `  ${session.session_id}  ${spent}  ${counts}${resume}`
 }
 
+// The session's own line plus the metrics continuation line beneath it (joshuafolkken/kit#1969).
+function session_block(session: SessionCost): Array<string> {
+	return [session_line(session), cost_session_metrics.format(session.metrics)]
+}
+
 // Nothing for a scope with no session axis — a single-session scope carries none — so the session,
 // `--all` and empty reports print exactly what they printed before.
 function format(by_session: ReadonlyArray<SessionCost>): Array<string> {
 	if (by_session.length === 0) return []
 
-	return ['', HEADING, ...by_session.map((one) => session_line(one))]
+	return ['', HEADING, ...by_session.flatMap((one) => session_block(one))]
 }
 
 const cost_sessions = { HEADING, build, format }

@@ -9,6 +9,7 @@ const EMPTY_TOTALS: UsageTotals = {
 	cache_read_tokens: 0,
 	output_tokens: 0,
 	thinking_tokens: 0,
+	thinking_measured: false,
 }
 
 const MODEL = 'claude-opus-4-8'

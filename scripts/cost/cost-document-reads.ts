@@ -85,6 +85,7 @@ function carry_totals(cache_read_tokens: number): UsageTotals {
 		cache_read_tokens,
 		output_tokens: 0,
 		thinking_tokens: 0,
+		thinking_measured: false,
 	}
 }
 

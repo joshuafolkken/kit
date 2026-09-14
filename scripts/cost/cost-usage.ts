@@ -63,6 +63,12 @@ interface UsageTotals {
 	cache_read_tokens: number
 	output_tokens: number
 	thinking_tokens: number
+	// Whether the API actually reported a thinking-token count, kept apart from the count itself
+	// because `thinking_tokens: 0` cannot tell "the model did no thinking" from "the field was
+	// absent" (joshuafolkken/kit#1969). A session row prints "not measured" for the second rather
+	// than a confident 0%, so the distinction has to survive `sum_totals`; it is OR-combined, so a
+	// session is measured once any one of its requests carried a count.
+	thinking_measured: boolean
 }
 
 interface UsageRecord {
@@ -98,6 +104,7 @@ const EMPTY_TOTALS: UsageTotals = {
 	cache_read_tokens: 0,
 	output_tokens: 0,
 	thinking_tokens: 0,
+	thinking_measured: false,
 }
 
 const UNKNOWN_MODEL = 'unknown'
@@ -124,8 +131,23 @@ function split_cache_write(usage: RawUsage): CacheWrite {
 	return { write_5m: detail.ephemeral_5m_input_tokens ?? total - write_1h, write_1h }
 }
 
+// The thinking-token count and whether it was reported at all. `output_tokens_details` is `null`
+// when the API sent no breakdown and `thinking_tokens` is `null` inside it when the breakdown omits
+// the field; both collapse to `measured: false`, while a real `0` stays measured.
+interface ThinkingUsage {
+	tokens: number
+	measured: boolean
+}
+
+function thinking_usage(usage: RawUsage): ThinkingUsage {
+	const raw = usage.output_tokens_details?.thinking_tokens
+
+	return { tokens: raw ?? 0, measured: raw !== null && raw !== undefined }
+}
+
 function to_totals(usage: RawUsage): UsageTotals {
 	const { write_5m, write_1h } = split_cache_write(usage)
+	const thinking = thinking_usage(usage)
 
 	return {
 		input_tokens: usage.input_tokens,
@@ -133,7 +155,8 @@ function to_totals(usage: RawUsage): UsageTotals {
 		cache_write_1h_tokens: write_1h,
 		cache_read_tokens: usage.cache_read_input_tokens ?? 0,
 		output_tokens: usage.output_tokens,
-		thinking_tokens: usage.output_tokens_details?.thinking_tokens ?? 0,
+		thinking_tokens: thinking.tokens,
+		thinking_measured: thinking.measured,
 	}
 }
 
@@ -226,6 +249,7 @@ function add_totals(left: UsageTotals, right: UsageTotals): UsageTotals {
 		cache_read_tokens: left.cache_read_tokens + right.cache_read_tokens,
 		output_tokens: left.output_tokens + right.output_tokens,
 		thinking_tokens: left.thinking_tokens + right.thinking_tokens,
+		thinking_measured: left.thinking_measured || right.thinking_measured,
 	}
 }
 
