@@ -76,6 +76,25 @@ gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f descriptio
   stay its only limits.
 - **`route:tier-a` and `route:interrupt` do not take it either**, at any depth: a filing the run
   cannot proceed without is already citing its own blockage.
+- **A depth-2 filing — one whose subject is what measures a run — carries a further requirement, on
+  top of the depth-0 citation above rather than in place of it** (joshuafolkken/kit#1975). The
+  citation the depth-0 gate asks for is one a slow run can always produce, so it barely bites on a
+  measurement Issue: "runs are slow" and "the diff is large" both name depth-0 work, while the number
+  the Issue proposes to produce changes nothing — and a listing that measures itself has no natural
+  stopping condition precisely there. So a discretionary depth-2 filing states two things the depth-0
+  citation does not force:
+  - **The decision the number would change, named** — the Issue number holding the choice it is
+    waiting on, or a decision a person is about to make. "Slow", "large" and "worth knowing" are not a
+    decision.
+  - **Which way it tips** — what range of the number selects which choice. A number that selects the
+    same action whatever it turns out to be changes no decision, and a filing that cannot write this
+    line is describing one.
+  - **Cannot write both, it is not filed** — the same exit the depth-0 gate takes: the ledger below,
+    pulled into an Issue by the jam arriving or the second sighting, never pushed by the lone idea.
+- **This narrows depth 2 alone, and the exemptions above carry over unchanged.** `route:tier-a` and
+  `route:interrupt` do not take this requirement any more than they take the depth-0 citation, a
+  depth-0 observation does not take it because it is the product, and a review round cap's branch-2
+  filing (below) clears its own bar and never reaches this one.
 
 **It governs this route only — the fourth row of §2d's table.** A review finding routed to branch 2
 of `prompts/review.md` → "Review round cap" is filed under that section's own bar — a confirmed
