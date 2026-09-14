@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { CANONICAL_DOC, read_repo_file } from '#scripts/ai-document-fixture'
+import { CANONICAL_DOC, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { create_base_config } from './base.js'
 import { code_quality_rules } from './rules/code-quality.js'

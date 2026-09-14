@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { claude_settings_fixture } from '#scripts/claude-settings-fixture'
+import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
 import { describe, expect, it } from 'vitest'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { transform_copied_content } from './init-copy-content'

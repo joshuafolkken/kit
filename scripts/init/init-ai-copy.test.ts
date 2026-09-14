@@ -25,7 +25,7 @@ const transform_copied_content_mock = vi.hoisted(() =>
 	vi.fn().mockImplementation((_destination: string, content: string) => content),
 )
 
-vi.mock('#scripts/gh-spawn', () => ({
+vi.mock('#scripts/gh/gh-spawn', () => ({
 	gh_spawn: { get_repo_name_with_owner: get_repo_name_mock },
 }))
 vi.mock('node:fs', () => ({

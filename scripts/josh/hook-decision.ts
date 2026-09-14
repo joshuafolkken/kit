@@ -272,7 +272,7 @@ interface GuardContext extends GuardParts {
 // Ask one disposition's rule against its own record, and if the rule fires, arm the record so it
 // cannot repeat on the call in hand. **Recording before firing is what makes a refusal unrepeatable**,
 // so a disposition that cannot record does not fire — it reports the fault instead of risking the
-// wedge, which is the half `scripts/batch-guard.ts` names. Shared by the refusal and the notice so the
+// wedge, which is the half `scripts/hooks/batch-guard.ts` names. Shared by the refusal and the notice so the
 // arm-then-fire order is written once (joshuafolkken/kit#1848).
 function fire_once(
 	stamp: RefusalStamp,

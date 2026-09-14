@@ -1,4 +1,4 @@
-import { file_reader } from '#scripts/read-file'
+import { file_reader } from '#scripts/lib/read-file'
 import { overrides_check, type OverridesSources } from './overrides-logic'
 
 // A project may carry either source file and not the other — app-kit's package.json has no `pnpm`

@@ -11,7 +11,7 @@ import type { ObservationRead } from './run-progress-read'
 // the exit: one interval of silence, exactly one line, and a return. The interval is set in
 // milliseconds so the wait is real without the suite waiting out a real one.
 
-vi.mock('#scripts/gh-spawn', () => ({
+vi.mock('#scripts/gh/gh-spawn', () => ({
 	gh_spawn: { get_repo_name_with_owner: vi.fn(), get_repo_name_with_owner_within: vi.fn() },
 }))
 vi.mock('./run-progress-read', () => ({

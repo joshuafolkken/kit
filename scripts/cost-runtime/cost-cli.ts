@@ -275,7 +275,7 @@ async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Pr
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and
 // `process.exit()` tears the process down before a pipe has drained — `--all --json | cat` lost
 // everything past the 64KB pipe buffer and produced JSON that would not parse. The same idiom, for
-// the same reason, is in `scripts/verification-gate.ts` and `scripts/lint-parallel.ts`.
+// the same reason, is in `scripts/gate/verification-gate.ts` and `scripts/lint/lint-parallel.ts`.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

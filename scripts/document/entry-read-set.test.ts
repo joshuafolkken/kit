@@ -60,7 +60,7 @@ describe('entry_read_set.read_set — which files', () => {
 
 	// §1 also carries a two-column table under a `###` subsection — the point-of-use triggers — whose
 	// rows parse as entry rows, and the parse stops before it (joshuafolkken/kit#1797). Asserted in
-	// `scripts/entry-fetch-document-rule.test.ts` against a fixture rather than here: in the live
+	// `scripts/rules/entry-fetch-document-rule.test.ts` against a fixture rather than here: in the live
 	// document those rows are suppressed by `push_row`'s own guard, so a check here would pass with
 	// the stop deleted.
 

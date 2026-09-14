@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
-import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
+import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
 
 type MergeFunction = (existing: string) => string
 

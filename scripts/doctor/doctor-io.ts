@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { read_spawn_stderr, read_spawn_stdout } from '#scripts/spawn-exit'
+import { read_spawn_stderr, read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
 import { doctor_logic } from './doctor-logic'
 

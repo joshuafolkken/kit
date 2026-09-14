@@ -1,4 +1,4 @@
-import { poll } from '#scripts/poll'
+import { poll } from '#scripts/lib/poll'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
 	describe_pr_failure,

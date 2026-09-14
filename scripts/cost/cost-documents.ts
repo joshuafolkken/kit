@@ -2,7 +2,7 @@ import path from 'node:path'
 import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 import {
 	cost_document_reads,
 	type DocumentRead,

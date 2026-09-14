@@ -1,4 +1,4 @@
-import { status_icons } from '#scripts/status-icons'
+import { status_icons } from '#scripts/lib/status-icons'
 import type { PropagateTarget } from './propagate-targets'
 
 // Running the per-consumer sequence, and reporting what happened to every consumer.

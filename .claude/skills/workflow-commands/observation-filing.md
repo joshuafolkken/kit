@@ -44,7 +44,7 @@ gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue
 **Create the three once per repository**, before the first filing that applies one — REST auto-creates
 a missing label with a generated color and no description, and the three lines below are what give
 each a stable color a reader can scan a listing by. `DEPTH_LABELS` in `scripts/git/issue-labels.ts`
-is the single source of the colors and descriptions, and `scripts/issue-depth-label.test.ts` keys
+is the single source of the colors and descriptions, and `scripts/rules/issue-depth-label.test.ts` keys
 these lines to it so the two cannot drift.
 
 ```bash

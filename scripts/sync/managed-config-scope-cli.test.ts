@@ -1,5 +1,8 @@
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { DISTRIBUTED_ROOT_FILE, DISTRIBUTED_SKILL_FILE } from '#scripts/managed-config-fixture'
+import {
+	DISTRIBUTED_ROOT_FILE,
+	DISTRIBUTED_SKILL_FILE,
+} from '#scripts/managed-marker/managed-config-fixture'
 import { describe, expect, it } from 'vitest'
 import { CLEAN_ANSWER, MANAGED_ANSWER, managed_config_scope_cli } from './managed-config-scope-cli'
 

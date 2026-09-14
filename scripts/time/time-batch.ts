@@ -1,4 +1,4 @@
-import { bounded_pool } from '#scripts/bounded-pool'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { time_spans } from '#scripts/time-runtime/time-spans'
 import { time_ci } from './time-ci'
 import { time_corpus } from './time-corpus'

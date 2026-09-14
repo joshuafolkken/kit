@@ -208,7 +208,7 @@ same rule the UI gate uses, and the only one that survives a release.
 
 ### A project with no E2E suite
 
-`pnpm josh test:e2e` runs through `scripts/test-e2e-guard.ts`, which **skips and exits 0**, naming
+`pnpm josh test:e2e` runs through `scripts/test/test-e2e-guard.ts`, which **skips and exits 0**, naming
 the reason, when `@playwright/test` is not installed or no `*.e2e.{ts,js}` file exists. That skip is
 a **defined** outcome, not an accident: a project with no E2E suite has nothing for the gate to
 read, and the run says so out loud. **A skip you did not see printed is not one** — it is an unread
@@ -224,7 +224,7 @@ that it required a file named exactly `playwright.config.ts` **and** an `*.e2e.{
 as `skipped`, the rollup parser counted the skip as passing exactly as it does for every other
 conditional job, and the first row of the table above closed the gate on a suite nobody ran.
 **Where the specs live was a precondition on the CI signal; it is now a property of the workflow.**
-The agreement is executed rather than described — `scripts/ci-yml-e2e-detect.test.ts` runs the
+The agreement is executed rather than described — `scripts/ci/ci-yml-e2e-detect.test.ts` runs the
 workflow's own script against each layout and compares its verdict to the guard's, and asserts over
 the whole matrix that no layout containing specs can yield `enabled=false`. § 1's placement
 convention still stands on its own merits (`eslint/rules/test-filename.js` bans a top-level

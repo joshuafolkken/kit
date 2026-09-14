@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { bounded_pool } from '#scripts/bounded-pool'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { issue_state, type IssueState } from './issue-state'
 
 // `josh issue:state <N> [<N> ...]` — print each issue's state and labels, in the spelling the

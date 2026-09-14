@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
-import { bounded_pool } from '#scripts/bounded-pool'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
-import { poll } from '#scripts/poll'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { poll } from '#scripts/lib/poll'
 import { eval_judge, type Verdict } from './eval-judge'
 import { eval_report } from './eval-report'
 import { eval_runner, type RunnerDependencies } from './eval-runner'

@@ -1,6 +1,6 @@
-import { all_documents, read_document } from '#scripts/ai-document-fixture'
 import { kit_only } from '#scripts/josh/kit-only'
 import { describe, expect, it } from 'vitest'
+import { all_documents, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
 
 // A distributed procedure document must not name a kit-only command as an execution step: a consumer

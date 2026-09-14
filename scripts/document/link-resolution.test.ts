@@ -1,7 +1,7 @@
 import node_path from 'node:path'
-import { all_documents, read_document } from '#scripts/ai-document-fixture'
-import { package_file } from '#scripts/skill-fixture'
+import { package_file } from '#scripts/claude/skill-fixture'
 import { describe, expect, it } from 'vitest'
+import { all_documents, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
 import { document_section } from './document-section'
 

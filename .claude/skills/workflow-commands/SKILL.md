@@ -97,7 +97,7 @@ with its subsections — what changes is the extent of the fetch, never whether 
 that does not resolve is refused, with the file's own headings listed**, and **an ambiguous prefix is
 refused too** rather than handing back whichever section came first. The set is derived from the table
 above and the documents themselves, not transcribed; `scripts/document/entry-read-set.test.ts` pins
-the derivation and `scripts/entry-read-set-document-rule.test.ts` pins this rule.
+the derivation and `scripts/rules/entry-read-set-document-rule.test.ts` pins this rule.
 
 **`backlogrun` reads `backlogrun.md` too, and that is the point rather than an omission.** It changes
 only which issues are offered and by what authorization; every procedure for *running* one of them —
@@ -674,7 +674,7 @@ comment nobody read cannot win anything. The `gh api` form stays for a **cross-r
 command takes no `--repo`.
 
 `gh issue view <N> --comments` is GraphQL-backed, a cloud session is answered `403`, and
-`scripts/gh-document-guard.test.ts` refuses it in a runnable block. The REST call above is the portable
+`scripts/gh/gh-document-guard.test.ts` refuses it in a runnable block. The REST call above is the portable
 form.
 
 **This repository writes its agreements into comments and then reads only bodies.** A Tier A decision

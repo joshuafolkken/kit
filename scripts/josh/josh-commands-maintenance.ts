@@ -10,17 +10,17 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	overrides: {
-		script: 'scripts/overrides-check.ts',
+		script: 'scripts/overrides/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',
 		category: 'Maintenance',
 	},
 	audit: {
-		script: 'scripts/security-audit.ts',
+		script: 'scripts/security/security-audit.ts',
 		description: 'Run security audit',
 		category: 'Maintenance',
 	},
 	'audit:provision': {
-		script: 'scripts/security-audit-provision.ts',
+		script: 'scripts/security/security-audit-provision.ts',
 		description: 'Install the pinned osv-scanner when the audit cannot find one (no-op if present)',
 		category: 'Maintenance',
 	},

@@ -1,4 +1,4 @@
-import { read_repo_file } from '#scripts/ai-document-fixture'
+import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { review_brief } from './review-brief'
 

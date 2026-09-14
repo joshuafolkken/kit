@@ -71,12 +71,12 @@ on-demand copy for them to have moved to, so the question the criterion asks doe
 their absence here is correct rather than an omission (joshuafolkken/kit#955).
 
 Within that scope, every rule that passes the test is resident in full, and a marker suite asserts
-each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most of them,
-`scripts/verify-ui-skill.test.ts` for the UI gate,
+each one present in `CLAUDE.md` — `scripts/claude/workflow-skills.test.ts` for most of them,
+`scripts/claude/verify-ui-skill.test.ts` for the UI gate,
 `scripts/document/document-markers.test.ts` for the follow-up filing step, and
 `scripts/document/document-markers.test.ts` for the file-editing prohibition. **A trigger-delivered rule
 is pinned differently** — by what its refusal says and by the trigger firing, in
-`scripts/turn-batching-rule.test.ts`, `scripts/backlog-manufacturing-rule.test.ts` and
+`scripts/rules/turn-batching-rule.test.ts`, `scripts/backlog/backlog-manufacturing-rule.test.ts` and
 `scripts/rules/delivered-rules.test.ts`, with only its one-line trigger asserted resident:
 
 - **Explicit invocation required** — it decides whether a workflow starts at all, so it binds on the
@@ -125,13 +125,13 @@ again (joshuafolkken/kit#1525).
   round trips and the guard could not reach one of them, and because a cluster holding one `Read` was breaking the wiring rather than the count.
   It was resident through every run the topic file measures, and moved none of them, so what the
   relocation gave up is prose that was not being obeyed
-  (`prompts/collaboration-workflow/turn-batching.md`, `scripts/turn-batching-rule.test.ts`).
+  (`prompts/collaboration-workflow/turn-batching.md`, `scripts/rules/turn-batching-rule.test.ts`).
 - **The backlog WIP cap** — `pnpm josh rule:guard` refuses the `Bash` call that files an Issue
   (`gh issue create`, or a `title`-bearing POST to `…/issues`) and delivers the count, the refusal,
   both exemptions and the three tests that decide the interrupt one — the three kept whole, because a
   delivery saying only "an interrupt is exempt" hands the deciding back to judgement
   (joshuafolkken/kit#1518). A comment endpoint is not a filing and is left alone
-  (`prompts/collaboration-workflow/wip-cap.md`, `scripts/backlog-manufacturing-rule.test.ts`).
+  (`prompts/collaboration-workflow/wip-cap.md`, `scripts/backlog/backlog-manufacturing-rule.test.ts`).
 - **The Issue's comments** — `pnpm josh rule:guard` refuses the `Bash` call that reads an Issue's
   body without them (`gh issue view <N>`, or a `GET` of a path ending `…/issues/<N>`) and hands over
   the reissue that carries them plus the rule for a comment that contradicts the body. It is the one
@@ -148,7 +148,7 @@ again (joshuafolkken/kit#1525).
   trigger deliberately overlaps another — a filing whose body carries a backtick is `wip-cap`'s
   first, and this one's on the reissue. A one-line trigger stays resident because a hook reaches
   Claude Code alone (`prompts/collaboration-workflow/shell-body.md`,
-  `scripts/shell-body-rule.test.ts`, joshuafolkken/kit#1198).
+  `scripts/rules/shell-body-rule.test.ts`, joshuafolkken/kit#1198).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in
@@ -162,7 +162,7 @@ case worth naming, because a prohibition on writing usually *is* resident. It is
 is that `auto-ok` exists nowhere but the documents that also forbid an agent applying it: a turn that
 opens none of them is a turn on which the label is never reached, so residency would buy nothing.
 
-**The criterion is not advisory.** `scripts/workflow-skills.test.ts` caps each document at
+**The criterion is not advisory.** `scripts/claude/workflow-skills.test.ts` caps each document at
 `RESIDENT_CEILING_BYTES` and requires headroom under it, so a procedure restated resident costs
 budget that the next genuinely-resident rule then has to take back out of existing prose.
 
@@ -226,7 +226,7 @@ paragraph above records why a line stays behind when the hook reaches one harnes
 sentence that exists nowhere else. The duplicate list of delivered rules in
 `prompts/collaboration-workflow/residency.md` looked like a clean test-1 case — a stale summary
 sitting directly beneath a pointer to its own single source — and fails test 3, because
-`scripts/shell-body-rule.test.ts` and `scripts/turn-batching-rule.test.ts` each assert that a
+`scripts/rules/shell-body-rule.test.ts` and `scripts/rules/turn-batching-rule.test.ts` each assert that a
 delivered rule is listed there. **Being pinned is what test 3 is for**: that assertion is the design
 requirement it looks like an accident of. Only the restated count above was retired. **A run that
 finds nothing retirable records the candidates with their evidence and stops there**, rather than

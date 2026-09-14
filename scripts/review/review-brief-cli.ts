@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { path_decision } from '#scripts/josh/path-decision'
-import { scoped_green } from '#scripts/scoped-green'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'

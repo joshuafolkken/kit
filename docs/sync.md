@@ -438,7 +438,7 @@ SECURITY.md         tsconfig.sonar.json
 > command. The harness default of 30,000 characters fired on none of 1,848 Bash results measured
 > across 25 sessions, which is why the distributed value is lower. The number, the measurement behind
 > it and the two designs it was chosen over are in
-> `prompts/collaboration-workflow/output-bounds.md`; `scripts/bash-output-cap.test.ts` fails a value
+> `prompts/collaboration-workflow/output-bounds.md`; `scripts/lib/bash-output-cap.test.ts` fails a value
 > that would not fire.
 >
 > **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the rule
@@ -476,7 +476,7 @@ SECURITY.md         tsconfig.sonar.json
 > written while moving a procedure is still a choice. Since
 > [#963](https://github.com/joshuafolkken/kit/issues/963) that is the only document those markers
 > are asserted against — `AGENTS.md` and `GEMINI.md` are pointers to it, guarded instead by
-> `scripts/ai-document-pointers.test.ts`, which fails if a rule body reappears in either.
+> `scripts/document/ai-document-pointers.test.ts`, which fails if a rule body reappears in either.
 >
 > Their markdown does cite `prompts/…` paths, which a byte copy would have shipped unresolved — so
 > the directory copy is followed by the same rewrite the file copies run, over the copied markdown
@@ -641,7 +641,7 @@ kit's base layer for `tsconfig.json`, `cspell.config.yaml`, and `lefthook.yml` i
 
 ## Path transformation
 
-The AI files kit distributes carry backtick path references that must resolve in a consumer. The same transform is applied in two places: `prepack` bakes it into the published `CLAUDE.md` (`scripts/build-claude-md.ts`), and `josh sync` applies it to the pointer files it still byte-copies — `AGENTS.md`, `GEMINI.md`, `.cursorrules` ([#963](https://github.com/joshuafolkken/kit/issues/963)):
+The AI files kit distributes carry backtick path references that must resolve in a consumer. The same transform is applied in two places: `prepack` bakes it into the published `CLAUDE.md` (`scripts/build/build-claude-md.ts`), and `josh sync` applies it to the pointer files it still byte-copies — `AGENTS.md`, `GEMINI.md`, `.cursorrules` ([#963](https://github.com/joshuafolkken/kit/issues/963)):
 
 ```text
 `prompts/foo.md`             →  `node_modules/@joshuafolkken/kit/prompts/foo.md`     (bundled)

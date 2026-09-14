@@ -400,7 +400,7 @@ describe('rule_delivery — the shell-body rule at the call that would execute t
 		expect(reason).toBe(delivered_rules.SHELL_BODY_REASON)
 	})
 
-	// What the reason *says* is pinned by `scripts/shell-body-rule.test.ts`, which the marker-test
+	// What the reason *says* is pinned by `scripts/rules/shell-body-rule.test.ts`, which the marker-test
 	// table in `shell-body.md` makes the owner of the delivery text. Restating those markers here
 	// would be the clone `CLAUDE.md` prohibits. This block owns firing and silence.
 	it(ONCE_PER_RUN, () => {

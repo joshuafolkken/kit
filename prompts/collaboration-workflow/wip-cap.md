@@ -2,7 +2,7 @@
 
 **単一ソースはこのファイルである。**
 
-**この規則は常駐していない — 引き金つき配送に移った**（joshuafolkken/kit#1524）。`pnpm josh rule:guard` が Issue を作成する `Bash` 呼び出し（`gh issue create`、または `…/issues` への `title` 付き POST）を拒否し、そこで数え方・拒否・2 つの免除・免除を決める 3 条件を突きつける。起票が無いターンでは何も起きず、それは上限に触れる行為が無いということである。配送は**ラン 1 回につき 1 度**なので、数えたうえで同じ呼び出しをもう一度出せばよい。機構と列挙表は `rule-delivery.md`、配送文の実体は `scripts/rules/delivered-rules.ts` の `WIP_CAP_REASON` にあり、`scripts/backlog-manufacturing-rule.test.ts` がその中身を固定している。
+**この規則は常駐していない — 引き金つき配送に移った**（joshuafolkken/kit#1524）。`pnpm josh rule:guard` が Issue を作成する `Bash` 呼び出し（`gh issue create`、または `…/issues` への `title` 付き POST）を拒否し、そこで数え方・拒否・2 つの免除・免除を決める 3 条件を突きつける。起票が無いターンでは何も起きず、それは上限に触れる行為が無いということである。配送は**ラン 1 回につき 1 度**なので、数えたうえで同じ呼び出しをもう一度出せばよい。機構と列挙表は `rule-delivery.md`、配送文の実体は `scripts/rules/delivered-rules.ts` の `WIP_CAP_REASON` にあり、`scripts/backlog/backlog-manufacturing-rule.test.ts` がその中身を固定している。
 
 ## 規則
 
@@ -19,7 +19,7 @@ gh api "repos/{owner}/{repo}/issues?state=open&per_page=100" --paginate \
 - epic も子も含める。epic を除外すると、epic を作ることで上限を回避できてしまう。
 - **上限は 30。** 31 件目以降を作る前に 1 件閉じる。
 - **プルリクエストは数えない。** REST の `issues` エンドポイントは PR も返すため、`select(.pull_request == null)` で落とす。この 1 句を省くと、PR が開いているだけで上限に達する。
-- **`gh issue list` は使わない。** 配布ドキュメントの実行可能ブロックに置ける `gh` は REST のものだけで、`gh issue list` は GraphQL 経由のためクラウドセッションで 403 になる（`scripts/gh-document-guard.test.ts`）。
+- **`gh issue list` は使わない。** 配布ドキュメントの実行可能ブロックに置ける `gh` は REST のものだけで、`gh issue list` は GraphQL 経由のためクラウドセッションで 403 になる（`scripts/gh/gh-document-guard.test.ts`）。
 
 ## なぜ上限が要るのか
 

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { read_spawn_stdout } from '#scripts/spawn-exit'
+import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { safe_json_parse } from '#scripts/version/parse-json'
 import { execaSync } from 'execa'

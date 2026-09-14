@@ -18,7 +18,7 @@ const BUNDLED_DISPATCHER_URL = 'file:///repo/dist/josh.js'
 
 const FIXTURE_EXIT_CODE = 3
 const SCRIPT_ENTRY: CommandEntry = {
-	script: 'scripts/lint-related.ts',
+	script: 'scripts/lint/lint-related.ts',
 	description: 'Lint the changed files',
 	category: 'Development',
 }

@@ -4,7 +4,7 @@ extends:
 # Kit-internal only (this file is not distributed to consumers). Fires when a
 # tracked template source or copy template is staged, so neither side can be
 # committed out of sync without reconciling.
-# Keep the glob in sync with COPY_PAIRS / TRIPWIRE_PAIRS in scripts/template-source-logic.ts.
+# Keep the glob in sync with COPY_PAIRS / TRIPWIRE_PAIRS in scripts/sync/template-source-logic.ts.
 pre-commit:
   commands:
     template-source-parity:

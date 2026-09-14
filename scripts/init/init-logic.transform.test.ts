@@ -94,10 +94,12 @@ describe('transform_distributed_paths bundled eslint/ references', () => {
 
 describe('transform_distributed_paths unbundled references', () => {
 	it('rewrites a *.test.ts reference to its GitHub source', () => {
-		const result = init_logic.transform_distributed_paths('`scripts/ai-document-pointers.test.ts`')
+		const result = init_logic.transform_distributed_paths(
+			'`scripts/document/ai-document-pointers.test.ts`',
+		)
 
 		expect(result).toBe(
-			'`https://github.com/joshuafolkken/kit/blob/main/scripts/ai-document-pointers.test.ts`',
+			'`https://github.com/joshuafolkken/kit/blob/main/scripts/document/ai-document-pointers.test.ts`',
 		)
 	})
 

@@ -25,7 +25,7 @@ function handle_unknown(cmd: string): never {
 }
 
 // `process.exit` truncates a piped stdout at its buffer size, and since joshuafolkken/kit#1342 the
-// output at risk is the script's own — `scripts/verification-gate.ts` writes its per-check blocks
+// output at risk is the script's own — `scripts/gate/verification-gate.ts` writes its per-check blocks
 // and its failure summary through this process, and sets `process.exitCode` rather than exiting for
 // exactly that reason. Recording the code and letting node exit when the loop drains keeps every
 // byte, and it leaves the last word with a script that finishes work after module evaluation

@@ -1,4 +1,4 @@
-import { buffered_process } from '#scripts/buffered-process'
+import { buffered_process } from '#scripts/lib/buffered-process'
 
 // Filling the lane, which is the other half of opening one (joshuafolkken/kit#1554).
 //

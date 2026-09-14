@@ -1,4 +1,4 @@
-import { json_object_schema } from '#scripts/schemas'
+import { json_object_schema } from '#scripts/lib/schemas'
 import strip_json_comments from 'strip-json-comments'
 
 // Every managed JSON config kit reads (tsconfig.json, package.json, .vscode/*.json) may legally

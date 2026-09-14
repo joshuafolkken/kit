@@ -9,7 +9,7 @@ import { time_pull_files } from './time-pull-files'
 // merged diff", which is the silent zero this module exists to remove.
 
 const PULL = 1387
-const PATH = 'scripts/verification-gate.ts'
+const PATH = 'scripts/gate/verification-gate.ts'
 const ADDITIONS = 12
 const DELETIONS = 3
 const REFUSAL = 'gh: 403'

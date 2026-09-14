@@ -2,7 +2,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { gh_spawn } from '#scripts/gh-spawn'
+import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_clock } from './run-progress-clock'

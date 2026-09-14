@@ -1,4 +1,4 @@
-import { bounded_pool } from '#scripts/bounded-pool'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import type { Verdict } from './eval-judge'
 import type { Scenario } from './eval-scenario'
 

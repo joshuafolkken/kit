@@ -15,7 +15,7 @@ import { cost_usage, type UsageRecord } from './cost-usage'
 // transcripts found" for a project whose transcripts were sitting right there.
 //
 // `homedir()` is otherwise forbidden under `scripts/` and this file is the single allowed exception
-// — see `scripts/no-global-shim-write.test.ts`. The guard exists to stop a lifecycle hook *writing*
+// — see `scripts/hooks/no-global-shim-write.test.ts`. The guard exists to stop a lifecycle hook *writing*
 // to a shared, user-level location; this module only ever reads, and the test enforces that.
 
 const TRANSCRIPT_ROOT = path.join('.claude', 'projects')

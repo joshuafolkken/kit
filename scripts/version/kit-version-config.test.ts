@@ -14,7 +14,7 @@ describe('kit_version_config', () => {
 
 	it('derives the kit fix-gh-packages repair path', () => {
 		expect(kit_version_config.fix_gh_packages_path).toBe(
-			'node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts',
+			'node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts',
 		)
 	})
 

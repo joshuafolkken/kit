@@ -1,5 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
-import { package_with_version_schema } from '#scripts/schemas'
+import { package_with_version_schema } from '#scripts/lib/schemas'
 import { version_targets } from '#scripts/version/version-targets'
 import { release_plan, type ReleasePlan, type VersionedCommit } from './release-plan'
 

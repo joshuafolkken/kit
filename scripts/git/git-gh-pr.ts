@@ -1,4 +1,4 @@
-import { poll } from '#scripts/poll'
+import { poll } from '#scripts/lib/poll'
 import { git_command } from './git-command'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
