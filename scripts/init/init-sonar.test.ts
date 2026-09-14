@@ -19,7 +19,7 @@ vi.mock('./init-logic', () => ({
 	},
 }))
 vi.mock('./init-paths', () => ({ PACKAGE_DIR: '/pkg', PROJECT_ROOT: '/project' }))
-vi.mock('#scripts/sonar-file', () => ({
+vi.mock('#scripts/security/sonar-file', () => ({
 	sonar_file: {
 		write_sonar_file: write_sonar_file_mock,
 		merge_sonar_file: merge_sonar_file_mock,

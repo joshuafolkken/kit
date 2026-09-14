@@ -1,8 +1,8 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { transform_copied_tree } from '#scripts/directory-copy-guard'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { transform_copied_tree } from './directory-copy-guard'
 import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
 import { skill_migration } from './skill-migration'
 

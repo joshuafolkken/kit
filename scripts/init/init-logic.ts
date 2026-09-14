@@ -1,5 +1,5 @@
 import { json_format } from '#scripts/config-merge/json-format'
-import { vscode_settings_schema } from '#scripts/schemas'
+import { vscode_settings_schema } from '#scripts/lib/schemas'
 import { distributed_paths } from './distributed-paths'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
@@ -34,7 +34,7 @@ const CSPELL_IMPORT = '@joshuafolkken/kit/cspell'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
 const SAFE_CHAIN_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
-const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
+const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts'
 // Marker identifying a consumer script that already runs the fix-gh-packages command.
 const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
 const PREPARE_KEY = 'prepare'

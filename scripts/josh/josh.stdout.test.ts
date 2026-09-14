@@ -1,5 +1,5 @@
-import { josh_cli_fixture, type CliResult } from '#scripts/josh/josh-cli-fixture'
 import { describe, expect, it } from 'vitest'
+import { josh_cli_fixture, type CliResult } from './josh-cli-fixture'
 
 // #825: `--port $(josh port dev)` substitutes stdout straight into a command line, so every failure
 // path of the CLI has to leave that stream empty. The unit tests cover each writer in isolation;

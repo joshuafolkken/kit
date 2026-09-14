@@ -1,4 +1,4 @@
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 import { COMMAND_PHASES, type PhaseName } from './time-phase-names'
 import { time_shell } from './time-shell'
 import type { Span } from './time-spans'

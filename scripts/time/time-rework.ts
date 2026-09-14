@@ -5,7 +5,7 @@ import type { PullFile } from './time-pull-files'
 // The edits a run made that never reached its merged diff, and the size of the diff that did
 // (joshuafolkken/kit#1387).
 //
-// The 2026-09-05 hand measurement of run #1379 found `scripts/verification-gate.ts` edited twice and
+// The 2026-09-05 hand measurement of run #1379 found `scripts/gate/verification-gate.ts` edited twice and
 // absent from the final diff — a mid-implementation change of approach, which is rework by any
 // reading. `josh time` read the transcript and it read GitHub, and reconciled neither against the
 // other, so that kind of work was invisible to every scope. The same measurement found the run's size

@@ -11,7 +11,7 @@ import type { WatchLoop, WatchOptions } from './run-progress-cli'
 
 import type { ObservationRead } from './run-progress-read'
 
-vi.mock('#scripts/gh-spawn', () => ({
+vi.mock('#scripts/gh/gh-spawn', () => ({
 	gh_spawn: { get_repo_name_with_owner: vi.fn(), get_repo_name_with_owner_within: vi.fn() },
 }))
 vi.mock('./run-progress-read', () => ({
@@ -38,7 +38,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn() },
 }))
 
-const { gh_spawn } = await import('#scripts/gh-spawn')
+const { gh_spawn } = await import('#scripts/gh/gh-spawn')
 const { lane_child_marker } = await import('#scripts/lane/lane-child-marker')
 const { run_progress_read } = await import('./run-progress-read')
 const { run_progress_clock } = await import('./run-progress-clock')
@@ -57,7 +57,7 @@ const is_child_of = vi.mocked(lane_child_marker.is_child_of)
 
 const REPO = 'joshuafolkken/kit'
 // A directory of this suite's own. A fixed name under the temp directory is shared by every suite
-// running at once, which `scripts/shared-temporary-path.test.ts` refuses for exactly that reason.
+// running at once, which `scripts/lib/shared-temporary-path.test.ts` refuses for exactly that reason.
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-cli-'))
 const STAMP = path.join(TEMPORARY, 'stamp.json')
 const LIFE_STAMP = path.join(TEMPORARY, 'life.json')

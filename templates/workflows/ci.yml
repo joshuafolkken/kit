@@ -231,7 +231,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # The same rule `scripts/test-e2e-guard.ts` applies locally, so a suite that runs under
+      # The same rule `scripts/test/test-e2e-guard.ts` applies locally, so a suite that runs under
       # `pnpm josh test:e2e` is a suite CI runs too. Every `*.e2e.{ts,js}` outside `node_modules`
       # counts, at any depth; the guard's glob leaves dot-directories out by default, which is what
       # the second prune term reproduces. The config filename is deliberately not consulted any
@@ -240,7 +240,7 @@ jobs:
       # GitHub recorded it as skipped, the status-check list counted the skip as a pass, and the
       # merge went through with the suite never run. The same held for a spec kept anywhere but
       # `tests` or `src/routes` (joshuafolkken/kit#991). The agreement is executed rather than
-      # asserted in prose: `scripts/ci-yml-e2e-detect.test.ts` runs this very script against
+      # asserted in prose: `scripts/ci/ci-yml-e2e-detect.test.ts` runs this very script against
       # fixtures and compares its verdict to the guard's.
       #
       # One difference from the guard is deliberate and one-sided. The guard also skips when
@@ -414,7 +414,7 @@ jobs:
       # instead of re-deriving it. It is a kit command rather than shell in this file because this
       # is the one part of the chain that can be wrong without anyone noticing: a signature that
       # stops matching silently stops retrying. As a script it has unit tests
-      # (`scripts/e2e-retry-check.test.ts`) that fail the build when the rule drifts; as a `run:`
+      # (`scripts/test/e2e-retry-check.test.ts`) that fail the build when the rule drifts; as a `run:`
       # block it would have none. The log it reads is wrangler's own debug output, already captured
       # for the artifact below — not Playwright's reporter output, which is reshaped between
       # releases and would need re-deriving each time.

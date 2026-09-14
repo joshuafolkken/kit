@@ -90,7 +90,7 @@ jobs:
           fi
 
   # joshuafolkken/kit#1226 split the gate's four checks across two runners. The unit suite is the only
-  # one that fans out across every core — 8.5 of them on the machine `scripts/gate-plan.ts` measures —
+  # one that fans out across every core — 8.5 of them on the machine `scripts/gate/gate-plan.ts` measures —
   # so on a 4-core GitHub runner it and the other three spent the whole job taking cores off each
   # other: measured here, 121 seconds for the job with 106 of them inside the one gate step, against
   # a theoretical floor of the unit suite alone.
@@ -185,7 +185,7 @@ jobs:
       # The unit suite runs in the `unit` job below, through the same `josh test:unit` this step used
       # to reach, so the set of checks CI enforces is unchanged — what moved is which runner each one
       # is on. The flag is also the *only* thing that makes the split safe on the local side:
-      # `scripts/verification-gate.ts` withholds the green-gate record and the in-flight marker on a
+      # `scripts/gate/verification-gate.ts` withholds the green-gate record and the in-flight marker on a
       # `--no-unit` run, so this narrower gate can never let a later full `pnpm josh gate` be skipped,
       # nor tell `josh review:brief` that a unit suite it did not run has passed.
       #
@@ -202,7 +202,7 @@ jobs:
   # `static-checks` rather than sharing them: a GitHub job is its own machine, so every job that
   # needs Node sets Node up, and this workflow already writes that preamble once per job. The
   # single-source alternative — a local composite action under `.github/actions/` — is ruled out by
-  # `scripts/ci-yml-action-parity.test.ts`, which pins the set of action names in this file to the
+  # `scripts/ci/ci-yml-action-parity.test.ts`, which pins the set of action names in this file to the
   # set in `templates/workflows/ci.yml`; a local action cannot appear in a distributed template,
   # because the template travels to consumers without it.
   #
@@ -255,8 +255,8 @@ jobs:
       # with nothing matching the test glob is a broken state and fails the job. Calling vitest here
       # would give that second half back — a job that ran zero tests and reported success — and the
       # split would have moved the check into a place that enforces less than the gate step did.
-      # `scripts/ci-yml-unit-job.test.ts` pins the command; the guard itself is
-      # `scripts/test-unit-guard.ts`.
+      # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
+      # `scripts/test/test-unit-guard.ts`.
       - name: Run unit tests
         run: pnpm josh test:unit
 
@@ -322,7 +322,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The same rule `scripts/test-e2e-guard.ts` applies locally, so a suite that runs under
+      # The same rule `scripts/test/test-e2e-guard.ts` applies locally, so a suite that runs under
       # `pnpm josh test:e2e` is a suite CI runs too. Every `*.e2e.{ts,js}` outside `node_modules`
       # counts, at any depth; the guard's glob leaves dot-directories out by default, which is what
       # the second prune term reproduces. The config filename is deliberately not consulted any
@@ -331,7 +331,7 @@ jobs:
       # GitHub recorded it as skipped, the status-check list counted the skip as a pass, and the
       # merge went through with the suite never run. The same held for a spec kept anywhere but
       # `tests` or `src/routes` (joshuafolkken/kit#991). The agreement is executed rather than
-      # asserted in prose: `scripts/ci-yml-e2e-detect.test.ts` runs this very script against
+      # asserted in prose: `scripts/ci/ci-yml-e2e-detect.test.ts` runs this very script against
       # fixtures and compares its verdict to the guard's.
       #
       # One difference from the guard is deliberate and one-sided. The guard also skips when

@@ -19,7 +19,7 @@ function config_with_endpoint(versions_endpoint: string): VersionCommandConfig {
 	return {
 		package_name: KIT_PACKAGE,
 		versions_endpoint,
-		fix_gh_packages_path: 'node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts',
+		fix_gh_packages_path: 'node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts',
 		upstreams: [],
 	}
 }

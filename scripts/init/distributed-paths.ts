@@ -1,6 +1,6 @@
 // The path transform that makes kit's distributed AI documents resolve in a consumer, and the
 // one-line CLAUDE.md import that replaces the old byte-copy (joshuafolkken/kit#1878). Applied at
-// publish time to CLAUDE.md (scripts/build-claude-md.ts) and at copy time to the pointer files kit
+// publish time to CLAUDE.md (scripts/build/build-claude-md.ts) and at copy time to the pointer files kit
 // still ships whole (AGENTS.md / GEMINI.md / .cursorrules, via init-copy-content.ts).
 
 // Where kit's own published files sit once a consumer has installed the package. Backtick-quoted

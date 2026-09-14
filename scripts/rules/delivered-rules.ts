@@ -15,7 +15,7 @@ import { shell_segments } from './shell-segments'
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
 //
 // **It exists because residency ran out and delivery did not.** `CLAUDE.md` sits 6 tokens under the
-// ceiling `scripts/workflow-skills.test.ts` enforces, while `prompts/` and `.claude/skills/` hold
+// ceiling `scripts/claude/workflow-skills.test.ts` enforces, while `prompts/` and `.claude/skills/` hold
 // fifteen times as much on demand — so the pressure is on the one channel that costs every turn.
 // joshuafolkken/kit#1344 measured three consecutive runs in which resident prose about batching moved
 // the number not at all, and joshuafolkken/kit#1460 measured the same for the investigation

@@ -7,7 +7,7 @@ import { time_run } from './time-run'
 import { time_run_fixture, type GhScript } from './time-run-fixture'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
-// joshuafolkken/kit#1387, end to end: run #1379 edited `scripts/verification-gate.ts` twice and merged
+// joshuafolkken/kit#1387, end to end: run #1379 edited `scripts/gate/verification-gate.ts` twice and merged
 // a diff that does not name it, and no scope of `josh time` could say so. Its size — 6 files, 254
 // additions — was equally invisible, which is why its 27 minutes could not be compared with any other
 // run's.
@@ -22,7 +22,7 @@ const { write_session, reader, merged_pull, report_of, pull_file, files_body } =
 time_run_fixture.use_transcript_home()
 
 const ROOT = `${CWD}/`
-const DROPPED_PATH = 'scripts/verification-gate.ts'
+const DROPPED_PATH = 'scripts/gate/verification-gate.ts'
 const KEPT_PATH = 'scripts/time/time-report.ts'
 const ADDITIONS = 254
 const DELETIONS = 40

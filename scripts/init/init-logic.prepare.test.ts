@@ -8,7 +8,7 @@ import { init_logic } from './init-logic'
 
 const EMPTY_PATH = ''
 const EXECUTABLE_MODE = 0o755
-const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
+const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts'
 const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
 const LEFTHOOK_INSTALL = 'lefthook install'
 const PREPARE = 'prepare'

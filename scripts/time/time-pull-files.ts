@@ -1,4 +1,4 @@
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { time_github, type GhReader } from './time-github'
 
@@ -6,7 +6,7 @@ import { time_github, type GhReader } from './time-github'
 // (joshuafolkken/kit#1387).
 //
 // `josh time` reads the transcript and GitHub's pull-request listing, and neither says what landed.
-// So an edit made mid-implementation and then abandoned — `scripts/verification-gate.ts` was edited
+// So an edit made mid-implementation and then abandoned — `scripts/gate/verification-gate.ts` was edited
 // twice on run #1379 and appears nowhere in that run's diff — is invisible, and so is the run's size:
 // 27 minutes on a 254-line change and 27 minutes on a 4-line one read as the same figure and cannot be
 // compared.

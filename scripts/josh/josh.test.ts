@@ -124,7 +124,7 @@ describe('josh.ts — unknown command', () => {
 
 // joshuafolkken/kit#1342: a script command now writes its output through this process, and
 // `process.exit` truncates a piped stdout at its buffer size — losing the failure summary
-// `scripts/verification-gate.ts` writes last. The code is recorded and node exits on its own.
+// `scripts/gate/verification-gate.ts` writes last. The code is recorded and node exits on its own.
 describe('josh.ts — command with non-zero exit code', () => {
 	it('records the exit code without calling process.exit', async () => {
 		josh_mock.state.run_command_return = FAILURE_EXIT_CODE

@@ -10,17 +10,17 @@ import {
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
 	[GATE_COMMAND]: {
-		script: 'scripts/verification-gate.ts',
+		script: 'scripts/gate/verification-gate.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
 	},
 	lint: {
-		script: 'scripts/lint-parallel.ts',
+		script: 'scripts/lint/lint-parallel.ts',
 		description: 'Check code with prettier and eslint',
 		category: 'Development',
 	},
 	'lint:related': {
-		script: 'scripts/lint-related.ts',
+		script: 'scripts/lint/lint-related.ts',
 		description: 'Check only the changed files with prettier and eslint (whole tree on fallback)',
 		category: 'Development',
 	},
@@ -42,12 +42,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 	},
 	'format:edited': {
-		script: 'scripts/format-edited-file.ts',
+		script: 'scripts/hooks/format-edited-file.ts',
 		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',
 		category: 'Development',
 	},
 	'batch:guard': {
-		script: 'scripts/batch-guard.ts',
+		script: 'scripts/hooks/batch-guard.ts',
 		description:
 			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
 		category: 'Development',
@@ -59,7 +59,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// node's own `--env-file` parser with node's own precedence.
 	},
 	'pretool:guard': {
-		script: 'scripts/pretool-guard.ts',
+		script: 'scripts/hooks/pretool-guard.ts',
 		description:
 			'Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin)',
 		category: 'Development',
@@ -83,23 +83,23 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 	},
 	'test:unit': {
-		script: 'scripts/test-unit-guard.ts',
+		script: 'scripts/test/test-unit-guard.ts',
 		description:
 			'Run unit tests with Vitest (skips when Vitest is absent; fails when it has no tests)',
 		category: 'Development',
 	},
 	'test:related': {
-		script: 'scripts/test-related.ts',
+		script: 'scripts/test/test-related.ts',
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 	},
 	'e2e:retry-check': {
-		script: 'scripts/e2e-retry-check.ts',
+		script: 'scripts/test/e2e-retry-check.ts',
 		description: 'Report whether the preview server crashed during a failed E2E attempt (CI)',
 		category: 'Development',
 	},
 	'test:e2e': {
-		script: 'scripts/test-e2e-guard.ts',
+		script: 'scripts/test/test-e2e-guard.ts',
 		description: 'Run E2E tests with Playwright (skips when absent or no e2e files)',
 		category: 'Development',
 	},

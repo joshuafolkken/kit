@@ -41,7 +41,7 @@ pnpm josh followup "<title> #<N>" --notify-message-file <path>
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 ```
 
-**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、上の 1 行目がそのまま使える。`gh issue comment` / `gh pr comment` にも `--body-file` はあるが、本リポジトリの配布ドキュメントは GraphQL 経由の `gh` サブコマンドを実行可能ブロックに書かない（クラウドセッションでは 403 になる。`scripts/gh-document-guard.test.ts`）。
+**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、上の 1 行目がそのまま使える。`gh issue comment` / `gh pr comment` にも `--body-file` はあるが、本リポジトリの配布ドキュメントは GraphQL 経由の `gh` サブコマンドを実行可能ブロックに書かない（クラウドセッションでは 403 になる。`scripts/gh/gh-document-guard.test.ts`）。
 
 `--body-file` / `--notify-message-file` はいずれも `-` で標準入力を読む（`gh issue create --body-file -` と同じ約束）。読み取りは `scripts/josh/cli-body.ts` の 1 本だけで、`josh notify` / `josh followup` / `epic --rationale-file` / `epic --decision-file` の 4 つがそれを共有する。**`--body` と `--body-file` の同時指定は拒否する** — 優先順位を決めると、ファイルを渡したつもりの呼び出しが、避けようとしていたインライン文字列をそのまま送ってしまう。
 
@@ -67,4 +67,4 @@ pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 - `scripts/josh/cli-body.test.ts` — バッククォート・`$` を含む本文がファイル経由で無改変に通ること、`-` が標準入力を読むこと、通常ファイル以外の読める経路（`/dev/stdin`・プロセス置換）を開けること、インラインとファイルの同時指定を拒否すること
 - `scripts/rules/shell-body-trigger.test.ts` — 危険な綴りで発火し、プレースホルダ・`@file` 形式・エスケープ済み `\$` では無言であること。`body=` のどちら側に引用符があっても発火すること、`$( … )` で包んでもバッククォートは免除されないこと、`$( … )` の中の引用符で捕捉が切れないことを、いずれも発火・非発火の対で固定する
 - `scripts/rules/delivered-rules.test.ts` — 上の引き金が列挙表の行に配線されており、非 `Bash` ツールでは無言であること
-- `scripts/shell-body-rule.test.ts` — 常駐 1 行がこの文書を指しており、配送文が被害・安全な綴り・再発行の指示を運ぶこと。**この一覧そのものも固定する** — 一覧が「あるスイートが何を固定しているか」を書きながら、そのケースが存在しないという食い違いが実際に起きた（`-` の標準入力）
+- `scripts/rules/shell-body-rule.test.ts` — 常駐 1 行がこの文書を指しており、配送文が被害・安全な綴り・再発行の指示を運ぶこと。**この一覧そのものも固定する** — 一覧が「あるスイートが何を固定しているか」を書きながら、そのケースが存在しないという食い違いが実際に起きた（`-` の標準入力）

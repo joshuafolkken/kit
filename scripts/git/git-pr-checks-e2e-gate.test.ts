@@ -144,7 +144,7 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 // *skipped* job — the parser maps SKIPPED to `pass`, asserted directly above — so a required `E2E`
 // would have passed on exactly the skipped job that let a merge through with the suite never run.
 // What guarantees the job actually runs is the detection rule, and that is where the fix went:
-// `scripts/ci-yml-e2e-detect.test.ts` executes it against the layouts it used to miss.
+// `scripts/ci/ci-yml-e2e-detect.test.ts` executes it against the layouts it used to miss.
 //
 // It would add nothing to the failure path either. A red E2E already ends the wait at once
 // (joshuafolkken/kit#990) and can never reach `success`, which is what the first two describes here

@@ -8,12 +8,12 @@ import { time_span_fixture } from './time-span-fixture'
 // Reconciling a run's edits against its merged diff, and the size of that diff
 // (joshuafolkken/kit#1387).
 //
-// The subject is run #1379, where `scripts/verification-gate.ts` was edited twice and appears nowhere
+// The subject is run #1379, where `scripts/gate/verification-gate.ts` was edited twice and appears nowhere
 // in the merged diff — a mid-implementation change of approach that no scope of `josh time` could see.
 
 const { edit_span, span } = time_span_fixture
 
-const DROPPED_PATH = 'scripts/verification-gate.ts'
+const DROPPED_PATH = 'scripts/gate/verification-gate.ts'
 const KEPT_PATH = 'scripts/time/time-report.ts'
 // A path no repository could hold, so an edit naming it can never appear in any diff. Written as a
 // home-relative scratch directory rather than under a publicly writable one, which the lint rules flag

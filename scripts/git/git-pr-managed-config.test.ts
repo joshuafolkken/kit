@@ -2,7 +2,7 @@ import {
 	DISTRIBUTED_ROOT_FILE,
 	DISTRIBUTED_SKILL_FILE,
 	DISTRIBUTED_SYNC_ARTIFACT,
-} from '#scripts/managed-config-fixture'
+} from '#scripts/managed-marker/managed-config-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_command } from './git-command'
 import { git_pr_managed_config } from './git-pr-managed-config'

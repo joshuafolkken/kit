@@ -1,5 +1,5 @@
-import { all_documents, read_document } from '#scripts/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
+import { all_documents, read_document } from './ai-document-fixture'
 import { document_section } from './document-section'
 import { RETIRED_PHRASES } from './retired-phrases'
 

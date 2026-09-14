@@ -1,4 +1,4 @@
-import { yaml_document } from '#scripts/yaml-document'
+import { yaml_document } from '#scripts/yaml/yaml-document'
 import {
 	package_pnpm_schema,
 	package_with_deps_schema,

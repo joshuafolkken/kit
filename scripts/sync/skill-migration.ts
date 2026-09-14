@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { is_transformable } from '#scripts/directory-copy-guard'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
+import { is_transformable } from './directory-copy-guard'
 import { PLUGIN_SKILL_DIRECTORIES } from './plugin-skill-directories'
 
 // `josh sync` removes a consumer's stale copy of one of the plugin-distributed skill directories —

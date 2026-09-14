@@ -161,7 +161,7 @@ const PARENT_SEGMENT_INDEX = -2
 
 // The state root holds transcripts and persisted results and no subject code, so it is exempt whole.
 // It is not anchored to the home directory: `cost-transcript.ts` is this package's only file allowed
-// to look that up at all (`scripts/no-global-shim-write.test.ts`), and two adjacent segments outside
+// to look that up at all (`scripts/hooks/no-global-shim-write.test.ts`), and two adjacent segments outside
 // the checkout are specific enough without it.
 function has_state_root(segments: ReadonlyArray<string>, index: number): boolean {
 	return SESSION_STATE_SEGMENTS.every((segment, offset) => segments[index + offset] === segment)

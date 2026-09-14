@@ -112,7 +112,7 @@ describe('version_commands.run_check for a package with no upstreams', () => {
 				`  Latest:  ${KIT_LATEST}`,
 				'',
 				`Run: pnpm add -g ${KIT_PACKAGE}@${KIT_LATEST}`,
-				`Run: pnpm add -D ${KIT_PACKAGE}@${KIT_LATEST} && node_modules/.bin/tsx node_modules/${KIT_PACKAGE}/scripts/fix-gh-packages.ts`,
+				`Run: pnpm add -D ${KIT_PACKAGE}@${KIT_LATEST} && node_modules/.bin/tsx node_modules/${KIT_PACKAGE}/scripts/gh/fix-gh-packages.ts`,
 			].join('\n'),
 		)
 		info_spy.mockRestore()

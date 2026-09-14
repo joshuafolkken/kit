@@ -6,10 +6,10 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { file_reader } from '#scripts/lib/read-file'
 import { lockfile_overrides } from '#scripts/overrides/lockfile-overrides'
 import { overrides_files } from '#scripts/overrides/overrides-files'
 import { overrides_check } from '#scripts/overrides/overrides-logic'
-import { file_reader } from '#scripts/read-file'
 import { execaSync } from 'execa'
 import { latest_regression, type VersionRegression } from './latest-regression'
 import { preinstall_version_update } from './preinstall-version-update'

@@ -1,4 +1,4 @@
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 // Reading the content blocks out of a session transcript (joshuafolkken/kit#1151).

@@ -1,4 +1,4 @@
-import { ci_yml_fixture, type WorkflowJob } from '#scripts/ci-yml-fixture'
+import { ci_yml_fixture, type WorkflowJob } from '#scripts/ci/ci-yml-fixture'
 import { describe, expect, it } from 'vitest'
 import {
 	CHECK_WAIT_INTERVAL_MS,

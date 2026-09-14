@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { bounded_pool } from '#scripts/bounded-pool'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { issue_read, type IssueComment, type IssueFields } from './issue-read'
 
 // `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { package_version_schema } from '#scripts/schemas'
+import { package_version_schema } from '#scripts/lib/schemas'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { safe_json_parse } from '#scripts/version/parse-json'
 import semver from 'semver'

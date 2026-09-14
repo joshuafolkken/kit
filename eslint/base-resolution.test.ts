@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest'
 // suite pays it again whenever `pnpm josh gate` runs enough workers to saturate the CPU. On the
 // default 10-second budget that reddened gates for changes touching neither ESLint's config nor any
 // file these tests read. `scripts/lines/effective-limit.test.ts` and
-// `scripts/cspell-distributed-words.test.ts` already declare their own budget for the same reason.
+// `scripts/gate/cspell-distributed-words.test.ts` already declare their own budget for the same reason.
 const LINT_PROBE_TIMEOUT_MS = 60_000
 
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })

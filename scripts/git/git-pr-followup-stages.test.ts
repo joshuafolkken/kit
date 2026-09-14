@@ -67,7 +67,7 @@ vi.mock('./git-epic-close', () => ({
 // on, once for every case here that calls `run`. This suite is a *timing* suite, so it was reporting
 // the network as the `telegram` stage's cost. `git-pr-followup.test.ts` mocks the same collaborator
 // the same way (joshuafolkken/kit#1077), and since joshuafolkken/kit#1515 the network guard in
-// `scripts/test-network-guard.ts` covers `git` as well as `gh`, so either mock going missing fails the
+// `scripts/test/test-network-guard.ts` covers `git` as well as `gh`, so either mock going missing fails the
 // suite outright instead of quietly slowing it down.
 // The post-merge tail reaches the observation-ledger flush (joshuafolkken/kit#1810); its behavior is
 // `git-followup-flush.test.ts`, so it is a no-op here.

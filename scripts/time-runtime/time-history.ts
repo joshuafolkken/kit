@@ -1,9 +1,9 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
-import { time_format } from '#scripts/time-runtime/time-format'
 import type { TimeReport } from '#scripts/time/time-report'
 import { z } from 'zod'
+import { time_format } from './time-format'
 
 // The durable half of `josh time` (joshuafolkken/kit#1471). The measurement itself only ever ran
 // when a person typed `diag`, so a run nobody asked about left no record at all — and a measurement

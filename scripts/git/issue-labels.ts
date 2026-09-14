@@ -67,7 +67,7 @@ const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 // hand, which is how the 2026-08-30 breakdown was produced and why it did not reproduce. Purely
 // informational: unlike the three above, a route label says nothing about whether an issue may run,
 // so none of them joins NOT_DIRECTLY_RUNNABLE_LABELS. The names are duplicated as literals in the
-// filing procedures (prose cannot import this module); `scripts/filing-route-label.test.ts` keys the
+// filing procedures (prose cannot import this module); `scripts/rules/filing-route-label.test.ts` keys the
 // docs to these constants so a filing command that drops the label fails rather than drifting.
 //
 // joshuafolkken/kit#1518 added a fourth: an interrupt is a defect found in *this* repository that
@@ -150,7 +150,7 @@ const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, 
 // Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
 //
 // **The provisioning command lives in `observation-filing.md`**, because prose cannot import this module —
-// the same split `FILING_ROUTE_LABELS` above lives with. `scripts/issue-depth-label.test.ts` keys
+// the same split `FILING_ROUTE_LABELS` above lives with. `scripts/rules/issue-depth-label.test.ts` keys
 // those three command lines to this array, so a color changed here without the document fails.
 const DEPTH_LABELS: ReadonlyArray<{
 	name: string

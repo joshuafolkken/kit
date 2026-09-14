@@ -1,4 +1,4 @@
-import { buffered_process, type BufferedProcessResult } from '#scripts/buffered-process'
+import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { INSTALL_ARGUMENTS, INSTALL_TIMEOUT_MS, lane_install } from './lane-install'
 
@@ -7,7 +7,7 @@ import { INSTALL_ARGUMENTS, INSTALL_TIMEOUT_MS, lane_install } from './lane-inst
 // `buffered-process.test.ts` already pins, which is why that shared helper is mocked rather than the
 // child being run.
 
-vi.mock('#scripts/buffered-process', () => ({
+vi.mock('#scripts/lib/buffered-process', () => ({
 	buffered_process: {
 		is_process_failed: (result: Pick<BufferedProcessResult, 'exit_code'>): boolean =>
 			result.exit_code !== 0,

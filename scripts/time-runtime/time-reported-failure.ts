@@ -1,5 +1,5 @@
-import { josh_verdict } from '#scripts/josh-verdict'
-import { status_icons } from '#scripts/status-icons'
+import { josh_verdict } from '#scripts/josh/josh-verdict'
+import { status_icons } from '#scripts/lib/status-icons'
 import { z } from 'zod'
 
 // Reading a josh check's failure out of what it printed, when the pipe threw its exit status away

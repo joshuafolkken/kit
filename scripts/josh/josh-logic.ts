@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
-import { package_version_schema } from '#scripts/schemas'
-import { resolve_spawn_exit } from '#scripts/spawn-exit'
+import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
+import { package_version_schema } from '#scripts/lib/schemas'
+import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
 import { command_suggest } from './command-suggest'
 import {
@@ -324,7 +324,7 @@ const josh_logic = {
 export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'
 export type { TsxRunner }
-export { SPAWN_ERROR_EXIT_CODE } from '#scripts/spawn-exit'
+export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {
 	find_package_directory,

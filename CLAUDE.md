@@ -64,7 +64,7 @@ Read from a `.env` file at the project root by the AI scripts, `josh port` and `
 
 - Svelte: `PascalCase.svelte` / `PascalCase.svelte.ts` · TypeScript: `kebab-case.ts` · Route files: exception
 - Test files: `*.test.ts` (node/unit) / `*.svelte.test.ts` (component/browser) — never `*.spec.ts`; colocate beside the code under test (no top-level `tests/`). Lint-enforced by `eslint/rules/test-filename.js`.
-- `scripts/` is grouped into subdirectories; relative parent-directory imports (`../`) are banned by ESLint — use the `#scripts/*` subpath import for cross-directory imports (e.g. `import { schema } from '#scripts/schemas'`), and keep same-directory/into-subdirectory imports relative.
+- `scripts/` is grouped into subdirectories; relative parent-directory imports (`../`) are banned by ESLint — use the `#scripts/*` subpath import for cross-directory imports (e.g. `import { schema } from '#scripts/lib/schemas'`), and keep same-directory/into-subdirectory imports relative.
 
 ### Quality limits
 
@@ -144,7 +144,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 ## Doc Sync Rules
 
-**`CLAUDE.md` is the single source for every agent rule.** `AGENTS.md` and `GEMINI.md` carry no rules — a rule addition, spec change or wording fix is written **once**, here (joshuafolkken/kit#963). The structural test [scripts/ai-document-pointers.test.ts](https://github.com/joshuafolkken/kit/blob/main/scripts/ai-document-pointers.test.ts) fails if a rule body reappears in either, or if a pointer loses the sentence that sends an agent here.
+**`CLAUDE.md` is the single source for every agent rule.** `AGENTS.md` and `GEMINI.md` carry no rules — a rule addition, spec change or wording fix is written **once**, here (joshuafolkken/kit#963). The structural test [scripts/document/ai-document-pointers.test.ts](https://github.com/joshuafolkken/kit/blob/main/scripts/document/ai-document-pointers.test.ts) fails if a rule body reappears in either, or if a pointer loses the sentence that sends an agent here.
 
 **docs/ must stay in sync with the package.** When `josh bump` changes the version, review `docs/` and update any section describing changed behavior (new/renamed commands, `josh init` / `josh sync` behavior, new config files) before committing.
 

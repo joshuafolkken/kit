@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { package_named_version_schema } from '#scripts/schemas'
+import { package_named_version_schema } from '#scripts/lib/schemas'
 import { safe_json_parse } from './parse-json'
 
 const PACKAGE_JSON = 'package.json'

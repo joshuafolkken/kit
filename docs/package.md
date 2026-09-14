@@ -34,16 +34,16 @@ See [sync.md](./sync.md) for what `sync` overwrites and why. A project-local `jo
 
 The package exposes config presets for direct import:
 
-| Use             | Reference                                                        |
-| --------------- | ---------------------------------------------------------------- |
-| ESLint config   | `@joshuafolkken/kit/eslint/vanilla`                              |
-| Prettier        | `@joshuafolkken/kit/prettier`                                    |
-| tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/base.json`           |
-| Scripts         | `tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts` |
-| Prompts         | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
-| Version library | `@joshuafolkken/kit/version`                                     |
-| Config-merge    | `@joshuafolkken/kit/config-merge`                                |
-| Env flags       | `@joshuafolkken/kit/env`                                         |
+| Use             | Reference                                                           |
+| --------------- | ------------------------------------------------------------------- |
+| ESLint config   | `@joshuafolkken/kit/eslint/vanilla`                                 |
+| Prettier        | `@joshuafolkken/kit/prettier`                                       |
+| tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/base.json`              |
+| Scripts         | `tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts` |
+| Prompts         | `node_modules/@joshuafolkken/kit/prompts/*.md`                      |
+| Version library | `@joshuafolkken/kit/version`                                        |
+| Config-merge    | `@joshuafolkken/kit/config-merge`                                   |
+| Env flags       | `@joshuafolkken/kit/env`                                            |
 
 Prefer wiring up individual configs without `josh init`? See [manual-config.md](./manual-config.md).
 

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { patch_json_key } from '#scripts/config-merge/patch-json-key'
-import { string_array_schema } from '#scripts/schemas'
+import { string_array_schema } from '#scripts/lib/schemas'
 
 // kit-family tsconfig presets used to ship with a `.jsonc` extension. Playwright (>= 1.62) appends
 // `.json` to any `extends` entry that does not already end in it and then hard-throws when the

@@ -10,7 +10,7 @@
 //
 // The list is single-sourced here because it now has three consumers that must not drift apart: the
 // probes that clear it, the fixture that clears it, and the unit-suite guard that refuses a write
-// while any of it is set (`scripts/test-repository-guard.ts`).
+// while any of it is set (`scripts/test/test-repository-guard.ts`).
 //
 // **Only the variables that redirect where git writes are listed.** `GIT_PREFIX`, `GIT_EDITOR` and
 // the `GIT_CONFIG_*` family are exported to hooks too and are deliberately absent: clearing them

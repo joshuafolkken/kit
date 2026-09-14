@@ -26,7 +26,7 @@ const DIRECT_ENTRY: CommandEntry = {
 }
 
 const SCRIPT_ENTRY: CommandEntry = {
-	script: 'scripts/test-e2e-guard.ts',
+	script: 'scripts/test/test-e2e-guard.ts',
 	description: 'Run E2E tests with Playwright',
 	category: 'Development',
 }

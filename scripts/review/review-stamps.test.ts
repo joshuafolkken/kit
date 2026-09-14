@@ -1,10 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { verification_gate, type GateStepResult } from '#scripts/gate/verification-gate'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
-import { test_unit_guard } from '#scripts/test-unit-guard'
-import { verification_gate, type GateStepResult } from '#scripts/verification-gate'
+import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { review_stamps } from './review-stamps'
 

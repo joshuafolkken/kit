@@ -1,4 +1,4 @@
-import { DISTRIBUTED_SKILL_FILE } from '#scripts/managed-config-fixture'
+import { DISTRIBUTED_SKILL_FILE } from '#scripts/managed-marker/managed-config-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
