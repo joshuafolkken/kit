@@ -9,7 +9,7 @@ import { run_invocation } from './run-invocation'
 // whole-run bound — and then loses all of it at the session cut, because the cut ends the session and
 // the next one starts from nothing. The decision recorded on that issue is that **the cut is an
 // execution detail of the same authorization**, so the budget has to survive it. Nothing in this
-// repository persisted a run across sessions before: `epicrun.md` → "What carries over" reads its
+// repository persisted a run across sessions before: `backlogrun.md` → "What carries over" reads its
 // state back off GitHub, and there is no epic to read it off when the run began from the backlog.
 //
 // **The unit is the repository, not the working tree.** `run-hold.ts` keys on the work tree's own git
@@ -35,7 +35,7 @@ import { run_invocation } from './run-invocation'
 
 const CARRY_PREFIX = 'josh-run-carry-'
 const REPOSITORY_DIRECTORY_INDEX = 1
-// **The whole-run bound is `backlog-budget.ts`'s, imported rather than restated.** `epicrun.md` →
+// **The whole-run bound is `backlog-budget.ts`'s, imported rather than restated.** `backlogrun.md` →
 // "Waiting, and never waiting forever" states the figure and that module applies it; a second copy
 // here would drift, and the drift is silent in exactly the direction that matters — raised there and
 // still 8 here, this record answers `expired`, `--begin` replaces it, and the budget restarts at

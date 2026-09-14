@@ -44,7 +44,7 @@ allowlist に 25 件を並べることになり、それは何も守らない（
 
 **すべての REST 呼び出しは今も `execa('gh', ['api', …])` である。** サブコマンドをやめたことで消えたのは
 GraphQL への依存であって、バイナリへの依存ではない。**`gh` が入っていないコンテナは実在する** — その環境
-では `pnpm josh epic:next` も `pnpm josh pr` も `pnpm josh followup` も完了できず、`fullrun` / `epicrun`
+では `pnpm josh epic:next` も `pnpm josh pr` も `pnpm josh followup` も完了できず、`fullrun`
 は GitHub に一切到達しない。`git push` が通り `GH_TOKEN` が効いていても、である。
 
 `check_gh_installed` は `gh CLI is not installed` と明示するが、git remote からリポジトリを読む側の

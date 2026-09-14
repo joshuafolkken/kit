@@ -57,7 +57,7 @@ say why that data does not reach it.**
 "This needs something else done first" is a different answer from "this is really several things". A
 split means the request in hand contains two or more deliverables; a prerequisite means it is still
 **one** deliverable that has another one in front of it. The prerequisite rule is `SKILL.md` → §2d, its
-single source; each entry's own branch is in `epicrun.md` → "A prerequisite discovered mid-run" and, for
+single source; each entry's own branch is in `backlogrun.md` → "A prerequisite discovered mid-run" and, for
 the stopping entry points, in `fullrun.md` / `halfrun.md`.
 
 ## Two or more always means an epic
@@ -84,20 +84,20 @@ on the Issue, without asking.
   that turns out to need three fixes is the case: promoting the report would leave the report itself
   with nowhere to live.
 
-## `epicrun` is the one entry that does not stop
+## `backlogrun` is the one entry that does not stop
 
-`epicrun` asked for the batch's authorization, so a split found under it is filed and continued through
-rather than stopped — including when the `epicrun` was given a bare, non-epic Issue, where the split is
-what creates the epic (`epicrun.md` → "When `#N` is not an epic"). The assessment itself is identical;
+`backlogrun` asked for the batch's authorization, so a split found under it is filed and continued through
+rather than stopped — including when the `backlogrun` was given a bare, non-epic Issue, where the split is
+what creates the epic (`backlogrun.md` → "When `#N` is not an epic"). The assessment itself is identical;
 only what follows the answer differs.
 
 ## Finding a split mid-run stops the run
 
 `fullrun` and `halfrun` **stop** after filing the children and the epic. They do not continue into
-implementation, and they do not silently become an `epicrun`. Typing `fullrun` approved implementing and
+implementation, and they do not silently become a `backlogrun`. Typing `fullrun` approved implementing and
 merging **one** Issue; a batch of N is a different authorization. Report what was filed and end with:
 
-> Please run `epicrun #<E>` to execute this epic.
+> Please run `backlogrun #<E> --only` to execute this epic.
 
 ## There is no `kickoff epic`
 

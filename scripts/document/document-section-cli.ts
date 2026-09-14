@@ -8,7 +8,7 @@ import { entry_read_set } from './entry-read-set'
 // `josh doc:section` — print one section of a markdown document (joshuafolkken/kit#1776).
 //
 // **It exists because the documents already cite each other by section and the reader could only
-// fetch files.** `` `epicrun.md` → "The hand-off" `` names 249 lines; opening `epicrun.md` costs
+// fetch files.** `` `backlogrun.md` → "The hand-off" `` names 249 lines; opening `backlogrun.md` costs
 // 2,121. Every entry point pays that difference at the moment it starts, before anything has been
 // implemented.
 //
@@ -29,7 +29,7 @@ const HEADING_ARGUMENT = 1
 const NO_CANDIDATE = 0
 const USAGE = 'Usage: josh doc:section <file.md> "<heading>"'
 
-// A bare `epicrun.md` means the workflow skill's own copy, because that is how every reference in
+// A bare `backlogrun.md` means the workflow skill's own copy, because that is how every reference in
 // those documents spells it; anything that resolves as a path is taken as one.
 //
 // **Every branch resolves against `root`, including the first.** Left relative to the process's own

@@ -370,9 +370,19 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 	it.each([
 		'**Three rules decide what a run does when the work turns out not to be one Issue**',
 		'split-assessment.md',
-		'`fullrun.md` / `halfrun.md` / `epicrun.md`',
-		'**`epicrun` parks a child instead of stopping the session**',
+		'`fullrun.md` / `halfrun.md` / `backlogrun.md`',
+		'**A `backlogrun` parks a child instead of stopping the run**',
 	])('routes to the moved procedures with %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+
+	// joshuafolkken/kit#1985: `epicrun` was removed and its job folded into `backlogrun`. A person who
+	// types the old keyword must be pointed at the command that runs the same scope, so the guidance is
+	// pinned resident — the mid-workflow turn that mistypes it loads no skill.
+	it.each([
+		'`epicrun` was removed (joshuafolkken/kit#1985)',
+		'tell them to run `backlogrun #E --only`',
+	])('guides a typed `epicrun` to `backlogrun #E --only` with %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 })

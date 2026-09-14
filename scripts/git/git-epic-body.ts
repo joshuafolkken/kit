@@ -37,19 +37,22 @@ function format_dependencies(children: ReadonlyArray<number>, is_ordered: boolea
 	return children.map((child) => to_issue_reference(child)).join(DEPENDENCY_ARROW)
 }
 
-// The command that runs the batch. `epicrun` takes the epic itself rather than a list of children
-// (joshuafolkken/kit#861): it re-reads the state from GitHub each round, so an interrupted run
-// resumes without anyone retyping the remaining numbers, and a child that needs a decision is parked
-// rather than ending the run.
+// The command that runs the batch. `backlogrun #E --only` takes the epic itself rather than a list of
+// children (joshuafolkken/kit#861, joshuafolkken/kit#1985): it re-reads the state from GitHub each
+// round, so an interrupted run resumes without anyone retyping the remaining numbers, and a child that
+// needs a decision is parked rather than ending the run. `--only` runs exactly the epic's children and
+// stops, which is the scope the removed `epicrun #E` keyword had.
 //
 // The epic number is not known while its own body is being built, so the placeholder is filled in by
 // `format_run_command` once the issue exists. Bodies written before this change still say
-// `queue …`; nothing reads the `Execution` section — the auto-close reads the task list and
-// `epic:check` never looks at it — so those epics are unaffected (joshuafolkken/kit#865).
+// `epicrun …` or `queue …`; nothing reads the `Execution` section — the auto-close reads the task
+// list and `epic:check` never looks at it — so those epics are unaffected (joshuafolkken/kit#865).
 const EPIC_PLACEHOLDER = '<this epic>'
 
 function format_run_command(epic_number: number | undefined): string {
-	return `epicrun #${epic_number === undefined ? EPIC_PLACEHOLDER : String(epic_number)}`
+	const epic = epic_number === undefined ? EPIC_PLACEHOLDER : String(epic_number)
+
+	return `backlogrun #${epic} --only`
 }
 
 // A backlink to the Issue this split came from, when the split originated in another repository.

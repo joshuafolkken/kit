@@ -92,7 +92,7 @@ function byte_size(relative_path: string): number {
 // path, which ends in the same file name — so it is removed before the search rather than matched
 // around.
 // A markdown link to the skill carries the file name **twice** — once in the destination and once
-// in the label a reader clicks — so removing the destination alone leaves `[`epicrun.md`](../../)`
+// in the label a reader clicks — so removing the destination alone leaves `[`backlogrun.md`](../../)`
 // behind, and a sibling topic file reads as citing the pointer while it is correctly citing the
 // skill. `epicrun` is the first topic whose skill file shares the pointer's name *and* is linked
 // under that name (joshuafolkken/kit#1188), so the whole link goes, label included.

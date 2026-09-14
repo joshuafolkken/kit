@@ -51,12 +51,15 @@ describe('git_epic_body.build_epic_body — dependencies', () => {
 })
 
 describe('git_epic_body.build_epic_body — execution and rationale', () => {
-	// `epicrun` takes the epic, not the children: it re-reads state from GitHub each round, so an
-	// interrupted run resumes without anyone retyping the remaining numbers (joshuafolkken/kit#861).
-	it('prints the epicrun command rather than a list of children', () => {
+	// `backlogrun #E --only` takes the epic, not the children: it re-reads state from GitHub each round,
+	// so an interrupted run resumes without anyone retyping the remaining numbers (joshuafolkken/kit#861,
+	// joshuafolkken/kit#1985).
+	it('prints the backlogrun --only command rather than a list of children', () => {
 		const body = build(false)
 
-		expect(body).toContain('epicrun')
+		expect(body).toContain('backlogrun')
+		expect(body).toContain('--only')
+		expect(body).not.toContain('epicrun')
 		expect(body).not.toContain('queue #101')
 	})
 
@@ -117,7 +120,9 @@ describe('git_epic_body.build_dependency_pairs', () => {
 
 describe('git_epic_body.format_run_command', () => {
 	it('names the epic once its number is known', () => {
-		expect(git_epic_body.format_run_command(EPIC_NUMBER)).toBe(`epicrun #${String(EPIC_NUMBER)}`)
+		expect(git_epic_body.format_run_command(EPIC_NUMBER)).toBe(
+			`backlogrun #${String(EPIC_NUMBER)} --only`,
+		)
 	})
 
 	// A new epic's body is written before the issue exists, so the number is substituted afterwards.
@@ -125,15 +130,15 @@ describe('git_epic_body.format_run_command', () => {
 		expect(git_epic_body.format_run_command(undefined)).toContain(git_epic_body.EPIC_PLACEHOLDER)
 	})
 
-	it('never lists the children, which epicrun does not take', () => {
+	it('never lists the children, which the run command does not take', () => {
 		expect(git_epic_body.format_run_command(EPIC_NUMBER)).not.toContain('#101')
 	})
 })
 
 // joshuafolkken/kit#1712 — `epic:audit`'s unjustified-order check asks where a declared order's
 // reason was recorded. `--ordered` is a person declaring one deliberately, so the creation records
-// that; without it every ordered epic failed its own audit the moment it was created, and `epicrun`
-// stopped at step one.
+// that; without it every ordered epic failed its own audit the moment it was created, and a
+// `backlogrun #E --only` stopped at step one.
 describe('git_epic_body.build_epic_body — the declared order is recorded', () => {
 	it('records the chain `--ordered` declared, under `## Decisions`', () => {
 		const body = build(true)

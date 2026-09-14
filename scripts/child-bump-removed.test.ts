@@ -124,7 +124,7 @@ const CHILD_FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	CHAIN_RULE,
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/epicrun.md',
+	'.claude/skills/workflow-commands/backlogrun.md',
 ]
 
 describe('no document still puts a version bump in the child flow', () => {

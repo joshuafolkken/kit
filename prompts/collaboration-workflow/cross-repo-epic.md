@@ -51,4 +51,4 @@ EPIC 本文のタスクリストに、次のどちらかの形で書く。
 pnpm josh epic:next joshuafolkken/kit#858 --repo joshuafolkken/app-kit
 ```
 
-**裸の `#N` は自リポジトリの別 Issue に解決される** — 番号が同じだけの、まったく別の Issue である。したがってクロス repo の EPIC には必ず修飾を付ける。`epicrun joshuafolkken/kit#858` も同じ形。
+**裸の `#N` は自リポジトリの別 Issue に解決される** — 番号が同じだけの、まったく別の Issue である。したがってクロス repo の EPIC には必ず修飾を付ける。`backlogrun joshuafolkken/kit#858 --only` も同じ形。

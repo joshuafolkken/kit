@@ -53,7 +53,7 @@ const WAKE_LOG_SUFFIX = '.log'
 //
 // **The window is measured from the spawn, so it has to cover everything before the session's first
 // `run:carry --begin`** — the agent CLI's cold start, the resident preamble, and reading `SKILL.md`,
-// `backlogrun.md`, `epicrun.md` and the `fullrun` set. Ten minutes is several times the observed cost
+// `backlogrun.md`, `backlogrun.md` and the `fullrun` set. Ten minutes is several times the observed cost
 // of that and still far inside the roughly 50-minute cut interval this exists to bridge. It was two
 // minutes first, which is inside the range a merely *slow* start occupies — and a slow start booked as
 // a failure ends the whole overnight run.

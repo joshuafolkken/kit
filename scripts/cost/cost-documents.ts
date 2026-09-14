@@ -15,7 +15,7 @@ import { cost_usage, type UsageRecord } from './cost-usage'
 //
 // `cost-resident.ts` decomposes the *preamble* — `CLAUDE.md`, the skills index, the hooks — which is
 // billed before any work happens. The documents a workflow reads *at its entry* (`SKILL.md`,
-// `epicrun.md`, `chain-rule.md`) are not in that preamble: a `Read` brings each into the conversation
+// `backlogrun.md`, `chain-rule.md`) are not in that preamble: a `Read` brings each into the conversation
 // partway through, and every request after it re-reads it from cache. That per-document carry cost is
 // what a point-of-use decision trades away, and until this it could only be re-measured by hand
 // against the transcript each time (#1856 chose its target from a hand calculation).

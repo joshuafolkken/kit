@@ -18,7 +18,7 @@
 
 const MS_PER_MINUTE = 60_000
 const MINUTES_PER_HOUR = 60
-// `epicrun.md` → "Waiting, and never waiting forever" carried this as prose only. Held here it is
+// `backlogrun.md` → "Waiting, and never waiting forever" carried this as prose only. Held here it is
 // the same bound, decided the same way as the two new ones rather than by an agent reading a clock.
 const WHOLE_RUN_BUDGET_HOURS = 8
 const WHOLE_RUN_BUDGET_MINUTES = WHOLE_RUN_BUDGET_HOURS * MINUTES_PER_HOUR
@@ -40,7 +40,7 @@ const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
 // That one is sized to a child's `fullrun`, which finishes in minutes; a watch is waiting on a person
 // to file an issue and opt it in, which happens on human timescales. Polling a watch every minute
 // would spend thirty of the parent session's own requests — each one billing the whole session
-// history — to learn nothing thirty times. `epicrun.md` → "Waiting, and never waiting forever" holds
+// history — to learn nothing thirty times. `backlogrun.md` → "Waiting, and never waiting forever" holds
 // the row; the figure is here because `idle_watch_reason` below has to say it.
 const IDLE_POLL_MINUTES = 5
 
@@ -50,7 +50,7 @@ const STOP_VERDICT = 'stop'
 
 // `run` — start what `backlog:next` offered. `watch` — sleep the polling interval and ask again,
 // except while something of the run's own is in flight, where the wake is the progress watcher's exit
-// and the interval is only a floor (`epicrun.md` → "The wake exists only while something is in
+// and the interval is only a floor (`backlogrun.md` → "The wake exists only while something is in
 // flight").
 // `stop` — report and finish. There is no fourth: an answer the loop cannot act on is a verdict
 // nobody can write a loop against.

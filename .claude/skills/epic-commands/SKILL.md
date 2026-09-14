@@ -9,18 +9,18 @@ These three commands are what turn an epic from a list of issue numbers into som
 execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
 skill is the operational procedure, and the two must agree.
 
-The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `epicrun`, `backlogrun` — live in the
+The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `backlogrun` — live in the
 `workflow-commands` skill.
 
 ## The order they run in
 
 ```
 epic:audit → find contradictions across the children, and fix what it finds (Tier A)
-epicrun    → which calls epic:next each round
+backlogrun → which calls epic:next each round
 ```
 
 Front-loading every `needs-decision` in one pass is `backlogrun`'s job, not a command of this skill:
-`backlogrun.md` → "Resolve what the plan can resolve, before starting". A standalone `epicrun`'s
+`backlogrun.md` → "Resolve what the plan can resolve, before starting". A `backlogrun #E --only`'s
 pre-check is `epic:audit`.
 
 ## Front-loading the decisions — now `backlogrun`'s
@@ -29,12 +29,12 @@ pre-check is `epic:audit`.
 `needs-decision` in one batch before the run started. That front-loading is retired as a command of
 its own (joshuafolkken/kit#1965): **`backlogrun` does it at the start of every run**, and
 `backlogrun.md` → "Resolve what the plan can resolve, before starting" is its single source. A
-standalone `epicrun`'s only pre-check is `epic:audit` below, run without being asked.
+`backlogrun #E --only`'s only pre-check is `epic:audit` below, run without being asked.
 
 **A decision is still recorded in two places, and one without the other loses half of it.** The epic's
 `## Decisions` log carries the decision; a comment on each child it applies to carries the reasoning
 for that child's reader. **Recording a decision removes that child's `needs-decision` label** (Tier A);
-the label-clearing rule itself is `epicrun.md` → "park and continue".
+the label-clearing rule itself is `backlogrun.md` → "park and continue".
 
 - **A decision taken *as* a child joins the epic** goes through `pnpm josh epic --add … --decision-file`
   — the `epic:bundle` section below is that flag's single source, and it writes both halves at once.
@@ -64,7 +64,7 @@ the label-clearing rule itself is `epicrun.md` → "park and continue".
 of a real epic found two contradictions that would have stalled the implementation while
 `epic:check` reported every requirement as passing.
 
-Run it **without being asked**: at the start of an `epicrun`, and right
+Run it **without being asked**: when a `backlogrun` starts a named epic's children, and right
 after a child is added or a dependency changed.
 
 The cycle and declaration-mismatch checks are `epic:next`'s, reused rather than re-derived. What this
@@ -88,7 +88,7 @@ other child *already depends on* is not reported at all.
 contradiction is that the criteria's child *can run first*, and one end closing is enough to make
 that false: a closed naming child has already run, and a closed named child has already delivered
 what the criteria ask for — so an epic that once forgot to declare an order would otherwise fail its
-audit forever, which stops every future `epicrun` on it at the first step. It is demoted rather than
+audit forever, which stops every future run of that epic at the first step. It is demoted rather than
 dropped because dropping it hands the same pair to the first check, which reports it as an implicit
 dependency instead: the same one line, minus the detail that the name is in the acceptance criteria
 (joshuafolkken/kit#1010, widened from both-closed to either-closed by joshuafolkken/kit#1597 after a
@@ -102,7 +102,7 @@ choice nobody has made.
 about the search itself rather than about anything the children say (joshuafolkken/kit#1033):
 
 - `✖ orphan search: Could not list the open issues…` — the search never ran, so "no orphans" would
-  be a claim about a listing that never arrived. It fails the audit, which stops an `epicrun` at its
+  be a claim about a listing that never arrived. It fails the audit, which stops the epic's run at its
   step 0. **Re-run the audit**; that is the whole response. There is nothing to fix and nothing to
   decide, so neither Tier A nor a `needs-decision` park applies. If it keeps failing, check
   `gh auth status` and whether the rate limit has reset.
@@ -158,7 +158,7 @@ actually occurs — a lane holding the label for minutes.
 
 **A child that is itself an epic is never offered** (joshuafolkken/kit#1476). An epic is not a unit of
 work, so a run handed one has nothing to implement — before this the row fell through to the
-dependency reading, which makes anything unblocked runnable, and `epicrun` passed the epic to
+dependency reading, which makes anything unblocked runnable, and `backlogrun` passed the epic to
 `fullrun` as an ordinary issue. It waits on a *person*, because no amount of waiting turns an epic
 into work. **The test is the child's `epic` label, never how its task-list row is written**: a row
 naming `owner/repo#N` is a different property and a legitimate one — it disables the epic auto-close
@@ -237,7 +237,7 @@ half by hand is the `declaration_mismatch` below, arrived at from the other dire
 
 **Write the boundary with `pnpm josh epic --add`, not by hand.** A declared link with no recorded
 `blocked-by` relation is the `declaration_mismatch` that `find_anomalies` reports, and it stops
-`epic:next` and `epicrun` outright; the rule further down — record the order in `blocked-by` **and**
+`epic:next` and the run that consumes it outright; the rule further down — record the order in `blocked-by` **and**
 in `Dependencies` — is what a wave has to satisfy, and editing the body alone satisfies half of it.
 **`--before <hub>` and `--after <hub>` are both refused while the hub sits in more than one chain
 with nothing after it** — which is exactly what a hub is the moment the earlier wave has been chained
@@ -292,7 +292,7 @@ condition, and it is narrower than it sounds:
 `from_blockers` in `scripts/epic/epic-classify.ts` propagates `human`: a wave-1 child labelled
 `needs-decision` makes every child behind it "waiting on a person" rather than "waiting on time".
 
-**The park itself is not the halt, and reading it as one hides how the cost arrives.** `epicrun` parks
+**The park itself is not the halt, and reading it as one hides how the cost arrives.** `backlogrun` parks
 that child and goes on running the rest of wave 1 exactly as it always does; the session stops once
 those close and nothing is runnable, because every later wave has been classified `human`. So a
 boundary is paid for at the *end* of the wave rather than at the moment one child parks — which is
@@ -327,8 +327,8 @@ to implement.
   target, by any route.
 - **The epic auto-closes only when every cross-repository child's state could actually be read.** One
   unreadable child leaves it open, exactly as before.
-- **An epic in another repository must be referenced as `owner/repo#N`** — `epicrun
-  joshuafolkken/kit#858`. A bare `#N` resolves to *this* repository's issue of that number.
+- **An epic in another repository must be referenced as `owner/repo#N`** — `backlogrun
+  joshuafolkken/kit#858 --only`. A bare `#N` resolves to *this* repository's issue of that number.
 
 **A dependency that crosses a repository is not satisfied by the blocking issue closing.** Merging
 does not publish: the merge, the auto-tag and the publish run one after another, so a consumer told
@@ -351,7 +351,7 @@ a publish that predates the change.
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
 Run it right after an issue is filed: by `kickoff` / `fullrun` / `halfrun`, or by any Tier A filing
-mid-implementation, including inside an `epicrun`. **It recommends; it writes nothing.**
+mid-implementation, including inside a `backlogrun`. **It recommends; it writes nothing.**
 
 "Two or more always means an epic" only fires when one request is split on the spot. Two issues filed
 days apart that turn out to be the front and back of one job are executed separately, in whatever

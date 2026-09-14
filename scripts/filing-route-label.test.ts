@@ -84,7 +84,7 @@ const NAMES_LABEL_CASE = '$doc names $label'
 const OPERATIONAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [
 	`${SKILL_ROOT}/fullrun.md`,
 	`${SKILL_ROOT}/halfrun.md`,
-	`${SKILL_ROOT}/epicrun.md`,
+	`${SKILL_ROOT}/backlogrun.md`,
 ].flatMap((document_) => [
 	{ doc: document_, label: SPLIT_ROUTE_LABEL },
 	{ doc: document_, label: TIER_A_ROUTE_LABEL },
@@ -101,7 +101,7 @@ describe('the workflow-command filing copies name their route label', () => {
 // prerequisites file unlabeled. **Single-sourcing removed the second layer rather than the check.**
 // joshuafolkken/kit#1174, #1185 and #1188 moved the split assessment, the mid-run prerequisite and
 // `epicrun` into their skills, so those topic files are pointers with no filing command to assert
-// against — and `epicrun.md`'s two rows would now be byte-identical to rows in
+// against — and `backlogrun.md`'s two rows would now be byte-identical to rows in
 // `OPERATIONAL_FILING_DOCS`, asserting the same labels against the same file twice. What remains
 // here is the one filing site that is not an entry-point procedure.
 const CANONICAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [

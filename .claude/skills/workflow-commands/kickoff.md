@@ -13,8 +13,7 @@
   **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2> ... [--ordered] [--rationale-file
   <path|->]` — the right choice when `#N` is a request, a discussion or a container — or, when `#N` is
   itself one of the deliverables, keep `#N` as a child and create a new epic with `pnpm josh epic`. That
-  branch is Tier A: choose it and record the reasoning on the Issue without asking. Present `epicrun
-  #<E>` and stop. Plan comments are written in the session language (`JOSH_SESSION_LANG`, default `ja`).
+  branch is Tier A: choose it and record the reasoning on the Issue without asking. Present `backlogrun #<E> --only` and stop. Plan comments are written in the session language (`JOSH_SESSION_LANG`, default `ja`).
   Telegram notification: `pnpm josh notify --task-type planning --issue-url "<issue-url>" --body=$'-
   <bullet1>\n- <bullet2>\n...'`. `--task-type` controls the header icon (`planning` 📋 / `completion` ✅
   / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️). `--repo-name` and `--issue-title` are
@@ -62,16 +61,16 @@ can confirm in one pass (the guide is about 10 changed files and about 400 chang
   "<epic-title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]`**,
   capturing its number `<E>` from the printed URL. The command satisfies the epic's four mechanical
   requirements by construction — the `epic` label, the task-list rows (`- [ ] #N`), the machine-readable
-  `Dependencies`, and the printed `epicrun` line. Check an epic you wrote or edited by hand with `pnpm
+  `Dependencies`, and the printed `backlogrun` line. Check an epic you wrote or edited by hand with `pnpm
   josh epic:check <E>`. Only where `josh` is unavailable, fall back to the manual procedure: ensure the
   label exists (`gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks
   a batch of child issues from one split" --silent 2>/dev/null || true`), then create the epic with `gh
   api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>"`. Its body
   follows the epic format in `prompts/collaboration-workflow/issue-template.md` — split rationale,
-  dependencies, the `epicrun` command, and a child task list in task-list syntax (`- [ ] #N`). The epic
+  dependencies, the `backlogrun` command, and a child task list in task-list syntax (`- [ ] #N`). The epic
   exists as the **non-closing home for the split rationale**. When the children have no required order,
   write `None — the children are independent; any execution order works.` under `Dependencies`. **The
-  epic itself is never implemented** — `epicrun` takes the epic and runs its *children*. `pnpm josh
+  epic itself is never implemented** — a `backlogrun` takes a named epic and runs its *children*. `pnpm josh
   followup` closes it automatically once every child is closed. **Only when the execution order
   matters**, record it natively: `pnpm josh epic --ordered` treats the argument order as the dependency
   order; on the manual fallback path, after the child Issues exist, `gh api
@@ -79,4 +78,4 @@ can confirm in one pass (the guide is about 10 changed files and about 400 chang
   repos/{owner}/{repo}/issues/<N1> --jq .id)"` for each dependent pair (the endpoint takes the blocker's
   **database id**, not its issue number; a failure here is non-fatal). Never fold the relation into the
   creation call. (3) Send Telegram notification listing all created issues. (4) Present the command
-  `epicrun #<E>`. (5) **Stop** — do not implement.
+  `backlogrun #<E> --only`. (5) **Stop** — do not implement.

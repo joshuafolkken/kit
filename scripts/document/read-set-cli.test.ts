@@ -7,7 +7,7 @@ import { read_set_cli } from './read-set-cli'
 
 const ROOT = process.cwd()
 const SUCCESS = 0
-const EPICRUN = 'epicrun.md'
+const BACKLOGRUN_DOC = 'backlogrun.md'
 const HAND_OFF = 'The hand-off'
 const BACKLOGRUN = 'backlogrun'
 const NO_SUCH_DOC = 'no-such-doc.md'
@@ -39,7 +39,7 @@ function captured(act: () => number): Captured {
 
 describe('josh doc:section', () => {
 	it('prints the named section of a sibling workflow document', () => {
-		const { code, out } = captured(() => document_section_cli.run([EPICRUN, HAND_OFF]))
+		const { code, out } = captured(() => document_section_cli.run([BACKLOGRUN_DOC, HAND_OFF]))
 
 		expect(code).toBe(SUCCESS)
 		expect(out).toContain(`## ${HAND_OFF}`)
@@ -47,7 +47,9 @@ describe('josh doc:section', () => {
 	})
 
 	it('refuses a heading the document does not have, and lists what it does', () => {
-		const { code, err } = captured(() => document_section_cli.run([EPICRUN, 'No Such Heading']))
+		const { code, err } = captured(() =>
+			document_section_cli.run([BACKLOGRUN_DOC, 'No Such Heading']),
+		)
 
 		expect(code).toBe(document_section_cli.FAILURE_EXIT_CODE)
 		expect(err).toContain(HAND_OFF)
@@ -61,15 +63,15 @@ describe('josh doc:section', () => {
 	})
 
 	it('prints the usage when either argument is missing', () => {
-		const { code, err } = captured(() => document_section_cli.run([EPICRUN]))
+		const { code, err } = captured(() => document_section_cli.run([BACKLOGRUN_DOC]))
 
 		expect(code).toBe(document_section_cli.FAILURE_EXIT_CODE)
 		expect(err).toBe(document_section_cli.USAGE)
 	})
 
 	it('resolves a bare document name inside the workflow skill directory', () => {
-		expect(document_section_cli.resolve_document(EPICRUN, ROOT)).toContain(
-			`.claude/skills/workflow-commands/${EPICRUN}`,
+		expect(document_section_cli.resolve_document(BACKLOGRUN_DOC, ROOT)).toContain(
+			`.claude/skills/workflow-commands/${BACKLOGRUN_DOC}`,
 		)
 	})
 })

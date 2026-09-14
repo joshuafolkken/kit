@@ -157,7 +157,7 @@ once here; the measurements that motivated each one live in the linked Issues.
 - **origin/main is merged in before the gate** — `pnpm josh main:merge` merges `origin/<default>` into
   the branch before the gate and the review start, so the gate verifies the tree that will actually
   merge rather than one that never existed (joshuafolkken/kit#1837). It is the last edit, so the scoped
-  pair and the gate run once over it. A conflict here fires `epicrun.md` → "Conflicts are not predicted"
+  pair and the gate run once over it. A conflict here fires `backlogrun.md` → "Conflicts are not predicted"
   early.
 - **A single check answers once per tree** — while implementing, re-run a single check by name
   (`pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's type

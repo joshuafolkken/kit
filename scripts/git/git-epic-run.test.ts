@@ -74,10 +74,12 @@ describe('git_epic_run.create_epic', () => {
 		expect(mocked_blocked_by).not.toHaveBeenCalled()
 	})
 
-	it('prints the epicrun command naming the epic, not a list of children', async () => {
+	it('prints the backlogrun --only command naming the epic, not a list of children', async () => {
 		await git_epic_run.create_epic(create_input(false))
 
-		expect(vi.mocked(console.info)).toHaveBeenCalledWith(expect.stringContaining('epicrun #700'))
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
+			expect.stringContaining('backlogrun #700 --only'),
+		)
 	})
 })
 

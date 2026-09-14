@@ -9,11 +9,11 @@ import { entry_read_set } from './entry-read-set'
 // these against itself and say nothing about the documents.
 
 const ROOT = process.cwd()
-// `fullrun` reads its own file, `split-assessment.md` and the skill; it cites `epicrun.md` at more
+// `fullrun` reads its own file, `split-assessment.md` and the skill; it cites `backlogrun.md` at more
 // than one out-of-set section ("The hand-off", "Progress while the run is quiet"), so it exercises the
 // section-saving measurement the removed `queue` entry used to (joshuafolkken/kit#1984).
 const SECTION_CITER = 'fullrun'
-const EPICRUN = 'epicrun.md'
+const BACKLOGRUN = 'backlogrun.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
 const UNKNOWN_ENTRY = 'no-such-entry'
@@ -22,15 +22,9 @@ const UNKNOWN_ENTRY = 'no-such-entry'
 const HALF_AGAIN = 1.5
 const NOTHING = 0
 
-const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'epicrun', 'backlogrun']
+const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'backlogrun']
 const PLAN_ONLY = 'kickoff'
-const EXPECTED_ENTRIES: ReadonlyArray<string> = [
-	'backlogrun',
-	'epicrun',
-	'fullrun',
-	'halfrun',
-	'kickoff',
-]
+const EXPECTED_ENTRIES: ReadonlyArray<string> = ['backlogrun', 'fullrun', 'halfrun', 'kickoff']
 
 function alphabetical(left: string, right: string): number {
 	return left.localeCompare(right)
@@ -42,16 +36,16 @@ function alphabetical(left: string, right: string): number {
 // exists, so the fallback never fires here.
 describe('entry_read_set.document_path — consumer fallback', () => {
 	it('resolves against the project when the project has the file', () => {
-		expect(entry_read_set.document_path(ROOT, EPICRUN)).toBe(
-			path.join(ROOT, entry_read_set.SKILL_DIRECTORY, EPICRUN),
+		expect(entry_read_set.document_path(ROOT, BACKLOGRUN)).toBe(
+			path.join(ROOT, entry_read_set.SKILL_DIRECTORY, BACKLOGRUN),
 		)
 	})
 
 	it('falls back to the package copy when the project has no skill tree', () => {
-		const resolved = entry_read_set.document_path(path.join(ROOT, 'no-such-consumer'), EPICRUN)
+		const resolved = entry_read_set.document_path(path.join(ROOT, 'no-such-consumer'), BACKLOGRUN)
 
 		expect(existsSync(resolved)).toBe(true)
-		expect(resolved).toContain(path.join(entry_read_set.SKILL_DIRECTORY, EPICRUN))
+		expect(resolved).toContain(path.join(entry_read_set.SKILL_DIRECTORY, BACKLOGRUN))
 	})
 })
 
@@ -84,7 +78,7 @@ describe('entry_read_set.read_set — which files', () => {
 
 	it("takes backlogrun's declared files from the table row", () => {
 		expect(entry_read_set.read_set(ROOT, 'backlogrun').files).toEqual(
-			expect.arrayContaining(['backlogrun.md', EPICRUN]),
+			expect.arrayContaining([BACKLOGRUN]),
 		)
 	})
 
@@ -113,7 +107,7 @@ describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#18
 		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(CHAIN_RULE)
 	})
 
-	it.each(['fullrun', 'epicrun', 'backlogrun'])(
+	it.each(['fullrun', 'backlogrun'])(
 		'keeps chain-rule.md out of the entry read of %s, which once read it whole',
 		(entry) => {
 			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(CHAIN_RULE)
@@ -152,17 +146,17 @@ describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkk
 describe('entry_read_set.read_set — which sections', () => {
 	it('collects the sections its own documents point at, out of the set', () => {
 		expect(entry_read_set.read_set(ROOT, SECTION_CITER).sections).toEqual(
-			expect.arrayContaining([{ file: EPICRUN, heading: 'The hand-off' }]),
+			expect.arrayContaining([{ file: BACKLOGRUN, heading: 'The hand-off' }]),
 		)
 	})
 
 	// A reference into a file the entry already reads whole costs nothing extra, so counting it would
 	// overstate the saving.
 	it('counts no section of a file the entry reads in full', () => {
-		const { files, sections } = entry_read_set.read_set(ROOT, 'epicrun')
+		const { files, sections } = entry_read_set.read_set(ROOT, 'backlogrun')
 
-		expect(files).toContain(EPICRUN)
-		expect(sections.map((reference) => reference.file)).not.toContain(EPICRUN)
+		expect(files).toContain(BACKLOGRUN)
+		expect(sections.map((reference) => reference.file)).not.toContain(BACKLOGRUN)
 	})
 
 	it('counts no reference to a document outside this skill directory', () => {
@@ -215,7 +209,7 @@ describe('entry_read_set.costed', () => {
 	})
 
 	// **A file cited at non-adjacent sections fabricates no boundary token** (joshuafolkken/kit#1934).
-	// The fullrun entry cites disjoint, non-adjacent `epicrun.md` sections; costing their union by
+	// The fullrun entry cites disjoint, non-adjacent `backlogrun.md` sections; costing their union by
 	// joining the skipped-gap lines into one string fabricated a token at every gap, drifting `scoped`
 	// a token above the per-reference sum and printing a false negative saving. Costed as contiguous
 	// runs instead, the deduped figure equals the per-reference sum exactly — none of these references

@@ -1,11 +1,11 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `epicrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun`, `epicrun` and `backlogrun` are the shorthand commands this
+`kickoff`, `fullrun`, `halfrun` and `backlogrun` are the shorthand commands this
 package's collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md`
 because each one applies only while its own command is running.
 
@@ -14,7 +14,7 @@ The canonical extended reference is `prompts/collaboration-workflow/` (indexed b
 
 ## 0. The rule that fires before any of them — explicit invocation
 
-**Never start a `kickoff` / `halfrun` / `fullrun` / `epicrun` / `backlogrun` workflow (including their
+**Never start a `kickoff` / `halfrun` / `fullrun` / `backlogrun` workflow (including their
 `#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
 resident in the AI documents, because it has to hold when this skill has *not* been loaded.
 
@@ -31,9 +31,8 @@ resident in the AI documents, because it has to hold when this skill has *not* b
 **A session cut inside a declared budget is not a new invocation.** A `backlogrun` that is cut and
 resumed is still the one invocation a person typed — the keyword authorized the declared budget, and
 the cut is an execution detail of spending it. What this rule forbids is _inferring_ a workflow from a
-request's shape. **The reading covers `backlogrun` and it alone** — an `epicrun` or `fullrun` cut
-still waits for the keyword, because an `epicrun` holds lanes in flight across the seam and a `fullrun`
-ends at one issue and has nothing to carry.
+request's shape. **The reading covers `backlogrun` and it alone** — a `fullrun` cut still waits for
+the keyword, because a `fullrun` ends at one issue and has nothing to carry.
 
 **`backlogrun.md` → "The session cut is inside the invocation" is the single source of the
 mechanism** — the record, the two commands, and what each answer means, and how a named-issue
@@ -42,7 +41,7 @@ record's `done` field rather than shrinking the string.
 
 ## 1. Which file to read
 
-Read this file, then the one for the command that was typed. `fullrun`, `epicrun` and
+Read this file, then the one for the command that was typed. `fullrun` and
 `backlogrun` also obey `chain-rule.md`, but at a point of use rather than at the entry (see "Four
 documents are read at the point of use" below). `halfrun` and `kickoff` never reach it — `halfrun`
 stops before the commit, and `kickoff` never implements.
@@ -52,8 +51,7 @@ stops before the commit, and `kickoff` never implements.
 | `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md` + `split-assessment.md`        |
 | `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md`        |
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
-| `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` |
-| `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` |
+| `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` + `split-assessment.md` + `fullrun.md` |
 
 ### The fetch is one `Read` call per file
 
@@ -74,8 +72,8 @@ named command, so there is no judgement about when:
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
 | `followup.md`           | Before issuing `pnpm josh followup`, in that same turn                          |
-| `chain-rule.md`         | Before running the `/code-review` step (`fullrun` / `epicrun` / `backlogrun`) |
-| `background-commands.md` | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `epicrun` / `backlogrun`) |
+| `chain-rule.md`         | Before running the `/code-review` step (`fullrun` / `backlogrun`) |
+| `background-commands.md` | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `backlogrun`) |
 
 This is "read it at the point of use", not "read it later": the fetch is whole and it happens before
 the command it governs. A `skip` answer from `latest:scope` reads nothing; the other three have no
@@ -101,11 +99,11 @@ refused too** rather than handing back whichever section came first. The set is 
 above and the documents themselves, not transcribed; `scripts/document/entry-read-set.test.ts` pins
 the derivation and `scripts/entry-read-set-document-rule.test.ts` pins this rule.
 
-**`backlogrun` reads `epicrun.md` too, and that is the point rather than an omission.** It changes
+**`backlogrun` reads `backlogrun.md` too, and that is the point rather than an omission.** It changes
 only which issues are offered and by what authorization; every procedure for *running* one of them —
 lanes, park-and-continue, the `needs-human-review` stop, a prerequisite discovered mid-run, the
 delegated unit, the preflight, the progress watcher, the hand-off check and the guards — stays
-`epicrun.md`'s and is referenced from `backlogrun.md` rather than restated there.
+`backlogrun.md`'s and is referenced from `backlogrun.md` rather than restated there.
 
 ## 2. What every one of them shares
 
@@ -138,7 +136,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
     review:brief` refuses a brief on a tree neither has been green on.
   - `kickoff` is the exception — it never implements, so it never reaches the gate.
   - **E2E closes after the review, and never by asking the user**: where the command ends in a pull
-    request (`fullrun` / `epicrun` / `backlogrun`) the CI E2E job is the result and `pnpm josh followup`
+    request (`fullrun` / `backlogrun`) the CI E2E job is the result and `pnpm josh followup`
     enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before the stop
     (`CLAUDE.md` → "Completion gate"; `prompts/testing-guide.md` → "Closing the E2E gate without a
     human run").
@@ -152,37 +150,39 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 - **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
   only once it has merged — decided from an enumeration (the verification gate, the code review, the
   pre-push hook, the merge checks) rather than from how serious the defect looks. It binds wherever
-  children are dispatched, so `epicrun.md` → "Lanes" carries it for the parallel case and
+  children are dispatched, so `backlogrun.md` → "Lanes" carries it for the parallel case and
   `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 is the single source.
 - **A command that can take minutes is issued in the background, and the turn never ends at the
   push** — §2h. `pnpm josh followup` is the one that stays in the foreground, because nearly every
   step after it reads its result.
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
-  §2z. It is the one *child's* stop `epicrun` does not turn into a park.
-- **`epicrun` differs on two points.** A stop that would otherwise end a batch parks one child instead
-  and the run continues (`epicrun.md` → "park and continue"), and the keyword accepts an Issue that is
-  **not** an epic — running it as a `fullrun`, and building the epic around it only if a prerequisite
-  or a split turns up (`epicrun.md` → "When `#N` is not an epic"). Both follow from what the keyword
-  authorizes: a batch, decided once at the start.
-- **`backlogrun` takes those same two and moves the boundary.** It authorizes every issue a person
-  has opted in with `auto-ok` rather than one epic's children, so what changes is which issues are
-  offered — by `pnpm josh backlog:next` — and nothing about how one of them is run (`backlogrun.md`).
-  Membership stays a person's to decide.
+  §2z. It is the one *child's* stop a `backlogrun` does not turn into a park.
+- **A named epic under `backlogrun` differs on two points from a single-issue item.** A stop that
+  would otherwise end a batch parks one child and the run continues (`backlogrun.md` → "park and
+  continue"), and a named item accepts an Issue that is **not** an epic — running it as a `fullrun`,
+  and building an epic around it only if a prerequisite or a split turns up (`backlogrun.md` → "When
+  `#N` is not an epic"). Both follow from what the keyword authorizes: a batch, decided once at the
+  start.
+- **`backlogrun` authorizes the whole opted-in pool as well as its named items.** Beyond the named
+  Issues and epics, it authorizes every issue a person has opted in with `auto-ok` rather than one
+  epic's children, so what changes across its argument forms is which issues are offered — by
+  `pnpm josh backlog:next` — and nothing about how one of them is run (`backlogrun.md`). Membership
+  stays a person's to decide.
 - **The working-tree hold is claimed before anything else** — `pnpm josh run:hold`, at every typed
   entry point that edits the tree, ahead of the split assessment and ahead of a `new` entry's filing.
   **`kickoff` is exempt**: it edits nothing, so it neither claims nor releases. §2f.
 - **The session boundary is asked at the entry as well, not only after a merge** —
   `pnpm josh cost --over 300000`, in the same turn as `pnpm josh run:hold` and before anything else is
   started, so a session already carrying an earlier Issue's whole conversation is cut before it pays
-  for one more. It is the same rule at a second application point, and `epicrun.md` → "The hand-off" is
+  for one more. It is the same rule at a second application point, and `backlogrun.md` → "The hand-off" is
   the single source of the check and of where 300,000 comes from (a temporary experiment rather than a
   settled number). `under`, and the run continues. `over` — or a run the check could not answer for —
   and the run **stops before the work starts**: send a `confirmation` Telegram carrying the figure
   printed on standard error and the resume command — the invocation as it was typed, in a fresh
   session (`fullrun #<N>` / `halfrun #<N>` for a `#N` entry, `fullrun new` / `halfrun new` for a `new`
   one) — then run `pnpm josh run:release <N>` (bare where the entry is a `new` one) and stop. **A
-  dispatched child does not ask it**: `epicrun` and `backlogrun` already own this question at
-  their own seam. `kickoff` is exempt, because it never implements.
+  dispatched child does not ask it**: a `backlogrun` already owns this question at its own seam.
+  `kickoff` is exempt, because it never implements.
 - **The split assessment** runs before any work starts, at *every* entry point, from the one
   definition in `split-assessment.md`. **The default is not to split**: separability and a scope that
   clearly exceeds what one verification gate can confirm in one pass — the guide is about 10 changed
@@ -217,7 +217,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 ## 2z. `needs-human-review` — the child that stops before its commit
 
 An issue carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop, whichever entry
-point reached it — `epicrun`, `fullrun` or `backlogrun`. It is `auto-ok`'s opposite: that label widens
+point reached it — `fullrun` or `backlogrun`. It is `auto-ok`'s opposite: that label widens
 unattended execution past an epic's edge, this one withholds its last step, and both may be applied
 **only by a person**. It exists because some work's quality is not something a test can judge — a
 **published artifact** whose unit tests say nothing about the writing, or **a choice that was a
@@ -233,7 +233,7 @@ person's to make** such as picking one of several generated candidates.
   `pnpm josh git` and `pnpm josh followup` are never reached.
 - **The working tree is left uncommitted, and nothing is stashed.**
 - **Send a `confirmation` Telegram and stop the whole run.** The remaining children are not started —
-  inside an `epicrun` this is the one thing that is *not* park-and-continue.
+  inside a `backlogrun` this is the one thing that is *not* park-and-continue.
 - The Telegram body carries the **resume command**, in the same form `halfrun`'s own stop uses.
 - **Resuming is `halfrun`'s stop exactly**: a person looks at the working tree and, if it is right,
   carries on from the commit themselves. The stop report carries that resume command too, not only the
@@ -272,7 +272,7 @@ leaving the label out of two sets: `scripts/git/issue-labels.ts` keeps it out of
 `NOT_DIRECTLY_RUNNABLE_LABELS` and `scripts/epic/epic-busy.ts` keeps it out of the parked set.
 
 Each entry point's own branch stays in its own file — `fullrun.md`, `halfrun.md`,
-`epicrun.md`, `backlogrun.md` — and routes here for the definition.
+`backlogrun.md`, `backlogrun.md` — and routes here for the definition.
 
 ## 2a. The `into <target>` suffix — where the new Issue lands
 
@@ -357,10 +357,10 @@ step that was weighed and `kept by default` for one nobody considered.
 **The mechanism is not the unit.** How a thing is delegated — an isolated execution unit, an explicit
 brief, a result the parent can verify, a failure that surfaces — is separate from what is delegated.
 The units are one step of a run (`gate-fix`, `survey`) and one whole child of a batch (`epic-child`) —
-an epic's child under `epicrun` and one named issue of a `backlogrun` alike. **They share one
+an epic's child and a named issue of a `backlogrun` alike. **They share one
 mechanism** — one enumeration, one command, one verifier requirement; building a second is the clone
 `CLAUDE.md` prohibits, so **no second row like `backlogrun-child` is added**. **A batch entry point
-that does not delegate is the defect**: the per-issue procedure is `epicrun.md` → "Each child runs in a
+that does not delegate is the defect**: the per-issue procedure is `backlogrun.md` → "Each child runs in a
 delegated unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue.
 
 **`followup-filing` is a third unit — one whole sub-procedure of a run.** The late-run follow-up
@@ -381,7 +381,7 @@ own ending rather than an unfinished child**. A child stopped by `needs-human-re
 **by design** (§2z) — its `in-progress` stays on, and it is never counted against the
 consecutive-failure guard. Read as a failure there, the parent strips that label, releases the
 repository, and hands the next child a `git switch main && git pull` on top of that uncommitted work.
-The classification belongs to the per-entry procedure: `epicrun.md` → "Each child runs in a delegated
+The classification belongs to the per-entry procedure: `backlogrun.md` → "Each child runs in a delegated
 unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue. The
 enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in readable form by
 `docs/josh-commands.md` → "`josh delegate`".
@@ -453,7 +453,7 @@ kickoff kit#new "<title>"
 fullrun joshuafolkken/app-kit#12
 halfrun kit#412
 backlogrun kit#1 kit#2
-epicrun joshuafolkken/kit#858
+backlogrun joshuafolkken/kit#858 --only
 ```
 
 - **One definition, every entry point.** The prefix goes where `#N` goes, so no new keyword is added,
@@ -488,10 +488,10 @@ epicrun joshuafolkken/kit#858
   `confirmation` Telegram — cloning decides the layout of someone's machine for them, and a dirty tree
   holds work that is not yours to stash. Otherwise the commands that act on the target execute in that
   checkout.
-- **`epicrun` is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,
+- **A named epic is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,
   not where its children are implemented. Its state is read against that repository through `gh api`,
   so that repository needs no checkout. The checkout rules bind each child at implementation time,
-  against **that child's** repository ("Concurrency" in `epicrun.md`).
+  against **that child's** repository ("Concurrency" in `backlogrun.md`).
 - **Independent of `into <target>`**: this says which repository the run acts on, `into` says which
   epic the artifact joins — `kickoff kit#new into joshuafolkken/kit#909` is one correct line.
 
@@ -507,7 +507,7 @@ another is the failure this section exists to prevent:
 | What turned up                                                              | What to do                                                                                                              |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
-| This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `epicrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
+| This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `backlogrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
 | Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; one that cannot cite it goes to `docs/observations.md` and is filed on its second sighting — all of them §2i's |
 
@@ -527,9 +527,9 @@ most likely to duplicate something.
 
 **Each entry point's own branch stays in that entry's file:**
 
-- **`epicrun`** files without confirmation, records the dependency with
+- **A named epic under `backlogrun`** files without confirmation, records the dependency with
   `pnpm josh epic --add <E> <N> --before <M>` — `<E>` the epic, `<N>` the prerequisite just filed,
-  `<M>` the child in hand — and the run **continues rather than parking it** (`epicrun.md` → "A
+  `<M>` the child in hand — and the run **continues rather than parking it** (`backlogrun.md` → "A
   prerequisite discovered mid-run"). Parking is only for a prerequisite that *cannot* be expressed as
   a dependency — one needing a design decision nobody has made, a Tier B toss-up, or a Tier C action.
 - **`fullrun` / `halfrun`** file the same way without asking, insert the prerequisite into the epic
@@ -614,9 +614,9 @@ pnpm josh run:release --force # a record left behind by a run that has ended
 - **`unknown` — nothing was established. Stop the same way.** It is not "the tree is free".
 
 **The unit is the working tree, and `epic-busy.ts` is not reused for it.** That read answers about a
-*repository* and implements `epicrun`'s one-child-per-repository rule; what these entry points contend
+*repository* and implements `backlogrun`'s one-child-per-repository rule; what these entry points contend
 for is one branch, one index and one uncommitted diff, and a linked work tree has its own three.
-**`epicrun`'s own guard is unchanged** — the two layers guard different resources.
+**`backlogrun`'s own guard is unchanged** — the two layers guard different resources.
 
 **`kickoff` does not claim it, and that is an exemption rather than an omission.** `kickoff` touches
 none of branch, index or uncommitted diff: it reads the Issue, normalizes the title, posts the plan,
@@ -648,7 +648,7 @@ goes in the stop report and the Telegram for the person to type. **An expired re
 still has uncommitted changes does not free it**: the command answers `busy` and says to commit, stash,
 or release once the work is done; only an expired record over a clean tree is replaced.
 
-**The batch entry points claim per child, not per batch.** `epicrun` and `backlogrun` never
+**The batch entry points claim per child, not per batch.** `backlogrun` never
 call it themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh
 followup` releases it at that child's merge. The command's behavior and the answer table are
 `docs/josh-commands.md` → "`josh run:hold` / `josh run:release`"; this section is the single source of
@@ -657,7 +657,7 @@ the procedure.
 ## 2g. An Issue's comments are part of the Issue
 
 **Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun` and
-`kickoff`. A `backlogrun` named issue and an `epicrun` child inherit it rather than restate it: each runs in a
+`kickoff`. A `backlogrun` named issue and a `backlogrun` epic child inherit it rather than restate it: each runs in a
 delegated unit executing `fullrun`'s procedure, and the hook keys its once-per-run record on the
 *fork's* transcript, so every child is delivered to in its own right. The read is one call, made in the
 same turn as whatever else the run already needs:
@@ -738,7 +738,7 @@ The procedure, in order:
    `pnpm josh run:release <N>`.
 4. **Then behave as the entry point does for a parked child.** A `fullrun` / `halfrun` a person typed
    sends a `confirmation` Telegram naming the Issue and the merge that already covers it, and stops. An
-   `epicrun` / `backlogrun` child is park-and-continue (`epicrun.md` → "park and continue").
+   `backlogrun` child is park-and-continue (`backlogrun.md` → "park and continue").
 5. **Never close the Issue.** That is Tier C at every entry point, and the label leaves the close one
    click away for the person who owns it.
 
@@ -767,15 +767,15 @@ one afterwards.** It governs issuing `pnpm josh git -y`, `pnpm josh gate` and th
 while `pnpm josh followup` stays in the foreground, the guarantee that the turn never ends at the push
 — bar a dispatched lane child's pre-gate cut (`pre-gate-cut.md`), the one sanctioned turn-end before it
 — and the tail that is emptied before `followup` rather than worked through after it. `background-commands.md`
-is the single source; `followup.md`, `chain-rule.md` and `epicrun.md` → "Progress while the run is
+is the single source; `followup.md`, `chain-rule.md` and `backlogrun.md` → "Progress while the run is
 quiet" route to it, and the run-tail guard (`prompts/collaboration-workflow/rule-delivery.md`) refuses
 a foreground push and names it.
 
 **A parent waiting on its children is this same rule at the batch's scale.** A background command's
 completion is what re-invokes the session, so a parent with children in flight already has a wake
-delivered to it and never has to time one — which is why the `epicrun` / `backlogrun` loop starts no
+delivered to it and never has to time one — which is why the `backlogrun` loop starts no
 sleep of its own and reads its polling figures as floors on a re-ask rather than as a clock to keep
-(`epicrun.md` → "The parent keeps no clock of its own", the single source).
+(`backlogrun.md` → "The parent keeps no clock of its own", the single source).
 
 ## 2i. An observation worth filing is filed without asking
 
@@ -784,7 +784,7 @@ cover work that changes what the run does — an upstream defect stops it, a spl
 prerequisite goes in front of it. **A plain observation changes none of that**: the Issue in hand is
 untouched, and what the run holds is a finding it would be a loss to forget. Handing it over is wrong
 twice: filing into a first-party repository is **Tier A** and already settled, and stopping for an
-answer under `epicrun` / `backlogrun` parks the run without saying so.
+answer under `backlogrun` parks the run without saying so.
 
 - **File it, without asking, the moment you judge it worth filing.** A **first-party** target — its
   owner equal to this session's repository owner, decided by `gh api repos/{owner}/{repo} --jq

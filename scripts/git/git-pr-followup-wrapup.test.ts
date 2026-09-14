@@ -272,7 +272,7 @@ describe('run_wrapup — a run that merged nothing', () => {
 // `git-pr-followup-managed-report.test.ts`, which leaves the matcher real. Reaching only one of the
 // two would leave the change invisible to whichever reader used the other.
 // Written the way `managed_config_scope.format_hit` writes it — path, then the list that claimed it.
-const REPORT_LINE = '.claude/skills/workflow-commands/epicrun.md (AI_COPY_DIRECTORIES)'
+const REPORT_LINE = '.claude/skills/workflow-commands/backlogrun.md (AI_COPY_DIRECTORIES)'
 
 function notes_passed(): ReadonlyArray<string> | undefined {
 	return vi.mocked(git_notify.build_completion_comment_body).mock.calls[0]?.[0]?.notes

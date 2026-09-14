@@ -204,7 +204,7 @@ describe('format_line — when the observation was taken', () => {
 // and the machine running the suite is the only reason neither is normally seen: the minutes field
 // printed `41.26666666666667`, and the local clock read off `getHours` / `getMinutes` truncated the
 // seconds the offset beside it rounded, so the stamp no longer named the instant it was taken at.
-// joshuafolkken/kit#1726. `epicrun.md` asked the run to derive this from the `at` stamp plus the
+// joshuafolkken/kit#1726. `backlogrun.md` asked the run to derive this from the `at` stamp plus the
 // interval in force, and one report reached a person as `20:1x` — placeholder digits, because a time
 // worked out by hand is eventually worked out wrong. Both inputs were already here; only one of them
 // was printed.

@@ -76,6 +76,6 @@ window removes is the other runs carrying the same bumps; it does not make that 
 Should the issue then fail CI on a bump rather than on its own change, that is a dependency problem
 found once — fix it forward before parking the issue for it.
 
-This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `epicrun.md` and `backlogrun.md`
+This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `backlogrun.md` and `backlogrun.md`
 each name `pnpm josh latest:scope` at the point their procedure reaches it and route here for
 everything else; `docs/josh-commands.md` documents the command itself.

@@ -47,7 +47,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		// `backlogrun` are the same unit — same brief, same summary, same verifier
 		// (joshuafolkken/kit#1149, folded from `queue` into `backlogrun` by joshuafolkken/kit#1984). A
 		// second row for the batch would be the clone `CLAUDE.md` prohibits.
-		does: "run one child of a batch end to end in an isolated unit — an epic's child under `epicrun` or one named issue of a `backlogrun` alike — plan, verification gate, PR, merge — and return only its summary to the parent loop",
+		does: "run one child of a batch end to end in an isolated unit — an epic's child or one named issue of a `backlogrun` alike — plan, verification gate, PR, merge — and return only its summary to the parent loop",
 		verifier:
 			"the parent reads the child's state from GitHub with `pnpm josh issue:state`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup` would touch the PR",
 	},

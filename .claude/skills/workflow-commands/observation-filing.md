@@ -24,7 +24,7 @@ it — read off the subject rather than judged**:
 | Depth | The subject | Where it lives |
 | --- | --- | --- |
 | **0** | What a consumer of this package touches | A `josh` command's behavior, a distributed document or config, the published package |
-| **1** | The run orchestration that executes an Issue | `fullrun` / `epicrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
+| **1** | The run orchestration that executes an Issue | `fullrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
 | **2** | What measures a run | `diag`, `josh time`, `josh cost` |
 
 **The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed**
@@ -289,7 +289,7 @@ Issue, not new ones.
 
 **A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary
 observations are not filed by the child at all: they go back in the summary's "Observations that
-could bite later" line (`epicrun.md` → "What the summary carries, and how long it may be"), and the
+could bite later" line (`backlogrun.md` → "What the summary carries, and how long it may be"), and the
 parent files what survives — under the depth test above, and inside the run's ceiling.
 
 **A delegated child does not append to the ledger either — the parent collapses the duplicates and

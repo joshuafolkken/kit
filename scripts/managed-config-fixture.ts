@@ -13,7 +13,7 @@ const DISTRIBUTED_ROOT_FILE = 'AGENTS.md'
 
 // On `AI_COPY_DIRECTORIES` only — it equals no list entry, so it is matched through the directory it
 // sits under. This is the path the run that skipped the gate had changed.
-const DISTRIBUTED_SKILL_FILE = '.claude/skills/workflow-commands/epicrun.md'
+const DISTRIBUTED_SKILL_FILE = '.claude/skills/workflow-commands/backlogrun.md'
 
 // A sibling of the distributed directory whose name merely begins with it: the case that separates a
 // containment test from a prefix test.
