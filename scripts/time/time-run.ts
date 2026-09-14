@@ -9,6 +9,7 @@ import { time_guard_refusals } from './time-guard-refusals'
 import { time_issue_window } from './time-issue-window'
 import { time_last_select } from './time-last-select'
 import type { Interval } from './time-overlap'
+import { time_parent_timeline, type ParentTimeline } from './time-parent-timeline'
 import { time_phase_costs } from './time-phase-costs'
 import { time_phases } from './time-phases'
 import { time_pull_files, type PullFileList } from './time-pull-files'
@@ -439,19 +440,33 @@ function run_notes(facts: RunFacts): Array<string> {
 	]
 }
 
+// The parent's timeline is read from the run's own spans and cost corpus for now: the dispatch
+// timings and foreground waits are span-only, and the implementation cost and context come from the
+// priced requests and the per-session tokens flattened into one series. It joins the cost blocks
+// because it too reads the run's cost corpus, and `time-run.ts` wires it to the run's spans until the
+// run-tree scope that identifies the true parent session lands (joshuafolkken/kit#1940).
+function parent_timeline_of(facts: RunFacts): ParentTimeline {
+	return time_parent_timeline.build_parent_timeline({
+		spans: facts.found.spans,
+		priced: facts.reading?.priced,
+		requests: facts.reading?.session_requests.flatMap((one) => one.requests),
+	})
+}
+
 // One input, keyed two ways: `phase_costs` by stage, `contributor_costs` by purpose. Neither
 // re-walks the corpus — both place the same priced requests against the same spans. Lifted out of
 // `to_report` so that function stays an assembly rather than an assembly plus the cost build.
 function cost_blocks(
 	facts: RunFacts,
 	round_trip_count: number,
-): Pick<TimeReport, 'phase_costs' | 'contributor_costs' | 'guard_refusals'> {
+): Pick<TimeReport, 'phase_costs' | 'contributor_costs' | 'guard_refusals' | 'parent_timeline'> {
 	const cost_input = { spans: facts.found.spans, requests: facts.reading?.priced, round_trip_count }
 
 	return {
 		phase_costs: time_phase_costs.build(cost_input),
 		contributor_costs: time_contributor_costs.build(cost_input),
 		guard_refusals: time_guard_refusals.build(cost_input),
+		parent_timeline: parent_timeline_of(facts),
 	}
 }
 
