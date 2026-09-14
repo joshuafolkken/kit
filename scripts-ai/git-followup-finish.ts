@@ -6,7 +6,7 @@ import { review_attest } from '../scripts/review/review-attest'
 import { review_stamps } from '../scripts/review/review-stamps'
 import { run_hold } from '../scripts/run/run-hold'
 import { run_progress_clock } from '../scripts/run/run-progress-clock'
-import { time_history, type RunRecordOutcome } from '../scripts/time/time-history'
+import { time_history, type RunRecordOutcome } from '../scripts/time-runtime/time-history'
 import { parse_completed_issue_number } from './followup-issue-number'
 
 // **The count of unreleased merges, not the project version** (joshuafolkken/kit#1486). This line

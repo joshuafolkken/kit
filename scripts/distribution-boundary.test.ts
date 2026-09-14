@@ -19,6 +19,13 @@ const TIME_RUNTIME = 'time-runtime'
 const COST_RUNTIME = 'cost-runtime'
 const RUNTIME_DIRS = [TIME_RUNTIME, COST_RUNTIME]
 const REPORT_DIRS = ['time', 'cost']
+// #1996 seeded only the runtime directories, so a command entry that reaches a report through a
+// distributed recorder went unchecked: `followup` records every merged run through
+// `time_history.record_run`, and that recorder used to statically pull in the whole report closure
+// (joshuafolkken/kit#2003). The command entries are seeded alongside the runtime so their static
+// closure is held to the same boundary.
+const FOLLOWUP_ENTRY = path.join(SCRIPTS_DIR, '..', 'scripts-ai', 'git-followup-finish.ts')
+const COMMAND_ENTRIES = [FOLLOWUP_ENTRY]
 
 // Every module a static value-import in `source` names. Whole-statement `import type` lines are
 // dropped first; a mixed `{ value, type X }` import still loads its module at runtime, so keeping
@@ -42,12 +49,17 @@ function resolve_spec(spec: string, from_file: string): string | undefined {
 	return undefined
 }
 
-function seed_files(): Array<string> {
+function runtime_seed_files(): Array<string> {
 	return RUNTIME_DIRS.flatMap((directory) =>
 		readdirSync(path.join(SCRIPTS_DIR, directory))
 			.filter((entry) => entry.endsWith('.ts') && !entry.endsWith('.test.ts'))
 			.map((entry) => path.join(SCRIPTS_DIR, directory, entry)),
 	)
+}
+
+// The runtime files plus the distributed command entries that reach the runtime through a recorder.
+function seed_files(): Array<string> {
+	return [...runtime_seed_files(), ...COMMAND_ENTRIES]
 }
 
 function is_report_file(file: string): boolean {
@@ -65,10 +77,10 @@ function imports_of(file: string): Array<string> {
 		.filter((resolved): resolved is string => resolved !== undefined)
 }
 
-// The full static value-import closure of the runtime, walked breadth-first from every runtime file.
-function runtime_closure(): Set<string> {
+// The full static value-import closure of a set of seed files, walked breadth-first.
+function closure_from(seeds: ReadonlyArray<string>): Set<string> {
 	const visited = new Set<string>()
-	const queue = seed_files()
+	const queue = [...seeds]
 
 	while (queue.length > 0) {
 		const file = queue.shift()
@@ -79,6 +91,11 @@ function runtime_closure(): Set<string> {
 	}
 
 	return visited
+}
+
+// The closure of the whole distributed surface: the runtime directories and the command entries.
+function runtime_closure(): Set<string> {
+	return closure_from(seed_files())
 }
 
 describe('the distributed runtime closure', () => {
@@ -96,5 +113,17 @@ describe('the distributed runtime closure', () => {
 			.map((file) => path.relative(SCRIPTS_DIR, file))
 
 		expect(reached_reports).toEqual([])
+	})
+
+	// The path #1996's runtime-only seed missed: `followup` records every merged run through
+	// `time_history.record_run`, so its static closure must reach the recorder and yet stay clear of
+	// the report directories (joshuafolkken/kit#2003).
+	it('walks the followup command entry to the recorder without reaching a report', () => {
+		expect(existsSync(FOLLOWUP_ENTRY)).toBe(true)
+
+		const followup_closure = closure_from([FOLLOWUP_ENTRY])
+
+		expect(followup_closure.has(path.join(SCRIPTS_DIR, TIME_RUNTIME, 'time-history.ts'))).toBe(true)
+		expect([...followup_closure].filter((file) => is_report_file(file))).toEqual([])
 	})
 })

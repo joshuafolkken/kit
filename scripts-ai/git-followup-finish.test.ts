@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelegramSendInput } from '../scripts/git/telegram-notify'
-import type { RunRecordOutcome } from '../scripts/time/time-history'
+import type { RunRecordOutcome } from '../scripts/time-runtime/time-history'
 
 // The run's tail, tested against the module that owns it rather than through the entry point
 // (joshuafolkken/kit#1539). `git-followup-workflow.ts` runs `main()` at import time, so every case
@@ -53,7 +53,7 @@ vi.mock('../scripts/review/review-attest', () => ({
 	review_attest: { clear_here: attest_clear_mock },
 }))
 
-vi.mock('../scripts/time/time-history', () => ({
+vi.mock('../scripts/time-runtime/time-history', () => ({
 	time_history: { record_run: record_run_mock },
 }))
 

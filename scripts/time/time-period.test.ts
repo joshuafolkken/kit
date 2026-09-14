@@ -1,5 +1,5 @@
+import type { RunTimeRecord } from '#scripts/time-runtime/time-history'
 import { describe, expect, it } from 'vitest'
-import type { RunTimeRecord } from './time-history'
 import { time_parent_turns } from './time-parent-turns'
 import { time_period } from './time-period'
 import { time_period_fixture } from './time-period-fixture'

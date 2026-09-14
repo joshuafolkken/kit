@@ -1,9 +1,9 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { time_report_fixture } from '#scripts/time/time-report-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_history, type RunTimeRecord } from './time-history'
-import { time_report_fixture } from './time-report-fixture'
 
 // joshuafolkken/kit#1471. The report only existed while a session was looking at it, so what these
 // cases are really about is the record surviving the run: what is written, what is compared against
@@ -190,9 +190,7 @@ describe('time_history.to_record', () => {
 			model_ms_per_round_trip: report.model_ms_per_round_trip,
 		})
 	})
-})
 
-describe('time_history — the turn breakdown a period report aggregates', () => {
 	// A run whose transcript was never read writes no breakdown at all, which is what lets the read
 	// side leave it out of the denominator rather than reading it as a row of zeroes.
 	it('writes no breakdown for a run nothing was read for', () => {
@@ -201,19 +199,6 @@ describe('time_history — the turn breakdown a period report aggregates', () =>
 		expect(time_history.to_record(CURRENT_ISSUE, report, RECORDED_AT)).not.toHaveProperty(
 			'by_contributor',
 		)
-	})
-
-	it('reads a written breakdown back as measured totals', () => {
-		const report = time_report_fixture.run_report(time_report_fixture.MIXED, CI_MS)
-		const kept = time_history.to_record(CURRENT_ISSUE, report, RECORDED_AT)
-
-		// Against the report's own totals rather than against a named field: what has to survive the
-		// round trip is that the rows still add up to the total their shares are computed from.
-		expect(time_history.parent_turns_of(kept)).toStrictEqual(report.parent_turns)
-	})
-
-	it('reads a record written before the breakdown existed as unmeasured', () => {
-		expect(time_history.parent_turns_of(record(CURRENT_ISSUE, 30, 100)).is_measured).toBe(false)
 	})
 })
 
@@ -334,7 +319,10 @@ describe('time_history.record_run', () => {
 	})
 
 	// The call happens after the merge, so a failure here is reported and never raised: a finished
-	// run must not be made to look broken by the measurement taken of it.
+	// run must not be made to look broken by the measurement taken of it. This is also the
+	// consumer-equivalent path (joshuafolkken/kit#2003): with `scripts/time/` undistributed, the
+	// report builder is absent and its dynamic import throws exactly as this injected builder does, so
+	// the recording step completes rather than crashing the merge.
 	it('reports an unavailable measurement instead of throwing', async () => {
 		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, fail_to_build, now)
 

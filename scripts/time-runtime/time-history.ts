@@ -2,10 +2,8 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { time_format } from '#scripts/time-runtime/time-format'
+import type { TimeReport } from '#scripts/time/time-report'
 import { z } from 'zod'
-import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
-import type { TimeReport } from './time-report'
-import { time_run } from './time-run'
 
 // The durable half of `josh time` (joshuafolkken/kit#1471). The measurement itself only ever ran
 // when a person typed `diag`, so a run nobody asked about left no record at all — and a measurement
@@ -15,6 +13,15 @@ import { time_run } from './time-run'
 // builder `josh time` calls, and this module only decides what of it is worth keeping and how the
 // keeping is read back. A second reader of the transcripts would be a second classification, which is
 // exactly what makes two runs incomparable — the rule the `diag` skill already states.
+//
+// **It lives in `time-runtime/`, and reaches the report builder only dynamically**
+// (joshuafolkken/kit#2003, following the #1996 cost-cli split). `record_run` is the recording path a
+// distributed `followup` runs after every merge, so it must not statically pull in the kit-only report
+// modules — the whole point of `scripts/time/` being undistributable. The one edge into that directory
+// is the `await import('#scripts/time/time-run')` in `build_default`; a `TimeReport` is a type here, so
+// its import is erased before it runs. A consumer without `scripts/time/` therefore completes the
+// recording step without crashing: the dynamic import throws, `record_run` catches it, and the run is
+// reported unrecorded rather than the merge being made to look broken.
 //
 // **Nothing here may fail a run.** It is reached after the merge has already happened, so a history
 // file that cannot be read or written ends as one honest line saying so, never as a thrown error
@@ -158,28 +165,12 @@ function append_record(root: string, record: RunTimeRecord): Array<RunTimeRecord
 }
 
 // **Written only where the transcript was read.** `exactOptionalPropertyTypes` is on, so the field is
-// absent rather than `undefined` — which is what lets the read side tell an unmeasured run from one
-// that made no turn of a given kind.
+// absent rather than `undefined` — which is what lets the read side (`time_history_turns.parent_turns_of`)
+// tell an unmeasured run from one that made no turn of a given kind.
 function contributor_field(report: TimeReport): Pick<RunTimeRecord, 'by_contributor'> {
 	if (!report.parent_turns.is_measured) return {}
 
 	return { by_contributor: report.parent_turns.by_contributor }
-}
-
-// The inverse of `contributor_field`, so the one place that writes the breakdown is beside the one
-// place that reads it back — and a record without one comes back as the same withheld totals every
-// other unmeasured scope prints.
-function parent_turns_of(record: RunTimeRecord): ParentTurnTotals {
-	const { by_contributor } = record
-
-	if (by_contributor === undefined) return { ...time_parent_turns.NO_PARENT_TURNS }
-
-	// **`round_trip_count`, not `turn_count`.** The breakdown is counted one per round trip — the
-	// grouping `build_parent_turns` walks — so its counts sum to that figure, while `turn_count` is a
-	// second walk that also counts a model span which issued no call. Reconstructing from the wrong
-	// one gives back a record whose rows do not add up to its own total, and `contributor_row`
-	// computes every share against that total.
-	return { turn_count: record.round_trip_count, by_contributor, is_measured: true }
 }
 
 function to_record(issue: number, report: TimeReport, recorded_at: string): RunTimeRecord {
@@ -280,7 +271,15 @@ function format_block(kept: ReadonlyArray<RunTimeRecord>): Array<string> {
 	]
 }
 
+// **The kit-only report builder is reached only here, dynamically** (joshuafolkken/kit#2003). A static
+// `import` would drag `time-run` → `time-report` and its whole table closure into this module's static
+// imports, and this module is what a distributed `followup` loads to record a run — so `scripts/time/`
+// could never be dropped from the package. The dynamic form keeps that closure out of the static graph;
+// a consumer without the directory has the import throw, which `record_run` reports as an unavailable
+// measurement rather than a failed merge.
 async function build_default(issue_number: number, cwd: string): Promise<TimeReport> {
+	const { time_run } = await import('#scripts/time/time-run')
+
 	return await time_run.build_run_report(issue_number, cwd)
 }
 
@@ -384,7 +383,6 @@ const time_history = {
 	read_records,
 	append_record,
 	to_record,
-	parent_turns_of,
 	format_block,
 	record_run,
 }
