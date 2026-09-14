@@ -8,11 +8,11 @@ turn that reaches it — `chain-rule.md` before the `/code-review` step, `follow
 that issues `pnpm josh followup` — per `SKILL.md` → §1, "Five documents are read at the point of
 use".
 
-**What it changes about `queue` is the blast radius of a stop.** `queue` makes each issue's explicit
-invocation its safety valve, so **a decision needed mid-implementation stops the whole session**.
-`epicrun` **sets aside only the child that needs the decision and moves on to the others** (see "park
-and continue" below): the same guards, with the blast radius reduced from the session to one issue.
-What each keyword *authorizes* is a separate axis — "What one invocation approves" below.
+**A decision needed mid-implementation does not stop the whole run.** `epicrun` **sets aside only the
+child that needs the decision and moves on to the others** (see "park and continue" below): the same
+guards, with the blast radius reduced from the session to one issue — where a `fullrun` a person typed
+would stop for it. What the keyword *authorizes* is a separate axis — "What one invocation approves"
+below.
 
 It also accepts an Issue that is **not** an epic; see "When `#N` is not an epic" below.
 
@@ -32,14 +32,14 @@ takes the same list — every leading argument is an epic reference — so
 `epic:next 858 909 --repo <this repository> --lanes` answers with children from both, up to the
 number of free lanes.
 
-**It is not a second spelling of `queue`, and reading it as one gets the blast radius wrong.**
+**It is not `backlogrun #N1 #N2 …`, and reading it as one gets the blast radius wrong.**
 
-| | `queue #N1 #N2 …` | `epicrun #E1 #E2 …` |
+| | `backlogrun #N1 #N2 …` | `epicrun #E1 #E2 …` |
 | --- | --- | --- |
-| What is named | The **issues** to run | The **epics** whose children to run |
+| What is named | The **issues** to run first | The **epics** whose children to run |
 | What the order means | The schedule — issue 1 finishes before issue 2 starts | A tie-break — whose candidate takes the next free lane |
-| How they run | Serially, one at a time | Concurrently, one per free lane |
-| A stop | Ends the whole session at the first failure | Parks that child; the run continues |
+| How they run | Serially, one at a time, then the backlog drains | Concurrently, one per free lane |
+| A stop | Parks that issue, skips the rest of the named list, then drains the backlog | Parks that child; the run continues |
 
 So `epicrun #858 #909` is **not** "run 858 to completion, then 909". Both graphs feed the pool from
 the first round, and a child of 909 can merge before a child of 858 does.
@@ -666,7 +666,7 @@ checkout **before each `lane:open`**. **And in a lane `josh latest` is not even 
 `latest:scope` always answers `required`; the reason and the stash that carries the lock file into the
 first lane are in "Once per repository, before the first lane opens" above.
 
-This is the same rule `queue.md` step 1 states.
+This is the same rule `latest-gate.md` is the single source of.
 
 **A resumed `epicrun` is a new session**, so it asks once again before its first child. The tree the
 resumed session finds may be days old — a session resumed within the window is told `skip`, one resumed
@@ -820,15 +820,15 @@ tree, or a carried budget), and the line names that stage as an observed fact (`
 yet`). **Only a checkout with no run recorded at all stays silent**, which keeps an ordinary
 conversational session outside the heartbeat.
 
-**The scope is every implementing run, not this command alone.** `fullrun`, `queue` and `halfrun` start
-the same watcher under the same rules, and this section is the single source for all four; `kickoff`
+**The scope is every implementing run, not this command alone.** `fullrun`, `halfrun` and `backlogrun`
+start the same watcher under the same rules, and this section is the single source for all four; `kickoff`
 starts none. **`halfrun` is included** because the trigger is silence rather than command identity — it
 still implements, runs the whole gate, both review rounds and `pnpm josh test:e2e`, most of the 20–46
 minutes.
 
 **One watcher per run, and the outermost invocation is the one that starts it.** A `fullrun` running as
-a `queue` issue or an `epicrun` child starts none: the brief names the invocation it descends from.
-`queue` starts one for the whole batch. **A dispatched lane child is refused a watcher by its
+a `backlogrun` named issue or an `epicrun` child starts none: the brief names the invocation it descends
+from. `backlogrun` starts one for the whole batch. **A dispatched lane child is refused a watcher by its
 `JOSH_LANE_CHILD` mark** — it still runs `--mark` for the parent's clock, but every reporting form
 (`--wait`, `--once`, the default watch) exits at once with a notice, so a child that misreads the prose
 is harmless.
@@ -854,7 +854,7 @@ bounded by that**: `--mark` restarts the clock, so a merge, a park or a stop is 
 long.
 
 **`--output` is omitted in a single-issue run, and `record` reads `unread`** — there is no delegated
-unit to name (a queue's unit changes every issue), so a fixed path would age a finished unit's file;
+unit to name (a batch's unit changes every issue), so a fixed path would age a finished unit's file;
 `unread` is the command's defined answer for "no path was given".
 
 **A run that merges needs no teardown; a run that stops has to end the reporting itself.** The issue
@@ -862,7 +862,7 @@ leaves the `in-progress` listing at the merge, so whatever is waiting prints not
 it. **A stop keeps that label on purpose** — so **no further `--wait` is started** after the stop
 notification, and any long-running watcher still in the background is stopped in the same turn. That
 covers `halfrun`'s stop before commit, a `needs-human-review` stop, a split or prerequisite stop, and
-`queue`'s failure stop.
+a `backlogrun` named issue's failure stop.
 
 ## The loop
 

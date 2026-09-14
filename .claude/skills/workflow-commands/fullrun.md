@@ -35,14 +35,14 @@ before the title is normalized and before a `new` entry files anything: send a `
 carrying the figure printed on standard error and the resume command (the invocation as it was typed,
 in a fresh session — `fullrun #<N>` for a `#N` entry, `fullrun new` for a `new` one), run
 `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run was dispatched
-by `epicrun`, `queue` or `backlogrun`** — that batch owns the same question at its own seam.
+by `epicrun` or `backlogrun`** — that batch owns the same question at its own seam.
 `epicrun.md` → "The hand-off" is the single source of the check and of where 300,000 comes from.
 
 **Start the progress step once the hold is claimed, and start it without being asked** —
 `pnpm josh run:progress --wait` in the background, what it printed presented in labelled form when it
 exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
 every real report this run makes. The procedure is `epicrun.md` → "Progress while the run is quiet",
-its single source; a `fullrun` running as a `queue` issue or an `epicrun` child starts none.
+its single source; a `fullrun` running as a `backlogrun` named issue or an `epicrun` child starts none.
 
 **Read Issue `#N` and every comment on it before implementing** — `pnpm josh issue:read <N>`. A
 decision recorded after the body was written lives only in a comment, and between a body and a comment
@@ -160,5 +160,5 @@ The procedure, in order:
 says whether a release is owed — `required`, `skip` or `unknown`, and `unknown` is never read as
 `skip`. On `required` the completion summary closes with the request and the exact command; the run
 never types `pnpm josh release` itself, because publishing is Tier C (`followup-reference.md` → "When
-`pnpm josh release` runs", the single source). A `fullrun` invoked as one child of a `queue` or an
-`epicrun` does not ask it — that batch asks once at its own end.
+`pnpm josh release` runs", the single source). A `fullrun` invoked as one child of an `epicrun` or a
+`backlogrun` does not ask it — that batch asks once at its own end.

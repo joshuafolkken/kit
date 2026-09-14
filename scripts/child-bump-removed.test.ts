@@ -124,7 +124,6 @@ const CHILD_FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	CHAIN_RULE,
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/queue.md',
 	'.claude/skills/workflow-commands/epicrun.md',
 ]
 

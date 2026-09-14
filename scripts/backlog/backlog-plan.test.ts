@@ -17,6 +17,7 @@ import {
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
+import { backlog_named } from './backlog-named'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_plan_cli } from './backlog-plan-cli'
 import { backlog_scope } from './backlog-scope'
@@ -184,13 +185,80 @@ describe('what a waiting child is waiting on', () => {
 	})
 })
 
+// joshuafolkken/kit#1984: `backlogrun #N1 #N2 …` runs the named issues in order before the pool, so
+// the plan leads with them. A bare `backlogrun` names none and the section is absent.
+describe('the named issues a backlogrun runs before the pool', () => {
+	it('leads the plan with the named issues, in the order they were typed', async () => {
+		stub_backlog()
+
+		await backlog_plan_cli.run([`#${String(BLOCKED_CHILD)}`, `#${String(READY_CHILD)}`])
+
+		const plan = stdout()
+		const named = plan.split(backlog_plan.READY_HEADING)[0] ?? ''
+
+		expect(named).toContain(backlog_plan.NAMED_HEADING)
+		expect(named.indexOf(`#${String(BLOCKED_CHILD)}`)).toBeLessThan(
+			named.indexOf(`#${String(READY_CHILD)}`),
+		)
+	})
+
+	it('omits the named section for a bare backlogrun', async () => {
+		stub_backlog()
+
+		await backlog_plan_cli.run([])
+
+		expect(stdout()).not.toContain(backlog_plan.NAMED_HEADING)
+	})
+
+	it('renders the named section from the invocation grammar', () => {
+		const context = {
+			repo: backlog_fixture.REPO,
+			titles: new Map(),
+			open_numbers: new Set<number>(),
+		}
+		const result = epic_report.build_result({ runnable: [], time: [], human: [] }, [])
+		const text = backlog_plan.format_plan(result, [], context, { issues: [901, 902], only: false })
+
+		expect(text).toContain(backlog_plan.NAMED_HEADING)
+		expect(text.indexOf('#901')).toBeLessThan(text.indexOf('#902'))
+	})
+})
+
+// joshuafolkken/kit#1984: `--only` runs the named list and stops, so the plan shows the named section
+// alone and item-less `--only` is refused before anything starts.
+describe('the --only plan', () => {
+	it('renders the named section alone, without the pool', async () => {
+		stub_backlog()
+
+		await backlog_plan_cli.run([`#${String(READY_CHILD)}`, '--only'])
+
+		const plan = stdout()
+
+		expect(plan).toContain(backlog_plan.ONLY_NAMED_HEADING)
+		expect(plan).not.toContain(backlog_plan.READY_HEADING)
+	})
+
+	it('refuses --only with no named issues before anything starts', async () => {
+		expect(await backlog_plan_cli.run(['--only'])).toBe(FAILURE_EXIT_CODE)
+		expect(stderr()).toContain(backlog_named.NOTHING_TO_RUN)
+	})
+
+	// `--only` before the `#N` block breaks the leading block in the run grammar, so the plan refuses it
+	// too rather than promising a scope the run would stop on.
+	it('refuses --only placed before the named issues, as the run grammar does', async () => {
+		expect(await backlog_plan_cli.run(['--only', `#${String(READY_CHILD)}`])).toBe(
+			FAILURE_EXIT_CODE,
+		)
+	})
+})
+
 describe('a classification that could not be made is not a plan', () => {
 	it('renders an unusable graph as no plan, never as an empty ready section', () => {
 		const result = epic_report.build_result({ runnable: [], time: [], human: [] }, [
 			{ kind: 'cycle', message: CYCLE_MESSAGE },
 		])
 
-		const text = backlog_plan.format_plan(result, [], plan_context([]))
+		const text = backlog_plan.format_plan(result, [], plan_context([]), { issues: [], only: false })
 
 		expect(text).toContain(backlog_plan.UNUSABLE_HEADING)
 		expect(text).toContain(CYCLE_MESSAGE)

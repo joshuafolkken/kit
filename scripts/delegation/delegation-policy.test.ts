@@ -9,7 +9,9 @@ const REVIEW = 'review'
 const EPIC_CHILD = 'epic-child'
 const FOLLOWUP_FILING = 'followup-filing'
 const ISSUE_COMMENT = 'issue-comment'
-const QUEUE_CHILD = 'queue-child'
+const BACKLOG_CHILD = 'backlogrun-child'
+// The keyword the widened `epic-child` row has to name, asserted in two places.
+const BACKLOGRUN_LABEL = '`backlogrun`'
 const INVESTIGATION = 'investigation'
 const DIAGNOSIS = 'diagnosis'
 // One title shared by the two rows that each assert their own membership.
@@ -118,19 +120,20 @@ describe('epic-child is a second unit on the one mechanism', () => {
 	})
 
 	// joshuafolkken/kit#1149 widens the unit from "an epic's child" to "one child of a batch", so a
-	// `queue`'s issues run isolated too. The widening has to be in the row the command prints: a
-	// `queue` asking `josh delegate epic-child` reads `--list` to learn what it is agreeing to, and a
-	// row that still says "epic" reads as an answer about someone else's run.
-	it('covers a queued issue as well as an epic child', () => {
+	// `backlogrun`'s named issues run isolated too (joshuafolkken/kit#1984 folded in the old `queue`).
+	// The widening has to be in the row the command prints: a `backlogrun` asking
+	// `josh delegate epic-child` reads `--list` to learn what it is agreeing to, and a row that still
+	// says "epic" reads as an answer about someone else's run.
+	it('covers a backlogrun named issue as well as an epic child', () => {
 		const step = delegation_policy.find_step(EPIC_CHILD)
 
-		expect(step?.does).toContain('`queue`')
+		expect(step?.does).toContain(BACKLOGRUN_LABEL)
 		expect(step?.does).toContain('`epicrun`')
 	})
 
 	// The single-source half. A second row would be a second mechanism in everything but name — same
 	// brief, same summary, same verifier — and the two would drift from the first edit onward.
-	it.each([QUEUE_CHILD, 'batch-child'])(
+	it.each([BACKLOG_CHILD, 'batch-child'])(
 		'keeps %s off the list rather than cloning the row',
 		(name) => {
 			expect(delegation_policy.find_step(name)).toBeUndefined()
@@ -140,7 +143,7 @@ describe('epic-child is a second unit on the one mechanism', () => {
 
 	it('stays one row for both entry points', () => {
 		const covering = delegation_policy.DELEGATABLE_STEPS.filter((step) =>
-			step.does.includes('`queue`'),
+			step.does.includes(BACKLOGRUN_LABEL),
 		)
 
 		expect(covering.map((step) => step.name)).toStrictEqual([EPIC_CHILD])

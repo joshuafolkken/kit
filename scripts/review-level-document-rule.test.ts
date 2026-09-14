@@ -27,7 +27,6 @@ const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/chain-rule.md',
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/queue.md',
 	'prompts/collaboration-workflow/plan-comment.md',
 ]
 

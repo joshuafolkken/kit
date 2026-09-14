@@ -17,6 +17,13 @@ const ROW_INDENT_WIDTH = 4
 const ROW_INDENT = ' '.repeat(ROW_INDENT_WIDTH)
 const NOTHING = `${ROW_INDENT}(none)`
 
+// The named-issue prefix of a `backlogrun #N1 #N2 …` (joshuafolkken/kit#1984): these run one at a
+// time, in the order they were typed, before anything in the pool below is picked up.
+const NAMED_HEADING = 'Named issues — run in order first, one at a time, then the backlog:'
+// `--only` runs the named list and stops, so its heading says the pool is not drained
+// (joshuafolkken/kit#1984). The plan then shows the named section alone.
+const ONLY_NAMED_HEADING =
+	'Named issues — run in order, one at a time, then stop (`--only`; the opted-in backlog is not run):'
 const READY_HEADING =
 	'Ready now — each takes a free lane in its repository, so these may run in parallel:'
 const WAITING_HEADING = 'Waiting — each names what it is waiting on:'
@@ -150,16 +157,51 @@ function format_unusable(result: EpicNextResult): string {
 	return [UNUSABLE_HEADING, ...(lines.length === 0 ? [NOTHING] : lines)].join('\n')
 }
 
+// The named prefix a `backlogrun` runs, and whether `--only` stops it there. Carried together because
+// the plan renders the same two facts the run acts on: which issues lead, and whether the pool follows.
+interface NamedPlan {
+	issues: ReadonlyArray<number>
+	only: boolean
+}
+
+// The named issues are this repository's own, so a bare `#N` names them and a title is looked up the
+// same way the pool's rows are. The order is the invocation's, never sorted.
+function named_lines(named: ReadonlyArray<number>, context: PlanContext): Array<string> {
+	return named.map((issue) => join_row(`#${String(issue)}`, context.titles.get(issue) ?? '', ''))
+}
+
+// The section leads the plan when the invocation named issues, and is absent otherwise — a bare
+// `backlogrun` has no named prefix, so the plan opens on the pool as it always did. This is the
+// non-`--only` prefix; `--only` renders its own whole plan in `format_only`.
+function named_prefix(named: NamedPlan, context: PlanContext): Array<string> {
+	if (named.issues.length === 0) return []
+
+	return [section(NAMED_HEADING, named_lines(named.issues, context)), '']
+}
+
+// `--only` runs the named list and stops, so its plan is the named section alone — the pool is not
+// run, and rendering it would promise work `--only` excludes. The header still names the repository.
+function format_only(named: NamedPlan, context: PlanContext): string {
+	return [
+		`Backlog plan — ${context.repo}`,
+		'',
+		section(ONLY_NAMED_HEADING, named_lines(named.issues, context)),
+	].join('\n')
+}
+
 function format_plan(
 	result: EpicNextResult,
 	out_of_scope: ReadonlyArray<OutOfScopeRow>,
 	context: PlanContext,
+	named: NamedPlan,
 ): string {
 	if (result.verdict === 'error') return format_unusable(result)
+	if (named.only) return format_only(named, context)
 
 	return [
 		`Backlog plan — ${context.repo}`,
 		'',
+		...named_prefix(named, context),
 		section(READY_HEADING, ready_lines(result, context)),
 		'',
 		section(WAITING_HEADING, waiting_lines(result.waiting, context)),
@@ -173,7 +215,9 @@ function format_plan(
 const backlog_plan = {
 	HUMAN_HEADING,
 	IN_PROGRESS_NOTE,
+	NAMED_HEADING,
 	NOTHING,
+	ONLY_NAMED_HEADING,
 	PAST_OFFER_NOTE,
 	READY_HEADING,
 	SCOPE_HEADING,
@@ -184,4 +228,4 @@ const backlog_plan = {
 }
 
 export { backlog_plan }
-export type { PlanContext }
+export type { NamedPlan, PlanContext }

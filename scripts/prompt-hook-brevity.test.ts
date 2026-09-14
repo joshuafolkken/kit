@@ -39,7 +39,7 @@ const REQUIRED_DIRECTIVES: ReadonlyArray<string> = [
 	'Details',
 	'every change with its test',
 	'never wrapped in a code fence',
-	'fullrun/halfrun/queue',
+	'fullrun/halfrun/backlogrun',
 	'never a confirmation stop',
 	'Cause / Fix / Result',
 	'Tests are required for ALL changes',

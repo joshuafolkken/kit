@@ -9,7 +9,10 @@ import { entry_read_set } from './entry-read-set'
 // these against itself and say nothing about the documents.
 
 const ROOT = process.cwd()
-const QUEUE = 'queue'
+// `fullrun` reads its own file, `split-assessment.md` and the skill; it cites `epicrun.md` at more
+// than one out-of-set section ("The hand-off", "Progress while the run is quiet"), so it exercises the
+// section-saving measurement the removed `queue` entry used to (joshuafolkken/kit#1984).
+const SECTION_CITER = 'fullrun'
 const EPICRUN = 'epicrun.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
@@ -19,7 +22,7 @@ const UNKNOWN_ENTRY = 'no-such-entry'
 const HALF_AGAIN = 1.5
 const NOTHING = 0
 
-const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', QUEUE, 'epicrun', 'backlogrun']
+const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'epicrun', 'backlogrun']
 const PLAN_ONLY = 'kickoff'
 const EXPECTED_ENTRIES: ReadonlyArray<string> = [
 	'backlogrun',
@@ -27,7 +30,6 @@ const EXPECTED_ENTRIES: ReadonlyArray<string> = [
 	'fullrun',
 	'halfrun',
 	'kickoff',
-	QUEUE,
 ]
 
 function alphabetical(left: string, right: string): number {
@@ -80,9 +82,9 @@ describe('entry_read_set.read_set — which files', () => {
 		for (const later of entry_read_set.POINT_OF_USE_FILES) expect(files).not.toContain(later)
 	})
 
-	it("takes queue's declared files from the table row", () => {
-		expect(entry_read_set.read_set(ROOT, QUEUE).files).toEqual(
-			expect.arrayContaining(['queue.md', 'fullrun.md']),
+	it("takes backlogrun's declared files from the table row", () => {
+		expect(entry_read_set.read_set(ROOT, 'backlogrun').files).toEqual(
+			expect.arrayContaining(['backlogrun.md', EPICRUN]),
 		)
 	})
 
@@ -111,7 +113,7 @@ describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#18
 		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(CHAIN_RULE)
 	})
 
-	it.each(['fullrun', QUEUE, 'epicrun', 'backlogrun'])(
+	it.each(['fullrun', 'epicrun', 'backlogrun'])(
 		'keeps chain-rule.md out of the entry read of %s, which once read it whole',
 		(entry) => {
 			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(CHAIN_RULE)
@@ -149,7 +151,7 @@ describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkk
 
 describe('entry_read_set.read_set — which sections', () => {
 	it('collects the sections its own documents point at, out of the set', () => {
-		expect(entry_read_set.read_set(ROOT, QUEUE).sections).toEqual(
+		expect(entry_read_set.read_set(ROOT, SECTION_CITER).sections).toEqual(
 			expect.arrayContaining([{ file: EPICRUN, heading: 'The hand-off' }]),
 		)
 	})
@@ -180,8 +182,8 @@ describe('entry_read_set.costed', () => {
 		expect(report.scoped.tokens).toBeLessThanOrEqual(report.whole.tokens)
 	})
 
-	it('resolves every section the queue entry references', () => {
-		const { sections } = entry_read_set.costed(ROOT, QUEUE)
+	it('resolves every section the fullrun entry references', () => {
+		const { sections } = entry_read_set.costed(ROOT, SECTION_CITER)
 
 		expect(sections.length).toBeGreaterThan(NOTHING)
 		expect(sections.every((section) => section.is_resolved)).toBe(true)
@@ -203,7 +205,7 @@ describe('entry_read_set.costed', () => {
 	// because a token estimate rounds each side independently; the separator budget is one byte per
 	// section (joshuafolkken/kit#1922).
 	it('charges a file cited more than once only once between its references', () => {
-		const report = entry_read_set.costed(ROOT, QUEUE)
+		const report = entry_read_set.costed(ROOT, SECTION_CITER)
 		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
 		const own = entry_read_set.total(report.files.map((file) => file.cost))
 
@@ -213,25 +215,25 @@ describe('entry_read_set.costed', () => {
 	})
 
 	// **A file cited at non-adjacent sections fabricates no boundary token** (joshuafolkken/kit#1934).
-	// The queue entry cites four disjoint, non-adjacent `epicrun.md` sections; costing their union by
+	// The fullrun entry cites disjoint, non-adjacent `epicrun.md` sections; costing their union by
 	// joining the skipped-gap lines into one string fabricated a token at every gap, drifting `scoped`
 	// a token above the per-reference sum and printing a false negative saving. Costed as contiguous
 	// runs instead, the deduped figure equals the per-reference sum exactly — none of these references
 	// overlaps, so no line is dropped and none is fabricated. A regression to the join would break the
 	// equality upward, which the `<=` guard above would also catch; this pins the exact expected value.
 	it('fabricates no boundary token for a file cited at non-adjacent sections', () => {
-		const report = entry_read_set.costed(ROOT, QUEUE)
+		const report = entry_read_set.costed(ROOT, SECTION_CITER)
 		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
 		const own = entry_read_set.total(report.files.map((file) => file.cost))
 
 		expect(report.scoped.tokens - own.tokens).toBe(per_reference.tokens)
 	})
 
-	// The whole point of the measurement: the sections a `queue` entry cites are a fraction of the
+	// The whole point of the measurement: the sections a `fullrun` entry cites are a fraction of the
 	// files it used to open for them. Equal figures would mean the reference scan had stopped
 	// resolving and every pointer was being charged at its file.
 	it('charges the referenced sections far less than the files they sit in', () => {
-		const report = entry_read_set.costed(ROOT, QUEUE)
+		const report = entry_read_set.costed(ROOT, SECTION_CITER)
 		const cited = entry_read_set.total(report.sections.map((section) => section.cost))
 		const referenced = report.whole.tokens - report.scoped.tokens + cited.tokens
 

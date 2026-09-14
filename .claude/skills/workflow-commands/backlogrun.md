@@ -1,10 +1,13 @@
 # `backlogrun` — Unattended execution of the opted-in backlog
 
-`epicrun` names an epic and runs its children. `queue` names the issues and the order by hand.
-**`backlogrun` names nothing.** It runs whatever `pnpm josh backlog:next` offers — the whole opted-in
+`epicrun` names an epic and runs its children. **`backlogrun` names either nothing, or the issues to
+run first.** With no argument it runs whatever `pnpm josh backlog:next` offers — the whole opted-in
 backlog, which is every issue carrying `auto-ok` plus every child of an epic whose root carries it,
-ordered by dependency and grouped into waves that may run beside one another
-(joshuafolkken/kit#1631).
+ordered by dependency and grouped into waves that may run beside one another (joshuafolkken/kit#1631).
+With `#N1 #N2 …` it runs those named issues in the order they were typed, one at a time, and **then**
+drains that same backlog — folding in what `queue` used to be a separate keyword for
+(joshuafolkken/kit#1984). **`--only` stops it after the named list**, draining nothing:
+`backlogrun #N1 #N2 … --only` runs exactly the scope the old `queue` did.
 
 **Before it existed the backlog could only be reached after something else had finished.** The
 `auto-ok` pickup ran only when `epic:next` answered `complete`, or once a bare-Issue `epicrun` had
@@ -80,6 +83,12 @@ rather than a membership.
 
 A Tier C action inside a child still stops that child, exactly as under `epicrun`.
 
+**A named issue is approved by the keyword and its number, not by `auto-ok`** (joshuafolkken/kit#1984).
+`backlogrun #N1 #N2 …` runs those issues whether or not they carry the label — typing them is the
+authorization, exactly as `queue` was explicit authorization to merge each of its issues. The pool
+that follows is unchanged: still `auto-ok`, still a person's to opt in. "Named issues run first, in
+order" below is the procedure.
+
 ### The brake that replaces the promise
 
 **The promise was an authorization boundary rather than a convenience**, so withdrawing it without
@@ -130,14 +139,60 @@ changes no offering condition whatever: not a line of `scripts/backlog/backlog-p
 `scripts/backlog/backlog-next.test.ts` fixes the behavior this section now describes. What changed
 here is the promise written above and the brake written beside it.
 
+## Named issues run first, in order
+
+**`backlogrun #N1 #N2 …` runs the named issues before it touches the pool** (joshuafolkken/kit#1984,
+folding in the old `queue` keyword). They run in the order they were typed, **one at a time — no
+lanes**, because the order is the point of naming them. Only once the named list is exhausted does the
+loop below drain the opted-in backlog. A bare `backlogrun` names none and starts straight on the loop,
+exactly as it always did.
+
+**`pnpm josh backlog:plan #N1 #N2 …` reports the whole plan** — the named prefix first, in order, then
+the pool — so the person sees the shape of the run before anything starts. `scripts/backlog/backlog-named.ts`
+is the single source of that order and of the failure branch below; the plan renders it rather than
+restating it.
+
+**Each named issue is a full `fullrun` in a delegated unit**, exactly as a backlog child is
+(`epicrun.md` → "Each child runs in a delegated unit"), and the once-per-session steps — `josh latest`
+on `required`, the progress watcher — run once for the whole invocation, never per issue
+("What runs once per session, not once per issue" below). Between issues, `pnpm josh ms`
+brings the previous merge into the checkout the next one implements in. The parent reads each issue's
+state back from GitHub — `pnpm josh issue:state <N>` — never the unit's summary.
+
+**A named issue that cannot finish parks, and the rest of the named list is skipped** — starting the
+issues after it would break the order they were named in. **The run does not stop there**: it goes on
+to drain the opted-in backlog, and the completion report lists the named issues it did not start. This
+is the one place a `backlogrun` differs from the old `queue`, whose failure ended the batch — and it
+holds because the pool that follows is a separate authorization the named list's order does not govern.
+`backlog_named.after_failure` is the single source.
+
+- A named issue read back `CLOSED` — merged, or already `already-done` — is finished; continue with the
+  next.
+- A **`needs-human-review`** named issue stops the whole run before its commit (`SKILL.md` → §2z),
+  exactly as any child does — the named issues after it are not started and neither is the pool.
+- Everything else about running one — the verification gate, the hand-off, the guards — is
+  `epicrun.md`'s and is not restated here.
+
+**`--only` runs the named list and stops there, draining no pool** (joshuafolkken/kit#1984) — the old
+`queue`'s scope kept under one keyword. `backlogrun #N1 #N2 … --only` runs the named issues in order and
+ends, and the completion report says in one line that `--only` held it back from the opted-in backlog.
+A named issue that fails **under `--only` ends the run** rather than falling through to a pool, and the
+issues after it are skipped as ever. **`--only` with no named issues has nothing to run and is refused
+before anything starts.** `backlog_named.startup` is the single source of both, and
+`pnpm josh backlog:plan #N1 #N2 … --only` renders the named-only plan the run will take.
+
 ## The session cut is inside the invocation
 
-**This section is the single source of the mechanism, and `queue` uses it too**
-(joshuafolkken/kit#1774). The record, the two commands, the answer table and what each one means are
-all here and are not restated anywhere else; `queue.md` → "The session boundary" carries the one thing
-that differs — a queue's invocation is pinned to the issue list that was typed, and its finished
-issues live in the record's `done` field rather than shrinking the string. `SKILL.md` → §0 is where
-the two entry points this reading covers are named.
+**This section is the single source of the mechanism** (joshuafolkken/kit#1774; folded into
+`backlogrun` by joshuafolkken/kit#1984). The record, the two commands, the answer table and what each
+one means are all here. **A named-issue `backlogrun #N1 #N2 …` pins its list across the cut**: the
+record keeps the **opening** list at every cut so `classify_claim`'s character-for-character
+comparison is untouched, and the issues it has finished live in the record's `done` field rather than
+shrinking the string — a resumed session reads `remaining` from `pnpm josh run:carry --json` and runs
+those, then drains the pool as ever. **`--only` rides in that invocation string like every other
+token**, so a resumed session runs the remaining named issues and **stops**, rather than silently
+draining the pool the person excluded. `SKILL.md` → §0 is where the entry point this reading covers is
+named.
 
 **Typing `backlogrun` once authorizes the declared budget, and a session cut is an execution detail of
 spending it** (joshuafolkken/kit#1714). `epicrun.md` → "The hand-off" stops the _session_ at the seam;
@@ -602,6 +657,9 @@ record's `started_at` across every cut, so a run cannot watch its way past it in
 
 Termination is decided by what the loop is told, never by a judgement that enough has been done:
 
+- **`--only` ends the run once the named list is done** — there is no pool and no idle watch to fall
+  through to, so the run reports and finishes (joshuafolkken/kit#1984). It is the one termination the
+  loop below never reaches, because `--only` never enters the pool loop at all.
 - **`pnpm josh backlog:budget` answering `stop`** — the single decision, covering an idle watch
   running out, the backlog emptying with the watch turned off, the maximum being reached, a parked
   backlog, an unreadable listing, and the whole-run bound.
@@ -631,7 +689,7 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 Nothing here is new, and nothing here is restated — a `backlogrun` child is a `fullrun` under a batch
 authorization, which is what an `epicrun` child already is:
 
-- **A stop that would end a `queue` parks one issue and the run continues** — `epicrun.md` → "park
+- **A stop that would end the run parks one issue and the run continues** — `epicrun.md` → "park
   and continue", which is that rule's single source, including what happens to the issue's lane.
 - **A prerequisite discovered mid-run is recorded as a dependency rather than parked** —
   `epicrun.md` → "A prerequisite discovered mid-run", and `SKILL.md` → §2d for the three-way

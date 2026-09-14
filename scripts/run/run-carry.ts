@@ -78,14 +78,14 @@ interface RunCarry {
 	// declared cut the only standing record carried without a person deciding.
 	is_handed_off?: boolean | undefined
 	// The issues this invocation has already finished, as `--done <N>` recorded them
-	// (joshuafolkken/kit#1774). **It exists because a `queue`'s invocation must not shrink.** The
-	// obvious way to resume `queue #1762 #1749 #1759` after #1762 merged is to begin again as
-	// `queue #1749 #1759` — and `classify_claim` compares the invocation character for character, so
-	// that answers `mismatch` and the run stops. Pinning the string to the opening list and keeping the
-	// progress here leaves that comparison, and joshuafolkken/kit#1722's single-writer guarantee with
-	// it, exactly as it was. `merged` cannot serve: it is a count of merges rather than a set of
-	// issues, so a child that ended without one — `already-done`, or a park — would shift every
-	// remaining position by one.
+	// (joshuafolkken/kit#1774; folded into `backlogrun` by joshuafolkken/kit#1984). **It exists because
+	// a named-issue invocation must not shrink.** The obvious way to resume
+	// `backlogrun #1762 #1749 #1759` after #1762 merged is to begin again as `backlogrun #1749 #1759` —
+	// and `classify_claim` compares the invocation character for character, so that answers `mismatch`
+	// and the run stops. Pinning the string to the opening list and keeping the progress here leaves
+	// that comparison, and joshuafolkken/kit#1722's single-writer guarantee with it, exactly as it was.
+	// `merged` cannot serve: it is a count of merges rather than a set of issues, so a child that ended
+	// without one — `already-done`, or a park — would shift every remaining position by one.
 	done?: ReadonlyArray<number> | undefined
 }
 
@@ -117,7 +117,8 @@ interface CarryChange {
 	filed?: number
 	cuts?: number
 	// One issue number to add to `done`, not a count. It is the one field of a change that names a
-	// thing rather than an amount, because what a resumed queue needs is *which* issues are finished.
+	// thing rather than an amount, because what a resumed named-issue run needs is *which* issues are
+	// finished.
 	done?: number
 }
 
@@ -369,8 +370,9 @@ function end_carry(target: string): void {
 // **What the resumed session has to be told, computed rather than stored.** A stored remainder would
 // be a second copy of a subtraction the record already determines, free to disagree with it; computed
 // here, `--json` answers the successor's one question — which issues are left, in the order they were
-// declared — so nothing downstream has to subtract two lists by hand. Anything that is not a `queue`
-// answers `undefined`, which `JSON.stringify` drops: a `backlogrun` record is unchanged by this.
+// declared — so nothing downstream has to subtract two lists by hand. An invocation that named no
+// issues answers `undefined`, which `JSON.stringify` drops: a budget-only `backlogrun` record is
+// unchanged by this.
 function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | undefined {
 	if (carry === undefined) return undefined
 
@@ -384,7 +386,7 @@ function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | unde
 }
 
 // The finished issues are named rather than counted, because the reader of a `busy` or `standing`
-// message about a queue has to know which ones are already merged before deciding anything.
+// message about a named-issue run has to know which ones are already merged before deciding anything.
 function done_note(carry: RunCarry): string {
 	const done = carry.done ?? []
 

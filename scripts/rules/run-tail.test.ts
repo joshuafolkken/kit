@@ -164,8 +164,8 @@ describe('rule_delivery — the run tail at the call that pushes in the foregrou
 		expect(reason).toBe(delivered_rules.RUN_TAIL_REASON)
 	})
 
-	// **A push is a recurring act, so the rule recurs with it.** One per child in a `queue` or an
-	// `epicrun`, and a second inside one `fullrun` when round 2 fixes a finding in place — refused
+	// **A push is a recurring act, so the rule recurs with it.** One per child in an `epicrun` or a
+	// `backlogrun`, and a second inside one `fullrun` when round 2 fixes a finding in place — refused
 	// once and free afterwards, every push but the first is back to the run's self-restraint.
 	it('delivers again on the next foreground push rather than once per run', () => {
 		const payload = payload_of('run-tail-repeat', FOREGROUND_PUSH)

@@ -23,8 +23,11 @@ const OTHER_REPOSITORY = path.join(scratch, 'other.git')
 
 const INVOCATION = 'backlogrun --max 5 --idle 30'
 const OTHER_INVOCATION = 'backlogrun --max 10'
-// The opening list, pinned: it is what the record holds across every cut of this queue.
-const QUEUE_INVOCATION = 'queue #1762 #1749 #1759'
+// The opening list, pinned: it is what the record holds across every cut of this named-issue run.
+const NAMED_INVOCATION = 'backlogrun #1762 #1749 #1759'
+// A `--only` named run, whose flag has to survive the cut in the invocation string like any other part.
+const NAMED_ONLY_INVOCATION = 'backlogrun #1762 #1749 --only'
+const NOT_CREATED = 'the scratch record was not created'
 const START = new Date('2026-09-10T00:00:00.000Z')
 const WITHIN_BOUND = new Date('2026-09-10T07:59:00.000Z')
 const PAST_BOUND = new Date('2026-09-10T08:00:01.000Z')
@@ -320,23 +323,24 @@ describe('a budget count guarded by ownership', () => {
 	})
 })
 
-// joshuafolkken/kit#1774: a `queue`'s invocation is pinned to the list that was typed, so the
+// joshuafolkken/kit#1774: a named-issue invocation is pinned to the list that was typed, so the
 // comparison `classify_claim` makes is untouched and what shrinks is this field instead. These pin the
-// two properties a resumed queue rests on — the finished issues survive the hand-off, and what is left
-// is derived from the record rather than from an arithmetic the successor does in its head.
-function queued(): RunCarry {
+// two properties a resumed named-issue run rests on — the finished issues survive the hand-off, and
+// what is left is derived from the record rather than from an arithmetic the successor does in its
+// head. joshuafolkken/kit#1984 folded this from the old `queue` keyword into `backlogrun`.
+function named_run(): RunCarry {
 	run_carry.end_carry(target())
 
-	const carry = run_carry.begin_carry(target(), QUEUE_INVOCATION, run_carry.NO_OWNER, START)
+	const carry = run_carry.begin_carry(target(), NAMED_INVOCATION, run_carry.NO_OWNER, START)
 
-	if (carry === undefined) throw new Error('the scratch record was not created')
+	if (carry === undefined) throw new Error(NOT_CREATED)
 
 	return carry
 }
 
-describe('the issues a queue has finished', () => {
+describe('the issues a backlogrun has finished', () => {
 	it('accumulates in the order they were recorded', () => {
-		const first = run_carry.apply_change(target(), queued(), { done: 1762 })
+		const first = run_carry.apply_change(target(), named_run(), { done: 1762 })
 
 		expect(run_carry.apply_change(target(), first, { done: 1749 }).done).toStrictEqual([1762, 1749])
 	})
@@ -344,33 +348,53 @@ describe('the issues a queue has finished', () => {
 	// A `--done` reissued after a retry must not list an issue twice, or `remaining` would be short by
 	// something already taken out of it.
 	it('records the same issue only once', () => {
-		const first = run_carry.apply_change(target(), queued(), { done: 1762 })
+		const first = run_carry.apply_change(target(), named_run(), { done: 1762 })
 
 		expect(run_carry.apply_change(target(), first, { done: 1762 }).done).toStrictEqual([1762])
 	})
 
 	it('leaves what is left in the order the invocation declared it', () => {
-		const carry = run_carry.apply_change(target(), queued(), { done: 1749 })
+		const carry = run_carry.apply_change(target(), named_run(), { done: 1749 })
 
 		expect(run_carry.remaining_of(carry)).toStrictEqual([1762, 1759])
 	})
 
 	// The whole point of the resumption: the successor does not re-run what the cut session finished.
 	it('survives the hand-off and the adoption that carries it', () => {
-		const started = run_carry.apply_change(target(), queued(), { done: 1762 })
+		const started = run_carry.apply_change(target(), named_run(), { done: 1762 })
 		const cut = run_carry.apply_change(target(), started, { cuts: 1 })
 
 		expect(run_carry.adopt_carry(target(), cut, dead_owner())?.done).toStrictEqual([1762])
 	})
 
-	// "This invocation has no issue list" and "this queue has no issues left" are different facts.
+	// "This invocation named no issues" and "this run has no issues left" are different facts.
 	it('is not reported for an invocation that declared none', () => {
 		expect(run_carry.remaining_of(begun())).toBeUndefined()
 	})
 
 	it('is named in the description a refusal message carries', () => {
-		const carry = run_carry.apply_change(target(), queued(), { done: 1762 })
+		const carry = run_carry.apply_change(target(), named_run(), { done: 1762 })
 
 		expect(run_carry.describe_carry(carry)).toContain('issues 1762 done')
+	})
+})
+
+// joshuafolkken/kit#1984: `--only` rides in the invocation string, so the record carries it across the
+// cut for free and the outstanding list is still derived from the named block, the flag ignored.
+describe('a --only invocation carried across a cut', () => {
+	it('keeps the flag in the record and still derives the remaining list', () => {
+		run_carry.end_carry(target())
+		const started = run_carry.begin_carry(
+			target(),
+			NAMED_ONLY_INVOCATION,
+			run_carry.NO_OWNER,
+			START,
+		)
+
+		if (started === undefined) throw new Error(NOT_CREATED)
+		const read = run_carry.read_carry(target(), WITHIN_BOUND)
+
+		expect(read.kind === 'carried' ? read.carry.invocation : '').toBe(NAMED_ONLY_INVOCATION)
+		expect(run_carry.remaining_of(started)).toStrictEqual([1762, 1749])
 	})
 })

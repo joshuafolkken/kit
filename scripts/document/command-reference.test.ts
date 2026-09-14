@@ -14,7 +14,6 @@ const KNOWN_EXTRA_COMMANDS: ReadonlyArray<string> = [
 	'kickoff',
 	'fullrun',
 	'halfrun',
-	'queue',
 	'epicrun',
 	'backlogrun',
 	'diag',

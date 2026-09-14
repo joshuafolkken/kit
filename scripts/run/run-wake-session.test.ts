@@ -14,7 +14,7 @@ const REORDERED_INVOCATION = 'backlogrun --idle 30 --max 5'
 const NO_WATCH_INVOCATION = 'backlogrun --idle 0'
 const ONE_FLAG_INVOCATION = 'backlogrun --max 5'
 const BARE_INVOCATION = 'backlogrun'
-const QUEUE_INVOCATION = 'queue #1762 #1749'
+const NAMED_INVOCATION = 'backlogrun #1762 #1749'
 const SCRIPT = '/somewhere/run-wake-cli.ts'
 const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
 const LOOPBACK_PROXY = 'http://localhost:52554'
@@ -79,9 +79,10 @@ describe('run_wake_session — what may reach the operating system', () => {
 		expect(run_wake_session.wake_argv('')).toBeUndefined()
 	})
 
-	// The supervisor continues a `backlogrun` or a `queue` and nothing else, so anything else in the
-	// record is a record that has been tampered with or a bug — never something to launch a session
-	// with. `epicrun` and `fullrun` are the two whose cut still waits for a keyword.
+	// The supervisor continues a `backlogrun` and nothing else, so anything else in the record is a
+	// record that has been tampered with or a bug — never something to launch a session with. `epicrun`
+	// and `fullrun` are the two whose cut still waits for a keyword; `queue` was removed entirely
+	// (joshuafolkken/kit#1984).
 	it('refuses an invocation that is neither', () => {
 		expect(run_wake_session.wake_argv('epicrun #1716')).toBeUndefined()
 		expect(run_wake_session.wake_argv('fullrun #1774')).toBeUndefined()
@@ -447,18 +448,18 @@ describe('run_wake_session.launch — each launch is delimited', () => {
 	})
 })
 
-// joshuafolkken/kit#1774: `queue` is the second invocation the supervisor continues. The record holds
-// the queue's **opening** issue list at every cut, so the prompt the successor is handed round-trips
-// back to `run:carry --begin` character for character — which is what `safe_invocation` refuses a wake
-// on when it does not.
-describe('run_wake_session.wake_argv — a queue invocation', () => {
+// joshuafolkken/kit#1984: a named-issue `backlogrun` is carried across a cut. The record holds the
+// **opening** issue list at every cut, so the prompt the successor is handed round-trips back to
+// `run:carry --begin` character for character — which is what `safe_invocation` refuses a wake on when
+// it does not.
+describe('run_wake_session.wake_argv — a named-issue backlogrun', () => {
 	it('hands on the list the record holds, unchanged', () => {
-		expect(prompt_of(QUEUE_INVOCATION)).toBe(QUEUE_INVOCATION)
+		expect(prompt_of(NAMED_INVOCATION)).toBe(NAMED_INVOCATION)
 	})
 
-	// A queue with no issue names nothing to do, and a repository-qualified reference is a grammar this
-	// supervisor does not carry — waking on either would launch a session that cannot claim the record.
-	it.each(['queue', 'queue kit#1749', 'queue #0'])('refuses %s', (invocation) => {
+	// A repository-qualified reference and a malformed number are grammars this supervisor does not
+	// carry — waking on either would launch a session that cannot claim the record.
+	it.each(['backlogrun kit#1749', 'backlogrun #0'])('refuses %s', (invocation) => {
 		expect(run_wake_session.wake_argv(invocation)).toBeUndefined()
 	})
 })

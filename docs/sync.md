@@ -51,7 +51,7 @@ SECURITY.md         tsconfig.sonar.json
 >
 > **The `npm` entry, by contrast, no longer opens routine version-update PRs in any consumer.**
 > It sets `open-pull-requests-limit: 0`, which disables version updates only. `josh latest` runs
-> at the start of every `fullrun` / `halfrun` / `queue` and already bumps npm dependencies to
+> at the start of every `fullrun` / `halfrun` / `backlogrun` and already bumps npm dependencies to
 > latest, so the weekly Dependabot PRs were duplicating it — in kit they were closed unmerged
 > after each had consumed a full CI run, and the same noise was replicated in every consumer that
 > synced the file. Security advisories are unaffected — GitHub's Dependabot options reference
@@ -418,7 +418,7 @@ SECURITY.md         tsconfig.sonar.json
 > (`git restore --worktree --staged <path>`), the plumbing spellings (`git update-index`,
 > `git apply --cached`), and everything that stages or commits by another route (`git merge`,
 > `git cherry-pick`, `git revert`). `git stash` is the notable one: the documented `fullrun new` /
-> `queue` steps run it and `git stash pop` themselves, and a `pop` without `--index` reapplies
+> `backlogrun` steps run it and `git stash pop` themselves, and a `pop` without `--index` reapplies
 > everything unstaged, so that flow flattens a staged baseline the deny entries otherwise protect.
 > Closing all of them would mean denying
 > `git` itself, which takes the read-only inspection commands the prompts require with it. The deny
@@ -457,7 +457,7 @@ SECURITY.md         tsconfig.sonar.json
 > **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
 > documents used to inline.** The rule document is read in full on every turn, and roughly
 > half of it was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
-> `halfrun` / `queue` steps, the `/code-review` → `followup` chain rule, and the checks that run
+> `halfrun` / `epicrun` / `backlogrun` steps, the `/code-review` → `followup` chain rule, and the checks that run
 > after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
 > documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB.
 >

@@ -19,7 +19,7 @@ points to them rather than restating them:
   branch — scope: the staged diff (`git diff --staged`), level from
   `pnpm josh review:brief --level-only`.
 - **Workflow review step** (same session, inline): the last stage of the verification gate in `fullrun`
-  / `halfrun` / `queue`, driven by the brief `pnpm josh review:brief` prints. Round 1 runs before the
+  / `halfrun` / `backlogrun`, driven by the brief `pnpm josh review:brief` prints. Round 1 runs before the
   commit — scope: `git diff main`. Round 2 runs after it, beside the CI the commit started
   (`.claude/skills/workflow-commands/chain-rule.md` → "The pull request opens between the rounds, so CI
   runs beside round 2").
@@ -179,7 +179,7 @@ Only branch 2 files an Issue. What follows applies to that branch.
 - **Filing does not end at the Issue.** `epic:next` only ever offers a child the task list of an epic
   names, so an Issue in no epic is never handed to a running `epicrun` — the deferred finding is parked
   forever, which reads the same from the backlog. **The three steps run inside the CI wait, not before
-  the commit.** Where the run opens a pull request — `fullrun`, `queue`, `epicrun` — they go after
+  the commit.** Where the run opens a pull request — `fullrun`, `epicrun`, `backlogrun` — they go after
   `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
   pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
   delegated unit** — `pnpm josh delegate followup-filing` (joshuafolkken/kit#1892).
