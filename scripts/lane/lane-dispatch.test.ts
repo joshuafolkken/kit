@@ -1,5 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
+import { git_gh_command } from '#scripts/git/git-gh-command'
+import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_liveness } from '#scripts/run/run-liveness'
@@ -27,6 +29,8 @@ const PID = 4242
 const launch = vi.spyOn(detached_launch, 'launch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
+const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
+const remove_label = vi.spyOn(git_gh_command, 'issue_remove_label')
 
 function lane(output: string | undefined): LaneInfo {
 	return {
@@ -52,6 +56,8 @@ beforeEach(() => {
 		lane: lane(DERIVED_LOG),
 		output: DERIVED_LOG,
 	})
+	add_label.mockResolvedValue(true)
+	remove_label.mockResolvedValue(undefined)
 })
 
 describe('lane_dispatch.child_invocation — what the child is asked to do', () => {
@@ -191,6 +197,51 @@ describe('lane_dispatch.is_worth_warning — what nobody would otherwise hear ab
 	it('warns on every refusal', () => {
 		expect(lane_dispatch.is_worth_warning({ kind: 'no-lane' })).toBe(true)
 		expect(lane_dispatch.is_worth_warning({ kind: 'unrecordable', reason: 'x' })).toBe(true)
+	})
+})
+
+// The parent claims `in-progress` at dispatch, so the window in which a running child looks like an
+// empty lane closes here rather than tens of minutes later once the child's own fullrun applies it.
+describe('lane_dispatch.dispatch_child — the in-progress marker the parent claims', () => {
+	it('applies in-progress before it starts the child', async () => {
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(add_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+		expect(add_label.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+			launch.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('starts nothing when the marker could not be applied', async () => {
+		add_label.mockResolvedValue(false)
+
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(outcome.kind).toBe('label-unset')
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	it('warns rather than leaving an unapplied marker silent', async () => {
+		add_label.mockResolvedValue(false)
+
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(lane_dispatch.is_worth_warning(outcome)).toBe(true)
+		expect(lane_dispatch.describe(outcome, ISSUE)).toContain(IN_PROGRESS_LABEL)
+	})
+
+	it('takes the marker back off when the launch fails, leaving none on an idle issue', async () => {
+		launch.mockReturnValue({ kind: 'failed', note: LAUNCH_FAILURE })
+
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+	})
+
+	it('leaves the marker in place on a dispatch that started the child', async () => {
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(remove_label).not.toHaveBeenCalled()
 	})
 })
 

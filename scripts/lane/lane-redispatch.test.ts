@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import { git_gh_command } from '#scripts/git/git-gh-command'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
@@ -24,6 +25,7 @@ const PID = 909
 const launch = vi.spyOn(detached_launch, 'launch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
+const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
 
 function lane(): LaneInfo {
 	return {
@@ -45,6 +47,7 @@ beforeEach(() => {
 	launch.mockReturnValue({ kind: 'launched', pid: PID })
 	find_open_lane.mockResolvedValue(lane())
 	record_output.mockResolvedValue({ kind: 'recorded', lane: lane(), output: DERIVED_LOG })
+	add_label.mockResolvedValue(true)
 })
 
 describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', () => {

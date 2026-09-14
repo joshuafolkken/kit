@@ -17,6 +17,16 @@ run:release <N>` (bare for a `halfrun new`) for the person to type once they are
 `halfrun` that stops on a split, a prerequisite or a third-party target releases it instead. `SKILL.md`
 → §2f is the single source.
 
+**`in-progress` is applied the moment `run:hold` answers `hold`** — ahead of the title normalization, so
+a `#N` counts as holding its lane from the claim rather than only once the work begins (the apply is in
+the `halfrun #<N>` / `halfrun new` steps below; a `halfrun new` applies it right after filing). **The
+stop before commit keeps the label on**, exactly as it keeps the hold, because the tree carries
+uncommitted work; the person removes it when they are done with the tree. **A stop that leaves the tree
+clean removes the label in the same turn as `pnpm josh run:release`, with `gh api -X DELETE
+repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`** — the `cost --over` `over`
+stop, a split, a prerequisite, and a third-party target. A lane child finds the label already applied by
+the parent at dispatch (`backlogrun.md` → "Concurrency"), so re-applying it here is idempotent.
+
 **Ask the session boundary in the same turn as the hold, and before anything else is started** —
 `pnpm josh cost --over 300000`, exactly as `fullrun` does. `under` — carry on. `over`, or a run it could
 not answer for — **stop here**, before the title is normalized and before a `new` entry files anything:
@@ -84,8 +94,9 @@ procedure, in order:
 
 **Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.
 
-- `halfrun #<N>`: Read Issue #N → **normalize the title** (same as `fullrun`) → **add `in-progress`
-  label** (create if missing) → post the agreed plan only if the Issue body is blank; if the body
+- `halfrun #<N>`: **add `in-progress` label the moment `run:hold` answered `hold`** (create if missing)
+  → Read Issue #N → **normalize the title** (same as `fullrun`) → post the agreed plan only if the Issue
+  body is blank; if the body
   already has content, skip the plan-posting step → run `git switch main && git pull`, then
   `pnpm josh latest:scope` and update dependencies only on `required` — `latest-gate.md` is its single
   source, and on `required` load the `dependency-update` skill afterwards → implement → run the **full

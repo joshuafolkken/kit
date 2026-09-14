@@ -1202,12 +1202,14 @@ pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an 
 
 The child runs `claude -p --model <model> --effort <effort> fullrun #<N>` with `--output-format stream-json`, through the same detached launcher as `josh run:wake`. It records its output path at `<temp>/josh-lane-dispatch-<N>-<digest>.log` (surviving `lane:close`), and does not pass `--dangerously-skip-permissions`.
 
+**Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
+
 **Options:**
 
 - `JOSH_LANE_MODEL` — override the child's model (default `opus`).
 - `JOSH_LANE_EFFORT` — override the effort; allowlist `low` / `medium` / `high` / `xhigh` / `max` (default `medium`), a value outside it refuses the launch.
 
-**Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` naming the log path. A child that started but whose log could not be opened warns and exits zero (`dispatched`).
+**Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 
 ### `josh cost`
 

@@ -994,11 +994,13 @@ carrying `in-progress` and not parked counts for one — whichever epic it belon
 deliberately not parked and goes on holding its lane, because its uncommitted work is still in that
 checkout.
 
-**It is advisory and not atomic.** The label is applied by whoever is about to implement a child,
-*after* this read, so two sessions starting in the same instant can both read the same free lane. What
-the check closes is the window that actually occurs — a lane already running a child holds the label
-for minutes, against a race measured in seconds. It is a guard that makes the invariant mechanical, not
-a mutex.
+**It is advisory and not atomic.** The label is applied when a child is dispatched — the parent claims
+it in `lane:dispatch` before the child process starts, and a standalone `fullrun` / `halfrun` claims it
+the moment `run:hold` answers `hold` — *after* this read, so two sessions starting in the same instant
+can both read the same free lane. What the check closes is the window that actually occurs — a
+dispatched lane holds the label from the launch onward, not the tens of minutes it took when the
+child's own `fullrun` had to reach its own apply first. It is a guard that makes the invariant
+mechanical, not a mutex.
 
 **It is scoped to the resource, not the epic.** A lane is its own checkout with its own branch and
 ports, so the repository-wide number is a **ceiling on how many lanes run at once**. How a session
