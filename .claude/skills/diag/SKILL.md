@@ -11,11 +11,22 @@ description: The procedure behind `diag fullrun` / `diag epicrun` / `diag #<N>` 
 its answer is "run this", it prints the command for the person to type — the explicit-invocation
 rule in `CLAUDE.md` is unchanged, and `diag` is not one of the keywords it governs.
 
-## Which run to measure
+**If `josh` cannot measure it, report the gap and file an issue (step 7) — never restore the figures
+by hand.** The hand tally that motivated this ordering happened only because the commands then had no
+run-tree view; where a reading below is `not measured`, that gap is the finding, not a cue to
+reconstruct it by eye. **Read the steps in order**: the run tree, whether it is stuck, its cost by
+role, the costliest sessions, the parent's timeline — and only then one run's internals.
+
+## 1. Which run to measure — the default is the last run tree
+
+**The default scope is the last _run tree_, not the last merged child** (joshuafolkken/kit#1937,
+joshuafolkken/kit#1939). A bare `pnpm josh time` reports the whole run — parent, wakes, lanes and
+subagents — and a bare `pnpm josh cost` reports that same tree in dollars; `--run` names it
+explicitly. Measure one issue on its own **only** when `diag #<N>` was typed.
 
 | Typed | What it measures | The call |
 | --- | --- | --- |
-| `diag` / `diag fullrun` | The most recently merged run | `pnpm josh time --top 5 --json` |
+| `diag` / `diag fullrun` | The last run tree — every session of the run | `pnpm josh time --run --top 5 --json` and `pnpm josh cost --run --json` |
 | `diag #<N>` | Issue `#N`'s whole run, from the `fullrun` invocation to the merge | `pnpm josh time --issue <N> --top 5 --json` |
 | `diag epicrun` / `diag #<E>` where `#<E>` is an epic | Every child of the epic, in execution order | `pnpm josh time --epic <E> --top 5 --json` |
 | `diag backlog` / `diag <N> days` | The backlog over a period — lanes, idle, serialization, throughput | `pnpm josh time --period <N> --top 5 --json` |
@@ -36,48 +47,100 @@ turn** and the direction across them, the one figure a `--issue` call per child 
 are not durations of zero, and the batch totals withhold any half no child contributed to. A child
 in one of those states is reported unmeasured, never counted as zero.
 
-## 1. Measure with `pnpm josh time` and `pnpm josh cost`, never by hand
+## 2. Is the run even progressing? — read the run state first
 
-```bash
-pnpm josh time --top 5 --json               # alias: josh tm
-pnpm josh time --issue <N> --top 5 --json
-pnpm josh time --epic <E> --top 5 --json
-pnpm josh time --last <N> --top 5 --json    # the spread across the last N merged runs
-pnpm josh time --period <N> --top 5 --json  # the backlog over the last N days — lanes, idle, serialization
-```
+A merged run always ended; a run tree may still be **stuck**, and that is the first thing to read.
+`pnpm josh time` on a run scope leads with a `Run state (from run:carry / run:wake):` block whenever
+the run is unfinished — the presence of a `run:carry` record _is_ the incompleteness, since a clean
+finish removes it, and `--json` carries the same figures.
 
-- **For a `backlogrun` or `epicrun` *parent*, read `Turns by contributor:` first.** A parent barely
-  implements, so its durations rank tools rather than work, and its cost grows with its turn count;
-  the contributor block says whether the turns went on progress polling, confirming children, the
-  loop's own asks, or reading issues. **A large contributor is a reason to look, never a finding** —
-  whether those turns were avoidable is `Bundling:`'s answer, and the two are ranked together in
-  step 3.
+- **`status`** is the axis that says how the _run_ stands, kept apart from a session's `end_state`.
+  The states no merged-run report could show belong at the top of the ranked table:
+  `cut_no_successor` (cut, and nothing took over), `owner_stalled` / `owner_gone` (the owner is idle
+  or gone), and `expired` (past the whole-run bound). `running` and `handed_off` are healthy.
+- **`whiffs`** — wake sessions that spun up, checked `run:carry` / `run:hold`, moved nothing and
+  exited. Read `whiffs.count` and `whiffs.cost_usd`: idle wakes that cost dollars and produced no
+  work are a ranking row of their own.
+- **`is_measured: false` is "no carry record to read here", never "the run is fine".** `cuts`,
+  `is_handed_off`, `is_owner_live`, `last_cut_at` and `idle_ms` fill in how many times it was cut and
+  how long it has sat silent.
 
-```bash
-pnpm josh cost --issue <N> --json     # this run's cost; alias: josh co
-pnpm josh cost --session <id> --json  # one session, or one delegated unit as <session-id>/agent-<agent-id>
-```
+## 3. Where the run's cost and time went, by role
 
-- **`--over` is not this step's flag** — it answers whether *this* session is too large to hand off,
-  reads the session it is in rather than a scope, and is refused beside `--issue` / `--all` / `--json`.
-  `diag` passes the scope flag with `--json`, never `--over`.
+Before any single-run phase, read how the tree split across its roles — the share question the hand
+tally answered and no command could. `pnpm josh cost --run` leads with dollars, `pnpm josh time
+--run` with wall time; both roll the tree up under `roles[]`.
+
+- **Each `roles[]` row is one of `parent` / `wake` / `lane` / `subagent`**, cost-heaviest first, with
+  `cost_share` and `elapsed_share` in `[0, 1]` (the four shares sum to one), and `cost_usd`,
+  `elapsed_ms`, `session_count` beside them. The `wake` role is the run's resumes — its
+  `preamble_tokens` is the resume cost the run keeps re-establishing.
+- **`sessions[]` is one row per session, cost-heaviest first** — `session_id`, `role`, `issue`,
+  `depth`, `parent_id`, `cost_usd`, `elapsed_ms`, `preamble_tokens` — the input to step 4.
+- **`unreadable_count` is withheld from the shares, never folded in as a zero.** A large role is a
+  reason to look, not a finding on its own.
+
+## 4. The costliest sessions
+
+Take the top rows of `sessions[]` (run scope) or `by_session[]` (`--issue` and the latest-run scope,
+keyed by the same session id) and read what each spent its money on. The per-row detail lives on two
+commands:
+
+- **`pnpm josh cost --issue` → `by_session[].metrics`**: `primary_model` and `other_models` (which
+  model priced the row), `thinking` (`thinking_tokens` over `output_tokens` — the reasoning share,
+  withheld when `measured` is false), and `context` (`median_ms` / `p90_ms` / `max_ms`, read as
+  tokens — how large the context grew).
+- **`pnpm josh time` → `by_session[].signals`**: `check_loop` (`count` edit-then-check transitions
+  and their `median_context_tokens` — a check loop repeating at a large context), and `stalls[]`
+  (each `wait_ms` of model wait and the `output_tokens` produced in it — the request-level stall).
+  `by_session[].end_state` says whether the session `merged`, `stopped`, or was `not_detected`.
+- **The stopped session's cost is a ranking row** — the work that produced no merge (step 7). Each
+  cost row also carries `cost_usd_with_delegated` and `output_turns`; each time row carries
+  `elapsed_ms`, `model_ms`, `round_trip_count` and, for a resume, `to_first_progress_ms`.
+
+## 5. The parent's timeline
+
+`pnpm josh time` on a run scope carries `parent_timeline` — where the parent's own wall clock went,
+the reading a batch's speed turns on.
+
+- **`dispatch.first_offset_ms`** — how long until the first lane was dispatched; `dispatch.dispatches[]`
+  lists each with its `offset_ms` and `issue`, and `has_dispatch` / `is_measured` say whether any ran
+  and whether the transcript was read.
+- **`foreground_waits.total_ms`** — the time the parent sat in the foreground waiting; each `waits[]`
+  row names its `command` (`josh followup` or a `sleep`) and its `duration_ms`.
+- **`implementation`** — the parent's own work: `request_count`, `cost_usd`, `median_context_tokens`
+  and the `issues[]` it implemented itself.
+- **For a `backlogrun` / `epicrun` parent, read `contributor_costs.by_contributor` first.** A parent
+  barely implements, so its durations rank tools rather than work; the block keys the dollars by what
+  the turn was _for_ (`child dispatch`, `progress polling`, `child confirmation`, `loop asks`, …),
+  with `no_tool_call` a bucket that is never prorated. A large contributor is a reason to look;
+  whether those turns were avoidable is `Bundling:`'s answer (step 7). `is_measured: false` is an
+  unknown, not a free run.
+
+## 6. Then, only if needed — one run's phases, round trips and rework
+
+The readings below are one run's internals, read after steps 1–5 when the question is which phase of
+a single run was slow or expensive.
+
 - **The output is an array even where the scope is one issue**, so read `[0]`. Four fields carry the
   reading — `request_count`, `cost_usd`, `breakdown`, `missing` — and `breakdown` is
   `resident_baseline_tokens` / `resident_billed_tokens` / `history_billed_tokens` /
   `billed_input_tokens`. **Derive the four readings the JSON does not print**: the resident and
   history shares of `billed_input_tokens`, the tokens per request, and the dollars per request.
+- **`--over` is not this step's flag** — it reads whether _this_ session is too large to hand off,
+  not a scope, and is refused beside `--issue` / `--all` / `--json`. `diag` passes the scope flag with
+  `--json`, never `--over`.
 - **`documents`** ranks the point-of-use candidates: one row per instruction document read at the
-  entry, largest carry cost first — `tokens` is what it stacked, `carried_requests` is how many
-  billed requests re-read it from cache, `cost_usd` is that carry at the cache-read rate. Moving a
-  document from "read at the entry" to "read at the point of use" removes its `carried_requests`, so
-  the top rows are the conversion candidates and their `cost_usd` is the saving. **Read `is_measured`
-  before quoting a row** — `false` is unmeasured, not zero. Present on `--issue` and single-session
-  scopes, absent on `--all`.
-- **Read `missing` before quoting any figure, and a non-zero count is unmeasured rather than zero.**
-  Its counters — `no_usage_lines`, `malformed_lines`, `unreadable_sessions`, `unattributed_sessions`
-  — say how much could not be priced or attributed; on `--issue` the first three are the **whole
-  corpus's**. A `cost_usd` reported beside a non-zero `missing` is a floor and is labelled one; a
-  non-empty `unpriced_models` is a second floor the command flags itself.
+  entry, largest carry cost first — `tokens` is what it stacked, `carried_requests` how many billed
+  requests re-read it from cache, `cost_usd` that carry at the cache-read rate. Moving a document to
+  "read at the point of use" removes its `carried_requests`, so the top rows are the conversion
+  candidates and their `cost_usd` the saving. **Read `is_measured` before quoting a row** — `false`
+  is unmeasured, not zero. Present on `--issue` and single-session scopes, absent on `--all`.
+- **Read `missing` before quoting any figure; a non-zero count is unmeasured, not zero.** Its
+  counters — `no_usage_lines`, `malformed_lines`, `unreadable_sessions`, `unattributed_sessions` —
+  say how much could not be priced or attributed; on `--issue` the first three are the **whole
+  corpus's**. A `cost_usd` beside a non-zero `missing` is a floor and is labelled one;
+  `unpriced_models` is a second floor the command flags itself.
 - **`curve` / `outliers` / `cap_simulation`**: `curve` is context growth across the run, built from
   the **main-line session alone** — read `curve.measured`, since a cross-session scope carries
   `measured: false`, which is `not measured` and never a flat curve. `outliers` names the requests
@@ -88,10 +151,9 @@ pnpm josh cost --session <id> --json  # one session, or one delegated unit as <s
 
 **`--top 5` is part of the call, not a nicety.** Without it the JSON carries every row of the
 per-tool and per-`josh` tables, and an epic pays for both once per child. The cap reaches the **row
-tables** and nothing else — the shares, phases, round trips and prices are unaffected. A cut table
-says so in `notes` (`by_tool: showing the top 5 of 34 rows`), and **that note is not a zero**; never
-read a capped table as the whole run. **Drop the flag when the tail is the question** — a cost spread
-thin across many commands is what five rows cannot show — and say that you did.
+tables** and nothing else. A cut table says so in `notes` (`by_tool: showing the top 5 of 34 rows`),
+and **that note is not a zero**. **Drop the flag when the tail is the question** — a cost spread thin
+across many commands is what five rows cannot show — and say that you did.
 
 **Five tables are capped**: `by_tool`, `by_josh_command`, `segments`, `by_invocation`,
 `rework.files`. `rework.files` is ordered dropped-first, so a cut table keeps the findings.
@@ -111,42 +173,29 @@ Read from the JSON, in this order:
   `not measured`, and ranking a stage off them there is ranking an unknown.
 - **the phase breakdown** — `plan` / `setup` / `implement` / `gate` / `rework` / `review` / `pr` /
   `wrapup` / `ci` / `merge` / `wait` / `wait-outside` / `pre-run` / `post-run` / `other`.
-  **`pre-run`, `post-run` and `wait-outside` are not stages and are never ranked** — a cut against
-  them cuts a different piece of work — and `wait` alone is the row a stop-reducing proposal is
-  measured against. `setup` and `wrapup` are the run's own and can be ranked.
+  **`pre-run`, `post-run` and `wait-outside` are not stages and are never ranked**; `wait` alone is
+  the row a stop-reducing proposal is measured against, and `setup` and `wrapup` are the run's own and
+  can be ranked.
 - **`ci` is not the `CI wait` share, and it is the row a CI proposal is ranked off.** The share is
   the part of the open→merge window no span covers; the phase adds what the merge command itself
   waited for, read from the check-runs of **every commit of the pull request**. **`ci: 0` never means
-  "nobody waited"**: a cycle that ran beside the review or a gate is free and stays out of the row,
-  and where cycles could not be read it says `not detected`.
+  "nobody waited"**: a cycle beside the review or a gate is free and stays out, and where cycles could
+  not be read it says `not detected`.
 - **`gate` is read like `ci`.** The gate is backgrounded (§2h), so the phase carries only the
-  two-second dispatch; its real runtime is the `Gate runtime (backgrounded)` block — the real length
-  and the `naked` part the run spent on it alone, and `not measured` where the backgrounded gate was
-  never read back. A small `gate` figure no more means the gate was fast than `ci: 0` meant nobody
-  waited.
+  dispatch; its real runtime is the `Gate runtime (backgrounded)` block — the real length and the
+  `naked` part the run spent on it alone, `not measured` where it was never read back. A small `gate`
+  figure no more means the gate was fast than `ci: 0` meant nobody waited.
 - **`is_detected` per phase** — a phase that never appeared prints `not detected`, which is not a
   measured zero; never rank a phase you did not measure.
 - **`phase_costs`** — `by_phase` carries a `request_count` and a `cost_usd` per phase, placed by each
   billed request's own instant. `unattributed` is a bucket, **never prorated into the phases**.
   `is_measured: false` means the corpus was not read for this scope (only `--issue` and the
   latest-run scope read it).
-- **`contributor_costs`** — `by_contributor` keys the dollars by what the turn was *for*:
-  `implementation`, `child dispatch`, `progress polling`, `child confirmation`, `loop asks`,
-  `issue bookkeeping`, `investigation`, `other`. `no_tool_call` is a bucket, **never prorated**. Rank
-  on the purpose's `cost_usd`, with `Bundling:` saying how much was avoidable; a high `no_tool_call`
-  points at deliberation, not a tool to bundle. `is_measured: false` is an unknown, not a free run.
-- **`delegated_cost`** — `units[]` names each subagent launch with its `baseline_tokens` (the context
-  it wrote into cache on its first request) and its `cost_usd`; `unit_count`, `baseline_tokens`,
-  `cost_usd` and `per_unit_cost_usd` are the totals. **Read it before crediting a delegation with a
-  saving**: a step whose own work is cheaper than `per_unit_cost_usd` cost more to delegate than to
-  run in the main line. Each unit names its `model` and `purpose`. `unpriced_unit_count` makes
-  `cost_usd` a floor; `unit_count: 0` on a measured run is a real answer.
-- **`by_session`** — the run broken down by main-line session, on both `josh time` and `josh cost`
-  under `--issue` and the latest-run scope, keyed by the same session id. Time rows carry elapsed,
-  model and tool wait, round trips and `end_state` (`merged` / `stopped` / `not_detected`); cost rows
-  carry request count, output tokens, `cost_usd`, `cost_usd_with_delegated`, the per-type
-  `composition`, `output_turns`, and a resume's `preamble_tokens`. **The stopped session's cost is a
-  ranking row — step 3.**
+- **`delegated_cost`** — `units[]` names each subagent launch with its `baseline_tokens`, `cost_usd`,
+  `model` and `purpose`; the totals are `unit_count`, `baseline_tokens`, `cost_usd` and
+  `per_unit_cost_usd`. **Read it before crediting a delegation with a saving**: a step whose own work
+  is cheaper than `per_unit_cost_usd` cost more to delegate than to run inline. `unpriced_unit_count`
+  makes `cost_usd` a floor; `unit_count: 0` on a measured run is a real answer.
 - **`cost_composition` and `output_turns`** — `cost_composition` splits `cost_usd` into uncached
   input / cache-write 5m / cache-write 1h / cache-read / output, so a "cut the cache-read carry" or
   "cut output" proposal is ranked on the term it acts on. `output_turns` is the per-turn output
@@ -169,7 +218,7 @@ Read from the JSON, in this order:
   without the flag before calling any of these the run's shape.
 - **what the round-2 disposition cost** — the extra commit and the CI cycle a fix-in-place buys
   (`prompts/review.md` → "Three-way disposition after the cap"). **The detector is a `pr` segment
-  *after* the round-2 `review` row**, corroborated by `by_invocation` in both directions
+  _after_ the round-2 `review` row**, corroborated by `by_invocation` in both directions
   (`josh git — 2 call(s)` beside a second `pr` row, or **no `josh git` row at all** for one commit).
   **Read both from uncapped output.** A second `pr` row is not proof the commit was round 2's — read
   the report's `failures` over that stretch first, since a commit repairing a red CI or gate reads
@@ -190,68 +239,60 @@ Read from the JSON, in this order:
   sum to `round_trip_count`. The same density over two differently-shaped runs has different room to
   batch, so quote the pair beside the density rather than the density alone.
 - **the price of one round trip** — `ms_per_round_trip`, with `model_ms_per_round_trip` beside it;
-  **without it the round trips cannot enter step 3's table**, which ranks by minutes and a count is
+  **without it the round trips cannot enter step 7's table**, which ranks by minutes and a count is
   not minutes. Multiply the price by the trips a change would remove. **The model share is the part
   batching actually removes.** **`usd_per_round_trip` is the same reading in money**, on the same
   denominator — so one recoverable-trip figure multiplies both. It is not a share of `elapsed_ms`
   (human wait, CI wait and the no-tool turns are outside it), so the product ranks beside `wait` and
   `ci` without double-counting; withheld, not zeroed, where there was no round trip.
-- **the spread that price is a mean of** — `gaps`, and `distribution` inside it. The price says what a
-  round trip cost *typically*; only this says whether the run was slow everywhere or slow once, and
-  the two need opposite fixes. **Read `max` and `p90` before proposing a batching change** — a flat
-  spread is one batching helps, a single long think is not. `longest` names the phase each stretch
-  was in. Withheld where no span or no tool call.
+- **the spread that price is a mean of** — `gaps`, and `distribution` inside it. Only this says
+  whether the run was slow everywhere or slow once. **Read `max` and `p90` before proposing a batching
+  change** — a flat spread is one batching helps, a single long think is not. `longest` names the
+  phase each stretch was in. Withheld where no span or no tool call.
 - **how much of the count was avoidable** — `bundles`, and `recoverable_round_trips` inside it. **Rank
   a batching proposal on this, never on floor arithmetic**, and multiply by `model_ms_per_round_trip`.
-  **`by_tool` inside it names whose trips those were**, so the tool a proposal names is read off this
-  block rather than reconstructed by hand; an **`Agent` row is the spread-apart launch series**
-  (independent subagent launches that could have fanned out in one turn). The `recoverable by tool`
-  row balances on every real run, so **a shortfall is a report defect, not a bucket of unlabelled
-  calls**. `is_measured: false` withholds it; `recoverable_round_trips: 0` on a measured run is a real
-  answer.
+  **`by_tool` inside it names whose trips those were**; an **`Agent` row is the spread-apart launch
+  series** (independent subagent launches that could have fanned out in one turn). The `recoverable by
+  tool` row balances on every real run, so **a shortfall is a report defect**. `is_measured: false`
+  withholds it; `recoverable_round_trips: 0` on a measured run is a real answer.
 - **the idle spent waiting on a delegated unit** — `delegated_wait`, read like the `CI cycles` block.
   Each row is one delegation window with its `naked` part (main line idle with one unit in flight,
   which a second lane would remove); `behind <phase>` and `parallel` are already overlapped. **Rank a
   "parallelize this delegation" proposal on the naked figure, not the window's length.**
   `not measured` is not zero, and the block is withheld entirely for a run that never delegated.
 - **the work thrown away** — `rework`. `files` names every path an `Edit` / `Write` touched with its
-  edit count and `presence` (whether it reached the merged diff — a row that "never reached the merged
-  diff" is a mid-implementation change of approach). `size` is the merged diff's `changed_file_count`
-  / `additions` / `deletions`, **without which two runs' minutes cannot be compared**. `outside_file_count`
-  is edits outside the work tree, counted apart — **never added to `dropped_count`**. Three withheld
-  states, none a zero: `is_measured: false`, `state: "refused"`, `state: "absent"`.
-- **the per-tool and per-`josh` totals** — **rank a tool by its round trips as well as its duration**:
-  a tool called thirty times one call per turn costs thirty round trips at the price above. Each
-  `by_tool` row carries `round_trip_count` beside `call_count` and `alone_in_turn_count`. **Name the
-  tool from `bundles.by_tool`, and use this table's `alone_in_turn_count` as the check on it** — the
-  two disagree by design (alone counts every solo call, the bundling block only the turns that could
-  have been one), and a proposal is sized on the smaller. `by_josh_command` carries neither count: a
-  `josh` subcommand's round trips are already the `Bash` row's. Two of the capped tables, so read
-  `notes` before saying a command is absent.
+  edit count and `presence` (whether it reached the merged diff). `size` is the merged diff's
+  `changed_file_count` / `additions` / `deletions`, **without which two runs' minutes cannot be
+  compared**. `outside_file_count` is edits outside the work tree, **never added to `dropped_count`**.
+  Three withheld states, none a zero: `is_measured: false`, `state: "refused"`, `state: "absent"`.
+- **the per-tool and per-`josh` totals** — **rank a tool by its round trips as well as its
+  duration**. Each `by_tool` row carries `round_trip_count` beside `call_count` and
+  `alone_in_turn_count`. **Name the tool from `bundles.by_tool`, and use this table's
+  `alone_in_turn_count` as the check** — the two disagree by design, and a proposal is sized on the
+  smaller. `by_josh_command` carries neither count: a `josh` subcommand's round trips are already the
+  `Bash` row's. Two of the capped tables, so read `notes` before saying a command is absent.
 - **which guard refused, how often, and what re-issuing cost** — `guard_refusals`. Each `by_guard[]`
-  row is one guard: `refusal_count`, the wall clock and `cost_usd` re-issuing cost, and
-  `same_args_reissue_count` — the false-positive hint (a refusal the run answered with the identical
-  call). **Rank by `cost_usd` and read `same_args_reissue_count` as the false-positive signal.**
-  Absent for a run that walked through no refusals; `is_cost_measured: false` prices none.
+  row is one guard: `refusal_count`, the `cost_usd` of re-issuing, and `same_args_reissue_count` (the
+  false-positive hint — a refusal answered with the identical call). **Rank by `cost_usd`.** Absent
+  where no refusal fired; `is_cost_measured: false` prices none.
 - **the entry-read documents, with re-reads** — `rows[].read_count` / `reads[]` /
-  `duplicate_cost_usd`. **A whole-document re-read at a late, large context is the waste to name** — a
-  32 KB file read twice near a run's tail is `read_count: 2` with a non-zero `duplicate_cost_usd` — so
-  rank a document by `duplicate_cost_usd`, and read `reads[].context_tokens` to say whether the re-read
-  fell where the context was largest.
+  `duplicate_cost_usd`. **A whole-document re-read at a late, large context is the waste to name**:
+  rank a document by `duplicate_cost_usd`, and read `reads[].context_tokens` to say whether the
+  re-read fell where the context was largest.
 
 **Never write a script to read the transcripts, and never restore the timings by eye** — a second
 reader is a second classification, the one thing a measurement meant to compare two runs must not
 have. If the command cannot answer, report what it printed and stop.
 
-## 2. Say whether the last speedup actually worked
+## Did the last speedup actually work?
 
 **Before judging, confirm what the run actually shipped — never from the commit title.** Read the
-merged diff's size (`rework.size`, which step 1 already read) and the Issue's completion comment, and
+merged diff's size (`rework.size`, which step 6 already read) and the Issue's completion comment, and
 say whether the run **shipped a speedup** or was **analysis only**. A run whose merged diff is a
 handful of lines, or whose completion comment reports analysis rather than a change, has no speedup to
 verify: say so and skip the phase comparison rather than inventing a verdict from the title.
 
-Re-measure the earlier run with `pnpm josh time --issue <M> --json` and compare it against step 1 on
+Re-measure the earlier run with `pnpm josh time --issue <M> --json` and compare it against step 6 on
 the phase the speedup issue named. State the verdict in one line — worked, did not, or cannot tell —
 with both figures beside it.
 
@@ -271,17 +312,21 @@ with both figures beside it.
 - **"Cannot tell" is an answer.** A phase `not detected` in either run, or a run with no merge read,
   cannot support a verdict.
 
-## 3. One ranked list — already-filed issues stay in it
+## 7. One ranked list — already-filed issues stay in it
 
-**Open the report with the three windows, then emit one table.** The header is the three lines step 1
+**Open the report with the three windows, then emit one table.** The header is the three lines step 6
 read — the run body, the pull request's open→merged, the issue's opened→closed — each with its length
-or `not measured`. It goes above the table because it is what the table's numbers are lengths *of*:
+or `not measured`. It goes above the table because it is what the table's numbers are lengths _of_:
 without it a reader cannot tell whether a five-minute saving is a quarter of the run or a fiftieth of
 the issue's life.
 
 Emit **one** table, ordered by the time each item would save per run, largest first — estimated from
-step 1's figures, not from how easy the work looks. **Every row names the window it acts on** — run
+step 6's figures, not from how easy the work looks. **Every row names the window it acts on** — run
 body, pull request, or issue — because rows against different windows do not add up.
+
+**Lead the table with the run-state findings from step 2.** A `cut_no_successor`, an `owner_stalled`,
+an `expired` run, or a stretch of whiff wakes is the largest thing a run can lose and belongs at the
+top, ranked by the idle time and the whiff dollars it cost.
 
 **A batching row names the tool, never the density.** Take it from `bundles.by_tool` — the heaviest
 row is the proposal, and its `sequence_count` says how many places in the run to look at — and size
@@ -306,17 +351,18 @@ total.** A stage carrying no row was not free (no billed request of its own insi
 whose `phase_costs.is_measured` is `false` was never priced — both take `not measured`. **The
 unattributed bucket is never spread across the rows** to make them add up.
 
+**A role or a session is a ranking row too.** A large `roles[]` share from step 3, or a costly
+`by_session[]` row from step 4 — including the stopped session, the one whose `end_state` is
+`stopped`, weighted by that session's `cost_usd` — is the work that produced no merge and ranks by its
+own dollars. A run with one session, or one that merged its first, has no such row, which is a real
+answer.
+
 **A proposal to stop delegating a step is ranked on `delegated_cost`, not on wall clock.** The
 launch's fixed cost is `per_unit_cost_usd`, and a step whose own work is cheaper than that saves money
 by staying in the main line — so the row states its saving in dollars with `—` in the minutes column.
 Where `delegated_cost.is_measured` is `false`, say so rather than ranking off a zero.
 
-**The stopped session's cost is its own row.** Where `by_session` shows a run that stopped and
-resumed, the stopped session (the one whose `end_state` is `stopped`) is a row of its own, weighted by
-that session's `cost_usd` — the work that produced no merge. A run with one session, or one that
-merged its first, has no such row, which is a real answer.
-
-**Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.**
+**Estimate the dollar saving from step 6's per-request figures, never as a share of `cost_usd`.**
 Dollars per request multiplied by the requests a change removes is a saving; a percentage of the total
 is not, because the total covers work the change leaves in place. A change that removes carried tokens
 rather than requests is ranked on the resident and history shares instead. **Where `missing` was
@@ -334,7 +380,7 @@ line — **the figures only, never a cause named from them**.
 `docs/observations.md` records observations a run made but did not file, one line each; the ones in
 the measured run's window are ranking candidates the backlog enumeration below never returns, because
 an un-filed observation has no Issue to list. Carry the lines whose window overlaps the run into the
-table as un-filed rows — step 4 files them through the scout — and say which you carried.
+table as un-filed rows — the filing section files them through the scout — and say which you carried.
 
 **Do not drop an item because it is already filed.** Avoiding duplicates means not filing a second
 issue for the same work; it does not mean leaving the work out of the ranking. **A filed but
@@ -382,17 +428,18 @@ gh api --paginate "repos/{owner}/{repo}/issues?state=open&per_page=100" \
 
 | State | What the row prints |
 | --- | --- |
-| Un-filed | The proposal, and the estimated saving. Go to step 4 |
+| Un-filed | The proposal, and the estimated saving. Go to the filing section |
 | Filed, not started | `#N`, and **the command to run next** — `fullrun #N`, or `epicrun #E` for the epic that tracks it. Never a second filing |
 | In progress | `#N` and that it is in progress. Do not propose running it again |
-| Done | The verdict from step 2 — whether it worked, with both figures |
+| Done | The verdict from the speedup section — whether it worked, with both figures |
 
 **Read the state from `pnpm josh issue:state <N> [<N> ...]`, never by parsing `gh` output yourself —
 and pass the whole table's numbers in one call.** One call per row costs a process start and a round
 trip each; one call reads them all at once.
 
-**Pass the numbers the enumeration kept**, plus any issue step 2 re-measured — that one has shipped,
-so a `state=open` listing never carries it. A row whose state was never read cannot be placed.
+**Pass the numbers the enumeration kept**, plus any issue the speedup section re-measured — that one
+has shipped, so a `state=open` listing never carries it. A row whose state was never read cannot be
+placed.
 
 ```bash
 pnpm josh issue:state 1262 1222 1176
@@ -430,7 +477,7 @@ Which epic to name for a filed row comes from `pnpm josh epic:bundle <N>`, which
 already tracks it. **Read the `epic-commands` skill before running that or any other `epic:*`
 command**, as `CLAUDE.md` requires.
 
-## 4. File only through `pnpm josh issue:scout`
+## File only through `pnpm josh issue:scout`
 
 An un-filed row is filed only after the scout has answered:
 
