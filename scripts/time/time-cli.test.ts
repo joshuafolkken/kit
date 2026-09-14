@@ -17,6 +17,8 @@ time_cli_fixture.capture_console()
 
 const SESSION = 'session-one'
 const INSTRUCTIONS_FLAG = '--instructions'
+// A project other than the process cwd, so `--path` is seen to read a directory it was not already in.
+const TARGET = '/Users/someone/Development/other-project'
 
 function prompt_line(minute: number): string {
 	return JSON.stringify({ type: 'user', timestamp: at(minute), message: { content: 'go' } })
@@ -39,14 +41,18 @@ function result_line(minute: number): string {
 	})
 }
 
-function write_session(): void {
-	const directory = path.join(time_cli_fixture.home(), cost_transcript.project_slug(CWD))
+function write_session_under(cwd: string): void {
+	const directory = path.join(time_cli_fixture.home(), cost_transcript.project_slug(cwd))
 
 	mkdirSync(directory, { recursive: true })
 	writeFileSync(
 		path.join(directory, `${SESSION}${cost_transcript.TRANSCRIPT_EXTENSION}`),
 		[prompt_line(0), call_line(1), result_line(3)].join('\n'),
 	)
+}
+
+function write_session(): void {
+	write_session_under(CWD)
 }
 
 describe('josh time registration', () => {
@@ -94,6 +100,25 @@ describe('time_cli.parse_options', () => {
 
 	it('refuses both scopes at once, which name different things', () => {
 		expect(time_cli.parse_options(['--issue', '1', '--session', 'abc'])).toBeUndefined()
+	})
+})
+
+// **`--path` says where to read, not which run** (joshuafolkken/kit#1987) — so it rides beside a
+// scope rather than instead of one, and its absence leaves the read at the process cwd.
+describe('time_cli.parse_options — the target project path', () => {
+	it('reads --path as the target project directory', () => {
+		expect(time_cli.parse_options(['--path', TARGET])).toMatchObject({ path: TARGET })
+	})
+
+	it('leaves the path unset when it is not given', () => {
+		expect(time_cli.parse_options([])?.path).toBeUndefined()
+	})
+
+	it('reads --path beside a scope rather than as a competing one', () => {
+		expect(time_cli.parse_options(['--session', 'abc', '--path', TARGET])).toMatchObject({
+			session: 'abc',
+			path: TARGET,
+		})
 	})
 })
 
@@ -302,5 +327,33 @@ describe('time_cli — the instruction-load block', () => {
 
 		expect(await time_cli.run(['--session', SESSION, INSTRUCTIONS_FLAG], CWD)).toBe(0)
 		expect(output()).toContain(time_instructions.HEADING)
+	})
+})
+
+// The point of joshuafolkken/kit#1987: from the kit checkout, `--path` aims the transcript read at
+// another project rather than at the process cwd.
+describe('time_cli.run — the target project path', () => {
+	it('reads the transcripts of the project named by --path', async () => {
+		write_session_under(TARGET)
+
+		expect(await time_cli.run(['--session', SESSION, '--path', TARGET], CWD)).toBe(0)
+		expect(output()).toContain(SESSION_SCOPE)
+	})
+
+	// Given --path, the read does not fall back to the process cwd — the target's absence is reported
+	// even though the process cwd has a transcript of its own.
+	it('does not read the process cwd when --path names another project', async () => {
+		write_session_under(CWD)
+
+		expect(await time_cli.run(['--session', SESSION, '--path', TARGET], CWD)).toBe(1)
+		expect(output()).toBe('')
+	})
+
+	// Unspecified --path keeps the former behavior: this process's own working directory.
+	it('reads the process cwd when --path is absent', async () => {
+		write_session_under(CWD)
+
+		expect(await time_cli.run(['--session', SESSION], CWD)).toBe(0)
+		expect(output()).toContain(SESSION_SCOPE)
 	})
 })
