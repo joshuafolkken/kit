@@ -39,7 +39,7 @@ completion *delivered* rather than something to remember to poll for.
 
 **A tail does follow the merge, and it is not small** (joshuafolkken/kit#1462). This section first
 gave a different reason for that last bullet — that the merge ends the run, leaving no tail to
-overlap — and the measurement says otherwise. `pnpm josh time` charges to **`post-run`** exactly what runs
+overlap — and the measurement says otherwise. The run-timing report charges to **`post-run`** exactly what runs
 after the last `followup` span ends: **3.0 min, 5.9% of a 50.5-minute run**, in the lane child
 `--issue 1599` (PR #1602); **2 min 31 s, 14% of 20m15s**, in the plain `fullrun #1597` (PR #1603);
 **3.1 min** hand-measured in run #1441's delegated child, which is where this Issue started. **What

@@ -44,14 +44,14 @@ What one invocation does, in order:
 - **Recovers the issue number from the pull request body** when the invocation named none: the `closes
   #N` keyword supplies it.
 - **Emits the run report and appends it to `.time-history.jsonl`**, on a merged run only. It measures
-  nothing of its own — the report is the same block `josh time` builds (elapsed, turns, round trips,
+  nothing of its own — the report is the same block the run-timing report builds (elapsed, turns, round trips,
   the per-round-trip cost, and the same figures against the previous recorded run). The record is
   looked up from where the run happened and appended to the durable checkout. **It cannot fail a run**:
   a history that cannot be read or written prints one line saying the measurement was unavailable,
-  names the `pnpm josh time --issue <N>` that would take it, and sends that same fact as a `warning`
+  names the per-issue timing report that would take it, and sends that same fact as a `warning`
   Telegram (⚠️). The warning is not a `failure`: the run merged, and only its measurement did not land.
   **It never fires for a history that was switched off** — `JOSH_TIME_HISTORY=0` turns the whole step
-  off. `pnpm josh time --period <days>` reads the accumulation back.
+  off. The multi-day timing report reads the accumulation back.
 
 ### The post-execution reference is in `followup-reference.md`
 

@@ -1277,6 +1277,8 @@ Two figures under one definition, which is what makes a before and an after comp
 
 ### `josh time`
 
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its report modules live under the undistributed `scripts/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
+
 Report where a run's wall clock went, read from the same transcripts `josh cost` prices and, for the part no transcript records (CI, merge), from GitHub.
 
 ```bash

@@ -1,7 +1,7 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 
 // The distribution boundary (joshuafolkken/kit#1996): the runtime analysis kit distributes —
 // everything under `time-runtime/` and `cost-runtime/`, reached by consumers through commands, hooks,
@@ -9,12 +9,9 @@ import { describe, expect, it } from 'vitest'
 // reports were split into their own directories (`time/`, `cost/`) precisely so this check is a
 // directory rule rather than an allow-list: no file the runtime statically pulls in may live there.
 //
-// Static imports only. A whole-statement `import type` is erased before it runs, and a dynamic
-// `import()` is the sanctioned escape hatch `cost-cli` uses to reach the report path, so neither
-// belongs to the runtime closure this walks.
+// The walker itself (static value-imports only, `#scripts/` and relative specifiers resolved against
+// `scripts/`) is single-sourced in `import-closure-fixture.ts` and shared with `pack-boundary.test.ts`.
 
-const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url))
-const SCRIPTS_ALIAS = '#scripts/'
 const TIME_RUNTIME = 'time-runtime'
 const COST_RUNTIME = 'cost-runtime'
 const RUNTIME_DIRS = [TIME_RUNTIME, COST_RUNTIME]
@@ -26,28 +23,6 @@ const REPORT_DIRS = ['time', 'cost']
 // closure is held to the same boundary.
 const FOLLOWUP_ENTRY = path.join(SCRIPTS_DIR, '..', 'scripts-ai', 'git-followup-finish.ts')
 const COMMAND_ENTRIES = [FOLLOWUP_ENTRY]
-
-// Every module a static value-import in `source` names. Whole-statement `import type` lines are
-// dropped first; a mixed `{ value, type X }` import still loads its module at runtime, so keeping
-// its specifier is correct. `export … from` re-exports load their module too, so they count.
-function value_import_specs(source: string): Array<string> {
-	const runtime = source.replaceAll(/import\s+type\s+[^\n]*/gu, '')
-
-	return [...runtime.matchAll(/from\s+['"]([^'"]+)['"]/gu)]
-		.map((match) => match[1])
-		.filter((spec): spec is string => spec !== undefined)
-}
-
-// A bare specifier resolved to a source file inside `scripts/`, or undefined for an external package.
-function resolve_spec(spec: string, from_file: string): string | undefined {
-	if (spec.startsWith(SCRIPTS_ALIAS)) {
-		return path.join(SCRIPTS_DIR, `${spec.slice(SCRIPTS_ALIAS.length)}.ts`)
-	}
-
-	if (spec.startsWith('.')) return `${path.resolve(path.dirname(from_file), spec)}.ts`
-
-	return undefined
-}
 
 function runtime_seed_files(): Array<string> {
 	return RUNTIME_DIRS.flatMap((directory) =>
@@ -68,38 +43,8 @@ function is_report_file(file: string): boolean {
 	return REPORT_DIRS.some((directory) => relative.startsWith(`${directory}${path.sep}`))
 }
 
-// The scripts-local files one file statically value-imports, external packages dropped.
-function imports_of(file: string): Array<string> {
-	if (!existsSync(file) || statSync(file).isDirectory()) return []
-
-	return value_import_specs(readFileSync(file, 'utf8'))
-		.map((spec) => resolve_spec(spec, file))
-		.filter((resolved): resolved is string => resolved !== undefined)
-}
-
-// The full static value-import closure of a set of seed files, walked breadth-first.
-function closure_from(seeds: ReadonlyArray<string>): Set<string> {
-	const visited = new Set<string>()
-	const queue = [...seeds]
-
-	while (queue.length > 0) {
-		const file = queue.shift()
-		if (file === undefined || visited.has(file)) continue
-
-		visited.add(file)
-		queue.push(...imports_of(file))
-	}
-
-	return visited
-}
-
-// The closure of the whole distributed surface: the runtime directories and the command entries.
-function runtime_closure(): Set<string> {
-	return closure_from(seed_files())
-}
-
 describe('the distributed runtime closure', () => {
-	const closure = runtime_closure()
+	const closure = import_closure.closure(seed_files())
 
 	it('is walked from a non-empty runtime, reaching its own foundation', () => {
 		expect(seed_files().length).toBeGreaterThan(0)
@@ -121,7 +66,7 @@ describe('the distributed runtime closure', () => {
 	it('walks the followup command entry to the recorder without reaching a report', () => {
 		expect(existsSync(FOLLOWUP_ENTRY)).toBe(true)
 
-		const followup_closure = closure_from([FOLLOWUP_ENTRY])
+		const followup_closure = import_closure.closure([FOLLOWUP_ENTRY])
 
 		expect(followup_closure.has(path.join(SCRIPTS_DIR, TIME_RUNTIME, 'time-history.ts'))).toBe(true)
 		expect([...followup_closure].filter((file) => is_report_file(file))).toEqual([])

@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { package_file, SKILL_ROOT } from './skill-fixture'
+import { package_file } from './skill-fixture'
+import { PLUGIN_SKILL_DIRECTORIES } from './sync/plugin-skill-directories'
 
 // Where the rules live, for every marker suite that checks one is present.
 //
@@ -50,6 +51,15 @@ function markdown_under(root: string): ReadonlyArray<string> {
 		.map((entry) => `${root}/${entry}`)
 }
 
+// The markdown under the distributed plugin skills only. Every skill directory lives under
+// `.claude/skills/` on disk, but a skill kit no longer ships — `diag`, kit's own run-measurement
+// skill — is not part of the surface a consumer loads, so the distribution guards must not walk it
+// (joshuafolkken/kit#1997). Deriving the set from `PLUGIN_SKILL_DIRECTORIES` keeps it single-sourced
+// with what the plugin actually distributes rather than with whatever happens to sit on disk.
+function distributed_skill_markdown(): ReadonlyArray<string> {
+	return PLUGIN_SKILL_DIRECTORIES.flatMap((directory) => markdown_under(directory))
+}
+
 // Every file that can route a reader somewhere — the rule document, every distributed skill, and
 // every markdown file under `prompts/` and `docs/`. Two suites check citations against this set and
 // each excludes a different handful from it; the *set* is what must not drift between them, since a
@@ -57,7 +67,7 @@ function markdown_under(root: string): ReadonlyArray<string> {
 function routing_documents(): ReadonlyArray<string> {
 	return [
 		...AI_DOCS,
-		...markdown_under(SKILL_ROOT),
+		...distributed_skill_markdown(),
 		...markdown_under(PROMPT_ROOT),
 		...markdown_under(DOCS_ROOT),
 	]
@@ -71,7 +81,7 @@ function routing_documents(): ReadonlyArray<string> {
 function agent_read_documents(): ReadonlyArray<string> {
 	return [
 		...AI_DOCS,
-		...markdown_under(SKILL_ROOT),
+		...distributed_skill_markdown(),
 		...markdown_under(PROMPT_ROOT),
 		...AGENT_READ_DOC,
 	].toSorted((left, right) => left.localeCompare(right))
@@ -131,14 +141,10 @@ function read_unwrapped(relative_path: string): string {
 }
 
 // Every markdown file under the distributed skills, sorted so the concatenation below is stable
-// whatever order the filesystem hands them back in.
+// whatever order the filesystem hands them back in. Derived from `PLUGIN_SKILL_DIRECTORIES`, so a
+// skill kit no longer ships (e.g. `diag`) is left out of the rule surface (joshuafolkken/kit#1997).
 function skill_documents(): ReadonlyArray<string> {
-	const entries = readdirSync(package_file(SKILL_ROOT), { encoding: 'utf8', recursive: true })
-
-	return entries
-		.filter((entry) => entry.endsWith(MARKDOWN_EXTENSION))
-		.map((entry) => `${SKILL_ROOT}/${entry}`)
-		.toSorted((left, right) => left.localeCompare(right))
+	return distributed_skill_markdown().toSorted((left, right) => left.localeCompare(right))
 }
 
 // joshuafolkken/kit#854 moved the conditional rules — the workflow procedures, the post-update

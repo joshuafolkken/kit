@@ -1292,7 +1292,7 @@ others have merged or parked, report and stop.
 Past a GitHub account's concurrency entitlement, jobs **queue** rather than fail, which could cancel out
 what the lanes bought; **`JOSH_LANE_LIMIT` lowers the ceiling with no code**. `ci.yml`'s concurrency
 group is keyed on `${{ github.ref }}`, so N lanes on N branches are N independent groups and no lane
-cancels another's run. Whether queueing bites is read from `pnpm josh time --period <days>` — a
+cancels another's run. Whether queueing bites is read from the multi-day backlog timing report — a
 `checks-wait` that grows with the lane count is the queueing.
 
 ## Audit before the first child
@@ -1678,7 +1678,7 @@ the next turn of this session costs more than the threshold in billed input, and
 explicitly so a run cannot drift it by remembering it wrong.
 
 **300,000 is a temporary experiment, not a settled number** — read it as under test. **If the total cost
-per session gets worse, retreat to the previous 150,000** (compare with `pnpm josh time`, same
+per session gets worse, retreat to the previous 150,000** (compare with the run-timing report, same
 definitions before and after: median requests per run, billed input per request, Issues finished per
 session, cuts reached). **The retreat is more than deleting this note**: enumerate every reference with
 `grep -rnE '\b300,?000\b' --include='*.md' --include='*.ts' .` (the word boundary keeps `run:wake`'s
@@ -1964,7 +1964,7 @@ or the two run side by side and the run pays for both.
 watcher can exit no more often than once an interval, so any parent call more frequent than that is a
 turn the parent woke itself for. That needs no second reading of the transcript — which matters, because
 the transcript parsing is what the `diag` skill forbids, and the re-measurement belongs to
-`pnpm josh cost` and `pnpm josh time`.
+`pnpm josh cost` and the run-timing report.
 
 **So the parent starts no wait of its own.** While something of this run's own is in flight, the next
 turn is the one the **watcher's exit delivers** — a background command's completion is what re-invokes

@@ -42,7 +42,6 @@ const JOSH_COMMANDS_CEILING_BYTES = 81_024
 // file (one in scope with no entry), so the definition cannot rot as documents are added or removed.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 5064 },
-	{ path: '.claude/skills/diag/SKILL.md', bytes: 37_660 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 32_596 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 5320 },
 	{ path: '.claude/skills/workflow-commands/SKILL.md', bytes: 62_819 },

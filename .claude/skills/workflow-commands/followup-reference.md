@@ -43,7 +43,7 @@ followup stages total:                    38.9 s
   **`checks-wait` is untouched**, which is the point — what was overlapped was never a wait.
 - **The total is the sum of the stages, not the command's whole wall clock.** What sits outside it is
   the tail the workflow script runs afterwards — the run report, the review-record clears, the hold
-  release, the next-issue listing and the version line — so a `pnpm josh time` reading of the same
+  release, the next-issue listing and the version line — so a run-timing reading of the same
   span is longer, and that gap is the tail. It is normally a second or two; a run whose record could
   not be written adds a Telegram round trip to it.
 - **What was measured is on joshuafolkken/kit#1349**, and cutting any of it is deliberately not this
