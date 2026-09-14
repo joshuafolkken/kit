@@ -289,7 +289,7 @@ Issue, not new ones.
 
 **A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary
 observations are not filed by the child at all: they go back in the summary's "Observations that
-could bite later" line (`backlogrun.md` → "What the summary carries, and how long it may be"), and the
+could bite later" line (`backlogrun-child.md` → "What the summary carries, and how long it may be"), and the
 parent files what survives — under the depth test above, and inside the run's ceiling.
 
 **A delegated child does not append to the ledger either — the parent collapses the duplicates and

@@ -57,7 +57,7 @@ say why that data does not reach it.**
 "This needs something else done first" is a different answer from "this is really several things". A
 split means the request in hand contains two or more deliverables; a prerequisite means it is still
 **one** deliverable that has another one in front of it. The prerequisite rule is `SKILL.md` → §2d, its
-single source; each entry's own branch is in `backlogrun.md` → "A prerequisite discovered mid-run" and, for
+single source; each entry's own branch is in `backlogrun-park.md` → "A prerequisite discovered mid-run" and, for
 the stopping entry points, in `fullrun.md` / `halfrun.md`.
 
 ## Two or more always means an epic
@@ -88,7 +88,7 @@ on the Issue, without asking.
 
 `backlogrun` asked for the batch's authorization, so a split found under it is filed and continued through
 rather than stopped — including when the `backlogrun` was given a bare, non-epic Issue, where the split is
-what creates the epic (`backlogrun.md` → "When `#N` is not an epic"). The assessment itself is identical;
+what creates the epic (`backlogrun-child.md` → "When `#N` is not an epic"). The assessment itself is identical;
 only what follows the answer differs.
 
 ## Finding a split mid-run stops the run

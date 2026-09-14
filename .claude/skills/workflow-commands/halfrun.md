@@ -25,7 +25,7 @@ uncommitted work; the person removes it when they are done with the tree. **A st
 clean removes the label in the same turn as `pnpm josh run:release`, with `gh api -X DELETE
 repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`** — the `cost --over` `over`
 stop, a split, a prerequisite, and a third-party target. A lane child finds the label already applied by
-the parent at dispatch (`backlogrun.md` → "Concurrency"), so re-applying it here is idempotent.
+the parent at dispatch (`backlogrun-lanes.md` → "Concurrency"), so re-applying it here is idempotent.
 
 **Ask the session boundary in the same turn as the hold, and before anything else is started** —
 `pnpm josh cost --over 300000`, exactly as `fullrun` does. `under` — carry on. `over`, or a run it could
@@ -33,13 +33,13 @@ not answer for — **stop here**, before the title is normalized and before a `n
 send a `confirmation` Telegram carrying the figure printed on standard error and the resume command (the
 invocation as it was typed, in a fresh session — `halfrun #<N>` for a `#N` entry, `halfrun new` for a
 `new` one), run `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run
-was dispatched by a batch entry point.** `backlogrun.md` → "The hand-off" is the single source of the check
+was dispatched by a batch entry point.** `backlogrun-progress.md` → "The hand-off" is the single source of the check
 and of where 300,000 comes from.
 
 **Start the progress step once the hold is claimed, and start it without being asked**, exactly as
 `fullrun` does — `pnpm josh run:progress --wait` in the background, presented in labelled form when it
 exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
-every real report. `backlogrun.md` → "Progress while the run is quiet" is the single source, including
+every real report. `backlogrun-progress.md` → "Progress while the run is quiet" is the single source, including
 that this command's stop before commit keeps `in-progress` on and so has to end the watcher itself.
 
 **Read Issue `#N` and every comment on it before implementing** — `pnpm josh issue:read <N>`. A
@@ -66,7 +66,7 @@ three-way distinction, the `route:tier-a` filing command and the filing ceiling 
 the single source; what follows is this entry's branch. Typing `halfrun` approved implementing **one**
 Issue and stopping for manual verification — it never authorized a commit, a push or a merge; a batch
 is a different authorization again, so the stop stays. Inside a `backlogrun` the same discovery is
-recorded as a dependency and **not** parked (`backlogrun.md` → "A prerequisite discovered mid-run"). The
+recorded as a dependency and **not** parked (`backlogrun-park.md` → "A prerequisite discovered mid-run"). The
 procedure, in order:
 
 1. **File the prerequisite `#<P>` without asking** (Tier A, first-party), tagging it `route:tier-a`. It

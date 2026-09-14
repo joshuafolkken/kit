@@ -8,6 +8,7 @@ import { read_set_cli } from './read-set-cli'
 const ROOT = process.cwd()
 const SUCCESS = 0
 const BACKLOGRUN_DOC = 'backlogrun.md'
+const PROGRESS_DOC = 'backlogrun-progress.md'
 const HAND_OFF = 'The hand-off'
 const BACKLOGRUN = 'backlogrun'
 const NO_SUCH_DOC = 'no-such-doc.md'
@@ -39,16 +40,16 @@ function captured(act: () => number): Captured {
 
 describe('josh doc:section', () => {
 	it('prints the named section of a sibling workflow document', () => {
-		const { code, out } = captured(() => document_section_cli.run([BACKLOGRUN_DOC, HAND_OFF]))
+		const { code, out } = captured(() => document_section_cli.run([PROGRESS_DOC, HAND_OFF]))
 
 		expect(code).toBe(SUCCESS)
 		expect(out).toContain(`## ${HAND_OFF}`)
-		expect(out).not.toContain('## Stopping conditions')
+		expect(out).not.toContain('## Waiting, and never waiting forever')
 	})
 
 	it('refuses a heading the document does not have, and lists what it does', () => {
 		const { code, err } = captured(() =>
-			document_section_cli.run([BACKLOGRUN_DOC, 'No Such Heading']),
+			document_section_cli.run([PROGRESS_DOC, 'No Such Heading']),
 		)
 
 		expect(code).toBe(document_section_cli.FAILURE_EXIT_CODE)

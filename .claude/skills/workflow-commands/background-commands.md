@@ -61,14 +61,14 @@ merge result?**
   comment's counter *values* (children run, Issues filed, consecutive failures, the run's start time)
   are all counted inside the run, and the completion report body is already
   placed beside `pnpm josh git -y` in the table below. **Only the write follows the merge.** The
-  comment exists because a compaction takes the counters at a moment nobody chooses (`backlogrun.md` →
+  comment exists because a compaction takes the counters at a moment nobody chooses (`backlogrun-progress.md` →
   "The counters live in the conversation"), so composing the values earlier moves no write and loses
   no counter.
 - **`pnpm josh cost --over 300000` stays after the merge, and reads nothing from it.** It measures
   this session's own transcript, so the question above would bring it forward — but its answer grows
   with the session, and asking it a call early under-reads the very number the hand-off is decided
   on. It is seconds of tail against a guard on session size, so it keeps its documented seam
-  (`backlogrun.md` → "The check is asked at every merge").
+  (`backlogrun-progress.md` → "The check is asked at every merge").
 
 **What runs beside a backgrounded command is the work that writes nothing to the working tree.** That
 is the whole test, and it is the same one that lets the gate and the review overlap (`SKILL.md` →
@@ -99,4 +99,4 @@ turn-end this section forbids. The boundary, its two commands and the resume ver
 `pre-gate-cut.md` skill document, its single source.
 
 This section is the single source of the rule. `followup.md`, `chain-rule.md` and
-`backlogrun.md` → "Progress while the run is quiet" route here for it rather than restating it.
+`backlogrun-progress.md` → "Progress while the run is quiet" route here for it rather than restating it.

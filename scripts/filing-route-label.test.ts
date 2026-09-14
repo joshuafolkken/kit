@@ -82,13 +82,16 @@ describe('every filing route labels the issue it creates', () => {
 // The it.each case name shared by the two label-mention suites below.
 const NAMES_LABEL_CASE = '$doc names $label'
 const OPERATIONAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [
-	`${SKILL_ROOT}/fullrun.md`,
-	`${SKILL_ROOT}/halfrun.md`,
-	`${SKILL_ROOT}/backlogrun.md`,
-].flatMap((document_) => [
-	{ doc: document_, label: SPLIT_ROUTE_LABEL },
-	{ doc: document_, label: TIER_A_ROUTE_LABEL },
-])
+	...[`${SKILL_ROOT}/fullrun.md`, `${SKILL_ROOT}/halfrun.md`].flatMap((document_) => [
+		{ doc: document_, label: SPLIT_ROUTE_LABEL },
+		{ doc: document_, label: TIER_A_ROUTE_LABEL },
+	]),
+	// joshuafolkken/kit#2010 split `backlogrun.md` into point-of-use phase documents, moving its
+	// mid-run filing prose off the entry file: the split-child filing to `backlogrun-child.md` and the
+	// prerequisite filing to `backlogrun-park.md`, so each label is pinned where its command now lives.
+	{ doc: `${SKILL_ROOT}/backlogrun-child.md`, label: SPLIT_ROUTE_LABEL },
+	{ doc: `${SKILL_ROOT}/backlogrun-park.md`, label: TIER_A_ROUTE_LABEL },
+]
 
 describe('the workflow-command filing copies name their route label', () => {
 	it.each(OPERATIONAL_FILING_DOCS)(NAMES_LABEL_CASE, ({ doc, label }) => {

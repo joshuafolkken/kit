@@ -34,7 +34,7 @@ its own (joshuafolkken/kit#1965): **`backlogrun` does it at the start of every r
 **A decision is still recorded in two places, and one without the other loses half of it.** The epic's
 `## Decisions` log carries the decision; a comment on each child it applies to carries the reasoning
 for that child's reader. **Recording a decision removes that child's `needs-decision` label** (Tier A);
-the label-clearing rule itself is `backlogrun.md` → "park and continue".
+the label-clearing rule itself is `backlogrun-park.md` → "park and continue".
 
 - **A decision taken *as* a child joins the epic** goes through `pnpm josh epic --add … --decision-file`
   — the `epic:bundle` section below is that flag's single source, and it writes both halves at once.

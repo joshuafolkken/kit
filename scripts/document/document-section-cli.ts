@@ -8,9 +8,9 @@ import { entry_read_set } from './entry-read-set'
 // `josh doc:section` — print one section of a markdown document (joshuafolkken/kit#1776).
 //
 // **It exists because the documents already cite each other by section and the reader could only
-// fetch files.** `` `backlogrun.md` → "The hand-off" `` names 249 lines; opening `backlogrun.md` costs
-// 2,121. Every entry point pays that difference at the moment it starts, before anything has been
-// implemented.
+// fetch files.** `` `backlogrun-progress.md` → "The hand-off" `` names 249 lines; opening
+// `backlogrun-progress.md` costs far more. Every entry point pays that difference at the moment it
+// starts, before anything has been implemented.
 //
 // **What it is not is a summary.** The section is printed verbatim, headings and all, so a run that
 // reads a section has read the same words a run that opened the file would have. Nothing is deferred

@@ -1,16 +1,17 @@
 import { read_repo_file } from './ai-document-fixture'
 
-// The numbered loop in `.claude/skills/workflow-commands/backlogrun.md` — "Running a named epic's
-// children", folded in from the removed `epicrun.md` (joshuafolkken/kit#1985) — is where a rule has to
-// be written to be reached. A rule stated only in the prose section that argues it is a rule a reader
-// working through the steps never meets, so two suites slice the loop's per-child step out and assert
-// against that slice rather than against the whole file.
+// The numbered loop in `.claude/skills/workflow-commands/backlogrun-progress.md` — "Running a named
+// epic's children", folded in from the removed `epicrun.md` (joshuafolkken/kit#1985) and moved out of
+// `backlogrun.md` when it was split into point-of-use phase documents (joshuafolkken/kit#2010) — is
+// where a rule has to be written to be reached. A rule stated only in the prose section that argues it
+// is a rule a reader working through the steps never meets, so two suites slice the loop's per-child
+// step out and assert against that slice rather than against the whole file.
 //
 // It lives here because both of them need the same three lines (joshuafolkken/kit#1212). Written
 // twice, a renamed step heading would take one suite green and leave the other asserting against an
 // empty string — which passes every `not.toContain` in it.
 
-const BACKLOG_EPIC_SKILL = '.claude/skills/workflow-commands/backlogrun.md'
+const BACKLOG_EPIC_SKILL = '.claude/skills/workflow-commands/backlogrun-progress.md'
 
 const LOOP_START = '1. Run the command above.'
 const NEXT_STEP = '3. '

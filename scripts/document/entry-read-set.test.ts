@@ -9,9 +9,11 @@ import { entry_read_set } from './entry-read-set'
 // these against itself and say nothing about the documents.
 
 const ROOT = process.cwd()
-// `fullrun` reads its own file, `split-assessment.md` and the skill; it cites `backlogrun.md` at more
-// than one out-of-set section ("The hand-off", "Progress while the run is quiet"), so it exercises the
-// section-saving measurement the removed `queue` entry used to (joshuafolkken/kit#1984).
+// `fullrun` reads its own file, `split-assessment.md` and the skill; it cites `followup-reference.md`
+// at one out-of-set section ("When `pnpm josh release` runs"), so it exercises the section-saving
+// measurement — reading that section rather than the whole file it sits in. (Before
+// joshuafolkken/kit#2010 it cited `backlogrun.md`'s "The hand-off" and "Progress while the run is
+// quiet"; that content moved to `backlogrun`'s point-of-use phase documents, which are not counted.)
 const SECTION_CITER = 'fullrun'
 const BACKLOGRUN = 'backlogrun.md'
 const CHAIN_RULE = 'chain-rule.md'
@@ -146,7 +148,9 @@ describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkk
 describe('entry_read_set.read_set — which sections', () => {
 	it('collects the sections its own documents point at, out of the set', () => {
 		expect(entry_read_set.read_set(ROOT, SECTION_CITER).sections).toEqual(
-			expect.arrayContaining([{ file: BACKLOGRUN, heading: 'The hand-off' }]),
+			expect.arrayContaining([
+				{ file: 'followup-reference.md', heading: 'When `pnpm josh release` runs' },
+			]),
 		)
 	})
 
@@ -208,14 +212,14 @@ describe('entry_read_set.costed', () => {
 		)
 	})
 
-	// **A file cited at non-adjacent sections fabricates no boundary token** (joshuafolkken/kit#1934).
-	// The fullrun entry cites disjoint, non-adjacent `backlogrun.md` sections; costing their union by
-	// joining the skipped-gap lines into one string fabricated a token at every gap, drifting `scoped`
-	// a token above the per-reference sum and printing a false negative saving. Costed as contiguous
-	// runs instead, the deduped figure equals the per-reference sum exactly — none of these references
-	// overlaps, so no line is dropped and none is fabricated. A regression to the join would break the
-	// equality upward, which the `<=` guard above would also catch; this pins the exact expected value.
-	it('fabricates no boundary token for a file cited at non-adjacent sections', () => {
+	// **A file's cited sections fabricate no boundary token** (joshuafolkken/kit#1934). Costing a
+	// file's cited sections by joining the skipped-gap lines into one string fabricated a token at
+	// every gap, drifting `scoped` a token above the per-reference sum and printing a false negative
+	// saving. Costed as contiguous runs instead, the deduped figure equals the per-reference sum
+	// exactly. A regression to the join would break the equality upward, which the `<=` guard above
+	// would also catch; this pins the exact expected value. (Before joshuafolkken/kit#2010 the fullrun
+	// entry cited two non-adjacent `backlogrun.md` sections, which exercised the gap directly.)
+	it('fabricates no boundary token for a file cited at its sections', () => {
 		const report = entry_read_set.costed(ROOT, SECTION_CITER)
 		const per_reference = entry_read_set.total(report.sections.map((section) => section.cost))
 		const own = entry_read_set.total(report.files.map((file) => file.cost))
