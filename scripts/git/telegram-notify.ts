@@ -1,4 +1,4 @@
-import { gh_spawn } from '#scripts/gh-spawn'
+import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { z } from 'zod'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org'

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
+import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 

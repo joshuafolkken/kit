@@ -3,7 +3,7 @@ import { create_version_command_config, derive_versions_endpoint } from './versi
 
 const KIT = '@joshuafolkken/kit'
 const KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/kit/versions?per_page=1'
-const KIT_FIX_PATH = 'node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
+const KIT_FIX_PATH = 'node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts'
 const APP_KIT = '@joshuafolkken/app-kit'
 const APP_KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/app-kit/versions?per_page=1'
 const GAME_KIT = '@joshuafolkken/game-kit'

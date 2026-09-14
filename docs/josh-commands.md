@@ -56,12 +56,12 @@ pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
 Print how many code lines a file has against the `max-lines` limit and how many remain — so splitting is decided before writing.
 
 ```bash
-pnpm josh lines scripts/format-edited-file.ts scripts/josh/josh-logic.ts  # alias: josh ln
+pnpm josh lines scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts  # alias: josh ln
 ```
 
 ```
 limit 300 code lines · near from 255
-scripts/format-edited-file.ts  230/300 code lines (76%), 70 to spare
+scripts/hooks/format-edited-file.ts  230/300 code lines (76%), 70 to spare
 ```
 
 - Count is lint's own (`skipBlankLines` / `skipComments`); `near from` marks 85%. Never fails on a large file — a non-zero exit means the argument list was unusable.

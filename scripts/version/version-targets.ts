@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { package_version_schema, pnpm_ls_global_schema } from '#scripts/schemas'
+import { package_version_schema, pnpm_ls_global_schema } from '#scripts/lib/schemas'
 import { execaSync } from 'execa'
 import { safe_json_parse } from './parse-json'
 

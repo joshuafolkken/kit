@@ -1,4 +1,4 @@
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 import { time_instant } from '#scripts/time-runtime/time-instant'
 import { z } from 'zod'
 import { time_github, type GhReader } from './time-github'

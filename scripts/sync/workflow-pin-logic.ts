@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 import { package_path } from '#scripts/init/init-paths'
-import { is_workflow_destination } from '#scripts/workflow-destination'
 
 // .github/workflows is the single source of truth for action SHA pins. The
 // distributed templates/workflows/* intentionally diverge in structure (steps,

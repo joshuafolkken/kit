@@ -1,6 +1,6 @@
 import { rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { gate_skip } from '#scripts/gate-skip'
+import { gate_skip } from '#scripts/gate/gate-skip'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'

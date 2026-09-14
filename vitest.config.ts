@@ -18,7 +18,7 @@ export default defineConfig({
 		// A unit test that reaches GitHub fails on someone else's latency rather than on the code under
 		// test. The guard puts a recording `gh` in front of the real one and fails the run if anything
 		// spawned it (joshuafolkken/kit#1353).
-		globalSetup: ['./scripts/test-network-guard.ts'],
+		globalSetup: ['./scripts/test/test-network-guard.ts'],
 		coverage: {
 			provider: 'v8',
 		},

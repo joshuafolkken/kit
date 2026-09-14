@@ -48,4 +48,4 @@
 See `prompts/collaboration-workflow/upstream-interrupt.md`.
 ```
 
-`scripts/collaboration-prompt-split.test.ts` が、文書と skill が指すファイルの実在と、この索引が全ファイルを列挙していることを検査する。
+`scripts/claude/collaboration-prompt-split.test.ts` が、文書と skill が指すファイルの実在と、この索引が全ファイルを列挙していることを検査する。

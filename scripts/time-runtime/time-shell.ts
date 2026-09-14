@@ -1,6 +1,6 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { canonical_command } from '#scripts/josh/josh-command-map'
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 
 // Reading a shell command well enough to name what it ran (joshuafolkken/kit#1344).
 //

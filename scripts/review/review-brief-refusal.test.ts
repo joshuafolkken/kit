@@ -1,6 +1,6 @@
+import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
-import { scoped_green } from '#scripts/scoped-green'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_brief_cli } from './review-brief-cli'
 import { review_tree } from './review-tree'
@@ -21,7 +21,7 @@ import { review_tree } from './review-tree'
 // the second writer joshuafolkken/kit#1441 and joshuafolkken/kit#1437 both closed. That path is
 // unchanged by this issue, and `review-round1-snapshot.test.ts` is where it is pinned.
 
-vi.mock('#scripts/scoped-green', () => ({ scoped_green: { refusal_for: vi.fn() } }))
+vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { refusal_for: vi.fn() } }))
 vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { change_base: vi.fn() } }))
@@ -36,7 +36,7 @@ const REFUSAL = '⛔ scoped checks not green on this tree: run them and reissue'
 const REFUSED_EXIT_CODE = 1
 const NO_ARGUMENTS: ReadonlyArray<string> = []
 const RESOLVED_COMMIT = 'a22b347965292713d70daff6e2b948dc7009a265'
-const CHANGED_FILE = 'scripts/scoped-green.ts'
+const CHANGED_FILE = 'scripts/gate/scoped-green.ts'
 const CHANGED_TREE = { [CHANGED_FILE]: 'digest' }
 
 beforeEach(() => {

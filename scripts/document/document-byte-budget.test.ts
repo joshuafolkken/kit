@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs'
-import { agent_read_documents } from '#scripts/ai-document-fixture'
-import { package_file } from '#scripts/skill-fixture'
+import { package_file } from '#scripts/claude/skill-fixture'
 import { describe, expect, it } from 'vitest'
+import { agent_read_documents } from './ai-document-fixture'
 import { document_byte_budget } from './document-byte-budget'
 
 const {

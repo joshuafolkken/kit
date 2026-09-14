@@ -1,0 +1,199 @@
+import path from 'node:path'
+import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
+import { describe, expect, it } from 'vitest'
+
+interface LefthookCommand {
+	run?: string
+	glob?: string
+}
+
+interface LefthookSetupInstruction {
+	run?: string
+}
+
+interface LefthookHook {
+	parallel?: boolean
+	setup?: ReadonlyArray<LefthookSetupInstruction>
+	commands?: Record<string, LefthookCommand>
+}
+
+type LefthookConfig = Record<string, LefthookHook>
+
+interface LefthookExtends {
+	extends?: ReadonlyArray<string>
+}
+
+const BASE_LEFTHOOK = path.join('lefthook', 'base.yml')
+const VANILLA_LEFTHOOK = path.join('lefthook', 'vanilla.yml')
+const PRE_COMMIT = 'pre-commit'
+const PRE_PUSH = 'pre-push'
+const CSPELL = 'cspell'
+const SECRETLINT = 'secretlint'
+const TYPE_CHECK = 'type-check'
+// Both hooks make the same claim about the same record (kit#1334, kit#1381), so both say it the same
+// way — a reader scanning the suite for "which layers reuse the gate's result" finds one phrase.
+const DELEGATES_TO_WRAPPER = 'delegates to the josh wrapper that can reuse a recorded green gate'
+// lefthook resolves a nested `extends` from the consumer git root, so kit presets must reference
+// base by this root-relative node_modules path — not the file-relative `./base.yml` that lefthook
+// silently drops in consumers (kit#629).
+const ROOT_RELATIVE_BASE = 'node_modules/@joshuafolkken/kit/lefthook/base.yml'
+const FILE_RELATIVE_BASE = './base.yml'
+
+function load_config(relative_path: string): LefthookConfig {
+	return yaml_config_fixture.load_yaml_config(relative_path) as LefthookConfig
+}
+
+const PRE_PUSH_HOOK = load_config(BASE_LEFTHOOK)[PRE_PUSH]
+
+function load_extends(relative_path: string): ReadonlyArray<string> {
+	const parsed = yaml_config_fixture.load_yaml_config(relative_path) as LefthookExtends
+
+	return parsed.extends ?? []
+}
+
+function load_pre_commit_command(
+	relative_path: string,
+	command_name: string,
+): LefthookCommand | undefined {
+	return load_config(relative_path)[PRE_COMMIT]?.commands?.[command_name]
+}
+
+function load_cspell_command(relative_path: string): LefthookCommand | undefined {
+	return load_pre_commit_command(relative_path, CSPELL)
+}
+
+describe('lefthook/base.yml pre-commit cspell glob', () => {
+	const cspell = load_cspell_command(BASE_LEFTHOOK)
+
+	it('defines a cspell pre-commit command', () => {
+		expect(cspell).toBeDefined()
+	})
+
+	it('includes .properties so kit-generated sonar-project.properties is checked locally like CI', () => {
+		expect(cspell?.glob).toContain('properties')
+	})
+})
+
+describe('lefthook/base.yml pre-commit secretlint command', () => {
+	const secretlint = load_pre_commit_command(BASE_LEFTHOOK, SECRETLINT)
+	const run = secretlint?.run ?? ''
+
+	it('defines a secretlint pre-commit command', () => {
+		expect(secretlint).toBeDefined()
+	})
+
+	// Scanning the whole tree on every commit would be slow enough that contributors
+	// disable the hook, which is the failure mode this check exists to prevent.
+	it('scans only the staged files', () => {
+		expect(run).toContain('{staged_files}')
+	})
+
+	// secretlint resolves from the consumer project, so a kit upgrade activates this hook
+	// before `josh sync` + `pnpm install` provisions the binary. A bare `pnpm exec secretlint`
+	// hard-fails in that window and blocks every commit (kit#695); the wrapper skips instead.
+	// The CLI flags moved with it — they are asserted in scripts/security/secretlint-scan.test.ts.
+	it('delegates to the josh wrapper instead of invoking the binary directly', () => {
+		expect(run).toContain('josh secretlint-scan')
+	})
+
+	it('does not invoke secretlint through a bare pnpm exec', () => {
+		expect(run).not.toContain('pnpm exec secretlint')
+	})
+
+	// An unscoped glob would make secretlint scan files unrelated to the commit.
+	it('does not restrict the command with a glob filter', () => {
+		expect(secretlint?.glob).toBeUndefined()
+	})
+})
+
+describe('lefthook/base.yml pre-push dependency barrier (kit#813)', () => {
+	const setup = PRE_PUSH_HOOK?.setup ?? []
+
+	// Every pre-push command runs through pnpm, which re-syncs node_modules before running when
+	// package.json drifted — which `josh bump` guarantees on ~every push. Concurrently, that
+	// rewrites node_modules/.bin underneath the tests already reading from it.
+	it('syncs dependencies before the parallel commands start', () => {
+		expect(setup[0]?.run).toContain('pnpm install')
+	})
+
+	// A second entry would run after the install and race nothing, but it would also make the
+	// barrier's single-purpose contract ambiguous for the next reader.
+	it('declares the barrier as the only setup instruction', () => {
+		expect(setup).toHaveLength(1)
+	})
+
+	// `--ignore-scripts` would make the barrier faster and silently skip the build scripts of the
+	// packages in allowBuilds, leaving native binaries missing while pnpm still records the tree
+	// as synced — so the commands would not repair it either.
+	it('does not skip the build scripts the barrier is meant to settle', () => {
+		expect(setup[0]?.run).not.toContain('--ignore-scripts')
+	})
+})
+
+// kit#1334: the hook ran the whole unit suite 40 seconds after `josh gate` had printed it green on
+// the same tree. The wrapper is what can read that record; a bare `vitest run` has nothing to read
+// it with, which is the state this pair of assertions exists to keep the config out of.
+describe('lefthook/base.yml pre-push unit command (kit#1334)', () => {
+	const test_unit = PRE_PUSH_HOOK?.commands?.['test-unit']
+	const run = test_unit?.run ?? ''
+
+	it('defines a test-unit pre-push command', () => {
+		expect(test_unit).toBeDefined()
+	})
+
+	it(DELEGATES_TO_WRAPPER, () => {
+		expect(run).toContain('josh pre-push-unit')
+	})
+
+	it('does not invoke vitest through a bare pnpm exec', () => {
+		expect(run).not.toContain('pnpm exec vitest')
+	})
+})
+
+// kit#1381: the hook type-checked the whole project seconds after `josh gate` had printed the same
+// project-wide type check green on the same tree. The wrapper is what can read that record; a bare
+// `pnpm exec tsc` has nothing to read it with. The glob is asserted too, because dropping it would
+// run the whole project type check on a commit that touches no TypeScript at all.
+describe('lefthook/base.yml pre-commit type-check command (kit#1381)', () => {
+	const type_check = load_pre_commit_command(BASE_LEFTHOOK, TYPE_CHECK)
+	const run = type_check?.run ?? ''
+
+	it('defines a type-check pre-commit command', () => {
+		expect(type_check).toBeDefined()
+	})
+
+	it(DELEGATES_TO_WRAPPER, () => {
+		expect(run).toContain('josh pre-commit-type-check')
+	})
+
+	it('does not invoke tsc through a bare pnpm exec', () => {
+		expect(run).not.toContain('pnpm exec tsc')
+	})
+
+	it('stays scoped to the file types a type check can be about', () => {
+		expect(type_check?.glob).toContain('ts')
+	})
+})
+
+describe('lefthook/base.yml pre-push parallel (kit#676)', () => {
+	// Enabled in kit#676 after auditing every active consumer: each has at most one
+	// preview-owning pre-push command (app-kit's unified `verify`, or a single `test-e2e`),
+	// so nothing collides on the fixed preview port. Revert to false only if a consumer
+	// reintroduces 2+ colliding preview-owning commands. This assertion guards that decision
+	// against an accidental flip back.
+	it('runs pre-push commands in parallel', () => {
+		expect(PRE_PUSH_HOOK?.parallel).toBe(true)
+	})
+})
+
+describe('lefthook/vanilla.yml base extends resolution (kit#629)', () => {
+	const extends_list = load_extends(VANILLA_LEFTHOOK)
+
+	it('references kit base by a root-relative node_modules path so it resolves in consumers', () => {
+		expect(extends_list).toContain(ROOT_RELATIVE_BASE)
+	})
+
+	it('does not use the file-relative ./base.yml form that lefthook silently drops in consumers', () => {
+		expect(extends_list).not.toContain(FILE_RELATIVE_BASE)
+	})
+})

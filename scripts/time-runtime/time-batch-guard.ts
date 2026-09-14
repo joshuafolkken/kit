@@ -58,7 +58,7 @@ import { time_transcript_line } from './time-transcript-line'
 // window) silences the guard permanently once the window passes the last refusal.
 //
 // **And the caller must fail toward allowing.** With no instant on record every sequence looks new, so
-// a caller that cannot record the refusal must not make it. `scripts/batch-guard.ts` states that half.
+// a caller that cannot record the refusal must not make it. `scripts/hooks/batch-guard.ts` states that half.
 
 // How many consecutive single-call turns are allowed before one is refused. **Three, from the
 // measurement rather than from taste**: joshuafolkken/kit#1344 found the longest bundleable sequence

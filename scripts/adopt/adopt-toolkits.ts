@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { find_local_bin_upwards } from '#scripts/local-bin'
+import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import type { Release } from '#scripts/propagate/propagate-steps'
 import { propagate_targets, type Manifest } from '#scripts/propagate/propagate-targets'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
@@ -61,7 +61,7 @@ function declared_toolkits(project_root: string): ReadonlyArray<string> {
 }
 
 // npm accepts two shapes for `bin`. The string form names exactly one executable and its name is the
-// package's *unscoped* one — the rule `read_bin_entry` in `scripts/local-bin.ts` reads in the other
+// package's *unscoped* one — the rule `read_bin_entry` in `scripts/build/local-bin.ts` reads in the other
 // direction, from a name to a path. The object form is answered by that same unscoped name where it
 // declares one, so a toolkit shipping several CLIs still resolves to one deterministically.
 function pick_bin_name(package_name: string, bin: string | Record<string, string>): string {

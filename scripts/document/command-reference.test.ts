@@ -1,6 +1,6 @@
-import { all_documents, read_document } from '#scripts/ai-document-fixture'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
+import { all_documents, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
 
 // Every `pnpm josh <x>` a document names in a code span has to be a real command. A per-rule marker

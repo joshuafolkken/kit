@@ -4,7 +4,7 @@ import {
 	DISTRIBUTED_SKILL_FILE,
 	DISTRIBUTED_SYNC_ARTIFACT,
 	SIBLING_DIRECTORY_FILE,
-} from '#scripts/managed-config-fixture'
+} from '#scripts/managed-marker/managed-config-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
 	AI_COPY_FILE_MAPPINGS_LIST,

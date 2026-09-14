@@ -1,4 +1,4 @@
-import { is_workflow_destination } from '#scripts/workflow-destination'
+import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 
 // Which package overwrites a given workflow is a question only that package can answer, and the
 // answer has to survive being copied on: a consumer of a consumer receives `ci.yml` from kit and

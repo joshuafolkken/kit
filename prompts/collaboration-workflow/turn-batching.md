@@ -108,7 +108,7 @@ Round trips:
 
 ## マーカーテスト
 
-`scripts/turn-batching-rule.test.ts` が次を固定する。
+`scripts/rules/turn-batching-rule.test.ts` が次を固定する。
 
 - 配送文が規則のトリガ文と判断基準の一文を運んでいること
 - 配送文の指し先が `CLAUDE.md` ではなくこのファイルであること（規則が常駐していない以上、`CLAUDE.md` を指す参照は何も指していない）

@@ -1,5 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { shell_segments } from './shell-segments'

@@ -41,14 +41,14 @@ describe('git_status.list_untracked_files', () => {
 	it('extracts paths from "?? " porcelain lines and ignores other states', () => {
 		const status_output = [
 			' M scripts/git/git-staging.ts',
-			'?? scripts/claude-settings.test.ts',
+			'?? scripts/claude/claude-settings.test.ts',
 			'A  src/lib/new-thing.ts',
 			'?? .claude/scheduled_tasks.lock',
 			'MM existing.ts',
 		].join('\n')
 
 		expect(git_status.list_untracked_files(status_output)).toStrictEqual([
-			'scripts/claude-settings.test.ts',
+			'scripts/claude/claude-settings.test.ts',
 			'.claude/scheduled_tasks.lock',
 		])
 	})

@@ -1,6 +1,6 @@
 ## 常駐ドキュメントと skill の分担（何を常駐に残すか）
 
-`CLAUDE.md` は毎ターン全文が読み込まれる。したがって常駐に書ける量は有限で、`scripts/workflow-skills.test.ts` の `RESIDENT_CEILING_BYTES` がその上限を固定している。**どの規則を常駐に残すかは、書き手の重要度判断ではなく次の 1 問で決める。**
+`CLAUDE.md` は毎ターン全文が読み込まれる。したがって常駐に書ける量は有限で、`scripts/claude/workflow-skills.test.ts` の `RESIDENT_CEILING_BYTES` がその上限を固定している。**どの規則を常駐に残すかは、書き手の重要度判断ではなく次の 1 問で決める。**
 
 > **その規則が効き始める瞬間を、1 件のツール呼び出しとして名指しできるか。**
 
@@ -18,7 +18,7 @@
 
 **範囲の外にある常駐規則はこの一覧に載らないのが正常である。** 命名規約、品質上限、Code Change Rules、Package-First などには移す先が存在せず、判定基準が問う「skill がロードされていないターンでも効くか」という問い自体が成り立たない。一覧に無いことは欠落ではない（joshuafolkken/kit#955）。
 
-範囲の中で常駐に残る規則は次で全部であり、いずれも `CLAUDE.md` に残っていることをマーカーテストが表明している（大半は `scripts/workflow-skills.test.ts`、UI 検証ゲートは `scripts/verify-ui-skill.test.ts`、後追い起票は `scripts/document/document-markers.test.ts`、ファイル編集の禁止は `scripts/document/document-markers.test.ts`）。**引き金つき配送へ移した規則は、常駐にあることではなく発火することで固定される** — ターン内バッチングは `scripts/turn-batching-rule.test.ts`、WIP 上限は `scripts/backlog-manufacturing-rule.test.ts`、機構そのものは `scripts/rules/delivered-rules.test.ts` である。
+範囲の中で常駐に残る規則は次で全部であり、いずれも `CLAUDE.md` に残っていることをマーカーテストが表明している（大半は `scripts/claude/workflow-skills.test.ts`、UI 検証ゲートは `scripts/claude/verify-ui-skill.test.ts`、後追い起票は `scripts/document/document-markers.test.ts`、ファイル編集の禁止は `scripts/document/document-markers.test.ts`）。**引き金つき配送へ移した規則は、常駐にあることではなく発火することで固定される** — ターン内バッチングは `scripts/rules/turn-batching-rule.test.ts`、WIP 上限は `scripts/backlog/backlog-manufacturing-rule.test.ts`、機構そのものは `scripts/rules/delivered-rules.test.ts` である。
 
 - **明示起動の必須**（「指示されていない行動は取らない」）— そもそもワークフローを開始してよいかを決める規則なので、ユーザーがキーワードを打った瞬間、つまり skill を読むより前に効く必要がある
 - **停止時の `confirmation` 通知** — これを要する停止の大半（別パッケージ起因の割り込み、Tier C の確認）は、ワークフローのキーワードが一度も打たれていないターンで起きる
@@ -56,7 +56,7 @@ no になり skill 側に本体を置くものの例:
 
 **話題ファイル自体は残す。** 索引（`prompts/collaboration-workflow.md`）は全話題ファイルを列挙しており、正典を人が読むときの入口はそこにある。指し先になった話題ファイルは「本文がどこへ行ったか」の記録として索引から辿られるものであり、他の文書からの引用で辿られるものではない。例外は単一ソースである skill 自身で、自分の指し先を名指すのは逆向きの参照だから 2 回読みを生まない。
 
-`scripts/pointer-citation-document-rule.test.ts` がこれを固定する。**縮小した話題ファイルは冒頭に「この規則の単一ソースは …」の宣言文を置くこと** — 検査はこの宣言文で指し先を機械的に検出し、そこに書かれた skill が実在すること、および他の文書がその話題ファイルを引用していないことを確かめる。宣言文が入口なので、横展開で新しく縮小された話題も、この規則の対象へ自動で入る。
+`scripts/rules/pointer-citation-document-rule.test.ts` がこれを固定する。**縮小した話題ファイルは冒頭に「この規則の単一ソースは …」の宣言文を置くこと** — 検査はこの宣言文で指し先を機械的に検出し、そこに書かれた skill が実在すること、および他の文書がその話題ファイルを引用していないことを確かめる。宣言文が入口なので、横展開で新しく縮小された話題も、この規則の対象へ自動で入る。
 
 **この基準は努力目標ではない。** 常駐に手順を書き戻すと、その分の予算を次に本当に常駐が要る規則が既存の文章から取り返すことになる。上限に張り付いた状態で 1 文を足すために別の文を削ると、**削る対象はマーカーで固定されていなかった箇所から選ばれる** — 規則の重要度ではなく、テストに拾われていなかったかどうかで残る文が決まる（joshuafolkken/kit#951）。上限そのものを引き上げる対処は、上限が防いでいる状態の追認にあたるので採らない。
 
@@ -72,7 +72,7 @@ no になり skill 側に本体を置くものの例:
 
 **非対称なリスクがあるので、迷ったら回収を選ぶ。** 回収を選んで足りなかった場合の損失は「もう一度考える」だけだが、引き上げを選んで間違っていた場合の損失は、常駐面が毎ターン全文読まれるコストとして恒久的に乗り続ける。しかも上限は一度上げると次の判断の基準線になるので、誤りが自己修復しない。
 
-**引き上げは Tier C として扱う。** `scripts/workflow-skills.test.ts` で常駐予算を決めている定数——`RESIDENT_CEILING_BYTES`、`RESIDENT_HEADROOM_BYTES`、および書き戻しを検知する下限 `RE_INLINE_GUARD_HEADROOM_BYTES`——の**緩和**は、上の 3 条件を示した上でユーザーの明示指示を得てから行う。条件が揃っていること自体は、変更してよいという指示ではない。**どれか 1 つだけを名指しすると、そのとき実際に効いている限界が対象外になる** — 上限に余裕があっても下限に張り付いていれば、緩めたくなるのは下限のほうであり、そこが素通しなら禁止は形だけになる。締める向きの変更（上限を下げる、下限を上げる）はこの禁止の対象外である。
+**引き上げは Tier C として扱う。** `scripts/claude/workflow-skills.test.ts` で常駐予算を決めている定数——`RESIDENT_CEILING_BYTES`、`RESIDENT_HEADROOM_BYTES`、および書き戻しを検知する下限 `RE_INLINE_GUARD_HEADROOM_BYTES`——の**緩和**は、上の 3 条件を示した上でユーザーの明示指示を得てから行う。条件が揃っていること自体は、変更してよいという指示ではない。**どれか 1 つだけを名指しすると、そのとき実際に効いている限界が対象外になる** — 上限に余裕があっても下限に張り付いていれば、緩めたくなるのは下限のほうであり、そこが素通しなら禁止は形だけになる。締める向きの変更（上限を下げる、下限を上げる）はこの禁止の対象外である。
 
 - このルールは横断ドキュメント（CLAUDE.md「Shorthand Commands」）および `.claude/skills/workflow-commands/SKILL.md`「What stays resident, and what is read from here」のカノニカル参照
 - **常駐ルールを「どこまで常駐させるか」の本体は `.claude/skills/workflow-commands/rule-residency.md` にある**（joshuafolkken/kit#1797）。常駐可否を決める 2 つの問いは `SKILL.md` §3 に残り、トリガ＋ポインタの形・常駐ルールの列挙・引退経路とその 3 条件・`rule:value` の測定結果はそちらへ移した。**発火するのはこれらの文書を編集するターンだけで、Issue を実行するターンでは一度も読まれない**ので、ワークフローの起動読み取りから外してある

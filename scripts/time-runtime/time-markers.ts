@@ -1,5 +1,5 @@
 import { cost_attribute } from '#scripts/cost-runtime/cost-attribute'
-import { json_value } from '#scripts/json-value'
+import { json_value } from '#scripts/lib/json-value'
 
 // Which workflow boundary a tool call marks (joshuafolkken/kit#1269).
 //

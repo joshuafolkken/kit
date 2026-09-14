@@ -1,5 +1,5 @@
-import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { describe, expect, it } from 'vitest'
+import { agent_session_environment } from './agent-session-environment'
 
 // joshuafolkken/kit#1760. A woken `backlogrun` session inherited the loopback proxy the package
 // manager that launched its supervisor had stood up, kept dialling it long after that invocation

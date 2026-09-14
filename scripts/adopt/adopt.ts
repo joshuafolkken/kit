@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { refuse_unknown_flags } from '#scripts/cli-flags'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { refuse_unknown_flags } from '#scripts/lib/cli-flags'
 import { propagate_run, type TargetResult } from '#scripts/propagate/propagate-run'
 import { propagate_steps, type Release, type ReleasePlan } from '#scripts/propagate/propagate-steps'
 import type { PropagateTarget } from '#scripts/propagate/propagate-targets'

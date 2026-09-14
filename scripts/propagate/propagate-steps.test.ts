@@ -1,3 +1,4 @@
+import { GATE_TARGETS } from '#scripts/gate/verification-gate'
 import {
 	GH_REQUEST_TIMEOUT_MESSAGE,
 	git_gh_exec,
@@ -5,7 +6,6 @@ import {
 } from '#scripts/git/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
-import { GATE_TARGETS } from '#scripts/verification-gate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { propagate_run, type StepResult } from './propagate-run'
 import { propagate_steps } from './propagate-steps'

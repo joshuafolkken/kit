@@ -144,7 +144,7 @@ words:
   # The id prefix the API gives a tool_use block. The eval suite's directory name, `evals`, is in
   # the distributed dictionary instead — a copied skill cites it (joshuafolkken/kit#1092).
   - toolu
-  # In the wrangler stack traces quoted verbatim in `scripts/e2e-retry-check-crash-fixture.ts`. Not
+  # In the wrangler stack traces quoted verbatim in `scripts/test/e2e-retry-check-crash-fixture.ts`. Not
   # in the distributed dictionary beside `workerd`, because that fixture is one of the `*-fixture.ts`
   # files `package.json` keeps out of the published package — no consumer ever spell-checks it.
   - miniflare

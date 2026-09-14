@@ -83,7 +83,7 @@ describe('COMMAND_MAP — new dev commands', () => {
 	it('routes test:e2e through the guard script instead of a raw shell command', () => {
 		const entry = get_command(TEST_E2E_COMMAND)
 
-		expect(entry?.script).toBe('scripts/test-e2e-guard.ts')
+		expect(entry?.script).toBe('scripts/test/test-e2e-guard.ts')
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})
@@ -91,7 +91,7 @@ describe('COMMAND_MAP — new dev commands', () => {
 	it('routes test:unit through the guard script instead of a raw shell command', () => {
 		const entry = get_command(TEST_UNIT_COMMAND)
 
-		expect(entry?.script).toBe('scripts/test-unit-guard.ts')
+		expect(entry?.script).toBe('scripts/test/test-unit-guard.ts')
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})

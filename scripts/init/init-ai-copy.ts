@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { is_workflow_destination } from '#scripts/claude/workflow-destination'
+import { gh_spawn } from '#scripts/gh/gh-spawn'
+import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import {
 	classify_path,
 	copy_directory_failure,
 	directory_copy_blocker,
-} from '#scripts/directory-copy-guard'
-import { gh_spawn } from '#scripts/gh-spawn'
-import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
-import { is_workflow_destination } from '#scripts/workflow-destination'
+} from '#scripts/sync/directory-copy-guard'
 import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'

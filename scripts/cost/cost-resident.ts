@@ -1,10 +1,10 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
+import { skill_meta } from '#scripts/claude/skill-meta'
 import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
-import { json_value } from '#scripts/json-value'
-import { prompt_hooks } from '#scripts/prompt-hooks'
-import { file_reader } from '#scripts/read-file'
-import { skill_meta } from '#scripts/skill-meta'
+import { prompt_hooks } from '#scripts/hooks/prompt-hooks'
+import { json_value } from '#scripts/lib/json-value'
+import { file_reader } from '#scripts/lib/read-file'
 
 // What the resident block is made of (joshuafolkken/kit#1151).
 //
