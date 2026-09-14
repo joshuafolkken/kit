@@ -296,6 +296,27 @@ function target_turn_lines(
 	return [...open_turn_lines(turn, targets, name), ...results]
 }
 
+// The body the harness writes back for a call this guard denied (joshuafolkken/kit#1979). It opens
+// with the ⛔ and the `batching` token `time-transcript-line.ts` reads a refusal's guard off, so a span
+// built from it carries `refusal_guard: 'batching'`.
+const BATCHING_REFUSAL_BODY = '⛔ batching: reissue this in one turn'
+
+// A refused turn: the same open-then-result shape as `target_turn_lines`, but each result is the ⛔
+// body above rather than `ok` — so `time_spans` reads it as a span carrying this guard's refusal label.
+// A refused call is written to the transcript like any other, and the batch guard's re-issue test looks
+// for exactly this shape when it decides not to refuse the identical call a second time.
+function refused_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
+	const results = call_ids(turn, targets.length).map((id) =>
+		error_result_line(turn_minute(turn) + 1, BRANCH, id, BATCHING_REFUSAL_BODY),
+	)
+
+	return [...open_turn_lines(turn, targets, name), ...results]
+}
+
 // A whole stretch of identical turns, which is what the live-density reading is measured against: at
 // `calls` of 1 the density is 1.00 and every turn is its own round trip, at 3 it is 3.00 over a third
 // as many.
@@ -417,6 +438,7 @@ const time_transcript_fixture = {
 	turn_lines,
 	open_turn_lines,
 	target_turn_lines,
+	refused_turn_lines,
 	density_text,
 	issue_lines,
 	lane_lines,
