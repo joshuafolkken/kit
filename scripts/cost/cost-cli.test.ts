@@ -1,15 +1,15 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { cost_cli } from './cost-cli'
-import { cost_transcript } from './cost-transcript'
+import { cost_cli_fixture } from './cost-cli-fixture'
 
-const CWD = '/Users/someone/Development/kit'
+// The console capture, the temporary transcript home and the transcript writers are
+// `cost-cli-fixture.ts`'s, shared with the `--path` suite (joshuafolkken/kit#1987).
+const { CWD, MAIN, SESSION_A, ISSUE_BRANCH, THINKING_TOKENS } = cost_cli_fixture
+const { usage_line, write_session, write_populated, output, stdout } = cost_cli_fixture
+
+cost_cli_fixture.capture_console()
+
 const FAILURE_EXIT_CODE = 1
-const ISSUE_BRANCH = '962-report-the-token-and-credit-cost-of-a-run'
-const MAIN = 'main'
-const SESSION_A = 'session-a'
 const SESSION_B = 'session-b'
 const BAD_LINE = '{ not json'
 const ISSUE_FLAG = '--issue'
@@ -17,90 +17,9 @@ const BAD_FLAG = '--nonsense'
 const NO_TRANSCRIPTS = 'No transcripts found'
 const ONE_REQUEST_FOR_962 = 'issue #962 — 1 request(s)'
 const ISSUE_NUMBER = '962'
-const MODEL = 'claude-opus-5'
 const ALL_FLAG = '--all'
 const RESIDENT_HEADING = 'Resident breakdown'
 const COMPOSITION_HEADING = 'Context composition'
-const THINKING_TOKENS = 7
-
-function usage_line(request_id: string, branch: string, output_tokens: number): string {
-	return JSON.stringify({
-		type: 'assistant',
-		requestId: request_id,
-		gitBranch: branch,
-		message: { model: MODEL, usage: { input_tokens: 1, output_tokens } },
-	})
-}
-
-// A line carrying both a usage block and content, which is what the two decompositions read
-// (joshuafolkken/kit#1151). `usage_line` deliberately carries no content, so the older suites keep
-// exercising the usage reader on its own.
-function content_line(command: string): string {
-	return JSON.stringify({
-		type: 'assistant',
-		requestId: 'r2',
-		gitBranch: ISSUE_BRANCH,
-		message: {
-			model: MODEL,
-			usage: {
-				input_tokens: 1,
-				output_tokens: 5,
-				output_tokens_details: { thinking_tokens: THINKING_TOKENS },
-			},
-			content: [{ type: 'tool_use', name: 'Bash', input: { command } }],
-		},
-	})
-}
-
-// Mutated properties rather than reassigned bindings, so `beforeEach` never assigns to a top-level
-// variable from inside a function.
-const state = { home: '', printed: [] as Array<string>, out: [] as Array<string> }
-
-function capture(message: unknown): void {
-	state.printed.push(String(message))
-}
-
-// stdout only. The `--over` verdict goes to stdout and its explanation to stderr, and the
-// explanation contains the word "over" whatever the verdict is (`… per request over N request(s)`) —
-// so a test reading both streams together passes on an inverted verdict.
-function capture_out(message: unknown): void {
-	state.out.push(String(message))
-	state.printed.push(String(message))
-}
-
-beforeEach(() => {
-	state.home = mkdtempSync(path.join(tmpdir(), 'cost-cli-'))
-	state.printed = []
-	state.out = []
-	vi.spyOn(console, 'info').mockImplementation(capture_out)
-	vi.spyOn(console, 'error').mockImplementation(capture)
-	vi.spyOn(cost_transcript, 'transcript_directories').mockImplementation((cwd: string) => [
-		path.join(state.home, cost_transcript.project_slug(cwd)),
-	])
-})
-
-afterEach(() => {
-	vi.restoreAllMocks()
-})
-
-function write_session(session_id: string, lines: ReadonlyArray<string>): void {
-	const directory = path.join(state.home, cost_transcript.project_slug(CWD))
-
-	mkdirSync(directory, { recursive: true })
-	writeFileSync(path.join(directory, `${session_id}.jsonl`), lines.join('\n'))
-}
-
-function output(): string {
-	return state.printed.join('\n')
-}
-
-function stdout(): string {
-	return state.out.join('\n')
-}
-
-function write_populated(): void {
-	write_session(SESSION_A, [usage_line('r1', MAIN, 10), content_line('git status --short')])
-}
 
 interface JsonReport {
 	measurement?: { composition: { rows: Array<{ category: string; tokens: number }> } }
@@ -251,8 +170,8 @@ describe('cost_cli.run missing-data scoping', () => {
 		expect(output()).not.toContain('Missing data')
 	})
 
-	// A line that could not be read carries no branch, so there is no way to rule out that it
-	// belonged to the issue being rolled up.
+	// A line that could not be read carries no branch, so there is no way to rule out that it belonged
+	// to the issue being rolled up.
 	it('still reports the corpus-wide missing lines for an issue rollup', () => {
 		write_session(SESSION_A, [usage_line('r1', ISSUE_BRANCH, 10)])
 		write_session(SESSION_B, [BAD_LINE])
@@ -263,13 +182,12 @@ describe('cost_cli.run missing-data scoping', () => {
 })
 
 // joshuafolkken/kit#968: a session that runs several epic children pays for every earlier child on
-// every later turn. Measured across one `epicrun` that ran six in one context: 222k billed input
-// per request during the first child, 645k during the sixth — the same work at 2.9x the price. The
-// hand-off is decided by that ratio, not by whether the run feels long.
+// every later turn. The hand-off is decided by the billed-input ratio, not by whether the run feels
+// long.
 describe('cost_cli.parse_options — the hand-off threshold', () => {
-	// Deliberately not the figure the documents ship (joshuafolkken/kit#1775 moved it to 300,000):
-	// the parser has no dependency on the threshold, so coupling this case to it would fail a
-	// parsing test for a non-parsing reason the next time the line moves.
+	// Deliberately not the figure the documents ship (joshuafolkken/kit#1775 moved it to 300,000): the
+	// parser has no dependency on the threshold, so coupling this case to it would fail a parsing test
+	// for a non-parsing reason the next time the line moves.
 	it('reads a threshold', () => {
 		expect(cost_cli.parse_options(['--over', '123456'])?.over).toBe(123_456)
 	})
@@ -310,8 +228,8 @@ describe('cost_cli.run --over', () => {
 		expect(output()).toContain('per request')
 	})
 
-	// The word "under" appears in the missing-transcript message too, so the verdict is checked by
-	// the exit code and the message, not by a substring that both share.
+	// The word "under" appears in the missing-transcript message too, so the verdict is checked by the
+	// exit code and the message, not by a substring that both share.
 	it('reports a missing transcript rather than answering a verdict', () => {
 		expect(cost_cli.run(['--over', '0'], CWD)).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(NO_TRANSCRIPTS)
@@ -362,8 +280,8 @@ describe('cost_cli.run — the resident and context decompositions', () => {
 })
 
 describe('cost_cli.run --over — what it refuses', () => {
-	// The verdict is about this session. Scoped to an issue it would answer for one slice, which is
-	// a different number from the one the hand-off rule is written against.
+	// The verdict is about this session. Scoped to an issue it would answer for one slice, which is a
+	// different number from the one the hand-off rule is written against.
 	it.each([['--all'], [ISSUE_FLAG]])('refuses to combine the threshold with %s', (flag) => {
 		const argv = flag === '--all' ? ['--over', '1', '--all'] : ['--over', '1', flag, ISSUE_NUMBER]
 
@@ -391,8 +309,8 @@ describe('cost_cli.run --over — what it refuses', () => {
 	})
 })
 
-// joshuafolkken/kit#1838: `--cap` is a whole-run counterfactual the session-scoped `--over` could
-// not express; the verdict math itself is unit-tested in cost-verdict.test.ts.
+// joshuafolkken/kit#1838: `--cap` is a whole-run counterfactual the session-scoped `--over` could not
+// express; the verdict math itself is unit-tested in cost-verdict.test.ts.
 describe('cost_cli.parse_options — the cap flag', () => {
 	it('reads a cap', () => {
 		expect(cost_cli.parse_options(['--cap', '200000'])?.cap).toBe(200_000)

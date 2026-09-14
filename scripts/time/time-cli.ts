@@ -4,7 +4,9 @@ import { parseArgs } from 'node:util'
 import { cost_run_report } from '#scripts/cost/cost-run-report'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
 import { cost_usage } from '#scripts/cost/cost-usage'
+import { transcript_cwd } from '#scripts/cost/transcript-cwd'
 import { time_batch, type RunTiming } from './time-batch'
+import { time_cli_refuse } from './time-cli-refuse'
 import { time_epic } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_family } from './time-family'
@@ -40,7 +42,7 @@ const FAILURE_EXIT_CODE = 1
 const NO_INSTANT = 0
 const JSON_INDENT = 2
 const USAGE =
-	'Usage: josh time [--run] [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--instructions] [--json]'
+	'Usage: josh time [--run] [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--instructions] [--json] [--path <dir>]'
 const NO_MERGED_RUN =
 	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
 const ONE_SCOPE =
@@ -87,6 +89,11 @@ interface Options {
 	// and sizes every instruction document from disk, which the wall-clock tables need none of.
 	is_instructions: boolean
 	is_json: boolean
+	// The target project whose transcripts to read, or `undefined` for this process's own working
+	// directory (joshuafolkken/kit#1987). It is not a scope: it says *where* to read, orthogonally to
+	// *which* run the scope flags name, so it is refused alongside none of them. From the kit checkout,
+	// `--path <dir>` points every read at another project's transcripts, history and config.
+	path: string | undefined
 }
 
 // What `print_scope` needs to know, which is how to render and how much to carry — never which scope
@@ -104,12 +111,11 @@ const PARSE_ARGS_OPTIONS = {
 	instructions: { type: 'boolean', default: false },
 	json: { type: 'boolean', default: false },
 	run: { type: 'boolean', default: false },
+	path: { type: 'string' },
 } as const
 
-// The flags that name a scope, in both the spelling `parseArgs` reports and the spelling a person
-// types. One list, so a fifth scope cannot be added to the parser and forgotten by the refusal.
-const SCOPE_KEYS = ['issue', 'session', 'epic', 'last', 'period'] as const
-const SCOPE_FLAGS = SCOPE_KEYS.map((key) => `--${key}`)
+// The scope flags in the spelling a person types, derived from the shared scope-key list.
+const SCOPE_FLAGS = time_cli_refuse.SCOPE_KEYS.map((key) => `--${key}`)
 
 // Only a positive number is an issue number, the rule `cost-cli.ts` states: a non-positive value
 // would collide with `cost_attribute`'s unattributed sentinel and report that bucket as though it
@@ -120,73 +126,6 @@ function to_number(raw: string | undefined): number | undefined {
 	const parsed = Number(raw)
 
 	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
-}
-
-interface RawValues {
-	issue?: string
-	session?: string
-	epic?: string
-	last?: string
-	period?: string
-	top?: string
-	// The one boolean the refusal reads. It is not a scope, so it is absent from `NUMBER_KEYS` and
-	// `SCOPE_KEYS` — what it needs is a scope already named, which `is_refused` checks against
-	// `session` directly (joshuafolkken/kit#1477).
-	instructions?: boolean
-	// Whether the run-tree scope was named. Like the bare no-argument default it selects the last run
-	// tree, so it may not accompany any of the `SCOPE_KEYS` (joshuafolkken/kit#1937).
-	run?: boolean
-}
-
-// The four flags that carry a number, parsed. Grouped so the refusal below asks one question of one
-// record rather than growing a parameter per flag past the four-parameter limit.
-interface ParsedNumbers {
-	issue: number | undefined
-	epic: number | undefined
-	last: number | undefined
-	period: number | undefined
-	top: number | undefined
-}
-
-// Every flag whose value is a number, listed once so a fifth one is refused when it does not parse
-// by being added here rather than by being remembered in the condition below.
-const NUMBER_KEYS = ['issue', 'epic', 'last', 'period', 'top'] as const
-
-// A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
-// quietly become "report the most recent run instead".
-function is_unparsed(raw: string | undefined, parsed: number | undefined): boolean {
-	return raw !== undefined && parsed === undefined
-}
-
-function has_unparsed(values: RawValues, parsed: ParsedNumbers): boolean {
-	return NUMBER_KEYS.some((key) => is_unparsed(values[key], parsed[key]))
-}
-
-function named_scopes(values: RawValues): number {
-	return SCOPE_KEYS.filter((key) => values[key] !== undefined).length
-}
-
-// Naming more than one scope is refused too — they are different questions, and answering one of
-// them silently is the wrong of the two.
-// `--top 0` and `--top abc` are refused on the same rule the scope numbers are: a cap that did not
-// parse must not quietly become "carry every row", which is the opposite of what was asked for.
-// `--last 0` goes the same way: a distribution over no run is not a smaller answer, it is none.
-// `--instructions` reports on one transcript, so it is refused without a named session.
-function refuses_instructions(values: RawValues): boolean {
-	return values.instructions === true && values.session === undefined
-}
-
-// `--run` is the whole-tree scope, so it may not accompany a scope flag that names one run.
-function refuses_run(values: RawValues): boolean {
-	return values.run === true && named_scopes(values) > 0
-}
-
-function is_refused(values: RawValues, parsed: ParsedNumbers): boolean {
-	if (has_unparsed(values, parsed)) return true
-	if (refuses_instructions(values)) return true
-	if (refuses_run(values)) return true
-
-	return named_scopes(values) > 1
 }
 
 // An unknown flag is a refusal rather than a default: a misspelled `--session` must not quietly
@@ -202,13 +141,14 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 			top: to_number(values.top),
 		}
 
-		if (is_refused(values, parsed)) return undefined
+		if (time_cli_refuse.is_refused(values, parsed)) return undefined
 
 		return {
 			session: values.session,
 			...parsed,
 			is_instructions: values.instructions,
 			is_json: values.json,
+			path: values.path,
 		}
 	} catch {
 		return undefined
@@ -491,7 +431,8 @@ async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Pr
 		return FAILURE_EXIT_CODE
 	}
 
-	return await dispatch(options, cwd)
+	// `--path <dir>` reads the target project instead of the process cwd (joshuafolkken/kit#1987).
+	return await dispatch(options, transcript_cwd.resolve(options.path, cwd))
 }
 
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and
