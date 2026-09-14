@@ -1,7 +1,8 @@
+import { time_history, type RunTimeRecord } from '#scripts/time-runtime/time-history'
 import { time_instant } from '#scripts/time-runtime/time-instant'
 import { time_contributors } from './time-contributors'
 import type { LabeledDistribution } from './time-distribution'
-import { time_history, type RunTimeRecord } from './time-history'
+import { parent_turns_of } from './time-history-turns'
 import { time_lanes, type Lane, type LaneRun, type SerialInterval } from './time-lanes'
 import type { Interval } from './time-overlap'
 
@@ -267,7 +268,7 @@ function to_report(input: PeriodInput): PeriodTimeReport {
 	const throughput = throughput_of(input.runs, frame)
 	// Read once and used twice — by the table and by the note that says how much of it was withheld —
 	// so the two cannot come to disagree about which records carried a breakdown.
-	const totals = input.records.map((record) => time_history.parent_turns_of(record))
+	const totals = input.records.map((record) => parent_turns_of(record))
 
 	return {
 		...window_of(input, frame),

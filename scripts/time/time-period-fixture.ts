@@ -1,4 +1,4 @@
-import type { RunTimeRecord } from './time-history'
+import type { RunTimeRecord } from '#scripts/time-runtime/time-history'
 import { time_period, type PeriodTimeReport } from './time-period'
 
 // The records a period report is built from, in one place (joshuafolkken/kit#1470).

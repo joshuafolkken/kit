@@ -167,3 +167,8 @@ words:
   # carries it, so `docs/josh-commands.md` has used it for some time; the workflow is YAML, where
   # that dictionary is off, so the word has to be declared here to be spelled the same in both.
   - rollup
+  # What `scripts/time-runtime/time-history.ts` calls `scripts/time/`: the report directory that is
+  # deliberately left out of the package, so the recorder must not statically pull it into a
+  # distributed command's closure (joshuafolkken/kit#2003). cspell derives "distributable" but not
+  # the "un-" compound.
+  - undistributable

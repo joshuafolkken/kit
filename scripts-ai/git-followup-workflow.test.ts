@@ -80,7 +80,7 @@ const record_run_mock = vi.hoisted(() =>
 		.mockResolvedValue({ is_recorded: true, lines: [] }),
 )
 
-vi.mock('../scripts/time/time-history', () => ({
+vi.mock('../scripts/time-runtime/time-history', () => ({
 	time_history: { record_run: record_run_mock },
 }))
 
