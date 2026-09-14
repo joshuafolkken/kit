@@ -1,7 +1,10 @@
+import { cost_format } from '#scripts/cost/cost-format'
 import type { SessionTimeline } from './time-corpus'
 import { time_format } from './time-format'
+import type { RequestTokens, SessionRequests } from './time-request-costs'
 import { time_round_trips } from './time-round-trips'
 import { time_session_end_state, type EndState } from './time-session-end-state'
+import { time_session_signals, type SessionSignals, type Stall } from './time-session-signals'
 import { time_spans, type Span } from './time-spans'
 
 // One issue's wall clock broken down by the main-line session it was spent in (joshuafolkken/kit#1912).
@@ -31,6 +34,10 @@ interface SessionTime {
 	// a state-changing josh command). Absent for the first session, and for a resume that never reached
 	// one — unknown rather than zero, the withheld-is-not-zero idiom the rest of the report follows.
 	to_first_progress_ms?: number
+	// The two signals joined from the cost axis' tokens (joshuafolkken/kit#1970): the edit-then-check
+	// loop and the long-wait-low-output stalls. Absent where the cost corpus was not read, so the
+	// columns are withheld rather than shown as zero.
+	signals?: SessionSignals
 }
 
 // The per-category wall clock, summing `duration_ms` exactly as `time_report.category_ms` does —
@@ -71,7 +78,20 @@ function resume_of(
 	return ms === undefined ? {} : { to_first_progress_ms: ms }
 }
 
-function to_session_time(timeline: SessionTimeline, is_resumed: boolean): SessionTime {
+function signals_of(
+	spans: ReadonlyArray<Span>,
+	requests: ReadonlyArray<RequestTokens> | undefined,
+): { signals?: SessionSignals } {
+	if (requests === undefined) return {}
+
+	return { signals: time_session_signals.build(spans, requests) }
+}
+
+function to_session_time(
+	timeline: SessionTimeline,
+	is_resumed: boolean,
+	requests: ReadonlyArray<RequestTokens> | undefined,
+): SessionTime {
 	const { spans } = timeline
 	const model_ms = category_ms(spans, time_spans.MODEL_CATEGORY)
 	const tool_ms = category_ms(spans, time_spans.TOOL_CATEGORY)
@@ -86,6 +106,7 @@ function to_session_time(timeline: SessionTimeline, is_resumed: boolean): Sessio
 		round_trip_count: time_round_trips.count_round_trips(spans),
 		end_state: time_session_end_state.classify(spans),
 		...resume_of(spans, is_resumed),
+		...signals_of(spans, requests),
 	}
 }
 
@@ -95,12 +116,26 @@ function session_start(timeline: SessionTimeline): number {
 	return starts.length === NONE ? Infinity : Math.min(...starts)
 }
 
-function build(by_session: ReadonlyArray<SessionTimeline>): Array<SessionTime> {
+function requests_for(
+	session_requests: ReadonlyArray<SessionRequests> | undefined,
+	session_id: string,
+): ReadonlyArray<RequestTokens> | undefined {
+	if (session_requests === undefined) return undefined
+
+	return session_requests.find((one) => one.session_id === session_id)?.requests ?? []
+}
+
+function build(
+	by_session: ReadonlyArray<SessionTimeline>,
+	session_requests?: ReadonlyArray<SessionRequests>,
+): Array<SessionTime> {
 	const ordered = [...by_session].toSorted(
 		(left, right) => session_start(left) - session_start(right),
 	)
 
-	return ordered.map((timeline, index) => to_session_time(timeline, index > FIRST))
+	return ordered.map((timeline, index) =>
+		to_session_time(timeline, index > FIRST, requests_for(session_requests, timeline.session_id)),
+	)
 }
 
 const HEADING = 'By main-line session (oldest first):'
@@ -111,17 +146,44 @@ function resume_text(session: SessionTime): string {
 	return ` · to first progress ${time_format.format_minutes(session.to_first_progress_ms)}`
 }
 
+function check_loop_text(session: SessionTime): string {
+	const loop = session.signals?.check_loop
+
+	if (loop === undefined) return ''
+
+	const context = cost_format.format_tokens(loop.median_context_tokens)
+
+	return ` · ${String(loop.count)} check-loop(s), median context ${context} tok`
+}
+
 function session_line(session: SessionTime): string {
 	const elapsed = time_format.format_minutes(session.elapsed_ms)
 	const trips = `${String(session.round_trip_count)} round trip(s)`
+	const tail = `${resume_text(session)}${check_loop_text(session)}`
 
-	return `  ${session.session_id}  ${elapsed} · ${trips} · ${session.end_state.state}${resume_text(session)}`
+	return `  ${session.session_id}  ${elapsed} · ${trips} · ${session.end_state.state}${tail}`
+}
+
+function stall_line(stall: Stall): string {
+	const window = time_format.format_window(stall.started_ms, stall.ended_ms)
+	const wait = time_format.format_minutes(stall.wait_ms)
+	const output = cost_format.format_tokens(stall.output_tokens)
+
+	return `      stall ${window} · ${wait} · ${output} out tok`
+}
+
+function stall_lines(session: SessionTime): Array<string> {
+	return (session.signals?.stalls ?? []).map((stall) => stall_line(stall))
+}
+
+function session_block(session: SessionTime): Array<string> {
+	return [session_line(session), ...stall_lines(session)]
 }
 
 function session_lines(by_session: ReadonlyArray<SessionTime> | undefined): Array<string> {
 	if (by_session === undefined || by_session.length === NONE) return []
 
-	return ['', HEADING, ...by_session.map((one) => session_line(one))]
+	return ['', HEADING, ...by_session.flatMap((one) => session_block(one))]
 }
 
 const time_by_session = { HEADING, build, session_lines }

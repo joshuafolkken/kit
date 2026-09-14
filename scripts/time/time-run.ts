@@ -474,7 +474,7 @@ function to_report(facts: RunFacts): TimeReport {
 	const found_notes = [...window_note(window, report.elapsed_ms), ...serial_note(report)]
 	const costs = cost_blocks(facts, report.round_trip_count)
 	const delegated_cost = time_delegated_cost.build(facts.reading?.units)
-	const by_session = time_by_session.build(facts.found.by_session)
+	const by_session = time_by_session.build(facts.found.by_session, facts.reading?.session_requests)
 
 	return { ...report, notes: [...notes, ...found_notes], ...costs, delegated_cost, by_session }
 }
