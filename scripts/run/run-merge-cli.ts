@@ -29,6 +29,11 @@ const STOP_TOKEN = 'stop'
 const RETRY_TOKEN = 'retry'
 // The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
 const DIGITS = /^\d+$/u
+// A GitHub `owner/repo` slug: two runs of word characters, hyphens or dots around a single slash.
+// `epic` and `repo` flow into `pnpm josh` subprocess arguments, so a value shaped like an option
+// (`--foo`) would be read as a flag rather than a value — argument injection (Sonar S8705). Validating
+// each against its shape is the sanitizer, exactly as `child`, `over` and `owner` are already checked.
+const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/u
 const USAGE =
 	'Usage: josh run:merge <issue> --over <tokens> [--epic <E> --repo <owner/repo>] [--owner <pid>]'
 
@@ -78,6 +83,27 @@ function is_epic_without_repo(values: ParsedArguments['values']): boolean {
 	return values.epic !== undefined && values.repo === undefined
 }
 
+// A present value that does not match its shape; an absent one is left to `is_epic_without_repo` and
+// the backlog fall-through, so `undefined` is not malformed.
+function is_malformed(raw: string | undefined, pattern: RegExp): boolean {
+	return raw !== undefined && !pattern.test(raw)
+}
+
+// The two subprocess-bound strings, checked before either reaches an argument list.
+function has_injection_risk(values: ParsedArguments['values']): boolean {
+	return (
+		is_malformed(values.epic, run_issue_number.ISSUE_NUMBER_PATTERN) ||
+		is_malformed(values.repo, REPO_PATTERN)
+	)
+}
+
+// The offer arguments that must hold before a context is built: an epic needs its repository, and
+// neither may be shaped like a subprocess flag. Both are grouped here so `to_context` reads them as one
+// precondition rather than as separate branches.
+function has_invalid_offer(values: ParsedArguments['values']): boolean {
+	return is_epic_without_repo(values) || has_injection_risk(values)
+}
+
 function valid_child(parsed: ParsedArguments): string | undefined {
 	const child = parsed.positionals[FIRST]
 
@@ -87,7 +113,7 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 }
 
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
-	if (is_epic_without_repo(parsed.values)) return undefined
+	if (has_invalid_offer(parsed.values)) return undefined
 
 	const child = valid_child(parsed)
 
