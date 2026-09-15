@@ -4,7 +4,7 @@ import { git_gh_command } from './git-gh-command'
 import { git_gh_helpers } from './git-gh-helpers'
 import type { GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
-import { git_pr_checks } from './git-pr-checks'
+import { DEFAULT_STABLE_READS, git_pr_checks, WATCH_CONFIRMED_STABLE_READS } from './git-pr-checks'
 import { is_coderabbit_check } from './git-pr-checks-eval'
 import { CHECK_STATUS_PASS, git_pr_checks_parse, type PrStateSnapshot } from './git-pr-checks-parse'
 import { git_pr_coderabbit } from './git-pr-coderabbit'
@@ -157,24 +157,40 @@ async function handle_watch_failure(branch_name: string, error: unknown): Promis
 	console.info(`⚠️ ${WATCH_FAILED_NOTE}: ${git_gh_helpers.get_error_message_with_stderr(error)}`)
 }
 
-async function watch_before_polling(branch_name: string): Promise<void> {
+// **Returns whether the watch confirmed completion** (joshuafolkken/kit#2029): `true` only when
+// `pr_checks_watch` saw every check finish, `false` when it timed out with checks still pending or
+// fell through to polling on a swallowed failure. `run_checks` reads it to decide how many stable poll
+// reads the wait still needs. A timed-out watch (`timed_out: true`) never spanned the pending→settled
+// window, so it must keep the full stable-read window rather than claim the confirmation. A rethrown
+// failure — the empty-rollup case — never reaches a caller, so it needs no answer here.
+async function watch_before_polling(branch_name: string): Promise<boolean> {
 	console.info('')
 	console.info('📊 Watching PR checks...')
 
 	try {
-		await git_gh_command.pr_checks_watch(branch_name)
+		const result = await git_gh_command.pr_checks_watch(branch_name)
+
+		return !result.timed_out
 	} catch (error) {
 		await handle_watch_failure(branch_name, error)
+
+		return false
 	}
 }
 
+// **A confirmed watch lowers the poll's stable-read requirement to one** (joshuafolkken/kit#2029). The
+// watch is the first confirmation that every check settled, so the poll that follows need only agree
+// once rather than twice — which removes the extra interval `followup` spent re-proving a settled run.
+// A skipped or fallen-through watch keeps `DEFAULT_STABLE_READS`, and a check that turned red is still
+// caught: the poll evaluates the full merge gate and throws on failure before any stable read counts.
 async function run_checks(input: {
 	branch_name: string
 	is_skip_watch: boolean
 }): Promise<PrStateSnapshot> {
-	if (!input.is_skip_watch) await watch_before_polling(input.branch_name)
+	const is_watch_confirmed = !input.is_skip_watch && (await watch_before_polling(input.branch_name))
+	const stable_reads = is_watch_confirmed ? WATCH_CONFIRMED_STABLE_READS : DEFAULT_STABLE_READS
 
-	return await git_pr_checks.wait_for_pr_success(input.branch_name)
+	return await git_pr_checks.wait_for_pr_success(input.branch_name, stable_reads)
 }
 
 // Temporary (kit#753): record every CodeRabbit check that was not passing when the merge gate

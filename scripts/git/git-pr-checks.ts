@@ -44,6 +44,13 @@ function get_configured_max_attempts(): number {
 const CHECK_MAX_ATTEMPTS = get_configured_max_attempts()
 const DEFAULT_STABLE_READS = 2
 
+// One authoritative gate poll is enough once `pr_checks_watch` has already seen every check finish:
+// the watch is the first confirmation, so the poll that follows need only agree once. The two reads
+// exist for the pending→settled window a bare poll opens on, and the watch has itself already spanned
+// that window — so waiting a second interval after it merely re-proves what the watch established
+// (joshuafolkken/kit#2029).
+const WATCH_CONFIRMED_STABLE_READS = 1
+
 // **A read that failed is not a verdict.** The loop reads every ten seconds, so a dropped connection,
 // a rate limit or one request over its budget is the kind of failure the *next* poll answers — and
 // ending a 32-minute wait on one of them costs the whole run again. Before joshuafolkken/kit#1077
@@ -289,13 +296,19 @@ async function default_fetch_pr_state(
 	return { ...snapshot, review_decision: read_string(decision) }
 }
 
-async function wait_for_pr_success_default(branch_name: string): Promise<PrStateSnapshot> {
+// **`required_stable_reads` is a parameter, not a constant, so the caller can lower it** — `run_checks`
+// passes `WATCH_CONFIRMED_STABLE_READS` when the watch already confirmed completion. It defaults to
+// `DEFAULT_STABLE_READS`, so every caller that names only the branch is exactly where it was.
+async function wait_for_pr_success_default(
+	branch_name: string,
+	required_stable_reads: number = DEFAULT_STABLE_READS,
+): Promise<PrStateSnapshot> {
 	return await wait_for_pr_success({
 		branch_name,
 		fetcher: default_fetch_pr_state,
 		interval_ms: CHECK_WAIT_INTERVAL_MS,
 		max_attempts: CHECK_MAX_ATTEMPTS,
-		required_stable_reads: DEFAULT_STABLE_READS,
+		required_stable_reads,
 	})
 }
 
@@ -310,6 +323,7 @@ export {
 	compute_max_attempts,
 	get_configured_max_attempts,
 	DEFAULT_STABLE_READS,
+	WATCH_CONFIRMED_STABLE_READS,
 	DEFAULT_MAX_ATTEMPTS,
 	MAX_CONSECUTIVE_READ_FAILURES,
 	DEFAULT_TIMEOUT_SECONDS,
