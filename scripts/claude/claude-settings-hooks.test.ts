@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { PROCESS_TIMEOUT_MS } from '#scripts/hooks/format-edited-file'
+import { hook_launch } from '#scripts/init/hook-launch'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { security_audit_provision_logic } from '#scripts/security/security-audit-provision-logic'
 import { describe, expect, it } from 'vitest'
@@ -14,15 +15,21 @@ import {
 const GITIGNORE_PATH = fileURLToPath(new URL('../../.gitignore', import.meta.url))
 
 // #852: the innermost feedback loop is one edited file, and before this hook the only way to see
-// what prettier and eslint made of it was a whole-project run. The command has to stay a `josh`
-// subcommand: a shell one-liner here would be a second copy of the logic in every consumer.
-const FORMAT_HOOK_COMMAND = 'pnpm josh format:edited'
+// what prettier and eslint made of it was a whole-project run. The hook launches the pre-built
+// bundle directly and drops to the `pnpm josh` subcommand only when it is absent
+// (joshuafolkken/kit#2023) — the formatter's logic still lives in that one subcommand/bundle, never
+// copied into settings, and the launch shape itself is single-sourced in `hook_launch`.
+const FORMAT_HOOK_COMMAND = hook_launch.hook_launch_command('format-edited.js', 'format:edited')
 // The consolidated PreToolUse guard (joshuafolkken/kit#1930): one process that runs the batching
 // guard (joshuafolkken/kit#1390), the investigation guard (joshuafolkken/kit#1460) and the rule
 // delivery guard (joshuafolkken/kit#1524) in turn. `PreToolUse` is the only event that can still stop
 // a call, and folding the three into one is two process starts saved on every guarded call — three
-// launches on every consumer's Bash call became one.
-const PRETOOL_GUARD_HOOK_COMMAND = 'pnpm josh pretool:guard'
+// launches on every consumer's Bash call became one. Launched from its own bundle with a `pnpm josh`
+// fallback (joshuafolkken/kit#2023).
+const PRETOOL_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command(
+	'pretool-guard.js',
+	'pretool:guard',
+)
 // Derived from the script's own per-spawn bound rather than written as a number: raising that bound
 // has to raise the declared budget with it, or the harness kills a run the script still considers
 // healthy — and it lands at a moment the script did not choose, possibly inside `prettier --write`.
@@ -70,8 +77,9 @@ const MINIMUM_PROVISION_TIMEOUT_SECONDS =
 	STARTUP_ALLOWANCE_SECONDS
 // The session-language hook (joshuafolkken/kit#1903): resolves JOSH_SESSION_LANG and prints it to
 // stdout, so a SessionStart / UserPromptSubmit hook injects the value into context every turn. It
-// starts no download and reads no large file, so one script start is its whole budget.
-const SESSION_LANG_HOOK_COMMAND = 'pnpm josh session:lang'
+// starts no download and reads no large file, so one script start is its whole budget. Launched from
+// its own bundle with a `pnpm josh` fallback (joshuafolkken/kit#2023).
+const SESSION_LANG_HOOK_COMMAND = hook_launch.hook_launch_command('session-lang.js', 'session:lang')
 const MINIMUM_SESSION_LANG_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 // The per-turn echoes are injected on every prompt, so each stays bounded (joshuafolkken/kit#1930).
 // The work-summary reminder carries every behavioral directive `prompt-hook-brevity.test.ts` pins
@@ -152,9 +160,13 @@ function describe_shared_hook_properties(wiring: HookWiring): void {
 	})
 
 	// The settings file names the subcommand as a string, so a rename on the josh side would leave a
-	// hook that fails on every call with nothing pointing at the cause.
+	// hook that fails on every call with nothing pointing at the cause. Read from the `pnpm josh`
+	// fallback the launch form still carries (joshuafolkken/kit#2023), which names the same subcommand
+	// the bundle runs; a plain `pnpm josh <cmd>` hook matches the same pattern.
 	it('names a subcommand josh actually has', () => {
-		expect(Object.keys(COMMAND_MAP)).toContain(wiring.command.split(' ').at(-1) ?? '')
+		const subcommand = /pnpm josh ([\w:-]+)/u.exec(wiring.command)?.[1] ?? ''
+
+		expect(Object.keys(COMMAND_MAP)).toContain(subcommand)
 	})
 }
 

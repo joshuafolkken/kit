@@ -58,8 +58,16 @@ function prompt_hook_commands(): ReadonlyArray<string> {
 	return prompt_hooks.user_prompt_hook_commands(readFileSync(SETTINGS_PATH, 'utf8'))
 }
 
+// Only an `echo` reminder's text is injected into the turn verbatim, so the ceiling weighs those
+// alone. A launcher command (`if [ -f … ] node … else pnpm josh … fi`, joshuafolkken/kit#2023) is
+// executed rather than injected — what reaches the turn is its runtime stdout, sized independently of
+// the command text — so counting its bytes here would guard a quantity that never enters context.
+const ECHO_COMMAND_PREFIX = 'echo '
+
 function injected_text(): string {
-	return prompt_hook_commands().join('\n')
+	return prompt_hook_commands()
+		.filter((command) => command.startsWith(ECHO_COMMAND_PREFIX))
+		.join('\n')
 }
 
 describe('the per-turn hooks stay small', () => {

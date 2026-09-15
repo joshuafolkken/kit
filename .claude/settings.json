@@ -64,7 +64,7 @@
 					},
 					{
 						"type": "command",
-						"command": "pnpm josh session:lang",
+						"command": "if [ -f dist/hooks/session-lang.js ]; then node dist/hooks/session-lang.js; else pnpm josh session:lang; fi",
 						"timeout": 10
 					}
 				]
@@ -76,7 +76,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "pnpm josh pretool:guard",
+						"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi",
 						"timeout": 20
 					}
 				]
@@ -88,7 +88,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "pnpm josh format:edited",
+						"command": "if [ -f dist/hooks/format-edited.js ]; then node dist/hooks/format-edited.js; else pnpm josh format:edited; fi",
 						"timeout": 90
 					}
 				]
