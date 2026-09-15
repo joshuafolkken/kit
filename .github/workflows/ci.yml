@@ -148,10 +148,47 @@ jobs:
           # `eslint/config-fingerprint.js` now invalidates the entries themselves; this key has to move
           # with it, or a rule edit would restore a cache whose every entry is stale, lint cold, and
           # save nothing back under the key it already hit — a cold lint on every later run.
-          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}
+          # joshuafolkken/kit#2030: `${{ github.sha }}` on the tail makes every run save a fresh entry
+          # under a new key, and the sha-less prefix in `restore-keys` restores the newest previous one
+          # first — so the cache tracks `main` instead of freezing on the first commit that hit the
+          # config-hash key and never re-saving. The config-hash body above still cold-invalidates on a
+          # rule edit exactly as before; the sha only ever adds a save, never suppresses one.
+          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
             ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-eslint-cache-
+
+      # `.tsbuildinfo` and `.cspellcache` were not cached in CI at all, so the type check and spell
+      # check ran cold on every run. Both are content-addressed — `tsc` records its compiler options
+      # inside the build-info file and cspell records a content hash of every config and dictionary it
+      # loaded — so restoring an older entry is never wrong; the tool re-checks only what changed
+      # (`scripts/lane/lane-cache.ts` relies on the same property when it warms a fresh lane). The sha
+      # tail plus a sha-less `restore-keys` prefix is the same save-fresh-every-run shape as the eslint
+      # cache above (joshuafolkken/kit#2030). The gate writes both files to the repo root:
+      # `josh check` runs `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` and `josh
+      # cspell:dot` runs `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`.
+      - name: Setup TypeScript build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: tsbuildinfo-cache
+        with:
+          path: |
+            .tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-tsbuildinfo-
+
+      - name: Setup cspell cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cspell-cache
+        with:
+          path: |
+            .cspellcache
+          key: ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-cspell-cache-
 
       - name: Setup safe-chain
         run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
