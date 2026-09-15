@@ -18,6 +18,12 @@ interface WorkflowStep {
 	'continue-on-error'?: string | boolean
 }
 
+interface WorkflowStrategy {
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
+	'fail-fast'?: boolean
+	matrix?: Record<string, ReadonlyArray<string | number>>
+}
+
 interface WorkflowJob {
 	container?: unknown
 	env?: Record<string, string>
@@ -27,6 +33,7 @@ interface WorkflowJob {
 	if?: string
 	outputs?: Record<string, string>
 	needs?: string | ReadonlyArray<string>
+	strategy?: WorkflowStrategy
 	steps?: ReadonlyArray<WorkflowStep>
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
 	'timeout-minutes'?: number
@@ -133,6 +140,12 @@ function step_continue_on_error(step: WorkflowStep | undefined): string | boolea
 	return step?.['continue-on-error']
 }
 
+// The matrix a job fans out over, or an empty object for a job that declares none — so a guard on a
+// sharded job asserts on the values instead of having to test for the block's existence first.
+function job_matrix(job: WorkflowJob | undefined): Record<string, ReadonlyArray<string | number>> {
+	return job?.strategy?.matrix ?? {}
+}
+
 // The e2e job and the two artifacts it publishes. Named here rather than in each guard so the two
 // suites that assert on them cannot drift apart: a stale copy of a name silently turns every
 // lookup into `undefined`, and the assertions built on it keep passing while testing nothing.
@@ -173,6 +186,7 @@ const ci_yml_fixture = {
 	find_upload,
 	job_timeout_minutes,
 	job_needs,
+	job_matrix,
 	find_step_by_id,
 	step_run,
 	step_continue_on_error,

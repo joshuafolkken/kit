@@ -209,10 +209,23 @@ jobs:
   # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `gate-plan.ts` leaves
   # any machine below its measured 11 cores uncapped, so vitest sizes its own pool from the runner
   # exactly as it did inside the gate step.
+  #
+  # **Sharded across two runners (joshuafolkken/kit#2031).** The unit suite was the slowest required
+  # check; vitest's `--shard=<n>/<total>` collects every file then runs only this shard's slice, so
+  # the two runners split the suite and every test runs exactly once. Two things keep the split from
+  # enforcing less. `fail-fast: false` lets both shards finish, so a red run names every failing
+  # shard rather than stopping at the first. And the required context is still the `checks` job
+  # below, which reads `needs.unit.result` — GitHub reports that as `success` only when *every* matrix
+  # leg succeeds — so the branch ruleset's `Checks` name and `pnpm josh followup`'s gate are both
+  # unchanged by the split, exactly as the two-job split of joshuafolkken/kit#1226 left them.
   unit:
-    name: Unit Tests
+    name: Unit Tests (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     permissions:
       contents: read
       packages: read
@@ -258,7 +271,7 @@ jobs:
       # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
       # `scripts/test/test-unit-guard.ts`.
       - name: Run unit tests
-        run: pnpm josh test:unit
+        run: pnpm josh test:unit -- --shard=${{ matrix.shard }}/2
 
   # **The required status check. `Checks` is a name the branch ruleset already requires, and this job
   # is what keeps that name meaning what it meant** (joshuafolkken/kit#1226) — every check the single

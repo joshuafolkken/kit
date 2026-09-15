@@ -53,13 +53,32 @@ function aggregate_script(): string {
 
 describe('the unit suite has a job of its own', () => {
 	it('runs it through the guard that refuses to report a check which ran nothing', () => {
-		expect(job_scripts(UNIT_JOB)).toContain(GUARDED_UNIT_COMMAND)
+		expect(job_scripts(UNIT_JOB).some((script) => script.includes(GUARDED_UNIT_COMMAND))).toBe(true)
 	})
 
 	// The guard is bypassed by calling the runner, not only by removing the step, so the negative is
 	// asserted beside the positive — as `scripts/ci/ci-yml-unit-step.test.ts` does for the template.
 	it('never reaches vitest directly, which would lose the zero-test failure', () => {
 		expect(aggregate_script() + job_scripts(UNIT_JOB).join('\n')).not.toContain('vitest')
+	})
+})
+
+// joshuafolkken/kit#2031 sharded the unit suite across two runners with vitest's `--shard`. The
+// required context is unchanged — the aggregate job still reads `needs.unit.result`, which GitHub
+// reports green only when both legs are — so the split is proven here rather than at the merge gate.
+describe('the unit suite is sharded across two runners', () => {
+	it('fans the job out over two shards', () => {
+		expect(ci_yml_fixture.job_matrix(runtime_job(UNIT_JOB))['shard']).toEqual([1, 2])
+	})
+
+	// Without this a failing shard cancels its sibling, so a red run names one failure where two
+	// exist — the inverse of the all-failures-in-one-pass property the gate step was written for.
+	it('lets both shards finish so a red run names every failing one', () => {
+		expect(runtime_job(UNIT_JOB)?.strategy?.['fail-fast']).toBe(false)
+	})
+
+	it('passes each shard index through to vitest', () => {
+		expect(job_scripts(UNIT_JOB).join('\n')).toContain('--shard=${{ matrix.shard }}/2')
 	})
 })
 
