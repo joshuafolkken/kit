@@ -103,6 +103,7 @@ const ALIASES: Record<string, string> = {
 	rv: 'run:liveness',
 	rg: 'run:progress',
 	rp: 'run:prep',
+	rmg: 'run:merge',
 	lno: 'lane:open',
 	lnc: 'lane:close',
 	lnl: 'lane:list',

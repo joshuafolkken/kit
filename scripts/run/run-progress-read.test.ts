@@ -41,7 +41,14 @@ const REPOSITORY_GIT_DIR = '/repo/.git'
 // type assertion (joshuafolkken/kit#1900).
 const A_TIME = '2026-09-13T00:00:00Z'
 const A_HOLD = { issue: '1900', taken_at: A_TIME, pid: 1 }
-const A_CARRY = { invocation: 'backlogrun', started_at: A_TIME, merged: 0, filed: 0, cuts: 0 }
+const A_CARRY = {
+	invocation: 'backlogrun',
+	started_at: A_TIME,
+	merged: 0,
+	filed: 0,
+	cuts: 0,
+	failures: 0,
+}
 const A_LANE_OBSERVATION = { issue: '1900', state: 'open' }
 const A_LANE_INFO = {
 	issue: '1900',

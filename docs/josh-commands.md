@@ -1138,6 +1138,34 @@ pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 
 
 Bundles the reads a run makes before its first edit into one call; alias `rp`.
 
+### `josh run:merge`
+
+Collapses a `backlogrun` merge event into one call (joshuafolkken/kit#2024); alias `rmg`. The parent
+calls it once at a child's return and reads back the next child number — or a control verdict.
+
+```bash
+next=$(pnpm josh run:merge <N> --over 300000 --epic <E> --repo <owner/repo> --owner "$PPID")
+pnpm josh run:merge <N> --over 300000 --owner "$PPID"   # backlog offer (no epic)
+```
+
+Confirms the child from GitHub and, by what it turned out to be, does the post-merge steps: a **merged**
+child (CLOSED) is counted into the carry record (which resets the failure streak), then `main:sync`,
+`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
+or `already-done`) is left alone; a **failed** child has its stale `in-progress` dropped, is parked with
+`needs-decision`, and is counted against the consecutive-failure guard.
+
+**Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
+`epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
+`over` (the merge crossed `--over`, so hand the lanes over and cut), `human-review` (the child stopped
+before its commit — stop), `stop` (the consecutive-failure guard tripped), and `retry` (the child's
+state could not be read).
+
+**Options:**
+
+- `--over <tokens>` — required; the per-request hand-off threshold, checked after a merge.
+- `--epic <E> --repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
+- `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
+
 ### `josh run:progress`
 
 Report an unattended run's progress once it has gone quiet — the one josh command meant to be started and left running in the background.

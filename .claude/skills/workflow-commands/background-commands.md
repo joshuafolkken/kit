@@ -62,7 +62,7 @@ merge result?**
   are all counted inside the run, and the completion report body is already
   placed beside `pnpm josh git -y` in the table below. **Only the write follows the merge.** The
   comment exists because a compaction takes the counters at a moment nobody chooses (`backlogrun-progress.md` →
-  "The counters live in the conversation"), so composing the values earlier moves no write and loses
+  "The counters live in the record"), so composing the values earlier moves no write and loses
   no counter.
 - **`pnpm josh cost --over 300000` stays after the merge, and reads nothing from it.** It measures
   this session's own transcript, so the question above would bring it forward — but its answer grows

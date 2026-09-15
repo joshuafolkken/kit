@@ -168,6 +168,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Bundle the reads a run makes before its first edit: issue body and comments, state, dependency-update scope',
 		category: 'AI tools',
 	},
+	'run:merge': {
+		script: 'scripts/run/run-merge-cli.ts',
+		description:
+			'Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child',
+		category: 'AI tools',
+	},
 	'lane:open': {
 		...LANE_ARGUMENTS,
 		description: 'Open a lane: a linked work tree with its own branch and its own port seed',

@@ -35,7 +35,11 @@ const SLACK_BYTES = 512
 // against a document #1978 had already filled to the 80,000 mark. joshuafolkken/kit#2002 raised it a
 // further slack unit (80,512 → 81,024) for the mandated `josh lane:dispatch` update documenting the
 // dispatch-time `in-progress` apply, again landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 81_024
+// joshuafolkken/kit#2024 raised it two slack units (81,024 → 82,048) for the mandated `josh
+// run:merge` section: the section landed against a document already at its mark, and the branch's own
+// merge with `main` layered a concurrent doc addition on top, so the merged tree the CI gate measures
+// needed the second unit that the branch tree alone did not.
+const JOSH_COMMANDS_CEILING_BYTES = 82_048
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -63,7 +67,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_355 },
-	{ path: 'docs/josh-commands.md', bytes: 80_512 },
+	{ path: 'docs/josh-commands.md', bytes: 81_536 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

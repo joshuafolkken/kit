@@ -212,27 +212,40 @@ single non-numeric line as the verdict.
    `in-progress`, which `epic:next` classifies as waiting on time — the loop would poll to the 90-minute
    stale window and learn nothing.
 
-   **A merge is one event, and it is one turn of the parent's — never a chain of them.** **None of the
-   reads a merge needs takes another's result** (`prompts/collaboration-workflow/turn-batching.md`), so
-   `pnpm josh issue:state <N>` — with `--repo <owner/repo>` for a cross-repository child —
-   `pnpm josh lane:list` and `pnpm josh cost --over 300000` go out **together**. **The acting half is
-   the next turn, and it is also one**: `pnpm josh ms`, `pnpm josh lane:close <N>`, the counters comment
-   and the next `epic:next` ask take that classification and none of them takes another. **In steady
-   state that is one parent call per event.** **A turn whose whole content is one read, or one two-line
-   progress report, is the shape this forbids.**
+   **A merge is one event, and one call of the parent's — `pnpm josh run:merge <N>`**
+   (joshuafolkken/kit#2024). What was a reading turn and an acting turn is one composite command: it
+   confirms the child from GitHub, does the post-merge steps, folds in the hand-off check, and prints
+   the next child number — or a control verdict — for the parent to read. Pass the merged child's
+   number, `--over 300000`, and the offer's source — `--epic <E> --repo <owner/repo>` for a named epic,
+   nothing for the opted-in backlog — with `--owner "$PPID"` so it counts into the carry record under
+   the ownership guard.
 
-   **The counters go into the epic progress comment in that acting turn** — children run, Issues filed,
-   **consecutive failures**, and the time the run started — at **every** child's
-   merge (see "The counters live in the conversation" below). Their **values** are counted inside the
-   run, so only the write waits for the merge (`background-commands.md`).
+   ```bash
+   next=$(pnpm josh run:merge <N> --over 300000 --epic <E> --repo <owner/repo> --owner "$PPID")
+   # a child number (or several, one per free lane) to run next, or a verdict token
+   ```
 
-   **The hand-off check is asked at every child's merge, delegated or not** — `pnpm josh cost --over
-   300000`, in the reading turn above. Go back to step 1 on `under`; on `over` **the run hands its lanes
-   over and stops in that same turn** — no new child is taken, the lanes already in flight keep running,
-   and the next session picks them up from `lane:list` and `pnpm josh lane:output` (see "The hand-off"
-   below). The one reading that does not stop is a lane nobody could poll — `unreadable`, or `open` with
-   no recorded path. **Never read the condition off `pnpm josh delegate epic-child`** — a static policy
-   lookup that answers `delegate` everywhere, so a gate built on it never fires.
+   **What the one call does is decided by what the child turned out to be** — read from its GitHub state,
+   never from a log: a **merged** child (CLOSED) is counted into the carry record (which resets the
+   failure streak), then `pnpm josh ms`, `pnpm josh lane:close <N>`, and the counters mirrored onto the
+   epic comment; a **parked** child (OPEN, `needs-decision` or `already-done`) is left alone and not
+   counted; a **failed** child (OPEN, neither label) has its stale `in-progress` dropped, is parked with
+   `needs-decision`, and is counted against the consecutive-failure guard. **A turn whose whole content
+   is one read, or one two-line progress report, is the shape this collapses.**
+
+   **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
+   `error` pass through), the composite adds four verdict tokens: `over` — the merge crossed the budget,
+   so hand the lanes over and take the cut ("The hand-off" below); `human-review` — the child stopped
+   before its commit, the run's own ending (SKILL.md → §2z), so stop; `stop` — the consecutive-failure
+   guard tripped; and `retry` — the child's state could not be read, so re-read before deciding.
+
+   **The counters are the carry record's, and the epic progress comment is generated from it** (see "The
+   counters live in the record" below). **The hand-off check is folded into the merge branch of the one
+   call** — `pnpm josh cost --over 300000`, run after `pnpm josh ms`; `under` offers the next child,
+   `over` prints `over` so the parent hands its lanes over and takes the cut ("The hand-off" below), and
+   a session that cannot measure is read as `over`. **Never read the condition off `pnpm josh delegate
+   epic-child`** — a static policy lookup that answers `delegate` everywhere, so a gate built on it never
+   fires.
 3. **`wait`** — go back to step 1. **With something of this run's own in flight, that happens on the
    wake the progress watcher's exit delivers** and the parent starts no sleep of its own; the 60 s
    figure bounds how soon the ask may be repeated. **With nothing in flight the watcher declines and
@@ -404,17 +417,20 @@ withheld, one that is not is dispatched into a free lane beside it. **A carried-
 survive the cut is re-dispatched, never adopted** — `pnpm josh lane:open <N>` then
 `pnpm josh lane:dispatch <N>`, never picked up into the parent's own context.
 
-### The counters live in the conversation
+### The counters live in the record
 
-**Write the run's counters into the epic progress comment at every child's merge, and read them back
-after a compaction** — children run, Issues filed, **consecutive failures**, and the time the run
-started, counted in the conversation and nowhere else. **It is every merge and not only an
-`over` reading**, because a compaction happens under context pressure at whatever moment it arrives, so
-counters persisted only where the run expected to stop are taken anyway. **The consecutive-failure count
-is the one that matters** — it is what the stopped-unit section leans on to notice the environment is at
-fault; lost, a run keeps feeding children into a broken environment and never reaches three. **This is
-not what "Nothing is carried in the conversation" denies**: that is about the state a *next session*
-needs, all of it on GitHub, while the counters are about *this* run's own guards.
+**The single source of the run's counters is the carry record (`pnpm josh run:carry`), and the epic
+progress comment is generated from it** (joshuafolkken/kit#2024) — children run, Issues filed,
+**consecutive failures**, and the time the run started, held in one place rather than counted twice.
+`pnpm josh run:merge` writes the merge into the record and mirrors the counters onto the epic comment at
+every child's merge, so the human-readable comment and the guard the run reads can never disagree. **The
+consecutive-failure count is the one that matters** — it is what the stopped-unit section leans on to
+notice the environment is at fault, and a merge resets it; lost, a run keeps feeding children into a
+broken environment and never reaches three. **The record survives a session cut and a compaction
+alike** — that is what it is for — so the counters a run's own guards rest on are never taken by the
+moment the context is dropped. **This is not what "Nothing is carried in the conversation" denies**:
+that is about the state a *next session* needs, all of it on GitHub, while the record is about *this*
+run's own guards.
 
 ### What carries over, and where it lives
 
