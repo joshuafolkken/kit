@@ -555,6 +555,9 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **The hand-off check** — `pnpm josh cost --over 300000` at every child's merge, and the lane
   hand-over that follows an `over` — is `backlogrun-progress.md` → "The hand-off", unchanged. It is
   **not** asked during an idle watch: "The cost check is not asked during a watch" above is why.
+- **Parking is not stopping.** A child that needs a decision, and a delegated unit that stopped
+  without reporting, are **parked** and the run continues (`backlogrun-park.md` → "park and
+  continue"); only the consecutive-failure guard above can turn repeated parks into a stop.
 
 ## What runs once per session, not once per issue
 
@@ -613,27 +616,9 @@ named step reaches it, exactly as `chain-rule.md` / `latest-gate.md` / `followup
 
 A failure that is not consecutive parks its child and the run continues.
 
-## Stopping conditions
-
-`backlogrun` stops only here:
-
-1. `epic:next` reports `complete`, and the summary has been sent.
-2. `epic:next` reports `stop` — every remaining child needs a person; report them.
-3. `epic:next` reports `error` — a cyclic or contradictory graph.
-4. A guard above was reached.
-5. A timeout above elapsed.
-6. `pnpm josh cost --over 300000` answered `over` — or could not answer — just after a child merged, and
-   every lane still in flight records the path the next session will poll it on. This is the one stopping
-   condition that is not a problem: nothing is parked, nothing is filed, the epic is unchanged, and the
-   lanes keep running. **The reading stops the run in its own turn** — with the one exception that a lane
-   nobody could poll, `unreadable` or `open` with no recorded path, sends it back to step 1 instead.
-
-**A child that needs a decision is not on this list.** It is parked, and the run continues. **Neither is
-a delegated unit that stopped without reporting** — booked as a failure and parked, the loop goes on;
-only the consecutive-failure guard can turn it into a stop.
 ## This file is the single source of the `backlogrun` procedure
 
 `CLAUDE.md` carries the keyword's row in the shorthand table and the explicit-invocation rule;
-`SKILL.md` → §1 routes here. Everything else about a `backlogrun` is either in this file or in
-this file, and where the two could disagree, the rule is that this file adds nothing to a child's
-procedure — it only says which children there are.
+`SKILL.md` → §1 routes here. Everything else about a `backlogrun` is either in this file or in the
+phase documents it points to, and where the two could disagree, the rule is that this file adds
+nothing to a child's procedure — it only says which children there are.
