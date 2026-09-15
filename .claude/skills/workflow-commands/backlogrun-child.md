@@ -210,7 +210,9 @@ through to the loop's park branch: leave the label on, count nothing against the
 guard, and go back to step 1.
 
 1. **Stash the half-finished work** — `git stash push -u -m "backlogrun: stopped unit for #<N>"` — and
-   record it on the Issue. `-u` is not optional, and the comment is what gets the stash popped.
+   record it on the Issue. `-u` is not optional, and the comment is what gets the stash popped — by
+   message, `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`, never a positional
+   `git stash pop` that a shared stack lets another lane divert.
 2. **Remove `in-progress`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
 3. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
    naming what `run:liveness` answered and what it read.
@@ -235,10 +237,10 @@ back a child number — before implementing that child — and never again:
 
 ```bash
 pnpm josh latest:scope   # → required | skip ; the reason on stderr
-git stash push -u        # only if the tree has staged or modified files — never conditional on the answer
+git stash push -u -m "backlogrun: josh latest #<N>"        # only if the tree has staged or modified files — never conditional on the answer
 git switch main && git pull
 pnpm josh latest         # on `required` only
-git stash pop            # only if you stashed above
+pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only if you stashed above — by message, not a positional pop
 ```
 
 On `required`, load the `dependency-update` skill and follow its procedure — the overrides in **both**
@@ -307,8 +309,10 @@ branch, I had better stop" are both defensible in the moment, which is why the c
 
 **The `git stash` above is one of the flows that authorizes automatic stashing**
 (`prompts/collaboration-workflow/operating-rules.md` → the `git stash` bullet). **It is the one entry
-there not followed by `git stash pop`**: what is stashed belongs to a run that is gone, so **the Issue
-comment is the only thing that can bring it back**.
+there not followed by a pop**: what is stashed belongs to a run that is gone, so **the Issue comment is
+the only thing that can bring it back** — recovered by message, `pnpm josh stash:pop "run:hold
+reclaimed before #<N>"`, never a positional `git stash pop` a shared stash stack lets another lane
+divert.
 
 **Report what was reclaimed** — a child that started from a `reclaim` or a `resume` says so, with the
 stash reference where there was one.

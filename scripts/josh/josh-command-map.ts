@@ -104,6 +104,7 @@ const ALIASES: Record<string, string> = {
 	rg: 'run:progress',
 	rp: 'run:prep',
 	rmg: 'run:merge',
+	sp: 'stash:pop',
 	lno: 'lane:open',
 	lnc: 'lane:close',
 	lnl: 'lane:list',

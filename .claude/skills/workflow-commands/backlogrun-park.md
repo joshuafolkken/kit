@@ -150,9 +150,11 @@ source; what follows is this entry's branch.
    ```
 
    **`-u` is not optional** (a new `*.test.ts` is untracked). The comment makes the paused state
-   auditable and tells the session that resumes `<M>` a stash is waiting. `git stash pop` when
-   `epic:next` offers `<M>` again, after its `git switch main && git pull` — the prerequisite has merged
-   by then, so expect to resolve conflicts.
+   auditable and tells the session that resumes `<M>` a stash is waiting. **Pop it by message, never by
+   position** — `pnpm josh stash:pop "backlogrun: paused #<M> for prerequisite #<N>"` — when `epic:next`
+   offers `<M>` again, after its `git switch main && git pull`. The stash is a repository-wide stack
+   every lane shares, so a bare `git stash pop` would take whichever lane last pushed; the message
+   targets this one. The prerequisite has merged by then, so expect to resolve conflicts.
 
 3. `pnpm josh epic --add <E> <N> --before <M>` — one command writes the task-list row, the declaration
    and the `blocked-by` relation together. Never edit the body by hand: the declaration and the relations

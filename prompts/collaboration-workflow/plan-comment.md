@@ -17,7 +17,7 @@
 
 4. ワークフロー開始時点で作業ツリーにステージング済みまたは変更済みのファイルが既にある場合（例: ユーザーが事前に kit/設定ファイルをステージングした場合）、先に変更を退避する:
    ```bash
-   git stash
+   git stash push -m "plan: pre-existing changes"
    ```
 5. メインブランチへ切り替えて最新を取得する:
    ```bash
@@ -28,9 +28,9 @@
    pnpm latest
    # 脆弱性が見つかった場合: package.json の overrides に対象バージョンを追加して pnpm install 後に再確認
    ```
-   ステップ 4 で stash した場合は、ここで復元する:
+   ステップ 4 で stash した場合は、ここでメッセージ指定で復元する（位置指定や引数なしの `git stash pop` は使わない — stash は全 work tree が共有する 1 本のスタックで、別のレーンの stash を取り込む恐れがある。joshuafolkken/kit#2050）:
    ```bash
-   git stash pop
+   pnpm josh stash:pop "plan: pre-existing changes"
    ```
 7. **作業サマリを提示してから**実装を開始する（`CLAUDE.md` の Code Change Rules Step 0）。書式は下記「報告フォーマット（平易な概要 ＋ 技術詳細）」に従う — `JOSH_SESSION_LANG` の言語で、平易な概要 3 行を先頭に置き、技術詳細（触るファイル / モジュール、アプローチとその理由、副作用・スコープ外、テスト宣言）はその下に置く。
 

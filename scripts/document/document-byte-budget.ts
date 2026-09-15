@@ -38,8 +38,10 @@ const SLACK_BYTES = 512
 // joshuafolkken/kit#2024 raised it two slack units (81,024 → 82,048) for the mandated `josh
 // run:merge` section: the section landed against a document already at its mark, and the branch's own
 // merge with `main` layered a concurrent doc addition on top, so the merged tree the CI gate measures
-// needed the second unit that the branch tree alone did not.
-const JOSH_COMMANDS_CEILING_BYTES = 82_048
+// needed the second unit that the branch tree alone did not. joshuafolkken/kit#2050 raised it four
+// slack units (82,048 → 84,096) for the mandated `josh stash:pop` section — its command reference and
+// the `conflicted` verdict — landing against a document already at its mark.
+const JOSH_COMMANDS_CEILING_BYTES = 84_096
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -58,7 +60,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 18_031 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
-	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 16_064 },
+	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 16_702 },
 	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 11_117 },
 	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 7528 },
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
@@ -67,7 +69,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_355 },
-	{ path: 'docs/josh-commands.md', bytes: 81_536 },
+	{ path: 'docs/josh-commands.md', bytes: 83_206 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

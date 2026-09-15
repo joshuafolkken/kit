@@ -112,8 +112,10 @@ The procedure, in order:
 2. **Stash the work in progress** — `git stash push -u -m "fullrun: paused #<N> for prerequisite #<P>"`
    — then record it on the Issue: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<what was
    stashed, and that #<P> must land first>"`. **`-u` is not optional** (the work almost always includes
-   a new untracked `*.test.ts`). The Issue comment is what gets the stash popped; say it in the
-   Telegram too, but the comment is the record.
+   a new untracked `*.test.ts`). The Issue comment is what gets the stash popped — by message,
+   `pnpm josh stash:pop "fullrun: paused #<N> for prerequisite #<P>"`, never a positional
+   `git stash pop` a shared stash stack lets another lane divert. Say it in the Telegram too, but the
+   comment is the record.
 3. **Find out whether `#N` already belongs to an epic, before creating one** — `pnpm josh epic:bundle
    <N>`, which names it (`#893 already tracks this issue`).
 
@@ -162,10 +164,12 @@ The procedure, in order:
   repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -f body="<body>"` (body per
   `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3) Add `in-progress` (as above).
   (4) Post the agreed plan in the session language: fill the body if blank, otherwise add a comment.
-  (5) If the working tree already has staged or modified files, `git stash` first. (6) `git switch main
+  (5) If the working tree already has staged or modified files,
+  `git stash push -m "fullrun new: pre-existing changes"` first. (6) `git switch main
   && git pull`. (7) `pnpm josh latest:scope`; on `required` run `josh latest` and load the
   `dependency-update` skill; on `skip` neither runs (`latest-gate.md` is the single source). If you
-  stashed in (5), `git stash pop`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`;
+  stashed in (5), `pnpm josh stash:pop "fullrun new: pre-existing changes"` — by message, never a
+  positional `git stash pop`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`;
   only the first review round runs here). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether
   a second round is due, once round 1's fixes are in and before the commit.** (10) Where the tree was
   edited after the first gate started, re-run `pnpm josh gate` and join it. (11) `pnpm josh git -y

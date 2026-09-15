@@ -27,6 +27,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Before filing: say whether an issue like this exists and which epic it belongs to',
 		category: 'AI tools',
 	},
+	'stash:pop': {
+		script: 'scripts/git/stash-pop-cli.ts',
+		description: 'Pop the stash matching this message, not whichever a shared stack has on top',
+		category: 'AI tools',
+	},
 	epic: {
 		script: 'scripts-ai/epic.ts',
 		description: 'Create an epic issue from its child issue numbers',

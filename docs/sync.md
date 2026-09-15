@@ -423,8 +423,10 @@ SECURITY.md         tsconfig.sonar.json
 > (`git restore --worktree --staged <path>`), the plumbing spellings (`git update-index`,
 > `git apply --cached`), and everything that stages or commits by another route (`git merge`,
 > `git cherry-pick`, `git revert`). `git stash` is the notable one: the documented `fullrun new` /
-> `backlogrun` steps run it and `git stash pop` themselves, and a `pop` without `--index` reapplies
-> everything unstaged, so that flow flattens a staged baseline the deny entries otherwise protect.
+> `backlogrun` steps run it and `pnpm josh stash:pop "<message>"` themselves (message-targeted, because
+> the stash is a repository-wide stack every lane shares — joshuafolkken/kit#2050), and a `pop` without
+> `--index` reapplies everything unstaged, so that flow flattens a staged baseline the deny entries
+> otherwise protect.
 > Closing all of them would mean denying
 > `git` itself, which takes the read-only inspection commands the prompts require with it. The deny
 > stops the habitual form, which is the form an agent reaches for; the prose rule in `CLAUDE.md`
