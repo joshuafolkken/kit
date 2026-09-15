@@ -112,6 +112,14 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 	return run_issue_number.ISSUE_NUMBER_PATTERN.test(child) ? child : undefined
 }
 
+// Returns a present value only when it matches its shape, so the string that reaches a subprocess
+// argument passes a recognized regex sanitizer in the same expression (Sonar S8705) — the same shape
+// `valid_child` uses. `has_invalid_offer` has already refused a present mismatch, so a present value
+// always matches here; the in-expression test is what the taint analyzer needs to see on the value.
+function sanitized(raw: string | undefined, pattern: RegExp): string | undefined {
+	return raw !== undefined && pattern.test(raw) ? raw : undefined
+}
+
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
 	if (has_invalid_offer(parsed.values)) return undefined
 
@@ -124,7 +132,13 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 
 	if (over === undefined || owner === undefined) return undefined
 
-	return { child, epic: parsed.values.epic, repo: parsed.values.repo, over, owner }
+	return {
+		child,
+		epic: sanitized(parsed.values.epic, run_issue_number.ISSUE_NUMBER_PATTERN),
+		repo: sanitized(parsed.values.repo, REPO_PATTERN),
+		over,
+		owner,
+	}
 }
 
 function parse(argv: ReadonlyArray<string>): MergeContext | undefined {
