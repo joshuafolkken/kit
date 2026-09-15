@@ -71,22 +71,8 @@ vi.mock('../scripts/review/review-attest', () => ({
 	},
 }))
 
-// **Mocked for the same reason `review_stamps` above is**: `main` runs at import time, so the real
-// recorder would measure — and append a record for — whatever run is executing this suite
-// (joshuafolkken/kit#1471).
-const record_run_mock = vi.hoisted(() =>
-	vi
-		.fn<() => Promise<{ is_recorded: boolean; lines: Array<string> }>>()
-		.mockResolvedValue({ is_recorded: true, lines: [] }),
-)
-
-vi.mock('../scripts/time-runtime/time-history', () => ({
-	time_history: { record_run: record_run_mock },
-}))
-
-// **Mocked for the same reason the recorder above is** (joshuafolkken/kit#1628): a run whose record
-// did not land now sends a `warning` Telegram from the tail, and `main` runs at import time — so an
-// unmocked sender would put this suite one unrecorded run away from a live HTTP request.
+// **Mocked because `git_pr_followup` reaches `telegram-notify` and `main` runs at import time** — so
+// an unmocked sender would put this suite one send away from a live HTTP request.
 vi.mock('../scripts/git/telegram-notify', () => ({
 	telegram_notify: { send_or_report: vi.fn(async () => true) },
 }))

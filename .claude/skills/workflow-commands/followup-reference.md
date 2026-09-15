@@ -42,10 +42,9 @@ followup stages total:                    38.9 s
   command line the title read waits for the body that names it, and only that read waits.
   **`checks-wait` is untouched**, which is the point — what was overlapped was never a wait.
 - **The total is the sum of the stages, not the command's whole wall clock.** What sits outside it is
-  the tail the workflow script runs afterwards — the run report, the review-record clears, the hold
+  the tail the workflow script runs afterwards — the review-record clears, the hold
   release, the next-issue listing and the version line — so a run-timing reading of the same
-  span is longer, and that gap is the tail. It is normally a second or two; a run whose record could
-  not be written adds a Telegram round trip to it.
+  span is longer, and that gap is the tail. It is normally a second or two.
 - **What was measured is on joshuafolkken/kit#1349**, and cutting any of it is deliberately not this
   block's business: the required-check wait and the AI-review scan are the merge gate, and narrowing
   either to make a number smaller is the workaround `CLAUDE.md` prohibits.

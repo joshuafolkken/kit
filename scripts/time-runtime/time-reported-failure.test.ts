@@ -1,4 +1,3 @@
-import { time_failures } from '#scripts/time/time-failures'
 import { describe, expect, it } from 'vitest'
 import { time_reported_failure } from './time-reported-failure'
 import { time_spans } from './time-spans'
@@ -7,7 +6,6 @@ import { time_spans } from './time-spans'
 // actually type, and the result is written back the way the harness writes it: `is_error: false`,
 // because the pipeline exited with `tail`'s status, over a body that says the gate failed.
 
-const MINUTE_MS = 60_000
 const GATE_COMMAND = 'pnpm josh gate 2>&1 | tail -40'
 const LINT_STEP_FAILED = '✗ lint (pnpm josh lint) 4.2s'
 const GATE_FAILED_BODY = ['', LINT_STEP_FAILED, '✗ verification gate failed: lint'].join('\n')
@@ -289,36 +287,5 @@ describe('the outcome a span carries', () => {
 		const lines = [bash_call(0, 'g1', GATE_COMMAND), bash_result(1, 'g1', GATE_PASSED_BODY, true)]
 
 		expect(outcomes_of(lines)).toStrictEqual([time_spans.FAILED_OUTCOME])
-	})
-})
-
-// The acceptance criterion: the aggregate `josh time` prints, taken from a transcript holding the
-// piped red gate and the re-run that answered it.
-describe('the failure aggregate over a transcript holding a piped red gate', () => {
-	const RERUN_MINUTES = 2
-	const lines = [
-		bash_call(0, 'g1', GATE_COMMAND),
-		bash_result(1, 'g1', GATE_FAILED_BODY, false),
-		bash_call(2, 'g2', GATE_COMMAND),
-		bash_result(2 + RERUN_MINUTES, 'g2', GATE_PASSED_BODY, false),
-	]
-
-	it('counts the red gate and charges the run that followed it as rework', () => {
-		const totals = time_failures.build_failures(time_spans.parse_timeline(lines.join('\n')).spans)
-
-		expect(totals).toStrictEqual({
-			failed_call_count: 1,
-			unknown_call_count: 0,
-			rerun_ms: RERUN_MINUTES * MINUTE_MS,
-			is_measured: true,
-		})
-	})
-
-	// What the same transcript reported before this change, so the case says what was recovered.
-	it('reported no failure at all while only the harness outcome was read', () => {
-		const { spans } = time_spans.parse_timeline(lines.join('\n'))
-		const harness_only = spans.map((span) => ({ ...span, outcome: time_spans.OK_OUTCOME }))
-
-		expect(time_failures.build_failures(harness_only).failed_call_count).toBe(0)
 	})
 })

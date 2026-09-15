@@ -35,7 +35,7 @@ What one invocation does, in order:
   keeps it. The removal reads the Issue's labels and sends back the spelling GitHub stored, so an
   `In-Progress` repository is not missed, and an Issue that never carried the label is never written to.
 - **Nothing after the merge can end the run.** Once the pull request has merged, every remaining step —
-  the Issue comment, the epic close, the run report, the review records and the working-tree hold
+  the Issue comment, the epic close, the review records and the working-tree hold
   release — runs on its own: one that fails is reported by name, with the command that finishes it by
   hand where one exists (`pnpm josh run:release --force` for the hold; `gh pr comment` or `gh api …
   /comments` for the completion report). Before the merge nothing changes: a failure there still ends
@@ -43,16 +43,6 @@ What one invocation does, in order:
   merge failure**: read the ⚠ lines, run what they name, and do not re-run the merge.
 - **Recovers the issue number from the pull request body** when the invocation named none: the `closes
   #N` keyword supplies it.
-- **Emits the run report and appends it to `.time-history.jsonl`**, on a merged run only. It measures
-  nothing of its own — the report is the same block the run-timing report builds (elapsed, turns, round trips,
-  the per-round-trip cost, and the same figures against the previous recorded run). The record is
-  looked up from where the run happened and appended to the durable checkout. **It cannot fail a run**:
-  a history that cannot be read or written prints one line saying the measurement was unavailable,
-  names the per-issue timing report that would take it, and sends that same fact as a `warning`
-  Telegram (⚠️). The warning is not a `failure`: the run merged, and only its measurement did not land.
-  **It never fires for a history that was switched off** — `JOSH_TIME_HISTORY=0` turns the whole step
-  off. The multi-day timing report reads the accumulation back.
-
 ### The post-execution reference is in `followup-reference.md`
 
 Everything the run reaches **after** it issues `pnpm josh followup` is in `followup-reference.md`, so

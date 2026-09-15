@@ -1,12 +1,10 @@
 import { git_followup_cleanup, type CleanupStep } from '../scripts/git/git-followup-cleanup'
 import { git_followup_pending } from '../scripts/git/git-followup-pending'
 import { git_next_issues } from '../scripts/git/git-next-issues'
-import { telegram_notify } from '../scripts/git/telegram-notify'
 import { review_attest } from '../scripts/review/review-attest'
 import { review_stamps } from '../scripts/review/review-stamps'
 import { run_hold } from '../scripts/run/run-hold'
 import { run_progress_clock } from '../scripts/run/run-progress-clock'
-import { time_history, type RunRecordOutcome } from '../scripts/time-runtime/time-history'
 import { parse_completed_issue_number } from './followup-issue-number'
 
 // **The count of unreleased merges, not the project version** (joshuafolkken/kit#1486). This line
@@ -76,91 +74,6 @@ async function clear_review_records(should_merge: boolean): Promise<void> {
 	await clear_review_target(should_merge)
 }
 
-// **A record that was not written is said out loud, not only printed** (joshuafolkken/kit#1628).
-// The printed line has been here since joshuafolkken/kit#1471 and it is not enough on its own: a
-// `followup` prints hundreds of lines, and thirteen consecutive runs lost their record with the
-// warning sitting unread in every one of their console logs. The completion notification is where the
-// user actually looks, so the gap goes there too.
-//
-// **It cannot fail the run, and it is not allowed to look like one.** `send_or_report` is the
-// tolerant form — a send that fails is reported on stderr and returns false — and the task type is
-// `warning` rather than `failure`, because the merge succeeded and only the measurement did not.
-//
-// **Sent only when a record was expected and did not arrive.** Two cases are deliberately silent: a
-// run whose record landed, which the printed block already reports; and a history switched off with
-// `JOSH_TIME_HISTORY=0`, which is an answer rather than a gap — `record_run` returns no `reason`
-// there, and warning once per merge about an opted-out feature is how a warning channel stops being
-// read. So the absent `reason` is the gate, not `is_recorded` on its own.
-//
-// **The body does not promise a recovery it cannot deliver.** `pnpm josh time` only ever *reads*;
-// nothing rewrites a missing line into `.time-history.jsonl`, so this run is permanently outside
-// every `--period` window and the message says exactly that. The measurement command is offered for
-// what it does — measure this one run by hand — and `send_or_report` is given no recovery line at
-// all, because nothing re-sends a warning that failed to send.
-async function notify_missing_record(issue: number, outcome: RunRecordOutcome): Promise<void> {
-	if (outcome.is_recorded || outcome.reason === undefined) return
-
-	const number = String(issue)
-	const body = [
-		`Merged, but this run was not recorded in the time history (${outcome.reason}).`,
-		`It is permanently absent from \`pnpm josh time --period <days>\` — nothing writes the missing line back.`,
-		`\`pnpm josh time --issue ${number}\` still measures this one run by hand.`,
-	].join(' ')
-
-	await telegram_notify.send_or_report(
-		{
-			task_type: 'warning',
-			repo_name: undefined,
-			issue_title: undefined,
-			body,
-			issue_url: undefined,
-			pr_url: undefined,
-		},
-		undefined,
-	)
-}
-
-// joshuafolkken/kit#1471: the run report only ever appeared when a person typed `diag`, so a run
-// nobody asked about left no record — and a measurement that is not continuous cannot say whether
-// the last change made anything faster. Every `fullrun`, and every child of an `epicrun` or a
-// `queue`, ends here, so emitting it from this one seam covers all of them without a second hook.
-//
-// **Gated on `should_merge`, like the epic auto-close and the round-1 snapshot clear above.** A
-// `--no-merge` run has not finished: the pull request is still open and its CI wait is not over, so
-// a record written there would compare a part of a run against whole ones.
-//
-// **Printed above `print_completion`**, because `print_pending_release` stays the final line of the
-// console output by contract.
-//
-// **The raw working directory is handed to `record_run`, which splits the two uses itself**
-// (joshuafolkken/kit#1825). A child of an `epicrun` runs in a lane work tree, and `process.cwd()`
-// there is the lane. Since `lane:dispatch` launches the child as its own process
-// (joshuafolkken/kit#1749), its transcript is filed under the lane's own slug — so the lookup must
-// start from the raw lane cwd, which `list_sessions_across` searches alongside the main checkout's slug.
-// Pre-rewriting to `session_cwd` here is what regressed it: it hid every dispatched child's transcript
-// by looking only in the main slug, and #1628's fix — added before the child was a separate process —
-// became the cause once #1749 landed. `record_run` still resolves the durable history root through
-// `session_cwd` internally, so the appended line lands in the main checkout rather than in a lane's
-// own `.time-history.jsonl`, which `pnpm josh lane:close` deletes.
-//
-// The `cwd` parameter exists for the test that pins it: the property under test is that a lane-shaped
-// work tree is passed through unchanged, which cannot be asserted against the suite's own directory.
-async function record_run_report(
-	issue_number: string | undefined,
-	should_merge: boolean,
-	cwd: string = process.cwd(),
-): Promise<void> {
-	if (!should_merge) return
-
-	const completed = parse_completed_issue_number(issue_number)
-	if (completed === undefined) return
-
-	const outcome = await time_history.record_run(completed, cwd)
-	for (const line of outcome.lines) console.info(line)
-
-	await notify_missing_record(completed, outcome)
-}
-
 // joshuafolkken/kit#1091: the working-tree hold a typed entry point claims before it starts is
 // released here, on the one seam every `fullrun` — and every child of an `epicrun` or a `queue` —
 // passes through, so a finished run never leaves the next one locked out. **Gated on `should_merge`
@@ -215,7 +128,7 @@ async function end_progress_watcher(should_merge: boolean): Promise<void> {
 }
 
 // **The steps are independent, and one of them failing must not discard the rest**
-// (joshuafolkken/kit#1539). They used to be four bare statements, so whichever threw first ended the
+// (joshuafolkken/kit#1539). They used to be bare statements, so whichever threw first ended the
 // process — and the hold release is the last of them, which is how three merged runs left their
 // working tree locked. The order is still the contract: `print_completion` ends with the
 // unreleased-merge count, the final console line.
@@ -224,16 +137,7 @@ function build_report_steps(
 	should_merge: boolean,
 ): ReadonlyArray<CleanupStep> {
 	return [
-		// No `recovery` for either: `time_history.record_run` is called from this file alone and
-		// `pnpm josh time` only *reads* what it wrote, so a missing record cannot be restored by hand;
-		// the completion output is console text, which nothing re-prints.
-		{
-			label: 'The run report',
-			recovery: undefined,
-			run: async () => {
-				await record_run_report(issue_number, should_merge)
-			},
-		},
+		// No `recovery`: the completion output is console text, which nothing re-prints.
 		{
 			label: 'The completion output',
 			recovery: undefined,
@@ -300,7 +204,6 @@ async function finish(issue_number: string | undefined, should_merge: boolean): 
 const git_followup_finish = {
 	finish,
 	build_finish_steps,
-	record_run_report,
 	print_completion,
 	print_next_issues,
 	print_pending_release,

@@ -52,7 +52,7 @@ epic #1262 の子（#1256〜#1260）がゲートを 133 秒から中央値 5 秒
 
   **却下したのはこの判定のしかたであって、`PreToolUse` という機構そのものではない。** joshuafolkken/kit#1390 は**まさに `PreToolUse` フックとして** `pnpm josh batch:guard` を実装し、`.claude/settings.json` で配布している。判定に使うのは、いま出そうとしている 1 件ではなく**閉じた履歴** — 結果が返り終わったターンの並び — である。単発呼び出しのターンが 2 つ続いたことは 1 件からは見えないが、履歴からは見える。上に並べた懸念は、それぞれ設計で避けてある。依存は**共有ターゲット**で見るので `grep` → `sed -n` は止まらず、**書き込みも読み取りとまったく同じ基準で拒否され**（joshuafolkken/kit#1762）、拒否は 1 つの単発連続につき **1 回だけ**である（フックが読む窓を超えて続く連続では、列の開始が窓の外へ出るため窓ごとに 1 回になる — 詳細は下記の `docs/josh-commands.md`）。機構の全体は `docs/josh-commands.md` →「`josh batch:guard`」にある。
 
-  **フックはフォークにも届く。** joshuafolkken/kit#1424 以降、判定も「1 回だけ」の記録も、親ではなく**フォーク自身の transcript** を鍵にする — フックの入力にある `agent_id` から解決する `time_hook_transcript.transcript_of`（`scripts/time/time-hook-transcript.ts`）が単一ソースで、ガードは `scripts/josh/hook-decision.ts` 経由でそこを通る。委譲された子やレビューエージェントは、親の記録を共有せず、それぞれに配送される。
+  **フックはフォークにも届く。** joshuafolkken/kit#1424 以降、判定も「1 回だけ」の記録も、親ではなく**フォーク自身の transcript** を鍵にする — フックの入力にある `agent_id` から解決する `time_hook_transcript.transcript_of`（`scripts/time-runtime/time-hook-transcript.ts`）が単一ソースで、ガードは `scripts/josh/hook-decision.ts` 経由でそこを通る。委譲された子やレビューエージェントは、親の記録を共有せず、それぞれに配送される。
 
   **書き込みが範囲に入ったのは joshuafolkken/kit#1762 である。** それまでの限界は 2 つあり、どちらも書き込みに一度も届かないという同じ結果になっていた。joshuafolkken/kit#1509 が、同じファイルを続けて編集する区間では共有ターゲットの判定が列を毎回捨てて数え直すため拒否に必要な 2 件に列が届かないことを特定し（`time-bundles.ts` の write→write 例外として解消済み）、そのうえで**配線が `Bash` のみだったので `Edit` の連続にはそもそもフックが呼ばれなかった**。実測 19 run で、回収できる往復 261 件のうち **184 件（70.5%）が書き込み**、`Edit` だけで 158 件（60.5%）— 最大の寄与源が構造上ずっと圏外だった。
 
@@ -87,7 +87,7 @@ Round trips:
 - **round trip は「1 ターンがまとめて出した呼び出しのかたまり」1 つ**であって、呼び出し 1 件ではない。まとめて出せば呼び出し数はそのままで往復だけが減る — つまりこの数字は、仕事を減らさずに費用だけ下げたかどうかを直接見せる
 - **しきい値は 1.50 呼び出し/往復。** 下回ると 1 行の指摘が出る。少しでもまとめている run は超えるので、これは程度を採点するのではなく**まとめていないこと**を検出する
 - **`tool-less turns` の行は、ツールを 1 つも呼ばなかったターン数**（`turn_count − round_trips`、joshuafolkken/kit#1875）。`batch:guard` は発話だけのターンを拒否できない — 呼ぶツールが無く `PreToolUse` が発火しないので、唯一の梃子がこの事後計測である。`Bundling:` はこれを構造上見られない（まとめる対象を持たないターンは列に入らない）。実測 run #1864 は 177 ターン中 149 が呼び出しあり、**28 がツールなし**だった
-- 実装は `scripts/time/time-round-trips.ts`、詳細は `docs/josh-commands.md` の `time` コマンドの項
+- 実装は `scripts/time-runtime/time-round-trips.ts`、詳細は `docs/josh-commands.md` の `time` コマンドの項
 
 ## なぜ resident ではなく引き金つき配送に置くか（joshuafolkken/kit#1524）
 
@@ -97,7 +97,7 @@ Round trips:
 
 **引き金が発火しないターンでは何も起きず、それが正しい。** 発火しないということは往復あたりの呼び出し数が下限（1.50）を上回っているということであり、規則が守られている状態と一致する。
 
-配送文（`scripts/time/time-batch-guard.ts` の `REASON`、および `time-density.ts` の実行時 1 行）が運ぶのは次の 2 点である。常駐側に残していたのと同じ内容であり、削っていない。
+配送文（`scripts/time-runtime/time-batch-guard.ts` の `REASON`、および `time-density.ts` の実行時 1 行）が運ぶのは次の 2 点である。常駐側に残していたのと同じ内容であり、削っていない。
 
 1. 別の呼び出しの結果に依存しない呼び出しは、同じターンに載せる
 2. 判断基準は「依存の有無」であって呼び出しの種類ではない（読み取りも編集も同じ）。かつ、往復を減らすことは仕事を減らすことではない
