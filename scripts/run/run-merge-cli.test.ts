@@ -139,6 +139,12 @@ describe('run_merge_cli.parse — sanitizes subprocess-bound arguments', () => {
 		expect(run_merge_cli.parse(argv)).toBeUndefined()
 	})
 
+	it('refuses an option-shaped slug whose half starts with a hyphen', () => {
+		const argv = [CHILD, '--over', '300000', '--epic', '900', '--repo=--evil/x']
+
+		expect(run_merge_cli.parse(argv)).toBeUndefined()
+	})
+
 	it('accepts a well-formed epic and repository', () => {
 		expect(run_merge_cli.parse(EPIC_ARGS)?.repo).toBe(REPO)
 	})

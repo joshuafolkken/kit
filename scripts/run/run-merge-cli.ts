@@ -29,11 +29,13 @@ const STOP_TOKEN = 'stop'
 const RETRY_TOKEN = 'retry'
 // The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
 const DIGITS = /^\d+$/u
-// A GitHub `owner/repo` slug: two runs of word characters, hyphens or dots around a single slash.
-// `epic` and `repo` flow into `pnpm josh` subprocess arguments, so a value shaped like an option
-// (`--foo`) would be read as a flag rather than a value — argument injection (Sonar S8705). Validating
-// each against its shape is the sanitizer, exactly as `child`, `over` and `owner` are already checked.
-const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/u
+// A GitHub `owner/repo` slug: an owner and a repository name around a single slash, each starting with
+// an alphanumeric so neither half can begin with `-`. `epic` and `repo` flow into `pnpm josh`
+// subprocess arguments, so a value shaped like an option (`--foo`, or `--evil/x`) would be read as a
+// flag rather than a value — argument injection (Sonar S8705). The leading-alphanumeric anchor is what
+// makes the pattern an *effective* sanitizer: a looser `[\w.-]+` still admits `--evil/x`, which GitHub
+// itself forbids (names cannot start with a hyphen) and which the taint analyzer keeps flagging.
+const REPO_PATTERN = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/u
 const USAGE =
 	'Usage: josh run:merge <issue> --over <tokens> [--epic <E> --repo <owner/repo>] [--owner <pid>]'
 
