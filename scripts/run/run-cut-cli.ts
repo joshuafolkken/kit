@@ -111,9 +111,13 @@ function report_relaunch_failure(target: string, note: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
-function relaunch(target: string, lane: LaneInfo, invocation: string): number {
+function relaunch(target: string, lane: LaneInfo): number {
 	const notes: Array<string> = []
-	const built = detached_launch.agent_argv(invocation)
+	// The relaunched child is given a resume-specific prompt, not the record's bare `fullrun #<N>`
+	// (joshuafolkken/kit#2022), so it goes straight to `run:cut --resume` without reading the
+	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
+	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
+	const built = detached_launch.agent_argv(lane_dispatch.resume_invocation(lane.issue))
 
 	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
 
@@ -165,7 +169,7 @@ async function cut(target: string, issue: string, phase: string): Promise<number
 
 	if (started === undefined) return report_cut_exists(target)
 
-	return relaunch(target, lane, started.invocation)
+	return relaunch(target, lane)
 }
 
 // **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two

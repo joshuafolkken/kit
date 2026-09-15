@@ -69,8 +69,12 @@ const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'
 
 interface RunCut {
-	// The command the fresh process runs — `fullrun #<N>`, built through `lane_dispatch.child_invocation`
-	// so the format is single-sourced with the dispatch that first launched the child.
+	// The identity of the run this cut belongs to — `fullrun #<N>`, built through
+	// `lane_dispatch.child_invocation` so it is single-sourced with the dispatch that first launched the
+	// child. **It is the resume-matching key, not the relaunch prompt** (joshuafolkken/kit#2022): the
+	// relaunch gives the fresh process `lane_dispatch.resume_invocation` instead, while
+	// `is_declared_cut` / `is_adopted_cut` still compare this field against `invocation_for(issue)` to
+	// confirm the record belongs to the resuming issue.
 	invocation: string
 	issue: string
 	// The branch the implementation sits on. The resume refuses to continue on any other branch, so a
