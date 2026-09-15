@@ -22,6 +22,9 @@ const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`
 // What the older flow recorded in a lane: the unit's own transcript, a file to read rather than write.
 const RECORDED_TRANSCRIPT = path.join(os.tmpdir(), 'josh-test-session.jsonl')
 const ALIVE_PROCESS = '--process alive'
+// An issue argument carrying a shell injection, refused by both invocation builders before it reaches a
+// command line.
+const INJECTION = '1749; rm -rf /'
 const LAUNCH_FAILURE = 'spawn claude ENOENT'
 const LOG_REFUSED = 'the session log at /x could not be opened'
 const PID = 4242
@@ -66,8 +69,38 @@ describe('lane_dispatch.child_invocation — what the child is asked to do', () 
 	})
 
 	it('refuses anything that is not an issue number, before it reaches a command line', () => {
-		expect(() => lane_dispatch.child_invocation('1749; rm -rf /')).toThrow()
+		expect(() => lane_dispatch.child_invocation(INJECTION)).toThrow()
 		expect(() => lane_dispatch.child_invocation('')).toThrow()
+	})
+})
+
+// joshuafolkken/kit#2022: a relaunched child is given a resume-specific prompt so it does not read the
+// workflow-commands entry documents to learn it is a resume. This pins that instruction — its resume
+// command, and that it still ends with `child_invocation` so the parent's liveness poll keeps matching.
+describe('lane_dispatch.resume_invocation — what a relaunched child is asked to do', () => {
+	it('tells the child to resume first and points it at the resume guide, not the entry docs', () => {
+		const prompt = lane_dispatch.resume_invocation(ISSUE)
+
+		expect(prompt).toContain(`pnpm josh run:cut --resume ${ISSUE}`)
+		expect(prompt).toContain('pre-gate-cut.md')
+		expect(prompt).toContain('do not re-read the workflow-commands entry documents')
+	})
+
+	// The parent's poll is `pgrep -laf "<child_invocation>$"` (see `describe`), so a relaunched process
+	// whose command line did not end with `fullrun #<N>` would be booked stopped while it ran.
+	it('ends with the bare `fullrun #<N>`, so the liveness poll keeps matching the relaunch', () => {
+		expect(
+			lane_dispatch.resume_invocation(ISSUE).endsWith(lane_dispatch.child_invocation(ISSUE)),
+		).toBe(true)
+	})
+
+	it('is a safe single command-line argument, never one the launcher rejects', () => {
+		expect(detached_launch.agent_argv(lane_dispatch.resume_invocation(ISSUE)).kind).toBe('argv')
+	})
+
+	it('refuses anything that is not an issue number', () => {
+		expect(() => lane_dispatch.resume_invocation(INJECTION)).toThrow()
+		expect(() => lane_dispatch.resume_invocation('')).toThrow()
 	})
 })
 

@@ -32,6 +32,10 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // from text that was read from anywhere — the same discipline `run-wake-session.ts` applies to the
 // invocation it rebuilds out of the carry record.
 const CHILD_INVOCATION = 'fullrun'
+// The resume guide a relaunched child is pointed at (joshuafolkken/kit#2022). It carries the resume
+// procedure a `run:cut` successor follows, so naming it lets the child read one section rather than the
+// workflow-commands entry documents it would otherwise read to learn it is a resume at all.
+const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const LOG_PREFIX = 'josh-lane-dispatch-'
 const LOG_SUFFIX = '.log'
 const NOTE_SEPARATOR = '; '
@@ -73,6 +77,25 @@ function child_invocation(issue: string): string {
 	run_issue_number.require_issue_number(issue)
 
 	return `${CHILD_INVOCATION} #${issue}`
+}
+
+/**
+ * The prompt a relaunched child is given after a `run:cut` — a resume-specific instruction followed by
+ * the bare `child_invocation` (joshuafolkken/kit#2022). A relaunched child used to be given the plain
+ * `fullrun #<N>`, so it read the workflow-commands entry documents (SKILL.md, fullrun.md, ~29k tokens)
+ * every resume before it could learn it was a resume at all — the "do not re-read" exception lives
+ * inside the very skill it had to open. This preamble tells it up front, so it goes straight to
+ * `run:cut --resume` and the stage that answers.
+ *
+ * **It ends with `child_invocation` on purpose, not as decoration.** The parent's liveness poll is
+ * `pgrep -laf "<child_invocation>$"` (built at dispatch — see `log_sentence`), so a relaunched process
+ * whose command line did not end with `fullrun #<N>` would be booked stopped while it ran. The trailing
+ * invocation keeps that poll matching and is also the ordinary run a `fresh` verdict falls back to.
+ */
+function resume_invocation(issue: string): string {
+	const preamble = `Resuming the lane child for issue #${issue} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:cut --resume ${issue}\` before anything else and follow the matching verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Only on \`fresh\` proceed as an ordinary`
+
+	return `${preamble} ${child_invocation(issue)}`
 }
 
 // **In the temp directory rather than in the lane**, so the log survives `pnpm josh lane:close` — the
@@ -249,6 +272,7 @@ const lane_dispatch = {
 	describe,
 	dispatch_child,
 	is_worth_warning,
+	resume_invocation,
 	warn_of_problem,
 }
 
