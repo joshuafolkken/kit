@@ -83,25 +83,39 @@ function is_epic_without_repo(values: ParsedArguments['values']): boolean {
 	return values.epic !== undefined && values.repo === undefined
 }
 
-// A present value that does not match its shape; an absent one is left to `is_epic_without_repo` and
-// the backlog fall-through, so `undefined` is not malformed.
-function is_malformed(raw: string | undefined, pattern: RegExp): boolean {
-	return raw !== undefined && !pattern.test(raw)
+// Returns a present epic only when it is an issue number, so the string that reaches a subprocess
+// argument passes a recognized regex sanitizer in the same expression (Sonar S8705). The named pattern
+// is tested directly rather than passed in, because the taint analyzer credits a literal pattern test
+// as a sanitizer — exactly as `valid_child` does — but not one reached through a parameter.
+function valid_epic(raw: string | undefined): string | undefined {
+	if (raw === undefined) return undefined
+
+	return run_issue_number.ISSUE_NUMBER_PATTERN.test(raw) ? raw : undefined
 }
 
-// The two subprocess-bound strings, checked before either reaches an argument list.
-function has_injection_risk(values: ParsedArguments['values']): boolean {
-	return (
-		is_malformed(values.epic, run_issue_number.ISSUE_NUMBER_PATTERN) ||
-		is_malformed(values.repo, REPO_PATTERN)
-	)
+// The repository counterpart, testing its own named pattern directly for the same reason.
+function valid_repo(raw: string | undefined): string | undefined {
+	if (raw === undefined) return undefined
+
+	return REPO_PATTERN.test(raw) ? raw : undefined
+}
+
+// A value that was present but failed its shape check: `valid_epic` / `valid_repo` map it to
+// `undefined`, and it was not absent to begin with. An absent value is left to `is_epic_without_repo`
+// and the backlog fall-through, so `undefined` is not a rejection.
+function is_rejected(raw: string | undefined, valid: string | undefined): boolean {
+	return raw !== undefined && valid === undefined
 }
 
 // The offer arguments that must hold before a context is built: an epic needs its repository, and
-// neither may be shaped like a subprocess flag. Both are grouped here so `to_context` reads them as one
-// precondition rather than as separate branches.
+// neither may be shaped like a subprocess flag (`valid_epic` / `valid_repo` reject that). Grouped here
+// so `to_context` reads them as one precondition rather than as separate branches.
 function has_invalid_offer(values: ParsedArguments['values']): boolean {
-	return is_epic_without_repo(values) || has_injection_risk(values)
+	return (
+		is_epic_without_repo(values) ||
+		is_rejected(values.epic, valid_epic(values.epic)) ||
+		is_rejected(values.repo, valid_repo(values.repo))
+	)
 }
 
 function valid_child(parsed: ParsedArguments): string | undefined {
@@ -110,14 +124,6 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 	if (child === undefined) return undefined
 
 	return run_issue_number.ISSUE_NUMBER_PATTERN.test(child) ? child : undefined
-}
-
-// Returns a present value only when it matches its shape, so the string that reaches a subprocess
-// argument passes a recognized regex sanitizer in the same expression (Sonar S8705) — the same shape
-// `valid_child` uses. `has_invalid_offer` has already refused a present mismatch, so a present value
-// always matches here; the in-expression test is what the taint analyzer needs to see on the value.
-function sanitized(raw: string | undefined, pattern: RegExp): string | undefined {
-	return raw !== undefined && pattern.test(raw) ? raw : undefined
 }
 
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
@@ -134,8 +140,8 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 
 	return {
 		child,
-		epic: sanitized(parsed.values.epic, run_issue_number.ISSUE_NUMBER_PATTERN),
-		repo: sanitized(parsed.values.repo, REPO_PATTERN),
+		epic: valid_epic(parsed.values.epic),
+		repo: valid_repo(parsed.values.repo),
 		over,
 		owner,
 	}
