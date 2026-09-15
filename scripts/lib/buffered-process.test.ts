@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -22,6 +22,8 @@ interface ObservedExecaOptions {
 	reject?: boolean
 	timeout?: number
 	cwd?: string
+	env?: NodeJS.ProcessEnv
+	extendEnv?: boolean
 }
 
 const spawn_options: Array<ObservedExecaOptions> = []
@@ -46,6 +48,10 @@ function mock_execa(): void {
 beforeEach(() => {
 	vi.clearAllMocks()
 	spawn_options.length = 0
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('run_buffered_process', () => {
@@ -108,6 +114,30 @@ describe('run_buffered_process', () => {
 
 		expect(Number.isFinite(result.elapsed_ms)).toBe(true)
 		expect(result.elapsed_ms).toBeGreaterThanOrEqual(0)
+	})
+})
+
+describe('color environment', () => {
+	it('forces color when the parent does not disable it', async () => {
+		vi.stubEnv('NO_COLOR', undefined)
+		mock_execa()
+
+		await buffered_process.run_buffered_process(['josh', 'lint'])
+
+		expect(spawn_options[0]?.env?.['FORCE_COLOR']).toBe('1')
+		expect(spawn_options[0]?.env).not.toHaveProperty('NO_COLOR')
+	})
+
+	it('respects disabled color without forwarding a conflicting override', async () => {
+		vi.stubEnv('NO_COLOR', '1')
+		vi.stubEnv('FORCE_COLOR', '3')
+		mock_execa()
+
+		await buffered_process.run_buffered_process(['josh', 'lint'])
+
+		expect(spawn_options[0]?.env?.['NO_COLOR']).toBe('1')
+		expect(spawn_options[0]?.env).not.toHaveProperty('FORCE_COLOR')
+		expect(spawn_options[0]?.extendEnv).toBe(false)
 	})
 })
 
