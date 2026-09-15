@@ -1,14 +1,15 @@
 import { claude_plugin_config } from './claude-plugin-config'
+import { hook_launch } from './hook-launch'
 
-// The consumer's `.claude/settings.json` runs its hooks through the published bundle directly, not
-// through `pnpm josh` (joshuafolkken/kit#1930). Every guarded call in a consumer used to pay a `pnpm`
-// launch — measured at ~0.2 s on top of the ~0.24 s the command itself takes — for no reason but to
-// resolve the same `dist/josh.js` the `bin.josh` entry already points at. `node` invokes that bundle
-// with none of that wrapper.
+// The consumer's `.claude/settings.json` runs its hooks off the published package directly, not
+// through `pnpm josh` (joshuafolkken/kit#1930, joshuafolkken/kit#2023). Two paths inside a hook
+// command are rebased onto the installed package: the per-hook bundle `dist/hooks/<name>.js` a hook
+// prefers, and the `pnpm josh <command>` fallback it drops to when that bundle is missing — which for
+// a consumer becomes the `dist/josh.js` dispatcher, since the published package always ships `dist`
+// and a `pnpm` launch would only add the wrapper this exists to remove.
 //
-// kit's own settings file is deliberately left on `pnpm josh` (which runs `tsx scripts/josh/josh.ts`
-// against the live source): a consumer wants the fast built bundle, but kit developing the guards
-// themselves must run the current source, not a stale build. The rewrite is therefore gated on the
+// kit's own settings file keeps the `pnpm josh` fallback (`tsx scripts/josh/josh.ts` against live
+// source), so a fresh clone with no `dist/` still runs the current guards. The rewrite is gated on the
 // copy destination, exactly as the plugin injection is — kit's source tree is never transformed in
 // place.
 
@@ -16,15 +17,36 @@ const PNPM_JOSH_PREFIX = 'pnpm josh '
 // Relative to the consumer's project root, which is the working directory a Claude Code hook runs in.
 // The path is the plugin marketplace's `node_modules` location plus the built entry `bin.josh` names.
 const BUNDLE_INVOCATION = `node ${claude_plugin_config.MARKETPLACE_PATH}/dist/josh.js `
-// Only the value of a `"command"` field that begins with `pnpm josh` — never the echo reminders, which
-// begin with `echo`, and never prose that merely mentions the string. The capture keeps whatever
-// spacing the serializer produced between the key and the value.
-const JOSH_COMMAND_FIELD = /("command":\s*")pnpm josh /gu
+// The per-hook bundle directory a fresh clone builds, and where it lives inside the installed package.
+const HOOK_BUNDLE_DIR = `${hook_launch.HOOK_DIST_DIR}/`
+const CONSUMER_HOOK_BUNDLE_DIR = `${claude_plugin_config.MARKETPLACE_PATH}/${HOOK_BUNDLE_DIR}`
+// Capture the value of every `"command"` field, escapes and all, so the rewrites below touch command
+// values alone — never an echo reminder's prose or a `"description"` that merely mentions the string.
+const COMMAND_FIELD = /("command":\s*")((?:[^"\\]|\\.)*)(")/gu
+
+// Idempotent on its own: `CONSUMER_HOOK_BUNDLE_DIR` still contains `HOOK_BUNDLE_DIR`, so a blind
+// second pass would rebase an already-rebased path onto itself. A value already targeting the
+// installed package is left untouched, restoring the idempotency the earlier `pnpm josh`-anchored
+// rewrite had for free.
+function rebase_bundle_directory(value: string): string {
+	return value.includes(CONSUMER_HOOK_BUNDLE_DIR)
+		? value
+		: value.split(HOOK_BUNDLE_DIR).join(CONSUMER_HOOK_BUNDLE_DIR)
+}
+
+// Rebase both paths a hook command can carry: the bundle it prefers, then the `pnpm josh` fallback.
+// The bundle rewrite runs first — its replacement never contains `pnpm josh`, so the two are
+// independent whichever order they run. The fallback rewrite is idempotent too (`BUNDLE_INVOCATION`
+// holds no `pnpm josh `), so the whole rewrite is safe to run more than once.
+function rewrite_command_value(value: string): string {
+	return rebase_bundle_directory(value).split(PNPM_JOSH_PREFIX).join(BUNDLE_INVOCATION)
+}
 
 function rewrite_hook_commands(content: string): string {
 	return content.replaceAll(
-		JOSH_COMMAND_FIELD,
-		(_match, prefix: string) => `${prefix}${BUNDLE_INVOCATION}`,
+		COMMAND_FIELD,
+		(_match, open: string, value: string, close: string) =>
+			`${open}${rewrite_command_value(value)}${close}`,
 	)
 }
 

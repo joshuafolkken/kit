@@ -7,6 +7,9 @@ import { transform_copied_content } from './init-copy-content'
 const { apply_hook_command_rewrite_for_destination, rewrite_hook_commands } = hook_command_rewrite
 const SETTINGS_DESTINATION = path.join('.claude', 'settings.json')
 const SESSION_LANG_COMMAND = '{"command": "pnpm josh session:lang"}'
+// A kit-side fallback-form command: prefers the built bundle, drops to `pnpm josh` when it is absent.
+const KIT_FALLBACK_FORM =
+	'{"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi"}'
 
 function consumer_hook_commands(): ReadonlyArray<string> {
 	const transformed = transform_copied_content(
@@ -43,6 +46,23 @@ describe('rewrite_hook_commands', () => {
 
 		expect(rewrite_hook_commands(prose)).toBe(prose)
 	})
+
+	// A fallback-form command carries two paths: the bundle it prefers and the `pnpm josh` fallback.
+	// Both are rebased onto the installed package, so a consumer's fallback is the dispatcher bundle
+	// rather than a pnpm launch (joshuafolkken/kit#2023).
+	it('rebases both the bundle path and the pnpm fallback of a fallback-form command', () => {
+		expect(rewrite_hook_commands(KIT_FALLBACK_FORM)).toBe(
+			'{"command": "if [ -f ./node_modules/@joshuafolkken/kit/dist/hooks/pretool-guard.js ]; then node ./node_modules/@joshuafolkken/kit/dist/hooks/pretool-guard.js; else node ./node_modules/@joshuafolkken/kit/dist/josh.js pretool:guard; fi"}',
+		)
+	})
+
+	// The rebased bundle path still contains `dist/hooks/`, so a blind rerun would rewrite it onto
+	// itself. A second pass over already-rewritten output must be a no-op (joshuafolkken/kit#2023).
+	it('is idempotent — a second rewrite leaves an already-rebased command unchanged', () => {
+		const once = rewrite_hook_commands(KIT_FALLBACK_FORM)
+
+		expect(rewrite_hook_commands(once)).toBe(once)
+	})
 })
 
 describe('apply_hook_command_rewrite_for_destination', () => {
@@ -74,6 +94,20 @@ describe('the distributed settings.json a consumer receives', () => {
 
 		for (const command of josh_hooks) {
 			expect(command).toContain('node ./node_modules/@joshuafolkken/kit/dist/josh.js ')
+		}
+	})
+
+	// The per-hook bundles are launched from the installed package, so a consumer's guarded call pays
+	// neither a pnpm launch nor the dispatcher's tsx re-spawn (joshuafolkken/kit#2023).
+	it('launches each per-hook bundle from the installed package', () => {
+		const bundle_hooks = consumer_hook_commands().filter((command) =>
+			command.includes('dist/hooks/'),
+		)
+
+		expect(bundle_hooks.length).toBeGreaterThan(0)
+
+		for (const command of bundle_hooks) {
+			expect(command).toContain('node ./node_modules/@joshuafolkken/kit/dist/hooks/')
 		}
 	})
 })
