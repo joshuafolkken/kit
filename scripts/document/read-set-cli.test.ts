@@ -11,6 +11,7 @@ const BACKLOGRUN_DOC = 'backlogrun.md'
 const PROGRESS_DOC = 'backlogrun-progress.md'
 const HAND_OFF = 'The hand-off'
 const BACKLOGRUN = 'backlogrun'
+const LANE_CHILD = 'lane-child'
 const NO_SUCH_DOC = 'no-such-doc.md'
 const FAILURE = 1
 const MISTYPED = 'not-an-entry'
@@ -129,5 +130,23 @@ describe('josh read:set', () => {
 				scoped: empty,
 			}),
 		).toBe(SUCCESS)
+	})
+})
+
+// The dispatched lane child is a synthetic entry, not a table keyword, so the CLI has to offer it and
+// report it (joshuafolkken/kit#2021).
+describe('josh read:set — the lane-child entry', () => {
+	it('reports the synthetic lane-child entry with its total-read figure and note', () => {
+		const { code, out } = captured(() => read_set_cli.run([LANE_CHILD], ROOT))
+
+		expect(code).toBe(SUCCESS)
+		expect(out).toContain(`entry: ${LANE_CHILD}`)
+		expect(out).toContain(read_set_cli.TOTAL_READ_LABEL)
+		expect(out).toContain('JOSH_LANE_CHILD')
+	})
+
+	it('lists lane-child among the entries it offers and never refuses it', () => {
+		expect(read_set_cli.known_entries(ROOT)).toContain(LANE_CHILD)
+		expect(captured(() => read_set_cli.run([LANE_CHILD], ROOT)).code).toBe(SUCCESS)
 	})
 })

@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { entry_read_set, type ReadSetCost, type SectionCost } from './entry-read-set'
+import { lane_child_read_set } from './lane-child-read-set'
 
 // `josh read:set` — what this entry point reads before it starts, and what that costs
 // (joshuafolkken/kit#1776).
@@ -29,8 +30,17 @@ const NUMBER_WIDTH = 9
 const USAGE = 'Usage: josh read:set [<entry>] [--json]'
 const WHOLE_LABEL = 'whole — every referenced file read in full'
 const SCOPED_LABEL = 'scoped — referenced sections only'
+const TOTAL_READ_LABEL = 'total read — scoped entry plus point-of-use reached'
 const SECTION_LABEL = '-- sections referenced out of the set --'
 const POINT_OF_USE_LABEL = '-- read at the point of use, not at the entry --'
+// **The dispatched lane child reads a trimmed `fullrun` set** — the point-of-use documents the parent
+// owns are dropped and the entry-only `SKILL.md` sections are read section by section, so `total read`
+// falls well below a normal `fullrun`'s (joshuafolkken/kit#2021).
+const LANE_CHILD_NOTE: ReadonlyArray<string> = [
+	'  a dispatched lane child (`JOSH_LANE_CHILD`) reads this trimmed set:',
+	'  - skips the point-of-use documents the parent owns — child dispatch, lane opening, the progress watcher and the hand-off',
+	'  - reads SKILL.md §2a/§2c/§2e/§2i/§3 at the section level, not whole — a leaf child never uses them',
+]
 const FETCH_RULE =
 	'fetch: one `Read` call per file — never `cat`, and never two files in one command.'
 const OVER_CAP_NOTE = '   Read (over the Bash cap)'
@@ -82,7 +92,15 @@ function labels_of(report: ReadSetCost): Array<string> {
 		...report.point_of_use.map((entry) => entry.file),
 		WHOLE_LABEL,
 		SCOPED_LABEL,
+		TOTAL_READ_LABEL,
 	]
+}
+
+// **The total the entry actually reads**: the scoped entry read plus the point-of-use documents this
+// entry reaches, each fetched whole at its step. It is the figure a before/after compares — a lane
+// child's set is smaller here, not in `scoped` alone (joshuafolkken/kit#2021).
+function total_read(report: ReadSetCost): { tokens: number; bytes: number } {
+	return entry_read_set.total([report.scoped, ...report.point_of_use.map((one) => one.cost)])
 }
 
 function label_width(report: ReadSetCost): number {
@@ -140,9 +158,14 @@ function total_lines(report: ReadSetCost, width: number): Array<string> {
 		'',
 		row(WHOLE_LABEL, report.whole, width),
 		row(SCOPED_LABEL, report.scoped, width),
+		row(TOTAL_READ_LABEL, total_read(report), width),
 		`  saved by reading sections: ${saved.toLocaleString('en-US')} tok (${String(saved_percent(report))}%)`,
 		'',
 	]
+}
+
+function note_lines(report: ReadSetCost): Array<string> {
+	return report.entry === lane_child_read_set.LANE_CHILD ? [...LANE_CHILD_NOTE, ''] : []
 }
 
 function report_lines(report: ReadSetCost): Array<string> {
@@ -150,6 +173,7 @@ function report_lines(report: ReadSetCost): Array<string> {
 
 	return [
 		`entry: ${report.entry}`,
+		...note_lines(report),
 		...file_lines(report, width),
 		...section_lines(report, width),
 		...point_of_use_lines(report, width),
@@ -158,10 +182,17 @@ function report_lines(report: ReadSetCost): Array<string> {
 	]
 }
 
+// **`lane-child` is a synthetic entry, not a table keyword.** It is not a keyword a person types, so
+// it stays out of `SKILL.md`'s "1. Which file to read" table and out of `entry_read_set.entries()`
+// (whose derivation the rule tests pin); the CLI adds it to the list it offers and validates against.
+function known_entries(root: string): Array<string> {
+	return [...entry_read_set.entries(root), lane_child_read_set.LANE_CHILD]
+}
+
 function wanted_entries(argv: ReadonlyArray<string>, root: string): Array<string> {
 	const named = argv.filter((value) => !value.startsWith(FLAG_PREFIX))
 
-	return named.length > NOTHING ? named : entry_read_set.entries(root)
+	return named.length > NOTHING ? named : known_entries(root)
 }
 
 // **An unrecognized keyword is refused, never reported on.** Left to fall through it produced a
@@ -170,9 +201,15 @@ function wanted_entries(argv: ReadonlyArray<string>, root: string): Array<string
 // "no such entry" for a mistyped keyword (joshuafolkken/kit#1776 review round 1). That is the silent wrong answer
 // `doc:section` refuses for an unresolvable heading, and this is the same refusal.
 function unknown_entries(wanted: ReadonlyArray<string>, root: string): Array<string> {
-	const known = entry_read_set.entries(root)
+	const known = known_entries(root)
 
 	return wanted.filter((entry) => !known.includes(entry))
+}
+
+function costed_entry(root: string, entry: string): ReadSetCost {
+	if (entry === lane_child_read_set.LANE_CHILD) return lane_child_read_set.costed(root)
+
+	return entry_read_set.costed(root, entry)
 }
 
 function printed(reports: ReadonlyArray<ReadSetCost>, is_json: boolean): string {
@@ -186,12 +223,12 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 	const unknown = unknown_entries(wanted, root)
 
 	if (wanted.length === NOTHING || unknown.length > NOTHING) {
-		console.error(`${USAGE}\nKnown entries: ${entry_read_set.entries(root).join(', ')}`)
+		console.error(`${USAGE}\nKnown entries: ${known_entries(root).join(', ')}`)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const reports = wanted.map((entry) => entry_read_set.costed(root, entry))
+	const reports = wanted.map((entry) => costed_entry(root, entry))
 
 	console.info(printed(reports, argv.includes(JSON_FLAG)))
 
@@ -207,8 +244,10 @@ const read_set_cli = {
 	JSON_FLAG,
 	POINT_OF_USE_LABEL,
 	SCOPED_LABEL,
+	TOTAL_READ_LABEL,
 	USAGE,
 	WHOLE_LABEL,
+	known_entries,
 	main,
 	run,
 	saved_percent,

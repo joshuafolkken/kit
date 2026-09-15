@@ -1265,6 +1265,8 @@ Two figures under one definition, which is what makes a before and an after comp
 - A file cited more than once is charged once, over the union of the lines its references cover.
 - Each file row names the tool that can deliver it whole; a file over the Bash cap is marked `Read (over the Bash cap)` — one `Read` call per file, never `cat`.
 - A `-- read at the point of use, not at the entry --` block lists `latest-gate.md`, `followup.md`, `chain-rule.md` and `background-commands.md` with their costs; they are listed, not counted in `whole`/`scoped`.
+- `total read` sums the scoped entry read and the point-of-use documents that entry actually reaches — the figure a before/after compares.
+- **`lane-child` is a synthetic entry**, not a table keyword: `pnpm josh read:set lane-child` prints the trimmed set a dispatched lane child (`JOSH_LANE_CHILD`) reads — it drops the point-of-use documents the parent owns (child dispatch, lane opening, the progress watcher and the hand-off) and reads the entry-only `SKILL.md` sections (§2a/§2c/§2e/§2i/§3) at the section level, so its `total read` falls well below a normal `fullrun`'s (joshuafolkken/kit#2021).
 
 **Output / exit codes:** an unrecognized keyword is refused with the known ones listed, rather than reporting a saving of zero.
 
