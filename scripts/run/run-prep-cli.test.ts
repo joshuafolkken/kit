@@ -6,6 +6,7 @@ import { run_prep } from './run-prep'
 const read_block_mock = vi.hoisted(() => vi.fn())
 const read_state_mock = vi.hoisted(() => vi.fn())
 const decide_mock = vi.hoisted(() => vi.fn())
+const is_child_mock = vi.hoisted(() => vi.fn())
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
 
@@ -19,6 +20,10 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 
 vi.mock('#scripts/version/latest-scope-cli', () => ({
 	latest_scope_cli: { decide: decide_mock },
+}))
+
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: is_child_mock },
 }))
 
 const { run_prep_cli } = await import('./run-prep-cli')
@@ -53,11 +58,13 @@ beforeEach(() => {
 	read_block_mock.mockReset()
 	read_state_mock.mockReset()
 	decide_mock.mockReset()
+	is_child_mock.mockReset()
 	vi.spyOn(console, 'info').mockImplementation(info_mock)
 	vi.spyOn(console, 'error').mockImplementation(error_mock)
 	info_mock.mockReset()
 	error_mock.mockReset()
 	decide_mock.mockReturnValue(SKIP_DECISION)
+	is_child_mock.mockReturnValue(false)
 })
 
 afterEach(() => {
@@ -120,6 +127,28 @@ describe('run_prep_cli.run', () => {
 	it('refuses no argument', async () => {
 		expect(await run_prep_cli.run([])).toBe(FAILURE)
 		expect(reported()).toContain('Usage')
+	})
+})
+
+describe('run_prep_cli.run dependency scope', () => {
+	it('skips the dependency scope inside a dispatched lane child', async () => {
+		stub_ok()
+		is_child_mock.mockReturnValue(true)
+
+		expect(await run_prep_cli.run([ISSUE])).toBe(SUCCESS)
+
+		expect(decide_mock).not.toHaveBeenCalled()
+		expect(printed()).toContain('latest: not asked')
+	})
+
+	it('computes the dependency scope outside a lane child', async () => {
+		stub_ok()
+		is_child_mock.mockReturnValue(false)
+
+		expect(await run_prep_cli.run([ISSUE])).toBe(SUCCESS)
+
+		expect(decide_mock).toHaveBeenCalledTimes(1)
+		expect(printed()).toContain('latest: skip')
 	})
 })
 
