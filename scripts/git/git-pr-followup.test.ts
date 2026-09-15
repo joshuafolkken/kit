@@ -35,6 +35,8 @@ vi.mock('./git-pr-checks', () => ({
 	git_pr_checks: {
 		wait_for_pr_success: vi.fn(),
 	},
+	DEFAULT_STABLE_READS: 2,
+	WATCH_CONFIRMED_STABLE_READS: 1,
 }))
 
 vi.mock('./git-pr-ai-review', () => ({

@@ -10,35 +10,17 @@ import {
 	parse_pr_state_snapshot,
 	parse_repo_name_from_package,
 	wait_for_pr_success,
-	type PrStateSnapshot,
 } from './git-pr-checks'
-import { CODE_RABBIT, make_pr_snapshot, PASSING_ROLLUP, SONAR_QUBE } from './git-pr-checks-fixture'
+import {
+	CODE_RABBIT,
+	make_pr_snapshot,
+	make_sequence_fetcher,
+	PASSING_ROLLUP,
+	pending_rollup_snapshot,
+	SONAR_QUBE,
+} from './git-pr-checks-fixture'
 
 const REPO_NAME = 'joshuafolkken-com'
-const NO_SNAPSHOT_ERROR = 'No snapshot available for test.'
-
-function pending_rollup_snapshot(): PrStateSnapshot {
-	return make_pr_snapshot({ merge_state_status: 'UNKNOWN', rollup: [] })
-}
-
-function make_sequence_fetcher(snapshots: ReadonlyArray<PrStateSnapshot>): {
-	count: () => number
-	fetch: () => Promise<PrStateSnapshot>
-} {
-	let index = 0
-
-	async function fetch(): Promise<PrStateSnapshot> {
-		const snapshot = snapshots[index] ?? snapshots.at(-1)
-
-		index += 1
-
-		if (snapshot === undefined) throw new Error(NO_SNAPSHOT_ERROR)
-
-		return snapshot
-	}
-
-	return { count: () => index, fetch }
-}
 
 describe('parse_repo_name_from_package', () => {
 	it('returns the name field from package.json content', () => {
