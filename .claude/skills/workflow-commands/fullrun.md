@@ -59,7 +59,7 @@ by `backlogrun`** — that batch owns the same question at its own seam.
 `backlogrun-progress.md` → "The hand-off" is the single source of the check and of where 300,000 comes from.
 
 **Start the progress step once the hold is claimed, and start it without being asked** —
-`pnpm josh run:progress --wait` in the background, what it printed presented in labelled form when it
+`pnpm josh run:progress --wait` in the background, what it printed presented as-is when it
 exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
 every real report this run makes. The procedure is `backlogrun-progress.md` → "Progress while the run is quiet",
 its single source; a `fullrun` running as a `backlogrun` named issue or epic child starts none.

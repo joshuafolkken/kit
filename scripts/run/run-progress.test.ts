@@ -132,8 +132,8 @@ const LINE = run_progress.format_line(observations(), {
 })
 
 describe('format_line — observations, never "still running"', () => {
-	it('is one line, because it is relayed beside the run’s own output', () => {
-		expect(LINE).not.toContain('\n')
+	it('is five lines now, one field group each, so a person reads it without reformatting', () => {
+		expect(LINE.split('\n')).toHaveLength(5)
 	})
 
 	it('names the child, its labels and whether a pull request exists', () => {
@@ -181,7 +181,7 @@ describe('format_line — when the observation was taken', () => {
 	// the reader's own zone *instead* would show another hour on any machine that is not on UTC. The
 	// `Z` is what stops a reader having to guess which of the two halves is which.
 	it('marks the zone, so a reader in another one is not left guessing', () => {
-		expect(LINE).toMatch(/ \/ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z /u)
+		expect(LINE).toMatch(/ \/ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z\n/u)
 	})
 
 	// The local half is what a person can act on without converting anything, and it leads for that
@@ -209,9 +209,9 @@ describe('format_line — when the observation was taken', () => {
 // worked out by hand is eventually worked out wrong. Both inputs were already here; only one of them
 // was printed.
 describe('format_line — when the next report is due', () => {
-	it('closes the line with it, rather than leaving a reader to work it out', () => {
+	it('closes the report with it on its own line, rather than leaving a reader to work it out', () => {
 		expect(LINE).toMatch(
-			/· next \d{4}-\d{2}-\d{2} \d{2}:\d{2}[+-]\d{2}:\d{2} \/ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u,
+			/\nnext \d{4}-\d{2}-\d{2} \d{2}:\d{2}[+-]\d{2}:\d{2} \/ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u,
 		)
 	})
 
@@ -308,5 +308,49 @@ describe('format_children — the pre-label stage', () => {
 		expect(
 			run_progress.format_children([{ issue: '9', labels: [IN_PROGRESS], pr_state: 'open' }]),
 		).toBe('#9 in-progress PR:open')
+	})
+})
+
+// joshuafolkken/kit#2026. The command prints the five labelled lines itself now, so the parent relays
+// them verbatim rather than rewriting one `·`-joined line every interval. The example is the one the doc
+// carried, so a reader comparing the two sees the same values under labels.
+const CHILDREN_LINE = 'children #1631 in-progress,route:split PR:open'
+
+const REPORT_FIELDS = {
+	observed_at: '2026-09-09 13:27+07:00 / 2026-09-09T06:27Z',
+	quiet: '29m',
+	unchanged: '0m',
+	children: '#1631 in-progress,route:split PR:open',
+	lanes: 'none',
+	load: '4.7',
+	record: 'unread',
+	next: '2026-09-09 13:47+07:00 / 2026-09-09T06:47Z',
+}
+
+describe('format_report — the five labelled lines', () => {
+	it('puts every field group on its own labelled line, in the documented order', () => {
+		expect(run_progress.format_report(REPORT_FIELDS).split('\n')).toEqual([
+			'⏳ at 2026-09-09 13:27+07:00 / 2026-09-09T06:27Z',
+			'quiet 29m · unchanged 0m',
+			CHILDREN_LINE,
+			'lanes none · load 4.7 · record unread',
+			'next 2026-09-09 13:47+07:00 / 2026-09-09T06:47Z',
+		])
+	})
+
+	it('labels the children line, the one field the single line left bare', () => {
+		expect(run_progress.format_report(REPORT_FIELDS).split('\n', 3)[2]).toBe(CHILDREN_LINE)
+	})
+
+	it('says a missing next was absent rather than inventing a time', () => {
+		const absent = run_progress.format_report({ ...REPORT_FIELDS, next: undefined })
+
+		expect(absent.split('\n').at(-1)).toBe(`next ${run_progress.NO_NEXT}`)
+	})
+
+	it('labels a present next, so the schedule line is read the same way as the others', () => {
+		expect(run_progress.format_next_line('2026-09-09 13:47+07:00')).toBe(
+			'next 2026-09-09 13:47+07:00',
+		)
 	})
 })

@@ -187,13 +187,14 @@ const EARLY_HEARTBEAT_REASON =
 	'⛔ early heartbeat: this call arms a wait timer of its own, and the progress clock is not yours ' +
 	'to keep. `pnpm josh run:progress --wait` waits the interval out for you ' +
 	'(`JOSH_PROGRESS_INTERVAL_MINUTES`, or `josh.progress_interval_minutes` in `package.json`, ' +
-	'default 20 minutes), prints one line and exits — start it in the background, relay the line it ' +
-	'printed when it exits, and start the next one. Two timers armed at ' +
+	'default 20 minutes), prints the five labelled lines and exits — start it in the background, relay ' +
+	'the lines it printed when it exits, and start the next one. Two timers armed at ' +
 	'once is what produced reports 3–5 minutes apart on a 15-minute setting ' +
 	'(joshuafolkken/kit#1570): a new one was armed on the turn a timer fired and again on the turn a ' +
 	"child's completion woke the run, and `--mark` recorded each report without anything refusing the " +
 	'early ones. **An explicit ask is not a heartbeat**: if the person asked for progress now, run ' +
-	'`pnpm josh run:progress --once`, which prints one line whatever the clock says. If you are ' +
+	'`pnpm josh run:progress --once`, which prints the five labelled lines whatever the clock says. ' +
+	'If you are ' +
 	'waiting on something rather than on a clock, wait on the thing itself — `pnpm josh followup` ' +
 	'waits for CI. The procedure is `.claude/skills/workflow-commands/backlogrun.md` → "Progress while ' +
 	'the run is quiet". **This rule fires on every early arm, not once per run**, so reissuing the ' +
