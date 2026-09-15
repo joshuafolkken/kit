@@ -56,13 +56,13 @@ carrying the figure printed on standard error and the resume command (the invoca
 in a fresh session — `fullrun #<N>` for a `#N` entry, `fullrun new` for a `new` one), run
 `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run was dispatched
 by `backlogrun`** — that batch owns the same question at its own seam.
-`backlogrun-progress.md` → "The hand-off" is the single source of the check and of where 300,000 comes from.
+`backlogrun-progress.md` → "The hand-off" is the single source of the check and of where 300,000 comes from — **a dispatched lane child does not perform this check and never reads that document** (its trimmed set is `pnpm josh read:set lane-child`).
 
 **Start the progress step once the hold is claimed, and start it without being asked** —
 `pnpm josh run:progress --wait` in the background, what it printed presented as-is when it
 exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
 every real report this run makes. The procedure is `backlogrun-progress.md` → "Progress while the run is quiet",
-its single source; a `fullrun` running as a `backlogrun` named issue or epic child starts none.
+its single source for a top-level run; a `fullrun` running as a dispatched lane child (a `backlogrun` named issue or epic child) **starts none and never reads that document** — the outermost run reports for every child, so the child's read set omits it (`pnpm josh read:set lane-child`).
 
 **Read Issue `#N` and every comment on it before implementing** — `pnpm josh issue:read <N>`. A
 decision recorded after the body was written lives only in a comment, and between a body and a comment
