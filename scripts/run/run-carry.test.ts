@@ -99,6 +99,7 @@ describe('a record written by one session and read by the next', () => {
 				merged: 0,
 				filed: 0,
 				cuts: 0,
+				failures: 0,
 			},
 		})
 	})
@@ -118,6 +119,32 @@ describe('a record written by one session and read by the next', () => {
 	})
 })
 
+// joshuafolkken/kit#2024: the consecutive-failure streak is folded into the record so it is the single
+// source, with the epic progress comment generated from it. These pin the two properties the run's
+// stopped-unit guard rests on — a merge breaks the streak, and it survives the session cut like every
+// other counter — and that a record written before the field existed reads a zero streak rather than
+// failing to parse.
+describe('the consecutive-failure streak', () => {
+	it('rises with each failed child', () => {
+		const first = run_carry.apply_change(target(), begun(), { failures: 1 })
+
+		expect(run_carry.apply_change(target(), first, { failures: 1 }).failures).toBe(2)
+	})
+
+	it('resets to zero when a child merges', () => {
+		const failed = run_carry.apply_change(target(), begun(), { failures: 2 })
+
+		expect(run_carry.apply_change(target(), failed, { merged: 1 }).failures).toBe(0)
+	})
+
+	it('carries the streak across the hand-off and the adoption', () => {
+		const failed = run_carry.apply_change(target(), begun(), { failures: 2 })
+		const cut = run_carry.apply_change(target(), failed, { cuts: 1 })
+
+		expect(run_carry.adopt_carry(target(), cut, dead_owner())?.failures).toBe(2)
+	})
+})
+
 describe('the whole-run bound', () => {
 	it('is spent once the record is older than eight hours', () => {
 		begun()
@@ -132,6 +159,7 @@ describe('the whole-run bound', () => {
 			merged: 0,
 			filed: 0,
 			cuts: 0,
+			failures: 0,
 		}
 
 		expect(run_carry.is_expired(undated, START)).toBe(true)
@@ -276,6 +304,7 @@ describe('a cut declares the hand-off', () => {
 			merged: cut.merged,
 			filed: cut.filed,
 			cuts: cut.cuts,
+			failures: cut.failures,
 			done: undefined,
 			owner_pid: DEAD_PID,
 			owner_start: undefined,

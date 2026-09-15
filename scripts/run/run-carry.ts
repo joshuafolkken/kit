@@ -61,6 +61,13 @@ interface RunCarry {
 	merged: number
 	filed: number
 	cuts: number
+	// The consecutive-failure streak (joshuafolkken/kit#2024). It is the count the stopped-unit guard
+	// leans on to notice the environment is at fault, and it lived only in the epic progress comment
+	// before this — the second place a counter was kept. Folded into the record so the record is the
+	// single source and the comment is generated from it. **A merge resets it to zero**: three failures
+	// in a row stop the run, and a child that merged in between breaks the streak. Read through
+	// `apply_change`, never bumped from outside, so the reset stays with the increment.
+	failures: number
 	// The process spending the budget, as the caller declared it with `--owner`. `run-hold.ts` records
 	// a pid it explicitly does not read back, because the process that claims a work tree is the
 	// short-lived `josh run:hold` itself; here the owner is the parent loop's own session, which
@@ -116,6 +123,10 @@ interface CarryChange {
 	merged?: number
 	filed?: number
 	cuts?: number
+	// One failed child to add to the streak (joshuafolkken/kit#2024). It is never sent in the same
+	// change as `merged` — a child either merged or it did not — and a change that carries `merged`
+	// resets the streak regardless of this field.
+	failures?: number
 	// One issue number to add to `done`, not a count. It is the one field of a change that names a
 	// thing rather than an amount, because what a resumed named-issue run needs is *which* issues are
 	// finished.
@@ -138,6 +149,9 @@ const run_carry_schema = z.object({
 	merged: z.number(),
 	filed: z.number(),
 	cuts: z.number(),
+	// Defaulted, so a record written before this field existed parses with a zero streak rather than
+	// failing to read — the same backward-compatibility the optional owner fields below carry.
+	failures: z.number().default(0),
 	// Optional, so a record written by the previous shape still parses. Read as "no owner declared",
 	// which is the not-provably-live answer rather than a live one.
 	owner_pid: z.number().optional(),
@@ -207,6 +221,7 @@ function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry
 		merged: NO_INCREMENT,
 		filed: NO_INCREMENT,
 		cuts: NO_INCREMENT,
+		failures: NO_INCREMENT,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 	}
@@ -254,7 +269,7 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
-	const { invocation, started_at, merged, filed, cuts, done } = carry
+	const { invocation, started_at, merged, filed, cuts, failures, done } = carry
 	// The recorded fields are named rather than spread from `carry`, so the previous owner cannot
 	// survive an adoption by a caller that declared none. **`done` is carried across**: the whole point
 	// of the resumption is that the successor does not re-run what the cut session finished.
@@ -264,6 +279,7 @@ function adopt_carry(
 		merged,
 		filed,
 		cuts,
+		failures,
 		done,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
@@ -286,6 +302,16 @@ function next_done(carry: RunCarry, done: number | undefined): ReadonlyArray<num
 	return current.includes(done) ? current : [...current, done]
 }
 
+// **A merge resets the streak; every other change adds to it.** The consecutive-failure guard trips
+// on children failing one after another, so a child that merged in between is what breaks the run —
+// the reset lives here, with the increment, rather than in a caller that could forget it
+// (joshuafolkken/kit#2024).
+function next_failures(carry: RunCarry, change: CarryChange): number {
+	if ((change.merged ?? NO_INCREMENT) > NO_INCREMENT) return NO_INCREMENT
+
+	return carry.failures + (change.failures ?? NO_INCREMENT)
+}
+
 function apply_change(target: string, carry: RunCarry, change: CarryChange): RunCarry {
 	const cuts = change.cuts ?? NO_INCREMENT
 	const next: RunCarry = {
@@ -293,6 +319,7 @@ function apply_change(target: string, carry: RunCarry, change: CarryChange): Run
 		merged: carry.merged + (change.merged ?? NO_INCREMENT),
 		filed: carry.filed + (change.filed ?? NO_INCREMENT),
 		cuts: carry.cuts + cuts,
+		failures: next_failures(carry, change),
 		done: next_done(carry, change.done),
 		// A cut declares the hand-off; any other count is the run carrying on, which spends it.
 		is_handed_off: cuts > NO_INCREMENT,
@@ -394,7 +421,7 @@ function done_note(carry: RunCarry): string {
 }
 
 function describe_carry(carry: RunCarry): string {
-	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
+	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.failures)} failed in a row, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
 }
 
 function expired_message(carry: RunCarry): string {
