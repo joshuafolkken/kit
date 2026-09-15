@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { run_prep, type PrepParts } from './run-prep'
 
@@ -21,6 +22,9 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE = 'Usage: josh run:prep <issue-number>'
+const LANE_SKIP_SCOPE = 'not asked'
+const LANE_SKIP_REASON =
+	'a dispatched lane child does not run josh latest — the parent does, once per session'
 
 interface LatestDecision {
 	scope: string
@@ -51,13 +55,25 @@ function failure_note(issue_number: string, kind: string): string {
 	return `(issue #${issue_number} not bundled: ${kind})`
 }
 
+// A dispatched lane child never runs `josh latest` — the parent does it once per session
+// (`backlogrun.md` → "`josh latest` runs once per session, not once per child"), so computing the
+// dependency scope inside a lane would report a decision nothing there acts on. Skip the read and say
+// so, rather than printing a `required` a lane never honors.
+function latest_decision(): LatestDecision {
+	if (lane_child_marker.is_child_of(process.cwd())) {
+		return { scope: LANE_SKIP_SCOPE, reason: LANE_SKIP_REASON }
+	}
+
+	return latest_scope_cli.decide()
+}
+
 async function gather(issue_number: string): Promise<PrepReads> {
 	const [content, state] = await Promise.all([
 		issue_read_cli.read_block(issue_number),
 		issue_state_cli.read_issue(issue_number),
 	])
 
-	return { content, state, latest: latest_scope_cli.decide() }
+	return { content, state, latest: latest_decision() }
 }
 
 function content_body(issue_number: string, content: BlockRead): string {
