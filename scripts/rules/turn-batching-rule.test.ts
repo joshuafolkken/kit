@@ -130,7 +130,7 @@ describe(`${CANONICAL} — carries the criterion and the reasoning`, () => {
 
 	it('says how the result is read back', () => {
 		expect(content).toContain('Round trips:')
-		expect(content).toContain('scripts/time/time-round-trips.ts')
+		expect(content).toContain('scripts/time-runtime/time-round-trips.ts')
 	})
 })
 

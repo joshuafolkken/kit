@@ -1,4 +1,3 @@
-import { time_model_gaps } from '#scripts/time/time-model-gaps'
 import { time_span_fixture } from '#scripts/time/time-span-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_round_trips } from './time-round-trips'
@@ -111,88 +110,6 @@ describe('time_round_trips.count_calls', () => {
 	})
 })
 
-// A turn that ends in a reply rather than a call: its model time bought no round trip, so batching
-// could never give it back. The last model span here is followed by a human wait, which is exactly
-// the shape of a run stopping to answer.
-const ANSWERED = [MODEL, MODEL, TOOL, MODEL, HUMAN]
-
-describe('time_model_gaps.issuing_model_ms', () => {
-	// Both model spans issued a round trip, so both are charged: one turn batched three calls and the
-	// next issued one.
-	it('charges the model time of every turn that opened a round trip', () => {
-		expect(time_model_gaps.issuing_model_ms(BATCHED)).toBe(2 * time_span_fixture.MINUTE_MS)
-	})
-
-	// The two spans before the call are one turn's composition and are charged; the one after it went
-	// to an answer, and charging it would price each round trip above what cutting one returns.
-	it('leaves out the model time of a turn that called nothing', () => {
-		expect(time_model_gaps.issuing_model_ms(ANSWERED)).toBe(2 * time_span_fixture.MINUTE_MS)
-	})
-
-	it('charges nothing where no round trip was opened', () => {
-		expect(time_model_gaps.issuing_model_ms([MODEL, HUMAN])).toBe(0)
-	})
-
-	// A call whose middle went to a delegated unit: the lead, the unit's own work ending in the
-	// subagent's closing turn, the tail that opens no round trip, and then the parent's next call.
-	// Carrying the pending time across that tail would charge the subagent's answer to the parent's
-	// next trip — the over-pricing this whole function exists to remove, one level down.
-	it("does not carry a delegated unit's answer past the tail of the call that bracketed it", () => {
-		const spans = [MODEL, TOOL, MODEL, CONTINUATION, MODEL, TOOL]
-
-		expect(time_model_gaps.issuing_model_ms(spans)).toBe(2 * time_span_fixture.MINUTE_MS)
-	})
-})
-
-// The stretches the mean above is the mean of (joshuafolkken/kit#1386).
-describe('time_model_gaps.issuing_model_gaps', () => {
-	// **One stretch per round trip, so the distribution and the mean share a denominator.** A walk that
-	// produced fewer would put the spread above the price the report prints beside it.
-	it('hands back one stretch for every round trip the run made', () => {
-		expect(time_model_gaps.issuing_model_gaps(SERIAL)).toHaveLength(
-			time_round_trips.count_round_trips(SERIAL),
-		)
-		expect(time_model_gaps.issuing_model_gaps(BATCHED)).toHaveLength(
-			time_round_trips.count_round_trips(BATCHED),
-		)
-	})
-
-	// The mean is defined as the sum of these, rather than folded separately — which is what stops the
-	// two from coming to disagree about what was charged.
-	it('sums to exactly the issuing model time', () => {
-		const total = time_model_gaps
-			.issuing_model_gaps(ANSWERED)
-			.reduce((sum, gap) => sum + gap.duration_ms, 0)
-
-		expect(total).toBe(time_model_gaps.issuing_model_ms(ANSWERED))
-	})
-
-	// A round trip opened with nothing pending is a stretch of zero, not a stretch that did not happen:
-	// the leading tool span here had no turn in front of it at all.
-	it('records a round trip nothing preceded as a stretch of zero', () => {
-		const [first] = time_model_gaps.issuing_model_gaps([TOOL, MODEL, TOOL])
-
-		expect(first?.duration_ms).toBe(0)
-		expect(first?.started_ms).toBe(first?.ended_ms)
-	})
-
-	// **The window ends where the stretch's last span ended, not where its durations add up to.** Two
-	// turns from different sessions are consecutive in the array with real time between them, and a
-	// window measured as a start plus a sum would send a reader back to the wrong turn.
-	it('closes the window at the last span of the stretch, across a gap in the timeline', () => {
-		const { MINUTE_MS } = time_span_fixture
-		const spans = [
-			{ ...MODEL, ended_ms: MINUTE_MS },
-			{ ...MODEL, ended_ms: 10 * MINUTE_MS },
-			{ ...TOOL, ended_ms: 11 * MINUTE_MS },
-		]
-		const [only] = time_model_gaps.issuing_model_gaps(spans)
-
-		expect(only?.duration_ms).toBe(2 * MINUTE_MS)
-		expect(only?.ended_ms).toBe(10 * MINUTE_MS)
-	})
-})
-
 // joshuafolkken/kit#1406. Claude Code writes each `tool_use` block as its own assistant line and the
 // harness returns each result as it arrives, so one turn issuing three calls reaches the timeline as
 // `use → result → use → result → use → result` — every call separated from the next by that same
@@ -249,27 +166,6 @@ describe('time_round_trips.count_round_trips — one turn, whatever order its re
 	it('falls back to adjacency where the transcript wrote no message id', () => {
 		// Three calls with nothing to group them by, read exactly as they were before this change.
 		expect(time_round_trips.count_round_trips([MODEL, TOOL, MODEL, TOOL, MODEL, TOOL])).toBe(3)
-	})
-})
-
-describe('time_model_gaps.issuing_model_gaps — a turn that issued several calls', () => {
-	// **One stretch, holding the whole turn's model time.** A round trip is a whole turn, so its price
-	// is everything that turn composed — including what it wrote between its second and third call.
-	// Charging only the part before the first call priced a batched turn below what removing it returns,
-	// and both the bundling and single-check blocks multiply that price out as a saving.
-	it('charges the composing between a turn own calls to the trip it opened', () => {
-		const gaps = time_model_gaps.issuing_model_gaps(INTERLEAVED)
-
-		expect(gaps).toHaveLength(1)
-		expect(time_model_gaps.issuing_model_ms(INTERLEAVED)).toBe(3 * time_span_fixture.MINUTE_MS)
-	})
-
-	// The invariant the distribution and the mean share: still one stretch per round trip, so the spread
-	// cannot come to sit above the price printed beside it.
-	it('still hands back one stretch for every round trip', () => {
-		expect(time_model_gaps.issuing_model_gaps(INTERLEAVED)).toHaveLength(
-			time_round_trips.count_round_trips(INTERLEAVED),
-		)
 	})
 })
 

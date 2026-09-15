@@ -1,9 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TelegramSendInput } from '../scripts/git/telegram-notify'
-import type { RunRecordOutcome } from '../scripts/time-runtime/time-history'
 
 // The run's tail, tested against the module that owns it rather than through the entry point
 // (joshuafolkken/kit#1539). `git-followup-workflow.ts` runs `main()` at import time, so every case
@@ -17,14 +12,6 @@ const release_hold_mock = vi.hoisted(() => vi.fn())
 const end_life_mock = vi.hoisted(() => vi.fn())
 const worktree_directory_mock = vi.hoisted(() =>
 	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(WORKTREE_DIRECTORY),
-)
-const MISSING_TRANSCRIPT = 'no session record for issue #42'
-const RECORDED = vi.hoisted(() => ({ is_recorded: true, lines: [] }))
-const record_run_mock = vi.hoisted(() =>
-	vi.fn<() => Promise<{ is_recorded: boolean; lines: Array<string>; reason?: string }>>(),
-)
-const send_or_report_mock = vi.hoisted(() =>
-	vi.fn<(input: TelegramSendInput, recovery: string | undefined) => Promise<boolean>>(),
 )
 const clear_round_one_mock = vi.hoisted(() => vi.fn())
 const attest_clear_mock = vi.hoisted(() => vi.fn(async () => undefined))
@@ -53,14 +40,6 @@ vi.mock('../scripts/review/review-attest', () => ({
 	review_attest: { clear_here: attest_clear_mock },
 }))
 
-vi.mock('../scripts/time-runtime/time-history', () => ({
-	time_history: { record_run: record_run_mock },
-}))
-
-vi.mock('../scripts/git/telegram-notify', () => ({
-	telegram_notify: { send_or_report: send_or_report_mock },
-}))
-
 vi.mock('../scripts/run/run-hold', () => ({
 	run_hold: {
 		hold_path: (directory: string) => `${directory}/hold.json`,
@@ -81,22 +60,6 @@ const { git_followup_finish } = await import('./git-followup-finish')
 
 const fetch_next_issue_lines_mock = vi.mocked(git_next_issues.fetch_next_issue_lines)
 
-// A real linked work tree rather than a stub: the property under test is that `record_run_report`
-// hands the lane's own directory through unchanged, so the behavior is pinned rather than the call
-// shape. A lane's `.git` is a *file* holding `gitdir: <main>/.git/worktrees/<name>` — this builds that.
-function make_lane_worktree(): { directory: string; main: string } {
-	const main = mkdtempSync(path.join(tmpdir(), 'followup-main-'))
-	const directory = mkdtempSync(path.join(tmpdir(), 'followup-lane-'))
-
-	writeFileSync(path.join(directory, '.git'), `gitdir: ${main}/.git/worktrees/1628\n`, 'utf8')
-
-	return { directory, main }
-}
-
-function not_recorded(reason: string): RunRecordOutcome {
-	return { is_recorded: false, lines: [], reason }
-}
-
 function silence_console(): void {
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -106,8 +69,6 @@ beforeEach(() => {
 	vi.restoreAllMocks()
 	vi.clearAllMocks()
 	worktree_directory_mock.mockResolvedValue(WORKTREE_DIRECTORY)
-	record_run_mock.mockResolvedValue(RECORDED)
-	send_or_report_mock.mockResolvedValue(true)
 	fetch_next_issue_lines_mock.mockResolvedValue([])
 	pending_release_mock.mockResolvedValue(PENDING_SENTINEL)
 	silence_console()
@@ -216,101 +177,6 @@ describe('the review records are cleared only by a merged run', () => {
 	})
 })
 
-// joshuafolkken/kit#1471. The report is emitted by the run that finished rather than by a person
-// typing `diag`, and "finished" is the merge — the same gate the round-1 clear above uses.
-describe('the run report is emitted only by a merged run', () => {
-	it('records the run that merged, against the checkout it ran in', async () => {
-		await git_followup_finish.record_run_report('#42', true)
-
-		expect(record_run_mock).toHaveBeenCalledWith(42, process.cwd())
-	})
-
-	// joshuafolkken/kit#1825. `record_run` is handed the raw work tree the run happened in: a dispatched
-	// lane child's transcript is filed under the lane's own slug (joshuafolkken/kit#1749), so the lookup
-	// must start there. `record_run` resolves the durable history root itself, so pre-rewriting to
-	// `session_cwd` here — as joshuafolkken/kit#1628 did, before the child was a separate process — is
-	// what hid every lane child's transcript by looking only in the main slug.
-	it('hands record_run the raw lane work tree, not the rewritten main checkout', async () => {
-		const lane = make_lane_worktree()
-
-		await git_followup_finish.record_run_report('#42', true, lane.directory)
-
-		expect(record_run_mock).toHaveBeenCalledWith(42, lane.directory)
-		expect(record_run_mock).not.toHaveBeenCalledWith(42, lane.main)
-	})
-
-	it('records nothing on a --no-merge run', async () => {
-		await git_followup_finish.record_run_report('#42', false)
-
-		expect(record_run_mock).not.toHaveBeenCalled()
-	})
-
-	it('records nothing when no issue number was given', async () => {
-		await git_followup_finish.record_run_report(undefined, true)
-
-		expect(record_run_mock).not.toHaveBeenCalled()
-	})
-
-	it('prints every line the recorder returned', async () => {
-		const heading = '📈 Run report — issue #42'
-
-		record_run_mock.mockResolvedValueOnce({ is_recorded: true, lines: [heading] })
-		await git_followup_finish.record_run_report('#42', true)
-
-		expect(console.info).toHaveBeenCalledWith(heading)
-	})
-})
-
-// joshuafolkken/kit#1628. The printed line has been there since joshuafolkken/kit#1471 and thirteen
-// runs still lost their record unnoticed, so the fact also goes where the user actually looks. It may
-// never fail the run: the merge already happened.
-describe('a record that was not written reaches the completion notification', () => {
-	it('warns rather than reporting a failure, and names what would measure it', async () => {
-		record_run_mock.mockResolvedValueOnce(not_recorded(MISSING_TRANSCRIPT))
-		await git_followup_finish.record_run_report('#42', true)
-
-		const [call] = send_or_report_mock.mock.calls
-
-		expect(call?.[0].task_type).toBe('warning')
-		expect(call?.[0].body).toContain(MISSING_TRANSCRIPT)
-		expect(call?.[0].body).toContain('pnpm josh time --issue 42')
-	})
-
-	// `JOSH_TIME_HISTORY=0` is an answer, not a gap: `record_run` returns unrecorded with no reason,
-	// and warning once per merge about an opted-out feature is how a warning channel stops being read.
-	it('says nothing when the history was switched off', async () => {
-		record_run_mock.mockResolvedValueOnce({ is_recorded: false, lines: [] })
-		await git_followup_finish.record_run_report('#42', true)
-
-		expect(send_or_report_mock).not.toHaveBeenCalled()
-	})
-
-	// Nothing rewrites a missing line into the file, so the message must not offer a recovery that
-	// only reads. `send_or_report`'s own recovery line is for a failed *send*, which nothing re-sends.
-	it('says the run is permanently absent rather than offering to restore it', async () => {
-		record_run_mock.mockResolvedValueOnce(not_recorded(MISSING_TRANSCRIPT))
-		await git_followup_finish.record_run_report('#42', true)
-
-		const [call] = send_or_report_mock.mock.calls
-
-		expect(call?.[0].body).toContain('permanently absent')
-		expect(call?.[1]).toBeUndefined()
-	})
-
-	it('says nothing when the record landed', async () => {
-		await git_followup_finish.record_run_report('#42', true)
-
-		expect(send_or_report_mock).not.toHaveBeenCalled()
-	})
-
-	it('carries on when the warning itself could not be sent', async () => {
-		record_run_mock.mockResolvedValueOnce(not_recorded('unwritable history'))
-		send_or_report_mock.mockResolvedValueOnce(false)
-
-		await expect(git_followup_finish.record_run_report('#42', true)).resolves.toBeUndefined()
-	})
-})
-
 // joshuafolkken/kit#1091. The hold a typed entry point claims before it starts is released on the one
 // seam every finished run passes through, so nothing has to remember to type the release command.
 describe('the working-tree hold is released only by a merged run', () => {
@@ -377,7 +243,7 @@ describe('the progress watcher is ended only by a merged run', () => {
 	// The steps are independent: an earlier one throwing must not skip the watcher end, the same
 	// guarantee joshuafolkken/kit#1539 gives the hold release beside it.
 	it('ends the watcher even when an earlier step threw', async () => {
-		record_run_mock.mockRejectedValueOnce(new Error('run report step failed'))
+		fetch_next_issue_lines_mock.mockRejectedValueOnce(new Error('completion output step failed'))
 
 		await git_followup_finish.finish('#42', true)
 
@@ -391,28 +257,20 @@ describe('the progress watcher is ended only by a merged run', () => {
 describe('finish — one failing step does not discard the rest', () => {
 	const FAILURE = new Error('ENOSPC: no space left on device')
 
-	it('releases the hold even when the run report throws', async () => {
-		record_run_mock.mockRejectedValueOnce(FAILURE)
-
-		await git_followup_finish.finish('#42', true)
-
-		expect(release_hold_mock).toHaveBeenCalledWith(`${WORKTREE_DIRECTORY}/hold.json`)
-	})
-
 	it('does not reject, so a merged run is not reported as a failed one', async () => {
-		record_run_mock.mockRejectedValueOnce(FAILURE)
+		fetch_next_issue_lines_mock.mockRejectedValueOnce(FAILURE)
 
 		await expect(git_followup_finish.finish('#42', true)).resolves.toBe(false)
 	})
 
 	it('names the step that failed rather than passing silently', async () => {
-		record_run_mock.mockRejectedValueOnce(FAILURE)
+		fetch_next_issue_lines_mock.mockRejectedValueOnce(FAILURE)
 
 		await git_followup_finish.finish('#42', true)
 
 		const warned = vi.mocked(console.warn).mock.calls.map(([line]) => String(line))
 
-		expect(warned.join('\n')).toContain('The run report')
+		expect(warned.join('\n')).toContain('The completion output')
 	})
 
 	it('releases the hold even when the completion output throws', async () => {

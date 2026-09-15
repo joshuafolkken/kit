@@ -418,7 +418,7 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 - `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
 
-**Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), removes `in-progress`, flushes the observation ledger, ends the progress watcher, appends a timing report to `.time-history.jsonl`, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
+**Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
@@ -1270,7 +1270,7 @@ Two figures under one definition, which is what makes a before and an after comp
 
 ### `josh time`
 
-**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its report modules live under the undistributed `scripts/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `scripts/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
 
 Report where a run's wall clock went, read from the same transcripts `josh cost` prices and, for the part no transcript records (CI, merge), from GitHub.
 
@@ -1287,7 +1287,7 @@ pnpm josh time --path <dir>     # read another project's transcripts from this c
 - `--path <dir>` — aim the read at another project (absolute path); keeps the `cwd` behavior when absent.
 - `--json` — the run tree, machine-readable.
 
-**Output:** wall clock is split into model wait / tool execution / human wait / CI wait (reconstructing the elapsed total exactly), then a phase breakdown (`plan`/`setup`/`implement`/`gate`/`rework`/`review`/`pr`/`wrapup`/`ci`/`merge`/`wait`/`other`), round-trip and bundling counts, and cost-by-phase where the cost corpus was read. An unreadable row prints `not measured` / `not detected` rather than a zero.
+**Output:** the run-tree report `josh cost --run` builds — a header (session count, active wall clock, total dollars, run and merge counts, and counts of transcripts outside this run and unreadable ones), a by-role breakdown (cost and wall clock with their shares, session and request counts, preamble tokens), and a per-session list. When the run this checkout carries is unfinished, a run-state block (read from `run:carry` / `run:wake`) leads the report so a cut, handed-off or stalled run is surfaced at the front rather than buried. An unmeasured figure prints `not measured` rather than a zero.
 
 **Output / exit codes:** an absent or untimed transcript exits non-zero and says where it looked.
 

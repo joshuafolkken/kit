@@ -1,7 +1,7 @@
 import { time_phase_fixture } from '#scripts/time/time-phase-fixture'
-import { time_phases } from '#scripts/time/time-phases'
 import { describe, expect, it } from 'vitest'
 import { time_background } from './time-background'
+import { GATE_PHASE } from './time-phase-names'
 import type { Span } from './time-spans'
 
 // joshuafolkken/kit#1662: a command taken into the background was recorded as its launch call and
@@ -276,7 +276,7 @@ describe('time_background.unread_phases', () => {
 	it('names the phase whose command was never read back', () => {
 		const unread = time_background.unread_phases([launch(0, 1), span(1, 5)])
 
-		expect([...unread]).toEqual([time_phases.GATE_PHASE])
+		expect([...unread]).toEqual([GATE_PHASE])
 	})
 
 	// The note joshuafolkken/kit#1696 restores: a phase whose command was only ever polled has no
@@ -284,7 +284,7 @@ describe('time_background.unread_phases', () => {
 	it('names the phase whose command was only polled while it ran', () => {
 		const spans = [launch(0, 1, { background_ended_ms: at(8) }), join(2, 1)]
 
-		expect([...time_background.unread_phases(spans)]).toEqual([time_phases.GATE_PHASE])
+		expect([...time_background.unread_phases(spans)]).toEqual([GATE_PHASE])
 	})
 
 	it('names nothing where the command was read back', () => {
