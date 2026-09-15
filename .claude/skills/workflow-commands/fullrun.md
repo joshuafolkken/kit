@@ -40,6 +40,14 @@ pre-gate boundary — implementation done, before `pnpm josh gate` — it takes 
 to a detached lane child alone; elsewhere `run:cut` answers `not-a-lane` and changes nothing. The
 boundary and its verdicts are `pre-gate-cut.md`, its single source.
 
+**A dispatched lane child records its park before it stops for a decision.** Before it sends the
+`confirmation` Telegram that ends its turn, a Tier B toss-up, a Tier C action, an upstream defect or a
+person-needing split is recorded on the Issue — `needs-decision` plus a comment carrying the question,
+the options and whether work was stashed — so the parent treats it as parked from GitHub state alone
+rather than reconstructing the question from a log. `pnpm josh rule:guard` refuses the stop notify
+until the park is recorded. The single source is `pre-gate-cut.md` → "A lane child records its park
+before it stops"; the park procedure itself is `backlogrun-park.md` → "park and continue".
+
 **Ask the session boundary in the same turn as the hold, and before anything else is started** —
 `pnpm josh cost --over 300000`. Branch on what the command answers, never on a judgement about how
 long the session feels. `under` — carry on. `over`, or a run it could not answer for — **stop here**,

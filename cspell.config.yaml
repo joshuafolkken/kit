@@ -176,3 +176,7 @@ words:
   # distributed command's closure (joshuafolkken/kit#2003). cspell derives "distributable" but not
   # the "un-" compound.
   - undistributable
+  # What `scripts/rules/lane-park.ts` calls a lane child's decision-stop that has not yet recorded its
+  # park on the Issue (joshuafolkken/kit#2034) — the state the delivered rule refuses. It reaches no
+  # distributed file: the word appears only in that module, its two suites and the enumeration.
+  - unparked

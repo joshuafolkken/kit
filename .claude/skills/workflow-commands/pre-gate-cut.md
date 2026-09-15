@@ -299,4 +299,53 @@ then** (joshuafolkken/kit#1933): one changed `backlogrun` compares the average a
 per request of each lane against the 2026-09-13 run recorded in the issue, and until that run exists
 the effect of the 200_000 threshold is reported as unmeasured.
 
+## A lane child records its park before it stops
+
+**A dispatched lane child records its park on the Issue before it stops for a decision**
+(joshuafolkken/kit#2034). A `backlogrun` runs each child as a detached `fullrun #<N>`, and a headless
+child's only route to ask a person anything is to park the Issue — `needs-decision` and a comment
+carrying the question. Measured twice in one run on 2026-09-14: **#2012**'s child had its
+`AskUserQuestion` refused (it is headless), wrote the question into its final message, sent a
+`confirmation` Telegram and exited; **#2011** wrote a Tier B decision to its final message and exited
+the same way. Neither left a label or a comment, so the parent found an OPEN Issue with `in-progress`
+and no question, and a person looking at it could not tell what to answer. The child is the only
+process that knows the question, the options and whether it stashed, so it records the park itself
+rather than leaving the parent to reconstruct it from a log.
+
+**The record, before the Telegram, is the park procedure exactly** — `needs-decision` plus a comment
+carrying the question, the options, and whether work was stashed. The procedure is not restated here:
+its single source is `backlogrun-park.md` → "park and continue", and the child follows it against its
+own Issue before sending the `confirmation` notify. With the label on the Issue, the parent's
+`pnpm josh run:liveness` reads the child as `settled` and treats it as parked from GitHub state alone —
+no change to the parent, and no `run:liveness` guess from the child's last log line.
+
+**A `needs-human-review` or `already-done` stop needs nothing added.** Those labels are already on the
+Issue — one applied by a person, one by the child's own verified-merged exit — so the stop is already
+recorded. It is only a decision-stop (a Tier B toss-up, a Tier C action, an upstream defect, a split
+that needs a person) that would otherwise leave the Issue bare.
+
+### The stop notify refuses until the park is recorded
+
+**This was prose that would have fired never**, the same measurement this file's own gate rule rests
+on: a step a child is free to skip under time pressure is the step it skips. So `pnpm josh rule:guard`
+**refuses `pnpm josh notify --task-type confirmation`** while this checkout is a lane child — the
+dispatch mark `JOSH_LANE_CHILD` names this lane's own issue — and hands back the park commands.
+
+- **It fires for a marked child and nowhere else.** A person's own `fullrun`, in the main checkout or
+  in a lane they are working in, carries no mark and sends its stop notify untouched.
+- **It fires once per run.** The child records the park and reissues the same notify; a refusal that
+  repeated would block the very stop it just asked the child to record. A `needs-human-review` or
+  `already-done` stop reissues after the one delivery, since its label is already on the Issue.
+- **The park state is not readable synchronously.** A `PreToolUse` guard answers without a network
+  call, and the park is a GitHub label — so the guard cannot stay silent only on the non-compliant
+  stop the way the pre-gate cut reads its local cut record. Scanning the transcript tail for the label
+  instead would read a child that merely *read* `backlogrun-park.md`, whose prose carries the command,
+  as compliant and fall silent on a real violation. So the delivery is a checklist rather than an
+  accusation, and one wasted reissue on the compliant path is the safe direction.
+
+This section is the single source of the lane-child park rule; `scripts/rules/lane-park.ts` implements
+the trigger, `scripts/rules/lane-park.test.ts` pins that it fires for a marked child on a stop notify
+and stays silent everywhere else, and the row joins the enumeration in
+`prompts/collaboration-workflow/rule-delivery.md`.
+
 This file is the single source of the rule.
