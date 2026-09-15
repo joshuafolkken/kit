@@ -183,19 +183,30 @@ describe('josh run:wake --list — a person can see what is running', () => {
 
 // joshuafolkken/kit#1910. A headless parent woken after a cut prints its progress only to its own
 // transcript, so `--list` relays the last heartbeat it persisted — a person's one window onto the run
-// once they are no longer the parent session. The line relayed is the watcher's own output verbatim.
+// once they are no longer the parent session. The heartbeat is five labelled lines now
+// (joshuafolkken/kit#2026), so the `progress:` label heads its own line and the block is indented
+// under it — every line, not just the first.
 describe('josh run:wake --list — the woken session’s progress', () => {
-	const LINE =
-		'⏳ at 2026-09-10 12:00+00:00 / 12:00Z · quiet 3m · #1904 in-progress PR:open · lanes none · load 1.0 · record unread · unchanged 3m · next later'
+	const LINE = [
+		'⏳ at 2026-09-10 12:00+00:00 / 2026-09-10T12:00Z',
+		'quiet 3m · unchanged 3m',
+		'children #1904 in-progress PR:open',
+		'lanes none · load 1.0 · record unread',
+		'next later',
+	].join('\n')
 
-	it('relays the last heartbeat line and keeps standard output one token', async () => {
+	it('relays the five-line heartbeat as an indented block and keeps standard output one token', async () => {
 		write_carry(false)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
 		run_progress_clock.mark(progress_target(), NOW.getTime(), LINE)
 
+		// The label heads its own line and every one of the five lines is indented under it — so a
+		// continuation line (`next later`) is indented, not left flush the way prefixing only line 1 left it.
+		const relayed = `progress:\n  ${LINE.replaceAll('\n', '\n  ')}`
+
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
 		expect(out).toStrictEqual([run_wake_cli.SUPERVISING_VERDICT])
-		expect(errors.join('\n')).toContain(`progress: ${LINE}`)
+		expect(errors.join('\n')).toContain(relayed)
 	})
 
 	// Before the first heartbeat there is no line, and "progress: (none)" on every pre-heartbeat listing

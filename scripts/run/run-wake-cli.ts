@@ -211,11 +211,14 @@ function outstanding_line(wake: RunWake): string | undefined {
 // The last heartbeat the woken session persisted, relayed here because a headless parent's progress
 // reaches its own transcript alone — after a cut, `--list` is the person's one window onto it
 // (joshuafolkken/kit#1910). Absent until the first heartbeat, and omitted rather than shown empty, the
-// way `outstanding_line` omits a count of zero.
+// way `outstanding_line` omits a count of zero. The heartbeat is five labelled lines now
+// (joshuafolkken/kit#2026), so the label heads its own line and the block is indented under it rather
+// than prefixing only the first of five.
 function progress_line(context: WakeContext): string | undefined {
 	const line = run_progress_clock.read_last_line(context.progress_target)
+	if (line === undefined) return undefined
 
-	return line === undefined ? undefined : `progress: ${line}`
+	return `progress:\n  ${line.replaceAll('\n', '\n  ')}`
 }
 
 // The wake count is printed beside the carry record's `cuts` rather than alone, because the two being

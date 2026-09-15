@@ -1144,7 +1144,7 @@ Report an unattended run's progress once it has gone quiet — the one josh comm
 
 ```bash
 pnpm josh run:progress --output <path>           # alias: josh rg
-pnpm josh run:progress --once                    # one line now, whatever the clock says
+pnpm josh run:progress --once                    # five labelled lines now, whatever the clock says
 pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 ```
 
@@ -1154,7 +1154,7 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 - `--interval <min>` — silence interval (default 20; also `JOSH_PROGRESS_INTERVAL_MINUTES`, then `josh.progress_interval_minutes`).
 - `--hours <n>` — how long the watcher lives (default 1); `--repo <owner/name>` scopes the read.
 
-**Output / exit codes:** stdout carries only the progress line; notices go to stderr. `--once` with no run recorded prints nothing and exits 0; an unreadable listing exits 1. It sends no Telegram; `JOSH_PROGRESS=0` reports nothing (`--mark` still records).
+**Output / exit codes:** stdout carries only the five labelled progress lines; notices go to stderr. `--once` with no run recorded prints nothing and exits 0; an unreadable listing exits 1. It sends no Telegram; `JOSH_PROGRESS=0` reports nothing (`--mark` still records).
 
 ### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
 

@@ -88,6 +88,11 @@ const NO_LANES = 'none'
 // (a lane, a hold, or a carried budget) says a run is underway, and the lanes field beside this one
 // carries whatever evidence exists.
 const NO_CHILD_YET = 'no in-progress child yet'
+// The fifth line's value when there is no scheduled next report. The command always supplies one, so
+// this is the migrated form of the rule `backlogrun.md` used to hold — a line with no `next` field says
+// the field was absent rather than inventing a time (joshuafolkken/kit#2026). `format_report` is a pure
+// renderer, so its contract states the absence rather than assuming a stamp is always there.
+const NO_NEXT = 'none'
 const QUIET_MARKER = '⏳'
 // `1970-01-01T00:00:00.000Z` cut after the minutes. Seconds are dropped because the interval this line
 // breaks is measured in minutes, and a heartbeat that claims a precision nobody uses is noise.
@@ -247,24 +252,63 @@ function format_next_report(now_ms: number, interval_ms: number): string {
 	return format_observed_at(now_ms + interval_ms)
 }
 
+// The already-formatted field strings the five labelled lines are built from. They are kept as strings
+// rather than the raw observation so that `format_report` stays a pure renderer the tests can drive with
+// an absent `next`, which is the migrated home of the doc's absent-field rule.
+interface ReportFields {
+	observed_at: string
+	quiet: string
+	unchanged: string
+	children: string
+	lanes: string
+	load: string
+	record: string
+	next: string | undefined
+}
+
+// `next none` when there is no scheduled report, the stamp otherwise — the absence said the same way the
+// other absent fields are (`record unread`, `lanes none`).
+function format_next_line(next: string | undefined): string {
+	return `next ${next ?? NO_NEXT}`
+}
+
 /**
- * One line, and it is one line on purpose: it is relayed into a session that is otherwise showing the
- * run's own output, and a block would compete with the thing the person is waiting to read.
+ * The five labelled lines a quiet run prints — one field group per line, a label in front of every
+ * field — so a person reads them without anything downstream re-labelling them (joshuafolkken/kit#2026).
+ * The command used to emit one `·`-joined run of values that `backlogrun.md` asked the parent to rewrite
+ * by hand every interval; the labels and the line breaks live here now, so the parent relays the output
+ * verbatim and rounds, rephrases or re-labels nothing.
  *
- * The observation time leads, because it is the field that says whether anything after it is still
- * about now — a stamp read after the elapsed figures is read too late to reframe them. The next report
- * time closes it for the mirrored reason: it is the one field about a moment that has not happened yet.
+ * The observation instant leads and the scheduled next closes it, for the reason the single line kept
+ * them at its two ends: the first field says whether everything after it is still about now, and the
+ * last is the one field about a moment that has not happened yet.
+ */
+function format_report(fields: ReportFields): string {
+	return [
+		`${QUIET_MARKER} at ${fields.observed_at}`,
+		`quiet ${fields.quiet} · unchanged ${fields.unchanged}`,
+		`children ${fields.children}`,
+		`lanes ${fields.lanes} · load ${fields.load} · record ${fields.record}`,
+		format_next_line(fields.next),
+	].join('\n')
+}
+
+/**
+ * The observations rendered into those five lines. It reads `now_ms` for both the observation stamp and
+ * the scheduled next so the two can never disagree, and hands `format_report` already-formatted strings
+ * so the rendering has one home.
  */
 function format_line(observations: Observations, timing: LineTiming): string {
-	const observed_at = format_observed_at(timing.now_ms)
-	const quiet = format_minutes(timing.now_ms - timing.quiet_since_ms)
-	const unchanged = format_minutes(timing.now_ms - timing.unchanged_since_ms)
-	const children = format_children(observations.children)
-	const lanes = format_lanes(observations.lanes)
-	const load = observations.load_average.toFixed(1)
-	const next = format_next_report(timing.now_ms, timing.interval_ms)
-
-	return `${QUIET_MARKER} at ${observed_at} · quiet ${quiet} · ${children} · lanes ${lanes} · load ${load} · record ${format_record(observations.record_age_ms)} · unchanged ${unchanged} · next ${next}`
+	return format_report({
+		observed_at: format_observed_at(timing.now_ms),
+		quiet: format_minutes(timing.now_ms - timing.quiet_since_ms),
+		unchanged: format_minutes(timing.now_ms - timing.unchanged_since_ms),
+		children: format_children(observations.children),
+		lanes: format_lanes(observations.lanes),
+		load: observations.load_average.toFixed(1),
+		record: format_record(observations.record_age_ms),
+		next: format_next_report(timing.now_ms, timing.interval_ms),
+	})
 }
 
 /**
@@ -303,17 +347,27 @@ const run_progress = {
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
 	NO_CHILD_YET,
+	NO_NEXT,
 	format_child,
 	format_children,
 	format_lanes,
 	format_line,
+	format_next_line,
 	format_next_report,
 	format_record,
+	format_report,
 	is_due,
 	minutes_from,
 	next_state,
 	observation_key,
 }
 
-export type { ChildObservation, LaneObservation, LineTiming, Observations, ProgressState }
+export type {
+	ChildObservation,
+	LaneObservation,
+	LineTiming,
+	Observations,
+	ProgressState,
+	ReportFields,
+}
 export { run_progress }

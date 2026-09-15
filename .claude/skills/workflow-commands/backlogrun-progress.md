@@ -21,32 +21,20 @@ right only where output is streamed. The parent changes no value on the line. **
 moves and no fourth:**
 
 1. Start `pnpm josh run:progress --wait --output <transcript paths>` **in the background**.
-2. When it exits, **present what it printed in the labelled form below**, closing with the next report
-   time.
+2. When it exits, **present what it printed as-is** — the command prints the five labelled lines and the
+   next report time itself.
 3. **In that same turn, start the next one.** The interval is measured from the last report.
 
-**The line is presented with a label in front of every field, never handed over as printed.** What the
-command emits is one `·`-joined run of unlabelled values —
-`⏳ at 2026-09-09 13:27+07:00 / 2026-09-09T06:27Z · quiet 29m · #1631 in-progress,route:split PR:open · lanes none · load 4.7 · record unread · unchanged 0m · next 2026-09-09 13:47+07:00 / 2026-09-09T06:47Z`
-— a person cannot read it. Present **four field lines then a fifth for the next report time:**
-
-1. **the observation instant** — the `at` stamp, copied exactly as printed, local first and UTC beside
-   it;
-2. **how long it has been quiet**, and **how long the observation has been unchanged**;
-3. **the children in flight** — each one's number, labels and pull request state;
-4. **the lanes, the load average, and the unit-output age** (the `record` field);
-5. **the `next` field**, the one line about a moment yet to come, carrying the schedule wording.
-
-**Every value is carried across unchanged; the presentation adds a label and nothing else.** No
-rounding, no rephrasing of a value into a state. **Naming a field is not interpreting it**: `quiet 29m`
-may be labelled *quiet* and may not become *stalled*. **Never present an unmeasured field as a
-measurement** — `record unread` means no `--output` path was given, never *not stalled*; `lanes none` is
-*no lane is open*, never *nothing is running*. **The next report time is an absolute instant in both
-clocks** (`2026-09-09 13:42+07:00 / 2026-09-09T06:42Z`), **printed and copied, never computed** — it is
-labelled a schedule (the time *if the silence continues*, superseded when a real report resets the clock
-through `--mark`); **a line with no `next` field gets none** — say the field was absent. **The five
-lines are that one line rendered readably**; the two lines of the run's own prose below are counted
-separately, and five lines with no table is a cost that does not compound with the run's length.
+**`run:progress` prints the five labelled lines itself now (joshuafolkken/kit#2026); present them
+as-is.** It emits the observation instant (`at`, local first and UTC beside it), the elapsed figures
+(`quiet` and `unchanged`), the children in flight, the run state (`lanes`, `load`, `record`), and the
+scheduled `next`, each behind its own label and on its own line — so relay the output verbatim and
+round, rephrase or re-label nothing. How each field reads when it has nothing to report (`record
+unread`, `no in-progress child yet`, `lanes none`, an absent `next`) is fixed by the command's own unit
+tests. **A value said that way is still an observation, never a state**: `record unread` means no
+`--output` path was given, not *not stalled*; `lanes none` is *no lane is open*, not *nothing is
+running*; and the `next` line is a schedule — the time *if the silence continues*, superseded when a
+real report resets the clock through `--mark`.
 
 **It exits only when it has a line to hand over**, or when `--hours` runs out having never gone quiet for
 a whole interval (that exit says so on standard error). **Nothing in flight keeps it waiting**, or step

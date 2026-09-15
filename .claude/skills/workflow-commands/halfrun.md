@@ -37,7 +37,7 @@ was dispatched by a batch entry point.** `backlogrun-progress.md` → "The hand-
 and of where 300,000 comes from.
 
 **Start the progress step once the hold is claimed, and start it without being asked**, exactly as
-`fullrun` does — `pnpm josh run:progress --wait` in the background, presented in labelled form when it
+`fullrun` does — `pnpm josh run:progress --wait` in the background, presented as-is when it
 exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
 every real report. `backlogrun-progress.md` → "Progress while the run is quiet" is the single source, including
 that this command's stop before commit keeps `in-progress` on and so has to end the watcher itself.
