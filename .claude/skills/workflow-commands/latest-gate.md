@@ -32,11 +32,15 @@ resolves it toward `skip` exactly when a stale dependency is most likely to matt
 ## What runs when the answer is `required`
 
 ```bash
-git stash push -u    # only if the working tree has staged or modified files
+git stash push -u -m "josh latest"    # only if the working tree has staged or modified files
 git switch main && git pull
 pnpm josh latest     # on `required` only
-git stash pop        # only if you stashed above
+pnpm josh stash:pop "josh latest"     # only if you stashed above — by message, never a positional pop
 ```
+
+**The pop is by message, never a bare `git stash pop`.** The stash is a repository-wide stack every
+work tree shares, so a positional pop would take whichever lane last pushed rather than the one this
+step saved (joshuafolkken/kit#2050).
 
 Then **load the `dependency-update` skill and follow its procedure** — the overrides in **both**
 `pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines` pnpm bump. That condition

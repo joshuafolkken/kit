@@ -543,8 +543,10 @@ most likely to duplicate something.
   new `*.test.ts`, which is untracked, and a stash without `-u` leaves exactly those files in the tree
   for the next child's `git switch main && git pull` to refuse.
 - **The Issue comment is what gets the stash popped, not the Telegram.** The run that later picks the
-  paused Issue up reads that comment and pops before implementing. Say it in the Telegram too — the
-  comment is the record.
+  paused Issue up reads that comment and pops before implementing — **by message,
+  `pnpm josh stash:pop "<the -m message>"`, never a positional `git stash pop`**, because the stash is
+  a repository-wide stack every lane shares and a positional pop takes whichever lane last pushed. Say
+  it in the Telegram too — the comment is the record.
 
 **Automatic filing is capped at 10 Issues per run** at every entry point. On reaching it, stop and
 report. `kickoff` is exempt — it never implements, so it never discovers one.

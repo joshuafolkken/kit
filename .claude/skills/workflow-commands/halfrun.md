@@ -75,8 +75,10 @@ procedure, in order:
 2. **Stash the work in progress** — `git stash push -u -m "halfrun: paused #<N> for prerequisite #<P>"`
    — then record it on the Issue: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<what was
    stashed, and that #<P> must land first>"`. **`-u` is not optional** (the work almost always includes
-   a new untracked `*.test.ts`). The Issue comment is what gets the stash popped; say it in the Telegram
-   too, but the comment is the record.
+   a new untracked `*.test.ts`). The Issue comment is what gets the stash popped — by message,
+   `pnpm josh stash:pop "halfrun: paused #<N> for prerequisite #<P>"`, never a positional
+   `git stash pop` a shared stash stack lets another lane divert. Say it in the Telegram too, but the
+   comment is the record.
 3. **Find out whether `#N` already belongs to an epic, before creating one** — `pnpm josh epic:bundle
    <N>`.
 
@@ -120,10 +122,11 @@ procedure, in order:
   the same work stops the run (`SKILL.md` → §2e). (2) `gh api repos/{owner}/{repo}/issues -f
   title="<title>" -f 'labels[]=depth:<n>' -f body="<body>"` (body per
   `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3) Add `in-progress`. (4) Post
-  the agreed plan in the session language. (5) If the working tree has staged/modified files, `git
-  stash`. (6) `git switch main && git pull`. (7) `pnpm josh latest:scope`; on `required` run `josh
-  latest` and load the `dependency-update` skill; on `skip` neither runs. If you stashed in step 5,
-  `git stash pop`. (8) Implement. (9) Run the verification gate (as in `halfrun #<N>`; `pnpm josh
+  the agreed plan in the session language. (5) If the working tree has staged/modified files,
+  `git stash push -m "halfrun new: pre-existing changes"`. (6) `git switch main && git pull`. (7) `pnpm
+  josh latest:scope`; on `required` run `josh latest` and load the `dependency-update` skill; on `skip`
+  neither runs. If you stashed in step 5, `pnpm josh stash:pop "halfrun new: pre-existing changes"` — by
+  message, never a positional `git stash pop`. (8) Implement. (9) Run the verification gate (as in `halfrun #<N>`; `pnpm josh
   test:e2e` run by **you**). (10) Send the `confirmation` Telegram (same body as `halfrun #<N>`) and
   **stop**. Do not run `pnpm josh git -y` or `pnpm josh followup` — the user resumes manually after
   verifying.

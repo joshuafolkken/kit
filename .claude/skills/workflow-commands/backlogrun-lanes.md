@@ -132,16 +132,18 @@ primary checkout to carry it. `git stash` is a repository-level ref shared by ev
 
 ```bash
 git stash push -u -m "backlogrun: josh latest before lanes"   # primary checkout, only if the update rewrote anything
-git -C "$dir" stash pop                                    # the first lane opened, after `lane:open`'s own install
+pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # the first lane opened, after `lane:open`'s own install
 ```
 
 Record it on that first child's Issue — the comment is what gets it popped if the run dies in between.
+**Pop it by message with `--dir`, never `git -C "$dir" stash pop`**: the stash is a repository-wide
+stack every lane shares, so a positional pop would take whichever lane last pushed.
 
 ### Opening one lane
 
 ```bash
 dir=$(pnpm josh lane:open "$n") || exit 1   # the directory on stdout, nothing else; alias: josh lno
-git -C "$dir" stash pop || exit 1           # the first lane only, and only if `josh latest` stashed
+pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir" || exit 1   # the first lane only, and only if `josh latest` stashed
 pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, which changed the lock
 ```
 
