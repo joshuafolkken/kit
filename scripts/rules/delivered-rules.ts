@@ -4,6 +4,7 @@ import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { early_heartbeat } from './early-heartbeat'
+import { lane_park } from './lane-park'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
@@ -413,6 +414,26 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
 		reaches: reaches_the_pre_gate_boundary,
 	},
+	// **The second row whose trigger consults the world beside the command** (joshuafolkken/kit#2034):
+	// "is this a dispatched lane child" is the dispatch mark against this checkout's own issue, read
+	// synchronously by `lane_child_marker.is_child_of`, and the command match runs first so an ordinary
+	// run pays nothing for it.
+	//
+	// **Once per run rather than `decide`, and no `already_satisfied`.** The stop ends the turn, so it
+	// is not the recurring act joshuafolkken/kit#1570 wrote `decide` for. It carries no
+	// `already_satisfied` because the park it asks for is a GitHub label a synchronous guard cannot
+	// read, and the transcript-tail alternative would read a child that merely *read*
+	// `backlogrun-park.md` — whose prose carries the `labels[]=needs-decision` command — as compliant
+	// and fall silent on a real violation. `lane-park.ts` states why one wasted reissue on the compliant
+	// path is the safe direction. `keeps` reads an actual label-application `Bash` command, never the
+	// tail, so it is not fooled the same way; `reaches` stays `is_trigger`, since a compliant run issues
+	// the same confirmation notify and belongs in the denominator.
+	{
+		id: 'lane-park',
+		is_trigger: on_bash_command(lane_park.is_unparked_stop),
+		reason: lane_park.LANE_PARK_REASON,
+		keeps: on_bash_command(lane_park.records_the_park),
+	},
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that
@@ -636,6 +657,7 @@ const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
 	ISSUE_COMMENTS_REASON,
+	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
