@@ -110,6 +110,14 @@ filings whose subject is the epic tooling, which the table above puts at depth 1
 lost, and nothing about it says which findings were worth having. This changes what counts as a
 finding at all, so what it excludes is excluded for a reason a reader can check.
 
+**And a PR that *adds* a measurement names its reader in the same way.** The requirement above binds
+a depth-2 Issue that *proposes* a measurement; a pull request that *adds* one — a new report column,
+section, scope or subcommand, a diagnostic step — states in its body the reader that consumes it: the
+Issue number that read the value to decide something, or the path of the rule that reads it. **A
+measurement with no reader is not added** — this is joshuafolkken/kit#2012's test, the one that
+retired every column no decision reads, moved to the moment a column is proposed so the retirement
+never has to be filed again. `route:tier-a` and `route:interrupt` carry over unchanged.
+
 ### The depth-0 share — what is counted
 
 **joshuafolkken/kit#1698 set a measurable target: the share of open Issues at depth 0** — 3/23

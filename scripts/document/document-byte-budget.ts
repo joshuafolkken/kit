@@ -58,7 +58,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 11_117 },
 	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 7528 },
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
-	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_245 },
+	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_931 },
 	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 21_661 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
