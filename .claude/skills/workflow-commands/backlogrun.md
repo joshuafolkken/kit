@@ -287,12 +287,12 @@ expired or cannot be read ends it the same way. `none` — the run having finish
 `--stop` ends it; the full contract, what it launches and why that is a constant rather than a
 setting are `docs/josh-commands.md` → "`josh run:wake`".
 
-**The woken session and its lane children run with an explicit model and effort**
-(joshuafolkken/kit#1932). The woken `claude -p backlogrun` parent, and every lane child it goes on to
-dispatch, is launched with model `opus` and effort `medium` by default — so an unattended run matches
-the parent session and stays comparable between runs — each overridable in `.env` with
-`JOSH_LANE_MODEL` / `JOSH_LANE_EFFORT`. `docs/josh-commands.md` → "`josh lane:dispatch`" and
-`backlogrun-child.md` → "Each child runs in a delegated unit" are the single sources.
+**Every unattended role runs with its own explicit profile.** The woken scheduler defaults to
+`opus` / `high`, each lane worker to `opus` / `medium`, and each reviewer to `opus` / `high`.
+Role-specific environment overrides are resolved before launch; `JOSH_LANE_*` migrates to the worker
+only. `run:wake --list`, `lane:list`, the review brief and each launch log expose the resolved role,
+model and effort. `docs/josh-commands.md` → "`josh lane:dispatch`" and `backlogrun-child.md` → "Each
+child runs in a delegated unit" are the single sources.
 
 **It relays the woken parent's progress**, because after a cut the parent is a headless `claude -p
 backlogrun` whose heartbeat reaches only its own transcript: the watcher persists each line into the

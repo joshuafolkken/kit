@@ -1,4 +1,6 @@
-import { detached_launch, type AgentArgv, type LaunchArgv } from './detached-launch'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { claude_agent_argv, type ClaudeArgvResult } from '#scripts/agent/claude-agent-argv'
+import { detached_launch, type LaunchArgv } from './detached-launch'
 import { run_invocation } from './run-invocation'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
@@ -17,7 +19,7 @@ import { run_invocation } from './run-invocation'
 // text handed to the agent CLI is still composed out of that module's own constants and validated
 // integers, and the recorded string still never reaches `spawn`.
 //
-// **The agent CLI is a constant, not configuration, and it is `detached-launch.ts`'s constant.** It was
+// **The agent CLI is a constant, not configuration, and it is the Claude adapter's constant.** It was
 // an environment variable first (`JOSH_WAKE_COMMAND`), which put the choice of *which binary runs* in
 // reach of anything that can set an environment — and this binary runs unattended, overnight, in the
 // person's own checkout with the person's own credentials. Shape-checking the name does not address
@@ -29,8 +31,8 @@ import { run_invocation } from './run-invocation'
 // stays a person's to apply, so a woken session is offered by exactly the rules the first one was. A
 // pool that grew across the seam is `backlogrun.md` → "What one invocation approves", not the
 // waker's doing (joshuafolkken/kit#1675).
-const WAKE_COMMAND = detached_launch.AGENT_COMMAND
-const WAKE_FLAGS = detached_launch.AGENT_FLAGS
+const WAKE_COMMAND = claude_agent_argv.AGENT_COMMAND
+const WAKE_FLAGS = claude_agent_argv.AGENT_FLAGS
 const LOOP_FLAG = '--loop'
 const INTERVAL_FLAG = '--interval'
 
@@ -55,14 +57,16 @@ function safe_invocation(invocation: string): string | undefined {
 
 // **The two failure modes are kept apart, not folded into one `undefined`** (joshuafolkken/kit#1932).
 // An unmatched or unsafe invocation is `undefined` and the caller names it as one; a rejected effort
-// override carries `agent_argv`'s own note through the `rejected` variant, so a `JOSH_LANE_EFFORT`
-// typo is reported as the env typo it is rather than as unreadable carried text.
-function wake_argv(invocation: string): AgentArgv | undefined {
+// override carries the role resolver's own note through the `rejected` variant, so a
+// `JOSH_SCHEDULER_EFFORT` typo is reported as the env typo it is rather than as unreadable carried text.
+function wake_argv(invocation: string, profile?: AgentProfile): ClaudeArgvResult | undefined {
 	const matched = safe_invocation(invocation)
 
 	if (matched === undefined) return undefined
 
-	return detached_launch.agent_argv(matched)
+	if (profile !== undefined) return claude_agent_argv.with_profile(matched, profile)
+
+	return claude_agent_argv.resolve(matched, agent_role_profile.SCHEDULER)
 }
 
 // Re-invoking this very script under the same runner, which is what makes the supervisor outlive the

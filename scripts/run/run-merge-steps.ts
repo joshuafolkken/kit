@@ -36,6 +36,11 @@ interface JoshResult {
 	out: string
 }
 
+interface FailedResult {
+	carry: RunCarry | undefined
+	is_parked: boolean
+}
+
 // A captured `pnpm josh` subprocess: its output is read back rather than inherited, and a non-zero
 // exit is a value to branch on rather than a throw (`reject: false`).
 async function josh(args: ReadonlyArray<string>): Promise<JoshResult> {
@@ -117,13 +122,13 @@ async function remove_in_progress(child: string): Promise<void> {
 // A failed child: count the failure, drop the stale `in-progress`, and park it with `needs-decision`
 // so the next offer does not hand the same child straight back. Returns the record so the caller can
 // read the streak against the guard.
-async function do_failed(ctx: MergeContext): Promise<RunCarry | undefined> {
+async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 	const carry = await apply_carry(ctx, run_merge.change_of('failed'))
 
 	await remove_in_progress(ctx.child)
-	await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
+	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
 
-	return carry
+	return { carry, is_parked }
 }
 
 // The hand-off check, asked at a merge alone. A subprocess that cannot measure exits non-zero, which

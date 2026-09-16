@@ -995,6 +995,8 @@ pnpm josh review:brief --level-only --json   # level and reason, machine-readabl
 
 It refuses to compose a brief when the scoped checks have never been green on this tree; run `pnpm josh lint:related && pnpm josh test:related`, then reissue.
 
+The brief prints the `reviewer` profile; pass its model and effort explicitly to the review subagent.
+
 #### The review level
 
 `pnpm josh review:brief --level-only` prints the `/code-review` level this change is reviewed at. The input is the list of changed paths and nothing else.
@@ -1114,7 +1116,7 @@ pnpm josh run:wake --stop                  # stop it
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 ```
 
-The supervisor launches `claude -p` with the invocation rebuilt from constants. It waits out the previous owner for up to ten minutes, then wakes; an unclaimed wake is retried up to three times before it stops.
+The supervisor launches `claude -p` as the `scheduler` role with the invocation rebuilt from constants; `--list` and the log show its profile. It waits out the previous owner for up to ten minutes, then wakes; an unclaimed wake is retried up to three times before it stops. Workers are never retried or promoted.
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
@@ -1218,7 +1220,7 @@ pnpm josh lane:prune        # alias: josh lnp
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
 - `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 6); applied by `josh epic:next`.
 
-**Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, and output path.
+**Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
 
 #### `josh lane:output`
 
@@ -1241,14 +1243,15 @@ Start a lane's child as a detached OS process, so cutting this session abandons 
 pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
 ```
 
-The child runs `claude -p --model <model> --effort <effort> fullrun #<N>` with `--output-format stream-json`, through the same detached launcher as `josh run:wake`. It records its output path at `<temp>/josh-lane-dispatch-<N>-<digest>.log` (surviving `lane:close`), and does not pass `--dangerously-skip-permissions`.
+The `worker` runs `claude -p --model <model> --effort <effort> fullrun #<N>` with streamed output through the same detached launcher as `josh run:wake`. Its lane record and log show the resolved profile. It does not pass `--dangerously-skip-permissions`.
 
 **Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 
 **Options:**
 
-- `JOSH_LANE_MODEL` — override the child's model (default `opus`).
-- `JOSH_LANE_EFFORT` — override the effort; allowlist `low` / `medium` / `high` / `xhigh` / `max` (default `medium`), a value outside it refuses the launch.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_{MODEL,EFFORT}` — role overrides; defaults are respectively `opus/high`, `opus/medium`, and `opus/high`.
+
+Blank values are unset; unsafe models and efforts outside `low|medium|high|xhigh|max` refuse launch. Legacy `JOSH_LANE_MODEL/EFFORT` fall back for workers only; migrate them to `JOSH_WORKER_MODEL/EFFORT`.
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 

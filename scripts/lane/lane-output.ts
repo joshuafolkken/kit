@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
+import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { lane_environment } from './lane-environment'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -56,7 +57,11 @@ function invalid_reason(output: string): string | undefined {
 }
 
 /** Record where this lane's unit writes, leaving everything else in its `.env` untouched. */
-async function record_output(issue: string, output: string): Promise<RecordOutcome> {
+async function record_output(
+	issue: string,
+	output: string,
+	profile?: AgentProfile,
+): Promise<RecordOutcome> {
 	const reason = invalid_reason(output)
 
 	if (reason !== undefined) return { kind: 'invalid', reason }
@@ -71,7 +76,7 @@ async function record_output(issue: string, output: string): Promise<RecordOutco
 
 	writeFileSync(
 		path.join(lane.directory, ENV_FILE_NAME),
-		lane_environment.with_lane_output(content, output),
+		lane_environment.with_lane_output(content, output, profile),
 	)
 
 	return { kind: 'recorded', lane, output }

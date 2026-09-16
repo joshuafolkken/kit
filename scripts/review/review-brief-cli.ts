@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -129,12 +130,16 @@ async function open_contract(): Promise<{ checkout: ReviewCheckout; nonce: strin
 	return { checkout, nonce: review_attest.record_target(checkout, checkout.root) }
 }
 
-async function compose_brief(
-	round: number,
-	paths: ReadonlyArray<string>,
-	tree: Record<string, string>,
-	base: string,
-): Promise<string> {
+interface ComposeRequest {
+	round: number
+	paths: ReadonlyArray<string>
+	tree: Record<string, string>
+	base: string
+	profile: AgentProfile
+}
+
+async function compose_brief(request: ComposeRequest): Promise<string> {
+	const { round, paths, tree, base, profile } = request
 	const stamps = {
 		gate: review_stamps.gate_stamp.read(),
 		in_flight: review_stamps.in_flight_stamp.read(),
@@ -143,6 +148,7 @@ async function compose_brief(
 
 	return review_brief.compose({
 		level: review_level.level_for(paths),
+		profile,
 		round,
 		tree,
 		stamps,
@@ -222,6 +228,20 @@ async function read_change(): Promise<ChangeReading> {
 	return { base, commit, paths, tree }
 }
 
+async function run_review(round: number, reading: ChangeReading): Promise<number> {
+	const { base, commit, paths, tree } = reading
+	const refusal = scoped_green.refusal_for(tree, commit)
+
+	if (refusal !== undefined) return report_error(refusal)
+	const resolved = agent_role_profile.resolve(agent_role_profile.REVIEWER)
+
+	if (resolved.kind === 'rejected') return report_error(resolved.note)
+	console.info(await compose_brief({ round, paths, tree, base, profile: resolved.profile }))
+	record_round_one(round, tree, commit)
+
+	return 0
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
 
@@ -229,15 +249,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (round === undefined) return report_error(USAGE)
 
-	const { base, commit, paths, tree } = await read_change()
-	const refusal = scoped_green.refusal_for(tree, commit)
-
-	if (refusal !== undefined) return report_error(refusal)
-
-	console.info(await compose_brief(round, paths, tree, base))
-	record_round_one(round, tree, commit)
-
-	return 0
+	return await run_review(round, await read_change())
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

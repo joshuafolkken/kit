@@ -90,11 +90,11 @@ still bounded at 25 lines. An in-process subagent could not survive the session 
 takes. `pnpm josh lane:dispatch` is where a lane's child is started; "Handing the child over" below
 carries the command.
 
-**The lane child is launched with an explicit model and effort.** It is started as
-`claude -p --model <model> --effort <effort> fullrun #<N>`, defaulting to model `opus` and effort
-`medium`, each overridable in `.env` with `JOSH_LANE_MODEL` / `JOSH_LANE_EFFORT`; an effort outside
-`low|medium|high|xhigh|max` refuses the launch. `docs/josh-commands.md` → "`josh lane:dispatch`" is
-the single source.
+**The lane child is launched with the explicit `worker` profile.** It is started as
+`claude -p --model <model> --effort <effort> fullrun #<N>`, defaulting to `opus` / `medium` and
+overridable with `JOSH_WORKER_MODEL` / `JOSH_WORKER_EFFORT`. Legacy `JOSH_LANE_*` values migrate only
+to this role. Invalid values refuse the launch; they never trigger an effort escalation or an automatic
+worker retry. `docs/josh-commands.md` → "`josh lane:dispatch`" is the single source.
 
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier: a unit that reports
 a child finished without its PR merged leaves that child open, and `pnpm josh issue:state <N>` says so

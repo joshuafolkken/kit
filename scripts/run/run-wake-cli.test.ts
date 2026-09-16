@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
@@ -134,6 +135,20 @@ describe('josh run:wake --start', () => {
 		expect(await run_wake_cli.run(['--start'])).toBe(SUCCESS)
 		expect(out).toStrictEqual([run_wake_cli.RUNNING_VERDICT])
 	})
+
+	it('rejects an invalid scheduler profile before claiming that a supervisor started', async () => {
+		write_carry(true)
+		process.env['JOSH_SCHEDULER_EFFORT'] = 'turbo'
+
+		try {
+			expect(await run_wake_cli.run(['--start'])).toBe(FAILURE)
+			expect(out).toStrictEqual([run_wake_cli.FAILED_VERDICT])
+			expect(errors.join('\n')).toContain('JOSH_SCHEDULER_EFFORT=turbo')
+			expect(run_wake.read_wake(wake_target())).toBeUndefined()
+		} finally {
+			delete process.env['JOSH_SCHEDULER_EFFORT']
+		}
+	})
 })
 
 describe('josh run:wake --list — a person can see what is running', () => {
@@ -178,6 +193,18 @@ describe('josh run:wake --list — a person can see what is running', () => {
 		await run_wake_cli.run(['--list'])
 
 		expect(errors.join('\n')).toContain('woke 1 session(s) across 2 cut(s)')
+	})
+})
+
+describe('josh run:wake --list — the scheduler profile', () => {
+	it('reports the profile recorded when the supervisor claimed the run', async () => {
+		write_carry(false)
+		const profile = agent_role_profile.DEFAULT_PROFILES.scheduler
+
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW, profile))
+		await run_wake_cli.run(['--list'])
+
+		expect(errors.join('\n')).toContain(agent_role_profile.describe(profile))
 	})
 })
 

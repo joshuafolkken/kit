@@ -2,6 +2,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_progress_clock } from './run-progress-clock'
@@ -234,6 +235,7 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 
 	return [
 		`invocation: ${wake.invocation}`,
+		`profile: ${wake.profile === undefined ? 'unrecorded' : agent_role_profile.describe(wake.profile)}`,
 		`supervisor: process ${String(wake.pid)} (${live}), watching since ${wake.started_at}`,
 		`woke ${String(wake.woke)} session(s) across ${cuts} cut(s)`,
 		outstanding_line(wake),
@@ -245,23 +247,27 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 		.join('\n')
 }
 
-function wake_session(context: WakeContext, invocation: string): LaunchResult {
-	const built = run_wake_session.wake_argv(invocation)
+function wake_session(
+	context: WakeContext,
+	invocation: string,
+	profile: AgentProfile,
+): LaunchResult {
+	const built = run_wake_session.wake_argv(invocation, profile)
 
 	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
 
 	return run_wake_session.launch(
-		{ argv: built.argv, cwd: context.worktree, log_path: context.log_target },
+		{ argv: built.argv, cwd: context.worktree, log_path: context.log_target, profile },
 		note_to_stderr,
 	)
 }
 
-function ports_for(context: WakeContext): LoopPorts {
+function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 	return {
 		read_carry: () => run_carry.read_carry(context.carry_target),
 		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_owner_live(read.carry),
-		wake: (invocation) => wake_session(context, invocation),
+		wake: (invocation) => wake_session(context, invocation, profile),
 		sleep: async (milliseconds) => {
 			await new Promise((resolve) => setTimeout(resolve, milliseconds))
 		},
@@ -333,6 +339,16 @@ function spawn_supervisor(context: WakeContext, interval: string | undefined): n
 	return report(STARTED_VERDICT)
 }
 
+function scheduler_profile(): AgentProfile | undefined {
+	const resolved = agent_role_profile.resolve(agent_role_profile.SCHEDULER)
+
+	if (resolved.kind === 'profile') return resolved.profile
+
+	console.error(resolved.note)
+
+	return undefined
+}
+
 function start(context: WakeContext, interval: string | undefined): number {
 	const read = run_carry.read_carry(context.carry_target)
 
@@ -345,6 +361,8 @@ function start(context: WakeContext, interval: string | undefined): number {
 
 		return report(RUNNING_VERDICT)
 	}
+
+	if (scheduler_profile() === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 
 	return spawn_supervisor(context, interval)
 }
@@ -367,11 +385,18 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 
 	if (read.kind !== 'carried') return refuse_without_carry(read.kind)
 
-	const claimed = run_wake.claim(context.wake_target, read.carry.invocation, new Date())
+	const profile = scheduler_profile()
+	if (profile === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
+
+	const claimed = run_wake.claim(context.wake_target, read.carry.invocation, new Date(), profile)
 
 	if (claimed === undefined) return report(RUNNING_VERDICT)
 
-	const stop = await run_wake_loop.run_loop(context.wake_target, ports_for(context), interval_ms)
+	const stop = await run_wake_loop.run_loop(
+		context.wake_target,
+		ports_for(context, claimed.profile ?? profile),
+		interval_ms,
+	)
 
 	tidy_up(context.wake_target)
 

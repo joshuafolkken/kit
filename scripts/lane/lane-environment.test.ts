@@ -1,3 +1,4 @@
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { describe, expect, it } from 'vitest'
 import { lane_environment } from './lane-environment'
 
@@ -176,5 +177,19 @@ describe('reading where a lane’s unit writes', () => {
 	it('reads a missing or blank record as undefined, never as an empty path', () => {
 		expect(lane_environment.read_lane_output(SEED_FILE)).toBeUndefined()
 		expect(lane_environment.read_lane_output('JOSH_LANE_OUTPUT=\n')).toBeUndefined()
+	})
+})
+
+describe('the worker profile recorded beside the output', () => {
+	it('round-trips the role, model and effort without changing the output', () => {
+		const profile = agent_role_profile.DEFAULT_PROFILES.worker
+		const content = lane_environment.with_lane_output(SEED_FILE, UNIT_OUTPUT, profile)
+
+		expect(lane_environment.read_lane_profile(content)).toStrictEqual(profile)
+		expect(lane_environment.read_lane_output(content)).toBe(UNIT_OUTPUT)
+	})
+
+	it('treats an incomplete or invalid profile as unrecorded', () => {
+		expect(lane_environment.read_lane_profile('JOSH_LANE_AGENT_ROLE=worker\n')).toBeUndefined()
 	})
 })

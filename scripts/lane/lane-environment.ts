@@ -1,4 +1,5 @@
 import { LANE_SEAT_KEY, PORT_SEED_KEY, ports } from '#ports'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 
 // The lane's `.env`, built from the root's (joshuafolkken/kit#1490, joshuafolkken/kit#1494).
 //
@@ -23,6 +24,9 @@ import { LANE_SEAT_KEY, PORT_SEED_KEY, ports } from '#ports'
 // nothing left to go stale. `.env` is gitignored in kit and in every consumer `josh sync` reaches,
 // which is the objection that sent the run hold's stamp to the temp directory instead.
 const LANE_OUTPUT_KEY = 'JOSH_LANE_OUTPUT'
+const LANE_ROLE_KEY = 'JOSH_LANE_AGENT_ROLE'
+const LANE_MODEL_KEY = 'JOSH_LANE_AGENT_MODEL'
+const LANE_EFFORT_KEY = 'JOSH_LANE_AGENT_EFFORT'
 const ASSIGNMENT_SEPARATOR = '='
 // `export PORT_SEED=3` is a form dotenv readers accept, so an assignment written that way has to be
 // read as the seed line rather than copied through beside the one appended below.
@@ -160,6 +164,14 @@ function read_lane_output(content: string): string | undefined {
 	return raw === undefined || raw.length === 0 ? undefined : raw
 }
 
+function read_lane_profile(content: string): AgentProfile | undefined {
+	return agent_role_profile.parse({
+		role: read_assignment(content, LANE_ROLE_KEY),
+		model: read_assignment(content, LANE_MODEL_KEY),
+		effort: read_assignment(content, LANE_EFFORT_KEY),
+	})
+}
+
 /**
  * The root file with its seed replaced, or with one appended where it had none.
  *
@@ -209,17 +221,25 @@ function lane_file_content(root_content: string, seat: number): string {
  * `#`, and dotenv readers cut a value at an unquoted ` #` — so an unquoted record would come back
  * truncated to something that still looks like a path. `read_lane_output` unquotes symmetrically.
  */
-function with_lane_output(content: string, output: string): string {
-	return upsert_assignment(content, LANE_OUTPUT_KEY, `"${output}"`)
+function with_lane_output(content: string, output: string, profile?: AgentProfile): string {
+	const recorded = upsert_assignment(content, LANE_OUTPUT_KEY, `"${output}"`)
+	if (profile === undefined) return recorded
+
+	const with_role = upsert_assignment(recorded, LANE_ROLE_KEY, profile.role)
+	const with_model = upsert_assignment(with_role, LANE_MODEL_KEY, profile.model)
+
+	return upsert_assignment(with_model, LANE_EFFORT_KEY, profile.effort)
 }
 
 const lane_environment = {
 	LANE_OUTPUT_KEY,
+	LANE_ROLE_KEY,
 	is_output_line,
 	is_seat_line,
 	is_seed_line,
 	lane_file_content,
 	read_lane_output,
+	read_lane_profile,
 	read_lane_ports,
 	read_lane_seat,
 	read_root_seed,

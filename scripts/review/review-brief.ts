@@ -1,3 +1,4 @@
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 
@@ -358,6 +359,7 @@ interface BriefStamps {
 
 interface BriefInput {
 	level: string
+	profile?: AgentProfile
 	round: number
 	tree: Record<string, string>
 	stamps: BriefStamps
@@ -379,8 +381,12 @@ function target_block(input: BriefInput): string {
 // The level alone on the first line, because the level-only mode's contract — a caller reading the
 // answer with `$(...)` — is the one thing a brief must not break.
 function compose(input: BriefInput): string {
+	const profile = input.profile ?? agent_role_profile.DEFAULT_PROFILES.reviewer
+
 	return [
 		input.level,
+		'',
+		`Agent profile: ${agent_role_profile.describe(profile)}`,
 		'',
 		rubric_line(input.checkout.root),
 		'',

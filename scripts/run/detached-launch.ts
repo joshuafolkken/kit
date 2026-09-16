@@ -1,5 +1,6 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 
@@ -22,27 +23,9 @@ const NO_PID_NOTE = 'the process started without a pid'
 const UNSAFE_NOTE =
 	'the wake command or its arguments contain characters that are not safe to execute'
 
-// **The agent CLI is a constant, not configuration, and it is one constant rather than two**
-// (joshuafolkken/kit#1749). `run:wake` fixed the binary here for a reason that holds identically for a
-// dispatched child — this runs unattended, in the person's own checkout with the person's own
-// credentials, so which binary runs must not be reachable from an environment variable. A second
-// launcher declaring its own copy would be free to drift from the one that was reviewed.
-//
-// **Neither vector carries `--dangerously-skip-permissions`.** What a headless session may do is the
-// checkout's own `.claude/settings.json` to decide; a launcher that disarmed every permission check
-// would take that decision away from the person, silently, on a machine nobody is watching.
-const AGENT_COMMAND = 'claude'
-// `-p` is a headless session: the invocation is the prompt, and nothing waits on a terminal.
-//
-// **`--output-format stream-json` is what makes the log grow while the child works**
-// (joshuafolkken/kit#1948). Without it a headless session prints nothing until it exits, so a
-// detached child's log holds only the launch header for the whole run — and `run:liveness` reads a
-// frozen log as a stopped unit, booking a working child `stopped` once the silent window passes.
-// Streaming emits a JSON event per turn and tool call, so the file grows steadily and the size-and-mtime
-// sample sees a live child move. `--verbose` is not optional: the agent CLI refuses
-// `--output-format stream-json` under `--print` without it.
-const AGENT_FLAGS: ReadonlyArray<string> = ['-p', '--verbose', '--output-format', 'stream-json']
-
+// Provider-specific commands and flags are composed before this boundary. This module accepts only
+// an argv vector and never infers policy from it; role/model/effort arrive separately as log metadata.
+// The provider adapter keeps the fixed binary and permission flags in one reviewed place.
 // **The inputs that reach `spawn` are validated rather than trusted, and that is a control rather than
 // a formality.** Two things already bound this — the argument vector never goes through a shell, so
 // there is no shell to inject into, and the invocation travels as exactly one argv element rather than
@@ -54,15 +37,8 @@ const AGENT_FLAGS: ReadonlyArray<string> = ['-p', '--verbose', '--output-format'
 // prefix of itself; the other control characters have no business in a command line and their presence
 // means the value did not come from where it was supposed to.
 //
-// Scanned by code point rather than matched by a regular expression: a character class over this
-// range has to carry the control characters themselves, which puts unreadable bytes in a source file
-// for no gain.
-const FIRST_PRINTABLE_CODE = 0x20
-const DELETE_CODE = 0x7f
-const FIRST_CODE_POINT = 0
-const MAX_ARGUMENT_LENGTH = 4096
-const EMPTY_LENGTH = 0
-
+// The shared value validation lives with the role policy so environment overrides and argv elements
+// cannot disagree about which control characters or lengths are safe.
 interface LaunchArgv {
 	command: string
 	args: ReadonlyArray<string>
@@ -83,111 +59,17 @@ interface LaunchRequest {
 	// launcher's own environment untouched, and spreading it last means an explicit value wins over an
 	// inherited one of the same name.
 	env?: Readonly<Record<string, string | undefined>>
+	// Resolved before this provider-independent launcher is called. It is launch metadata, not an
+	// argument source: the provider adapter already placed the same model and effort in `argv`.
+	profile?: AgentProfile | undefined
 }
 
-function is_control_character(character: string): boolean {
-	const code = character.codePointAt(FIRST_CODE_POINT) ?? FIRST_PRINTABLE_CODE
-
-	return code < FIRST_PRINTABLE_CODE || code === DELETE_CODE
-}
-
-// Iterated rather than spread into an array: spreading a string is flagged for decomposing rich
-// characters, and nothing here needs a copy of it.
-function has_control_character(value: string): boolean {
-	for (const character of value) {
-		if (is_control_character(character)) return true
-	}
-
-	return false
-}
-
-function is_safe_length(value: string): boolean {
-	return value.length > EMPTY_LENGTH && value.length <= MAX_ARGUMENT_LENGTH
-}
-
-function is_safe_value(value: string): boolean {
-	return is_safe_length(value) && !has_control_character(value)
-}
+const { is_safe_value } = agent_role_profile
 
 // The single gate every argument vector passes before it reaches the operating system, whoever
 // composed it.
 function is_safe_argv(argv: LaunchArgv): boolean {
 	return is_safe_value(argv.command) && argv.args.every((value) => is_safe_value(value))
-}
-
-// **Model and effort are made explicit at launch rather than left to the person's own settings**
-// (joshuafolkken/kit#1932). A dispatched child ran on whatever `~/.claude/settings.json` happened to
-// hold, so a run's lanes could disagree with its parent session on the model and no two runs were
-// comparable. The defaults live in one place — model `opus`, the latest-version alias so it matches the
-// parent, and effort `medium` — and the person's `.env` overrides each within the same validation the
-// invocation itself passes.
-const DEFAULT_MODEL = 'opus'
-const DEFAULT_EFFORT = 'medium'
-const MODEL_ENV_KEY = 'JOSH_LANE_MODEL'
-const EFFORT_ENV_KEY = 'JOSH_LANE_EFFORT'
-const MODEL_FLAG = '--model'
-const EFFORT_FLAG = '--effort'
-
-// **Effort is an allowlist; the model is not** (joshuafolkken/kit#1932). The agent CLI takes exactly
-// these five levels, so a value outside them is a typo that would fail the session minutes in — it is
-// refused at launch instead. A model name is open-ended, since the CLI grows aliases, so it passes the
-// same control-character and length gate every argument passes and no further one.
-const ALLOWED_EFFORTS: ReadonlyArray<string> = ['low', 'medium', 'high', 'xhigh', 'max']
-
-type LaunchEnvironment = Readonly<Record<string, string | undefined>>
-
-type EffortResult = { kind: 'ok'; effort: string } | { kind: 'rejected'; note: string }
-
-// **The launch is composed and validated, then returned as one of two answers**
-// (joshuafolkken/kit#1932). A rejected effort override stops the session rather than falling back to the
-// default, so the answer carries a note rather than always being a vector; every caller already reports
-// a failed launch the same way. `model` and `effort` ride along so the launch log can record what ran.
-type AgentArgv =
-	| { kind: 'argv'; argv: LaunchArgv; model: string; effort: string }
-	| { kind: 'rejected'; note: string }
-
-// A blank or whitespace-only override is not a value: it is treated as unset, so an `.env` line left as
-// `JOSH_LANE_MODEL=` falls back to the default rather than launching with an empty model name.
-function trimmed_override(value: string | undefined): string | undefined {
-	const trimmed = value?.trim()
-
-	return trimmed !== undefined && trimmed.length > EMPTY_LENGTH ? trimmed : undefined
-}
-
-function resolved_model(environment: LaunchEnvironment): string {
-	return trimmed_override(environment[MODEL_ENV_KEY]) ?? DEFAULT_MODEL
-}
-
-function effort_rejection(value: string): EffortResult {
-	return {
-		kind: 'rejected',
-		note: `${EFFORT_ENV_KEY}=${value} is not one of ${ALLOWED_EFFORTS.join(', ')}, so the session was not started`,
-	}
-}
-
-function resolved_effort(environment: LaunchEnvironment): EffortResult {
-	const override = trimmed_override(environment[EFFORT_ENV_KEY])
-
-	if (override === undefined) return { kind: 'ok', effort: DEFAULT_EFFORT }
-	if (!ALLOWED_EFFORTS.includes(override)) return effort_rejection(override)
-
-	return { kind: 'ok', effort: override }
-}
-
-// **The invocation goes on the command line last and as one argument**, never interpolated into a
-// command string: it is the prompt the headless session is given, not a list of arguments to the agent
-// CLI. The model and effort flags sit between the headless flag and that invocation, resolved from the
-// environment or the defaults. Each caller composes the invocation string out of its own constants and
-// validated values; this function only places it and refuses a disallowed effort.
-function agent_argv(invocation: string, environment: LaunchEnvironment = process.env): AgentArgv {
-	const effort = resolved_effort(environment)
-
-	if (effort.kind === 'rejected') return { kind: 'rejected', note: effort.note }
-
-	const model = resolved_model(environment)
-	const args = [...AGENT_FLAGS, MODEL_FLAG, model, EFFORT_FLAG, effort.effort, invocation]
-
-	return { kind: 'argv', argv: { command: AGENT_COMMAND, args }, model, effort: effort.effort }
 }
 
 function note_of(error: unknown): string {
@@ -212,37 +94,17 @@ function launched(pid: number): LaunchResult {
 const LOG_FLAGS = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW
 const LOG_MODE = 0o600
 
-const NEXT_OFFSET = 1
-const NOT_FOUND = -1
-
-// The value that follows a flag in an argument vector, or undefined when the flag is absent. Used to
-// read the model and effort back out of what `agent_argv` composed, so the log records them without a
-// second source that could drift from what was actually launched.
-function flag_value(args: ReadonlyArray<string>, flag: string): string | undefined {
-	const index = args.indexOf(flag)
-
-	return index === NOT_FOUND ? undefined : args[index + NEXT_OFFSET]
-}
-
-// **The model and effort are logged when the vector carries them, and nothing is added when it does
-// not** (joshuafolkken/kit#1932). A dispatched child and a woken session carry both; the supervisor
-// relaunching itself carries neither, so its header stays exactly what it was.
-function model_effort_suffix(argv: LaunchArgv): string {
-	const model = flag_value(argv.args, MODEL_FLAG)
-	const effort = flag_value(argv.args, EFFORT_FLAG)
-
-	if (model === undefined || effort === undefined) return ''
-
-	return ` · model=${model} effort=${effort}`
+function profile_suffix(profile: AgentProfile | undefined): string {
+	return profile === undefined ? '' : ` · ${agent_role_profile.describe(profile)}`
 }
 
 // One line in front of each launch, so the sessions started into one file can be told apart. The
 // child's own pid is not known until `spawn` returns, and a header written afterwards would race the
 // child's first output; the time and the launching process separate the runs.
-function log_header(argv: LaunchArgv): string {
+function log_header(argv: LaunchArgv, profile?: AgentProfile): string {
 	const stamp = new Date().toISOString()
 
-	return `\n=== ${stamp} · started by process ${String(process.pid)} · ${argv.command}${model_effort_suffix(argv)} ===\n`
+	return `\n=== ${stamp} · started by process ${String(process.pid)} · ${argv.command}${profile_suffix(profile)} ===\n`
 }
 
 function opened_log(log_path: string, on_error: (note: string) => void): number | undefined {
@@ -275,12 +137,13 @@ function opened_log(log_path: string, on_error: (note: string) => void): number 
 function stamped(
 	descriptor: number | undefined,
 	argv: LaunchArgv,
+	profile: AgentProfile | undefined,
 	on_error: (note: string) => void,
 ): void {
 	if (descriptor === undefined) return
 
 	try {
-		writeSync(descriptor, log_header(argv))
+		writeSync(descriptor, log_header(argv, profile))
 	} catch (error) {
 		on_error(`the session log could not be written: ${note_of(error)}`)
 	}
@@ -405,7 +268,7 @@ function launch(request: LaunchRequest, on_error: (note: string) => void): Launc
 	const log = open_log(request.log_path, on_error)
 
 	try {
-		stamped(log, request.argv, on_error)
+		stamped(log, request.argv, request.profile, on_error)
 
 		return spawned(request, log, on_error)
 	} catch (error) {
@@ -416,16 +279,7 @@ function launch(request: LaunchRequest, on_error: (note: string) => void): Launc
 }
 
 const detached_launch = {
-	AGENT_COMMAND,
-	AGENT_FLAGS,
-	ALLOWED_EFFORTS,
-	DEFAULT_EFFORT,
-	DEFAULT_MODEL,
-	EFFORT_ENV_KEY,
-	MAX_ARGUMENT_LENGTH,
-	MODEL_ENV_KEY,
 	UNSAFE_NOTE,
-	agent_argv,
 	ensure_log,
 	is_safe_argv,
 	is_safe_value,
@@ -434,5 +288,5 @@ const detached_launch = {
 	note_of,
 }
 
-export type { AgentArgv, LaunchArgv, LaunchRequest, LaunchResult }
+export type { LaunchArgv, LaunchRequest, LaunchResult }
 export { detached_launch }

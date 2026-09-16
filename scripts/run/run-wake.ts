@@ -1,3 +1,4 @@
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
@@ -78,6 +79,7 @@ interface RunWake {
 	// Copied from the carry record at `--start`, so the two cannot disagree about what is being
 	// continued. It is what the woken session is handed as its prompt.
 	invocation: string
+	profile?: AgentProfile | undefined
 	started_at: string
 	// The supervisor process. Unlike `run-hold.ts`, which records a pid it explicitly never reads back,
 	// this one is read: `--list` reports whether the supervisor is still running and `--stop` needs
@@ -186,6 +188,7 @@ const run_wake_schema = z.object({
 	attempts: z.number().optional(),
 	woke_pid: z.number().optional(),
 	held_at: z.string().optional(),
+	profile: agent_role_profile.PROFILE_SCHEMA.optional(),
 })
 
 // An unparsable stamp reads as overdue rather than as fresh: a mark whose time cannot be established
@@ -269,9 +272,10 @@ function remove_wake(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
-function fresh_wake(invocation: string, now: Date): RunWake {
+function fresh_wake(invocation: string, now: Date, profile?: AgentProfile): RunWake {
 	return {
 		invocation,
+		...(profile && { profile }),
 		started_at: now.toISOString(),
 		woke: NO_WAKES,
 		...process_identity.own_fields(),
@@ -305,6 +309,7 @@ function carried_state(existing: RunWake | undefined, invocation: string): Parti
 		attempts: existing.attempts,
 		woke_pid: existing.woke_pid,
 		held_at: existing.held_at,
+		...(existing.profile && { profile: existing.profile }),
 	}
 }
 
@@ -332,12 +337,17 @@ function reclaim(target: string, wake: RunWake): RunWake | undefined {
 // then succeed, leaving two supervisors waking two sessions into one carry budget. Attempted first, the
 // create is what decides between them, and the sweep runs only where it found something already there
 // — including a stamp that could not be parsed at all, which is why the sweep is not simply dropped.
-function claim(target: string, invocation: string, now: Date): RunWake | undefined {
+function claim(
+	target: string,
+	invocation: string,
+	now: Date,
+	profile?: AgentProfile,
+): RunWake | undefined {
 	const existing = read_wake(target)
 
 	if (is_held_by_live_supervisor(existing)) return undefined
 
-	const wake = { ...fresh_wake(invocation, now), ...carried_state(existing, invocation) }
+	const wake = { ...fresh_wake(invocation, now, profile), ...carried_state(existing, invocation) }
 
 	return stamp_file.create_stamp(target, wake) ? wake : reclaim(target, wake)
 }

@@ -5,7 +5,8 @@ is a polished Markdown review with severity-tagged findings and a final recommen
 intermediate step, not a finished deliverable.
 
 **The review is spawned in a subagent, and the main line never loads the skill.** Run `/code-review`
-through the `Agent` tool — a subagent that loads the skill in its own context, reviews the same diff at
+through the `Agent` tool with the reviewer model and effort printed by `pnpm josh review:brief` — a
+subagent that loads the skill in its own context, reviews the same diff at
 the same level for the same rounds, and returns the findings — never through the `Skill` tool in the
 main line, whose mid-run load rewrites the whole cached prompt prefix ("The review runs in a subagent,
 never a main-line skill load", under "Orchestration facts single-sourced here" below). So everywhere below reads "the `/code-review`

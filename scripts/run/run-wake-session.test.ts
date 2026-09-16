@@ -1,9 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { detached_launch } from './detached-launch'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // joshuafolkken/kit#1719. What the supervisor spawns is the one place it could widen what may be run,
@@ -20,11 +20,11 @@ const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
 const LOOPBACK_PROXY = 'http://localhost:52554'
 
 describe('run_wake_session.wake_argv — what the woken session is asked to do', () => {
-	// The woken session goes through the same launcher as a dispatched child, so it carries the same
-	// explicit model and effort defaults (joshuafolkken/kit#1932) with the invocation still last.
+	// The scheduler and worker share the provider adapter but resolve role-specific defaults; the
+	// scheduler's explicit profile travels with the invocation still last (joshuafolkken/kit#1932).
 	it('runs the agent CLI headless with the recorded invocation as its prompt and the default model and effort', () => {
 		expect(run_wake_session.wake_argv(INVOCATION)).toStrictEqual(
-			detached_launch.agent_argv(INVOCATION),
+			claude_agent_argv.resolve(INVOCATION, 'scheduler'),
 		)
 	})
 
