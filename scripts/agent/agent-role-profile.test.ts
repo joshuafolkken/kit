@@ -25,7 +25,7 @@ describe('the role policy defaults', () => {
 		})
 		expect(profile(WORKER)).toMatchObject({
 			provider: 'anthropic',
-			model: 'opus',
+			model: 'sonnet',
 			effort: 'medium',
 		})
 		expect(profile(REVIEWER)).toMatchObject({

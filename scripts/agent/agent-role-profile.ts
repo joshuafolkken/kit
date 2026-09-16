@@ -35,7 +35,7 @@ const PROVIDER_ENV_KEY = 'JOSH_AGENT_PROVIDER'
 
 const DEFAULT_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
 	scheduler: { provider: DEFAULT_PROVIDER, role: SCHEDULER, model: 'opus', effort: 'high' },
-	worker: { provider: DEFAULT_PROVIDER, role: WORKER, model: 'opus', effort: 'medium' },
+	worker: { provider: DEFAULT_PROVIDER, role: WORKER, model: 'sonnet', effort: 'medium' },
 	reviewer: { provider: DEFAULT_PROVIDER, role: REVIEWER, model: 'opus', effort: 'high' },
 }
 

@@ -97,9 +97,14 @@ function session_parent(parent_id: string | undefined): string {
 
 function session_line(row: SessionRow): string {
 	const tag = `${row.role.padEnd(ROLE_PAD)} d${String(row.depth)} ${session_issue(row.issue).padEnd(ISSUE_PAD)}`
-	const spent = `${cost_format.format_usd(row.cost_usd)} · ${format_minutes(row.elapsed_ms)} · ${String(row.request_count)} req · preamble ${cost_format.format_tokens(row.preamble_tokens)}`
+	const identity = `  ${tag} ${row.session_id}`
 
-	return `  ${tag} ${row.session_id}  ${spent}${session_parent(row.parent_id)}`
+	if (!row.is_measured) return `${identity}  ${NOT_MEASURED}${session_parent(row.parent_id)}`
+
+	const usage = `${String(row.request_count)} req · output ${cost_format.format_tokens(row.output_tokens)}`
+	const spent = `${cost_format.format_usd(row.cost_usd)} · ${format_minutes(row.elapsed_ms)} · ${usage} · preamble ${cost_format.format_tokens(row.preamble_tokens)}`
+
+	return `${identity}  ${spent}${session_parent(row.parent_id)}`
 }
 
 function session_lines(report: RunCostReport): Array<string> {

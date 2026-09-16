@@ -1252,10 +1252,10 @@ native auth/config stay put. The printed PID is the supervisor PID.
 
 **Options:**
 
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_{MODEL,EFFORT}` — role overrides; defaults are respectively `opus/high`, `opus/medium`, and `opus/high`.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_{MODEL,EFFORT}` — role overrides; Anthropic defaults are respectively `opus/high`, `sonnet/medium`, and `opus/high`.
 - `JOSH_AGENT_PROVIDER` — `anthropic` (default) or `openai`; OpenAI defaults are `gpt-5.6-sol` with scheduler/worker/reviewer efforts `high`/`medium`/`high`.
 
-Blank means unset. Invalid provider/model/effort or unavailable Codex CLI/auth refuses launch. No fallback, promotion, or worker retry. Legacy `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`.
+Blank means unset. Invalid provider/model/effort or unavailable Codex CLI/auth refuses launch. No fallback, promotion, or worker retry. Legacy `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker evaluation procedure](./backlogrun-worker-evaluation.md).
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 
