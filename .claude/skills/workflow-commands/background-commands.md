@@ -1,5 +1,23 @@
 # A command that can take minutes is issued in the background
 
+## Background the gate and push
+
+- Background `pnpm josh gate` beside the review; join it before commit.
+- Issue `pnpm josh git -y` in the background. Its completion event resumes the run; the turn never
+  ends at the push.
+- Keep `pnpm josh followup` in the foreground. Nearly every following step reads its result, so
+  detaching it creates no overlap.
+- Overlap only tree-readers: review beside the gate; report writing and finding disposition beside
+  `git -y`; round 2, branch-2 filing and `epic:bundle` beside CI.
+- Compose merge-independent tail data before `followup`. Keep `josh ms`, state checks, next-child
+  selection, lane closing and the session-cost check after it.
+- A dispatched lane child's pre-gate cut is the sole allowed turn boundary before the push; it
+  relaunches the child through `pre-gate-cut.md`.
+
+Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
+
+## Decision record
+
 This document is read at its point of use, not at the entry: it binds only after the first edit —
 at the gate, the push, the CI wait and `pnpm josh followup` — so it is fetched in full, in the turn
 that reaches the first backgroundable command (`pnpm josh gate`), by the run that has to obey it
@@ -21,21 +39,9 @@ cap chooses the detached path without choosing the completion notification that 
 A call issued detached from the start re-invokes the run when it exits — which is what makes the
 completion *delivered* rather than something to remember to poll for.
 
-**Which commands, and the one that is deliberately not among them:**
-
-- **`pnpm josh git -y` — background.** Commit, the pre-push hook's unit suite, the push (120 seconds
-  with one automatic retry, `scripts/git/git-push-transport.ts`) and the pull request. It is about a
-  minute in the ordinary case and reached 19m26s once, on a transport fault.
-- **`pnpm josh gate` — background, and already so.** It is *started* when `/code-review` starts and
-  *joined* before the commit (`SKILL.md` → §2, joshuafolkken/kit#1242); that is backgrounding under
-  an older name, and nothing about it changes here.
-- **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nearly
-  every step after it reads its result — the one that does not is named below — so detaching it
-  would move the reading rather than overlap anything, and would buy an empty turn. **`followup.md`
-  is read in full in the turn that issues the call, and not at the entry** (`SKILL.md` → §1, "Five
-  documents are read at the point of use"); `followup.md` →
-  "Always run `pnpm josh followup` in the foreground" stays exactly as it is, and shell `&`
-  backgrounding is a different thing again — it never works at all.
+The measured outliers were a 6m28s foreground `git -y`, 6m06s of unattended CI and a 19m26s push
+transport fault. The operational section above maps those waits to background gate/push and a
+foreground `followup`; `followup.md` remains its command procedure.
 
 **A tail does follow the merge, and it is not small** (joshuafolkken/kit#1462). This section first
 gave a different reason for that last bullet — that the merge ends the run, leaving no tail to
@@ -98,5 +104,5 @@ act, so the run continues rather than stalling — the sanctioned boundary disti
 turn-end this section forbids. The boundary, its two commands and the resume verification are the
 `pre-gate-cut.md` skill document, its single source.
 
-This section is the single source of the rule. `followup.md`, `chain-rule.md` and
+The operational section above is the single source of the rule. `followup.md`, `chain-rule.md` and
 `backlogrun-progress.md` → "Progress while the run is quiet" route here for it rather than restating it.

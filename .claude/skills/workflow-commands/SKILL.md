@@ -65,19 +65,19 @@ and marks every file that exceeds it.
 ### Four documents are read at the point of use, not at the entry
 
 **`followup.md`, `latest-gate.md`, `chain-rule.md` and `background-commands.md` are not entry reads.**
-Each is fetched **in full, in the same turn, by the step that has to obey it** — and that step is a
+Each is fetched **at the named scope, in the same turn, by the step that has to obey it** — and that step is a
 named command, so there is no judgement about when:
 
 | Document                | Read it when                                                                   |
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
-| `followup.md`           | Before issuing `pnpm josh followup`, in that same turn                          |
-| `chain-rule.md`         | Before running the `/code-review` step (`fullrun` / `backlogrun`) |
-| `background-commands.md` | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `backlogrun`) |
+| `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
+| `chain-rule.md` → "Run the review-to-merge chain" | Before running the `/code-review` step (`fullrun` / `backlogrun`) |
+| `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `backlogrun`) |
 
-This is "read it at the point of use", not "read it later": the fetch is whole and it happens before
-the command it governs. A `skip` answer from `latest:scope` reads nothing; the other three have no
-skip, so they are read when their step arrives. **The trigger sentence for each of the four is
+This is "read it at the point of use", not "read it later": the fetch happens before the command it
+governs. A `skip` answer from `latest:scope` reads nothing; `latest-gate.md` remains a whole-file read,
+while the other three fetch only the operational section named above. **The trigger sentence for each of the four is
 resident in §2 and in the command's own file**, so a run that never opens these documents still calls
 the right command at the right moment. `followup.md`'s post-execution reference — the stage-timing
 block, the AI-reviewer comment scan, the config-file report and the release ask — is in
@@ -764,9 +764,9 @@ no hooks still owes the read.
 
 ## 2h. A command that can take minutes is issued in the background
 
-**The rule and its whole procedure are `background-commands.md`, read at its point of use — before
-backgrounding the first long-running command (`pnpm josh gate`), and again wherever a run backgrounds
-one afterwards.** It governs issuing `pnpm josh git -y`, `pnpm josh gate` and the CI wait detached
+**The rule and its operational procedure are `background-commands.md` → "Background the gate and
+push", read at its point of use — before backgrounding the first long-running command (`pnpm josh
+gate`).** It governs issuing `pnpm josh git -y`, `pnpm josh gate` and the CI wait detached
 while `pnpm josh followup` stays in the foreground, the guarantee that the turn never ends at the push
 — bar a dispatched lane child's pre-gate cut (`pre-gate-cut.md`), the one sanctioned turn-end before it
 — and the tail that is emptied before `followup` rather than worked through after it. `background-commands.md`

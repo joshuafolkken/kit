@@ -39,7 +39,7 @@ const POINT_OF_USE_LABEL = '-- read at the point of use, not at the entry --'
 const LANE_CHILD_NOTE: ReadonlyArray<string> = [
 	'  a dispatched lane child (`JOSH_LANE_CHILD`) reads this trimmed set:',
 	'  - skips the point-of-use documents the parent owns — child dispatch, lane opening, the progress watcher and the hand-off',
-	'  - reads SKILL.md §2a/§2c/§2e/§2i/§3 at the section level, not whole — a leaf child never uses them',
+	'  - omits SKILL.md §0/§2a/§2b/§2c/§2e/§2i/§3 — dispatch already authorized the run and a leaf child never uses them',
 ]
 const FETCH_RULE =
 	'fetch: one `Read` call per file — never `cat`, and never two files in one command.'
@@ -79,6 +79,10 @@ function section_label(section: SectionCost): string {
 	return `${section.file} → "${section.heading}"${mark}`
 }
 
+function point_of_use_label(section: SectionCost): string {
+	return section.heading === '' ? section.file : section_label(section)
+}
+
 function saved_percent(report: ReadSetCost): number {
 	if (report.whole.tokens === NOTHING) return NOTHING
 
@@ -89,15 +93,15 @@ function labels_of(report: ReadSetCost): Array<string> {
 	return [
 		...report.files.map((entry) => entry.file),
 		...report.sections.map((section) => section_label(section)),
-		...report.point_of_use.map((entry) => entry.file),
+		...report.point_of_use.map((entry) => point_of_use_label(entry)),
 		WHOLE_LABEL,
 		SCOPED_LABEL,
 		TOTAL_READ_LABEL,
 	]
 }
 
-// **The total the entry actually reads**: the scoped entry read plus the point-of-use documents this
-// entry reaches, each fetched whole at its step. It is the figure a before/after compares — a lane
+// **The total the entry actually reads**: the scoped entry plus each point-of-use section (or whole
+// file where no section is named). It is the figure a before/after compares — a lane
 // child's set is smaller here, not in `scoped` alone (joshuafolkken/kit#2021).
 function total_read(report: ReadSetCost): { tokens: number; bytes: number } {
 	return entry_read_set.total([report.scoped, ...report.point_of_use.map((one) => one.cost)])
@@ -113,15 +117,14 @@ function file_lines(report: ReadSetCost, width: number): Array<string> {
 	)
 }
 
-// **What left the entry read is listed, never dropped.** A report that simply stopped naming these
-// three would show a saving with nowhere for the cost to have gone; each is still fetched whole, by
-// the command whose turn reaches it (joshuafolkken/kit#1797).
+// **What left the entry read is listed, never dropped.** Each row names the whole document or the
+// operational section fetched by the command whose turn reaches it.
 function point_of_use_lines(report: ReadSetCost, width: number): Array<string> {
 	if (report.point_of_use.length === NOTHING) return []
 
 	return [
 		`  ${POINT_OF_USE_LABEL}`,
-		...report.point_of_use.map((entry) => row(entry.file, entry.cost, width)),
+		...report.point_of_use.map((entry) => row(point_of_use_label(entry), entry.cost, width)),
 	]
 }
 

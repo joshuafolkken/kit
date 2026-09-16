@@ -191,8 +191,7 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 		[FULLRUN_FILE, 'pnpm josh followup'],
 		[HALFRUN_FILE, '**Invoking `halfrun` is _not_ authorization to commit, push, or merge**'],
 		[KICKOFF_FILE, 'pnpm josh epic'],
-		[CHAIN_RULE_FILE, ANTI_PATTERN_MARKER],
-		[CHAIN_RULE_FILE, 'Turn-end self-check'],
+		[CHAIN_RULE_FILE, 'Run the review-to-merge chain'],
 		[FOLLOWUP_FILE, '`auto-merge` — Default `fullrun` behavior'],
 	])('%s states %j', (filename, marker) => {
 		expect(read_skill_file(WORKFLOW_SKILL, filename)).toContain(marker)
