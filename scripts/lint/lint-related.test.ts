@@ -2,6 +2,7 @@ import path from 'node:path'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { ESLINT_RELATED_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lint_parallel } from './lint-parallel'
@@ -112,6 +113,7 @@ describe('lint_related.run_related_lint', () => {
 		expect(mocked_whole_tree).not.toHaveBeenCalled()
 		expect(mocked_scoped.mock.calls[0]?.[0]).toContain(ABSOLUTE_SOURCE)
 		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
+		expect(mocked_scoped.mock.calls[0]?.[2]).toBe(ESLINT_RELATED_CACHE_FILE)
 	})
 
 	it('reports the narrowing it applied before either linter starts', async () => {

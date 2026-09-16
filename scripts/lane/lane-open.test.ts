@@ -283,14 +283,14 @@ describe('refusing to open a lane', () => {
 describe('opening a lane — its verification caches', () => {
 	it('seeds the gate caches the main checkout has into the new lane', async () => {
 		for (const cache_file of GATE_CACHE_FILES) {
-			writeFileSync(path.join(REPOSITORY_ROOT, cache_file), `warm:${cache_file}`)
+			writeFileSync(path.join(REPOSITORY_ROOT, cache_file), JSON.stringify({ cache_file }))
 		}
 
 		await lane_open.open_lane(ISSUE)
 
 		for (const cache_file of GATE_CACHE_FILES) {
 			expect(readFileSync(path.join(LANE_ROOT, ISSUE, cache_file), 'utf8')).toBe(
-				`warm:${cache_file}`,
+				JSON.stringify({ cache_file }),
 			)
 		}
 	})

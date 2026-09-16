@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { plan_commands } from '#scripts/hooks/format-edited-file'
 import { PACKAGE_DIR, package_path } from '#scripts/init/init-paths'
+import { CSPELL_ARGS } from '#scripts/lint/cspell-cached'
 import { ESLINT_ARGS } from '#scripts/lint/lint-parallel'
 import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
@@ -57,7 +58,7 @@ describe('verification gate cache flags', () => {
 	})
 
 	it('spell-checks from a content-addressed cache at a named location', () => {
-		expect(command_line_of('cspell:dot')).toContain(CSPELL_CACHE_FLAGS.join(' '))
+		expect(CSPELL_ARGS.join(' ')).toContain(CSPELL_CACHE_FLAGS.join(' '))
 	})
 
 	// `josh lint` runs `lint-parallel.ts`, never the `lint:eslint` map entry, so asserting only the

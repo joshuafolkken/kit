@@ -1,13 +1,21 @@
+import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
+import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
+}))
+vi.mock('#scripts/lane/lane-cache-run', () => ({
+	lane_cache_run: {
+		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+	},
 }))
 
 const { lint_parallel } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
+const mocked_cache_run = vi.mocked(lane_cache_run.run)
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 
@@ -49,6 +57,14 @@ describe('run_lint_parallel_checks', () => {
 		const code = await run_lint_parallel_checks()
 
 		expect(code).toBe(0)
+	})
+
+	it('shares the eslint cache around the eslint process', async () => {
+		mock_exit_codes(0, 0)
+
+		await run_lint_parallel_checks()
+
+		expect(mocked_cache_run).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function))
 	})
 
 	it.each([

@@ -1,5 +1,4 @@
 import {
-	CSPELL_CACHE_FLAGS,
 	ESLINT_CACHE_FLAGS,
 	GATE_COMMAND,
 	PE,
@@ -78,7 +77,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
 	},
 	'cspell:dot': {
-		shell: [...PE, 'cspell', '.', '--dot', ...CSPELL_CACHE_FLAGS],
+		script: 'scripts/lint/cspell-cached.ts',
 		description: 'Run spell check including dotfiles',
 		category: 'Development',
 	},
