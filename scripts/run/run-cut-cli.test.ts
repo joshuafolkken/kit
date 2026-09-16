@@ -6,6 +6,7 @@ import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
+import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
@@ -51,7 +52,7 @@ const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const state = vi.spyOn(run_cut, 'current_state')
 const default_branch = vi.spyOn(git_command, 'get_default_branch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
-const log_path = vi.spyOn(lane_dispatch, 'default_log_path')
+const log_path = vi.spyOn(lane_dispatch_log, 'default_log_path')
 const launch = vi.spyOn(detached_launch, 'launch')
 const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
@@ -145,6 +146,22 @@ describe('the resume prompt the relaunch carries', () => {
 		)
 
 		expect(launch.mock.calls[0]?.[0].argv).not.toStrictEqual(bare_argv)
+	})
+})
+
+describe('a manual OpenAI lane process', () => {
+	it('leaves a manual OpenAI process running when no matching supervisor owns the lane', async () => {
+		find_open_lane.mockResolvedValue({
+			...lane(),
+			profile: agent_role_profile.OPENAI_PROFILES.worker,
+		})
+
+		const code = await run_cut_cli.run([ISSUE])
+
+		expect(code).toBe(1)
+		expect(verdict()).toBe(run_cut_cli.FAILED_VERDICT)
+		expect(run_cut.read_cut(target()).kind).toBe('none')
+		expect(launch).not.toHaveBeenCalled()
 	})
 })
 

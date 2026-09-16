@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 import { codex_agent_argv } from './codex-agent-argv'
@@ -6,6 +7,7 @@ const INVOCATION = 'fullrun #2071'
 const MODEL = 'gpt-5.6-sol'
 const SANDBOX = 'workspace-write'
 const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
+const LANE = '/lanes/2071'
 
 function openai_worker(): AgentProfile {
 	const result = agent_role_profile.resolve(agent_role_profile.WORKER, {
@@ -46,5 +48,22 @@ describe('Codex argv construction', () => {
 		expect(argv.args.join(' ')).not.toContain('dangerously')
 		expect(argv.args).toContain(SANDBOX)
 		expect(argv.args).toContain(NETWORK_CONFIG)
+	})
+})
+
+describe('Codex lane runtime state', () => {
+	it('keeps lane session state local and makes the headless session ephemeral', () => {
+		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
+
+		expect(argv.args).toContain('sqlite_home="/lanes/2071/node_modules/.cache/josh/openai"')
+		expect(argv.args).toContain('--ephemeral')
+		expect(argv.args).not.toContain('--ignore-user-config')
+	})
+
+	it('quotes an absolute SQLite path when the lane name contains spaces', () => {
+		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), './lanes/lane with spaces')
+		const expected = path.resolve('./lanes/lane with spaces/node_modules/.cache/josh/openai')
+
+		expect(argv.args).toContain(`sqlite_home=${JSON.stringify(expected)}`)
 	})
 })

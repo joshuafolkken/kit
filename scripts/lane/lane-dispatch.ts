@@ -3,12 +3,14 @@ import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { telegram_notify } from '#scripts/git/telegram-notify'
-import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_issue_number } from '#scripts/run/run-issue-number'
+import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
+import { lane_dispatch_log } from './lane-dispatch-log'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { openai_lane_supervisor } from './openai-lane-supervisor'
 
 // `josh lane:dispatch <issue-number>` — start a lane's child as an operating-system process of its own
 // (joshuafolkken/kit#1749).
@@ -33,13 +35,9 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // The invocation the child is given. Composed from this constant and a digits-only issue number, never
 // from text that was read from anywhere — the same discipline `run-wake-session.ts` applies to the
 // invocation it rebuilds out of the carry record.
-const CHILD_INVOCATION = 'fullrun'
 // The resume guide a relaunched child is pointed at (joshuafolkken/kit#2022). It carries the resume
 // procedure a `run:cut` successor follows, so naming it lets the child read one section rather than the
 // workflow-commands entry documents it would otherwise read to learn it is a resume at all.
-const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
-const LOG_PREFIX = 'josh-lane-dispatch-'
-const LOG_SUFFIX = '.log'
 const NOTE_SEPARATOR = '; '
 const WARNING_TITLE = 'lane child dispatch'
 const WARNING_RECOVERY =
@@ -89,9 +87,7 @@ type Prepared =
 
 /** The prompt the headless child is given: `fullrun #<N>`, and nothing a caller supplied verbatim. */
 function child_invocation(issue: string): string {
-	run_issue_number.require_issue_number(issue)
-
-	return `${CHILD_INVOCATION} #${issue}`
+	return lane_child_invocation.child_invocation(issue)
 }
 
 /**
@@ -108,9 +104,7 @@ function child_invocation(issue: string): string {
  * invocation keeps that poll matching and is also the ordinary run a `fresh` verdict falls back to.
  */
 function resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue #${issue} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:cut --resume ${issue}\` before anything else and follow the matching verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Only on \`fresh\` proceed as an ordinary`
-
-	return `${preamble} ${child_invocation(issue)}`
+	return lane_child_invocation.resume_invocation(issue)
 }
 
 // **In the temp directory rather than in the lane**, so the log survives `pnpm josh lane:close` — the
@@ -124,7 +118,7 @@ function resume_invocation(issue: string): string {
 // second scheme: `stamp_file.stamp_path` takes the prefix, the root the record is keyed to, and the
 // suffix. The issue number stays in the prefix so a person can still find the file by eye.
 function default_log_path(lane: LaneInfo): string {
-	return stamp_file.stamp_path(`${LOG_PREFIX}${lane.issue}-`, lane.directory, LOG_SUFFIX)
+	return lane_dispatch_log.default_log_path(lane)
 }
 
 // **The dispatch owns the log, so it writes to its own path rather than to whatever was recorded.**
@@ -144,35 +138,107 @@ async function resolved_log(lane: LaneInfo, profile: AgentProfile): Promise<LogO
 // The notes the launcher reports are collected rather than printed: one of them arrives
 // asynchronously, from the child-process `error` event, and a launch that failed has to say everything
 // it knows in one message.
-function started(request: StartRequest): DispatchOutcome {
-	const notes: Array<string> = []
-	const { lane, log_path, invocation, argv, profile } = request
+function failed_start(
+	request: StartRequest,
+	note: string,
+	notes: ReadonlyArray<string>,
+): DispatchOutcome {
+	return {
+		kind: 'failed',
+		lane: request.lane,
+		log_path: request.log_path,
+		note: [note, ...notes].join(NOTE_SEPARATOR),
+	}
+}
 
+function existing_dispatch(request: StartRequest): DispatchOutcome | undefined {
+	if (request.profile.provider !== 'openai') return undefined
+	const active = openai_lane_supervisor.active(request.lane.directory)
+	if (active?.issue !== request.lane.issue) return undefined
+
+	if (!openai_lane_supervisor.approve(request.lane.directory, active.nonce)) {
+		return failed_start(
+			request,
+			`the OpenAI supervisor for lane #${request.lane.issue} was cancelled`,
+			[],
+		)
+	}
+
+	return { kind: 'dispatched', ...request, pid: active.pid, notes: [] }
+}
+
+function launch_argv(request: StartRequest, nonce: string | undefined): AgentArgv {
+	if (request.profile.provider !== 'openai') return request.argv
+	if (nonce === undefined) throw new Error('OpenAI supervisor nonce is missing')
+
+	return openai_lane_supervisor.supervisor_argv(request.lane.issue, nonce)
+}
+
+async function openai_dispatched_start(
+	request: StartRequest,
+	notes: ReadonlyArray<string>,
+	nonce: string | undefined,
+): Promise<DispatchOutcome> {
+	const { lane, log_path, invocation, profile } = request
+	const owner = await openai_lane_supervisor.wait_for_active(lane.directory)
+
+	if (owner?.issue !== lane.issue) {
+		if (nonce !== undefined) openai_lane_supervisor.cancel(lane.directory, nonce)
+
+		return failed_start(request, `the OpenAI supervisor did not claim lane #${lane.issue}`, notes)
+	}
+
+	if (!openai_lane_supervisor.approve(lane.directory, owner.nonce)) {
+		return failed_start(
+			request,
+			`the OpenAI supervisor for lane #${lane.issue} was cancelled`,
+			notes,
+		)
+	}
+
+	return { kind: 'dispatched', lane, invocation, log_path, pid: owner.pid, profile, notes }
+}
+
+async function dispatched_start(
+	request: StartRequest,
+	pid: number,
+	notes: ReadonlyArray<string>,
+	nonce: string | undefined,
+): Promise<DispatchOutcome> {
+	const { lane, log_path, invocation, profile } = request
+
+	return profile.provider === 'openai'
+		? await openai_dispatched_start(request, notes, nonce)
+		: { kind: 'dispatched', lane, invocation, log_path, pid, profile, notes }
+}
+
+async function started(request: StartRequest): Promise<DispatchOutcome> {
+	const notes: Array<string> = []
+	const existing = existing_dispatch(request)
+	if (existing !== undefined) return existing
+	const nonce =
+		request.profile.provider === 'openai' ? openai_lane_supervisor.new_nonce() : undefined
 	const result = detached_launch.launch(
 		{
-			argv,
-			cwd: lane.directory,
-			log_path,
-			profile,
-			// The mark that tells the child it was dispatched rather than typed (joshuafolkken/kit#1904),
-			// so the pre-gate cut fires from the environment instead of the model's reading of the prompt.
-			env: lane_child_marker.env_for(lane.issue),
+			argv: launch_argv(request, nonce),
+			cwd: request.lane.directory,
+			log_path: request.log_path,
+			profile: request.profile,
+			env: lane_child_marker.env_for(request.lane.issue),
 		},
 		(note) => {
 			notes.push(note)
 		},
 	)
 
-	if (result.kind !== 'launched') {
-		return { kind: 'failed', lane, log_path, note: [result.note, ...notes].join(NOTE_SEPARATOR) }
-	}
+	if (result.kind !== 'launched') return failed_start(request, result.note, notes)
 
-	return { kind: 'dispatched', lane, invocation, log_path, pid: result.pid, profile, notes }
+	return await dispatched_start(request, result.pid, notes, nonce)
 }
 
 function prepared(lane: LaneInfo): Prepared {
 	const invocation = child_invocation(lane.issue)
-	const built = agent_argv.resolve(invocation, agent_role_profile.WORKER)
+	const built = agent_argv.resolve_in(invocation, agent_role_profile.WORKER, lane.directory)
 
 	return built.kind === 'rejected'
 		? built
@@ -202,7 +268,7 @@ async function unmark_in_progress(issue: string): Promise<void> {
 }
 
 async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
-	const outcome = started(request)
+	const outcome = await started(request)
 
 	if (outcome.kind === 'failed') await unmark_in_progress(issue)
 
@@ -296,7 +362,7 @@ async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise
 }
 
 const lane_dispatch = {
-	CHILD_INVOCATION,
+	CHILD_INVOCATION: lane_child_invocation.CHILD_INVOCATION,
 	child_invocation,
 	default_log_path,
 	describe,

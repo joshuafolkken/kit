@@ -60,14 +60,27 @@ function safe_invocation(invocation: string): string | undefined {
 // An unmatched or unsafe invocation is `undefined` and the caller names it as one; a rejected effort
 // override carries the role resolver's own note through the `rejected` variant, so a
 // `JOSH_SCHEDULER_EFFORT` typo is reported as the env typo it is rather than as unreadable carried text.
-function wake_argv(invocation: string, profile?: AgentProfile): AgentArgvResult | undefined {
-	const matched = safe_invocation(invocation)
+function profiled_argv(invocation: string, profile: AgentProfile, cwd?: string): AgentArgvResult {
+	return cwd === undefined
+		? agent_argv.with_profile(invocation, profile)
+		: agent_argv.with_profile_in(invocation, profile, cwd)
+}
 
+function resolved_argv(invocation: string, cwd?: string): AgentArgvResult {
+	return cwd === undefined
+		? agent_argv.resolve(invocation, agent_role_profile.SCHEDULER)
+		: agent_argv.resolve_in(invocation, agent_role_profile.SCHEDULER, cwd)
+}
+
+function wake_argv(
+	invocation: string,
+	profile?: AgentProfile,
+	cwd?: string,
+): AgentArgvResult | undefined {
+	const matched = safe_invocation(invocation)
 	if (matched === undefined) return undefined
 
-	if (profile !== undefined) return agent_argv.with_profile(matched, profile)
-
-	return agent_argv.resolve(matched, agent_role_profile.SCHEDULER)
+	return profile === undefined ? resolved_argv(matched, cwd) : profiled_argv(matched, profile, cwd)
 }
 
 // Re-invoking this very script under the same runner, which is what makes the supervisor outlive the

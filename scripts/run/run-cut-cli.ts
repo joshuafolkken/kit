@@ -3,9 +3,11 @@ import { fileURLToPath } from 'node:url'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_command } from '#scripts/git/git-command'
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { lane_dispatch } from '#scripts/lane/lane-dispatch'
+import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { detached_launch } from './detached-launch'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
@@ -113,17 +115,25 @@ function report_relaunch_failure(target: string, note: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
+function report_missing_supervisor(issue: string): number {
+	console.error(
+		`The OpenAI supervisor for #${issue} is not live, so this nested process was not cut and can continue. Re-dispatch the lane to recover the supervisor.`,
+	)
+
+	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
+}
+
 function relaunch(target: string, lane: LaneInfo): number {
 	const notes: Array<string> = []
 	// The relaunched child is given a resume-specific prompt, not the record's bare `fullrun #<N>`
 	// (joshuafolkken/kit#2022), so it goes straight to `run:cut --resume` without reading the
 	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
 	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
-	const invocation = lane_dispatch.resume_invocation(lane.issue)
+	const invocation = lane_child_invocation.resume_invocation(lane.issue)
 	const built =
 		lane.profile === undefined
-			? agent_argv.resolve(invocation, agent_role_profile.WORKER)
-			: agent_argv.with_profile(invocation, lane.profile)
+			? agent_argv.resolve_in(invocation, agent_role_profile.WORKER, lane.directory)
+			: agent_argv.with_profile_in(invocation, lane.profile, lane.directory)
 
 	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
 
@@ -131,7 +141,7 @@ function relaunch(target: string, lane: LaneInfo): number {
 		{
 			argv: built.argv,
 			cwd: lane.directory,
-			log_path: lane_dispatch.default_log_path(lane),
+			log_path: lane_dispatch_log.default_log_path(lane),
 			profile: built.profile,
 			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
 			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
@@ -162,6 +172,29 @@ function clear_expired(target: string): void {
 	if (run_cut.read_cut(target).kind === 'expired') run_cut.end_cut(target)
 }
 
+function is_openai_lane(lane: LaneInfo): boolean {
+	return lane.profile?.provider === 'openai'
+}
+
+function has_matching_supervisor(lane: LaneInfo, issue: string): boolean {
+	if (!is_openai_lane(lane)) return true
+
+	return openai_lane_supervisor.active(lane.directory)?.issue === issue
+}
+
+interface CutRequest {
+	branch: string
+	issue: string
+	phase: string
+}
+
+function finish_cut(target: string, lane: LaneInfo, request: CutRequest): number {
+	const started = run_cut.begin_cut(target, request)
+	if (started === undefined) return report_cut_exists(target)
+
+	return is_openai_lane(lane) ? report(CUT_VERDICT, SUCCESS_EXIT_CODE) : relaunch(target, lane)
+}
+
 async function cut(target: string, issue: string, phase: string): Promise<number> {
 	const lane = await lane_registry.find_open_lane(issue)
 
@@ -172,11 +205,9 @@ async function cut(target: string, issue: string, phase: string): Promise<number
 	if (!(await is_lane_branch(state))) return refuse_unready(state)
 
 	clear_expired(target)
-	const started = run_cut.begin_cut(target, { issue, branch: state.branch, phase })
+	if (!has_matching_supervisor(lane, issue)) return report_missing_supervisor(issue)
 
-	if (started === undefined) return report_cut_exists(target)
-
-	return relaunch(target, lane)
+	return finish_cut(target, lane, { issue, branch: state.branch, phase })
 }
 
 // **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two

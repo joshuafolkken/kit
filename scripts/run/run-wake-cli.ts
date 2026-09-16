@@ -254,7 +254,7 @@ function wake_session(
 	invocation: string,
 	profile: AgentProfile,
 ): LaunchResult {
-	const built = run_wake_session.wake_argv(invocation, profile)
+	const built = run_wake_session.wake_argv(invocation, profile, context.worktree)
 
 	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }

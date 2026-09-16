@@ -1116,16 +1116,18 @@ pnpm josh run:wake --stop                  # stop it
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 ```
 
-`scheduler` runs provider; listings show profile/result. Anthropic defaults. After login, OpenAI runs `codex exec --sandbox workspace-write -c sandbox_workspace_write.network_access=true --json` without fallback. Unclaimed wakes try thrice; workers never retry/promote.
+`scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local
+`sqlite_home` and `--ephemeral`, retaining native auth/config. Unclaimed wakes try thrice.
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
 ### `josh run:cut`
 
-Cut a dispatched lane child before the verification gate and resume a fresh process from persisted state.
+Cut a dispatched lane child before the verification gate. OpenAI uses its lane supervisor; Anthropic
+relaunches directly. With no matching supervisor, OpenAI returns `failed` before writing the cut.
 
 ```bash
-pnpm josh run:cut 1839            # take the cut and relaunch a fresh process; alias: josh rct
+pnpm josh run:cut 1839            # take the cut and hand it to a fresh process; alias: josh rct
 pnpm josh run:cut --resume 1839   # a fresh process's entry check
 pnpm josh run:cut --end           # clear the record
 ```
@@ -1243,7 +1245,9 @@ Start a lane's child as a detached OS process, so cutting this session abandons 
 pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
 ```
 
-`JOSH_AGENT_PROVIDER` selects worker: blank/`anthropic` runs `claude -p`; `openai` runs `codex exec --sandbox workspace-write --model <model> -c model_reasoning_effort="<effort>" -c sandbox_workspace_write.network_access=true --json`. Shell-free launch passes `fullrun #<N>` singly; listings/liveness normalize JSON/JSONL.
+`JOSH_AGENT_PROVIDER` selects worker: blank/`anthropic` runs unchanged `claude -p`; `openai` uses a
+detached non-AI supervisor for initial/successor Codex generations. State is lane-local and ephemeral;
+native auth/config stay put. The printed PID is the supervisor PID.
 
 **Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 

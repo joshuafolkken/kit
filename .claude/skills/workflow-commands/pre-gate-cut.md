@@ -34,7 +34,7 @@ the model reading the shape of its own prompt (joshuafolkken/kit#1904).
 
 ### The dispatch mark
 
-`lane:dispatch` and the `run:cut` relaunch both start the child with the environment variable
+`lane:dispatch` starts each child generation with the environment variable
 **`JOSH_LANE_CHILD`** set to the lane's issue number. `scripts/lane/lane-child-marker.ts` is its one
 definition.
 
@@ -62,11 +62,11 @@ pnpm josh run:cut <N>          # alias: josh rct
 
 | Verdict      | Exit | What it means, and what to do                                                                                                   |
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `cut`        | 0    | The record was written and a fresh `fullrun #<N>` was relaunched in the same lane. **End the turn immediately** — do not continue to the gate; the fresh process owns the run from here |
+| `cut`        | 0    | The record was written and handed to the lane's launch owner: the OpenAI supervisor starts the successor after this process exits; Anthropic relaunches directly. **End the turn immediately** — do not continue to the gate; the fresh process owns the run from here |
 | `not-a-lane` | 0    | No open lane for this issue, so this is not a dispatched child. **Continue to the gate in this process** as an uncut run does    |
 | `unready`    | 1    | The tree is clean or on the default branch, so there is nothing to carry. Continue to the gate in this process                  |
 | `busy`       | 1    | A cut is already in flight for this tree — the double-cut guard. Do not relaunch a second one                                    |
-| `failed`     | 1    | The relaunch could not be started; **the record was cleared**, so continue to the gate in this process. The run is never lost to a failed hand-off |
+| `failed`     | 1    | No matching OpenAI supervisor was live, or the Anthropic relaunch could not start. No OpenAI cut was created; an Anthropic relaunch failure clears its cut. Continue to the gate in this process |
 | `unknown`    | 1    | This work tree's git directory could not be read, so no record was acted on. Continue to the gate in this process |
 
 **`cut` is the only verdict that ends the turn.** Every other one leaves the current process to carry
@@ -169,10 +169,10 @@ run — removed.
 - **The resume verifies the tree against the record**: the branch matches, the tree is dirty (the
   implementation is present), the issue matches, and the tree is still under the hold the cutting run
   held. Any mismatch is `stale`.
-- **No owner is recorded on the cut.** A cut relaunches exactly one fresh process, so there is no live
-  session a resume must be blocked against; recording the cutting session's pid would only stall the
-  resume against a process on its way out. Uniqueness rests on the hand-off and the exclusive create
-  below instead.
+- **No owner is recorded on the cut.** OpenAI keeps a separate immutable, per-worktree supervisor
+  owner record and mutable generation state; the cut remains the stage hand-off alone. A dead owner
+  can be replaced without starting beside its still-live child, and a standing hand-off is resumed
+  before an ordinary initial generation.
 - **The cut is exclusive.** `run:cut` writes the record with an exclusive create, so a second cut on
   the same tree is refused `busy` and never relaunches a second process.
 - **The resume is unique.** Taking the hand-off over spends it — a second `run:cut --resume` reads a
