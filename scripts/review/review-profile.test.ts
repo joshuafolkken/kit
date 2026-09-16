@@ -14,5 +14,20 @@ test('the review brief hands orchestration the resolved reviewer profile', () =>
 		base: 'main',
 	})
 
-	expect(brief).toContain('role=reviewer model=opus effort=high')
+	expect(brief).toContain('provider=anthropic role=reviewer model=opus effort=high')
+})
+
+test('the review brief hands orchestration the OpenAI reviewer profile', () => {
+	const brief = review_brief.compose({
+		level: 'medium',
+		profile: agent_role_profile.OPENAI_PROFILES.reviewer,
+		round: 1,
+		tree: {},
+		stamps: { gate: undefined, in_flight: undefined, round_one: undefined },
+		checkout: { root: '/lane', branch: '2071-lane', head: 'abc' },
+		nonce: 'nonce',
+		base: 'main',
+	})
+
+	expect(brief).toContain('provider=openai role=reviewer model=gpt-5.6-sol effort=high')
 })

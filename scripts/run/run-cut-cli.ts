@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
@@ -122,8 +122,8 @@ function relaunch(target: string, lane: LaneInfo): number {
 	const invocation = lane_dispatch.resume_invocation(lane.issue)
 	const built =
 		lane.profile === undefined
-			? claude_agent_argv.resolve(invocation, agent_role_profile.WORKER)
-			: claude_agent_argv.with_profile(invocation, lane.profile)
+			? agent_argv.resolve(invocation, agent_role_profile.WORKER)
+			: agent_argv.with_profile(invocation, lane.profile)
 
 	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
 

@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
+import { run_liveness } from './run-liveness'
 import { run_progress_clock } from './run-progress-clock'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
@@ -240,6 +241,7 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 		`woke ${String(wake.woke)} session(s) across ${cuts} cut(s)`,
 		outstanding_line(wake),
 		progress_line(context),
+		run_liveness.describe_agent_state(context.log_target),
 		`output: ${context.log_target}`,
 		`stop it with \`${STOP_COMMAND}\``,
 	]

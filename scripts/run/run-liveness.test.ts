@@ -1,9 +1,11 @@
 import { mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { AgentEventState } from '#scripts/agent/agent-event'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_hold } from './run-hold'
 import {
 	ALIVE_VERDICT,
 	MS_PER_MINUTE,
@@ -26,6 +28,7 @@ import {
 
 const ISSUE = '1169'
 const TRANSCRIPT_NAME = 'transcript.jsonl'
+const BUDGET_EXCEEDED = 'budget exceeded'
 
 function arrange_traces(overrides: Partial<Traces> = {}): Traces {
 	return {
@@ -36,6 +39,24 @@ function arrange_traces(overrides: Partial<Traces> = {}): Traces {
 		...overrides,
 	}
 }
+
+describe('a provider-reported stop', () => {
+	it('surfaces a normalized provider failure immediately for parking', () => {
+		const agent_state: AgentEventState = {
+			provider: 'openai',
+			launch: 'started',
+			progress: 'running tests',
+			result: 'failed',
+			reason: BUDGET_EXCEEDED,
+			usage: undefined,
+		}
+		const decision = run_liveness.decide(
+			arrange_traces({ agent_state, is_output_frozen: false, process_trace: PROCESS_ALIVE }),
+		)
+
+		expect(decision).toMatchObject({ verdict: STOPPED_VERDICT, reason: BUDGET_EXCEEDED })
+	})
+})
 
 describe('the stop a unit leaves, whether or not it reached the implementation', () => {
 	// The measured case: the unit died seven minutes in, while still reading. The tree was clean, no
@@ -314,6 +335,52 @@ describe('what makes a child settled, read from GitHub', () => {
 		vi.spyOn(git_gh_issue_read, 'issue_view_json').mockResolvedValue(undefined)
 
 		await expect(run_liveness.read_child_settled(ISSUE)).resolves.toBeUndefined()
+	})
+})
+
+function arrange_terminal_check(
+	...issue_results: ReadonlyArray<string | undefined>
+): LivenessRequest {
+	const { target } = arrange_transcript(0)
+
+	writeFileSync(target, `${JSON.stringify({ type: 'turn.completed' })}\n`)
+	const issue_read = vi.spyOn(git_gh_issue_read, 'issue_view_json')
+	for (const result of issue_results) issue_read.mockResolvedValueOnce(result)
+	vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
+
+	return {
+		gap_ms: 0,
+		issue: ISSUE,
+		output_path: target,
+		process_trace: PROCESS_NONE,
+		silent_window_ms: MS_PER_MINUTE,
+	}
+}
+
+describe('terminal event and GitHub settlement race', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('re-reads GitHub and prefers a concurrently settled child', async () => {
+		const open = JSON.stringify({ labels: [], state: 'OPEN' })
+		const closed = JSON.stringify({ labels: [], state: 'CLOSED' })
+
+		await expect(run_liveness.check(arrange_terminal_check(open, closed))).resolves.toMatchObject({
+			verdict: SETTLED_VERDICT,
+		})
+
+		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledTimes(2)
+	})
+
+	it('keeps an initial CLOSED result when the terminal re-read is unavailable', async () => {
+		const closed = JSON.stringify({ labels: [], state: 'CLOSED' })
+
+		await expect(
+			run_liveness.check(arrange_terminal_check(closed, undefined)),
+		).resolves.toMatchObject({ verdict: SETTLED_VERDICT })
+
+		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledTimes(2)
 	})
 })
 

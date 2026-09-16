@@ -1,7 +1,8 @@
-import { realpathSync, statSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { agent_event, type AgentEventState } from '#scripts/agent/agent-event'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
 import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { issue_state } from '#scripts/issue/issue-state'
@@ -77,6 +78,7 @@ interface OutputSample {
 }
 
 interface Traces {
+	agent_state?: AgentEventState | undefined
 	is_child_settled: boolean | undefined
 	is_output_frozen: boolean | undefined
 	is_tree_dirty: boolean
@@ -126,6 +128,22 @@ function is_output_moving(traces: Traces): boolean {
 	return traces.is_output_frozen === false
 }
 
+function is_agent_state_finished(state: AgentEventState | undefined): boolean {
+	return state?.result === 'completed' || state?.result === 'failed'
+}
+
+function is_agent_finished(traces: Traces): boolean {
+	return is_agent_state_finished(traces.agent_state)
+}
+
+function definitive_verdict(traces: Traces): LivenessVerdict | undefined {
+	if (traces.is_child_settled === true) return SETTLED_VERDICT
+	if (is_agent_finished(traces)) return STOPPED_VERDICT
+	if (is_output_moving(traces)) return ALIVE_VERDICT
+
+	return undefined
+}
+
 // A live process is a unit inside a long check — a `pnpm josh followup` waiting on CI writes
 // nothing for up to 32 minutes, which is longer than the silent window and is exactly the false
 // positive this trace exists to stop. **It is asked after the unreadable check rather than before it**
@@ -148,8 +166,8 @@ function has_unreadable_trace(traces: Traces): boolean {
 }
 
 function to_verdict(traces: Traces): LivenessVerdict {
-	if (is_output_moving(traces)) return ALIVE_VERDICT
-	if (traces.is_child_settled === true) return SETTLED_VERDICT
+	const definitive = definitive_verdict(traces)
+	if (definitive !== undefined) return definitive
 	if (has_unreadable_trace(traces)) return UNDETERMINED_VERDICT
 
 	return is_check_running(traces) ? ALIVE_VERDICT : STOPPED_VERDICT
@@ -170,7 +188,7 @@ function decide(traces: Traces): LivenessDecision {
 	return {
 		advice: to_advice(verdict, has_work_to_stash),
 		has_work_to_stash,
-		reason: REASONS[verdict],
+		reason: traces.agent_state?.reason ?? REASONS[verdict],
 		verdict,
 	}
 }
@@ -247,6 +265,27 @@ function sample_output(output_path: string): OutputSample | undefined {
 	return { mtime_ms: stats.mtimeMs, size: stats.size }
 }
 
+function read_agent_state(output_path: string): AgentEventState | undefined {
+	const safe_path = to_safe_path(output_path)
+	if (safe_path === undefined) return undefined
+
+	try {
+		const state = agent_event.read(readFileSync(safe_path, 'utf8'))
+
+		return state.provider === undefined ? undefined : state
+	} catch {
+		return undefined
+	}
+}
+
+function describe_agent_state(output_path: string): string | undefined {
+	const state = read_agent_state(output_path)
+
+	return state === undefined
+		? undefined
+		: `agent: ${state.provider ?? 'unknown'} ${agent_event.describe(state)}`
+}
+
 interface FreshnessRequest {
 	gap_ms: number
 	now_ms: number
@@ -310,7 +349,7 @@ async function read_child_settled(issue: string, repo?: string): Promise<boolean
 // the advice offers a stash that may find nothing — the safe direction for the only question this
 // input decides, and one that cannot move the verdict.
 async function read_traces(request: LivenessRequest): Promise<Traces> {
-	const [is_child_settled, is_output_frozen, is_tree_dirty] = await Promise.all([
+	const [is_initial_child_settled, is_output_frozen, is_tree_dirty] = await Promise.all([
 		read_child_settled(request.issue, request.repo),
 		read_output_frozen({
 			gap_ms: request.gap_ms ?? DEFAULT_GAP_SECONDS * MS_PER_SECOND,
@@ -320,8 +359,23 @@ async function read_traces(request: LivenessRequest): Promise<Traces> {
 		}),
 		run_hold.is_tree_dirty(),
 	])
+	const agent_state = read_agent_state(request.output_path)
+	// A child can close or park its Issue and append its terminal event after the parallel GitHub read
+	// returned OPEN. Re-read only at that terminal boundary so the final state, not the stale sample,
+	// decides whether recovery owns anything. If that re-read is unavailable, positive settlement from
+	// the first read remains conclusive; a transient read failure must not turn CLOSED into stopped.
+	const is_latest_child_settled = is_agent_state_finished(agent_state)
+		? await read_child_settled(request.issue, request.repo)
+		: undefined
+	const is_child_settled = is_latest_child_settled ?? is_initial_child_settled
 
-	return { is_child_settled, is_output_frozen, is_tree_dirty, process_trace: request.process_trace }
+	return {
+		agent_state,
+		is_child_settled,
+		is_output_frozen,
+		is_tree_dirty,
+		process_trace: request.process_trace,
+	}
 }
 
 async function check(request: LivenessRequest): Promise<LivenessDecision> {
@@ -338,7 +392,9 @@ async function check(request: LivenessRequest): Promise<LivenessDecision> {
 const run_liveness = {
 	check,
 	decide,
+	describe_agent_state,
 	read_child_settled,
+	read_agent_state,
 	read_output_frozen,
 	sample_output,
 	to_safe_path,

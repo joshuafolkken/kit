@@ -1,13 +1,14 @@
 import os from 'node:os'
 import path from 'node:path'
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
-import { detached_launch } from '#scripts/run/detached-launch'
+import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { run_liveness } from '#scripts/run/run-liveness'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
@@ -37,6 +38,7 @@ const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
 const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
 const remove_label = vi.spyOn(git_gh_command, 'issue_remove_label')
+const check_diagnostics = vi.spyOn(agent_diagnostics, 'check')
 
 function lane(output: string | undefined): LaneInfo {
 	return {
@@ -53,6 +55,13 @@ function lane(output: string | undefined): LaneInfo {
 
 const DERIVED_LOG = lane_dispatch.default_log_path(lane(undefined))
 
+function launched_request(): LaunchRequest {
+	const request = launch.mock.calls[0]?.[0]
+	if (request === undefined) throw new Error('Expected the child to be launched')
+
+	return request
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	launch.mockReturnValue({ kind: 'launched', pid: PID })
@@ -64,6 +73,10 @@ beforeEach(() => {
 	})
 	add_label.mockResolvedValue(true)
 	remove_label.mockResolvedValue(undefined)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('lane_dispatch.child_invocation — what the child is asked to do', () => {
@@ -129,6 +142,22 @@ describe('lane_dispatch.default_log_path — the log the dispatch owns', () => {
 		const elsewhere = { ...lane(undefined), directory: `${LANE_DIRECTORY}-other-repository` }
 
 		expect(lane_dispatch.default_log_path(elsewhere)).not.toBe(DERIVED_LOG)
+	})
+})
+
+describe('lane_dispatch.dispatch_child — provider selection', () => {
+	it('uses the OpenAI worker adapter when the provider is selected', async () => {
+		vi.stubEnv('JOSH_AGENT_PROVIDER', 'openai')
+		check_diagnostics.mockReturnValue({ kind: 'ready' })
+
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		const request = launched_request()
+
+		expect(request.argv.command).toBe('codex')
+		expect(request.argv.args).toContain('gpt-5.6-sol')
+		expect(request.argv.args).toContain('model_reasoning_effort="medium"')
+		expect(request.profile).toStrictEqual(agent_role_profile.OPENAI_PROFILES.worker)
 	})
 })
 
