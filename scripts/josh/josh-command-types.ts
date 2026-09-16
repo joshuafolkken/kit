@@ -68,11 +68,49 @@ const PE = ['pnpm', 'exec'] as const
 const ESLINT_CACHE_FILE = '.eslintcache'
 const TS_BUILD_INFO_FILE = '.tsbuildinfo'
 const CSPELL_CACHE_FILE = '.cspellcache'
-const GATE_CACHE_FILES: ReadonlyArray<string> = [
-	ESLINT_CACHE_FILE,
-	TS_BUILD_INFO_FILE,
-	CSPELL_CACHE_FILE,
+const ESLINT_EDIT_CACHE_FILE = '.eslintcache.edit'
+const ESLINT_RELATED_CACHE_FILE = '.eslintcache.related'
+
+type GateCachePortability = 'raw' | 'rooted-json'
+
+interface GateCacheSpec {
+	cache_file: string
+	portability: GateCachePortability
+}
+
+const ROOTED_JSON_PORTABILITY: GateCachePortability = 'rooted-json'
+
+// One declaration controls both the one-time lane seed and the caches a gate keeps current across
+// worktrees (#2060). ESLint stores absolute file paths and must be rebased; cspell stores relative
+// keys and can move byte-for-byte. TypeScript's build info is still seeded once, but is not
+// continuously published until its dependency-path portability is established on every project.
+const ESLINT_CACHE_SPEC: GateCacheSpec = {
+	cache_file: ESLINT_CACHE_FILE,
+	portability: ROOTED_JSON_PORTABILITY,
+}
+const TS_CACHE_SPEC: GateCacheSpec = {
+	cache_file: TS_BUILD_INFO_FILE,
+	portability: 'raw',
+}
+const CSPELL_CACHE_SPEC: GateCacheSpec = {
+	cache_file: CSPELL_CACHE_FILE,
+	portability: 'raw',
+}
+const ESLINT_RELATED_CACHE_SPEC: GateCacheSpec = {
+	cache_file: ESLINT_RELATED_CACHE_FILE,
+	portability: ROOTED_JSON_PORTABILITY,
+}
+const GATE_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
+	ESLINT_CACHE_SPEC,
+	TS_CACHE_SPEC,
+	CSPELL_CACHE_SPEC,
 ]
+const SHARED_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
+	ESLINT_CACHE_SPEC,
+	ESLINT_RELATED_CACHE_SPEC,
+	CSPELL_CACHE_SPEC,
+]
+const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => spec.cache_file)
 
 // joshuafolkken/kit#1332: the `PostToolUse` edit hook runs eslint too, and ESLint *deletes* the file
 // at `--cache-location` whenever it is started without `--cache` — so every single edit wiped the
@@ -86,7 +124,6 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = [
 // **Pruning is not the reason**, though it reads like one: `file-entry-cache` defaults `noPrune` to
 // true, and a single-file run against the gate's full cache was measured byte-identical, so a shared
 // file would keep the entries that run never visited.
-const ESLINT_EDIT_CACHE_FILE = '.eslintcache.edit'
 // joshuafolkken/kit#1347: the same reasoning, reached a second time. `josh lint:related` is what an
 // implementation loop calls between edits, and `josh gate` lints the whole tree beside the review —
 // so those two run at the same time as readily as the hook and the gate do, and they shared one file
@@ -103,7 +140,6 @@ const ESLINT_EDIT_CACHE_FILE = '.eslintcache.edit'
 // **The lint's target scope is untouched.** This is where a cache is written, not what is read:
 // `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
 // whole tree before any commit.
-const ESLINT_RELATED_CACHE_FILE = '.eslintcache.related'
 // What the ignore rules are asserted against: every cache file this package writes, wherever it is
 // written from. The gate's three, the edit hook's, and the scoped lint's — a cache file that is not
 // ignored is committed, or spell-checked, which is a red gate with nothing misspelled in the tree.
@@ -133,14 +169,12 @@ const ESLINT_RELATED_CACHE_FLAGS = content_cache_flags(ESLINT_RELATED_CACHE_FILE
 const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
 const CSPELL_CACHE_FLAGS = content_cache_flags(CSPELL_CACHE_FILE)
 
-export type { CommandCategory, CommandEntry }
+export type { CommandCategory, CommandEntry, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
 // them per target (joshuafolkken/kit#1314): the lint step writes only the eslint one, so a target
-// that cleared the list would report a cold type check as the lint's own cost. The edit hook's
-// `.eslintcache.edit` and the scoped lint's `.eslintcache.related` are deliberately not exported
-// here — nothing but their own command may touch either, which is the whole of joshuafolkken/kit#1332
-// and joshuafolkken/kit#1347. Their *flags* are exported, so the one command that writes each file
-// names it from here rather than spelling it out again.
+// that cleared the list would report a cold type check as the lint's own cost. The edit hook's cache
+// stays private; the scoped lint cache is exported because #2060 shares its completed file between
+// worktrees, but it still never overlaps the gate's distinct cache location.
 export {
 	CSPELL_CACHE_FILE,
 	CSPELL_CACHE_FLAGS,
@@ -148,11 +182,14 @@ export {
 	ESLINT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FLAGS,
+	ESLINT_RELATED_CACHE_FILE,
 	GATE_CACHE_FILES,
+	GATE_CACHE_SPECS,
 	GATE_COMMAND,
 	IGNORED_CACHE_FILES,
 	OPTIONAL_ENV_FILE_FLAGS,
 	PE,
+	SHARED_CACHE_SPECS,
 	TS_BUILD_INFO_FILE,
 	TS_CACHE_FLAGS,
 }
