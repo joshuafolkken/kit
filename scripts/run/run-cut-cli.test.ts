@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
@@ -62,6 +62,13 @@ function verdict(): string {
 	return String(info.mock.calls.at(-1)?.[0])
 }
 
+function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
+	const built = agent_argv.resolve_in(invocation, agent_role_profile.WORKER, LANE_DIRECTORY)
+	if (built.kind === 'rejected') throw new Error(built.note)
+
+	return built
+}
+
 // A declared cut already on disk, as a fresh process would find one at its entry.
 function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
 	run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH, phase })
@@ -91,14 +98,13 @@ describe('cutting a lane child before the gate', () => {
 		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
 		// joshuafolkken/kit#2022: the relaunch prompt is the resume-specific instruction, not the record's
 		// bare `fullrun #<N>`, so the fresh process skips the workflow-commands entry documents.
-		const profile = agent_role_profile.DEFAULT_PROFILES.worker
-		const built = claude_agent_argv.build(lane_dispatch.resume_invocation(ISSUE), profile)
+		const built = worker_argv(lane_dispatch.resume_invocation(ISSUE))
 
 		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
-			argv: built,
+			argv: built.argv,
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
-			profile,
+			profile: built.profile,
 			env: { [lane_child_marker.KEY]: ISSUE },
 		})
 		expect(run_cut.read_cut(target()).kind).toBe('carried')
@@ -140,12 +146,9 @@ describe('the resume prompt the relaunch carries', () => {
 	it('relaunches with the resume prompt, not the bare fullrun invocation', async () => {
 		await run_cut_cli.run([ISSUE])
 
-		const bare_argv = claude_agent_argv.build(
-			INVOCATION,
-			agent_role_profile.DEFAULT_PROFILES.worker,
-		)
+		const bare = worker_argv(INVOCATION)
 
-		expect(launch.mock.calls[0]?.[0].argv).not.toStrictEqual(bare_argv)
+		expect(launch.mock.calls[0]?.[0].argv).not.toStrictEqual(bare.argv)
 	})
 })
 
