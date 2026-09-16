@@ -6,7 +6,34 @@ how auto-merge is authorized, and the Telegram notifications. `fullrun` and `bac
 
 This file is the single source of the rule.
 
-## Where it sits — Step 5, after `pnpm josh git`
+## Run `pnpm josh followup`
+
+Run it in the foreground after `pnpm josh git` and after every required review disposition:
+
+```bash
+pnpm josh followup "<title> #<N>" --notify-message-file <report-file>
+```
+
+The report uses the session language: plain `Cause:`, `Fix:` and `Result:` lines, then `Details:`
+bullets. Use the file option whenever it contains a command or path.
+
+It waits for required CI, checks CodeRabbit and top-level AI review comments, sends the completion
+Telegram, merges by default, posts the Issue report, closes completed epics, removes `in-progress`,
+and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. Keep the
+default Issue target. Ignore a finding only after verifying it is inapplicable; rate-limit text is not
+a finding.
+
+A pre-merge failure stops the run; an unverifiable AI finding or CI failure needing input receives a
+`confirmation` Telegram. Post-merge cleanup failures are named and do not undo the merge; run the
+named recovery without rerunning it. Because notification precedes merge, the printed result is
+authoritative.
+
+After success, run `pnpm josh ms`; in a lane its refusal is expected and the parent uses
+`pnpm josh lane:close <N>`. Never delete the branch unless requested. Read
+`followup-reference.md` after execution for timing output, reviewer-scan details, config claims and the
+release ask.
+
+## Command stages and options — reference
 
 `pnpm josh followup` is a **separate script run after `pnpm josh git`**, not a stage inside it. The
 commit and the pull request come first; this is everything after them.

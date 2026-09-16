@@ -29,8 +29,8 @@ const ONE_LINE = 1
 // when `pnpm josh latest:scope` answers `required`, `followup.md` in the turn that issues
 // `pnpm josh followup`, `chain-rule.md` before the `/code-review` step it governs, and
 // `background-commands.md` before the first backgroundable command (`pnpm josh gate`). **They are
-// not deferred and not summarized** — each is fetched whole, in the same turn, by the step that has
-// to obey it; what changed is only that a run which never reaches the step never pays for it.
+// not deferred or summarized** — the named operational section is fetched in the same turn; only
+// `latest-gate.md` remains whole because its result branches across that document.
 // Measured on `fullrun #1783`, `followup.md` rode 55 requests before its first use. **`chain-rule.md`
 // is joshuafolkken/kit#1856's addition**: it governs the `/code-review` → `followup` chain, which in
 // `fullrun` / `queue` / `epicrun` / `backlogrun` runs *after* the first edit, so its 7,396 tokens
@@ -113,9 +113,9 @@ interface ReadSetCost {
 	entry: string
 	files: ReadonlyArray<FileCost>
 	sections: ReadonlyArray<SectionCost>
-	// What the entry no longer reads, each fetched whole by the command whose turn reaches it. Listed
-	// rather than dropped: a saving reported without saying where the cost went is not a measurement.
-	point_of_use: ReadonlyArray<FileCost>
+	// What the entry reads later: the section named in the trigger table, or the whole document when
+	// none is named. Listed rather than dropped so the reported total has no hidden cost.
+	point_of_use: ReadonlyArray<SectionCost>
 	// The character cap a Bash result is truncated at, so the report can say which of the files above
 	// a `cat` cannot deliver whole. **Compared against each file's byte count, which is a deliberate
 	// conservative proxy**: these documents are heavily non-ASCII, so bytes run above characters and
@@ -238,10 +238,6 @@ function table_rows(root: string): Map<string, ReadonlyArray<string>> {
 	return rows
 }
 
-function is_usable_cap(chars: number): boolean {
-	return Number.isSafeInteger(chars) && chars > NOTHING
-}
-
 function property_of(value: unknown, key: string): unknown {
 	if (typeof value !== 'object' || value === null) return undefined
 
@@ -265,7 +261,7 @@ function bash_output_cap(root: string): number {
 	const text = document_section.read_optional(path.join(root, SETTINGS_FILE)) ?? ''
 	const chars = Number(declared_cap(text))
 
-	return is_usable_cap(chars) ? chars : HARNESS_DEFAULT_CAP_CHARS
+	return Number.isSafeInteger(chars) && chars > NOTHING ? chars : HARNESS_DEFAULT_CAP_CHARS
 }
 
 // **A point-of-use document is dropped from the set wherever a table row still names it**, so the
@@ -463,6 +459,27 @@ function file_costs(root: string, names: ReadonlyArray<string>): Array<FileCost>
 	return names.map((file) => ({ file, cost: cost_of(read_document(root, file)) }))
 }
 
+function point_of_use_cost(
+	root: string,
+	file: string,
+	references: ReadonlyArray<SectionReference>,
+): SectionCost {
+	const reference = references.find((one) => one.file === file)
+
+	if (reference !== undefined) return section_cost(root, reference)
+
+	return { file, heading: '', cost: cost_of(read_document(root, file)), is_resolved: true }
+}
+
+function point_of_use_costs(root: string): Array<SectionCost> {
+	const found = document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)
+	const references = all_matches(found?.text ?? '', SECTION_REFERENCE).map((match) =>
+		to_reference(match),
+	)
+
+	return [...POINT_OF_USE_FILES].map((file) => point_of_use_cost(root, file, references))
+}
+
 function costed(root: string, entry: string): ReadSetCost {
 	const { files, sections } = read_set(root, entry)
 	const own_costs = file_costs(root, files)
@@ -473,7 +490,7 @@ function costed(root: string, entry: string): ReadSetCost {
 		entry,
 		files: own_costs,
 		sections: section_costs,
-		point_of_use: file_costs(root, [...POINT_OF_USE_FILES]),
+		point_of_use: point_of_use_costs(root),
 		bash_output_cap: bash_output_cap(root),
 		whole: total([own, referenced_cost(root, sections)]),
 		scoped: total([own, scoped_cost(root, sections)]),

@@ -23,12 +23,14 @@ const FULLRUN = 'fullrun'
 
 // **The `SKILL.md` sections a dispatched lane child never uses**, read at the section level rather
 // than in full. A child is handed one issue to run, so it never files a new one with an `into`
-// target (§2a), never names a repository or scouts for a duplicate at its entry (§2c, §2e), returns
-// an observation to the parent rather than filing it (§2i, `SKILL.md` → §2i), and never edits these
-// documents, so the residency meta-guidance (§3) is not procedure it acts on. The headings are the
-// text after `## `, exactly as `document_section` resolves them.
+// target (§2a), never delegates its own pre-implementation reading (§2b), never names a repository or
+// scouts for a duplicate at its entry (§2c, §2e), returns an observation to the parent rather than
+// filing it (§2i), and never edits these documents (§3). Its dispatch is already an explicit workflow
+// invocation, so §0 cannot decide anything for it either. Review delegation remains in chain-rule.md.
 const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
+	'0. The rule that fires before any of them — explicit invocation',
 	'2a. The `into <target>` suffix — where the new Issue lands',
+	'2b. Delegating a step to a cheaper tier',
 	'2c. The `owner/repo#` prefix — which repository the run acts on',
 	'2e. Before filing a new Issue — `pnpm josh issue:scout`',
 	'2i. An observation worth filing is filed without asking',

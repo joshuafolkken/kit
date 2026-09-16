@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { document_section } from './document-section'
 import { entry_read_set } from './entry-read-set'
 
 // joshuafolkken/kit#1776. What is asserted here is that the set is **derived**: the files come from
@@ -18,10 +19,33 @@ const SECTION_CITER = 'fullrun'
 const BACKLOGRUN = 'backlogrun.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
+const FOLLOWUP = 'followup.md'
+const CHAIN_HEADING = 'Run the review-to-merge chain'
+const FOLLOWUP_HEADING = 'Run `pnpm josh followup`'
+const BACKGROUND_HEADING = 'Background the gate and push'
+const OPERATIONAL_POINT_OF_USE: ReadonlyArray<[string, string]> = [
+	[CHAIN_RULE, CHAIN_HEADING],
+	[FOLLOWUP, FOLLOWUP_HEADING],
+	[BACKGROUND_COMMANDS, BACKGROUND_HEADING],
+]
+const MANDATORY_POINT_OF_USE: ReadonlyArray<[string, string, ReadonlyArray<string>]> = [
+	[
+		CHAIN_RULE,
+		CHAIN_HEADING,
+		['review:attest --check', 'review:round2', 'josh followup', 'confirmation'],
+	],
+	[
+		FOLLOWUP,
+		FOLLOWUP_HEADING,
+		['required CI', 'completion Telegram', 'merges by default', 'josh ms'],
+	],
+	[BACKGROUND_COMMANDS, BACKGROUND_HEADING, ['josh gate', 'josh git -y', 'foreground']],
+]
 const UNKNOWN_ENTRY = 'no-such-entry'
 // The margin the section read has to beat: the cited sections together stay under two thirds of the
 // files they were cut from. Loose on purpose — it asserts the shape, not today's figure.
 const HALF_AGAIN = 1.5
+const MAX_BACKLOGRUN_TOKENS = 90_000
 const NOTHING = 0
 
 const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'backlogrun']
@@ -30,6 +54,13 @@ const EXPECTED_ENTRIES: ReadonlyArray<string> = ['backlogrun', 'fullrun', 'halfr
 
 function alphabetical(left: string, right: string): number {
 	return left.localeCompare(right)
+}
+
+function point_of_use_text(file: string, heading: string): string {
+	const markdown = document_section.read_optional(entry_read_set.document_path(ROOT, file)) ?? ''
+	const text = document_section.section(markdown, heading)?.text ?? ''
+
+	return text.replaceAll(/\s+/gu, ' ')
 }
 
 // joshuafolkken/kit#1879: the skill bodies are no longer copied into a consumer's tree — they ship as
@@ -68,8 +99,8 @@ describe('entry_read_set.read_set — which files', () => {
 		expect(entry_read_set.read_set(ROOT, 'kickoff').files).toContain(entry_read_set.SKILL_FILE)
 	})
 
-	// joshuafolkken/kit#1797: the two gate documents and `followup.md` are read by the command that
-	// has to obey them, in full and in the same turn, so no entry reads one at the entry. Asserted
+	// The gate documents and `followup.md` are read by the command that has to obey them, at their
+	// named point-of-use scope, so no entry reads one at the entry. Asserted
 	// over every keyword rather than over `kickoff` alone — the old rule exempted the plan-only entry
 	// and this one has no exemption to make.
 	it.each([...IMPLEMENTING, PLAN_ONLY])('gives %s no point-of-use document', (entry) => {
@@ -124,6 +155,53 @@ describe('entry_read_set — background-commands.md is point-of-use (joshuafolkk
 	// this pins is that it is classified point-of-use in the first place.
 	it('classifies background-commands.md as a point-of-use document', () => {
 		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(BACKGROUND_COMMANDS)
+	})
+})
+
+describe('entry_read_set — point-of-use section costs', () => {
+	const report = entry_read_set.costed(ROOT, 'fullrun')
+
+	it.each(OPERATIONAL_POINT_OF_USE)('charges %s at section %s', (file, heading) => {
+		expect(report.point_of_use).toContainEqual(
+			expect.objectContaining({ file, heading, is_resolved: true }),
+		)
+	})
+
+	it('keeps the operational point-of-use read smaller than the whole files', () => {
+		const operational = report.point_of_use.filter(({ file }) =>
+			OPERATIONAL_POINT_OF_USE.some(([named]) => named === file),
+		)
+		const scoped = entry_read_set.total(operational.map(({ cost }) => cost))
+		const whole = entry_read_set.total(
+			OPERATIONAL_POINT_OF_USE.map(([file]) =>
+				entry_read_set.cost_of(
+					document_section.read_optional(entry_read_set.document_path(ROOT, file)) ?? '',
+				),
+			),
+		)
+
+		expect(scoped.tokens).toBeLessThan(whole.tokens)
+	})
+})
+
+describe('entry_read_set — point-of-use reachability', () => {
+	it.each(MANDATORY_POINT_OF_USE)(
+		'keeps the mandatory %s rules reachable',
+		(file, heading, markers) => {
+			const text = point_of_use_text(file, heading)
+
+			expect(markers.map((marker) => text.includes(marker))).not.toContain(false)
+		},
+	)
+
+	it('reduces the backlogrun total below 90k tokens', () => {
+		const backlogrun = entry_read_set.costed(ROOT, 'backlogrun')
+		const total = entry_read_set.total([
+			backlogrun.scoped,
+			...backlogrun.point_of_use.map(({ cost }) => cost),
+		])
+
+		expect(total.tokens).toBeLessThan(MAX_BACKLOGRUN_TOKENS)
 	})
 })
 

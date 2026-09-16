@@ -1,11 +1,10 @@
 # `fullrun` — Full execution (plan → implement → PR → completion notify)
 
 This command implements, commits, opens the PR and merges it. **`chain-rule.md`, `followup.md` and
-`background-commands.md` are not entry reads** — each is fetched in full in the turn that reaches it:
-`chain-rule.md` before the `/code-review` step it governs, `followup.md` in the turn that issues
-`pnpm josh followup`, and `background-commands.md` before backgrounding `pnpm josh gate` (`SKILL.md` →
-§1, "Four documents are read at the point of use"). The rules a `fullrun` most often breaks live in
-those files, not here.
+`background-commands.md` are not entry reads** — the operational section named by `SKILL.md` is
+fetched in the turn that reaches it: before `/code-review`, before `pnpm josh followup`, and before
+backgrounding `pnpm josh gate`, respectively. The rules a `fullrun` most often breaks live there, not
+here.
 
 **Claim the working tree before anything else — `pnpm josh run:hold <N>`, or bare `pnpm josh run:hold`
 for `fullrun new`.** It is this command's first call: ahead of the title normalization, ahead of
