@@ -67,8 +67,16 @@ function launched_request(): LaunchRequest {
 	return request
 }
 
+function mock_supervisor(): void {
+	active_supervisor.mockReturnValue(undefined)
+	wait_for_supervisor.mockResolvedValue(undefined)
+	approve_supervisor.mockReturnValue(true)
+	cancel_supervisor.mockReturnValue(true)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv('JOSH_AGENT_PROVIDER', 'anthropic')
 	launch.mockReturnValue({ kind: 'launched', pid: PID })
 	find_open_lane.mockResolvedValue(lane(undefined))
 	record_output.mockResolvedValue({
@@ -78,10 +86,7 @@ beforeEach(() => {
 	})
 	add_label.mockResolvedValue(true)
 	remove_label.mockResolvedValue(undefined)
-	active_supervisor.mockReturnValue(undefined)
-	wait_for_supervisor.mockResolvedValue(undefined)
-	approve_supervisor.mockReturnValue(true)
-	cancel_supervisor.mockReturnValue(true)
+	mock_supervisor()
 })
 
 afterEach(() => {
@@ -209,6 +214,7 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 			profile: WORKER_PROFILE,
 			env: { [lane_child_marker.KEY]: ISSUE },
 		})
+		expect(launched_request().profile).toMatchObject({ model: 'sonnet', effort: 'medium' })
 	})
 
 	// **The mark is what tells the child it was dispatched rather than typed** (joshuafolkken/kit#1904),

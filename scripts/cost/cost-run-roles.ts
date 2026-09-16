@@ -44,10 +44,19 @@ interface SessionRow {
 	issue: number | undefined
 	parent_id: string | undefined
 	depth: number
+	is_readable: boolean
+	is_measured: boolean
 	cost_usd: number
 	elapsed_ms: number
 	request_count: number
+	output_tokens: number
 	preamble_tokens: number
+}
+
+interface SessionMeasurement {
+	output_tokens: number
+	cost_usd: number
+	elapsed_ms: number
 }
 
 interface RunRoles {
@@ -138,9 +147,12 @@ function to_row(node: RunNode): SessionRow {
 		issue: node.issue,
 		parent_id: node.parent_id,
 		depth: node.depth,
+		is_readable: node.is_readable,
+		is_measured: node.is_readable && node.records.length > NONE,
 		cost_usd: cost_of(node.records),
 		elapsed_ms: elapsed_of(node.records),
 		request_count: node.records.length,
+		output_tokens: cost_usage.sum_totals(node.records).output_tokens,
 		preamble_tokens: node.baseline_tokens,
 	}
 }
@@ -151,6 +163,25 @@ function build_rows(nodes: ReadonlyArray<RunNode>): Array<SessionRow> {
 
 function unreadable_of(nodes: ReadonlyArray<RunNode>): number {
 	return nodes.filter((node) => !node.is_readable).length
+}
+
+function lane_issue_rows(rows: ReadonlyArray<SessionRow>, issue: number): Array<SessionRow> {
+	return rows.filter((row) => row.role === 'lane' && row.issue === issue)
+}
+
+function measure_lane_issue(
+	rows: ReadonlyArray<SessionRow>,
+	issue: number,
+): SessionMeasurement | undefined {
+	const matching = lane_issue_rows(rows, issue)
+
+	if (matching.length === NONE || matching.some((row) => !row.is_measured)) return undefined
+
+	return {
+		output_tokens: matching.reduce((total, row) => total + row.output_tokens, NONE),
+		cost_usd: matching.reduce((total, row) => total + row.cost_usd, NONE),
+		elapsed_ms: matching.reduce((total, row) => total + row.elapsed_ms, NONE),
+	}
 }
 
 // The whole tree summed by role. The two denominators are computed once and handed to every role so
@@ -173,7 +204,7 @@ function shares_total(roles: ReadonlyArray<RoleTotals>): number {
 	return roles.reduce((total, role) => total + role.cost_share, NONE)
 }
 
-const cost_run_roles = { ROLE_ORDER, WHOLE, build, shares_total }
+const cost_run_roles = { ROLE_ORDER, WHOLE, build, measure_lane_issue, shares_total }
 
 export type { RoleTotals, RunRoles, SessionRow }
 export { cost_run_roles }

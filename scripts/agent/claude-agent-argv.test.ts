@@ -16,12 +16,22 @@ describe('Claude argv construction', () => {
 	})
 
 	it('resolves exactly the requested role', () => {
-		const result = claude_agent_argv.resolve(INVOCATION, agent_role_profile.REVIEWER)
+		const result = claude_agent_argv.resolve(INVOCATION, agent_role_profile.REVIEWER, {})
 
 		expect(result).toMatchObject({
 			kind: 'argv',
 			profile: agent_role_profile.DEFAULT_PROFILES.reviewer,
 		})
+	})
+
+	it('resolves the balanced worker profile onto the command line', () => {
+		const result = claude_agent_argv.resolve(INVOCATION, agent_role_profile.WORKER, {})
+
+		expect(result).toMatchObject({
+			kind: 'argv',
+			profile: { provider: 'anthropic', role: 'worker', model: 'sonnet', effort: 'medium' },
+		})
+		if (result.kind === 'argv') expect(result.argv.args).toContain('sonnet')
 	})
 
 	it('passes no permission-bypass flag', () => {

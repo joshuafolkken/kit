@@ -54,6 +54,14 @@ describe('cost_run_report.build', () => {
 		expect(report.merged).toBeUndefined()
 		expect(report.session_count).toBe(2)
 	})
+
+	it('serializes session output tokens in JSON', () => {
+		const report = cost_run_report.build(1, 0, NODES)
+
+		expect(JSON.stringify(report)).toContain('"output_tokens":100')
+		expect(JSON.stringify(report)).toContain('"is_readable":true')
+		expect(JSON.stringify(report)).toContain('"is_measured":true')
+	})
 })
 
 describe('cost_run_report.format_report', () => {
@@ -70,5 +78,35 @@ describe('cost_run_report.format_report', () => {
 		expect(text).toContain('Sessions')
 		expect(text).toContain('#1913')
 		expect(text).toContain('d1')
+		expect(text).toContain('output 100')
+	})
+})
+
+describe('cost_run_report.format_report missing measurements', () => {
+	it('marks an unreadable session as not measured', () => {
+		const unreadable = {
+			...node('broken', 'lane', 1913, 1),
+			records: [],
+			is_readable: false,
+		}
+		const unreadable_text = cost_run_report.format_report(cost_run_report.build(1, 0, [unreadable]))
+
+		expect(unreadable_text).toContain('broken  not measured')
+		expect(unreadable_text).not.toContain('output 0')
+		expect(JSON.stringify(cost_run_report.build(1, 0, [unreadable]))).toContain(
+			'"is_readable":false',
+		)
+	})
+
+	it('marks a readable session without usage records as not measured', () => {
+		const empty = {
+			...node('readable-empty', 'lane', 1913, 1),
+			records: [],
+			is_readable: true,
+		}
+		const report = cost_run_report.build(1, 0, [empty])
+
+		expect(cost_run_report.format_report(report)).toContain('readable-empty  not measured')
+		expect(report.sessions[0]).toMatchObject({ is_readable: true, is_measured: false })
 	})
 })

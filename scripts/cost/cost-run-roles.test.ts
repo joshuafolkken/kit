@@ -14,6 +14,7 @@ const EMPTY: UsageTotals = {
 }
 
 const SHARE_EPSILON = 1e-9
+const READABLE_EMPTY = 'readable-empty'
 
 function rec(id: string, output: number): UsageRecord {
 	return {
@@ -78,5 +79,69 @@ describe('cost_run_roles.build', () => {
 		expect(rows.map((row) => row.cost_usd)).toEqual(
 			rows.map((row) => row.cost_usd).toSorted((left, right) => right - left),
 		)
+	})
+
+	it('reports output tokens for each session', () => {
+		const lane = node('L3', 'lane', undefined)
+
+		lane.records = [rec('first', 100), rec('second', 200)]
+		const rows = cost_run_roles.build([...NODES, lane]).sessions
+
+		expect(rows.find((row) => row.session_id === 'L3')?.output_tokens).toBe(300)
+		expect(rows.find((row) => row.session_id === 'broken')?.output_tokens).toBe(0)
+	})
+})
+
+describe('cost_run_roles.measure_lane_issue', () => {
+	it('sums every lane session for an issue', () => {
+		const first = {
+			...node('first', 'lane', 100),
+			issue: 2076,
+			records: [
+				{ ...rec('first-a', 40), at_ms: 100 },
+				{ ...rec('first-b', 60), at_ms: 250 },
+			],
+		}
+		const resumed = {
+			...node('resumed', 'lane', 200),
+			issue: 2076,
+			records: [
+				{ ...rec('resumed-a', 80), at_ms: 500 },
+				{ ...rec('resumed-b', 120), at_ms: 750 },
+			],
+		}
+		const rows = cost_run_roles.build([first, resumed]).sessions
+		const expected_cost = rows.reduce((total, row) => total + row.cost_usd, 0)
+
+		expect(cost_run_roles.measure_lane_issue(rows, 2076)).toEqual({
+			output_tokens: 300,
+			cost_usd: expected_cost,
+			elapsed_ms: 400,
+		})
+	})
+})
+
+describe('cost_run_roles.measure_lane_issue missing measurements', () => {
+	it('does not measure an issue when any matching lane session is unreadable', () => {
+		const readable = { ...node('readable', 'lane', 100), issue: 2076 }
+		const unreadable = { ...node('unreadable', 'lane', undefined), issue: 2076 }
+		const rows = cost_run_roles.build([readable, unreadable]).sessions
+
+		expect(cost_run_roles.measure_lane_issue(rows, 2076)).toBeUndefined()
+		expect(cost_run_roles.measure_lane_issue(rows, 9999)).toBeUndefined()
+	})
+
+	it('does not measure a readable session without usage records', () => {
+		const measured = { ...node('measured', 'lane', 100), issue: 2076 }
+		const empty = {
+			...node(READABLE_EMPTY, 'lane', undefined),
+			issue: 2076,
+			is_readable: true,
+		}
+		const rows = cost_run_roles.build([measured, empty]).sessions
+		const empty_row = rows.find((row) => row.session_id === READABLE_EMPTY)
+
+		expect(empty_row).toMatchObject({ is_readable: true, is_measured: false })
+		expect(cost_run_roles.measure_lane_issue(rows, 2076)).toBeUndefined()
 	})
 })
