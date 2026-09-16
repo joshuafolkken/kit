@@ -64,6 +64,7 @@ const BEACON_SUFFIX = '.sock'
 const BEACON_PREFIX = `josh-process-identity-${String(process.getuid?.() ?? '')}-`
 const BEACON_ID_LENGTH = 36
 const BEACON_ID_PATTERN = /^[\da-f-]+$/u
+const WINDOWS_PLATFORM = 'win32'
 const SOCKET_PROBE_SOURCE =
 	"const net=require('node:net');const socket=net.createConnection(process.argv[1]);socket.once('connect',()=>process.exit(0));socket.once('error',()=>process.exit(1));socket.setTimeout(1000,()=>process.exit(1));"
 const beacons = new Map<string, Server>()
@@ -162,10 +163,25 @@ function ignore_beacon_error(): void {
 	/* an unavailable beacon makes the identity safely unverifiable */
 }
 
-function open_beacon(): string {
+function bind_beacon(target: string): Server {
+	return createServer().on('error', ignore_beacon_error).listen(target)
+}
+
+function try_bind_beacon(bind: (target: string) => Server, target: string): Server | undefined {
+	try {
+		const server = bind(target)
+
+		return server.listening ? server : undefined
+	} catch {
+		return undefined
+	}
+}
+
+function open_beacon(bind: (target: string) => Server = bind_beacon): string | undefined {
 	const target = path.join(PLATFORM_TEMP_ROOT, `${BEACON_PREFIX}${randomUUID()}${BEACON_SUFFIX}`)
 	const token = `${BEACON_SCHEME}${target}`
-	const server = createServer().on('error', ignore_beacon_error).listen(target)
+	const server = try_bind_beacon(bind, target)
+	if (server === undefined) return undefined
 
 	server.unref()
 	beacons.set(token, server)
@@ -178,8 +194,14 @@ function open_beacon(): string {
 // random path is the generation token and the kernel-held listener is its lifetime: SIGKILL closes
 // it even when no cleanup handler runs, while a stale filesystem entry accepts no connection. A
 // process that later receives the same pid therefore cannot make the old pair live again.
-function resolve_own_start(probes: StartProbes = START_PROBES): string {
-	return read_start(process.pid, probes) ?? open_beacon()
+function resolve_own_start(
+	probes: StartProbes = START_PROBES,
+	platform: NodeJS.Platform = process.platform,
+): string | undefined {
+	const start = read_start(process.pid, probes)
+	if (start !== undefined || platform === WINDOWS_PLATFORM) return start
+
+	return open_beacon()
 }
 
 function is_valid_beacon_name(name: string): boolean {
@@ -302,6 +324,7 @@ const process_identity = {
 	is_live_pid,
 	is_own_process,
 	is_same_process,
+	open_beacon,
 	own_fields,
 	own_start,
 	read_start,

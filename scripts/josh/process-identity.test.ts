@@ -1,3 +1,4 @@
+import { createServer } from 'node:net'
 import { describe, expect, it } from 'vitest'
 import { process_identity } from './process-identity'
 import { process_identity_fixture } from './process-identity-fixture'
@@ -17,9 +18,14 @@ const {
 	GROUP_PID,
 	NEGATIVE_PID,
 	SANDBOX_START,
+	has_native_start_probe,
 	has_start_probe,
 	sandbox_probes,
 } = process_identity_fixture
+
+function fail_binding(): never {
+	throw new Error('bind denied')
+}
 
 describe('process_identity.is_same_process — a pid is not a process identity', () => {
 	it.skipIf(!has_start_probe)('recognizes this process by its own pid and start time', () => {
@@ -29,7 +35,7 @@ describe('process_identity.is_same_process — a pid is not a process identity',
 	// **The assertion this Issue was filed for.** The pid is live — it is this very process — and the
 	// recorded start time belongs to some other process, which is precisely the state a reissued pid
 	// leaves a marker in. Answering `true` here is what let the brief print "a gate is running".
-	it.skipIf(!has_start_probe)('refuses a live pid the record did not name', () => {
+	it.skipIf(!has_native_start_probe)('refuses a live pid the record did not name', () => {
 		expect(process_identity.is_same_process(process.pid, FOREIGN_START)).toBe(false)
 	})
 
@@ -77,19 +83,33 @@ describe('process_identity — reading a start time', () => {
 		expect(process_identity.is_same_process(process.pid, FOREIGN_START, read)).toBe(false)
 		expect(process_identity.is_same_process(DEAD_PID, SANDBOX_START, read)).toBe(false)
 	})
+})
 
-	it('uses a live generation beacon when proc and ps are unavailable', () => {
-		const token = process_identity.resolve_own_start(sandbox_probes(undefined))
+describe('process_identity — sandbox generation beacons', () => {
+	it.skipIf(process.platform === 'win32')(
+		'uses a live generation beacon when proc and ps are unavailable',
+		() => {
+			const token = process_identity.resolve_own_start(sandbox_probes(undefined)) ?? ''
 
-		try {
-			expect(token).toMatch(/^socket:/u)
-			expect(process_identity.is_same_process(process.pid, token)).toBe(true)
-			expect(process_identity.is_same_process(DEAD_PID, token)).toBe(false)
-		} finally {
-			process_identity.close_beacon(token)
-		}
+			try {
+				expect(token).toMatch(/^socket:/u)
+				expect(process_identity.is_same_process(process.pid, token)).toBe(true)
+				expect(process_identity.is_same_process(DEAD_PID, token)).toBe(false)
+			} finally {
+				process_identity.close_beacon(token)
+			}
 
-		expect(process_identity.is_same_process(process.pid, token)).toBe(false)
+			expect(process_identity.is_same_process(process.pid, token)).toBe(false)
+		},
+	)
+
+	it('keeps the safe unknown result on Windows when native probes are unavailable', () => {
+		expect(process_identity.resolve_own_start(sandbox_probes(undefined), 'win32')).toBeUndefined()
+	})
+
+	it('keeps the safe unknown result when the generation beacon cannot bind', () => {
+		expect(process_identity.open_beacon(() => createServer())).toBeUndefined()
+		expect(process_identity.open_beacon(fail_binding)).toBeUndefined()
 	})
 })
 
@@ -109,9 +129,12 @@ describe('process_identity.is_own_process — whether a record is the caller’s
 		expect(process_identity.is_own_process(DEAD_PID, process_identity.own_start())).toBe(false)
 	})
 
-	it.skipIf(!has_start_probe)('refuses this pid paired with another process’s start time', () => {
-		expect(process_identity.is_own_process(process.pid, FOREIGN_START)).toBe(false)
-	})
+	it.skipIf(!has_native_start_probe)(
+		'refuses this pid paired with another process’s start time',
+		() => {
+			expect(process_identity.is_own_process(process.pid, FOREIGN_START)).toBe(false)
+		},
+	)
 
 	// A record written before the start time existed knows less than this process does, so it is not
 	// claimed as this process's — the safe direction, since a refused write costs one pass.

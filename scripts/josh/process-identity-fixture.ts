@@ -37,15 +37,19 @@ function sandbox_probes(proc_start: string | undefined): StartProbes {
 	}
 }
 
-// Whether this platform can report a process start time at all. Linux uses `/proc`, with `/bin/ps`
-// as the cross-platform fallback; platforms that answer neither skip cases requiring a real start
-// rather than asserting loosely. Derived here so the suites cannot disagree about the condition.
+// Whether this platform can establish an identity at all. A native start probe supplies it where
+// available; the process-owned socket supplies it inside a sandbox that denies both native probes.
 const has_start_probe = process_identity.own_start() !== undefined
+// A foreign native start token can only be disproved when the reader can run one of the same native
+// probes. A socket identity remains fully verifiable without making an unrelated `ps` token
+// comparable, so tests that fabricate such a token use this narrower capability.
+const has_native_start_probe = process_identity.read_start(process.pid) !== undefined
 
 const process_identity_fixture = {
 	DEAD_PID,
 	FOREIGN_START,
 	GROUP_PID,
+	has_native_start_probe,
 	NEGATIVE_PID,
 	SANDBOX_START,
 	has_start_probe,

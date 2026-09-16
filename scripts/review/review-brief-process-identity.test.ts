@@ -11,23 +11,25 @@ const RUNNING = 'Running now'
 const NOT_VERIFIED = 'Not verified'
 
 describe('review brief sandbox process identity fallback', () => {
-	it('recognizes a live gate without proc or ps and rejects its stale generation', () => {
-		const tree = { [FILE]: DIGEST }
-		const token = process_identity.resolve_own_start(
-			process_identity_fixture.sandbox_probes(undefined),
-		)
-		const marker = { taken_at: STARTED_AT, files: tree, pid: process.pid, process_start: token }
+	it.skipIf(process.platform === 'win32')(
+		'recognizes a live gate without proc or ps and rejects its stale generation',
+		() => {
+			const tree = { [FILE]: DIGEST }
+			const token =
+				process_identity.resolve_own_start(process_identity_fixture.sandbox_probes(undefined)) ?? ''
+			const marker = { taken_at: STARTED_AT, files: tree, pid: process.pid, process_start: token }
 
-		try {
+			try {
+				expect(
+					review_brief.gate_line({ gate: undefined, in_flight: marker }, tree, BASE),
+				).toContain(RUNNING)
+			} finally {
+				process_identity.close_beacon(token)
+			}
+
 			expect(review_brief.gate_line({ gate: undefined, in_flight: marker }, tree, BASE)).toContain(
-				RUNNING,
+				NOT_VERIFIED,
 			)
-		} finally {
-			process_identity.close_beacon(token)
-		}
-
-		expect(review_brief.gate_line({ gate: undefined, in_flight: marker }, tree, BASE)).toContain(
-			NOT_VERIFIED,
-		)
-	})
+		},
+	)
 })
