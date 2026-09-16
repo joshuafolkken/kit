@@ -5,6 +5,7 @@ import { codex_agent_argv } from './codex-agent-argv'
 const INVOCATION = 'fullrun #2071'
 const MODEL = 'gpt-5.6-sol'
 const SANDBOX = 'workspace-write'
+const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
 
 function openai_worker(): AgentProfile {
 	const result = agent_role_profile.resolve(agent_role_profile.WORKER, {
@@ -30,6 +31,8 @@ describe('Codex argv construction', () => {
 				MODEL,
 				'-c',
 				'model_reasoning_effort="medium"',
+				'-c',
+				NETWORK_CONFIG,
 				'--json',
 				INVOCATION,
 			],
@@ -42,5 +45,6 @@ describe('Codex argv construction', () => {
 		expect(argv.args.at(-1)).toBe(INVOCATION)
 		expect(argv.args.join(' ')).not.toContain('dangerously')
 		expect(argv.args).toContain(SANDBOX)
+		expect(argv.args).toContain(NETWORK_CONFIG)
 	})
 })

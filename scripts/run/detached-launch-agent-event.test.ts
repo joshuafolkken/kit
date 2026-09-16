@@ -14,6 +14,8 @@ const THREAD_STARTED = 'thread.started'
 const BUDGET_EXCEEDED = 'budget exceeded'
 const PLAIN_STDERR = 'codex exited seven'
 const LOG_NAME = 'codex.jsonl'
+const GH_TOKEN = 'secret-detached-token'
+const ENV_NAME = 'codex-environment'
 const scratch = { directory: '', log: '' }
 
 afterEach(() => {
@@ -49,6 +51,7 @@ function write_provider_fakes(): void {
 	const codex = String.raw`#!/bin/sh
 printf '%s\n' "$*" >> "$FAKE_CALLS"
 if [ "$1" = "login" ]; then exit 0; fi
+printf '%s\n%s\n' "$GH_TOKEN" "$TMPDIR" > "$FAKE_ENV"
 printf '%s\n' '{"type":"thread.started","thread_id":"fake"}'
 printf '%s\n' '{"type":"error","message":"${BUDGET_EXCEEDED}"}'
 printf '%s\n' '${PLAIN_STDERR}' >&2
@@ -58,28 +61,40 @@ exit 7
 printf '%s\n' "$*" >> "$FAKE_CLAUDE_CALLS"
 exit 99
 `
+	const gh = String.raw`#!/bin/sh
+if [ "$1 $2" = "auth token" ]; then printf '%s\n' '${GH_TOKEN}'; exit 0; fi
+exit 1
+`
 
 	executable('codex', codex)
 	executable('claude', claude)
+	executable('gh', gh)
 }
 
-function arrange_provider_fakes(): { calls: string; claude_calls: string } {
-	const calls = path.join(scratch.directory, 'codex-calls')
-	const claude_calls = path.join(scratch.directory, 'claude-calls')
-
-	write_provider_fakes()
+function initialize_fake_outputs(calls: string, claude_calls: string): void {
 	writeFileSync(calls, '')
 	writeFileSync(claude_calls, '')
+}
+
+function arrange_provider_fakes(): { calls: string; claude_calls: string; environment: string } {
+	const calls = path.join(scratch.directory, 'codex-calls')
+	const claude_calls = path.join(scratch.directory, 'claude-calls')
+	const environment = path.join(scratch.directory, ENV_NAME)
+
+	write_provider_fakes()
+	initialize_fake_outputs(calls, claude_calls)
 	vi.stubEnv('PATH', scratch.directory)
 	vi.stubEnv('FAKE_CALLS', calls)
 	vi.stubEnv('FAKE_CLAUDE_CALLS', claude_calls)
+	vi.stubEnv('FAKE_ENV', environment)
 
-	return { calls, claude_calls }
+	return { calls, claude_calls, environment }
 }
 
 async function run_provider_failure(): Promise<{
 	calls: string
 	claude_calls: string
+	environment: string
 	launch_kind: string
 	output: string
 }> {
@@ -146,5 +161,17 @@ describe('detached fake Codex failure through the provider adapter', () => {
 		expect(invocations.filter((line) => line === 'login status')).toHaveLength(1)
 		expect(invocations.filter((line) => line.startsWith('exec '))).toHaveLength(1)
 		expect(readFileSync(claude_calls, 'utf8')).toBe('')
+	})
+
+	it('passes auth and a work-tree TMPDIR without exposing the token in argv or logs', async () => {
+		const { calls, environment, output } = await run_provider_failure()
+		const [token, temporary_directory] = readFileSync(environment, 'utf8').trim().split('\n', 2)
+
+		expect(token).toBe(GH_TOKEN)
+		expect(temporary_directory).toBe(
+			path.join(scratch.directory, 'node_modules', '.cache', 'josh', OPENAI_PROVIDER),
+		)
+		expect(readFileSync(calls, 'utf8')).not.toContain(GH_TOKEN)
+		expect(output).not.toContain(GH_TOKEN)
 	})
 })

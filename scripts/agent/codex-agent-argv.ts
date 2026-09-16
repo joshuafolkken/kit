@@ -5,6 +5,7 @@ const AGENT_FLAGS: ReadonlyArray<string> = ['exec', '--sandbox', 'workspace-writ
 const MODEL_FLAG = '--model'
 const CONFIG_FLAG = '-c'
 const JSON_FLAG = '--json'
+const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
 
 interface CodexArgv {
 	command: string
@@ -24,6 +25,8 @@ function build(invocation: string, profile: AgentProfile): CodexArgv {
 			profile.model,
 			CONFIG_FLAG,
 			effort_config(profile),
+			CONFIG_FLAG,
+			NETWORK_CONFIG,
 			JSON_FLAG,
 			invocation,
 		],

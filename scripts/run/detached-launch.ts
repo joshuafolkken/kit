@@ -1,5 +1,6 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
+import { agent_launch_environment } from '#scripts/agent/agent-launch-environment'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -248,7 +249,8 @@ function spawned(
 	on_error: (note: string) => void,
 ): LaunchResult {
 	const { command, args } = request.argv
-	const child = spawn(command, [...args], spawn_options(request.cwd, log, request.env)) // NOSONAR — see above
+	const environment = agent_launch_environment.build(request.cwd, request.profile, request.env)
+	const child = spawn(command, [...args], spawn_options(request.cwd, log, environment)) // NOSONAR — see above
 
 	child.on('error', (error) => {
 		on_error(note_of(error))

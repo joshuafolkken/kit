@@ -1116,7 +1116,7 @@ pnpm josh run:wake --stop                  # stop it
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 ```
 
-The supervisor launches the selected provider as `scheduler`; listings show profile and result. Anthropic is default. OpenAI uses `codex exec --sandbox workspace-write --json`, checks login, and never falls back. An unclaimed scheduler wake gets three tries. Workers are never retried or promoted.
+`scheduler` runs provider; listings show profile/result. Anthropic defaults. After login, OpenAI runs `codex exec --sandbox workspace-write -c sandbox_workspace_write.network_access=true --json` without fallback. Unclaimed wakes try thrice; workers never retry/promote.
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
@@ -1243,7 +1243,7 @@ Start a lane's child as a detached OS process, so cutting this session abandons 
 pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
 ```
 
-`JOSH_AGENT_PROVIDER` selects the `worker`: blank or `anthropic` runs `claude -p`; `openai` runs `codex exec --sandbox workspace-write --model <model> -c model_reasoning_effort="<effort>" --json`. The shell-free launcher passes `fullrun #<N>` as one argument. Records expose normalized JSON/JSONL state to listings and liveness.
+`JOSH_AGENT_PROVIDER` selects worker: blank/`anthropic` runs `claude -p`; `openai` runs `codex exec --sandbox workspace-write --model <model> -c model_reasoning_effort="<effort>" -c sandbox_workspace_write.network_access=true --json`. Shell-free launch passes `fullrun #<N>` singly; listings/liveness normalize JSON/JSONL.
 
 **Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 
