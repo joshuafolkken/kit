@@ -179,6 +179,10 @@ interface SessionFile {
 
 const OWN_DEPTH = 0
 
+function home_directory(): string {
+	return homedir()
+}
+
 function to_session_file(
 	full_path: string,
 	session_id: string,
@@ -517,6 +521,7 @@ const cost_transcript = {
 	read_raw,
 	read_optional,
 	missing_message,
+	home_directory,
 }
 
 export type { SearchedDirectory, SessionFile, SessionUsage }

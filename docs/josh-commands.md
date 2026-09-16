@@ -1161,8 +1161,8 @@ Collapses a `backlogrun` merge event into one call (joshuafolkken/kit#2024); ali
 calls it once at a child's return and reads back the next child number — or a control verdict.
 
 ```bash
-next=$(pnpm josh run:merge <N> --over 300000 --epic <E> --repo <owner/repo> --owner "$PPID")
-pnpm josh run:merge <N> --over 300000 --owner "$PPID"   # backlog offer (no epic)
+next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID")
+pnpm josh run:merge <N> --owner "$PPID"   # backlog offer (no epic)
 ```
 
 Confirms the child from GitHub and, by what it turned out to be, does the post-merge steps: a **merged**
@@ -1173,13 +1173,12 @@ or `already-done`) is left alone; a **failed** child has its stale `in-progress`
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
-`over` (the merge crossed `--over`, so hand the lanes over and cut), `human-review` (the child stopped
+`over` (the merge crossed the shared 150,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
 before its commit — stop), `stop` (the consecutive-failure guard tripped), and `retry` (the child's
 state could not be read).
 
 **Options:**
 
-- `--over <tokens>` — required; the per-request hand-off threshold, checked after a merge.
 - `--epic <E> --repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
 
@@ -1262,16 +1261,17 @@ Blank means unset. Invalid provider/model/effort or unavailable Codex CLI/auth r
 
 ### `josh cost`
 
-Answer whether the next turn of a run will cost more than a threshold, read from Claude Code's session transcripts. Since #2016 this is the `--over` hand-off verdict alone: the readerless report scopes (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were retired because no rule or decision read them. The `josh time` run-timing report keeps the hand-off aggregates (median billed input per request, median context) the 300,000 experiment is judged against.
+Answer whether a run's next turn exceeds a threshold, using the active provider's session usage. `--cut` selects the shared 150,000 context-cut threshold; `--over <tokens>` remains available for explicit measurement. Since #2016 these are hand-off verdicts alone: the readerless report scopes (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were retired because no rule or decision read them. The `josh time` run-timing report keeps the hand-off aggregates (median billed input per request, median context) for before/after comparison.
 
 ```bash
-pnpm josh cost --over <tokens>  # print `over`/`under` for billed input per request vs the limit; alias: josh co
-pnpm josh cost --path <dir>     # read another project's transcripts from this checkout
+pnpm josh cost --cut             # compare billed input per request with the shared 150,000 context-cut threshold
+pnpm josh cost --over <tokens>   # compare with an explicit limit; alias: josh co
+pnpm josh cost --cut --path <dir> # use another project's provider usage
 ```
 
-**Options:** `--over <tokens>` prints its verdict (`over` / `under`) on stdout with the measured billed-input-per-request figure on stderr — the entry judgment `fullrun` / `backlogrun` / `halfrun` / `pre-gate-cut` ask; `--path <dir>` aims the read at another project (absolute path), rides beside the threshold, and keeps the `cwd` behavior when absent.
+**Options:** `--cut` selects the shared threshold; `--over <tokens>` selects an explicit one. Either prints `over` / `under` on stdout and measured input per request on stderr. `--path <dir>` selects another project (absolute path); absent, it keeps the current `cwd`.
 
-**Output / exit codes:** an invocation naming no `--over` threshold prints the usage line; an absent transcript exits non-zero and says where it looked; a session with no requests says so rather than answering a verdict.
+**Output / exit codes:** no threshold selector prints usage; absent provider usage exits non-zero and says where it looked; a session with no requests says so rather than answering a verdict.
 
 ### `josh doc:section`
 

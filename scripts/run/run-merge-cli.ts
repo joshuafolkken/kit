@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_carry, type CarryOwner } from './run-carry'
 import { run_issue_number } from './run-issue-number'
@@ -38,7 +39,7 @@ const DIGITS = /^\d+$/u
 // itself forbids (names cannot start with a hyphen) and which the taint analyzer keeps flagging.
 const REPO_PATTERN = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/u
 const USAGE =
-	'Usage: josh run:merge <issue> --over <tokens> [--epic <E> --repo <owner/repo>] [--owner <pid>]'
+	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>]'
 
 const OPTIONS = {
 	epic: { type: 'string' },
@@ -58,14 +59,6 @@ function read_args(argv: ReadonlyArray<string>): ParsedArguments | undefined {
 	} catch {
 		return undefined
 	}
-}
-
-function to_over(raw: string | undefined): number | undefined {
-	if (raw === undefined || !DIGITS.test(raw)) return undefined
-
-	const parsed = Number(raw)
-
-	return Number.isSafeInteger(parsed) ? parsed : undefined
 }
 
 // Absent owner is "no owner declared", which the carry guard reads as not provably foreign; a present
@@ -121,6 +114,14 @@ function has_invalid_offer(values: ParsedArguments['values']): boolean {
 	)
 }
 
+// Old parents may still pass the numeric threshold they started with. Its shape remains strict, but
+// its value is ignored so an in-flight caller cannot restore a second threshold source.
+function has_invalid_legacy_over(raw: string | undefined): boolean {
+	if (raw === undefined) return false
+
+	return !DIGITS.test(raw) || !Number.isSafeInteger(Number(raw))
+}
+
 function valid_child(parsed: ParsedArguments): string | undefined {
 	const child = parsed.positionals[FIRST]
 
@@ -130,22 +131,23 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 }
 
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
-	if (has_invalid_offer(parsed.values)) return undefined
+	if (has_invalid_offer(parsed.values) || has_invalid_legacy_over(parsed.values.over)) {
+		return undefined
+	}
 
 	const child = valid_child(parsed)
 
 	if (child === undefined) return undefined
 
-	const over = to_over(parsed.values.over)
 	const owner = to_owner(parsed.values.owner)
 
-	if (over === undefined || owner === undefined) return undefined
+	if (owner === undefined) return undefined
 
 	return {
 		child,
 		epic: valid_epic(parsed.values.epic),
 		repo: valid_repo(parsed.values.repo),
-		over,
+		over: CONTEXT_CUT_THRESHOLD,
 		owner,
 	}
 }

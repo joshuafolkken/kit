@@ -173,11 +173,11 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   entry point that edits the tree, ahead of the split assessment and ahead of a `new` entry's filing.
   **`kickoff` is exempt**: it edits nothing, so it neither claims nor releases. §2f.
 - **The session boundary is asked at the entry as well, not only after a merge** —
-  `pnpm josh cost --over 300000`, in the same turn as `pnpm josh run:hold` and before anything else is
+  `pnpm josh cost --cut`, in the same turn as `pnpm josh run:hold` and before anything else is
   started, so a session already carrying an earlier Issue's whole conversation is cut before it pays
   for one more. It is the same rule at a second application point, and `backlogrun-progress.md` → "The hand-off" is
-  the single source of the check and of where 300,000 comes from (a temporary experiment rather than a
-  settled number). `under`, and the run continues. `over` — or a run the check could not answer for —
+  the single source of the check and of the shared 150,000 threshold. `under`, and the run continues.
+  `over` — or a run the check could not answer for —
   and the run **stops before the work starts**: send a `confirmation` Telegram carrying the figure
   printed on standard error and the resume command — the invocation as it was typed, in a fresh
   session (`fullrun #<N>` / `halfrun #<N>` for a `#N` entry, `fullrun new` / `halfrun new` for a `new`

@@ -9,6 +9,7 @@ const { usage_line, write_session, write_session_under, output } = cost_cli_fixt
 // A project other than the process cwd, so `--path` is seen to read a directory it was not already in.
 const TARGET = '/Users/someone/Development/other-project'
 const FAILURE_EXIT_CODE = 1
+const ANTHROPIC_ENV = { JOSH_AGENT_PROVIDER: 'anthropic' }
 const NO_TRANSCRIPTS = 'No transcripts found'
 const PER_REQUEST = 'per request'
 
@@ -31,7 +32,7 @@ describe('cost_cli.run — the target project path', () => {
 	it('reads the transcripts of the project named by --path', () => {
 		write_session_under(TARGET, SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD)).toBe(0)
+		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD, ANTHROPIC_ENV)).toBe(0)
 		expect(output()).toContain(PER_REQUEST)
 	})
 
@@ -39,7 +40,9 @@ describe('cost_cli.run — the target project path', () => {
 	it('does not read the process cwd when --path names another project', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD, ANTHROPIC_ENV)).toBe(
+			FAILURE_EXIT_CODE,
+		)
 		expect(output()).toContain(NO_TRANSCRIPTS)
 	})
 
@@ -47,7 +50,7 @@ describe('cost_cli.run — the target project path', () => {
 	it('reads the process cwd when --path is absent', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0'], CWD)).toBe(0)
+		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(0)
 		expect(output()).toContain(PER_REQUEST)
 	})
 })

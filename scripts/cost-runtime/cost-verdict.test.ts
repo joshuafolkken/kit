@@ -1,5 +1,6 @@
 import { run_cut } from '#scripts/run/run-cut'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 import { cost_verdict, type OverMeasurement } from './cost-verdict'
 
@@ -76,27 +77,26 @@ describe('cost_verdict.report_over', () => {
 })
 
 // joshuafolkken/kit#1933: the implementation-phase cut of a lane child is decided by this same
-// `report_over` measurement — `pnpm josh cost --over <IMPLEMENTATION_CONTEXT_THRESHOLD>` — not by a
+// `report_over` measurement — `pnpm josh cost --cut` — not by a
 // second decision function. This pins the boundary against the real path: over the threshold a lane
-// child cuts, at or below it it keeps implementing, and the threshold's initial value is the
-// documented 200k, single-sourced from `run_cut` so this test and the doc cannot drift.
+// child cuts, at or below it it keeps implementing, and the shared threshold is single-sourced so
+// the scheduler and worker cannot drift.
 describe("cost_verdict.report_over at the lane child's implementation threshold", () => {
-	const INITIAL_THRESHOLD = 200_000
-	const threshold = run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD
+	const EXPECTED_CONTEXT_CUT_THRESHOLD = 150_000
+	const threshold = CONTEXT_CUT_THRESHOLD
 
-	it('starts at the documented 200k initial value', () => {
-		expect(run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD).toBe(INITIAL_THRESHOLD)
+	it('uses the shared 150k threshold', () => {
+		expect(CONTEXT_CUT_THRESHOLD).toBe(EXPECTED_CONTEXT_CUT_THRESHOLD)
+		expect(run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD).toBe(CONTEXT_CUT_THRESHOLD)
 	})
 
-	it('answers over — the lane child cuts — above the threshold', () => {
-		cost_verdict.report_over(over_of([record(threshold + 1)]), threshold)
+	it.each([
+		[cost_verdict.UNDER_VERDICT, threshold - 1],
+		[cost_verdict.UNDER_VERDICT, threshold],
+		[cost_verdict.OVER_VERDICT, threshold + 1],
+	])('answers %s at the shared boundary for %s billed tokens', (verdict, tokens) => {
+		cost_verdict.report_over(over_of([record(tokens)]), threshold)
 
-		expect(stdout()).toBe(cost_verdict.OVER_VERDICT)
-	})
-
-	it('answers under — the lane child keeps implementing — at or below the threshold', () => {
-		cost_verdict.report_over(over_of([record(threshold)]), threshold)
-
-		expect(stdout()).toBe(cost_verdict.UNDER_VERDICT)
+		expect(stdout()).toBe(verdict)
 	})
 })
