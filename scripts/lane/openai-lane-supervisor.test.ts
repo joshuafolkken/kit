@@ -20,6 +20,7 @@ const lane_directory = path.join(scratch, 'lane')
 const target = run_cut.cut_path(repository)
 const profile = agent_role_profile.OPENAI_PROFILES.worker
 const RESUME_PROMPT = 'run:cut --resume 2084'
+const EPHEMERAL_FLAG = '--ephemeral'
 
 const launch = vi.spyOn(detached_launch, 'launch_attached')
 const worktree = vi.spyOn(run_cut, 'worktree_directory')
@@ -83,7 +84,7 @@ describe('OpenAI lane supervisor generations', () => {
 
 		expect(request.argv.command).toBe('codex')
 		expect(request.argv.args.at(-1)).toBe(`fullrun #${ISSUE}`)
-		expect(request.argv.args).toContain('--ephemeral')
+		expect(request.argv.args).not.toContain(EPHEMERAL_FLAG)
 		expect(request.argv.args).toContain(
 			`sqlite_home=${JSON.stringify(path.join(lane_directory, 'node_modules/.cache/josh/openai'))}`,
 		)
@@ -111,6 +112,8 @@ describe('OpenAI lane supervisor generations', () => {
 		expect(await supervise('generations')).toBe(0)
 		expect(launch).toHaveBeenCalledTimes(3)
 		expect(launched_request(1).argv.args.at(-1)).toContain(RESUME_PROMPT)
+		expect(launched_request(1).argv.args).not.toContain(EPHEMERAL_FLAG)
+		expect(launched_request(1).profile).toStrictEqual(profile)
 		expect(launched_request(2).argv.args.at(-1)).toContain(RESUME_PROMPT)
 	})
 })

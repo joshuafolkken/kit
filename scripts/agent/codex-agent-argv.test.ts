@@ -7,6 +7,7 @@ import { codex_agent_argv } from './codex-agent-argv'
 const INVOCATION = 'fullrun #2071'
 const MODEL = 'gpt-5.6-sol'
 const SANDBOX = 'workspace-write'
+const EPHEMERAL_FLAG = '--ephemeral'
 const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
 const LANE = '/lanes/2071'
 const GIT_COMMON_DIRECTORY = '/projects/kit with spaces/.git'
@@ -25,6 +26,10 @@ function openai_worker(): AgentProfile {
 	if (result.kind === 'rejected') throw new Error(result.note)
 
 	return result.profile
+}
+
+function openai_scheduler(): AgentProfile {
+	return agent_role_profile.OPENAI_PROFILES.scheduler
 }
 
 describe('Codex argv construction', () => {
@@ -60,12 +65,18 @@ describe('Codex argv construction', () => {
 })
 
 describe('Codex lane runtime state', () => {
-	it('keeps lane session state local and makes the headless session ephemeral', () => {
+	it('keeps lane runtime state local and persists the worker rollout', () => {
 		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
 
 		expect(argv.args).toContain('sqlite_home="/lanes/2071/node_modules/.cache/josh/openai"')
-		expect(argv.args).toContain('--ephemeral')
+		expect(argv.args).not.toContain(EPHEMERAL_FLAG)
 		expect(argv.args).not.toContain('--ignore-user-config')
+	})
+
+	it('keeps a cwd-scoped scheduler ephemeral', () => {
+		const argv = codex_agent_argv.build(INVOCATION, openai_scheduler(), LANE)
+
+		expect(argv.args).toContain(EPHEMERAL_FLAG)
 	})
 
 	it('quotes an absolute SQLite path when the lane name contains spaces', () => {

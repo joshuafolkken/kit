@@ -145,6 +145,21 @@ function report_missing(target: string, provider: AgentProvider): number {
 	return FAILURE_EXIT_CODE
 }
 
+function same_openai_project(target: string, cwd: string): boolean {
+	return cost_transcript.session_cwd(target) === cost_transcript.session_cwd(cwd)
+}
+
+function reject_openai_cross_project(context: RunContext, target: string, cwd: string): boolean {
+	if (context.provider !== 'openai' || context.path === undefined) return false
+	if (same_openai_project(target, cwd)) return false
+
+	console.error(
+		'OpenAI --path cannot select a thread from another project; run josh cost in that project.',
+	)
+
+	return true
+}
+
 // `--over`: what the next turn of this session will cost, read from the latest own session alone.
 function run_over(
 	target: string,
@@ -191,12 +206,10 @@ function run(
 	}
 
 	// `--path <dir>` reads the target project instead of the process cwd (joshuafolkken/kit#1987).
-	return run_over(
-		transcript_cwd.resolve(context.path, cwd),
-		context.over,
-		context.provider,
-		environment,
-	)
+	const target = transcript_cwd.resolve(context.path, cwd)
+	if (reject_openai_cross_project(context, target, cwd)) return FAILURE_EXIT_CODE
+
+	return run_over(target, context.over, context.provider, environment)
 }
 
 function main(argv: ReadonlyArray<string>): void {
