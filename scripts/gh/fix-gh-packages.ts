@@ -1,15 +1,14 @@
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execaSync } from 'execa'
 import { z } from 'zod'
 import { fix_gh_packages_logic, type LockfilePackage } from './fix-gh-packages-logic'
+import { gh_cli_token } from './gh-cli-token'
 
 const LOCKFILE = 'pnpm-lock.yaml'
 const NPMRC = '.npmrc'
 const GH_PACKAGES_HOST = 'npm.pkg.github.com'
 const FETCH_TIMEOUT_MS = 10_000
-const GH_CLI_TIMEOUT_MS = 5000
 
 const npm_distribution_schema = z.looseObject({ tarball: z.string().optional() })
 const npm_version_schema = z.looseObject({ dist: npm_distribution_schema.optional() })
@@ -23,17 +22,6 @@ function read_file(file_path: string): string {
 	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
 }
 
-function get_gh_cli_token(): string | undefined {
-	try {
-		const { stdout } = execaSync('gh', ['auth', 'token'], { timeout: GH_CLI_TIMEOUT_MS })
-		const token = stdout.trim()
-
-		return token.length > 0 ? token : undefined
-	} catch {
-		return undefined
-	}
-}
-
 // Resolution order: NODE_AUTH_TOKEN → a literal token in the project .npmrc → `gh auth token`.
 // The kit does not distribute the `_authToken=${NODE_AUTH_TOKEN}` line, and a consumer that
 // keeps one (see docs/authentication.md §4(d)) is unaffected: parse_npmrc_auth_token skips the
@@ -44,7 +32,7 @@ function get_effective_auth_token(npmrc: string): string | undefined {
 	const environment_token = process.env['NODE_AUTH_TOKEN']?.trim()
 	const npmrc_token = fix_gh_packages_logic.parse_npmrc_auth_token(npmrc)
 
-	return fix_gh_packages_logic.resolve_token(environment_token, npmrc_token, get_gh_cli_token)
+	return fix_gh_packages_logic.resolve_token(environment_token, npmrc_token, gh_cli_token.get)
 }
 
 async function fetch_tarball_url(
@@ -139,5 +127,3 @@ async function main(): Promise<void> {
 
 const [, argv1] = process.argv
 if (argv1 !== undefined && realpathSync(argv1) === fileURLToPath(import.meta.url)) await main()
-
-export { get_gh_cli_token }

@@ -134,7 +134,7 @@ interface AllowedSpawn {
 // repository must start with `api`.
 const ALLOWED_SPAWNS: ReadonlyArray<AllowedSpawn> = [
 	{
-		file: 'scripts/gh/fix-gh-packages.ts',
+		file: 'scripts/gh/gh-cli-token.ts',
 		subcommand: 'auth',
 		reason:
 			'`gh auth token` prints the credential the local CLI already holds. It contacts no GitHub endpoint, so there is no REST request it could be expressed as.',
