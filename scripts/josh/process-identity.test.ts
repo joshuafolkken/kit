@@ -11,8 +11,15 @@ import { process_identity_fixture } from './process-identity-fixture'
 // the reader sees in that situation is a pid that is alive paired with a recorded start time that is
 // not the one that pid has now. This suite constructs exactly that.
 
-const { DEAD_PID, FOREIGN_START, GROUP_PID, NEGATIVE_PID, has_start_probe } =
-	process_identity_fixture
+const {
+	DEAD_PID,
+	FOREIGN_START,
+	GROUP_PID,
+	NEGATIVE_PID,
+	SANDBOX_START,
+	has_start_probe,
+	sandbox_probes,
+} = process_identity_fixture
 
 describe('process_identity.is_same_process — a pid is not a process identity', () => {
 	it.skipIf(!has_start_probe)('recognizes this process by its own pid and start time', () => {
@@ -54,6 +61,35 @@ describe('process_identity — reading a start time', () => {
 	// write would otherwise pay again — so the answer is read once and kept.
 	it('answers the same start time for this process every time it is asked', () => {
 		expect(process_identity.own_start()).toBe(process_identity.own_start())
+	})
+
+	it('uses the proc identity when the sandbox refuses ps', () => {
+		expect(process_identity.read_start(process.pid, sandbox_probes(SANDBOX_START))).toBe(
+			SANDBOX_START,
+		)
+	})
+
+	it('keeps live, dead, and reused pids distinct when ps is unavailable', () => {
+		const read = (pid: number): string | undefined =>
+			process_identity.read_start(pid, sandbox_probes(SANDBOX_START))
+
+		expect(process_identity.is_same_process(process.pid, SANDBOX_START, read)).toBe(true)
+		expect(process_identity.is_same_process(process.pid, FOREIGN_START, read)).toBe(false)
+		expect(process_identity.is_same_process(DEAD_PID, SANDBOX_START, read)).toBe(false)
+	})
+
+	it('uses a live generation beacon when proc and ps are unavailable', () => {
+		const token = process_identity.resolve_own_start(sandbox_probes(undefined))
+
+		try {
+			expect(token).toMatch(/^socket:/u)
+			expect(process_identity.is_same_process(process.pid, token)).toBe(true)
+			expect(process_identity.is_same_process(DEAD_PID, token)).toBe(false)
+		} finally {
+			process_identity.close_beacon(token)
+		}
+
+		expect(process_identity.is_same_process(process.pid, token)).toBe(false)
 	})
 })
 

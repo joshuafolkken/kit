@@ -1,5 +1,6 @@
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { git_common_directory } from '#scripts/git/git-common-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 import { codex_agent_argv } from './codex-agent-argv'
 
@@ -8,6 +9,13 @@ const MODEL = 'gpt-5.6-sol'
 const SANDBOX = 'workspace-write'
 const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
 const LANE = '/lanes/2071'
+const GIT_COMMON_DIRECTORY = '/projects/kit with spaces/.git'
+
+const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
+
+beforeEach(() => {
+	resolve_common_directory.mockReturnValue(undefined)
+})
 
 function openai_worker(): AgentProfile {
 	const result = agent_role_profile.resolve(agent_role_profile.WORKER, {
@@ -65,5 +73,17 @@ describe('Codex lane runtime state', () => {
 		const expected = path.resolve('./lanes/lane with spaces/node_modules/.cache/josh/openai')
 
 		expect(argv.args).toContain(`sqlite_home=${JSON.stringify(expected)}`)
+	})
+
+	it('adds exactly the linked worktree common Git directory as a writable root', () => {
+		resolve_common_directory.mockReturnValue(GIT_COMMON_DIRECTORY)
+
+		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
+		const additions = argv.args.flatMap((argument, index) =>
+			argument === '--add-dir' ? [argv.args[index + 1]] : [],
+		)
+
+		expect(resolve_common_directory).toHaveBeenCalledWith(LANE)
+		expect(additions).toStrictEqual([GIT_COMMON_DIRECTORY])
 	})
 })

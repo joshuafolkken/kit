@@ -1,4 +1,4 @@
-import { process_identity } from './process-identity'
+import { process_identity, type StartProbes } from './process-identity'
 
 // The pids and start times every suite that exercises a pid-keyed record needs
 // (joshuafolkken/kit#1245).
@@ -26,12 +26,20 @@ const NEGATIVE_PID = -1
 // process's own — it is exactly what a record looks like once the operating system has reissued the
 // pid it was written with, which is the case that cannot be produced on demand any other way.
 const FOREIGN_START = 'Thu Jan  1 00:00:00 1970'
+const SANDBOX_START = 'proc:12345'
 
-// Whether this platform can report a process start time at all. The probe is `/bin/ps`, which macOS
-// and Linux both answer and Windows has no equivalent for, so the cases that need a real start time
-// are skipped there rather than asserted loosely — a test that passed on an answer the platform
-// cannot give would be asserting nothing. Derived here rather than in each suite so the three that
-// depend on it cannot disagree about the condition.
+function sandbox_probes(proc_start: string | undefined): StartProbes {
+	return {
+		read_proc_start: () => proc_start,
+		read_ps_start: () => {
+			throw new Error('ps denied by sandbox')
+		},
+	}
+}
+
+// Whether this platform can report a process start time at all. Linux uses `/proc`, with `/bin/ps`
+// as the cross-platform fallback; platforms that answer neither skip cases requiring a real start
+// rather than asserting loosely. Derived here so the suites cannot disagree about the condition.
 const has_start_probe = process_identity.own_start() !== undefined
 
 const process_identity_fixture = {
@@ -39,7 +47,9 @@ const process_identity_fixture = {
 	FOREIGN_START,
 	GROUP_PID,
 	NEGATIVE_PID,
+	SANDBOX_START,
 	has_start_probe,
+	sandbox_probes,
 }
 
 export { process_identity_fixture }

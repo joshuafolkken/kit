@@ -1,4 +1,9 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { readFileSync, rmSync } from 'node:fs'
+import { createServer, type Server } from 'node:net'
+import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // Whether the process a record names is still the one that wrote it (joshuafolkken/kit#1245).
 //
@@ -14,11 +19,10 @@ import { execFileSync } from 'node:child_process'
 // This is the fix rather than a narrowing of the window: a lifetime on the record, the other
 // candidate, only shortens how long a phantom can be believed.
 //
-// **The start time is an opaque token, never a date.** Both sides obtain it from the same command in
-// the same format and compare it for equality; nothing here parses it, so the source may be replaced
-// per platform without any reader changing. Second resolution is enough — a pid is reissued only
-// after the whole pid space has wrapped, which takes very many process creations and never the same
-// second in which the recorded process started.
+// **The start time is an opaque token, never a date.** Both sides use the same ordered probes and
+// compare the resulting token for equality; readers never parse it. Linux reads `/proc` directly,
+// other platforms try `ps`, and a sandbox that permits neither uses a process-owned Unix socket.
+// That socket accepts connections only while its writer lives, so a reused pid cannot revive it.
 //
 // **The token is only opaque if it is also stable, which it is not by default.** `ps` renders the
 // start time through the caller's own time zone and locale, so the *same* process prints
@@ -29,10 +33,10 @@ import { execFileSync } from 'node:child_process'
 // whole machine, and `bench-guard` would clear the caches out from under a running gate. The probe
 // therefore pins `TZ` and `LC_ALL` rather than inheriting them.
 
-// The absolute path rather than a name resolved through `PATH`, which both removes the lookup from
-// whatever the caller's environment happens to be and lets the probe run with no inherited
-// environment at all. macOS and every Linux distribution this runs on ship `ps` here; where it is
-// absent the probe answers "cannot tell", which is a case every caller already handles.
+// The `ps` fallback uses an absolute path rather than a name resolved through `PATH`, which removes
+// the lookup from the caller's environment and lets the probe run with no inherited environment.
+// Where neither `/proc` nor `ps` is available, the probe answers "cannot tell", a case every caller
+// already handles.
 const PS_COMMAND = '/bin/ps'
 const FORMAT_FLAG = '-o'
 // `lstart` is the process's start time, printed as `Tue Sep  8 08:39:04 2026`. Both implementations
@@ -54,6 +58,21 @@ const LIVENESS_SIGNAL = 0
 // negative addresses another group, so a truncated or hand-edited record carrying either would
 // otherwise answer "alive" forever.
 const LOWEST_REAL_PID = 1
+const PROC_START_FIELD_INDEX = 19
+const BEACON_SCHEME = 'socket:'
+const BEACON_SUFFIX = '.sock'
+const BEACON_PREFIX = `josh-process-identity-${String(process.getuid?.() ?? '')}-`
+const BEACON_ID_LENGTH = 36
+const BEACON_ID_PATTERN = /^[\da-f-]+$/u
+const SOCKET_PROBE_SOURCE =
+	"const net=require('node:net');const socket=net.createConnection(process.argv[1]);socket.once('connect',()=>process.exit(0));socket.once('error',()=>process.exit(1));socket.setTimeout(1000,()=>process.exit(1));"
+const beacons = new Map<string, Server>()
+const exit_cleanup = { is_registered: false }
+
+interface StartProbes {
+	read_proc_start: (pid: number) => string | undefined
+	read_ps_start: (pid: number) => string | undefined
+}
 
 function is_live_pid(pid: number): boolean {
 	if (pid < LOWEST_REAL_PID) return false
@@ -67,11 +86,26 @@ function is_live_pid(pid: number): boolean {
 	}
 }
 
-// `undefined` where the start time cannot be asked for: `ps` is absent (Windows), the field is not
-// supported, the probe timed out, or the pid named nothing. An empty answer is folded into the same
-// case — `ps` exits non-zero for an unknown pid on some platforms and prints nothing on others, and
-// both mean the same thing here.
-function read_start(pid: number): string | undefined {
+// Linux exposes field 22 as the process start time in clock ticks since boot. The command name in
+// field 2 may itself contain spaces or `)`, so parsing starts after its final closing parenthesis;
+// `state` is then index 0 and `starttime` index 19. A direct file read avoids process enumeration and
+// remains available to a workspace sandbox that refuses `ps`.
+function read_proc_start(pid: number): string | undefined {
+	try {
+		const stat = readFileSync(`/proc/${String(pid)}/stat`, 'utf8')
+		const fields = stat
+			.slice(stat.lastIndexOf(')') + 1)
+			.trim()
+			.split(/\s+/u)
+		const start = fields[PROC_START_FIELD_INDEX]
+
+		return start === undefined ? undefined : `proc:${start}`
+	} catch {
+		return undefined
+	}
+}
+
+function read_ps_start(pid: number): string | undefined {
 	try {
 		const printed = execFileSync(
 			PS_COMMAND,
@@ -90,6 +124,112 @@ function read_start(pid: number): string | undefined {
 	}
 }
 
+const START_PROBES: StartProbes = { read_proc_start, read_ps_start }
+
+function safe_probe(probe: (pid: number) => string | undefined, pid: number): string | undefined {
+	try {
+		return probe(pid)
+	} catch {
+		return undefined
+	}
+}
+
+function read_start(pid: number, probes: StartProbes = START_PROBES): string | undefined {
+	return safe_probe(probes.read_proc_start, pid) ?? safe_probe(probes.read_ps_start, pid)
+}
+
+function close_beacon(token: string): void {
+	const server = beacons.get(token)
+	if (server === undefined) return
+
+	beacons.delete(token)
+	server.close()
+	rmSync(token.slice(BEACON_SCHEME.length), { force: true })
+}
+
+function close_beacons(): void {
+	for (const token of beacons.keys()) close_beacon(token)
+}
+
+function ensure_exit_cleanup(): void {
+	if (exit_cleanup.is_registered) return
+
+	exit_cleanup.is_registered = true
+	process.once('exit', close_beacons)
+}
+
+function ignore_beacon_error(): void {
+	/* an unavailable beacon makes the identity safely unverifiable */
+}
+
+function open_beacon(): string {
+	const target = path.join(PLATFORM_TEMP_ROOT, `${BEACON_PREFIX}${randomUUID()}${BEACON_SUFFIX}`)
+	const token = `${BEACON_SCHEME}${target}`
+	const server = createServer().on('error', ignore_beacon_error).listen(target)
+
+	server.unref()
+	beacons.set(token, server)
+	ensure_exit_cleanup()
+
+	return token
+}
+
+// A Unix-domain listener is the macOS sandbox fallback rather than a weaker pid-only answer. The
+// random path is the generation token and the kernel-held listener is its lifetime: SIGKILL closes
+// it even when no cleanup handler runs, while a stale filesystem entry accepts no connection. A
+// process that later receives the same pid therefore cannot make the old pair live again.
+function resolve_own_start(probes: StartProbes = START_PROBES): string {
+	return read_start(process.pid, probes) ?? open_beacon()
+}
+
+function is_valid_beacon_name(name: string): boolean {
+	if (!name.startsWith(BEACON_PREFIX) || !name.endsWith(BEACON_SUFFIX)) return false
+
+	const id = name.slice(BEACON_PREFIX.length, -BEACON_SUFFIX.length)
+
+	return id.length === BEACON_ID_LENGTH && BEACON_ID_PATTERN.test(id)
+}
+
+function beacon_target(token: string): string | undefined {
+	if (!token.startsWith(BEACON_SCHEME)) return undefined
+
+	const target = token.slice(BEACON_SCHEME.length)
+	if (path.dirname(target) !== PLATFORM_TEMP_ROOT) return undefined
+
+	return is_valid_beacon_name(path.basename(target)) ? target : undefined
+}
+
+function is_live_beacon(target: string): boolean {
+	return (
+		spawnSync(process.execPath, ['-e', SOCKET_PROBE_SOURCE, target], {
+			stdio: 'ignore',
+			timeout: PROBE_TIMEOUT_MS,
+		}).status === 0
+	)
+}
+
+function has_matching_start(
+	pid: number,
+	recorded_start: string,
+	read: (pid: number) => string | undefined,
+): boolean | undefined {
+	const observed = read(pid)
+
+	return observed === undefined ? undefined : observed === recorded_start
+}
+
+function matches_recorded_start(
+	pid: number,
+	recorded_start: string,
+	read: (pid: number) => string | undefined,
+): boolean | undefined {
+	const target = beacon_target(recorded_start)
+
+	return target === undefined
+		? has_matching_start(pid, recorded_start, read)
+		: is_live_beacon(target)
+}
+
 // Read once and kept: a process's own start time cannot change, and the probe costs a subprocess that
 // every record write would otherwise pay again. A `Map` rather than a nullable variable because
 // `has` distinguishes "not asked yet" from "asked, and the platform could not answer" — the second is
@@ -97,7 +237,7 @@ function read_start(pid: number): string | undefined {
 const own_probe = new Map<number, string | undefined>()
 
 function own_start(): string | undefined {
-	if (!own_probe.has(process.pid)) own_probe.set(process.pid, read_start(process.pid))
+	if (!own_probe.has(process.pid)) own_probe.set(process.pid, resolve_own_start())
 
 	return own_probe.get(process.pid)
 }
@@ -111,12 +251,6 @@ function own_fields(): { pid: number; process_start?: string } {
 	const start = own_start()
 
 	return { pid: process.pid, ...(start !== undefined && { process_start: start }) }
-}
-
-function compare_start(pid: number, recorded_start: string): boolean | undefined {
-	const observed = read_start(pid)
-
-	return observed === undefined ? undefined : observed === recorded_start
 }
 
 // **Three answers, because the third one is real and the two callers resolve it in opposite
@@ -136,11 +270,12 @@ function compare_start(pid: number, recorded_start: string): boolean | undefined
 function is_same_process(
 	pid: number | undefined,
 	recorded_start: string | undefined,
+	read: (pid: number) => string | undefined = read_start,
 ): boolean | undefined {
 	if (pid === undefined || !is_live_pid(pid)) return false
 	if (recorded_start === undefined) return undefined
 
-	return compare_start(pid, recorded_start)
+	return matches_recorded_start(pid, recorded_start, read)
 }
 
 // **Whether a record is the caller's own, which is a different question from whether its writer is
@@ -163,12 +298,15 @@ function is_own_process(pid: number | undefined, recorded_start: string | undefi
 }
 
 const process_identity = {
+	close_beacon,
 	is_live_pid,
 	is_own_process,
 	is_same_process,
 	own_fields,
 	own_start,
 	read_start,
+	resolve_own_start,
 }
 
 export { process_identity }
+export type { StartProbes }

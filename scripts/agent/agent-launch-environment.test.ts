@@ -1,6 +1,7 @@
 import { existsSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
+import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agent_launch_environment } from './agent-launch-environment'
 import { agent_role_profile } from './agent-role-profile'
@@ -32,7 +33,7 @@ describe('OpenAI detached launch environment', () => {
 		expect(environment['JOSH_LANE_CHILD_ISSUE']).toBe(MARKER)
 	})
 
-	it('creates TMPDIR below the child work tree', () => {
+	it('creates TMPDIR under the platform temporary root and outside the child work tree', () => {
 		get.mockReturnValue(undefined)
 
 		const environment = agent_launch_environment.build(
@@ -40,8 +41,10 @@ describe('OpenAI detached launch environment', () => {
 			agent_role_profile.OPENAI_PROFILES.scheduler,
 		)
 
-		expect(environment['TMPDIR']).toBe(path.join(CWD, 'node_modules', '.cache', 'josh', 'openai'))
+		expect(environment['TMPDIR']).toBe(PLATFORM_TEMP_ROOT)
+		expect(path.relative(CWD, environment['TMPDIR'] ?? '')).toMatch(/^\.\./u)
 		expect(existsSync(environment['TMPDIR'] ?? '')).toBe(true)
+		expect(platform_temporary.is_writable_directory(environment['TMPDIR'] ?? '')).toBe(true)
 		expect(environment).not.toHaveProperty('GH_TOKEN')
 	})
 
