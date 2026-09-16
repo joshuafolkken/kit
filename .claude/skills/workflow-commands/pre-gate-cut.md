@@ -196,20 +196,17 @@ resumes the same lane **back into implementation** carrying none of the thinking
 ### The measurement is the parent hand-off's, never a second one
 
 The child decides whether to cut with the same measurement the parent uses between children —
-`pnpm josh cost --over <threshold>` (`cost_verdict.per_request_cost`, billed input tokens per
-request), whose single source is `backlogrun-progress.md` → "The hand-off". **Only the threshold differs**: the
-parent's seam is 300_000, the child's is `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` — **200_000
-initially**. No separate measurement is built for the lane child.
+`pnpm josh cost --cut` (`cost_verdict.per_request_cost`, billed input tokens per request), whose single
+source is `backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
+`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` both use the shared 150_000 constant. No separate
+measurement or threshold is built for the lane child.
 
 ```bash
-pnpm josh cost --over 200000     # over → cut ; under → keep implementing
+pnpm josh cost --cut     # over → cut ; under → keep implementing
 ```
 
-**200_000 is the initial value, and its derivation is recorded here.** The lane bodies above ran at
-208k–386k while implementing, and joshuafolkken/kit#1837's cap simulation put a 200k per-request cap
-at 71% of the final 427k (300k at 89%) — so cutting at 200k during implementation caps an
-accumulation the pre-gate boundary alone left uncapped. The value is a single constant,
-`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD`, so this figure and the test cannot drift.
+The value is the shared `CONTEXT_CUT_THRESHOLD`; `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` aliases it
+so the procedure, scheduler and worker tests cannot drift.
 
 ### Where the boundary is
 
@@ -221,7 +218,7 @@ the fresh process a half-written tree, which the resume verification would rejec
 
 ### Taking it
 
-At such a boundary, when `pnpm josh cost --over 200000` answers `over`, issue:
+At such a boundary, when `pnpm josh cost --cut` answers `over`, issue:
 
 ```bash
 pnpm josh run:cut --impl <N>
@@ -256,7 +253,7 @@ The pre-gate cut is enforced by a `PreToolUse` refusal because it fires uncondit
 The implementation cut cannot be: its trigger is the per-request cost, and that is read from the
 transcript **asynchronously** (`cost --over` loads the corpus), while a `PreToolUse` guard answers
 synchronously or not at all — and a synchronous approximation would be the very "separate measurement
-for the lane child" joshuafolkken/kit#1933 forbids. So the child runs `pnpm josh cost --over 200000`
+for the lane child" joshuafolkken/kit#1933 forbids. So the child runs `pnpm josh cost --cut`
 at each boundary itself, and whether the run held to it is read from the run-timing report and
 `pnpm josh cost` on a real dispatched run (see "Measurement" below) — the same feedback loop the
 pre-gate cut's own measurement uses.
@@ -297,7 +294,7 @@ tells whether the average fell.
 **The implementation-phase cut's drop is measured the same way, and is likewise unmeasured until
 then** (joshuafolkken/kit#1933): one changed `backlogrun` compares the average and maximum context
 per request of each lane against the 2026-09-13 run recorded in the issue, and until that run exists
-the effect of the 200_000 threshold is reported as unmeasured.
+the effect of the 150_000 threshold is reported as unmeasured.
 
 ## A lane child records its park before it stops
 

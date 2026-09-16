@@ -1,7 +1,7 @@
 # `backlogrun` — progress, the hand-off, resume and waiting
 
 **Read this file in full before the progress watcher starts** (`pnpm josh run:progress --wait`) and
-before the hand-off check at a child's merge (`pnpm josh cost --over 300000`). It is a point-of-use
+before the hand-off check at a child's merge (`pnpm josh cost --cut`). It is a point-of-use
 document, never an entry read: the entry procedure is `backlogrun.md`, which points here at those
 steps (joshuafolkken/kit#2010). This file is the single source of the heartbeat, the session hand-off
 and cut/resume, waiting without waiting forever, and the end-of-run summary and propagate.
@@ -216,12 +216,12 @@ single non-numeric line as the verdict.
    (joshuafolkken/kit#2024). What was a reading turn and an acting turn is one composite command: it
    confirms the child from GitHub, does the post-merge steps, folds in the hand-off check, and prints
    the next child number — or a control verdict — for the parent to read. Pass the merged child's
-   number, `--over 300000`, and the offer's source — `--epic <E> --repo <owner/repo>` for a named epic,
+   number and the offer's source — `--epic <E> --repo <owner/repo>` for a named epic,
    nothing for the opted-in backlog — with `--owner "$PPID"` so it counts into the carry record under
    the ownership guard.
 
    ```bash
-   next=$(pnpm josh run:merge <N> --over 300000 --epic <E> --repo <owner/repo> --owner "$PPID")
+   next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID")
    # a child number (or several, one per free lane) to run next, or a verdict token
    ```
 
@@ -241,7 +241,7 @@ single non-numeric line as the verdict.
 
    **The counters are the carry record's, and the epic progress comment is generated from it** (see "The
    counters live in the record" below). **The hand-off check is folded into the merge branch of the one
-   call** — `pnpm josh cost --over 300000`, run after `pnpm josh ms`; `under` offers the next child,
+   call** — `pnpm josh cost --cut`, run after `pnpm josh ms`; `under` offers the next child,
    `over` prints `over` so the parent hands its lanes over and takes the cut ("The hand-off" below), and
    a session that cannot measure is read as `over`. **Never read the condition off `pnpm josh delegate
    epic-child`** — a static policy lookup that answers `delegate` everywhere, so a gate built on it never
@@ -276,29 +276,24 @@ with it** (`backlogrun.md` → "The session cut is inside the invocation"). The 
 sessions; it is not a stop.
 
 ```bash
-pnpm josh cost --over 300000
+pnpm josh cost --cut
 ```
 
 It prints `over` or `under` on standard output and the measured figure on standard error. `over` means
 the next turn of this session costs more than the threshold in billed input, and the number is passed
 explicitly so a run cannot drift it by remembering it wrong.
 
-**300,000 is a temporary experiment, not a settled number** — read it as under test. **If the total cost
-per session gets worse, retreat to the previous 150,000** (compare with the run-timing report, same
-definitions before and after: median requests per run, billed input per request, Issues finished per
-session, cuts reached). **The retreat is more than deleting this note**: enumerate every reference with
-`grep -rnE '\b300,?000\b' --include='*.md' --include='*.ts' .` (the word boundary keeps `run:wake`'s
-`3000000` out), set the code constant back to 150,000, and drop the "temporary experiment" wording. **The
-150,000 output ceiling and the 150,000 entry-read character figure are separate systems — do not sweep
-them into the replace.** **The threshold expresses the balance between tokens and human effort**: cutting
-every child would make a person retype the command every time and lose the unattended property.
+**150,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
+The value is `CONTEXT_CUT_THRESHOLD` in `scripts/cost-runtime/context-cut-threshold.ts`; `cost --cut`,
+`run:merge` and `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` all read it rather than carrying separate
+numbers. The 150,000 output ceiling and the 150,000 entry-read character figure are separate systems.
 
 ### The check is asked at every merge, and delegation does not excuse it
 
 **A delegating parent reaches the threshold too**, because most of its billed input is conversation
 history rather than resident preamble, and the cost is not linear — n requests bill about n²/2, so a
 condition that delays the first cut multiplies a cost rather than deferring it. **So there is no
-condition: `pnpm josh cost --over 300000` is asked after every child's merge**, delegated or not.
+condition: `pnpm josh cost --cut` is asked after every child's merge**, delegated or not.
 **Never wire the question to `pnpm josh delegate epic-child`** — a static policy lookup answering
 `delegate` on every machine forever, so a gate built on it never fires.
 
@@ -318,10 +313,10 @@ on the default branch, and the epic's state on GitHub is complete.
 **The same `pnpm josh cost --over` measurement bounds a lane child's context _during_ implementation, not
 only the parent's between children** — the pre-gate cut fires only once implementation is done, so it
 never caps the thinking a child accumulates while implementing. The child measures its own per-request
-context with **this command** at a threshold of its own — `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD`,
-200_000 — and cuts with `pnpm josh run:cut --impl <N>`. **The measurement is single-sourced here**:
-`cost_verdict.per_request_cost` is what both seams compare, and only the threshold differs (the parent's
-300_000, the child's 200_000). The boundary and the resume are `pre-gate-cut.md` → "The
+context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 150_000, and cuts with
+`pnpm josh run:cut --impl <N>`. **The measurement and threshold are single-sourced**:
+`cost_verdict.per_request_cost` is what both seams compare, and `cost --cut` selects the same constant
+for the parent and child. The boundary and the resume are `pre-gate-cut.md` → "The
 implementation-phase cut", its single source.
 
 **A merge is not by itself a safe seam, because another lane may still be running.** The reference to

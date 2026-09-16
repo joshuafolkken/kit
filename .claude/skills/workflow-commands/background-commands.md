@@ -64,7 +64,7 @@ merge result?**
   comment exists because a compaction takes the counters at a moment nobody chooses (`backlogrun-progress.md` →
   "The counters live in the record"), so composing the values earlier moves no write and loses
   no counter.
-- **`pnpm josh cost --over 300000` stays after the merge, and reads nothing from it.** It measures
+- **`pnpm josh cost --cut` stays after the merge, and reads nothing from it.** It measures
   this session's own transcript, so the question above would bring it forward — but its answer grows
   with the session, and asking it a call early under-reads the very number the hand-off is decided
   on. It is seconds of tail against a guard on session size, so it keeps its documented seam
@@ -80,7 +80,7 @@ with. Applied to the three waits a run actually has:
 | `pnpm josh gate` | a subagent running `/code-review` with the brief `pnpm josh review:brief` prints |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
 | CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
-| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 300000` |
+| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --cut` |
 
 **The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
 resumes the run, and the turn that reads it goes straight through any branch-2 filing and

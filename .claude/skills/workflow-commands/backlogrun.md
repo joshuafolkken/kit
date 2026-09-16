@@ -516,7 +516,7 @@ what `backlog:budget` printed rather than paraphrased.
 ### The cost check is not asked during a watch
 
 **A watch does not count towards the session cut** (joshuafolkken/kit#1676). The hand-off check —
-`pnpm josh cost --over 300000`, `backlogrun-progress.md` → "The hand-off" — is asked **at a child's merge**, and a
+`pnpm josh cost --cut`, `backlogrun-progress.md` → "The hand-off" — is asked **at a child's merge**, and a
 watch has no merges, so a run that is only watching never reaches one. That is a decision rather than
 an omission: a watch holds nothing (the working tree's hold and every lane were released at the last
 child's merge), its cost is bounded before it starts (`--idle N` is at most `N / 5` asks), and when the
@@ -555,7 +555,7 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **A `needs-human-review` child stops the whole run** before its commit — `SKILL.md` → §2z, which is
   the single source, and `backlogrun-park.md` → "`needs-human-review` — the one stop that is not a park" for
   what happens to its lane.
-- **The hand-off check** — `pnpm josh cost --over 300000` at every child's merge, and the lane
+- **The hand-off check** — `pnpm josh cost --cut` at every child's merge, and the lane
   hand-over that follows an `over` — is `backlogrun-progress.md` → "The hand-off", unchanged. It is
   **not** asked during an idle watch: "The cost check is not asked during a watch" above is why.
 - **Parking is not stopping.** A child that needs a decision, and a delegated unit that stopped
@@ -606,7 +606,7 @@ named step reaches it, exactly as `chain-rule.md` / `latest-gate.md` / `followup
 | --- | --- | --- |
 | `backlogrun-child.md` | dispatching the first child (`pnpm josh delegate epic-child`, `pnpm josh lane:dispatch`) | the shared per-child `fullrun`, a bare non-epic `#N`, the delegated unit and its summary bound, liveness recovery, and the once-per-session setup (audit, `josh latest`, preflight) |
 | `backlogrun-lanes.md` | opening the first lane (`pnpm josh lane:open`) | the per-repository lane ceiling and the lane lifecycle, and how a merge conflict is resolved |
-| `backlogrun-progress.md` | starting the progress watcher (`pnpm josh run:progress --wait`) and the hand-off check at a merge (`pnpm josh cost --over 300000`) | the heartbeat, the hand-off and the cut/resume, waiting without waiting forever, and the end-of-run summary and propagate |
+| `backlogrun-progress.md` | starting the progress watcher (`pnpm josh run:progress --wait`) and the hand-off check at a merge (`pnpm josh cost --cut`) | the heartbeat, the hand-off and the cut/resume, waiting without waiting forever, and the end-of-run summary and propagate |
 | `backlogrun-park.md` | a child cannot finish | park-and-continue, the `needs-human-review` stop, a stale `in-progress`, a prerequisite discovered mid-run, and a mid-run split |
 
 ## Guards

@@ -1,3 +1,4 @@
+import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 
@@ -17,7 +18,7 @@ const CONTEXT = {
 	child: '2070',
 	epic: undefined,
 	repo: undefined,
-	over: 300_000,
+	over: CONTEXT_CUT_THRESHOLD,
 	owner: run_carry.NO_OWNER,
 }
 

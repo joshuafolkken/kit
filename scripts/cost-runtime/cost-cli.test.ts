@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { codex_usage } from './codex-usage'
+import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
 import { cost_cli } from './cost-cli'
 import { cost_cli_fixture } from './cost-cli-fixture'
+import { cost_corpus } from './cost-corpus'
 
 // The console capture, the temporary transcript home and the transcript writers are
 // `cost-cli-fixture.ts`'s, shared with the `--path` suite (joshuafolkken/kit#1987).
@@ -9,6 +12,8 @@ const { CWD, MAIN, SESSION_A, usage_line, write_session, output, stdout } = cost
 cost_cli_fixture.capture_console()
 
 const FAILURE_EXIT_CODE = 1
+const ANTHROPIC_ENV = { JOSH_AGENT_PROVIDER: 'anthropic' }
+const OPENAI_ENV = { CODEX_THREAD_ID: 'thread', JOSH_AGENT_PROVIDER: 'openai' }
 const BAD_FLAG = '--nonsense'
 const NO_TRANSCRIPTS = 'No transcripts found'
 // The readerless report scopes retired in #2016: now unknown flags, so each is refused rather than
@@ -25,6 +30,14 @@ const RETIRED_FLAGS: ReadonlyArray<ReadonlyArray<string>> = [
 describe('cost_cli.parse_options', () => {
 	it('reads a threshold', () => {
 		expect(cost_cli.parse_options(['--over', '123456'])?.over).toBe(123_456)
+	})
+
+	it('reads the shared context-cut threshold', () => {
+		expect(cost_cli.parse_options(['--cut'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+	})
+
+	it('refuses two threshold sources', () => {
+		expect(cost_cli.parse_options(['--cut', '--over', '1'])).toBeUndefined()
 	})
 
 	it('reads a target path', () => {
@@ -80,20 +93,20 @@ describe('cost_cli.run --over', () => {
 	it('answers over when the marginal cost exceeds the limit', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0'], CWD)).toBe(0)
+		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(0)
 		expect(stdout().trim()).toBe('over')
 	})
 
 	it('answers under when it does not', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '99999999'], CWD)).toBe(0)
+		expect(cost_cli.run(['--over', '99999999'], CWD, ANTHROPIC_ENV)).toBe(0)
 		expect(stdout().trim()).toBe('under')
 	})
 
 	it('says what the measured cost was, not only the verdict', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-		cost_cli.run(['--over', '0'], CWD)
+		cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)
 
 		expect(output()).toContain('per request')
 	})
@@ -101,12 +114,12 @@ describe('cost_cli.run --over', () => {
 	// The word "under" appears in the missing-transcript message too, so the verdict is checked by the
 	// exit code and the message, not by a substring that both share.
 	it('reports a missing transcript rather than answering a verdict', () => {
-		expect(cost_cli.run(['--over', '0'], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(NO_TRANSCRIPTS)
 	})
 
 	it('prints the usage line for a bad invocation', () => {
-		expect(cost_cli.run([BAD_FLAG], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run([BAD_FLAG], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(cost_cli.USAGE)
 	})
 
@@ -115,7 +128,29 @@ describe('cost_cli.run --over', () => {
 	it('prints the usage line when no threshold is given', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run([], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run([], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(cost_cli.USAGE)
+	})
+})
+
+describe('cost_cli.run --cut provider source', () => {
+	it('uses Codex usage for OpenAI without reading Claude transcripts', () => {
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
+			request_count: 1,
+			billed_input_tokens: CONTEXT_CUT_THRESHOLD + 1,
+		})
+		const claude = vi.spyOn(cost_corpus, 'load_corpus')
+
+		expect(cost_cli.run(['--cut'], CWD, OPENAI_ENV)).toBe(0)
+		expect(stdout().trim()).toBe('over')
+		expect(claude).not.toHaveBeenCalled()
+	})
+
+	it('keeps the Anthropic transcript path', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+		const codex = vi.spyOn(codex_usage, 'measurement')
+
+		expect(cost_cli.run(['--cut'], CWD, ANTHROPIC_ENV)).toBe(0)
+		expect(codex).not.toHaveBeenCalled()
 	})
 })

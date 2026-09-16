@@ -1,3 +1,4 @@
+import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#2024: the composite `run:merge` command, exercised end to end with the side-effect
@@ -29,7 +30,7 @@ const { run_merge_cli } = await import('./run-merge-cli')
 
 const CHILD = '2024'
 const REPO = 'joshuafolkken/kit'
-const EPIC_ARGS = [CHILD, '--over', '300000', '--epic', '900', '--repo', REPO]
+const EPIC_ARGS = [CHILD, '--epic', '900', '--repo', REPO]
 const NEXT = '2039'
 const SUCCESS = 0
 const FAILURE = 1
@@ -131,26 +132,35 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.RETRY_TOKEN)
 	})
 
-	it('refuses without a threshold', async () => {
-		expect(await run_merge_cli.run([CHILD])).toBe(FAILURE)
+	it('uses the shared threshold without a numeric argument', () => {
+		expect(run_merge_cli.parse([CHILD])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+	})
+
+	it('accepts but ignores an in-flight legacy threshold', () => {
+		expect(run_merge_cli.parse([CHILD, '--over', '300000'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+		expect(run_merge_cli.parse([CHILD, '--over', '1'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+	})
+
+	it('keeps legacy threshold parsing strict', () => {
+		expect(run_merge_cli.parse([CHILD, '--over', 'invalid'])).toBeUndefined()
 	})
 })
 
 describe('run_merge_cli.parse — sanitizes subprocess-bound arguments', () => {
 	it('refuses an epic that is not an issue number', () => {
-		const argv = [CHILD, '--over', '300000', '--epic', 'evil', '--repo', REPO]
+		const argv = [CHILD, '--epic', 'evil', '--repo', REPO]
 
 		expect(run_merge_cli.parse(argv)).toBeUndefined()
 	})
 
 	it('refuses a repository that is not an owner/repo slug', () => {
-		const argv = [CHILD, '--over', '300000', '--epic', '900', '--repo=--force']
+		const argv = [CHILD, '--epic', '900', '--repo=--force']
 
 		expect(run_merge_cli.parse(argv)).toBeUndefined()
 	})
 
 	it('refuses an option-shaped slug whose half starts with a hyphen', () => {
-		const argv = [CHILD, '--over', '300000', '--epic', '900', '--repo=--evil/x']
+		const argv = [CHILD, '--epic', '900', '--repo=--evil/x']
 
 		expect(run_merge_cli.parse(argv)).toBeUndefined()
 	})

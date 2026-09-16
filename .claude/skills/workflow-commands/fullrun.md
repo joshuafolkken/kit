@@ -49,14 +49,14 @@ until the park is recorded. The single source is `pre-gate-cut.md` → "A lane c
 before it stops"; the park procedure itself is `backlogrun-park.md` → "park and continue".
 
 **Ask the session boundary in the same turn as the hold, and before anything else is started** —
-`pnpm josh cost --over 300000`. Branch on what the command answers, never on a judgement about how
+`pnpm josh cost --cut`. Branch on what the command answers, never on a judgement about how
 long the session feels. `under` — carry on. `over`, or a run it could not answer for — **stop here**,
 before the title is normalized and before a `new` entry files anything: send a `confirmation` Telegram
 carrying the figure printed on standard error and the resume command (the invocation as it was typed,
 in a fresh session — `fullrun #<N>` for a `#N` entry, `fullrun new` for a `new` one), run
 `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run was dispatched
 by `backlogrun`** — that batch owns the same question at its own seam.
-`backlogrun-progress.md` → "The hand-off" is the single source of the check and of where 300,000 comes from — **a dispatched lane child does not perform this check and never reads that document** (its trimmed set is `pnpm josh read:set lane-child`).
+`backlogrun-progress.md` → "The hand-off" is the single source of the check and of the shared 150,000 threshold — **a dispatched lane child does not perform this check and never reads that document** (its trimmed set is `pnpm josh read:set lane-child`).
 
 **Start the progress step once the hold is claimed, and start it without being asked** —
 `pnpm josh run:progress --wait` in the background, what it printed presented as-is when it
@@ -73,7 +73,7 @@ rather than proceed.
 **One call gathers the mechanical reads before the first edit — `pnpm josh run:prep <N>`**
 (joshuafolkken/kit#1978): `issue:read`'s body/comments, `issue:state`'s state/labels/`human_review`,
 and `latest:scope`'s dependency scope in one report, run beside `pnpm josh run:hold` and
-`pnpm josh cost --over 300000` in the same turn — three round trips into one. The §2g stops, the §2z
+`pnpm josh cost --cut` in the same turn — three round trips into one. The §2g stops, the §2z
 `human_review` stop and the dependency decision are read off it. Cross-repo issues keep
 separate commands; no `--repo`.
 

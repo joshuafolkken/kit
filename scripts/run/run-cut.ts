@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_utilities } from '#scripts/git/constants'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -43,17 +44,11 @@ const PRE_GATE_PHASE = 'pre-gate'
 // implementation cut resumes into more implementation rather than into the gate.
 const IMPLEMENTATION_PHASE = 'implementation'
 // **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
-// child decides whether to take this cut with `pnpm josh cost --over <IMPLEMENTATION_CONTEXT_THRESHOLD>`
+// child decides whether to take this cut with `pnpm josh cost --cut`
 // — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
-// `pnpm josh cost --over 300000` hand-off uses (`backlogrun-progress.md` → "The hand-off"). Only the threshold
-// differs, and this constant is its single source so the procedure doc and the test cannot drift.
-//
-// **200_000 is the initial value.** The 2026-09-13 `backlogrun` measured lane bodies at 386k / 283k /
-// 240k / 208k median context per request while implementing — the second half of a run costing about
-// twice the first over the same requests — and joshuafolkken/kit#1837's cap simulation put a 200k
-// per-request cap at 71% of the final 427k and 300k at 89%. Cutting at 200k during implementation caps
-// the accumulation the pre-gate boundary alone never reached.
-const IMPLEMENTATION_CONTEXT_THRESHOLD = 200_000
+// `pnpm josh cost --cut` hand-off uses (`backlogrun-progress.md` → "The hand-off"). The shared
+// threshold prevents the scheduler and worker boundaries from drifting apart.
+const IMPLEMENTATION_CONTEXT_THRESHOLD = CONTEXT_CUT_THRESHOLD
 // **The whole-run bound is `backlog-budget.ts`'s, imported rather than restated** — the same reuse
 // `run-carry.ts` makes. A resume is expected within seconds of the cut, so this age is only a backstop
 // against a fresh process that never started; an expired record is cleared and replaced by the next

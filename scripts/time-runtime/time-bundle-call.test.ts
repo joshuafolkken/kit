@@ -301,7 +301,7 @@ describe('time_bundle_call.bash_facts — read-only josh bookkeeping', () => {
 		'pnpm josh issue:state 1875',
 		'pnpm josh release:scope',
 		'pnpm josh epic:bundle 1875',
-		'pnpm josh cost --over 300000',
+		'pnpm josh cost --cut',
 	])('reads a full-name josh bookkeeping command as bundleable: %s', (command) => {
 		const facts = time_bundle_call.bash_facts(command)
 

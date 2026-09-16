@@ -28,13 +28,13 @@ stop, a split, a prerequisite, and a third-party target. A lane child finds the 
 the parent at dispatch (`backlogrun-lanes.md` → "Concurrency"), so re-applying it here is idempotent.
 
 **Ask the session boundary in the same turn as the hold, and before anything else is started** —
-`pnpm josh cost --over 300000`, exactly as `fullrun` does. `under` — carry on. `over`, or a run it could
+`pnpm josh cost --cut`, exactly as `fullrun` does. `under` — carry on. `over`, or a run it could
 not answer for — **stop here**, before the title is normalized and before a `new` entry files anything:
 send a `confirmation` Telegram carrying the figure printed on standard error and the resume command (the
 invocation as it was typed, in a fresh session — `halfrun #<N>` for a `#N` entry, `halfrun new` for a
 `new` one), run `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run
 was dispatched by a batch entry point.** `backlogrun-progress.md` → "The hand-off" is the single source of the check
-and of where 300,000 comes from.
+and of the shared 150,000 threshold.
 
 **Start the progress step once the hold is claimed, and start it without being asked**, exactly as
 `fullrun` does — `pnpm josh run:progress --wait` in the background, presented as-is when it
