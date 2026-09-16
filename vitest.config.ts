@@ -4,6 +4,9 @@ const TEST_TIMEOUT_MS = 10_000
 
 export default defineConfig({
 	test: {
+		env: {
+			JOSH_AGENT_PROVIDER: 'anthropic',
+		},
 		include: [
 			'*.test.ts',
 			'scripts/**/*.test.ts',
