@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
@@ -23,6 +24,8 @@ const RESUME_PROMPT = 'run:cut --resume 2084'
 const launch = vi.spyOn(detached_launch, 'launch_attached')
 const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const diagnostic = vi.spyOn(agent_diagnostics, 'check')
+const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
+const common_directory = path.join(scratch, 'repository with spaces', '.git')
 
 function lane(): LaneInfo {
 	return {
@@ -63,6 +66,7 @@ beforeEach(() => {
 	stamp_file.remove_stamp(openai_lane_supervisor.state_path(lane_directory))
 	worktree.mockResolvedValue(repository)
 	diagnostic.mockReturnValue({ kind: 'ready' })
+	resolve_common_directory.mockReturnValue(undefined)
 	launch.mockResolvedValue({ kind: 'completed', pid: 9001, exit_code: 0 })
 })
 
@@ -108,6 +112,21 @@ describe('OpenAI lane supervisor generations', () => {
 		expect(launch).toHaveBeenCalledTimes(3)
 		expect(launched_request(1).argv.args.at(-1)).toContain(RESUME_PROMPT)
 		expect(launched_request(2).argv.args.at(-1)).toContain(RESUME_PROMPT)
+	})
+})
+
+describe('OpenAI lane supervisor Git access', () => {
+	it('allows the linked worktree Git common directory in the launched generation', async () => {
+		resolve_common_directory.mockReturnValue(common_directory)
+
+		await supervise('git-common-directory')
+
+		const { args } = launched_request().argv
+		const flag_index = args.indexOf('--add-dir')
+
+		expect(resolve_common_directory).toHaveBeenCalledWith(lane_directory)
+		expect(args.at(flag_index + 1)).toBe(common_directory)
+		expect(args.lastIndexOf('--add-dir')).toBe(flag_index)
 	})
 })
 

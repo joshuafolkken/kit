@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { AgentProfile } from './agent-role-profile'
 
 const AGENT_COMMAND = 'codex'
@@ -9,6 +10,7 @@ const JSON_FLAG = '--json'
 const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
 const SQLITE_CACHE_PATH = ['node_modules', '.cache', 'josh', 'openai']
 const EPHEMERAL_FLAG = '--ephemeral'
+const ADD_DIRECTORY_FLAG = '--add-dir'
 
 interface CodexArgv {
 	command: string
@@ -23,6 +25,14 @@ function sqlite_config(cwd: string): string {
 	return `sqlite_home=${JSON.stringify(path.resolve(cwd, ...SQLITE_CACHE_PATH))}`
 }
 
+function lane_arguments(cwd: string): ReadonlyArray<string> {
+	const common_directory = git_common_directory.resolve(cwd)
+	const additional_directory =
+		common_directory === undefined ? [] : [ADD_DIRECTORY_FLAG, common_directory]
+
+	return [CONFIG_FLAG, sqlite_config(cwd), EPHEMERAL_FLAG, ...additional_directory]
+}
+
 function build(invocation: string, profile: AgentProfile, cwd?: string): CodexArgv {
 	return {
 		command: AGENT_COMMAND,
@@ -34,7 +44,7 @@ function build(invocation: string, profile: AgentProfile, cwd?: string): CodexAr
 			effort_config(profile),
 			CONFIG_FLAG,
 			NETWORK_CONFIG,
-			...(cwd === undefined ? [] : [CONFIG_FLAG, sqlite_config(cwd), EPHEMERAL_FLAG]),
+			...(cwd === undefined ? [] : lane_arguments(cwd)),
 			JSON_FLAG,
 			invocation,
 		],

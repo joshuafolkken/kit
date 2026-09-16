@@ -4,6 +4,7 @@ import path from 'node:path'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_event } from '#scripts/agent/agent-event'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
 
@@ -163,14 +164,12 @@ describe('detached fake Codex failure through the provider adapter', () => {
 		expect(readFileSync(claude_calls, 'utf8')).toBe('')
 	})
 
-	it('passes auth and a work-tree TMPDIR without exposing the token in argv or logs', async () => {
+	it('passes auth and a platform TMPDIR without exposing the token in argv or logs', async () => {
 		const { calls, environment, output } = await run_provider_failure()
 		const [token, temporary_directory] = readFileSync(environment, 'utf8').trim().split('\n', 2)
 
 		expect(token).toBe(GH_TOKEN)
-		expect(temporary_directory).toBe(
-			path.join(scratch.directory, 'node_modules', '.cache', 'josh', OPENAI_PROVIDER),
-		)
+		expect(temporary_directory).toBe(PLATFORM_TEMP_ROOT)
 		expect(readFileSync(calls, 'utf8')).not.toContain(GH_TOKEN)
 		expect(output).not.toContain(GH_TOKEN)
 	})
