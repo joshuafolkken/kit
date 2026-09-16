@@ -16,10 +16,17 @@ interface AgentArgv {
 type AgentArgvResult =
 	{ kind: 'argv'; argv: AgentArgv; profile: AgentProfile } | { kind: 'rejected'; note: string }
 
-function build(invocation: string, profile: AgentProfile): AgentArgv {
+function build(invocation: string, profile: AgentProfile, cwd?: string): AgentArgv {
 	return profile.provider === 'openai'
-		? codex_agent_argv.build(invocation, profile)
+		? codex_agent_argv.build(invocation, profile, cwd)
 		: claude_agent_argv.build(invocation, profile)
+}
+
+function with_profile_in(invocation: string, profile: AgentProfile, cwd: string): AgentArgvResult {
+	const diagnostic = agent_diagnostics.check(profile)
+	if (diagnostic.kind === 'rejected') return diagnostic
+
+	return { kind: 'argv', argv: build(invocation, profile, cwd), profile }
 }
 
 function with_profile(invocation: string, profile: AgentProfile): AgentArgvResult {
@@ -39,7 +46,20 @@ function resolve(
 	return resolved.kind === 'rejected' ? resolved : with_profile(invocation, resolved.profile)
 }
 
-const agent_argv = { build, resolve, with_profile }
+function resolve_in(
+	invocation: string,
+	role: AgentRole,
+	cwd: string,
+	environment: AgentEnvironment = process.env,
+): AgentArgvResult {
+	const resolved = agent_role_profile.resolve(role, environment)
+
+	return resolved.kind === 'rejected'
+		? resolved
+		: with_profile_in(invocation, resolved.profile, cwd)
+}
+
+const agent_argv = { build, resolve, resolve_in, with_profile, with_profile_in }
 
 export type { AgentArgv, AgentArgvResult }
 export { agent_argv }

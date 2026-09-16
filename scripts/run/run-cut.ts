@@ -3,7 +3,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { git_utilities } from '#scripts/git/constants'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lane_dispatch } from '#scripts/lane/lane-dispatch'
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { z } from 'zod'
 import { run_hold } from './run-hold'
 
@@ -70,9 +70,9 @@ const READ_COMMAND = 'pnpm josh run:cut --json'
 
 interface RunCut {
 	// The identity of the run this cut belongs to — `fullrun #<N>`, built through
-	// `lane_dispatch.child_invocation` so it is single-sourced with the dispatch that first launched the
+	// `lane_child_invocation.child_invocation` so it is single-sourced with the dispatch that first launched the
 	// child. **It is the resume-matching key, not the relaunch prompt** (joshuafolkken/kit#2022): the
-	// relaunch gives the fresh process `lane_dispatch.resume_invocation` instead, while
+	// relaunch gives the fresh process `lane_child_invocation.resume_invocation` instead, while
 	// `is_declared_cut` / `is_adopted_cut` still compare this field against `invocation_for(issue)` to
 	// confirm the record belongs to the resuming issue.
 	invocation: string
@@ -148,10 +148,10 @@ function cut_path(git_directory: string): string {
 // resumes under key to exactly the same tree — never a second copy of the index-0 derivation.
 const { worktree_directory } = run_hold
 
-// `fullrun #<N>`, validated and formatted once in `lane_dispatch.child_invocation` so the record and
+// `fullrun #<N>`, validated and formatted once in `lane_child_invocation` so the record and
 // the dispatch cannot disagree about what a lane child is.
 function invocation_for(issue: string): string {
-	return lane_dispatch.child_invocation(issue)
+	return lane_child_invocation.child_invocation(issue)
 }
 
 function parse_cut(raw: string): RunCut | undefined {

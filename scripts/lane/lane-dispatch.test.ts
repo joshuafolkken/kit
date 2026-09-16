@@ -13,6 +13,7 @@ import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { openai_lane_supervisor } from './openai-lane-supervisor'
 
 // **The launch and the lane lookup are spied on, not reimplemented.** What this file pins is the
 // request the dispatch composes — which directory the child runs in, which file it writes to, and that
@@ -39,6 +40,10 @@ const record_output = vi.spyOn(lane_output, 'record_output')
 const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
 const remove_label = vi.spyOn(git_gh_command, 'issue_remove_label')
 const check_diagnostics = vi.spyOn(agent_diagnostics, 'check')
+const active_supervisor = vi.spyOn(openai_lane_supervisor, 'active')
+const wait_for_supervisor = vi.spyOn(openai_lane_supervisor, 'wait_for_active')
+const approve_supervisor = vi.spyOn(openai_lane_supervisor, 'approve')
+const cancel_supervisor = vi.spyOn(openai_lane_supervisor, 'cancel')
 
 function lane(output: string | undefined): LaneInfo {
 	return {
@@ -73,6 +78,10 @@ beforeEach(() => {
 	})
 	add_label.mockResolvedValue(true)
 	remove_label.mockResolvedValue(undefined)
+	active_supervisor.mockReturnValue(undefined)
+	wait_for_supervisor.mockResolvedValue(undefined)
+	approve_supervisor.mockReturnValue(true)
+	cancel_supervisor.mockReturnValue(true)
 })
 
 afterEach(() => {
@@ -149,15 +158,41 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 	it('uses the OpenAI worker adapter when the provider is selected', async () => {
 		vi.stubEnv('JOSH_AGENT_PROVIDER', 'openai')
 		check_diagnostics.mockReturnValue({ kind: 'ready' })
+		wait_for_supervisor.mockResolvedValue({ issue: ISSUE, nonce: 'owner', pid: PID })
 
-		await lane_dispatch.dispatch_child(ISSUE)
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
 
 		const request = launched_request()
 
-		expect(request.argv.command).toBe('codex')
-		expect(request.argv.args).toContain('gpt-5.6-sol')
-		expect(request.argv.args).toContain('model_reasoning_effort="medium"')
+		expect(outcome.kind).toBe('dispatched')
+		expect(request.argv.command).toBe(process.execPath)
+		expect(request.argv.args).toContain(ISSUE)
 		expect(request.profile).toStrictEqual(agent_role_profile.OPENAI_PROFILES.worker)
+	})
+
+	it('does not reuse a live OpenAI owner recorded for another issue', async () => {
+		vi.stubEnv('JOSH_AGENT_PROVIDER', 'openai')
+		check_diagnostics.mockReturnValue({ kind: 'ready' })
+		active_supervisor.mockReturnValue({ issue: '9999', nonce: 'other', pid: PID })
+		wait_for_supervisor.mockResolvedValue({ issue: '9999', nonce: 'other', pid: PID })
+
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(launch).toHaveBeenCalledOnce()
+		expect(outcome.kind).toBe('failed')
+		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
+	})
+
+	it('reports failure when the spawned OpenAI supervisor never claims the lane', async () => {
+		vi.stubEnv('JOSH_AGENT_PROVIDER', 'openai')
+		check_diagnostics.mockReturnValue({ kind: 'ready' })
+
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(outcome.kind).toBe('failed')
+		expect(outcome.kind === 'failed' && outcome.note).toContain('did not claim')
+		expect(cancel_supervisor).toHaveBeenCalledOnce()
+		expect(remove_label).toHaveBeenCalledWith(ISSUE, IN_PROGRESS_LABEL)
 	})
 })
 

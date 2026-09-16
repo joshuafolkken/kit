@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
-import { lstatSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { PLATFORM_TEMP_ROOT } from './platform-temporary'
@@ -95,6 +95,25 @@ function write_stamp(target: string, payload: unknown): string {
 	return write_exclusively(target, JSON.stringify(payload))
 }
 
+// Mutable coordination state cannot disappear between an unlink and its replacement: a reader that
+// mistakes that gap for "no child" can start the same generation twice. The temporary file lives
+// beside the target, uses the same exclusive/symlink-safe create, and rename publishes it atomically.
+function replace_stamp(target: string, payload: unknown): string {
+	const temporary = `${target}.${String(process.pid)}.${randomUUID()}`
+
+	try {
+		writeFileSync(temporary, JSON.stringify(payload), {
+			flag: STAMP_CREATE_FLAG,
+			mode: STAMP_FILE_MODE,
+		})
+		renameSync(temporary, target)
+
+		return target
+	} finally {
+		rmSync(temporary, { force: true })
+	}
+}
+
 // The same write for a payload that is already text. `josh gate`'s log is another tool's output read
 // by a person or by an agent's `tail` (joshuafolkken/kit#1227), and JSON-encoding it would put `\n`
 // escapes between the reader and the thing they came to read. **It shares the body above rather than
@@ -165,6 +184,7 @@ const stamp_file = {
 	digest,
 	is_own_regular_file,
 	read_stamp_text,
+	replace_stamp,
 	remove_stamp,
 	stamp_path,
 	write_stamp,

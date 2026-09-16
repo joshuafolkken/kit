@@ -46,6 +46,8 @@ interface LaunchArgv {
 }
 
 type LaunchResult = { kind: 'launched'; pid: number } | { kind: 'failed'; note: string }
+type AttachedLaunchResult =
+	{ kind: 'completed'; pid: number; exit_code: number | null } | { kind: 'failed'; note: string }
 
 interface LaunchRequest {
 	argv: LaunchArgv
@@ -217,13 +219,57 @@ function spawn_options(
 	cwd: string,
 	log: number | undefined,
 	environment: Readonly<Record<string, string | undefined>> = {},
+	is_detached = true,
 ): SpawnOptions {
 	return {
 		cwd,
-		detached: true,
+		detached: is_detached,
 		stdio: log === undefined ? 'ignore' : ['ignore', log, log],
 		env: { ...process.env, ...agent_session_environment.removed_environment(), ...environment },
 	}
+}
+
+function notify_spawn(
+	pid: number | undefined,
+	on_spawn: (pid: number) => void,
+	on_error: (note: string) => void,
+): void {
+	if (pid === undefined) return
+
+	try {
+		on_spawn(pid)
+	} catch (error) {
+		on_error(`the child state could not be recorded: ${note_of(error)}`)
+	}
+}
+
+async function attached_spawn(
+	request: LaunchRequest,
+	log: number | undefined,
+	on_error: (note: string) => void,
+	on_spawn: (pid: number) => void,
+): Promise<AttachedLaunchResult> {
+	return await new Promise((resolve) => {
+		const environment = agent_launch_environment.build(request.cwd, request.profile, request.env)
+		const child = spawn(
+			request.argv.command,
+			[...request.argv.args],
+			spawn_options(request.cwd, log, environment, false),
+		) // NOSONAR — shell stays false
+
+		child.once('error', (error) => {
+			on_error(note_of(error))
+			resolve({ kind: 'failed', note: note_of(error) })
+		})
+		child.once('exit', (exit_code) => {
+			resolve({ kind: 'completed', pid: child.pid ?? 0, exit_code })
+		})
+		notify_spawn(child.pid, on_spawn, on_error)
+	})
+}
+
+function ignore_spawn(_pid: number): void {
+	/* caller does not need the attached child's pid */
 }
 
 // **`tssecurity:S8705` is suppressed on the `spawn` line, and this is the reason it is allowed to be.**
@@ -280,15 +326,35 @@ function launch(request: LaunchRequest, on_error: (note: string) => void): Launc
 	}
 }
 
+async function launch_attached(
+	request: LaunchRequest,
+	on_error: (note: string) => void,
+	on_spawn: (pid: number) => void = ignore_spawn,
+): Promise<AttachedLaunchResult> {
+	if (!is_safe_argv(request.argv)) return { kind: 'failed', note: UNSAFE_NOTE }
+	const log = open_log(request.log_path, on_error)
+
+	try {
+		stamped(log, request.argv, request.profile, on_error)
+
+		return await attached_spawn(request, log, on_error, on_spawn)
+	} catch (error) {
+		return { kind: 'failed', note: note_of(error) }
+	} finally {
+		if (log !== undefined) closeSync(log)
+	}
+}
+
 const detached_launch = {
 	UNSAFE_NOTE,
 	ensure_log,
 	is_safe_argv,
 	is_safe_value,
 	launch,
+	launch_attached,
 	log_header,
 	note_of,
 }
 
-export type { LaunchArgv, LaunchRequest, LaunchResult }
+export type { AttachedLaunchResult, LaunchArgv, LaunchRequest, LaunchResult }
 export { detached_launch }
