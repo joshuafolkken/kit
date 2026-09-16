@@ -1245,8 +1245,8 @@ pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an 
 ```
 
 `JOSH_AGENT_PROVIDER` selects worker: blank/`anthropic` runs unchanged `claude -p`; `openai` uses a
-detached non-AI supervisor for initial/successor Codex generations. State is lane-local and ephemeral;
-native auth/config stay put. The printed PID is the supervisor PID.
+detached non-AI supervisor for Codex generations. SQLite stays lane-local; worker rollout files persist
+for active-usage cuts. Native auth/config stay put. The printed PID is the supervisor's.
 
 **Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 
@@ -1261,15 +1261,15 @@ Blank means unset. Invalid provider/model/effort or unavailable Codex CLI/auth r
 
 ### `josh cost`
 
-Answer whether a run's next turn exceeds a threshold, using the active provider's session usage. `--cut` selects the shared 150,000 context-cut threshold; `--over <tokens>` remains available for explicit measurement. Since #2016 these are hand-off verdicts alone: the readerless report scopes (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were retired because no rule or decision read them. The `josh time` run-timing report keeps the hand-off aggregates (median billed input per request, median context) for before/after comparison.
+Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 150,000 limit; `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
 
 ```bash
 pnpm josh cost --cut             # compare billed input per request with the shared 150,000 context-cut threshold
 pnpm josh cost --over <tokens>   # compare with an explicit limit; alias: josh co
-pnpm josh cost --cut --path <dir> # use another project's provider usage
+pnpm josh cost --cut --path <dir> # Anthropic project or current OpenAI worktree
 ```
 
-**Options:** `--cut` selects the shared threshold; `--over <tokens>` selects an explicit one. Either prints `over` / `under` on stdout and measured input per request on stderr. `--path <dir>` selects another project (absolute path); absent, it keeps the current `cwd`.
+**Options:** either threshold prints `over` / `under` on stdout and measured input per request on stderr. `--path <dir>` selects another Anthropic project; OpenAI accepts only linked checkouts of the current project. OpenAI workers persist each generation's rollout, whose pre-terminal `token_count` events are read only when thread ID and normalized project cwd match.
 
 **Output / exit codes:** no threshold selector prints usage; absent provider usage exits non-zero and says where it looked; a session with no requests says so rather than answering a verdict.
 

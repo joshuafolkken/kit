@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { codex_usage } from './codex-usage'
 import { cost_cli } from './cost-cli'
 import { cost_cli_fixture } from './cost-cli-fixture'
 
@@ -10,10 +14,59 @@ const { usage_line, write_session, write_session_under, output } = cost_cli_fixt
 const TARGET = '/Users/someone/Development/other-project'
 const FAILURE_EXIT_CODE = 1
 const ANTHROPIC_ENV = { JOSH_AGENT_PROVIDER: 'anthropic' }
+const OPENAI_ENV = { CODEX_THREAD_ID: 'thread', JOSH_AGENT_PROVIDER: 'openai' }
 const NO_TRANSCRIPTS = 'No transcripts found'
 const PER_REQUEST = 'per request'
+const WORKTREE_GIT_PATH = '.git/worktrees/2089'
+const ISSUE = '2089'
+const THREAD_ID = 'active-thread'
 
 cost_cli_fixture.capture_console()
+
+function write_active_rollout(codex_home: string, lane: string): void {
+	const directory = path.join(codex_home, 'sessions/2026/09/17')
+
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(
+		path.join(directory, `rollout-${THREAD_ID}.jsonl`),
+		[
+			JSON.stringify({ type: 'session_meta', payload: { id: THREAD_ID, cwd: lane } }),
+			JSON.stringify({
+				type: 'event_msg',
+				payload: {
+					type: 'token_count',
+					info: {
+						total_token_usage: { input_tokens: 1 },
+						last_token_usage: { input_tokens: 1 },
+					},
+				},
+			}),
+		].join('\n'),
+	)
+}
+
+function linked_rollout(): { main: string; lane: string; environment: Record<string, string> } {
+	const main = mkdtempSync(path.join(os.tmpdir(), 'cost-openai-main-'))
+	const lane_root = mkdtempSync(path.join(os.tmpdir(), 'cost-openai-lanes-'))
+	const lane = path.join(lane_root, ISSUE)
+	const codex_home = mkdtempSync(path.join(os.tmpdir(), 'cost-openai-home-'))
+
+	mkdirSync(path.join(main, WORKTREE_GIT_PATH), { recursive: true })
+	mkdirSync(lane, { recursive: true })
+	writeFileSync(path.join(lane, '.git'), `gitdir: ${path.join(main, WORKTREE_GIT_PATH)}`)
+	write_active_rollout(codex_home, lane)
+
+	return {
+		main,
+		lane,
+		environment: {
+			CODEX_HOME: codex_home,
+			CODEX_THREAD_ID: THREAD_ID,
+			JOSH_AGENT_PROVIDER: 'openai',
+			JOSH_LANE_ROOT: lane_root,
+		},
+	}
+}
 
 describe('cost_cli.parse_options — the target project path', () => {
 	it('reads --path as the target project directory', () => {
@@ -52,5 +105,22 @@ describe('cost_cli.run — the target project path', () => {
 
 		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(0)
 		expect(output()).toContain(PER_REQUEST)
+	})
+})
+
+describe('cost_cli.run — OpenAI path scope', () => {
+	it('refuses an OpenAI path in another project without reading a thread', () => {
+		const measurement = vi.spyOn(codex_usage, 'measurement')
+
+		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD, OPENAI_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain('OpenAI --path cannot select a thread from another project')
+		expect(measurement).not.toHaveBeenCalled()
+	})
+
+	it('reads the active lane rollout when --path names its linked main checkout', () => {
+		const { main, lane, environment } = linked_rollout()
+
+		expect(cost_cli.run(['--over', '0', '--path', main], lane, environment)).toBe(0)
+		expect(output()).toContain('over')
 	})
 })

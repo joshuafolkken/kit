@@ -134,15 +134,19 @@ describe('cost_cli.run --over', () => {
 })
 
 describe('cost_cli.run --cut provider source', () => {
-	it('uses Codex usage for OpenAI without reading Claude transcripts', () => {
+	it.each([
+		[CONTEXT_CUT_THRESHOLD - 1, 'under'],
+		[CONTEXT_CUT_THRESHOLD, 'under'],
+		[CONTEXT_CUT_THRESHOLD + 1, 'over'],
+	])('uses Codex usage %i for the OpenAI cut boundary', (tokens, verdict) => {
 		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
 			request_count: 1,
-			billed_input_tokens: CONTEXT_CUT_THRESHOLD + 1,
+			billed_input_tokens: tokens,
 		})
 		const claude = vi.spyOn(cost_corpus, 'load_corpus')
 
 		expect(cost_cli.run(['--cut'], CWD, OPENAI_ENV)).toBe(0)
-		expect(stdout().trim()).toBe('over')
+		expect(stdout().trim()).toBe(verdict)
 		expect(claude).not.toHaveBeenCalled()
 	})
 

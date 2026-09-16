@@ -208,6 +208,15 @@ pnpm josh cost --cut     # over → cut ; under → keep implementing
 The value is the shared `CONTEXT_CUT_THRESHOLD`; `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` aliases it
 so the procedure, scheduler and worker tests cannot drift.
 
+For OpenAI, a persisted scheduler continues to read its rollout, and each lane worker now persists
+the current generation's rollout too. `josh cost` reads its `token_count` events before the terminal
+`turn.completed` event and requires both the current `CODEX_THREAD_ID` and normalized project working
+directory to match; a previous generation or another project is never included. Worker rollout files
+remain in the native Codex session directory as the explicit trade-off that makes the
+implementation-phase cut measurable. OpenAI `--path` is limited to the current checkout and its
+linked worktrees because a path cannot select a thread in another project; Anthropic cross-project
+transcript reads are unchanged.
+
 ### Where the boundary is
 
 **At a consistent working-tree boundary, never mid-edit.** The cut leaves the uncommitted

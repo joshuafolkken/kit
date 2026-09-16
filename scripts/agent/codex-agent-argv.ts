@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import type { AgentProfile } from './agent-role-profile'
+import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
 const AGENT_COMMAND = 'codex'
 const AGENT_FLAGS: ReadonlyArray<string> = ['exec', '--sandbox', 'workspace-write']
@@ -25,12 +25,21 @@ function sqlite_config(cwd: string): string {
 	return `sqlite_home=${JSON.stringify(path.resolve(cwd, ...SQLITE_CACHE_PATH))}`
 }
 
-function lane_arguments(cwd: string): ReadonlyArray<string> {
+function persistence_arguments(profile: AgentProfile): ReadonlyArray<string> {
+	return profile.role === agent_role_profile.WORKER ? [] : [EPHEMERAL_FLAG]
+}
+
+function lane_arguments(cwd: string, profile: AgentProfile): ReadonlyArray<string> {
 	const common_directory = git_common_directory.resolve(cwd)
 	const additional_directory =
 		common_directory === undefined ? [] : [ADD_DIRECTORY_FLAG, common_directory]
 
-	return [CONFIG_FLAG, sqlite_config(cwd), EPHEMERAL_FLAG, ...additional_directory]
+	return [
+		CONFIG_FLAG,
+		sqlite_config(cwd),
+		...persistence_arguments(profile),
+		...additional_directory,
+	]
 }
 
 function build(invocation: string, profile: AgentProfile, cwd?: string): CodexArgv {
@@ -44,7 +53,7 @@ function build(invocation: string, profile: AgentProfile, cwd?: string): CodexAr
 			effort_config(profile),
 			CONFIG_FLAG,
 			NETWORK_CONFIG,
-			...(cwd === undefined ? [] : lane_arguments(cwd)),
+			...(cwd === undefined ? [] : lane_arguments(cwd, profile)),
 			JSON_FLAG,
 			invocation,
 		],
