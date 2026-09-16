@@ -123,7 +123,8 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
     when the review starts and joined before the commit** — neither writes to the working tree, so
     running them one after the other is pure waiting. **There is no path to a commit on a gate nobody
     read**: a red gate is fixed and re-run whatever the review concluded.
-  - **The review is a subagent running `/code-review`** with the brief `pnpm josh review:brief` prints
+  - **The review is a subagent running `/code-review`** with the reviewer model and effort printed by
+    `pnpm josh review:brief`; pass both explicitly when spawning it, together with the rest of the brief
     (the level, what the gate has already proved or is still proving on this tree, and the target) on
     `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**,
     the second a verification pass over the fixes (`prompts/review.md` → "Review round cap"). Whether a

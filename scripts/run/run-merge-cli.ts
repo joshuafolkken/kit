@@ -27,6 +27,7 @@ const OVER_TOKEN = 'over'
 const HUMAN_REVIEW_TOKEN = 'human-review'
 const STOP_TOKEN = 'stop'
 const RETRY_TOKEN = 'retry'
+const PARK_FAILURE_NOTE = 'The failed child could not be parked with needs-decision; stopping.'
 // The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
 const DIGITS = /^\d+$/u
 // A GitHub `owner/repo` slug: an owner and a repository name around a single slash, each starting with
@@ -176,9 +177,15 @@ async function on_merged(ctx: MergeContext): Promise<number> {
 }
 
 async function on_failed(ctx: MergeContext): Promise<number> {
-	const carry = await run_merge_steps.do_failed(ctx)
+	const result = await run_merge_steps.do_failed(ctx)
 
-	if (carry !== undefined && run_merge.is_guard_tripped(carry.failures)) {
+	if (!result.is_parked) {
+		console.error(PARK_FAILURE_NOTE)
+
+		return emit(STOP_TOKEN, FAILURE_EXIT_CODE)
+	}
+
+	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
 		return emit(STOP_TOKEN, SUCCESS_EXIT_CODE)
 	}
 

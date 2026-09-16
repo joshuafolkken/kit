@@ -1,6 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
@@ -88,12 +90,14 @@ describe('cutting a lane child before the gate', () => {
 		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
 		// joshuafolkken/kit#2022: the relaunch prompt is the resume-specific instruction, not the record's
 		// bare `fullrun #<N>`, so the fresh process skips the workflow-commands entry documents.
-		const built = detached_launch.agent_argv(lane_dispatch.resume_invocation(ISSUE))
+		const profile = agent_role_profile.DEFAULT_PROFILES.worker
+		const built = claude_agent_argv.build(lane_dispatch.resume_invocation(ISSUE), profile)
 
 		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
-			argv: built.kind === 'argv' ? built.argv : undefined,
+			argv: built,
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
+			profile,
 			env: { [lane_child_marker.KEY]: ISSUE },
 		})
 		expect(run_cut.read_cut(target()).kind).toBe('carried')
@@ -135,8 +139,10 @@ describe('the resume prompt the relaunch carries', () => {
 	it('relaunches with the resume prompt, not the bare fullrun invocation', async () => {
 		await run_cut_cli.run([ISSUE])
 
-		const bare = detached_launch.agent_argv(INVOCATION)
-		const bare_argv = bare.kind === 'argv' ? bare.argv : undefined
+		const bare_argv = claude_agent_argv.build(
+			INVOCATION,
+			agent_role_profile.DEFAULT_PROFILES.worker,
+		)
 
 		expect(launch.mock.calls[0]?.[0].argv).not.toStrictEqual(bare_argv)
 	})

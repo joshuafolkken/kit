@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
+import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_environment } from './lane-environment'
@@ -33,6 +34,7 @@ interface LaneInfo {
 	// fresh session can poll a running child with `pnpm josh run:liveness <N> --output <path>`
 	// instead of waiting for the pool to drain before it can be cut.
 	output: string | undefined
+	profile?: AgentProfile | undefined
 	is_stranded: boolean
 }
 
@@ -139,6 +141,7 @@ function build_lane(
 	const content = is_stranded ? undefined : read_environment(directory)
 	const held = held_seat(content)
 	const output = content === undefined ? undefined : lane_environment.read_lane_output(content)
+	const profile = content === undefined ? undefined : lane_environment.read_lane_profile(content)
 
 	return {
 		issue,
@@ -148,6 +151,7 @@ function build_lane(
 		development_port: held.development_port,
 		preview_port: held.preview_port,
 		output,
+		profile,
 		is_stranded,
 	}
 }

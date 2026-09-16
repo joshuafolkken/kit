@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
@@ -90,6 +91,7 @@ function compose(input: {
 }): string {
 	return review_brief.compose({
 		level: LEVEL,
+		profile: agent_role_profile.DEFAULT_PROFILES.reviewer,
 		round: input.round,
 		tree: input.tree,
 		stamps: { gate: input.gate, in_flight: input.in_flight, round_one: input.round_one },

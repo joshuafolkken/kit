@@ -1,5 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -56,12 +58,13 @@ describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', (
 		const outcome = await lane_dispatch.dispatch_child(RELEASED_CHILD)
 		// The lane child now launches with the explicit model and effort (joshuafolkken/kit#1932), so the
 		// expected vector is derived from the launcher rather than spelled out with the flags inline.
-		const built = detached_launch.agent_argv(`fullrun #${RELEASED_CHILD}`)
+		const built = claude_agent_argv.build(
+			`fullrun #${RELEASED_CHILD}`,
+			agent_role_profile.DEFAULT_PROFILES.worker,
+		)
 
 		expect(outcome.kind).toBe('dispatched')
-		expect(launch.mock.calls[0]?.[0].argv).toStrictEqual(
-			built.kind === 'argv' ? built.argv : undefined,
-		)
+		expect(launch.mock.calls[0]?.[0].argv).toStrictEqual(built)
 		expect(launch.mock.calls[0]?.[0].cwd).toBe(LANE_DIRECTORY)
 	})
 

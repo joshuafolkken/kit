@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
@@ -117,7 +119,11 @@ function relaunch(target: string, lane: LaneInfo): number {
 	// (joshuafolkken/kit#2022), so it goes straight to `run:cut --resume` without reading the
 	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
 	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
-	const built = detached_launch.agent_argv(lane_dispatch.resume_invocation(lane.issue))
+	const invocation = lane_dispatch.resume_invocation(lane.issue)
+	const built =
+		lane.profile === undefined
+			? claude_agent_argv.resolve(invocation, agent_role_profile.WORKER)
+			: claude_agent_argv.with_profile(invocation, lane.profile)
 
 	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
 
@@ -126,6 +132,7 @@ function relaunch(target: string, lane: LaneInfo): number {
 			argv: built.argv,
 			cwd: lane.directory,
 			log_path: lane_dispatch.default_log_path(lane),
+			profile: built.profile,
 			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
 			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
 			// since the parent-session strip runs on the way in.

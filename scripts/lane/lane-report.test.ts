@@ -1,3 +1,4 @@
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { describe, expect, it } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
@@ -89,6 +90,20 @@ describe('the recorded output path in the listing', () => {
 
 		expect(line).toContain(LANE_DIRECTORY)
 		expect(line.indexOf(LANE_DIRECTORY)).toBeLessThan(line.indexOf(UNIT_OUTPUT))
+	})
+})
+
+describe('the recorded agent profile in the listing', () => {
+	it('names the worker role, model and effort', () => {
+		const profile = agent_role_profile.DEFAULT_PROFILES.worker
+
+		expect(lane_report.describe_lane(lane({ profile }))).toContain(
+			agent_role_profile.describe(profile),
+		)
+	})
+
+	it('marks a lane that has not been dispatched as unrecorded', () => {
+		expect(lane_report.describe_lane(lane())).toContain('profile -')
 	})
 })
 

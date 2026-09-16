@@ -1,5 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
@@ -28,6 +30,7 @@ const INJECTION = '1749; rm -rf /'
 const LAUNCH_FAILURE = 'spawn claude ENOENT'
 const LOG_REFUSED = 'the session log at /x could not be opened'
 const PID = 4242
+const WORKER_PROFILE = agent_role_profile.DEFAULT_PROFILES.worker
 
 const launch = vi.spyOn(detached_launch, 'launch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
@@ -95,7 +98,12 @@ describe('lane_dispatch.resume_invocation — what a relaunched child is asked t
 	})
 
 	it('is a safe single command-line argument, never one the launcher rejects', () => {
-		expect(detached_launch.agent_argv(lane_dispatch.resume_invocation(ISSUE)).kind).toBe('argv')
+		const argv = claude_agent_argv.build(
+			lane_dispatch.resume_invocation(ISSUE),
+			agent_role_profile.DEFAULT_PROFILES.worker,
+		)
+
+		expect(detached_launch.is_safe_argv(argv)).toBe(true)
 	})
 
 	it('refuses anything that is not an issue number', () => {
@@ -128,12 +136,13 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 	it('starts the agent CLI headless in the lane’s own work tree, writing to its own log', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		const built = detached_launch.agent_argv(`fullrun #${ISSUE}`)
+		const built = claude_agent_argv.build(`fullrun #${ISSUE}`, WORKER_PROFILE)
 
 		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
-			argv: built.kind === 'argv' ? built.argv : undefined,
+			argv: built,
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
+			profile: WORKER_PROFILE,
 			env: { [lane_child_marker.KEY]: ISSUE },
 		})
 	})
@@ -149,7 +158,7 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 	it('records the path it writes to, so an unrecorded lane is not a reachable state', async () => {
 		const outcome = await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(record_output).toHaveBeenCalledWith(ISSUE, DERIVED_LOG)
+		expect(record_output).toHaveBeenCalledWith(ISSUE, DERIVED_LOG, WORKER_PROFILE)
 		expect(outcome.kind === 'dispatched' && outcome.log_path).toBe(DERIVED_LOG)
 	})
 
@@ -158,7 +167,7 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(record_output).toHaveBeenCalledWith(ISSUE, DERIVED_LOG)
+		expect(record_output).toHaveBeenCalledWith(ISSUE, DERIVED_LOG, WORKER_PROFILE)
 		expect(launch.mock.calls[0]?.[0].log_path).toBe(DERIVED_LOG)
 	})
 })

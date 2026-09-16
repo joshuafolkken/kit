@@ -86,20 +86,30 @@ describe('run_merge_cli.run — a child that did not merge', () => {
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 	})
 
-	it('parks a failed child and offers the next below the guard', async () => {
+	it('parks a failed or budget-exhausted worker once without retrying it', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({ failures: BELOW_GUARD })
+		do_failed_mock.mockResolvedValue({ carry: { failures: BELOW_GUARD }, is_parked: true })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
+		expect(ask_next_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
 	})
 
 	it('stops when the failure guard trips', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({ failures: AT_GUARD })
+		do_failed_mock.mockResolvedValue({ carry: { failures: AT_GUARD }, is_parked: true })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
+		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.STOP_TOKEN)
+		expect(ask_next_mock).not.toHaveBeenCalled()
+	})
+
+	it('stops with an error when the failed child could not be parked', async () => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
+		do_failed_mock.mockResolvedValue({ carry: { failures: BELOW_GUARD }, is_parked: false })
+
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
 		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.STOP_TOKEN)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})

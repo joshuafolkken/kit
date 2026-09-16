@@ -1,3 +1,5 @@
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { claude_agent_argv, type ClaudeArgv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { telegram_notify } from '#scripts/git/telegram-notify'
@@ -52,6 +54,7 @@ interface Dispatched {
 	invocation: string
 	log_path: string
 	pid: number
+	profile: AgentProfile
 	// What the launcher reported while starting the child. **A launch can succeed with notes**, and
 	// that combination is the one this field exists for: `detached_launch.launch` treats a log it could
 	// not open as a reason to lose the diagnosis rather than a reason not to start the session, so the
@@ -71,6 +74,18 @@ type DispatchOutcome =
 	| { kind: typeof LABEL_UNSET_KIND }
 
 type LogOutcome = { kind: 'ready'; path: string } | { kind: 'unrecordable'; reason: string }
+
+interface StartRequest {
+	lane: LaneInfo
+	log_path: string
+	invocation: string
+	argv: ClaudeArgv
+	profile: AgentProfile
+}
+
+type Prepared =
+	| { kind: 'prepared'; invocation: string; argv: ClaudeArgv; profile: AgentProfile }
+	| { kind: 'rejected'; note: string }
 
 /** The prompt the headless child is given: `fullrun #<N>`, and nothing a caller supplied verbatim. */
 function child_invocation(issue: string): string {
@@ -118,8 +133,8 @@ function default_log_path(lane: LaneInfo): string {
 // and the child's raw output into one would corrupt exactly the file `run:liveness` then parses. The
 // derived path is the same for every dispatch of a lane, so re-dispatching appends a second header to
 // the file it already owns rather than starting a new one somewhere else.
-async function resolved_log(lane: LaneInfo): Promise<LogOutcome> {
-	const outcome = await lane_output.record_output(lane.issue, default_log_path(lane))
+async function resolved_log(lane: LaneInfo, profile: AgentProfile): Promise<LogOutcome> {
+	const outcome = await lane_output.record_output(lane.issue, default_log_path(lane), profile)
 
 	if (outcome.kind === 'recorded') return { kind: 'ready', path: outcome.output }
 
@@ -129,18 +144,16 @@ async function resolved_log(lane: LaneInfo): Promise<LogOutcome> {
 // The notes the launcher reports are collected rather than printed: one of them arrives
 // asynchronously, from the child-process `error` event, and a launch that failed has to say everything
 // it knows in one message.
-function started(lane: LaneInfo, log_path: string): DispatchOutcome {
+function started(request: StartRequest): DispatchOutcome {
 	const notes: Array<string> = []
-	const invocation = child_invocation(lane.issue)
-	const built = detached_launch.agent_argv(invocation)
-
-	if (built.kind === 'rejected') return { kind: 'failed', lane, log_path, note: built.note }
+	const { lane, log_path, invocation, argv, profile } = request
 
 	const result = detached_launch.launch(
 		{
-			argv: built.argv,
+			argv,
 			cwd: lane.directory,
 			log_path,
+			profile,
 			// The mark that tells the child it was dispatched rather than typed (joshuafolkken/kit#1904),
 			// so the pre-gate cut fires from the environment instead of the model's reading of the prompt.
 			env: lane_child_marker.env_for(lane.issue),
@@ -154,7 +167,16 @@ function started(lane: LaneInfo, log_path: string): DispatchOutcome {
 		return { kind: 'failed', lane, log_path, note: [result.note, ...notes].join(NOTE_SEPARATOR) }
 	}
 
-	return { kind: 'dispatched', lane, invocation, log_path, pid: result.pid, notes }
+	return { kind: 'dispatched', lane, invocation, log_path, pid: result.pid, profile, notes }
+}
+
+function prepared(lane: LaneInfo): Prepared {
+	const invocation = child_invocation(lane.issue)
+	const built = claude_agent_argv.resolve(invocation, agent_role_profile.WORKER)
+
+	return built.kind === 'rejected'
+		? built
+		: { kind: 'prepared', invocation, argv: built.argv, profile: built.profile }
 }
 
 // **The parent claims the marker before it starts the child**, so the window in which a running child
@@ -179,6 +201,14 @@ async function unmark_in_progress(issue: string): Promise<void> {
 	}
 }
 
+async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
+	const outcome = started(request)
+
+	if (outcome.kind === 'failed') await unmark_in_progress(issue)
+
+	return outcome
+}
+
 /** Start `fullrun #<N>` detached in the lane for `#<N>`, recording where it writes as it does so. */
 async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 	run_issue_number.require_issue_number(issue)
@@ -186,18 +216,18 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return { kind: 'no-lane' }
+	const built = prepared(lane)
+	const log_path = default_log_path(lane)
 
-	const log = await resolved_log(lane)
+	if (built.kind === 'rejected') return { kind: 'failed', lane, log_path, note: built.note }
+
+	const log = await resolved_log(lane, built.profile)
 
 	if (log.kind !== 'ready') return log
 
 	if (!(await mark_in_progress(issue))) return { kind: LABEL_UNSET_KIND }
 
-	const outcome = started(lane, log.path)
-
-	if (outcome.kind === 'failed') await unmark_in_progress(issue)
-
-	return outcome
+	return await finish_dispatch(issue, { lane, log_path: log.path, ...built })
 }
 
 // **A launch whose log could not be opened is still a launch, and the reader has to hear both halves.**
@@ -239,7 +269,7 @@ function describe(outcome: DispatchOutcome, issue: string): string {
 		return `The child for #${issue} did not start: ${outcome.note}. Its log is at ${outcome.log_path}.`
 	}
 
-	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory}.${log_sentence(outcome, issue)}`
+	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${log_sentence(outcome, issue)}`
 }
 
 /**
