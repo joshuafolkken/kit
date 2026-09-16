@@ -1,4 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { run_liveness } from '#scripts/run/run-liveness'
 import type { LaneInfo } from './lane-registry'
 
 // What a person reads when they ask what is open (joshuafolkken/kit#1490, joshuafolkken/kit#1494).
@@ -40,6 +41,13 @@ function profile_column(lane: LaneInfo): string {
 	return `profile ${lane.profile === undefined ? UNKNOWN_VALUE : agent_role_profile.describe(lane.profile)}`
 }
 
+function event_column(lane: LaneInfo): string {
+	if (lane.output === undefined) return 'agent -'
+	const state = run_liveness.describe_agent_state(lane.output)
+
+	return state ?? 'agent -'
+}
+
 function describe_lane(lane: LaneInfo): string {
 	return [
 		`#${lane.issue}`,
@@ -51,6 +59,7 @@ function describe_lane(lane: LaneInfo): string {
 		lane.directory,
 		output_column(lane.output),
 		profile_column(lane),
+		event_column(lane),
 	].join(COLUMN_SEPARATOR)
 }
 

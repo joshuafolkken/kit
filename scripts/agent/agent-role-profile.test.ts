@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { agent_role_profile } from './agent-role-profile'
+import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
 const { REVIEWER, SCHEDULER, WORKER } = agent_role_profile
+const OPENAI_MODEL = 'gpt-5.6-sol'
 
 function profile(
 	role: typeof SCHEDULER | typeof WORKER | typeof REVIEWER,
 	environment = {},
-): ReturnType<typeof agent_role_profile.parse> {
+): AgentProfile {
 	const result = agent_role_profile.resolve(role, environment)
 
 	if (result.kind === 'rejected') throw new Error(result.note)
@@ -16,9 +17,39 @@ function profile(
 
 describe('the role policy defaults', () => {
 	it('assigns the requested Anthropic profile to each role', () => {
-		expect(profile(SCHEDULER)).toStrictEqual({ role: SCHEDULER, model: 'opus', effort: 'high' })
-		expect(profile(WORKER)).toStrictEqual({ role: WORKER, model: 'opus', effort: 'medium' })
-		expect(profile(REVIEWER)).toStrictEqual({ role: REVIEWER, model: 'opus', effort: 'high' })
+		expect(profile(SCHEDULER)).toStrictEqual({
+			provider: 'anthropic',
+			role: SCHEDULER,
+			model: 'opus',
+			effort: 'high',
+		})
+		expect(profile(WORKER)).toMatchObject({
+			provider: 'anthropic',
+			model: 'opus',
+			effort: 'medium',
+		})
+		expect(profile(REVIEWER)).toMatchObject({
+			provider: 'anthropic',
+			model: 'opus',
+			effort: 'high',
+		})
+	})
+
+	it('assigns the requested OpenAI profile to each role', () => {
+		const environment = { JOSH_AGENT_PROVIDER: 'openai' }
+
+		expect(profile(SCHEDULER, environment)).toStrictEqual({
+			provider: 'openai',
+			role: SCHEDULER,
+			model: OPENAI_MODEL,
+			effort: 'high',
+		})
+		expect(profile(WORKER, environment)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
+		expect(profile(REVIEWER, environment)).toMatchObject({ model: OPENAI_MODEL, effort: 'high' })
+	})
+
+	it('keeps Anthropic as the backward-compatible provider', () => {
+		expect(profile(WORKER).provider).toBe('anthropic')
 	})
 })
 
@@ -86,6 +117,12 @@ describe('blank new worker overrides', () => {
 })
 
 describe('invalid overrides', () => {
+	it('rejects an unknown provider without falling back', () => {
+		const result = agent_role_profile.resolve(WORKER, { JOSH_AGENT_PROVIDER: 'unknown' })
+
+		expect(result).toMatchObject({ kind: 'rejected' })
+		expect(JSON.stringify(result)).toContain('JOSH_AGENT_PROVIDER=unknown')
+	})
 	it('rejects an effort outside the allowlist without escalating it', () => {
 		const result = agent_role_profile.resolve(WORKER, { JOSH_WORKER_EFFORT: 'turbo' })
 

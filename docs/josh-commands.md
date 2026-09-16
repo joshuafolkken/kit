@@ -1116,7 +1116,7 @@ pnpm josh run:wake --stop                  # stop it
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 ```
 
-The supervisor launches `claude -p` as the `scheduler` role with the invocation rebuilt from constants; `--list` and the log show its profile. It waits out the previous owner for up to ten minutes, then wakes; an unclaimed wake is retried up to three times before it stops. Workers are never retried or promoted.
+The supervisor launches the selected provider as `scheduler`; listings show profile and result. Anthropic is default. OpenAI uses `codex exec --sandbox workspace-write --json`, checks login, and never falls back. An unclaimed scheduler wake gets three tries. Workers are never retried or promoted.
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
@@ -1243,15 +1243,16 @@ Start a lane's child as a detached OS process, so cutting this session abandons 
 pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
 ```
 
-The `worker` runs `claude -p --model <model> --effort <effort> fullrun #<N>` with streamed output through the same detached launcher as `josh run:wake`. Its lane record and log show the resolved profile. It does not pass `--dangerously-skip-permissions`.
+`JOSH_AGENT_PROVIDER` selects the `worker`: blank or `anthropic` runs `claude -p`; `openai` runs `codex exec --sandbox workspace-write --model <model> -c model_reasoning_effort="<effort>" --json`. The shell-free launcher passes `fullrun #<N>` as one argument. Records expose normalized JSON/JSONL state to listings and liveness.
 
 **Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 
 **Options:**
 
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_{MODEL,EFFORT}` — role overrides; defaults are respectively `opus/high`, `opus/medium`, and `opus/high`.
+- `JOSH_AGENT_PROVIDER` — `anthropic` (default) or `openai`; OpenAI defaults are `gpt-5.6-sol` with scheduler/worker/reviewer efforts `high`/`medium`/`high`.
 
-Blank values are unset; unsafe models and efforts outside `low|medium|high|xhigh|max` refuse launch. Legacy `JOSH_LANE_MODEL/EFFORT` fall back for workers only; migrate them to `JOSH_WORKER_MODEL/EFFORT`.
+Blank means unset. Invalid provider/model/effort or unavailable Codex CLI/auth refuses launch. No fallback, promotion, or worker retry. Legacy `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`.
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 

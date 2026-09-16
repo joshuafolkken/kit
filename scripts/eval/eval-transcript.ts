@@ -1,3 +1,4 @@
+import { claude_result_event } from '#scripts/agent/claude-result-event'
 import { z } from 'zod'
 
 // `claude -p --output-format stream-json --verbose` writes one JSON object per line. Only the
@@ -79,24 +80,10 @@ function has_started(transcript: string): boolean {
 // Every field but the discriminator is `unknown`: typing any of them narrowly means an unexpected
 // value in *one* of them fails the whole parse and discards the others — which is how a perfectly
 // good reason was lost beside a `result` that was not a string (joshuafolkken/kit#1001).
-const RESULT_EVENT_SCHEMA = z.looseObject({
-	type: z.literal('result'),
-	is_error: z.unknown().optional(),
-	subtype: z.unknown().optional(),
-	result: z.unknown().optional(),
-})
-
-// An empty `result` is not a reason either, so it falls through to `subtype` rather than shadowing it.
-function usable_reason(value: unknown): string | undefined {
-	return typeof value === 'string' && value.trim() !== '' ? value : undefined
-}
-
 function error_in_line(line: string): string | undefined {
-	const parsed = RESULT_EVENT_SCHEMA.safeParse(parse_line(line))
+	const result = claude_result_event.decode(parse_line(line))
 
-	if (!parsed.success || parsed.data.is_error !== true) return undefined
-
-	return usable_reason(parsed.data.result) ?? usable_reason(parsed.data.subtype)
+	return result?.is_error === true ? result.reason : undefined
 }
 
 function read_error_reason(transcript: string): string | undefined {

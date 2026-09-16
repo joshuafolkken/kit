@@ -1,5 +1,5 @@
+import { agent_argv, type AgentArgv } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
-import { claude_agent_argv, type ClaudeArgv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { telegram_notify } from '#scripts/git/telegram-notify'
@@ -79,12 +79,12 @@ interface StartRequest {
 	lane: LaneInfo
 	log_path: string
 	invocation: string
-	argv: ClaudeArgv
+	argv: AgentArgv
 	profile: AgentProfile
 }
 
 type Prepared =
-	| { kind: 'prepared'; invocation: string; argv: ClaudeArgv; profile: AgentProfile }
+	| { kind: 'prepared'; invocation: string; argv: AgentArgv; profile: AgentProfile }
 	| { kind: 'rejected'; note: string }
 
 /** The prompt the headless child is given: `fullrun #<N>`, and nothing a caller supplied verbatim. */
@@ -172,7 +172,7 @@ function started(request: StartRequest): DispatchOutcome {
 
 function prepared(lane: LaneInfo): Prepared {
 	const invocation = child_invocation(lane.issue)
-	const built = claude_agent_argv.resolve(invocation, agent_role_profile.WORKER)
+	const built = agent_argv.resolve(invocation, agent_role_profile.WORKER)
 
 	return built.kind === 'rejected'
 		? built

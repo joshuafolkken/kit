@@ -1,5 +1,6 @@
+import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
-import { claude_agent_argv, type ClaudeArgvResult } from '#scripts/agent/claude-agent-argv'
+import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { detached_launch, type LaunchArgv } from './detached-launch'
 import { run_invocation } from './run-invocation'
 
@@ -59,14 +60,14 @@ function safe_invocation(invocation: string): string | undefined {
 // An unmatched or unsafe invocation is `undefined` and the caller names it as one; a rejected effort
 // override carries the role resolver's own note through the `rejected` variant, so a
 // `JOSH_SCHEDULER_EFFORT` typo is reported as the env typo it is rather than as unreadable carried text.
-function wake_argv(invocation: string, profile?: AgentProfile): ClaudeArgvResult | undefined {
+function wake_argv(invocation: string, profile?: AgentProfile): AgentArgvResult | undefined {
 	const matched = safe_invocation(invocation)
 
 	if (matched === undefined) return undefined
 
-	if (profile !== undefined) return claude_agent_argv.with_profile(matched, profile)
+	if (profile !== undefined) return agent_argv.with_profile(matched, profile)
 
-	return claude_agent_argv.resolve(matched, agent_role_profile.SCHEDULER)
+	return agent_argv.resolve(matched, agent_role_profile.SCHEDULER)
 }
 
 // Re-invoking this very script under the same runner, which is what makes the supervisor outlive the
