@@ -362,10 +362,12 @@ async function read_traces(request: LivenessRequest): Promise<Traces> {
 	const agent_state = read_agent_state(request.output_path)
 	// A child can close or park its Issue and append its terminal event after the parallel GitHub read
 	// returned OPEN. Re-read only at that terminal boundary so the final state, not the stale sample,
-	// decides whether recovery owns anything.
-	const is_child_settled = is_agent_state_finished(agent_state)
+	// decides whether recovery owns anything. If that re-read is unavailable, positive settlement from
+	// the first read remains conclusive; a transient read failure must not turn CLOSED into stopped.
+	const is_latest_child_settled = is_agent_state_finished(agent_state)
 		? await read_child_settled(request.issue, request.repo)
-		: is_initial_child_settled
+		: undefined
+	const is_child_settled = is_latest_child_settled ?? is_initial_child_settled
 
 	return {
 		agent_state,

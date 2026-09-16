@@ -338,35 +338,49 @@ describe('what makes a child settled, read from GitHub', () => {
 	})
 })
 
+function arrange_terminal_check(
+	...issue_results: ReadonlyArray<string | undefined>
+): LivenessRequest {
+	const { target } = arrange_transcript(0)
+
+	writeFileSync(target, `${JSON.stringify({ type: 'turn.completed' })}\n`)
+	const issue_read = vi.spyOn(git_gh_issue_read, 'issue_view_json')
+	for (const result of issue_results) issue_read.mockResolvedValueOnce(result)
+	vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
+
+	return {
+		gap_ms: 0,
+		issue: ISSUE,
+		output_path: target,
+		process_trace: PROCESS_NONE,
+		silent_window_ms: MS_PER_MINUTE,
+	}
+}
+
 describe('terminal event and GitHub settlement race', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
 	})
 
 	it('re-reads GitHub and prefers a concurrently settled child', async () => {
-		const { target } = arrange_transcript(0)
-
-		writeFileSync(target, `${JSON.stringify({ type: 'turn.completed' })}\n`)
 		const open = JSON.stringify({ labels: [], state: 'OPEN' })
 		const closed = JSON.stringify({ labels: [], state: 'CLOSED' })
-		const issue_read = vi
-			.spyOn(git_gh_issue_read, 'issue_view_json')
-			.mockResolvedValueOnce(open)
-			.mockResolvedValueOnce(closed)
 
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
+		await expect(run_liveness.check(arrange_terminal_check(open, closed))).resolves.toMatchObject({
+			verdict: SETTLED_VERDICT,
+		})
+
+		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledTimes(2)
+	})
+
+	it('keeps an initial CLOSED result when the terminal re-read is unavailable', async () => {
+		const closed = JSON.stringify({ labels: [], state: 'CLOSED' })
 
 		await expect(
-			run_liveness.check({
-				gap_ms: 0,
-				issue: ISSUE,
-				output_path: target,
-				process_trace: PROCESS_NONE,
-				silent_window_ms: MS_PER_MINUTE,
-			}),
+			run_liveness.check(arrange_terminal_check(closed, undefined)),
 		).resolves.toMatchObject({ verdict: SETTLED_VERDICT })
 
-		expect(issue_read).toHaveBeenCalledTimes(2)
+		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledTimes(2)
 	})
 })
 
