@@ -100,6 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
+      actions: read
       checks: read
       contents: read
       pull-requests: read
@@ -120,7 +121,7 @@ jobs:
             exit 0
           fi
           if ! pull=$(printf '%s' "${pulls}" | jq -r --arg sha "${CURRENT_SHA}" \
-            '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")] | if length == 1 then .[0] | [.head.sha, .head.ref, .created_at, .merged_at] | @tsv else empty end'); then
+            '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")] | if length == 1 then .[0] | [.number, .head.sha, .head.ref, .created_at, .merged_at] | @tsv else empty end'); then
             echo '::notice::Could not parse the pull request; running the verification jobs.'
             exit 0
           fi
@@ -128,7 +129,7 @@ jobs:
             echo 'No unique merged pull request matched this push; running the verification jobs.'
             exit 0
           fi
-          IFS=$'\t' read -r head_sha head_ref created_at merged_at <<< "${pull}"
+          IFS=$'\t' read -r pull_number head_sha head_ref created_at merged_at <<< "${pull}"
 
           if ! current_tree=$(gh api "repos/${REPOSITORY}/git/commits/${CURRENT_SHA}" --jq '.tree.sha') || \
             ! pr_tree=$(gh api "repos/${REPOSITORY}/git/commits/${head_sha}" --jq '.tree.sha'); then
@@ -158,8 +159,12 @@ jobs:
             if printf '%s' "${run}" | jq -e --arg head_sha "${head_sha}" --arg head_ref "${head_ref}" \
               --arg created_at "${created_at}" --arg merged_at "${merged_at}" \
               '.event == "pull_request" and .head_sha == $head_sha and .head_branch == $head_ref and .path == ".github/workflows/ci.yml" and .conclusion == "success" and .created_at >= $created_at and .created_at <= $merged_at' >/dev/null; then
-              passed=true
-              break
+              if artifacts=$(gh api --method GET "repos/${REPOSITORY}/actions/runs/${run_id}/artifacts" \
+                -f per_page=100) && printf '%s' "${artifacts}" | jq -e --arg name "pr-checks-${pull_number}" \
+                '.artifacts | any(.name == $name and .expired == false)' >/dev/null; then
+                passed=true
+                break
+              fi
             fi
           done
           if [ "${passed}" != 'true' ]; then
@@ -422,6 +427,23 @@ jobs:
           fi
           echo "::error::the verification gate did not pass on both runners"
           exit 1
+
+      # The artifact binds this successful Checks job to the pull request number. A later main push
+      # reads it from this exact Actions run before reusing the result; the name alone is sufficient
+      # because the run already proves the head SHA, branch, workflow and pull_request event.
+      - name: Write PR Checks evidence
+        if: github.event_name == 'pull_request'
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: printf '%s\n' "${PULL_REQUEST_NUMBER}" > pr-checks-evidence
+
+      - name: Upload PR Checks evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-checks-${{ github.event.pull_request.number }}
+          path: pr-checks-evidence
+          retention-days: 1
 
   security:
     name: Security Audit
