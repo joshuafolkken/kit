@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
@@ -64,6 +65,9 @@ beforeEach(() => {
 		errors.push(text)
 	})
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])
+	vi.spyOn(process_identity, 'read_start').mockImplementation((pid: number) =>
+		pid === process.pid ? process_identity.own_start() : undefined,
+	)
 	run_carry.end_carry(target())
 })
 
