@@ -20,7 +20,7 @@ beforeEach(() => {
 
 function openai_worker(): AgentProfile {
 	const result = agent_role_profile.resolve(agent_role_profile.WORKER, {
-		JOSH_AGENT_PROVIDER: 'openai',
+		CODEX_THREAD_ID: 'thread',
 	})
 
 	if (result.kind === 'rejected') throw new Error(result.note)

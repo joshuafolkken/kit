@@ -103,7 +103,7 @@ async function run_provider_failure(): Promise<{
 	scratch.log = path.join(scratch.directory, LOG_NAME)
 	const fake = arrange_provider_fakes()
 	const built = agent_argv.resolve('fullrun #2071', agent_role_profile.WORKER, {
-		JOSH_AGENT_PROVIDER: OPENAI_PROVIDER,
+		CODEX_THREAD_ID: 'thread',
 	})
 	if (built.kind !== 'argv') throw new Error(built.note)
 	const launch = detached_launch.launch(

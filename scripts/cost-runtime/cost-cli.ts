@@ -118,12 +118,9 @@ function report_empty(cwd: string): number {
 }
 
 function provider_of(environment: Environment): AgentProvider | undefined {
-	const raw = environment[agent_role_profile.PROVIDER_ENV_KEY]?.trim()
-	const parsed = agent_role_profile.PROVIDER_SCHEMA.safeParse(
-		raw === undefined || raw === '' ? agent_role_profile.DEFAULT_PROVIDER : raw,
-	)
+	const resolved = agent_role_profile.resolve_provider(environment)
 
-	return parsed.success ? parsed.data : undefined
+	return resolved.kind === 'provider' ? resolved.provider : undefined
 }
 
 function anthropic_measurement(target: string): OverMeasurement | undefined {

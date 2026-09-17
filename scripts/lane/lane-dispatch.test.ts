@@ -76,7 +76,8 @@ function mock_supervisor(): void {
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	vi.stubEnv('JOSH_AGENT_PROVIDER', 'anthropic')
+	vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'session')
+	vi.stubEnv('CODEX_THREAD_ID', '')
 	launch.mockReturnValue({ kind: 'launched', pid: PID })
 	find_open_lane.mockResolvedValue(lane(undefined))
 	record_output.mockResolvedValue({
@@ -161,7 +162,8 @@ describe('lane_dispatch.default_log_path — the log the dispatch owns', () => {
 
 describe('lane_dispatch.dispatch_child — provider selection', () => {
 	it('uses the OpenAI worker adapter when the provider is selected', async () => {
-		vi.stubEnv('JOSH_AGENT_PROVIDER', 'openai')
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		vi.stubEnv('CODEX_THREAD_ID', 'thread')
 		check_diagnostics.mockReturnValue({ kind: 'ready' })
 		wait_for_supervisor.mockResolvedValue({ issue: ISSUE, nonce: 'owner', pid: PID })
 
@@ -176,7 +178,8 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 	})
 
 	it('does not reuse a live OpenAI owner recorded for another issue', async () => {
-		vi.stubEnv('JOSH_AGENT_PROVIDER', 'openai')
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		vi.stubEnv('CODEX_THREAD_ID', 'thread')
 		check_diagnostics.mockReturnValue({ kind: 'ready' })
 		active_supervisor.mockReturnValue({ issue: '9999', nonce: 'other', pid: PID })
 		wait_for_supervisor.mockResolvedValue({ issue: '9999', nonce: 'other', pid: PID })
@@ -189,7 +192,8 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 	})
 
 	it('reports failure when the spawned OpenAI supervisor never claims the lane', async () => {
-		vi.stubEnv('JOSH_AGENT_PROVIDER', 'openai')
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		vi.stubEnv('CODEX_THREAD_ID', 'thread')
 		check_diagnostics.mockReturnValue({ kind: 'ready' })
 
 		const outcome = await lane_dispatch.dispatch_child(ISSUE)

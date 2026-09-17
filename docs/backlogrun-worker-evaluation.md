@@ -2,7 +2,7 @@
 
 Use completed ordinary-task transcripts from before a worker default changes as the frozen baseline.
 Do not replay old tasks, add a comparison review, or spend AI calls only to build the comparison.
-Ordinary work uses the balanced default; difficult work may explicitly set
+Ordinary Claude Code work uses the balanced default; difficult Claude Code work may explicitly set
 `JOSH_WORKER_MODEL=opus JOSH_WORKER_EFFORT=high`. Dispatch never promotes itself or adds a
 lightweight/Haiku role, and scheduler/reviewer gates remain `opus/high`.
 

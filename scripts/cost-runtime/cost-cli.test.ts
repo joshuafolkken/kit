@@ -12,8 +12,8 @@ const { CWD, MAIN, SESSION_A, usage_line, write_session, output, stdout } = cost
 cost_cli_fixture.capture_console()
 
 const FAILURE_EXIT_CODE = 1
-const ANTHROPIC_ENV = { JOSH_AGENT_PROVIDER: 'anthropic' }
-const OPENAI_ENV = { CODEX_THREAD_ID: 'thread', JOSH_AGENT_PROVIDER: 'openai' }
+const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
+const OPENAI_ENV = { CODEX_THREAD_ID: 'thread' }
 const BAD_FLAG = '--nonsense'
 const NO_TRANSCRIPTS = 'No transcripts found'
 // The readerless report scopes retired in #2016: now unknown flags, so each is refused rather than

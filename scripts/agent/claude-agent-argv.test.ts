@@ -3,6 +3,7 @@ import { agent_role_profile } from './agent-role-profile'
 import { claude_agent_argv } from './claude-agent-argv'
 
 const INVOCATION = 'fullrun #2070'
+const CLAUDE_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
 
 describe('Claude argv construction', () => {
 	it('puts an already-resolved profile and the invocation on the command line', () => {
@@ -16,7 +17,7 @@ describe('Claude argv construction', () => {
 	})
 
 	it('resolves exactly the requested role', () => {
-		const result = claude_agent_argv.resolve(INVOCATION, agent_role_profile.REVIEWER, {})
+		const result = claude_agent_argv.resolve(INVOCATION, agent_role_profile.REVIEWER, CLAUDE_ENV)
 
 		expect(result).toMatchObject({
 			kind: 'argv',
@@ -25,7 +26,7 @@ describe('Claude argv construction', () => {
 	})
 
 	it('resolves the balanced worker profile onto the command line', () => {
-		const result = claude_agent_argv.resolve(INVOCATION, agent_role_profile.WORKER, {})
+		const result = claude_agent_argv.resolve(INVOCATION, agent_role_profile.WORKER, CLAUDE_ENV)
 
 		expect(result).toMatchObject({
 			kind: 'argv',

@@ -319,12 +319,19 @@ async function finish(stop: LoopStop, context: WakeContext): Promise<number> {
 }
 
 function spawn_supervisor(context: WakeContext, interval: string | undefined): number {
+	const profile = run_wake_session.scheduler_profile()
+	if (profile === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 	const argv = run_wake_session.supervisor_argv(SCRIPT_PATH, interval)
 	// **The supervisor's own output goes to the same file as the sessions it starts.** It is detached
 	// with the same call, so before joshuafolkken/kit#1746 its `console.error` — the launch note that
 	// says the agent CLI is not on `PATH`, and the stop note behind every warning — went nowhere at all.
 	const result = run_wake_session.launch(
-		{ argv, cwd: context.worktree, log_path: context.log_target },
+		{
+			argv,
+			cwd: context.worktree,
+			log_path: context.log_target,
+			env: run_wake_session.supervisor_environment(profile),
+		},
 		note_to_stderr,
 	)
 
@@ -341,16 +348,6 @@ function spawn_supervisor(context: WakeContext, interval: string | undefined): n
 	return report(STARTED_VERDICT)
 }
 
-function scheduler_profile(): AgentProfile | undefined {
-	const resolved = agent_role_profile.resolve(agent_role_profile.SCHEDULER)
-
-	if (resolved.kind === 'profile') return resolved.profile
-
-	console.error(resolved.note)
-
-	return undefined
-}
-
 function start(context: WakeContext, interval: string | undefined): number {
 	const read = run_carry.read_carry(context.carry_target)
 
@@ -363,8 +360,6 @@ function start(context: WakeContext, interval: string | undefined): number {
 
 		return report(RUNNING_VERDICT)
 	}
-
-	if (scheduler_profile() === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 
 	return spawn_supervisor(context, interval)
 }
@@ -387,7 +382,7 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 
 	if (read.kind !== 'carried') return refuse_without_carry(read.kind)
 
-	const profile = scheduler_profile()
+	const profile = run_wake_session.scheduler_profile()
 	if (profile === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 
 	const claimed = run_wake.claim(context.wake_target, read.carry.invocation, new Date(), profile)

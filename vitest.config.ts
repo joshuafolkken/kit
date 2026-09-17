@@ -5,7 +5,8 @@ const TEST_TIMEOUT_MS = 10_000
 export default defineConfig({
 	test: {
 		env: {
-			JOSH_AGENT_PROVIDER: 'anthropic',
+			CLAUDE_CODE_SESSION_ID: 'vitest-session',
+			CODEX_THREAD_ID: '',
 		},
 		include: [
 			'*.test.ts',

@@ -90,11 +90,11 @@ still bounded at 25 lines. An in-process subagent could not survive the session 
 takes. `pnpm josh lane:dispatch` is where a lane's child is started; "Handing the child over" below
 carries the command.
 
-**The lane child uses its `worker` provider/profile.** Anthropic defaults to `opus` /
-`medium`; `JOSH_AGENT_PROVIDER=openai` uses `codex exec`, `gpt-5.6-sol` / `medium`, the
-workspace-write sandbox and JSONL. Role overrides remain `JOSH_WORKER_MODEL` /
-`JOSH_WORKER_EFFORT`; legacy `JOSH_LANE_*` values apply only here. Invalid config, unavailable
-CLI/auth, and failure refuse or park without fallback or retry.
+**The lane child uses the invoking CLI's `worker` profile.** Claude Code defaults to Anthropic
+`sonnet` / `medium`; Codex uses `codex exec`, OpenAI `gpt-5.6-sol` / `medium`, workspace-write and
+JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
+and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
+refuse or park without fallback or retry.
 `docs/josh-commands.md` → "`josh lane:dispatch`" is the single source.
 
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier: a unit that reports
