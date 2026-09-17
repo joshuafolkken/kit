@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { z } from 'zod'
 
 const FIRST_PRINTABLE_CODE = 0x20
@@ -24,19 +25,20 @@ type AgentEnvironment = Readonly<Record<string, string | undefined>>
 type ProfileResult = { kind: 'profile'; profile: AgentProfile } | { kind: 'rejected'; note: string }
 type Rejected = Extract<ProfileResult, { kind: 'rejected' }>
 type EffortResult = Rejected | { kind: 'effort'; effort: AgentEffort }
+type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider }
 
 const SCHEDULER: AgentRole = 'scheduler'
 const WORKER: AgentRole = 'worker'
 const REVIEWER: AgentRole = 'reviewer'
-const DEFAULT_PROVIDER: AgentProvider = 'anthropic'
+const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
 const OPENAI_PROVIDER: AgentProvider = 'openai'
 const OPENAI_MODEL = 'gpt-5.6-sol'
-const PROVIDER_ENV_KEY = 'JOSH_AGENT_PROVIDER'
+const CODEX_SESSION_KEY = 'CODEX_THREAD_ID'
 
 const DEFAULT_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
-	scheduler: { provider: DEFAULT_PROVIDER, role: SCHEDULER, model: 'opus', effort: 'high' },
-	worker: { provider: DEFAULT_PROVIDER, role: WORKER, model: 'sonnet', effort: 'medium' },
-	reviewer: { provider: DEFAULT_PROVIDER, role: REVIEWER, model: 'opus', effort: 'high' },
+	scheduler: { provider: ANTHROPIC_PROVIDER, role: SCHEDULER, model: 'opus', effort: 'high' },
+	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: 'sonnet', effort: 'medium' },
+	reviewer: { provider: ANTHROPIC_PROVIDER, role: REVIEWER, model: 'opus', effort: 'high' },
 }
 
 const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
@@ -93,6 +95,18 @@ function override_value(
 		: { key: legacy, value: legacy_value }
 }
 
+function model_override(
+	role: AgentRole,
+	environment: AgentEnvironment,
+	provider: AgentProvider,
+): { key: string; value: string | undefined } {
+	const key = ENV_KEYS[role].model
+
+	return provider === OPENAI_PROVIDER
+		? { key, value: undefined }
+		: override_value(role, 'model', environment)
+}
+
 function rejection(key: string, value: string, expected: string): Rejected {
 	return { kind: 'rejected', note: `${key}=${value} ${expected}, so the agent was not started` }
 }
@@ -108,13 +122,25 @@ function resolved_effort(
 		: rejection(override.key, override.value ?? '', 'is not an allowed effort')
 }
 
-function resolved_provider(environment: AgentEnvironment): Rejected | { provider: AgentProvider } {
-	const raw = trimmed(environment[PROVIDER_ENV_KEY]) ?? DEFAULT_PROVIDER
-	const parsed = PROVIDER_SCHEMA.safeParse(raw)
+function has_session(environment: AgentEnvironment, keys: ReadonlyArray<string>): boolean {
+	return keys.some((key) => trimmed(environment[key]) !== undefined)
+}
 
-	return parsed.success
-		? { provider: parsed.data }
-		: rejection(PROVIDER_ENV_KEY, raw, 'is not an allowed provider')
+function session_rejection(is_conflicting: boolean): Rejected {
+	const note = is_conflicting
+		? 'both Codex and Claude Code sessions were detected'
+		: 'no Codex or Claude Code session was detected'
+
+	return { kind: 'rejected', note }
+}
+
+function resolve_provider(environment: AgentEnvironment = process.env): ProviderResult {
+	const has_codex = has_session(environment, [CODEX_SESSION_KEY])
+	const has_claude = has_session(environment, agent_session_environment.PARENT_SESSION_KEYS)
+
+	if (has_codex === has_claude) return session_rejection(has_codex)
+
+	return { kind: 'provider', provider: has_codex ? OPENAI_PROVIDER : ANTHROPIC_PROVIDER }
 }
 
 function validate(profile: AgentProfile, model_key: string): ProfileResult {
@@ -126,10 +152,10 @@ function validate(profile: AgentProfile, model_key: string): ProfileResult {
 }
 
 function resolve(role: AgentRole, environment: AgentEnvironment = process.env): ProfileResult {
-	const selected = resolved_provider(environment)
-	if ('kind' in selected) return selected
+	const selected = resolve_provider(environment)
+	if (selected.kind === 'rejected') return selected
 	const defaults = PROVIDER_PROFILES[selected.provider][role]
-	const model = override_value(role, 'model', environment)
+	const model = model_override(role, environment, selected.provider)
 	const effort = override_value(role, 'effort', environment)
 	const resolved = resolved_effort(effort, defaults.effort)
 
@@ -157,13 +183,11 @@ function parse(value: unknown): AgentProfile | undefined {
 
 const agent_role_profile = {
 	DEFAULT_PROFILES,
-	DEFAULT_PROVIDER,
 	EFFORT_SCHEMA,
 	ENV_KEYS,
 	LEGACY_WORKER_KEYS,
 	MAX_VALUE_LENGTH,
 	OPENAI_PROFILES,
-	PROVIDER_ENV_KEY,
 	PROVIDER_SCHEMA,
 	PROFILE_SCHEMA,
 	REVIEWER,
@@ -173,6 +197,7 @@ const agent_role_profile = {
 	is_safe_value,
 	parse,
 	resolve,
+	resolve_provider,
 }
 
 export type { AgentEffort, AgentEnvironment, AgentProfile, AgentProvider, AgentRole, ProfileResult }

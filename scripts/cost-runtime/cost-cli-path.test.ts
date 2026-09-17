@@ -13,8 +13,8 @@ const { usage_line, write_session, write_session_under, output } = cost_cli_fixt
 // A project other than the process cwd, so `--path` is seen to read a directory it was not already in.
 const TARGET = '/Users/someone/Development/other-project'
 const FAILURE_EXIT_CODE = 1
-const ANTHROPIC_ENV = { JOSH_AGENT_PROVIDER: 'anthropic' }
-const OPENAI_ENV = { CODEX_THREAD_ID: 'thread', JOSH_AGENT_PROVIDER: 'openai' }
+const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
+const OPENAI_ENV = { CODEX_THREAD_ID: 'thread' }
 const NO_TRANSCRIPTS = 'No transcripts found'
 const PER_REQUEST = 'per request'
 const WORKTREE_GIT_PATH = '.git/worktrees/2089'
@@ -62,7 +62,6 @@ function linked_rollout(): { main: string; lane: string; environment: Record<str
 		environment: {
 			CODEX_HOME: codex_home,
 			CODEX_THREAD_ID: THREAD_ID,
-			JOSH_AGENT_PROVIDER: 'openai',
 			JOSH_LANE_ROOT: lane_root,
 		},
 	}

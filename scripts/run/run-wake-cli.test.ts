@@ -3,11 +3,12 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_progress_clock } from './run-progress-clock'
 import { run_wake } from './run-wake'
 import { run_wake_cli } from './run-wake-cli'
+import { run_wake_session } from './run-wake-session'
 
 // joshuafolkken/kit#1719. Two things are pinned here: standard output is one verdict token on every
 // path, and a person can find the supervisor and stop it — the last acceptance criterion, and the one
@@ -32,6 +33,7 @@ const FAILURE = 1
 const LOOP_FLAG = '--loop'
 const INTERVAL_FLAG = '--interval'
 const OUTPUT_LABEL = 'output: '
+const SUPERVISOR_PID = 4242
 
 const out: Array<string> = []
 const errors: Array<string> = []
@@ -149,6 +151,21 @@ describe('josh run:wake --start', () => {
 			delete process.env['JOSH_SCHEDULER_EFFORT']
 		}
 	})
+})
+
+test('start passes the inferred provider marker to the detached supervisor', async () => {
+	write_carry(true)
+	const launch = vi.spyOn(run_wake_session, 'launch').mockReturnValue({
+		kind: 'launched',
+		pid: SUPERVISOR_PID,
+	})
+
+	expect(await run_wake_cli.run(['--start'])).toBe(SUCCESS)
+	expect(launch).toHaveBeenCalledWith(
+		expect.objectContaining({ env: { CLAUDE_CODE_CHILD_SESSION: 'run-wake-supervisor' } }),
+		expect.any(Function),
+	)
+	launch.mockRestore()
 })
 
 describe('josh run:wake --list — a person can see what is running', () => {

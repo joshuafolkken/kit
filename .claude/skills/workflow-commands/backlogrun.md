@@ -287,13 +287,15 @@ expired or cannot be read ends it the same way. `none` — the run having finish
 `--stop` ends it; the full contract, what it launches and why that is a constant rather than a
 setting are `docs/josh-commands.md` → "`josh run:wake`".
 
-**Every unattended role runs with its own explicit provider and profile.** `JOSH_AGENT_PROVIDER`
-selects `anthropic` or `openai`, with Anthropic as the backward-compatible default. Anthropic uses
-`opus` with scheduler/worker/reviewer efforts `high`/`medium`/`high`; OpenAI uses `gpt-5.6-sol` with
-the same efforts. Role-specific environment overrides are resolved before launch; `JOSH_LANE_*`
-migrates to the worker only. Invalid configuration, a missing CLI or missing authentication refuses
-the selected provider without fallback, promotion or worker retry. `run:wake --list`, `lane:list`, the
-review brief and each launch log expose the resolved provider, role, model and effort.
+**Every unattended role runs with the provider selected from the invoking CLI and its own profile.**
+Codex sessions use OpenAI; Claude Code sessions use Anthropic. Anthropic uses scheduler `opus`, worker
+`sonnet` and reviewer `opus`; OpenAI uses `gpt-5.6-sol`, with role efforts
+`high`/`medium`/`high` for both. Role-specific environment overrides are resolved before launch;
+model overrides apply only to Claude Code, effort overrides apply to either provider, and legacy
+`JOSH_LANE_*` values migrate to the worker only. Invalid configuration, a missing or conflicting
+session marker, a missing CLI or missing authentication refuses the selected provider without
+fallback, promotion or worker retry. `run:wake --list`, `lane:list`, the review brief and each launch
+log expose the resolved provider, role, model and effort.
 `docs/josh-commands.md` → "`josh lane:dispatch`" and `backlogrun-child.md` → "Each child runs in a
 delegated unit" are the single sources.
 

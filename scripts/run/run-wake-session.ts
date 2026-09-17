@@ -36,6 +36,22 @@ const WAKE_COMMAND = claude_agent_argv.AGENT_COMMAND
 const WAKE_FLAGS = claude_agent_argv.AGENT_FLAGS
 const LOOP_FLAG = '--loop'
 const INTERVAL_FLAG = '--interval'
+const SUPERVISOR_SESSION = 'run-wake-supervisor'
+
+function scheduler_profile(): AgentProfile | undefined {
+	const resolved = agent_role_profile.resolve(agent_role_profile.SCHEDULER)
+	if (resolved.kind === 'profile') return resolved.profile
+
+	console.error(resolved.note)
+
+	return undefined
+}
+
+function supervisor_environment(profile: AgentProfile): Record<string, string> {
+	return profile.provider === 'openai'
+		? { CODEX_THREAD_ID: SUPERVISOR_SESSION }
+		: { CLAUDE_CODE_CHILD_SESSION: SUPERVISOR_SESSION }
+}
 
 // **What comes back is always the rebuilt text, and it is refused unless it matches the record.** The
 // two requirements are separate. Returning the rebuilt string is what severs the flow from the file;
@@ -110,7 +126,9 @@ const run_wake_session = {
 	ensure_log: detached_launch.ensure_log,
 	is_safe_argv: detached_launch.is_safe_argv,
 	launch: detached_launch.launch,
+	scheduler_profile,
 	supervisor_argv,
+	supervisor_environment,
 	wake_argv,
 }
 

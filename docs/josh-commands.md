@@ -1244,18 +1244,24 @@ Start a lane's child as a detached OS process, so cutting this session abandons 
 pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
 ```
 
-`JOSH_AGENT_PROVIDER` selects worker: blank/`anthropic` runs unchanged `claude -p`; `openai` uses a
-detached non-AI supervisor for Codex generations. SQLite stays lane-local; worker rollout files persist
-for active-usage cuts. Native auth/config stay put. The printed PID is the supervisor's.
+The invoking CLI selects the worker provider: Codex sessions use a detached
+non-AI supervisor for Codex generations, while Claude Code sessions run unchanged `claude -p`.
+SQLite stays lane-local; worker rollout files persist for active-usage cuts. Native auth/config stay
+put. The printed PID is the supervisor's.
 
 **Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
 
 **Options:**
 
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_{MODEL,EFFORT}` — role overrides; Anthropic defaults are respectively `opus/high`, `sonnet/medium`, and `opus/high`.
-- `JOSH_AGENT_PROVIDER` — `anthropic` (default) or `openai`; OpenAI defaults are `gpt-5.6-sol` with scheduler/worker/reviewer efforts `high`/`medium`/`high`.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `opus`, `sonnet`, and `opus`. Codex keeps its provider-specific model.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `high`, `medium`, and `high`.
 
-Blank means unset. Invalid provider/model/effort or unavailable Codex CLI/auth refuses launch. No fallback, promotion, or worker retry. Legacy `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker evaluation procedure](./backlogrun-worker-evaluation.md).
+Blank means unset. The inherited agent session identifier selects the provider; a missing or
+conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
+refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
+defaults to `gpt-5.6-sol` with scheduler/worker/reviewer efforts `high`/`medium`/`high`. Legacy
+`JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
+evaluation procedure](./backlogrun-worker-evaluation.md).
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 
