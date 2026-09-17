@@ -149,10 +149,24 @@ jobs:
           # `eslint/config-fingerprint.js` now invalidates the entries themselves; this key has to move
           # with it, or a rule edit would restore a cache whose every entry is stale, lint cold, and
           # save nothing back under the key it already hit — a cold lint on every later run.
-          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}
+          # joshuafolkken/kit#2054: the commit sha makes each run save its warmed cache under a fresh
+          # key, while the sha-less prefix restores the newest entry from an earlier run.
+          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
             ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-eslint-cache-
+
+      - name: Setup cspell cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cspell-cache
+        with:
+          path: |
+            .cspellcache
+          key: ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-cspell-cache-
 
       - name: Setup safe-chain
         run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
@@ -163,7 +177,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run spell check
-        run: pnpm exec cspell . --dot
+        run: pnpm josh cspell:dot
 
       - name: Prepare
         run: pnpm prepare
