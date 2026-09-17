@@ -2,18 +2,22 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
 import { density_envelope, format_edited_payload } from './format-edited-file'
 import { pretool_guard } from './pretool-guard'
 
 const APPLY_PATCH_TOOL = 'apply_patch'
 const EDIT_TOOL = 'Edit'
-const WRITE_TOOL = 'Write'
 const PRETOOL_MODE = 'pretool'
 const POSTTOOL_MODE = 'posttool'
 const MODE_ARGUMENT_INDEX = 2
 const PATCH_FILE_PATTERN = /^\*\*\* (?:Add|Delete|Update) File: (.+)$/gmu
 const PATCH_MOVE_PATTERN = /^\*\*\* Move to: (.+)$/gmu
+// One canonical formatter can spend at most 75 seconds across its bounded process fallbacks. Start
+// at most two together and no later work, so every formatter that starts retains the 15-second
+// margin inside the Codex hook's 90-second timeout. Remaining files are left to the verification gate.
+const MAX_PARALLEL_FORMATS = 2
 
 // Codex deliberately reports its canonical tool name even when an Edit or Write matcher selected
 // the hook. Its apply_patch body is `tool_input.command`; the Claude-shaped handlers downstream
@@ -58,10 +62,10 @@ function patch_paths(tool_input: unknown): Array<string> {
 
 function canonical_payload(
 	payload: z.infer<typeof codex_payload_schema>,
-	tool_name: string,
 	file_path: string,
+	file_paths: ReadonlyArray<string>,
 ): string {
-	return JSON.stringify({ ...payload, tool_name, tool_input: { file_path } })
+	return JSON.stringify({ ...payload, tool_name: EDIT_TOOL, tool_input: { file_path, file_paths } })
 }
 
 function pretool_payload(raw_payload: string): string {
@@ -70,11 +74,8 @@ function pretool_payload(raw_payload: string): string {
 	const paths = patch_paths(payload.tool_input)
 	const [file_path] = paths
 	if (file_path === undefined) return raw_payload
-	// A multi-file patch cannot be represented by one Claude Edit target. Route it through Write's
-	// non-blocking notice path rather than let the guard refuse using an incomplete dependency set.
-	const tool_name = paths.length === 1 ? EDIT_TOOL : WRITE_TOOL
 
-	return canonical_payload(payload, tool_name, file_path)
+	return canonical_payload(payload, file_path, paths)
 }
 
 function posttool_payloads(raw_payload: string): Array<string> {
@@ -82,7 +83,7 @@ function posttool_payloads(raw_payload: string): Array<string> {
 	if (payload?.tool_name !== APPLY_PATCH_TOOL) return [raw_payload]
 
 	return patch_paths(payload.tool_input).map((file_path) =>
-		canonical_payload(payload, EDIT_TOOL, file_path),
+		canonical_payload(payload, file_path, [file_path]),
 	)
 }
 
@@ -95,7 +96,11 @@ async function format_posttool_payloads(
 	project_root: string,
 	formatter: PayloadFormatter = format_edited_payload,
 ): Promise<void> {
-	for (const payload of posttool_payloads(raw_payload)) await formatter(payload, project_root)
+	const planned = posttool_payloads(raw_payload).slice(0, MAX_PARALLEL_FORMATS)
+
+	await bounded_pool.bounded_map(planned, MAX_PARALLEL_FORMATS, async (payload) => {
+		await formatter(payload, project_root)
+	})
 }
 
 function write_density(raw_payload: string): void {

@@ -25,6 +25,13 @@ describe('time_bundle_call.tool_facts', () => {
 		expect(time_bundle_call.tool_facts('Edit', { file_path: READ_PATH }).is_bundleable).toBe(true)
 	})
 
+	it('keeps every explicitly listed target of one edit operation', () => {
+		const file_paths = [READ_PATH, OTHER_PATH, 'scripts/third.ts']
+		const facts = time_bundle_call.tool_facts('Edit', { file_path: READ_PATH, file_paths })
+
+		expect(facts.targets).toStrictEqual(file_paths)
+	})
+
 	// The allow-list is what keeps an unclassified tool out. A delegation is the case it exists for:
 	// the call after one routinely needs what the unit answered.
 	it('refuses a tool nobody put on the allow-list', () => {

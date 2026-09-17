@@ -219,6 +219,7 @@ const WHITESPACE_PATTERN = /\s+/u
 // `new_string` and `content` carry file bodies, and tokenizing those would pull every path the file
 // happens to mention into the call's target set — where it would make unrelated calls look ordered.
 const TARGET_FIELDS = ['file_path', 'notebook_path', 'path', 'url']
+const TARGET_ARRAY_FIELD = 'file_paths'
 
 // How many targets one call contributes. A `find` line naming twenty paths says nothing more about
 // what it depends on than its first few do, and the set is carried on every span of a run.
@@ -432,12 +433,22 @@ function field_text(input: unknown, field: string): string {
 	return typeof value === 'string' ? value : ''
 }
 
+function field_targets(input: unknown): Array<string> {
+	if (!json_value.is_record(input)) return []
+	const value = input[TARGET_ARRAY_FIELD]
+
+	return Array.isArray(value)
+		? value.filter((entry): entry is string => typeof entry === 'string')
+		: []
+}
+
 // A non-`Bash` tool names its target in a field, so the value is taken whole rather than tokenized: a
 // path containing a space is one target, and splitting it would produce two that match nothing.
 function tool_targets(input: unknown): Array<string> {
-	return TARGET_FIELDS.map((field) => normalize(field_text(input, field)))
-		.filter((value) => value !== '')
-		.slice(0, MAX_TARGETS)
+	const scalar_targets = TARGET_FIELDS.map((field) => field_text(input, field))
+	const targets = [...scalar_targets, ...field_targets(input)].map((target) => normalize(target))
+
+	return [...new Set(targets)].filter((target) => target !== '')
 }
 
 // Whether a subagent launch's prompt builds on an earlier launch's finding. The prompt is the input
