@@ -1100,7 +1100,7 @@ pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"  # adopt a rec
 
 **Options:**
 
-- `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A second live parent is refused with `busy`.
+- `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
 - `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
