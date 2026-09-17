@@ -27,11 +27,12 @@ interface HookBundle {
 	out: string
 }
 
-// The three settings.json hooks, plus the two guards `pretool-guard` composes: `batch-guard` and
-// `investigation-guard` each self-invoke, so they must be their own entries to keep their
-// `import.meta.url` out of `pretool-guard`'s file. `delivered-rules` (the third guard) has no
-// self-invoke, so it stays inlined.
+// The three settings.json hooks, the Codex input adapter, and the two guards `pretool-guard`
+// composes: `batch-guard` and `investigation-guard` each self-invoke, so they must be their own
+// entries to keep their `import.meta.url` out of `pretool-guard`'s file. `delivered-rules` (the third
+// guard) has no self-invoke, so it stays inlined.
 const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
+	{ source: 'scripts/hooks/codex-hook-adapter.ts', out: 'codex-hook-adapter' },
 	{ source: 'scripts/hooks/pretool-guard.ts', out: 'pretool-guard' },
 	{ source: 'scripts/hooks/format-edited-file.ts', out: 'format-edited' },
 	{ source: 'scripts/josh/session-language-cli.ts', out: 'session-lang' },

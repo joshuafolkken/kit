@@ -64,9 +64,10 @@ words:
   # "re-askable" from "ask".
   - askable
   # The single-process guard command wired to the distributed `.claude/settings.json` PreToolUse hook
-  # (`josh pretool:guard`). Distributed, because `josh sync` copies that settings file and the docs
-  # that name the command.
+  # (`josh pretool:guard`), and the matching Codex adapter phase. Distributed, because `josh sync`
+  # copies that settings file and the package carries the provider adapter.
   - pretool
+  - posttool
   - delegatable
   - backgrounding
   - unretried

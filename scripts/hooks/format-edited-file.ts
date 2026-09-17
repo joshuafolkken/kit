@@ -345,6 +345,12 @@ async function format_edited_file(
 	}
 }
 
+// Provider adapters use the same live runner as the direct Claude hook without exporting that
+// implementation detail or recreating its fallback sequence.
+async function format_edited_payload(raw_payload: string, project_root: string): Promise<void> {
+	await format_edited_file(raw_payload, run_command, project_root)
+}
+
 // The one hook event this file is wired to, and the value the envelope below has to name.
 const HOOK_EVENT_NAME = 'PostToolUse'
 
@@ -390,13 +396,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		// Written before the formatters run: it costs milliseconds against their second, and a hook
 		// killed at its timeout would otherwise lose the line along with the formatting.
 		write_density_envelope(payload)
-		await format_edited_file(payload, run_command, process.cwd())
+		await format_edited_payload(payload, process.cwd())
 	}
 }
 
 export {
 	density_envelope,
 	format_edited_file,
+	format_edited_payload,
 	is_start_failure,
 	parse_edited_path,
 	plan_commands,
