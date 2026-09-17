@@ -129,7 +129,7 @@
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
 		"@types/node": "^26.6.1",
 		"@types/semver": "^7.8.0",
-		"cspell": "^10.3.1",
+		"cspell": "^10.3.2",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.10.0",
 		"lefthook": "^2.1.14",
@@ -140,7 +140,7 @@
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.5",
 		"typescript": "^6.0.3",
-		"vitest": "^5.0.0"
+		"vitest": "^5.0.1"
 	},
 	"dependencies": {
 		"@eslint/compat": "^2.1.1",
@@ -150,7 +150,7 @@
 		"eslint-import-resolver-typescript": "^4.4.5",
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-promise": "^7.3.0",
-		"eslint-plugin-sonarjs": "^4.2.0",
+		"eslint-plugin-sonarjs": "^4.2.1",
 		"eslint-plugin-unicorn": "^74.0.0",
 		"eslint_d": "^15.0.3",
 		"execa": "^10.0.1",

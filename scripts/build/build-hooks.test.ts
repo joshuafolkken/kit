@@ -37,28 +37,32 @@ async function expect_parity(source: string, bundle: string, input: string): Pro
 	expect(from_bundle).toEqual(from_source)
 }
 
+async function expect_adapter_parity(mode: string, input: string): Promise<void> {
+	const source = await run(TSX_BIN, ['scripts/hooks/codex-hook-adapter.ts', mode], input)
+	const bundle = await run('node', ['dist/hooks/codex-hook-adapter.js', mode], input)
+
+	expect(bundle).toEqual(source)
+}
+
+const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
+
+writeFileSync(path.join(directory, 't.jsonl'), '{"type":"assistant","message":{"content":[]}}\n')
+
+beforeAll(async () => {
+	await build_hooks()
+}, BUILD_TIMEOUT_MS)
+
+afterAll(() => {
+	rmSync(directory, { recursive: true, force: true })
+})
+
+function payload(tool_name: string, tool_input: Record<string, unknown>): string {
+	const transcript_path = path.join(directory, 't.jsonl')
+
+	return JSON.stringify({ transcript_path, tool_name, tool_input })
+}
+
 describe('build_hooks', () => {
-	let directory: string
-
-	beforeAll(async () => {
-		await build_hooks()
-		directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
-		writeFileSync(
-			path.join(directory, 't.jsonl'),
-			'{"type":"assistant","message":{"content":[]}}\n',
-		)
-	}, BUILD_TIMEOUT_MS)
-
-	afterAll(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
-
-	function payload(tool_name: string, tool_input: Record<string, unknown>): string {
-		const transcript_path = path.join(directory, 't.jsonl')
-
-		return JSON.stringify({ transcript_path, tool_name, tool_input })
-	}
-
 	it('builds every hook bundle', () => {
 		for (const bundle of HOOK_BUNDLES) expect(existsSync(outfile_for(bundle))).toBe(true)
 	})
@@ -78,4 +82,17 @@ describe('build_hooks', () => {
 
 		await expect_parity('scripts/hooks/format-edited-file.ts', 'dist/hooks/format-edited.js', input)
 	})
+})
+
+describe('Codex adapter bundle', () => {
+	it.each(['pretool', 'posttool'])(
+		'runs the Codex %s adapter identically to the source',
+		async (mode) => {
+			const input = payload('apply_patch', {
+				command: '*** Begin Patch\n*** Update File: absent.ts\n*** End Patch',
+			})
+
+			await expect_adapter_parity(mode, input)
+		},
+	)
 })
