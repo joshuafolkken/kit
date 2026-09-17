@@ -208,10 +208,13 @@ function read_carry(target: string, now: Date = new Date()): CarryRead {
 }
 
 // The identity to record for a pid the caller declared. `read_start` is what makes the pair an
-// identity rather than a number: a pid the operating system reissues to something else has a
-// different start time, so the record stops matching the moment its owner is gone.
-function owner_of(pid: number): CarryOwner {
-	return { pid, start: process_identity.read_start(pid) }
+// identity rather than a number; injected in tests so the sandbox branch is exercised without
+// changing the machine's process capabilities.
+function owner_of(
+	pid: number,
+	read: (owner_pid: number) => string | undefined = process_identity.read_start,
+): CarryOwner {
+	return { pid, start: read(pid) }
 }
 
 function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry {
@@ -330,12 +333,11 @@ function apply_change(target: string, carry: RunCarry, change: CarryChange): Run
 	return next
 }
 
-// `=== true` rather than truthiness: `is_same_process` answers `undefined` where this platform cannot
-// tell, and where nobody declared an owner. Both resolve to *not provably live*, which routes to
-// `standing` — a refusal that asks for a decision — instead of to `busy`, which would claim a fact
-// nothing established.
+// A live pid with no readable start token is conservatively held rather than replaced. The command
+// cannot prove its generation inside that sandbox, but a false `busy` stops for a person while a
+// false `standing` can put two parents on one budget. A record with no pid still resolves false.
 function is_owner_live(carry: RunCarry): boolean {
-	return process_identity.is_same_process(carry.owner_pid, carry.owner_start) === true
+	return process_identity.is_same_process(carry.owner_pid, carry.owner_start) !== false
 }
 
 function is_owned_by(carry: RunCarry, owner: CarryOwner): boolean {

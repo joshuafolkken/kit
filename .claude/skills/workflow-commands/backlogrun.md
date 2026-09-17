@@ -193,7 +193,9 @@ pnpm josh run:carry --json                                                   # r
 what lets the command answer `busy` instead of letting a second parent count into a budget that is
 still being spent. Left off, the record declares no owner and every standing record reads as not
 provably live — refused rather than resumed, so nothing is lost silently, but the useful half of the
-answer is gone.
+answer is gone. When the sandbox cannot read a process-start token, a live PID is conservatively held
+as `busy`: stopping on a reused PID costs a decision, while replacing a genuinely live owner creates
+two parents on one budget.
 
 **Ask it before the plan, in the same turn as the first `git switch main && git pull`.** The contract
 is `docs/josh-commands.md` → "`josh run:carry`"; what this loop does with each answer is here:

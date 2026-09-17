@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
@@ -21,8 +22,8 @@ vi.mock('#scripts/git/git-command', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
 
-// `owner_of` identifies a declared pid through native probes; the socket fallback identifies only
-// the current process that opened it, which the CLI's `--owner "$PPID"` is not.
+// These cases fabricate native start tokens, so they stay capability-gated separately from the
+// no-probe regression below.
 const { DEAD_PID, has_native_start_probe: has_owner_probe } = process_identity_fixture
 
 const TEST_PREFIX = 'run-carry-cli-test-'
@@ -108,6 +109,18 @@ describe('who a standing record belongs to', () => {
 
 	it.skipIf(!has_owner_probe)('answers busy while the owner is still running', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
+		out.length = 0
+
+		expect(await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(DEAD_PID)])).toBe(1)
+		expect(out).toStrictEqual([run_carry_cli.BUSY_VERDICT])
+	})
+
+	it('answers busy conservatively when the sandbox cannot read an owner start token', async () => {
+		vi.spyOn(process_identity, 'read_start').mockReturnValue(undefined)
+		await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
+		out.length = 0
+		await run_carry_cli.run(['--merged', '1', '--owner', String(process.pid)])
+		expect(out).toStrictEqual([run_carry_cli.COUNTED_VERDICT])
 		out.length = 0
 
 		expect(await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(DEAD_PID)])).toBe(1)
