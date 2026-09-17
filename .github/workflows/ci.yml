@@ -89,6 +89,92 @@ jobs:
             echo "::warning::Playwright image ${image} could not be resolved on MCR (HTTP ${status}). Running on the plain runner and installing ${browsers} instead (set the JOSH_PLAYWRIGHT_BROWSERS repository variable to change the list)."
           fi
 
+  # A merge commit whose tree is identical to the merged pull request's head has already passed the
+  # required Checks context. Prove all three facts before reusing that result: this push came from one
+  # merged pull request, both commits name the same tree, and GitHub reports a successful Checks run on
+  # that exact pull request head. Every API or parsing failure leaves `reuse=false`, so a direct push,
+  # a conflicted merge, or unavailable evidence falls back to running both verification jobs.
+  reuse-pr-checks:
+    name: Reuse PR Checks
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    outputs:
+      reuse: ${{ steps.prove.outputs.reuse }}
+    steps:
+      - name: Prove the pushed tree passed PR Checks
+        id: prove
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          echo 'reuse=false' >> "$GITHUB_OUTPUT"
+
+          if ! pulls=$(gh api "repos/${REPOSITORY}/commits/${CURRENT_SHA}/pulls"); then
+            echo '::notice::Could not identify the pull request; running the verification jobs.'
+            exit 0
+          fi
+          if ! pull=$(printf '%s' "${pulls}" | jq -r --arg sha "${CURRENT_SHA}" \
+            '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")] | if length == 1 then .[0] | [.number, .head.sha, .head.ref, .created_at, .merged_at] | @tsv else empty end'); then
+            echo '::notice::Could not parse the pull request; running the verification jobs.'
+            exit 0
+          fi
+          if [ -z "${pull}" ]; then
+            echo 'No unique merged pull request matched this push; running the verification jobs.'
+            exit 0
+          fi
+          IFS=$'\t' read -r pull_number head_sha head_ref created_at merged_at <<< "${pull}"
+
+          if ! current_tree=$(gh api "repos/${REPOSITORY}/git/commits/${CURRENT_SHA}" --jq '.tree.sha') || \
+            ! pr_tree=$(gh api "repos/${REPOSITORY}/git/commits/${head_sha}" --jq '.tree.sha'); then
+            echo '::notice::Could not compare Git trees; running the verification jobs.'
+            exit 0
+          fi
+          if [ "${current_tree}" != "${pr_tree}" ]; then
+            echo 'The pushed tree differs from the verified pull request; running the verification jobs.'
+            exit 0
+          fi
+
+          if ! check_runs=$(gh api --method GET "repos/${REPOSITORY}/commits/${head_sha}/check-runs" \
+            -f per_page=100); then
+            echo '::notice::Could not read pull request checks; running the verification jobs.'
+            exit 0
+          fi
+          if ! run_ids=$(printf '%s' "${check_runs}" | jq -r \
+            '.check_runs[] | select(.name == "Checks" and .app.slug == "github-actions" and .status == "completed" and .conclusion == "success") | .details_url | select(test("/actions/runs/[0-9]+/job/")) | capture("/actions/runs/(?<id>[0-9]+)/job/").id'); then
+            echo '::notice::Could not parse pull request checks; running the verification jobs.'
+            exit 0
+          fi
+          passed=false
+          for run_id in ${run_ids}; do
+            if ! run=$(gh api "repos/${REPOSITORY}/actions/runs/${run_id}"); then
+              continue
+            fi
+            if printf '%s' "${run}" | jq -e --arg head_sha "${head_sha}" --arg head_ref "${head_ref}" \
+              --arg created_at "${created_at}" --arg merged_at "${merged_at}" \
+              '.event == "pull_request" and .head_sha == $head_sha and .head_branch == $head_ref and .path == ".github/workflows/ci.yml" and .conclusion == "success" and .created_at >= $created_at and .created_at <= $merged_at' >/dev/null; then
+              if artifacts=$(gh api --method GET "repos/${REPOSITORY}/actions/runs/${run_id}/artifacts" \
+                -f per_page=100) && printf '%s' "${artifacts}" | jq -e --arg name "pr-checks-${pull_number}" \
+                '.artifacts | any(.name == $name and .expired == false)' >/dev/null; then
+                passed=true
+                break
+              fi
+            fi
+          done
+          if [ "${passed}" != 'true' ]; then
+            echo 'The pull request has no successful Checks result; running the verification jobs.'
+            exit 0
+          fi
+
+          echo 'reuse=true' >> "$GITHUB_OUTPUT"
+          echo "Reusing successful PR Checks for tree ${current_tree}."
+
   # joshuafolkken/kit#1226 split the gate's four checks across two runners. The unit suite is the only
   # one that fans out across every core — 8.5 of them on the machine `scripts/gate/gate-plan.ts` measures —
   # so on a 4-core GitHub runner it and the other three spent the whole job taking cores off each
@@ -104,6 +190,8 @@ jobs:
   # already requires: a job that is green only when both halves are.
   static-checks:
     name: Static Checks
+    needs: reuse-pr-checks
+    if: ${{ always() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -248,6 +336,8 @@ jobs:
   # exactly as it did inside the gate step.
   unit:
     name: Unit Tests
+    needs: reuse-pr-checks
+    if: ${{ always() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -313,7 +403,7 @@ jobs:
   # shell body is the pattern to keep out of a workflow regardless of the value's provenance.
   checks:
     name: Checks
-    needs: [static-checks, unit]
+    needs: [reuse-pr-checks, static-checks, unit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -321,16 +411,39 @@ jobs:
     steps:
       - name: Require both halves of the verification gate
         env:
+          REUSE_RESULT: ${{ needs.reuse-pr-checks.outputs.reuse }}
           STATIC_RESULT: ${{ needs.static-checks.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
         run: |
+          echo "Reuse PR Checks: ${REUSE_RESULT}"
           echo "Static Checks: ${STATIC_RESULT}"
           echo "Unit Tests: ${UNIT_RESULT}"
           if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'success' ]; then
             exit 0
           fi
+          if [ "${REUSE_RESULT}" = 'true' ] && [ "${STATIC_RESULT}" = 'skipped' ] && \
+            [ "${UNIT_RESULT}" = 'skipped' ]; then
+            exit 0
+          fi
           echo "::error::the verification gate did not pass on both runners"
           exit 1
+
+      # The artifact binds this successful Checks job to the pull request number. A later main push
+      # reads it from this exact Actions run before reusing the result; the name alone is sufficient
+      # because the run already proves the head SHA, branch, workflow and pull_request event.
+      - name: Write PR Checks evidence
+        if: github.event_name == 'pull_request'
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: printf '%s\n' "${PULL_REQUEST_NUMBER}" > pr-checks-evidence
+
+      - name: Upload PR Checks evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-checks-${{ github.event.pull_request.number }}
+          path: pr-checks-evidence
+          retention-days: 1
 
   security:
     name: Security Audit
