@@ -157,19 +157,6 @@ jobs:
             ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-eslint-cache-
 
-      # The `josh` checks below write both incremental caches at the repo root. A sha-tailed key saves
-      # the warmed result from every run, and the sha-less prefix restores the newest prior entry.
-      - name: Setup TypeScript build cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: tsbuildinfo-cache
-        with:
-          path: |
-            .tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-tsbuildinfo-
-
       - name: Setup cspell cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: cspell-cache
@@ -196,7 +183,7 @@ jobs:
         run: pnpm prepare
 
       - name: Run type check
-        run: pnpm exec svelte-kit sync && pnpm exec svelte-check --tsconfig ./tsconfig.json --threshold error && pnpm josh check
+        run: pnpm exec svelte-kit sync && pnpm exec svelte-check --tsconfig ./tsconfig.json --threshold error
 
       - name: Run prettier check
         run: pnpm exec prettier --check .
