@@ -18,8 +18,13 @@ const LANE_COUNT = 6
 const PROBE_PREFIX = 'josh-unit-share-test-'
 // The pids no live process holds and the start time none can have — `process-identity-fixture.ts` for
 // why each is the value it is.
-const { DEAD_PID, FOREIGN_START, GROUP_PID, NEGATIVE_PID, has_start_probe } =
-	process_identity_fixture
+const {
+	DEAD_PID,
+	FOREIGN_START,
+	GROUP_PID,
+	NEGATIVE_PID,
+	has_native_start_probe: has_start_probe,
+} = process_identity_fixture
 
 const DEAD_MARKER = `${unit_worker_share.RUN_PREFIX}dead.json`
 const ALIVE_MARKER = `${unit_worker_share.RUN_PREFIX}alive.json`

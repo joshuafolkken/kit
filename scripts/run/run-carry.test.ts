@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_carry, type CarryClaimRequest, type CarryOwner, type RunCarry } from './run-carry'
@@ -59,7 +60,9 @@ function claim_of(
 }
 
 function live_owner(): CarryOwner {
-	return run_carry.owner_of(process.pid)
+	const identity = process_identity.own_fields()
+
+	return { pid: identity.pid, start: identity.process_start }
 }
 
 // A pid that cannot exist, so the record reads as an owner that is gone without racing the operating

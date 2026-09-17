@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_unit_guard } from './test-unit-guard'
@@ -15,9 +16,41 @@ type ExecaResult = Awaited<ReturnType<typeof execa>>
 const UNIT_TEST_BASENAME = 'sample.test.ts'
 const COVERAGE_FLAG = '--coverage'
 const UNIT_FILE = path.join('src', UNIT_TEST_BASENAME)
+const OUTER_SEED = '7'
+const OUTER_SEAT = '3'
+const SPAWN_OPTIONS_POSITION = 2
 
 function fake_result(exit_code: number | undefined): ExecaResult {
 	return { exitCode: exit_code } as unknown as ExecaResult
+}
+
+function is_record(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null
+}
+
+function last_spawn_options(): Record<string, unknown> {
+	const { calls }: { calls: unknown } = mocked_execa.mock
+	if (!Array.isArray(calls)) throw new Error('The execa mock did not record calls')
+
+	const safe_calls = calls.map((call: unknown) => call)
+	const last_call: unknown = safe_calls.at(-1)
+	if (!Array.isArray(last_call)) throw new Error('The execa mock recorded no last call')
+
+	const safe_call = last_call.map((entry: unknown) => entry)
+	const options: unknown = safe_call.at(SPAWN_OPTIONS_POSITION)
+	if (!is_record(options)) throw new Error('The execa call carried no options')
+
+	return options
+}
+
+function expect_isolated_environment(options: Record<string, unknown>): void {
+	const environment = options['env']
+	if (!is_record(environment)) throw new Error('The execa environment was not an object')
+
+	expect(options['extendEnv']).toBe(false)
+	expect(environment[PORT_SEED_KEY]).toBeUndefined()
+	expect(environment[LANE_SEAT_KEY]).toBeUndefined()
+	expect(environment['PATH']).toBe(process.env['PATH'])
 }
 
 const ctx = { project_directory: '' }
@@ -38,6 +71,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
@@ -203,7 +237,7 @@ describe('test_unit_guard.run_guarded_unit — run path', () => {
 		expect(mocked_execa).toHaveBeenCalledWith(
 			'pnpm',
 			['exec', 'vitest', 'run', COVERAGE_FLAG],
-			expect.objectContaining({ reject: false }),
+			expect.objectContaining({ extendEnv: false, reject: false }),
 		)
 	})
 
@@ -228,5 +262,33 @@ describe('test_unit_guard.run_guarded_unit — run path', () => {
 			['exec', 'vitest', 'run', '--maxWorkers=2'],
 			expect.objectContaining({ reject: false }),
 		)
+	})
+})
+
+describe('test_unit_guard.isolated_unit_environment', () => {
+	it('removes the checkout port allocation and keeps unrelated values', () => {
+		vi.stubEnv(PORT_SEED_KEY, OUTER_SEED)
+		vi.stubEnv(LANE_SEAT_KEY, OUTER_SEAT)
+		const environment = test_unit_guard.isolated_unit_environment()
+
+		expect(environment[PORT_SEED_KEY]).toBeUndefined()
+		expect(environment[LANE_SEAT_KEY]).toBeUndefined()
+		expect(environment['PATH']).toBe(process.env['PATH'])
+	})
+})
+
+describe('test_unit_guard.run_guarded_unit — spawn environment', () => {
+	beforeEach(() => {
+		add_vitest_package()
+		add_unit_file(UNIT_FILE)
+	})
+
+	it('passes the isolated environment to Vitest', async () => {
+		vi.stubEnv(PORT_SEED_KEY, OUTER_SEED)
+		vi.stubEnv(LANE_SEAT_KEY, OUTER_SEAT)
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
+		expect_isolated_environment(last_spawn_options())
 	})
 })

@@ -2,6 +2,7 @@
 import { existsSync, globSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
 import { execa } from 'execa'
 import { unit_worker_share } from './unit-worker-share'
 
@@ -72,6 +73,19 @@ function has_unit_tests(project_directory: string): boolean {
 	return matches.length > 0
 }
 
+// A lane's port allocation belongs to its development and preview servers, not to unit fixtures.
+// Passing it into Vitest makes every case that deliberately omits or replaces the seed inherit the
+// checkout's seat instead. Keep the rest of the caller's environment, including CI and PATH guards.
+function isolated_unit_environment(
+	environment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+	const isolated = { ...environment }
+
+	for (const key of PROJECT_ENVIRONMENT_KEYS) Reflect.deleteProperty(isolated, key)
+
+	return isolated
+}
+
 // The whole vitest invocation after the binary, not just the flags: `josh test:related` runs
 // `vitest related <files> --run` where this command runs `vitest run`, and the two must not grow
 // two copies of the guard, the spawn or the skip notice around that one difference
@@ -92,6 +106,8 @@ async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<numb
 			unit_worker_share.current_share(),
 		)
 		const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments, ...sized], {
+			env: isolated_unit_environment(),
+			extendEnv: false,
 			stdio: 'inherit',
 			reject: false,
 		})
@@ -160,6 +176,7 @@ const test_unit_guard = {
 	resolve_guard_action,
 	is_vitest_installed,
 	has_unit_tests,
+	isolated_unit_environment,
 	run_guarded_unit,
 	run_guarded_vitest,
 }

@@ -21,7 +21,9 @@ vi.mock('#scripts/git/git-command', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
 
-const { DEAD_PID, has_start_probe } = process_identity_fixture
+// `owner_of` identifies a declared pid through native probes; the socket fallback identifies only
+// the current process that opened it, which the CLI's `--owner "$PPID"` is not.
+const { DEAD_PID, has_native_start_probe: has_owner_probe } = process_identity_fixture
 
 const TEST_PREFIX = 'run-carry-cli-test-'
 const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
@@ -104,7 +106,7 @@ describe('who a standing record belongs to', () => {
 		expect(run_carry.read_carry(target())).toStrictEqual(first)
 	})
 
-	it.skipIf(!has_start_probe)('answers busy while the owner is still running', async () => {
+	it.skipIf(!has_owner_probe)('answers busy while the owner is still running', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
 		out.length = 0
 
@@ -134,7 +136,7 @@ describe('beginning a run over a record that is already there', () => {
 
 	// The bound ends *that* run. Replacing a spent record a live parent is still counting into would
 	// delete its budget and answer `began` — the two-parents defect, one branch over.
-	it.skipIf(!has_start_probe)('refuses a spent record whose owner is still running', async () => {
+	it.skipIf(!has_owner_probe)('refuses a spent record whose owner is still running', async () => {
 		run_carry.begin_carry(target(), INVOCATION, run_carry.owner_of(process.pid), LONG_AGO)
 
 		expect(await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(DEAD_PID)])).toBe(1)
@@ -234,7 +236,7 @@ describe('counting into a carried run', () => {
 // with `--owner "$PPID"`; a session handed off at a cut, or whose record a successor took over, is
 // refused so the single writer joshuafolkken/kit#1722 established survives the cut.
 describe('counting guarded by ownership', () => {
-	it.skipIf(!has_start_probe)('lets the recorded live owner advance the budget', async () => {
+	it.skipIf(!has_owner_probe)('lets the recorded live owner advance the budget', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
 		out.length = 0
 
@@ -242,7 +244,7 @@ describe('counting guarded by ownership', () => {
 		expect(out).toStrictEqual([run_carry_cli.COUNTED_VERDICT])
 	})
 
-	it.skipIf(!has_start_probe)(
+	it.skipIf(!has_owner_probe)(
 		'refuses a count from a session whose ownership was taken',
 		async () => {
 			await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(process.pid)])
