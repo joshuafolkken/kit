@@ -1,7 +1,7 @@
 import { KIT_PACKAGE_NAME } from './kit-descriptor'
 
 const NODE_MODULES = 'node_modules'
-const FIX_GH_PACKAGES_SCRIPT = 'scripts/fix-gh-packages.ts'
+const FIX_GH_PACKAGES_SCRIPT = 'scripts/gh/fix-gh-packages.ts'
 const SCOPED_PACKAGE_PATTERN = /^@(?<owner>[^/]+)\/(?<name>.+)$/u
 
 // fix-gh-packages.ts is published only by kit, so every consumer (kit, app-kit, game-kit) repairs

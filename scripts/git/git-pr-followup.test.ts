@@ -3,7 +3,7 @@ import { UNREADABLE_CR_NOTE } from './git-pr-coderabbit'
 import {
 	build_issue_url,
 	git_pr_followup,
-	post_notify_issue,
+	parse_closes_issue_number,
 	warn_if_missing_closes,
 	type FollowupInput,
 } from './git-pr-followup'
@@ -35,6 +35,8 @@ vi.mock('./git-pr-checks', () => ({
 	git_pr_checks: {
 		wait_for_pr_success: vi.fn(),
 	},
+	DEFAULT_STABLE_READS: 2,
+	WATCH_CONFIRMED_STABLE_READS: 1,
 }))
 
 vi.mock('./git-pr-ai-review', () => ({
@@ -46,9 +48,45 @@ vi.mock('./git-pr-ai-review', () => ({
 	},
 }))
 
+// The gate reads the branch diff of whatever tree the suite happens to run in, so leaving it real
+// would make these tests pass or fail on the working copy — green today, red the moment the run
+// edits a distributed file (joshuafolkken/kit#1578). The implementation is passed to `vi.fn` rather
+// than set afterwards so it survives `clearAllMocks` / `resetAllMocks`; `run_review_checks` spreads
+// the result, and a bare `vi.fn()` would answer `undefined`.
+vi.mock('./git-pr-managed-config', () => ({
+	git_pr_managed_config: {
+		handle_managed_config_changes: vi.fn(async () => []),
+	},
+}))
+
 vi.mock('./telegram-notify', () => ({
 	telegram_notify: {
 		send: vi.fn(),
+		send_or_report: vi.fn(),
+	},
+}))
+
+// **The missing mock, added while the merge-gate recovery in joshuafolkken/kit#1077 was being
+// verified.** `notify_completion` asks this collaborator for the unreleased-merge line, and the real
+// one resolves the tip by running `git fetch origin main` — measured at about 5 seconds in a linked
+// work tree. Every one of this file's tests calls `run`, so every one of them made that request, and
+// against the 10-second `testTimeout` a handful of them failed on network variance rather than on
+// anything under test. That is exactly what joshuafolkken/kit#1353's network guard exists to prevent;
+// the guard watched `gh` only, so a `git` fetch walked straight past it — **which it no longer does**:
+// joshuafolkken/kit#1515 extended the shim to `git`, so this mock going missing now fails the whole
+// suite rather than costing it four seconds a test. Nothing here asserts on the
+// line — `git-followup-pending.test.ts` covers it, passing `tip` so it fetches nothing.
+// The post-merge tail reaches the observation-ledger flush (joshuafolkken/kit#1810); its behavior is
+// `git-followup-flush.test.ts`, so it is a no-op here.
+vi.mock('./git-followup-flush', () => ({
+	git_followup_flush: { flush_ledger_step: vi.fn() },
+}))
+
+vi.mock('./git-followup-pending', () => ({
+	git_followup_pending: {
+		MERGE_PENDING_NOTE: '',
+		pending_release_line: vi.fn(),
+		read_pending: vi.fn(),
 	},
 }))
 
@@ -69,14 +107,11 @@ const BASE_INPUT: FollowupInput = {
 	should_merge: false,
 }
 
-const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
-const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
-const mocked_comment = vi.mocked(git_gh_command.issue_comment)
 const mocked_pr_get_body = vi.mocked(git_gh_command.pr_get_body)
 
 // The body of the completion notification the run sent, or undefined when it sent none.
 function notify_body(): string | undefined {
-	return (vi.mocked(telegram_notify.send).mock.calls[0] ?? [])[0]?.body
+	return (vi.mocked(telegram_notify.send_or_report).mock.calls[0] ?? [])[0]?.body
 }
 
 function silence_warnings(): void {
@@ -95,7 +130,7 @@ function setup_run_mocks(): void {
 	})
 	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
-	vi.mocked(telegram_notify.send).mockResolvedValue()
+	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
 	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
 }
 
@@ -105,48 +140,56 @@ function setup_skip_policy_mocks(): void {
 	setup_run_mocks()
 }
 
-describe('post_notify_issue — blank body uses edit, non-blank uses comment', () => {
-	const ISSUE_NUMBER = '42'
-	const NOTIFY_BODY = 'Completion notification'
+// joshuafolkken/kit#1539: the issue number used to reach the notification from the command line
+// alone, and an invocation that omitted it threw after the merge had already landed. The stage that
+// warns about a missing `closes #N` reads the pull request body anyway, so that read is what recovers
+// the number.
+const CLOSES_KEYWORD = 'closes #1539'
+const BODY_WITHOUT_CLOSES = '## Summary\nNo issue link here'
 
-	beforeEach(() => {
-		vi.clearAllMocks()
+describe('parse_closes_issue_number — the number the pull request closes', () => {
+	it('reads the number out of the closes keyword', () => {
+		expect(parse_closes_issue_number(`## Summary\n\n${CLOSES_KEYWORD}\n`)).toBe('1539')
 	})
 
-	it('calls issue_edit_body when issue body is blank', async () => {
-		mocked_get_body.mockResolvedValue('')
-		mocked_edit_body.mockResolvedValue('')
-
-		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
-
-		expect(mocked_edit_body).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
-		expect(mocked_comment).not.toHaveBeenCalled()
+	it('matches the keyword whatever its case', () => {
+		expect(parse_closes_issue_number('Closes #42')).toBe('42')
 	})
 
-	it('calls issue_comment when issue body is non-blank', async () => {
-		mocked_get_body.mockResolvedValue('existing content')
-		mocked_comment.mockResolvedValue('')
-
-		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
-
-		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
-		expect(mocked_edit_body).not.toHaveBeenCalled()
+	it('answers undefined when the body has no closes keyword', () => {
+		expect(parse_closes_issue_number(BODY_WITHOUT_CLOSES)).toBeUndefined()
 	})
 
-	it('falls back to issue_comment when body fetch fails (undefined)', async () => {
-		mocked_get_body.mockResolvedValue(undefined)
-		mocked_comment.mockResolvedValue('')
+	it('answers undefined when the body could not be read', () => {
+		expect(parse_closes_issue_number(undefined)).toBeUndefined()
+	})
+})
 
-		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
+describe('git_pr_followup.run — the issue number an invocation omitted', () => {
+	beforeEach(setup_skip_policy_mocks)
 
-		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
-		expect(mocked_edit_body).not.toHaveBeenCalled()
+	it('recovers it from the pull request body', async () => {
+		mocked_pr_get_body.mockResolvedValue(CLOSES_KEYWORD)
+
+		await expect(
+			git_pr_followup.run({ ...BASE_INPUT, issue_number: undefined, should_merge: true }),
+		).resolves.toBe('1539')
 	})
 
-	it('throws when issue_number is undefined', async () => {
-		await expect(post_notify_issue({ issue_number: undefined, body: NOTIFY_BODY })).rejects.toThrow(
-			'Issue number is required for issue notification.',
-		)
+	it('keeps the number the invocation named', async () => {
+		mocked_pr_get_body.mockResolvedValue(CLOSES_KEYWORD)
+
+		await expect(
+			git_pr_followup.run({ ...BASE_INPUT, issue_number: '42', should_merge: true }),
+		).resolves.toBe('42')
+	})
+
+	it('answers undefined when neither the invocation nor the body carried one', async () => {
+		mocked_pr_get_body.mockResolvedValue(BODY_WITHOUT_CLOSES)
+
+		await expect(
+			git_pr_followup.run({ ...BASE_INPUT, issue_number: undefined, should_merge: true }),
+		).resolves.toBeUndefined()
 	})
 })
 
@@ -159,7 +202,7 @@ describe('warn_if_missing_closes', () => {
 	})
 
 	it('prints a warning when PR body has no closes keyword', async () => {
-		mocked_pr_get_body.mockResolvedValue('## Summary\nNo issue link here')
+		mocked_pr_get_body.mockResolvedValue(BODY_WITHOUT_CLOSES)
 
 		await warn_if_missing_closes(BRANCH)
 
@@ -189,7 +232,7 @@ describe('git_pr_followup.run — --merge flag', () => {
 	it('calls notify before pr_merge when should_merge is true', async () => {
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		const [notify_order] = vi.mocked(telegram_notify.send).mock.invocationCallOrder
+		const [notify_order] = vi.mocked(telegram_notify.send_or_report).mock.invocationCallOrder
 		const [merge_order] = vi.mocked(git_gh_command.pr_merge).mock.invocationCallOrder
 
 		expect(notify_order).toBeLessThan(merge_order ?? Infinity)

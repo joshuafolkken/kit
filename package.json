@@ -1,20 +1,23 @@
 {
-	"version": "1.340.0",
+	"version": "1.638.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
-	"packageManager": "pnpm@11.25.0+sha512.5cde925b4f075f725eb71fbae18a42ffe784524789f19b61c731cb8721ec28aaee160e01a8d5af4fedb2a42cdbf300efe23db356b0d4a17b4d63e11f8ab7c956",
+	"packageManager": "pnpm@11.27.0+sha512.ad12821463bb143295f1fa3ecde77a6b9b97a7990386da800ff57bffc3964dc64b7b1c7559d5dbe5c337aea659ed9c8937d4370bd198ca2009bc6fa0249808e7",
 	"engines": {
 		"node": ">=22.19.0"
+	},
+	"josh": {
+		"progress_interval_minutes": 15
 	},
 	"bin": {
 		"josh": "dist/josh.js"
 	},
 	"scripts": {
 		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci",
-		"prepare": "lefthook install",
-		"build": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts && tsx scripts/build-self-sync-guard.ts",
-		"prepack": "tsx scripts/version/publishable-range-check.ts && tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts && tsx scripts/build-self-sync-guard.ts",
+		"prepare": "(command -v lefthook >/dev/null 2>&1 && { lefthook install || echo 'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything' >&2; } || true)",
+		"build": "tsx scripts/build/build-bin.ts && tsx scripts/build/build-hooks.ts && tsx scripts/build/build-version.ts && tsx scripts/build/build-config-merge.ts && tsx scripts/build/build-managed-marker.ts && tsx scripts/build/build-self-sync-guard.ts && tsx scripts/build/build-claude-md.ts",
+		"prepack": "tsx scripts/version/publishable-range-check.ts && tsx scripts/build/build-bin.ts && tsx scripts/build/build-hooks.ts && tsx scripts/build/build-version.ts && tsx scripts/build/build-config-merge.ts && tsx scripts/build/build-managed-marker.ts && tsx scripts/build/build-self-sync-guard.ts && tsx scripts/build/build-claude-md.ts",
 		"josh": "tsx scripts/josh/josh.ts"
 	},
 	"files": [
@@ -33,6 +36,8 @@
 		"lefthook",
 		".claude/settings.json",
 		".claude/skills",
+		".claude/.claude-plugin",
+		".claude-plugin",
 		".vscode",
 		".github",
 		"CLAUDE.md",
@@ -50,9 +55,12 @@
 		"tsconfig.sonar.json",
 		"playwright.config.ts",
 		"!**/*.test.ts",
-		"!scripts/gh-subcommand-guard.ts",
+		"!scripts/gh/gh-subcommand-guard.ts",
 		"!**/*.spec.ts",
-		"!**/*-fixture.ts"
+		"!**/*-fixture.ts",
+		"!scripts/eval",
+		"!scripts/time",
+		"!scripts/cost"
 	],
 	"imports": {
 		"#eslint/*": "./eslint/*",
@@ -119,20 +127,20 @@
 		"@actions/expressions": "^0.3.61",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
-		"@types/node": "^26.4.1",
+		"@types/node": "^26.6.1",
 		"@types/semver": "^7.8.0",
-		"cspell": "^10.2.2",
+		"cspell": "^10.3.2",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.10.0",
-		"lefthook": "^2.1.12",
+		"lefthook": "^2.1.14",
 		"prettier": "^3.9.6",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.63.1",
+		"rollup": "^4.63.3",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.5",
 		"typescript": "^6.0.3",
-		"vitest": "^5.0.0"
+		"vitest": "^5.0.1"
 	},
 	"dependencies": {
 		"@eslint/compat": "^2.1.1",
@@ -142,24 +150,24 @@
 		"eslint-import-resolver-typescript": "^4.4.5",
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-promise": "^7.3.0",
-		"eslint-plugin-sonarjs": "^4.2.0",
+		"eslint-plugin-sonarjs": "^4.2.1",
 		"eslint-plugin-unicorn": "^74.0.0",
 		"eslint_d": "^15.0.3",
 		"execa": "^10.0.1",
 		"globals": "^17.12.0",
-		"js-yaml": "^5.4.1",
+		"js-yaml": "^5.4.2",
 		"jsonc-parser": "^3.3.1",
 		"ora": "^9.4.1",
 		"semver": "^7.8.5",
 		"strip-json-comments": "^5.0.3",
 		"tsx": "^4.23.13",
-		"typescript-eslint": "^8.69.0",
-		"zod": "^4.5.4"
+		"typescript-eslint": "^8.70.0",
+		"zod": "^4.6.5"
 	},
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "11.25.0+sha512.5cde925b4f075f725eb71fbae18a42ffe784524789f19b61c731cb8721ec28aaee160e01a8d5af4fedb2a42cdbf300efe23db356b0d4a17b4d63e11f8ab7c956",
+			"version": "11.27.0+sha512.ad12821463bb143295f1fa3ecde77a6b9b97a7990386da800ff57bffc3964dc64b7b1c7559d5dbe5c337aea659ed9c8937d4370bd198ca2009bc6fa0249808e7",
 			"onFail": "error"
 		}
 	}

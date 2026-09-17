@@ -27,6 +27,10 @@ const SOURCE = 'scripts/review/review-brief-cli.ts'
 const ADDED_TEST = 'scripts/review/review-round1-snapshot.test.ts'
 const IMPLEMENTED = 'aaa'
 const FIXED = 'bbb'
+// One change base throughout, which is the ordinary run: nothing moves it between the two rounds. A
+// record taken against a *different* base is not comparable at all since joshuafolkken/kit#1537, and
+// `review-round2-target-scope.test.ts` is where real git moves it.
+const BASE = '0123456789abcdef0123456789abcdef01234567'
 
 // The tree round 1 read, and the tree round 1's fixes left behind. The fix added a file as well as
 // changing one, because both sides of the comparison have to reach the delta.
@@ -34,7 +38,7 @@ const IMPLEMENTATION: Record<string, string> = { [SOURCE]: IMPLEMENTED }
 const AFTER_FIXES: Record<string, string> = { [SOURCE]: FIXED, [ADDED_TEST]: FIXED }
 
 function plant(files: Record<string, string>): void {
-	review_stamps.round_one_stamp.write(files, RECORD_PATH)
+	review_stamps.round_one_stamp.write(files, RECORD_PATH, BASE)
 }
 
 function recorded_files(): Record<string, string> | undefined {
@@ -43,6 +47,7 @@ function recorded_files(): Record<string, string> | undefined {
 
 function decide_with_record(tree: Record<string, string>): ReturnType<typeof review_round2.decide> {
 	return review_round2.decide({
+		base: BASE,
 		is_round_one_closed: true,
 		snapshot: review_stamps.round_one_stamp.read(RECORD_PATH),
 		tree,
@@ -64,19 +69,24 @@ describe('review_brief_cli.record_round_one — written once per run, never reta
 	it('keeps the record the run already has rather than retaking it against the fixed tree', () => {
 		plant(IMPLEMENTATION)
 
-		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, RECORD_PATH)
+		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, BASE, RECORD_PATH)
 
 		expect(recorded_files()).toStrictEqual(IMPLEMENTATION)
 	})
 
 	it('records the snapshot when the run has none yet', () => {
-		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, IMPLEMENTATION, RECORD_PATH)
+		review_brief_cli.record_round_one(
+			review_brief_cli.FIRST_ROUND,
+			IMPLEMENTATION,
+			BASE,
+			RECORD_PATH,
+		)
 
 		expect(recorded_files()).toStrictEqual(IMPLEMENTATION)
 	})
 
 	it('writes nothing on round 2, which reads the record rather than taking one', () => {
-		review_brief_cli.record_round_one(review_brief.SECOND_ROUND, AFTER_FIXES, RECORD_PATH)
+		review_brief_cli.record_round_one(review_brief.SECOND_ROUND, AFTER_FIXES, BASE, RECORD_PATH)
 
 		expect(recorded_files()).toBeUndefined()
 	})
@@ -85,7 +95,7 @@ describe('review_brief_cli.record_round_one — written once per run, never reta
 		plant(IMPLEMENTATION)
 		const taken_at = review_stamps.round_one_stamp.read(RECORD_PATH)?.taken_at ?? ''
 
-		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, RECORD_PATH)
+		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, BASE, RECORD_PATH)
 
 		expect(console.error).toHaveBeenCalledWith(
 			expect.stringContaining(review_brief_cli.KEPT_NOTE_PREFIX),
@@ -100,7 +110,7 @@ describe('the round-2 decision after a round-1 brief is re-run over the fixed tr
 	it('answers required rather than skip, because the kept record still predates the fixes', () => {
 		plant(IMPLEMENTATION)
 
-		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, RECORD_PATH)
+		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, BASE, RECORD_PATH)
 		const decision = decide_with_record(AFTER_FIXES)
 
 		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
@@ -128,7 +138,7 @@ describe('review_stamps.clear_round_one — the record lives for one run', () =>
 
 		expect(recorded_files()).toBeUndefined()
 
-		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, RECORD_PATH)
+		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, BASE, RECORD_PATH)
 
 		expect(recorded_files()).toStrictEqual(AFTER_FIXES)
 	})

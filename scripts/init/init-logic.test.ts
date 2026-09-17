@@ -109,10 +109,12 @@ describe('generate_playwright_config - CI detection helper', () => {
 })
 
 describe('get_ai_copy_files - AI and community files', () => {
-	it('includes all AI markdown and community files', () => {
+	// CLAUDE.md is deliberately absent: since joshuafolkken/kit#1878 it is distributed by import, not
+	// byte-copied (its own guard lives in init-logic.transform.test.ts).
+	it('includes the AI markdown and community files it still byte-copies', () => {
 		const result = init_logic.get_ai_copy_files()
 
-		expect(result).toContain('CLAUDE.md')
+		expect(result).not.toContain('CLAUDE.md')
 		expect(result).toContain('AGENTS.md')
 		expect(result).toContain('GEMINI.md')
 		expect(result).toContain('CODE_OF_CONDUCT.md')
@@ -271,8 +273,10 @@ describe('merge_package_scripts retired scripts', () => {
 })
 
 describe('get_ai_copy_directories', () => {
-	it('distributes the verify-ui skill', () => {
-		expect(init_logic.get_ai_copy_directories()).toContain('.claude/skills/verify-ui')
+	// The skill directories moved to plugin distribution (joshuafolkken/kit#1879), so nothing is copied
+	// as a directory any more; the list is kept as the seam for any future distributed directory.
+	it('no longer copies the verify-ui skill, which now ships as the kit plugin', () => {
+		expect(init_logic.get_ai_copy_directories()).not.toContain('.claude/skills/verify-ui')
 	})
 })
 

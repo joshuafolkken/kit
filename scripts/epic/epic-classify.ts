@@ -1,5 +1,17 @@
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	ALREADY_DONE_LABEL,
+	has_label_name,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/git/issue-labels'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
+import { epic_nested } from './epic-nested'
+import {
+	epic_outside_blocker,
+	type DependencyVerdict,
+	type OutsideNotice,
+	type ResolveDependency,
+} from './epic-outside-blocker'
 
 // Sorting an epic's open children into what a caller should do about them.
 //
@@ -13,17 +25,8 @@ import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 // What a caller does with a child: run it, wait for it, or stop and report it.
 type ChildCategory = 'runnable' | 'time' | 'human' | 'done'
 
-// What one dependency means for the child that carries it.
-//
-// `inherit` is the ordinary answer: the blocker is not finished, so this child's fate is the
-// blocker's fate. `time` and `human` are for a dependency that is unresolved for a reason the
-// blocker's own state does not show — joshuafolkken/kit#864's case, where a blocker is closed but
-// its package has not been published yet, is `time`.
-type DependencyVerdict = 'resolved' | 'time' | 'human' | 'inherit'
-
-// The extension point. Replaced wholesale by joshuafolkken/kit#864 to add the publish condition;
-// the default here knows only that a closed blocker is a finished one.
-type ResolveDependency = (blocker: EpicChild, blocked: EpicChild) => DependencyVerdict
+// `DependencyVerdict` and `ResolveDependency` live in `epic-outside-blocker.ts`, which weighs a
+// blocker no graph tracks with the same resolver (joshuafolkken/kit#1943), and are re-exported below.
 
 interface Classification {
 	runnable: ReadonlyArray<EpicChild>
@@ -38,15 +41,38 @@ function resolve_by_state(blocker: EpicChild): DependencyVerdict {
 	return blocker.state === CLOSED ? 'resolved' : 'inherit'
 }
 
+// Case-insensitive, through the shared comparison rather than `Array.includes`. GitHub keeps the
+// casing a label was created with and treats `Epic` and `epic` as one label, so a repository that
+// predates these scripts can answer with either spelling — and a child read by eye against the
+// lowercase string is one this classification never sees (`scripts/git/issue-labels.ts`).
 function has_label(child: EpicChild, label: string): boolean {
-	return child.labels.includes(label)
+	return has_label_name(child.labels, label)
+}
+
+// The labels that put a child in `human` on their own. `needs-decision` waits for an answer nobody
+// has given; `already-done` has its answer — the work is merged, and the close that is left is Tier C
+// and so a person's (joshuafolkken/kit#1679). Neither is resolved by waiting, which is what separates
+// them from `in-progress` below.
+const HUMAN_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
+
+function has_human_label(child: EpicChild): boolean {
+	return HUMAN_LABELS.some((label) => has_label(child, label))
 }
 
 // What a child is before its dependencies are considered. A parked child is `human` whatever blocks
 // it, and a child already being worked on is `time` — someone else's session will finish it.
+//
+// **A child that is itself an epic is `human`** (joshuafolkken/kit#1476). An epic is not a unit of
+// work, so a run handed one has nothing to implement; before this the row fell straight through to
+// `from_blockers`, which mints `runnable` for anything unblocked, and `epicrun` passed the epic to
+// `fullrun` as an ordinary issue. `human` rather than `time` because no amount of waiting turns an
+// epic into work: a person has to flatten the row or restructure the epics, and meta-epic support is
+// frozen (joshuafolkken/kit#894). What the question is — and, just as importantly, what it is not —
+// is `epic-nested.ts`, which the audit asks the same way.
 function local_category(child: EpicChild): ChildCategory | undefined {
 	if (child.state === CLOSED) return 'done'
-	if (has_label(child, NEEDS_DECISION_LABEL)) return 'human'
+	if (epic_nested.is_nested_epic(child)) return 'human'
+	if (has_human_label(child)) return 'human'
 	if (has_label(child, IN_PROGRESS_LABEL)) return 'time'
 
 	return undefined
@@ -76,14 +102,11 @@ interface ClassifyContext {
 	// Keyed by identity — repository plus number — because two children of one epic can share a
 	// number across repositories (joshuafolkken/kit#864).
 	memo: Map<string, ChildCategory>
+	// Every issue this invocation may run, keyed like `index` (joshuafolkken/kit#1943). A blocker
+	// outside `index` waits when it is in here and goes to a person when it is not.
+	running: ReadonlySet<string>
 }
 
-// A blocker this epic does not track as a child. Said out loud rather than dropped in silence: the
-// relation is real, the graph has nothing to order it against, and a reader watching an unattended
-// run start that child should be able to see what was not weighed (joshuafolkken/kit#1126).
-//
-// Whether such a blocker should hold the child back at all is a separate question, and it belongs to
-// joshuafolkken/kit#1123 — this reports, it does not decide.
 // Announced once per invocation rather than once per pass. One `epic:next --repo` classifies the same
 // children several times — the report, the candidate confirmation, and once per candidate it withholds
 // — so an unguarded warning said the same thing up to four times, in two wordings.
@@ -96,19 +119,57 @@ function reset_reported(): void {
 	reported.clear()
 }
 
-function report_untracked(child: EpicChild, blocker: IssueReference): void {
-	const line = `${epic_graph.key_of(child)}:${epic_graph.key_of(blocker)}`
+function report_notice(notice: OutsideNotice): void {
+	if (reported.has(notice.key)) return
+
+	reported.add(notice.key)
+	console.warn(notice.message)
+}
+
+// A blocker no graph in this invocation tracks. It used to be announced and dropped, which offered a
+// child waiting on another epic's open issue as runnable; it is weighed now, and what could not be
+// decided is still said out loud (joshuafolkken/kit#1126, joshuafolkken/kit#1943).
+function outside_category(
+	child: EpicChild,
+	reference: IssueReference,
+	context: ClassifyContext,
+): ChildCategory | undefined {
+	const answer = epic_outside_blocker.outside_category(
+		child,
+		reference,
+		context.resolve,
+		context.running,
+	)
+
+	if (answer.notice !== undefined) report_notice(answer.notice)
+
+	return answer.category
+}
+
+// Said out loud because the report cannot say it: a withheld epic prints as a bare `#N` under
+// "Waiting on a person", which is true of a parked issue and of an epic alike, and the two need
+// entirely different things done to them (joshuafolkken/kit#1476).
+function report_nested_epic(child: EpicChild): void {
+	const line = `epic:${epic_graph.key_of(child)}`
 	if (reported.has(line)) return
 
 	reported.add(line)
 	console.warn(
-		`⚠ #${String(child.number)} is blocked by ${epic_graph.key_of(blocker)}, ` +
-			'which this epic does not track — the dependency is not weighed',
+		`⚠ ${epic_graph.key_of(child)} is itself an epic — a run cannot implement one, ` +
+			'so it is withheld rather than offered',
 	)
 }
 
+// Announced once per classification pass, deduplicated by `reported` like every other notice here.
+// Closed children are skipped: a finished epic is the part of the graph nobody has to act on.
+function report_nested_epics(children: ReadonlyArray<EpicChild>): void {
+	for (const child of children) {
+		if (child.state !== CLOSED && epic_nested.is_nested_epic(child)) report_nested_epic(child)
+	}
+}
+
 // What one recorded relation contributes. A blocker inside the epic is resolved through the caller's
-// resolver; one outside it is reported and contributes nothing.
+// resolver; one outside it is weighed against what this invocation runs.
 function relation_category(
 	child: EpicChild,
 	blocker_reference: IssueReference,
@@ -116,11 +177,7 @@ function relation_category(
 ): ChildCategory | undefined {
 	const blocker = context.index.get(epic_graph.blocker_key(blocker_reference))
 
-	if (blocker === undefined) {
-		report_untracked(child, blocker_reference)
-
-		return undefined
-	}
+	if (blocker === undefined) return outside_category(child, blocker_reference, context)
 
 	return dependency_category(
 		context.resolve(blocker, child),
@@ -185,15 +242,28 @@ function fill_memo(children: ReadonlyArray<EpicChild>, context: ClassifyContext)
 
 // Every open child, sorted. Closed children are simply absent — they are the part of the epic that
 // is finished, and a caller has nothing to do with them.
-function classify_children(
+//
+// `running` defaults to these children alone, which is one epic's answer; a caller that runs several
+// graphs, or a backlog, passes the whole set so a blocker in another of them waits rather than stops.
+function new_context(
 	children: ReadonlyArray<EpicChild>,
 	resolve: ResolveDependency = resolve_by_state,
-): Classification {
-	const context: ClassifyContext = {
+	running: ReadonlySet<string> = epic_outside_blocker.running_keys(children),
+): ClassifyContext {
+	return {
 		index: epic_graph.index_children(children),
 		resolve,
 		memo: new Map<string, ChildCategory>(),
+		running,
 	}
+}
+
+function classify_children(
+	children: ReadonlyArray<EpicChild>,
+	resolve?: ResolveDependency,
+	running?: ReadonlySet<string>,
+): Classification {
+	const context = new_context(children, resolve, running)
 	const buckets: Record<'runnable' | 'time' | 'human', Array<EpicChild>> = {
 		runnable: [],
 		time: [],
@@ -201,6 +271,7 @@ function classify_children(
 	}
 
 	fill_memo(children, context)
+	report_nested_epics(children)
 
 	for (const child of children) {
 		const category = context.memo.get(epic_graph.key_of(child)) ?? 'time'
@@ -218,5 +289,7 @@ const epic_classify = {
 	classify_children,
 }
 
-export type { Classification, ChildCategory, DependencyVerdict, ResolveDependency }
+export type { Classification, ChildCategory }
 export { epic_classify }
+
+export { type DependencyVerdict, type ResolveDependency } from './epic-outside-blocker'

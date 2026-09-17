@@ -4,8 +4,24 @@ import { epic_fetch } from './epic-fetch'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'
-const GET_CHILD = 'issue_get_state_and_relations'
-const GET_BODY = 'issue_get_body'
+// The classified reads, because the fetch has to tell a child it could not reach from one it may
+// never reach (joshuafolkken/kit#1690). The payloads below are the same ones the unclassified reads
+// answered with, wrapped in the `read` case.
+const GET_CHILD = 'issue_get_state_and_relations_classified'
+const GET_BODY = 'issue_get_body_classified'
+
+// A read that failed for a reason asking again will not change — which is what an absent payload
+// meant before the classification existed.
+const UNREAD = { kind: 'unreadable', reason: 'rejected', status: 403 } as const
+
+function body_read(text: string | undefined): { kind: 'read'; text: string | undefined } {
+	return { kind: 'read', text }
+}
+
+function json_read(json: string): { kind: 'read'; json: string } {
+	return { kind: 'read', json }
+}
+
 const THIRD_PARTY_REPO = 'sveltejs/kit'
 const EPIC = 858
 const IN_PROGRESS = 'in-progress'
@@ -19,21 +35,33 @@ function gh_child(input: {
 	state?: string
 	labels?: ReadonlyArray<string>
 	blocked_by?: ReadonlyArray<number>
-}): string {
-	return JSON.stringify({
-		number: input.number,
-		state: input.state ?? 'OPEN',
-		labels: (input.labels ?? []).map((name) => ({ name })),
-		blockedBy: {
-			nodes: (input.blocked_by ?? []).map((number) => ({ number })),
-			totalCount: (input.blocked_by ?? []).length,
-		},
-	})
+}): { kind: 'read'; json: string } {
+	return json_read(
+		JSON.stringify({
+			number: input.number,
+			state: input.state ?? 'OPEN',
+			labels: (input.labels ?? []).map((name) => ({ name })),
+			blockedBy: {
+				nodes: (input.blocked_by ?? []).map((number) => ({ number })),
+				totalCount: (input.blocked_by ?? []).length,
+			},
+		}),
+	)
 }
 
 // The epic's own body, which decides which rows the fetch then tries to read.
 function epic_body(rows: string): void {
-	vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(rows)
+	vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(body_read(rows))
+}
+
+const TWO_CHILD_BODY = '- [ ] #1\n- [ ] #2'
+const UNREACHABLE = { kind: 'unreadable', reason: 'unreachable', status: undefined } as const
+
+// One read per row of `TWO_CHILD_BODY`, in that order, so a case can give each child its own answer.
+function children_reading(by_row: ReadonlyArray<unknown>): void {
+	vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(
+		async (number: string) => (by_row[Number(number) - 1] ?? UNREAD) as never,
+	)
 }
 
 beforeEach(() => {
@@ -50,7 +78,7 @@ describe('epic_fetch.fetch_child', () => {
 
 	it('reads a child with no relations at all', async () => {
 		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(
-			JSON.stringify({ number: 1, state: 'OPEN' }),
+			json_read(JSON.stringify({ number: 1, state: 'OPEN' })),
 		)
 		const child = await epic_fetch.fetch_child(1, REPO)
 
@@ -83,7 +111,7 @@ describe('epic_fetch.fetch_child', () => {
 
 describe('epic_fetch.fetch_child — what it refuses to guess', () => {
 	it('reports a child gh could not answer for', async () => {
-		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(UNREAD)
 
 		expect(await epic_fetch.fetch_child(1, REPO)).toBeUndefined()
 	})
@@ -91,13 +119,13 @@ describe('epic_fetch.fetch_child — what it refuses to guess', () => {
 	// gh's JSON is somebody else's contract, and `epic:next` is what a run asks when it needs to know
 	// where it stands — a shape surprise must not take the command down.
 	it('reports a child whose JSON does not match the expected shape', async () => {
-		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue('{"unexpected": true}')
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(json_read('{"unexpected": true}'))
 
 		expect(await epic_fetch.fetch_child(1, REPO)).toBeUndefined()
 	})
 
 	it('reports a child whose response is not JSON at all', async () => {
-		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue('gh: Not Found (HTTP 404)')
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(json_read('gh: Not Found (HTTP 404)'))
 
 		expect(await epic_fetch.fetch_child(1, REPO)).toBeUndefined()
 	})
@@ -117,7 +145,7 @@ describe('epic_fetch.fetch_children', () => {
 	// Dropping them silently is what made a fully open epic read as complete.
 	it('names the children it could not read instead of dropping them', async () => {
 		vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(async (number: string) =>
-			number === '1' ? gh_child({ number: 1 }) : undefined,
+			number === '1' ? gh_child({ number: 1 }) : UNREAD,
 		)
 		const fetched = await epic_fetch.fetch_children([1, 2], REPO)
 
@@ -132,6 +160,38 @@ describe('epic_fetch.fetch_children', () => {
 
 		expect(fetched.skipped).toHaveLength(2)
 		expect(fetched.skipped[0]?.repo).toBe(REPO)
+	})
+})
+
+// joshuafolkken/kit#1690: the snapshot says the run is worth repeating only when **every** read that
+// failed failed on the transport. One child refused for good beside one unreachable would otherwise
+// be retried for ever, and the run would never reach the verdict that says a person is needed.
+describe('epic_fetch.fetch_epic — whether the reads are worth repeating', () => {
+	it('says so when every failed read failed on the transport', async () => {
+		epic_body(TWO_CHILD_BODY)
+		children_reading([UNREACHABLE, UNREACHABLE])
+
+		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(snapshot.is_unreachable).toBe(true)
+	})
+
+	it('does not, when one of them was refused for good', async () => {
+		epic_body(TWO_CHILD_BODY)
+		children_reading([UNREACHABLE, UNREAD])
+
+		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(snapshot.is_unreachable).toBe(false)
+	})
+
+	it('does not, when nothing failed at all', async () => {
+		epic_body(TWO_CHILD_BODY)
+		children_reading([gh_child({ number: 1 }), gh_child({ number: 2 })])
+
+		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(snapshot.is_unreachable).toBe(false)
 	})
 })
 
@@ -151,7 +211,7 @@ describe('epic_fetch.fetch_epic — naming what it could not read', () => {
 
 	it('names a local child it could not read as this repository', async () => {
 		epic_body('- [ ] #7')
-		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(UNREAD)
 		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
 
 		expect(snapshot.unreadable).toEqual([{ repo: REPO, number: 7 }])
@@ -161,7 +221,7 @@ describe('epic_fetch.fetch_epic — naming what it could not read', () => {
 	// which tracker it belongs to.
 	it('names a child the owner restriction refused with its own repository', async () => {
 		epic_body(`- [ ] ${THIRD_PARTY_REPO}#7`)
-		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(UNREAD)
 		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
 
 		expect(snapshot.unreadable).toEqual([{ repo: THIRD_PARTY_REPO, number: 7 }])
@@ -169,7 +229,7 @@ describe('epic_fetch.fetch_epic — naming what it could not read', () => {
 
 	it('names a child in a sibling repository it could not read with that repository', async () => {
 		epic_body(`- [ ] ${OTHER_REPO}#40`)
-		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(UNREAD)
 		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
 
 		expect(snapshot.unreadable).toEqual([{ repo: OTHER_REPO, number: 40 }])
@@ -181,7 +241,7 @@ describe('epic_fetch.fetch_epic — naming what it could not read', () => {
 // the children were still stamped with the other repository (joshuafolkken/kit#1016).
 describe('epic_fetch.fetch_epic — the repository the epic itself lives in', () => {
 	it('reads an epic in this repository unqualified, exactly as before', async () => {
-		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue('- [ ] #1')
+		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(body_read('- [ ] #1'))
 		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 1 }))
 
 		await epic_fetch.fetch_epic(EPIC, REPO)
@@ -195,7 +255,7 @@ describe('epic_fetch.fetch_epic — the repository the epic itself lives in', ()
 	// readable through the very read that was just added.
 	it('takes the owner allow-list from the repository the command runs in', async () => {
 		epic_body(`- [ ] ${THIRD_PARTY_REPO}#7`)
-		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(UNREAD)
 		const snapshot = await epic_fetch.fetch_epic(EPIC, THIRD_PARTY_REPO, REPO)
 
 		expect(get_child).not.toHaveBeenCalled()
@@ -203,7 +263,7 @@ describe('epic_fetch.fetch_epic — the repository the epic itself lives in', ()
 	})
 
 	it('reads an epic elsewhere, and its rows, through that repository', async () => {
-		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue('- [ ] #1')
+		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(body_read('- [ ] #1'))
 		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 1 }))
 
 		await epic_fetch.fetch_epic(EPIC, OTHER_REPO, REPO)
@@ -236,7 +296,7 @@ describe('epic_fetch.fetch_epic — relations the summary count missed', () => {
 	const ORDERED_EPIC_BODY = '- [ ] #1\n- [ ] #2\n\n#1 -> #2\n'
 
 	it('re-reads a declared link the first read found unrecorded', async () => {
-		vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(ORDERED_EPIC_BODY)
+		vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(body_read(ORDERED_EPIC_BODY))
 		vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(async (issue_number) =>
 			gh_child({ number: Number(issue_number) }),
 		)
@@ -255,7 +315,7 @@ describe('epic_fetch.fetch_epic — relations the summary count missed', () => {
 	// The cost guard the correction must not undo: an epic whose relations already match asks the
 	// listing nothing at all.
 	it('asks the listing nothing when the declared link is already recorded', async () => {
-		vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(ORDERED_EPIC_BODY)
+		vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(body_read(ORDERED_EPIC_BODY))
 		vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(async (issue_number) =>
 			gh_child({ number: Number(issue_number), blocked_by: Number(issue_number) === 2 ? [1] : [] }),
 		)

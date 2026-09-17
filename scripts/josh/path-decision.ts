@@ -2,7 +2,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 
 // The shape both path-decided commands share (joshuafolkken/kit#907).
 //
-// `josh review:level` and `josh eval:scope` ask different questions of the same tree, and they answer
+// `josh review:level` and `josh review:round2` ask different questions of the same tree, and they answer
 // the same way: read the changed paths, decide from them alone, print the answer on stdout and the reason on
 // stderr. Only the question differs, so only the question is written twice — a second copy of the
 // reading, the flags and the printing would let two commands disagree about what "changed" means.
@@ -57,7 +57,7 @@ function format_path_list(paths: ReadonlyArray<string>): string {
 
 // The answer alone on stdout so `$(pnpm josh <command>)` reads it, and the reason on stderr so a
 // person sees why without a shell having to parse around it. `--json` puts both in one object under
-// the key that command has always used — `level` for `review:level`, `scope` for `eval:scope`.
+// the key that command has always used — `level` for `review:level`.
 function print_decision(key: string, answer: string, reason: string, is_json: boolean): void {
 	if (is_json) {
 		console.info(JSON.stringify({ [key]: answer, reason }))

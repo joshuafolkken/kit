@@ -29,13 +29,23 @@ SECURITY.md         tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
-.claude/skills/verify-ui/   (directory)
-.claude/skills/workflow-commands/   (directory)
-.claude/skills/dependency-update/   (directory)
-.claude/skills/epic-commands/   (directory)
-.claude/skills/diag/   (directory)
 ```
 
+> **The four distributed skills ship as the `kit` Claude Code plugin, not as copies
+> (joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file — it
+> carries the `permissions.deny` rules a plugin cannot provide — and now also declares the `kit`
+> marketplace and enables the `kit` plugin. The skill bodies load from the package
+> (`node_modules/@joshuafolkken/kit/.claude/skills/`). The CLI does not auto-install a plugin from
+> settings alone, so a consumer runs a one-time `claude plugin marketplace add
+./node_modules/@joshuafolkken/kit && claude plugin install kit@kit` (or `/plugin`). `josh sync`
+> removes a stale copied skill directory only when its content still matches the shipment, and keeps —
+> with a warning — one the consumer edited or authored.
+>
+> **A retired skill is removed the same way, but from a frozen manifest (joshuafolkken/kit#1990).** A
+> skill dropped from distribution has no package source left to compare against, so `josh sync` matches a
+> consumer's leftover copy against the recorded hash of its last distributed content: an untouched
+> copy is removed, an edited one is kept with a warning.
+>
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
 > (`ci.yml`, `auto-tag.yml`, `production.yml`, `sonar-qube.yml`) is overwritten on
 > each `josh sync`, so action SHA pins are bumped once in the kit and propagated to all consumers —
@@ -46,7 +56,7 @@ SECURITY.md         tsconfig.sonar.json
 >
 > **The `npm` entry, by contrast, no longer opens routine version-update PRs in any consumer.**
 > It sets `open-pull-requests-limit: 0`, which disables version updates only. `josh latest` runs
-> at the start of every `fullrun` / `halfrun` / `queue` and already bumps npm dependencies to
+> at the start of every `fullrun` / `halfrun` / `backlogrun` and already bumps npm dependencies to
 > latest, so the weekly Dependabot PRs were duplicating it — in kit they were closed unmerged
 > after each had consumed a full CI run, and the same noise was replicated in every consumer that
 > synced the file. Security advisories are unaffected — GitHub's Dependabot options reference
@@ -286,9 +296,18 @@ SECURITY.md         tsconfig.sonar.json
 > that found nothing upstream-managed in the diff, was overtaken by a force-push that added one, and
 > reached its arming step after the newer run had already reconciled, would arm auto-merge on a diff
 > kit overwrites — with nothing left to run afterwards to undo it. Both copies therefore declare
-> `group: ${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`, the same grouping
-> `ci.yml` uses; `github.ref` is the pull request's own merge ref, so a superseded run is cancelled
-> without one bump waiting on another's.
+> `group: ${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`; `github.ref` is
+> the pull request's own merge ref, so a superseded run is cancelled without one bump waiting on
+> another's.
+>
+> **`ci.yml`'s group is no longer the same expression, and it is not one to reconcile with.** Since
+> joshuafolkken/kit#1481 it appends the commit sha on a `push` event, so that every commit landing on
+> the default branch runs to completion instead of being cancelled by the next one. This workflow is
+> triggered by `pull_request` alone, so that clause can never fire here: copied verbatim it renders
+> to the empty string and buys nothing. Copied **without** its `github.event_name == 'push'` guard it
+> would be actively wrong — the merge ref's sha moves with every push to the branch, so each push
+> would get a group of its own and no superseded run would ever be cancelled, which is the whole of
+> what this block buys.
 >
 > In kit's **own** repository the same workflow deliberately has no upstream-managed exclusion — and so
 > has nothing to withdraw, which is why it keeps a plain arming step and the narrower `github.actor`
@@ -329,7 +348,7 @@ SECURITY.md         tsconfig.sonar.json
 > ```json
 > "Bash(git add*)", "Bash(git stage*)", "Bash(git rm*)", "Bash(git mv*)",
 > "Bash(git reset*)", "Bash(git restore --staged*)", "Bash(git restore -S*)",
-> "Bash(git commit -a*)", "Bash(git commit --all*)", "Bash(gh pr merge*)"
+> "Bash(git commit*)", "Bash(gh pr merge*)"
 > ```
 >
 > **The REST era gave every write a second spelling, and joshuafolkken/kit#1022 left the deny list
@@ -372,7 +391,7 @@ SECURITY.md         tsconfig.sonar.json
 > cannot be denied and is left to the prose rule. An entry carrying a colon would ship as a guard
 > that was never in force, which is why `claude-settings.test.ts` fails one.
 >
-> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup --merge` run git and gh from
+> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup` run git and gh from
 > inside node scripts, so the only command string the Bash matcher ever sees is the `pnpm josh …`
 > wrapper — denying the direct forms leaves the entire commit-and-merge workflow intact. `git rm` is
 > denied whole rather than as `git rm --cached`, which would leave `git rm -r --cached` through; a
@@ -382,25 +401,32 @@ SECURITY.md         tsconfig.sonar.json
 > denied. Unblocked is not the same as endorsed — the prose rule still has the agent ask before
 > running that or any other destructive rewrite.
 >
-> **`git commit` is denied by flag, not as a whole.** `git commit -a` stages every tracked file and
-> commits it, which is the fallback a refused `git add` pushes an agent toward, so both spellings of
-> that flag are denied. Plain `git commit -m "…"` was left alone deliberately:
-> `prompts/git-automation.md` — shipped to consumers in the same package — instructed the agent to
-> run exactly that command, and denying it here would have broken a documented flow from the other
-> half of the distribution. **That reason is gone**: joshuafolkken/kit#1064 retired the prompt, and
-> nothing distributed asks for a bare `git commit` any more, because `pnpm josh git` drives the whole
-> commit through a node script. Widening the deny to the subcommand is joshuafolkken/kit#1075 rather
-> than part of that retirement — it rewrites the entry list `CLAUDE.md` and
-> `prompts/collaboration-workflow/operating-rules.md` both quote, which is a separate deliverable
-> from removing the document that blocked it.
+> **`git commit` is denied as a whole subcommand, and was not always.** `git commit -a` stages every
+> tracked file and commits it, which is the fallback a refused `git add` pushes an agent toward, so
+> the two spellings of that flag were denied first and alone. Plain `git commit -m "…"` was left
+> reachable deliberately: `prompts/git-automation.md` — shipped to consumers in the same package —
+> instructed the agent to run exactly that command, and denying it here would have broken a
+> documented flow from the other half of the distribution. **That reason is gone.**
+> joshuafolkken/kit#1064 retired the prompt, and no distributed document instructs the agent to run a
+> bare `git commit` any more, because `pnpm josh git` drives the whole commit through a node script —
+> so the Bash matcher sees `pnpm josh …` and the approved commit flow is untouched by any pattern
+> written here. joshuafolkken/kit#1075 therefore folded both flag entries into the single
+> `Bash(git commit*)` that contains them. What that closes is the second fallback: an agent refused
+> at `git add` reached for `git commit -a`, and an agent refused at both reached for `git commit -m`,
+> which is now denied by the same prefix as the staging command it was standing in for. The one bare
+> `git commit` still printed anywhere is the pre-commit type check's `JOSH_PRE_COMMIT_FORCE=1 …`
+> hint, and that is addressed to whoever is at the terminal: an environment assignment ahead of the
+> command does not escape the matcher, so an agent that copies it is refused like any other spelling.
 >
 > **It is a guardrail, not a sandbox.** Each entry is a prefix pattern, so plenty still runs: a
 > global option ahead of the subcommand (`git -C . add .`), a flag pair the prefix does not cover
 > (`git restore --worktree --staged <path>`), the plumbing spellings (`git update-index`,
 > `git apply --cached`), and everything that stages or commits by another route (`git merge`,
 > `git cherry-pick`, `git revert`). `git stash` is the notable one: the documented `fullrun new` /
-> `queue` steps run it and `git stash pop` themselves, and a `pop` without `--index` reapplies
-> everything unstaged, so that flow flattens a staged baseline the deny entries otherwise protect.
+> `backlogrun` steps run it and `pnpm josh stash:pop "<message>"` themselves (message-targeted, because
+> the stash is a repository-wide stack every lane shares — joshuafolkken/kit#2050), and a `pop` without
+> `--index` reapplies everything unstaged, so that flow flattens a staged baseline the deny entries
+> otherwise protect.
 > Closing all of them would mean denying
 > `git` itself, which takes the read-only inspection commands the prompts require with it. The deny
 > stops the habitual form, which is the form an agent reaches for; the prose rule in `CLAUDE.md`
@@ -413,7 +439,7 @@ SECURITY.md         tsconfig.sonar.json
 > command. The harness default of 30,000 characters fired on none of 1,848 Bash results measured
 > across 25 sessions, which is why the distributed value is lower. The number, the measurement behind
 > it and the two designs it was chosen over are in
-> `prompts/collaboration-workflow/output-bounds.md`; `scripts/bash-output-cap.test.ts` fails a value
+> `prompts/collaboration-workflow/output-bounds.md`; `scripts/lib/bash-output-cap.test.ts` fails a value
 > that would not fire.
 >
 > **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the rule
@@ -438,7 +464,7 @@ SECURITY.md         tsconfig.sonar.json
 > **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
 > documents used to inline.** The rule document is read in full on every turn, and roughly
 > half of it was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
-> `halfrun` / `queue` steps, the `/code-review` → `followup --merge` chain rule, and the checks that run
+> `halfrun` / `backlogrun` steps, the `/code-review` → `followup` chain rule, and the checks that run
 > after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
 > documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB.
 >
@@ -451,7 +477,7 @@ SECURITY.md         tsconfig.sonar.json
 > written while moving a procedure is still a choice. Since
 > [#963](https://github.com/joshuafolkken/kit/issues/963) that is the only document those markers
 > are asserted against — `AGENTS.md` and `GEMINI.md` are pointers to it, guarded instead by
-> `scripts/ai-document-pointers.test.ts`, which fails if a rule body reappears in either.
+> `scripts/document/ai-document-pointers.test.ts`, which fails if a rule body reappears in either.
 >
 > Their markdown does cite `prompts/…` paths, which a byte copy would have shipped unresolved — so
 > the directory copy is followed by the same rewrite the file copies run, over the copied markdown
@@ -476,16 +502,23 @@ SECURITY.md         tsconfig.sonar.json
 > those three tools, and why it never fails.
 >
 > **And it wires the batching guard, on the earlier side of the same event pair.** A `PreToolUse` hook
-> runs `pnpm josh batch:guard` before every `Bash` call, refusing the one that would make a third
-> consecutive single-call turn (joshuafolkken/kit#1390). It is on the earlier event for the reason the
+> runs `pnpm josh batch:guard` before every `Bash`, `Edit`, `Read` and `Write` call, refusing the one that would make a third
+> consecutive single-call turn — or, for a `Write`, which it cannot refuse, notifying instead (joshuafolkken/kit#1390, joshuafolkken/kit#1848). It is on the earlier event for the reason the
 > formatter is on the later one: by `PostToolUse` the round trip has already been spent, and describing
 > it there is what the density line above already does — measured at 1.10–1.12 calls per round trip
-> across the three runs after that line shipped, against a 1.50 floor. **It names `Bash` alone, unlike
-> the formatter**, because it must never refuse a write: Claude Code denies one call of a turn and runs
-> the rest, so a refused edit would leave its siblings applied and itself not. Within `Bash` the
-> mutation words already exclude every `pnpm josh` command, commit and Issue write, and the script
-> excludes the edit tools on top of the matcher, plus `sed`, `tee`, `dd` or a `>` anywhere in the line —
-> a matcher is settings a consumer can widen, and the guarantee has to hold whatever the wiring says.
+> across the three runs after that line shipped, against a 1.50 floor. **It names `Edit` beside `Bash` since joshuafolkken/kit#1762,
+> `Read` since joshuafolkken/kit#1798 and `Write` (for the notice) since joshuafolkken/kit#1848**, where it named `Bash` alone before the first of those: `Edit` carries 164 of the 251
+> recoverable round trips measured over 20 runs, so excluding it put the largest contributor beyond
+> reach. Refusing one is safe because the guard **withholds the refusal whenever the call in hand names
+> a file the sequence behind it already touched** — the visible case where a reissued edit would meet
+> text that has moved, since Claude Code denies one call of a turn and runs the rest. It cannot see the
+> turn it interrupts, so a batched turn's first edit can still be refused while its siblings apply; the
+> bound is that a refusable write is content-addressed, so the reissue either applies where it was meant
+> to or fails to match and is reported, never lands wrongly. **`Write` is excluded for exactly that
+> reason** — a reissued whole-file write carries no match check, so it could overwrite a sibling's
+> applied edit in silence. Within `Bash` the
+> mutation words still exclude every `pnpm josh` command, commit and Issue write — a matcher is settings
+> a consumer can widen, and what a call is stays the script's answer whatever the wiring says.
 > `JOSH_BATCH_GUARD=off` in the environment or in `.env` switches it off without editing the settings
 > file. `docs/josh-commands.md` carries the conditions, what the guard
 > cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
@@ -495,11 +528,29 @@ SECURITY.md         tsconfig.sonar.json
 > worth of files it has not edited **since its last delegated unit** — the count taken off the
 > transcript rather than kept in an agent's head, which is what makes the threshold fire a second and
 > third time instead of once per run. It names `Read` as well as `Bash` because in these transcripts the
-> reading is split between the two, and on the `Bash` side it refuses only a line the batching guard
-> would also have refused, so the never-refuse-a-write guarantee above is one rule and not two. A
+> reading is split between the two, and on the `Bash` side it refuses only a line that **writes
+> nothing** — the test the batching guard itself asked until joshuafolkken/kit#1762 widened that one,
+> kept under a name of its own so the two guards cannot be moved together by accident. A
 > `sed -n` read is therefore counted and never refused. `JOSH_INVESTIGATION_GUARD=off` switches it off,
 > and `docs/josh-commands.md` carries which commands count as reading, the one-refusal-per-accumulation
 > bound and how to verify it.
+>
+> **A third `PreToolUse` hook runs `pnpm josh rule:guard`, on `Bash`** (joshuafolkken/kit#1524). It is
+> a dispatcher rather than a third rule: `scripts/rules/delivered-rules.ts` enumerates the rules whose
+> trigger can be named as one tool call, and each row is a spec of the same shell the two guards above
+> share. **This is what makes a rule cheaper to ship than to carry** — `CLAUDE.md` is read on every
+> turn and had run out of room, while a refusal costs nothing until the call that binds the rule and
+> cannot be skimmed past. Today it delivers the backlog WIP cap at the call that files an Issue; a
+> comment endpoint is not a filing and is left alone, and so — the trigger reads the command string —
+> is a filing whose title never appears in it. **That limit is why the rule keeps a one-line trigger
+> resident**: the line binds on every route, and the delivery reinforces it where it can see one. It
+> also delivers the rule that an Issue's comments are read with its body (joshuafolkken/kit#1319), and
+> the one that a verification command is not read through a pipe (joshuafolkken/kit#1556) — a pipeline
+> exits with its last command's status, so a red gate read through `| tail` came back as a success.
+> **Read-only listings are untouched** — that trigger names only the checks whose result means pass or
+> fail, and narrowing a listing with `| head` is how one is properly read.
+> `JOSH_RULE_GUARD=off` switches it off, and
+> `prompts/collaboration-workflow/rule-delivery.md` is the enumeration and the criterion behind it.
 >
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
 > turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
@@ -591,13 +642,16 @@ kit's base layer for `tsconfig.json`, `cspell.config.yaml`, and `lefthook.yml` i
 
 ## Path transformation
 
-`CLAUDE.md` and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`. The `AGENTS.md` / `GEMINI.md` pointers are rewritten by the same pass ([#963](https://github.com/joshuafolkken/kit/issues/963)): each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one, and that citation has to resolve in a consumer like any other:
+The AI files kit distributes carry backtick path references that must resolve in a consumer. The same transform is applied in two places: `prepack` bakes it into the published `CLAUDE.md` (`scripts/build/build-claude-md.ts`), and `josh sync` applies it to the pointer files it still byte-copies — `AGENTS.md`, `GEMINI.md`, `.cursorrules` ([#963](https://github.com/joshuafolkken/kit/issues/963)):
 
 ```text
-`prompts/foo.md`  →  `node_modules/@joshuafolkken/kit/prompts/foo.md`
+`prompts/foo.md`             →  `node_modules/@joshuafolkken/kit/prompts/foo.md`     (bundled)
+`eslint/rules/foo.js`        →  `node_modules/@joshuafolkken/kit/eslint/rules/foo.js` (bundled)
+`scripts/foo.test.ts`        →  `https://github.com/joshuafolkken/kit/blob/main/scripts/foo.test.ts`  (not bundled)
+`docs/`                      →  `https://github.com/joshuafolkken/kit/tree/main/docs/`  (not bundled)
 ```
 
-This transformation is applied to backtick-quoted paths matching the pattern `` `prompts/<path>` ``.
+Bundled directories (`prompts/`, `eslint/`) point into `node_modules`; paths the package does not ship (tests, `docs/`) become full GitHub URLs, since a consumer never receives them. Globs such as `` `prompts/**` `` are left alone. **`CLAUDE.md` itself is no longer byte-copied** ([#1878](https://github.com/joshuafolkken/kit/issues/1878)): the package ships the transformed copy at `dist/CLAUDE.md`, and a consumer's `CLAUDE.md` is a one-line `@import` of it plus the project's own additions — so `josh sync` only ensures that import line is present, never overwriting the additions, and a package update keeps the rules current on its own.
 
 ## Refused inside the distribution package's own repository
 
@@ -639,7 +693,10 @@ the same rule rather than each re-implementing it.
 
 ## What does NOT get synced
 
-- `package.json` — largely init-only to avoid clobbering project version / dependencies. To refresh kit-managed scripts or dev-dependency pins, re-run `josh init`. The one exception: `sync` realigns `devEngines.packageManager.version` with the whole `packageManager` pin, `+sha512…` Corepack integrity suffix included (pnpm compares the two as raw strings, so any drift — including a stripped suffix — reintroduces the pnpm `Cannot use both "packageManager" and "devEngines.packageManager"` warning); scripts, dependencies, and the project version are never touched.
+- `package.json` — largely init-only to avoid clobbering project version / dependencies. To refresh kit-managed scripts or dev-dependency pins, re-run `josh init`. The project version is never touched. The exceptions are three targeted migrations, each there so a project initialized before a fix receives it **without** re-running `josh init` — every one of them leaves the file byte-identical when it has nothing to change:
+  - `devEngines.packageManager.version` is realigned with the whole `packageManager` pin, `+sha512…` Corepack integrity suffix included (pnpm compares the two as raw strings, so any drift — including a stripped suffix — reintroduces the pnpm `Cannot use both "packageManager" and "devEngines.packageManager"` warning).
+  - The secretlint `devDependencies` are added when missing, because the pre-commit rule resolves secretlint from the consumer project. A version you pinned yourself is never overwritten.
+  - The `prepare` clause **kit itself wrote** — `command -v lefthook >/dev/null 2>&1 && lefthook install` — is rewritten so a failed `lefthook install` says so on standard error ([#1503](https://github.com/joshuafolkken/kit/issues/1503), [#1507](https://github.com/joshuafolkken/kit/issues/1507)). It is the one place `sync` writes to `scripts`, it matches that exact clause and nothing else, and a `prepare` that never carried it is left alone. Run `pnpm install` afterwards — the rewritten `prepare` only takes effect on the next install. The new clause reports the failure and then returns success, so a hand-written `prepare` that chained kit's clause without a `|| true` of its own stops failing the install and warns instead; that is the same trade [init.md](./init.md#package-scripts) describes for `josh init`.
 
 ## When to run
 

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,
 	has_any_label,
+	has_label_name,
 	IN_PROGRESS_LABEL,
+	INTERRUPT_ROUTE_LABEL,
+	label_name_of,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
@@ -19,17 +23,26 @@ import {
 
 // Spelled out rather than compared to the constants themselves, which would assert nothing.
 const EPIC_SPELLING = 'epic'
+// The same label as GitHub answers with in a repository that created it before these scripts did.
+const EPIC_CREATED_CASING = 'Epic'
+const UNRELATED_SPELLING = 'bug'
 const IN_PROGRESS_SPELLING = 'in-progress'
+const IN_PROGRESS_CREATED_CASING = 'In-Progress'
 const NEEDS_DECISION_SPELLING = 'needs-decision'
 const AUTO_OK_SPELLING = 'auto-ok'
 const NEEDS_HUMAN_REVIEW_SPELLING = 'needs-human-review'
-const NOT_DIRECTLY_RUNNABLE_COUNT = 3
+// joshuafolkken/kit#1679: the exit for an Issue whose work a run verified is already merged.
+const ALREADY_DONE_SPELLING = 'already-done'
+const NOT_DIRECTLY_RUNNABLE_COUNT = 4
 // joshuafolkken/kit#1083: the route labels are the same GitHub contract, and the aggregation query
 // (`?labels=route:split`) fails silently on a drifted name exactly as the others do.
 const REVIEW_CAP_ROUTE_SPELLING = 'route:review-cap'
 const SPLIT_ROUTE_SPELLING = 'route:split'
 const TIER_A_ROUTE_SPELLING = 'route:tier-a'
-const FILING_ROUTE_COUNT = 3
+// joshuafolkken/kit#1518: the interrupt route, whose aggregation query is what makes "how often did
+// a serious defect have to bypass the cap" answerable at all.
+const INTERRUPT_ROUTE_SPELLING = 'route:interrupt'
+const FILING_ROUTE_COUNT = 4
 
 describe('the label names', () => {
 	it.each([
@@ -38,6 +51,8 @@ describe('the label names', () => {
 		[NEEDS_DECISION_LABEL, NEEDS_DECISION_SPELLING],
 		[AUTO_OK_LABEL, AUTO_OK_SPELLING],
 		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
+		[ALREADY_DONE_LABEL, ALREADY_DONE_SPELLING],
+		[INTERRUPT_ROUTE_LABEL, INTERRUPT_ROUTE_SPELLING],
 		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
 		[SPLIT_ROUTE_LABEL, SPLIT_ROUTE_SPELLING],
 		[TIER_A_ROUTE_LABEL, TIER_A_ROUTE_SPELLING],
@@ -51,13 +66,14 @@ describe('FILING_ROUTE_LABELS', () => {
 	// is created with. A route added to the constants but not here would never be provisioned.
 	it('carries one entry per route label', () => {
 		expect(FILING_ROUTE_LABELS.map((label) => label.name)).toStrictEqual([
+			INTERRUPT_ROUTE_LABEL,
 			REVIEW_CAP_ROUTE_LABEL,
 			SPLIT_ROUTE_LABEL,
 			TIER_A_ROUTE_LABEL,
 		])
 	})
 
-	it('holds exactly the three route labels', () => {
+	it('holds exactly the four route labels', () => {
 		expect(FILING_ROUTE_LABELS).toHaveLength(FILING_ROUTE_COUNT)
 	})
 
@@ -70,9 +86,12 @@ describe('FILING_ROUTE_LABELS', () => {
 })
 
 describe('NOT_DIRECTLY_RUNNABLE_LABELS', () => {
-	it.each([EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL])('holds %s', (label) => {
-		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(label)).toBe(true)
-	})
+	it.each([EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL])(
+		'holds %s',
+		(label) => {
+			expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(label)).toBe(true)
+		},
+	)
 
 	// Opting in is what makes an issue runnable outside an epic, so a set that also excluded it would
 	// filter out every candidate the pickup exists to find.
@@ -87,7 +106,15 @@ describe('NOT_DIRECTLY_RUNNABLE_LABELS', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(NEEDS_HUMAN_REVIEW_LABEL)).toBe(false)
 	})
 
-	it('holds those three and nothing else', () => {
+	// joshuafolkken/kit#1518: a route label is informational — it says which filing produced an issue,
+	// never whether the issue may run. Added here, `route:interrupt` would make every interrupt
+	// invisible to `epic:next`, so the defect the cap now lets through would be filed and then never
+	// offered — the "filed but never run" state the rule body warns is no better than a lost comment.
+	it.each(FILING_ROUTE_LABELS.map((label) => label.name))('does not hold %s', (name) => {
+		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(name)).toBe(false)
+	})
+
+	it('holds those four and nothing else', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.size).toBe(NOT_DIRECTLY_RUNNABLE_COUNT)
 	})
 })
@@ -100,11 +127,11 @@ describe('has_any_label', () => {
 	// GitHub keeps the casing a label was created with and treats `Epic` and `epic` as one label, so
 	// a repository that predates these scripts can answer with either spelling.
 	it('matches regardless of the casing GitHub answers with', () => {
-		expect(has_any_label([{ name: 'Epic' }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(true)
+		expect(has_any_label([{ name: EPIC_CREATED_CASING }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(true)
 	})
 
 	it('does not match an unrelated label', () => {
-		expect(has_any_label([{ name: 'bug' }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(false)
+		expect(has_any_label([{ name: UNRELATED_SPELLING }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(false)
 	})
 
 	it('treats a missing labels field as no labels', () => {
@@ -113,5 +140,47 @@ describe('has_any_label', () => {
 
 	it('treats an empty labels field as no labels', () => {
 		expect(has_any_label([], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(false)
+	})
+})
+
+// The same rule for the one shape `has_any_label` cannot take: bare label names, which is what
+// `EpicChild.labels` carries (joshuafolkken/kit#1476).
+describe('has_label_name', () => {
+	it('matches the label it is given', () => {
+		expect(has_label_name([IN_PROGRESS_SPELLING], IN_PROGRESS_LABEL)).toBe(true)
+	})
+
+	it('matches a bare name regardless of the casing GitHub answers with', () => {
+		expect(has_label_name([EPIC_CREATED_CASING], EPIC_LABEL)).toBe(true)
+	})
+
+	it('does not match a bare name that is an unrelated label', () => {
+		expect(has_label_name([UNRELATED_SPELLING], EPIC_LABEL)).toBe(false)
+	})
+
+	it('treats an empty label list as no labels', () => {
+		expect(has_label_name([], EPIC_LABEL)).toBe(false)
+	})
+})
+
+// A removal names the label in the request path, so the stored spelling is what it has to send —
+// not the lowercase constant it matched against (joshuafolkken/kit#1794).
+describe('label_name_of', () => {
+	it('answers the stored spelling rather than the name it was asked for', () => {
+		expect(label_name_of([IN_PROGRESS_CREATED_CASING], IN_PROGRESS_LABEL)).toBe(
+			IN_PROGRESS_CREATED_CASING,
+		)
+	})
+
+	it('answers the exact name when the casing already matches', () => {
+		expect(label_name_of([IN_PROGRESS_SPELLING], IN_PROGRESS_LABEL)).toBe(IN_PROGRESS_SPELLING)
+	})
+
+	it('answers undefined when the label is not there', () => {
+		expect(label_name_of([UNRELATED_SPELLING], IN_PROGRESS_LABEL)).toBeUndefined()
+	})
+
+	it('answers undefined for an empty label list', () => {
+		expect(label_name_of([], IN_PROGRESS_LABEL)).toBeUndefined()
 	})
 })

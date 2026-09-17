@@ -11,7 +11,7 @@ import { to_gh_state } from './git-gh-rest-state'
 // `gh pr view --json mergeStateStatus,reviewDecision,statusCheckRollup` is answered 403 in a cloud
 // session (joshuafolkken/kit#1022), and all three fields are GraphQL-only: one has no REST
 // counterpart at all, one is spelled differently, and one is two endpoints that `gh` merged.
-// `pnpm josh followup --merge` decides a pull request is green from this value, so a mistake here
+// `pnpm josh followup` decides a pull request is green from this value, so a mistake here
 // ships as a merge no gate ever cleared rather than as a command that stops working
 // (joshuafolkken/kit#1028).
 //

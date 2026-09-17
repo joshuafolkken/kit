@@ -49,7 +49,8 @@ function context(
 	return { children, resolve: epic_classify.resolve_by_state, read_blockers: reader(listing) }
 }
 
-// The candidates `epic_report.candidates_for_repo` would hand over, picked by number.
+// The candidates `epic_report.candidates_for_repo` would hand over, in the order the epic lists them
+// (joshuafolkken/kit#1583). The numbers here select which children, not the order they come back in.
 function bundle(
 	children: ReadonlyArray<EpicChild>,
 	numbers: ReadonlyArray<number>,
@@ -65,7 +66,7 @@ describe('epic_candidate_confirm.answer_for_repo — a stale zero summary', () =
 			context(children, new Map([[2, [1]]])),
 		)
 
-		expect(answer.child).toBeUndefined()
+		expect(answer.children).toEqual([])
 		expect(answer.verdict).toBe('wait')
 	})
 
@@ -73,7 +74,7 @@ describe('epic_candidate_confirm.answer_for_repo — a stale zero summary', () =
 		const children = [child(1)]
 		const answer = await epic_candidate_confirm.answer_for_repo(children, context(children))
 
-		expect(answer.child?.number).toBe(1)
+		expect(answer.children.map((entry) => entry.number)).toEqual([1])
 		expect(answer.verdict).toBe('run')
 	})
 })
@@ -88,7 +89,7 @@ describe('epic_candidate_confirm.answer_for_repo — what the recovered blocker 
 			context(children, new Map([[2, [1]]])),
 		)
 
-		expect(answer.child?.number).toBe(2)
+		expect(answer.children.map((entry) => entry.number)).toEqual([2])
 	})
 
 	it('reports a parked blocker as needing a person rather than as waiting', async () => {
@@ -110,38 +111,65 @@ describe('epic_candidate_confirm.answer_for_repo — what the recovered blocker 
 			context(children),
 		)
 
-		expect(answer.child?.repo).toBe(REPO)
+		expect(answer.children.map((entry) => entry.repo)).toEqual([REPO])
 	})
 })
 
-// `classify_children` drops a blocker the epic does not track, so the candidate is still offered —
-// the standing rule, applied here to a relation the confirmation just paid a request to recover.
-describe('epic_candidate_confirm.answer_for_repo — a blocker outside the epic', () => {
-	const OUTSIDER = 999
+// `classify_children` weighs a blocker the epic does not track since joshuafolkken/kit#1943, and the
+// confirmation applies the same rule to a relation it just paid a request to recover.
+const OUTSIDER = 999
 
-	it('still offers the candidate, as it does for a relation the summary counted', async () => {
+function outsider_context(
+	children: ReadonlyArray<EpicChild>,
+	state: 'OPEN' | 'CLOSED',
+	running?: ReadonlySet<string>,
+): ConfirmContext {
+	const outsider = { repo: REPO, number: OUTSIDER, state }
+
+	return { ...context(children), read_blockers: vi.fn(async () => [outsider]), running }
+}
+
+describe('epic_candidate_confirm.answer_for_repo — a blocker outside the epic', () => {
+	it('offers the candidate once the outside blocker is closed, naming the relation', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 		const children = [child(2)]
 		const answer = await epic_candidate_confirm.answer_for_repo(
 			children,
-			context(children, new Map([[2, [OUTSIDER]]])),
+			outsider_context(children, 'CLOSED'),
 		)
 
-		expect(answer.child?.number).toBe(2)
+		expect(answer.children.map((entry) => entry.number)).toEqual([2])
+		expect(warn.mock.calls.join('\n')).toContain(`#${String(OUTSIDER)}`)
+		expect(warn.mock.calls.join('\n')).toContain('does not track those')
+		warn.mockRestore()
+	})
+})
+
+describe('epic_candidate_confirm.answer_for_repo — an open blocker outside the epic', () => {
+	it('withholds for a person when the open outside blocker is not run by this invocation', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+		const children = [child(2)]
+		const answer = await epic_candidate_confirm.answer_for_repo(
+			children,
+			outsider_context(children, 'OPEN'),
+		)
+
+		expect(answer.children).toEqual([])
+		expect(answer.verdict).toBe('stop')
 		warn.mockRestore()
 	})
 
-	it('names the relation it discarded rather than offering the child silently', async () => {
+	it('withholds to wait when this invocation also runs the open outside blocker', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 		const children = [child(2)]
-
-		await epic_candidate_confirm.answer_for_repo(
+		const running = new Set([`${REPO}#2`, `${REPO}#${String(OUTSIDER)}`])
+		const answer = await epic_candidate_confirm.answer_for_repo(
 			children,
-			context(children, new Map([[2, [OUTSIDER]]])),
+			outsider_context(children, 'OPEN', running),
 		)
 
-		expect(warn.mock.calls.join('\n')).toContain(`#${String(OUTSIDER)}`)
-		expect(warn.mock.calls.join('\n')).toContain('does not track those')
+		expect(answer.children).toEqual([])
+		expect(answer.verdict).toBe('wait')
 		warn.mockRestore()
 	})
 
@@ -187,7 +215,7 @@ describe('epic_candidate_confirm.answer_for_repo — walking the bundle', () => 
 			context(children, new Map([[2, [1]]])),
 		)
 
-		expect(answer.child?.number).toBe(3)
+		expect(answer.children.map((entry) => entry.number)).toEqual([3])
 	})
 
 	// Only the carried-forward correction reaches `stop`: judged against the stale snapshot instead,
@@ -205,7 +233,7 @@ describe('epic_candidate_confirm.answer_for_repo — walking the bundle', () => 
 			),
 		)
 
-		expect(answer.child).toBeUndefined()
+		expect(answer.children).toEqual([])
 		expect(answer.verdict).toBe('stop')
 	})
 })
@@ -223,7 +251,7 @@ describe('epic_candidate_confirm.answer_for_repo — a read that failed', () => 
 		}
 		const answer = await epic_candidate_confirm.answer_for_repo(children, state)
 
-		expect(answer.child).toBeUndefined()
+		expect(answer.children).toEqual([])
 		expect(warn.mock.calls[0]?.[0]).toContain('could not confirm the blockers of #1')
 		warn.mockRestore()
 	})

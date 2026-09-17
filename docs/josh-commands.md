@@ -4,138 +4,32 @@
 
 ## How a command runs
 
-Most commands are a TypeScript file under `scripts/`; the rest are a shell line the dispatcher spawns. **In kit's own checkout the dispatcher evaluates a script command in its own process** rather than starting a second TypeScript runtime for it ([#1342](https://github.com/joshuafolkken/kit/issues/1342)). Measured on 2026-09-04, medians of five: `pnpm josh port dev` went from **0.55s to 0.38s**, and `pnpm josh format:edited` — the command the edit hook runs 60–90 times in a single run — from **0.55s to 0.39s**. About **0.17s** comes off every script command, which is 15–20 seconds of a run that makes roughly a hundred of them.
+Most commands are a TypeScript file under `scripts/`; the rest are a shell line the dispatcher spawns. In kit's own checkout the dispatcher evaluates a script command in its own process rather than starting a second TypeScript runtime for it. Three conditions decide whether a command takes that route:
 
-Three things decide whether a command takes that route, and none of them is a judgement:
-
-- **The dispatcher has to be running from TypeScript source.** That is kit's own `pnpm josh`. A consumer's `josh` bin is the bundled `dist/josh.js` under plain node, which cannot evaluate `scripts/*.ts` at all, so **every consumer keeps the spawning path exactly as it was**.
-- **The command must not need node flags of its own.** `doctor`, `latest:scope`, `followup`, `notify` and `eval:scope` each pass `--env-file`, which has to be in force before the script's first line; those five keep a process of their own. Each runs at most a few times per run, so none of them is where the cost accumulated.
+- **The dispatcher must run from TypeScript source** — kit's own `pnpm josh`. A consumer's `josh` bin is the bundled `dist/josh.js` under plain node, so every consumer keeps the spawning path.
+- **The command must not need node flags of its own.** `doctor`, `latest:scope`, `followup` and `notify` pass `--env-file`, so they keep a process of their own.
 - **A shell command has no script to import** and is spawned as before.
 
-**A new josh script keeps the canonical main guard**, `process.argv[1] === fileURLToPath(import.meta.url)`, or none at all. The dispatcher sets `process.argv` to what the spawned process would have had, so a guard written any other way would import cleanly, run nothing and answer 0 — a `josh gate` that passes without running a check. `scripts/josh/josh-in-process.test.ts` asserts the shape for every command that takes this route.
+A new josh script keeps the canonical main guard `process.argv[1] === fileURLToPath(import.meta.url)`, or none at all. `scripts/josh/josh-in-process.test.ts` asserts the shape for every command that takes this route.
 
 ## Development
 
-These commands replace the corresponding `package.json` scripts. Consumer projects no longer need to add them manually.
+These commands replace the corresponding `package.json` scripts; consumer projects need not add them manually.
 
 ### `josh gate`
 
-Run the completion gate's four checks — lint, type check, spell check and unit tests — **concurrently**.
+Run the completion gate's four checks — lint, type check, spell check and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
 
 ```bash
 pnpm josh gate
-```
-
-The four are independent and share no mutable state, so nothing is gained by running them one after another. Measured in kit on an Apple M3 Pro with warm caches, the four run back to back take **19.1s** and together **15.1s** — a median of three interleaved runs each ([#1258](https://github.com/joshuafolkken/kit/issues/1258)).
-
-**How many run at once, and how wide the unit suite fans out, are read off the machine rather than fixed at four** ([#1258](https://github.com/joshuafolkken/kit/issues/1258)). The first line of every run says what was decided:
-
-```
-plan: 4 of 4 checks at once, test:unit at 7 workers (11 cores)
-```
-
-The plan comes from one table in `scripts/gate-plan.ts`, where each check declares the cores it holds for as long as it runs — measured as CPU-seconds ÷ wall-seconds with the check run alone: lint 2.1, type check 1.7, spell check 1.3, unit tests 8.5. Three things follow from those numbers.
-
-- **The unit suite is the only check worth sizing.** It accounts for 107 of the gate's 122 CPU-seconds on its own, because vitest opens one worker per core while the other three are one or two processes each. It is handed `--maxWorkers=<cores − 4>` — the cores the other three do not hold — which keeps the gate's total demand at the size of the machine instead of about 1.3× it. Measured: no change in wall time beyond run-to-run noise, and 5–6% less CPU burned (101s against 107s). The flag needs vitest 2.1 or newer, which every project this package supports is far past.
-- **A machine smaller than the one it was measured on is left alone.** The cap applies from 11 cores up and nowhere below, because four reserved cores are half an eight-core machine against a third of the measured one, and one measurement says nothing about whether the reservation still pays there. Extrapolating it downward is what would hurt: the suite takes 11.7s at eight workers and 16.7s at four, so a rule that handed an eight-core machine four workers would pin the longest check at the slow end of a curve nobody measured there. Below the line vitest keeps sizing its own pool — the behavior `josh gate` had before the plan existed — and a four-core CI runner is far below it, so CI runs exactly as it did.
-- **Below four cores the checks queue instead of fighting.** The three reserving checks want four cores between them, so a three-core machine runs two checks at a time and a two-core machine one. **Every check still runs and every failure is still reported in one pass** — narrowing the plan changes the order, never the set.
-
-The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
-
-```
-plan: 4 of 4 checks at once, test:unit at 7 workers (11 cores)
-✔ lint (pnpm josh lint) 9.0s
-✗ check (pnpm josh-app check:ci) 4.6s
-…
-✗ verification gate failed: lint, cspell (23.0s)
-```
-
-or, on a green one:
-
-```
-✔ verification gate passed (4 checks) in 23.0s.
-```
-
-Each block's header names the command that ran, not only the check, because the type check's command is resolved per project (below). Re-run a single check while fixing by copying the command from its header; the other three are always `pnpm josh lint`, `pnpm josh cspell:dot` and `pnpm josh test:unit`. The exit code is `1` when any check failed, `0` otherwise.
-
-**Every header ends with how long that check took, and the summary with how long the gate took** ([#1248](https://github.com/joshuafolkken/kit/issues/1248)). The total is wall-clock for the command, not the sum of the four — they run concurrently, so a sum would report about three times what you waited. Read the four against it: 9.0s, 4.6s, 3.1s and 15.4s against a total of 23.0s says the fan-out is working and the unit suite is the long pole; the same four against 80s says the machine was contended rather than any one check being slow. Without those numbers the figure quoted above had to be re-measured by hand every time it was questioned — twice on [#1153](https://github.com/joshuafolkken/kit/issues/1153) alone, which is what put the timing in the output rather than in a stopwatch around it.
-
-**Three of the four checks read a cache, so a second run only looks at what changed** ([#1256](https://github.com/joshuafolkken/kit/issues/1256)). eslint has had one from the start; the spell check now runs `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`, and the type check — **on a project that falls through to `pnpm josh check`**, which is kit itself and any plain TypeScript project — `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`. Together those two went from 6.9s and 3.6s of CPU to 1.9s and 0.9s. On a project whose type check resolves to a toolkit command (`josh-app check:ci`, below) that step is app-kit's or game-kit's to cache, so three of the four checks are cached here and two of the four there. **Neither of those two needs an invalidation rule of its own**: `tsc` stores the compiler options in the build-info file and re-checks everything when they differ, and `cspell` stores a content hash of every config and dictionary file it loaded, so editing `tsconfig.json` or `cspell.config.yaml` invalidates what it should — measured at 3.3s and a full 845-file rescan respectively, against 1.0s and 0.8s warm. **eslint's does need one** ([#1347](https://github.com/joshuafolkken/kit/issues/1347)). It decides an entry is still valid from the file's content hash plus a hash of the _serialized_ config, and serializing drops every function — so editing a rule under `eslint/rules/` changed nothing in that hash, every existing entry stayed valid, and `pnpm josh lint` reported the pre-edit verdict for each file the change had not touched. `eslint/config-fingerprint.js` closes it by putting a content fingerprint of those modules into the shared config's `settings`, which _is_ serialized: one value there invalidates the gate's cache, the scoped lint's and the edit hook's together, because all three load their config through `create_base_config`. The value is content-addressed rather than an mtime or a token so that it agrees across machines — CI restores the gate's cache, and a per-checkout value would make every CI lint cold. CI restores only the eslint cache (`Setup ESLint cache` in `.github/workflows/ci.yml`, keyed on the lockfile and the eslint config); the other two start every run cold, which is why neither needs a cache-busting key there. The three cache files — `.eslintcache`, `.tsbuildinfo`, `.cspellcache` — together with the edit hook's own `.eslintcache.edit` ([#1332](https://github.com/joshuafolkken/kit/issues/1332), under [`josh format:edited`](#josh-formatedited)) and the scoped lint's own `.eslintcache.related` ([#1347](https://github.com/joshuafolkken/kit/issues/1347), under [`josh lint:related`](#josh-lintrelated)) are in the `.gitignore` `josh sync` merges into a consumer project, which also keeps them out of `prettier --check .`. **They are named in the distributed `cspell/index.yaml` `ignorePaths` as well**, and not only left to `useGitignore`: the flags that write them arrive with the package, while the `.gitignore` entries arrive on the consumer's next `josh sync`, so a consumer that upgraded and ran `pnpm josh gate` first had `josh cspell:dot` spell-check the build-info file `josh check` had just written — 125 issues, with nothing misspelled in the tree.
-
-**That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat. **Two of the checks that loop repeats are scoped**: [`josh lint:related`](#josh-lintrelated) checks only the changed files ([#1298](https://github.com/joshuafolkken/kit/issues/1298)) and [`josh test:related`](#josh-testrelated) runs only the tests related to them ([#1257](https://github.com/joshuafolkken/kit/issues/1257)); the gate itself keeps running `josh lint` and `josh test:unit` over everything.
-
-**Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent or the project has no tests, and a gate that ran zero tests must not look like one that ran them all), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
-
-**A tree the gate was already green on is not checked again** ([#1328](https://github.com/joshuafolkken/kit/issues/1328)). Every green run records the digest of each changed file it passed on — the record `josh review:brief` reads to print `Already verified` ([#1241](https://github.com/joshuafolkken/kit/issues/1241)). The gate now reads it back at start-up, and where nothing that record covers has moved it prints the recorded result and exits 0 without starting a process:
-
-```
-✔ this tree is already green — lint, the type check, the spell check and the unit tests all passed on it at 2026-09-04T05:31:12.004Z (`pnpm josh gate`).
-  Reusing that result; nothing was re-run. `pnpm josh gate --force` runs the four checks anyway.
-```
-
-**This is reuse of a result, not a check dropped**: the bytes the skip answers for are the bytes the record was written from, compared one by one. Five things send the gate back to the four checks, and the last two are what the design turns on — **a file map is a diff, so everything it says stays true while the branch it is measured against moves underneath it.**
-
-- **No record** — including after a red gate, and after a green one that had something to print (a check that passed with warnings, or one that passed without running), neither of which writes one. So the re-verification that follows a fix always runs, and a warning is never made invisible by a run that reuses a result instead of printing it.
-- **A file either side covers has moved, appeared or gone.** The comparison unions both key sets, so a new untracked file refuses the skip exactly as an edited one does.
-- **The default branch moved**, even with the map byte-identical. Fetch an advanced `main` and rebase onto it and the same files still differ by the same digests, over a working tree whose every other file has been replaced by code no check has read. The record pins the commit it was taken against, and both halves have to match.
-- **An empty changed map**, which is never evidence. Straight after `git switch main && git pull` the map is empty, and an empty map compares equal to any other empty map. `epicrun` runs exactly that pair of commands between children. Refusing costs nothing: a tree with no changed file is not where a run spends its gate time.
-- **`pnpm josh gate --force`**, for when something outside the tree changed and you know it — a `pnpm install`, a toolchain bump, a cache thrown away.
-
-**Both git hooks read the same record through the same decision**, each adding one condition of its own because the record describes the working tree while a git operation carries something narrower — [`josh pre-push-unit`](#josh-pre-push-unit) for the unit suite, since a push carries `HEAD` ([#1334](https://github.com/joshuafolkken/kit/issues/1334)), and [`josh pre-commit-type-check`](#josh-pre-commit-type-check) for the project-wide type check, since a commit carries the index ([#1381](https://github.com/joshuafolkken/kit/issues/1381)). What the two share is `scripts/hook-gate-reuse.ts`, and the comparison itself is `scripts/gate-skip.ts` in both — so no hook can answer "is this still the recorded tree" differently from the gate printing its answer beside it.
-
-#### A gate a pending version bump would invalidate is refused, not run
-
-**`josh bump` always rewrites `package.json`, so a gate run before it is certain to run again after it** ([#1437](https://github.com/joshuafolkken/kit/issues/1437)). Neither the reuse above nor the pre-push hook's can match a record taken before the version moved, so the second gate is full price. Measured on `fullrun 1428` (PR #1435), one run went `gate` → `bump` → `gate` and threw 19 seconds away entirely; the order the workflow prescribes — the bump first — needs one gate for the same tree. The gate now says so instead of spending the time:
-
-```
-⚠ nothing was checked — this gate would have been paid for twice.
-  Lint, the type check, the spell check and the unit tests were already green on this branch at 2026-09-05T14:29:41.118Z, the tree has moved since, and this branch still carries no version bump.
-  Where this run will commit: `pnpm josh bump minor` rewrites `package.json`, so whatever is verified now has to be verified again after it — run `pnpm josh bump minor` first and then `pnpm josh gate`, one gate instead of two.
-  Where it will not (`halfrun`, or a `needs-human-review` child — neither ever bumps): `pnpm josh gate --force` runs the four checks now.
-```
-
-**It refuses rather than warning, because a warning is printed by a command that has already run.** The seconds are spent by the time anyone reads one, and the gate's `call_count` does not move — [#1344](https://github.com/joshuafolkken/kit/issues/1344) measured across three consecutive runs that notices and prose do not change the numbers. **Nothing is narrowed, dropped or reinterpreted**: the first words say nothing was verified, so the output cannot be mistaken for a pass, and it carries neither of the gate's own verdict lines so a re-run after it is not charged as rework ([#1374](https://github.com/joshuafolkken/kit/issues/1374)).
-
-**No run-progress state is involved, and none exists to consult.** The tree and the record already say it: all five of these hold, and any one of them failing leaves the gate exactly as it was.
-
-- **A green record covers this same branch state** — the same base commit, and **every path that record covers is still changed in this tree**. Within one run that always holds: a fix moves digests and may add files, and nothing a run has edited stops differing from the base. Across runs it usually fails, because the previous run's work has been committed, reverted or stashed — which is what keeps a record left by an abandoned run from refusing the _first_ gate of the next one, something the base check alone cannot do while the default branch has not moved. The one case it does not exclude is a run resuming an earlier one's uncommitted tree, and there the refusal is right.
-- **That record was itself taken before a bump.** A record written after one carries `package.json`, so the last gate of a run that followed the prescribed order can never be the one that refuses.
-- **The working tree carries no version bump yet** — `package.json` is absent from the changed map. Changed for any other reason, it reads as "the bump may already be in" and nothing fires: a missed refusal costs one gate, a wrong one costs a run that cannot verify itself.
-- **The tree has moved since that record.** A tree it still covers is answered by the reuse above at no cost, so the ordering question only ever arises where real time is at stake.
-- **`--force` was not passed.** A run that will not commit — `halfrun`, or a `needs-human-review` child — never bumps at all, and no condition above can see which kind of run this is, so the message names the flag as its second way forward rather than burying it after the bump. `halfrun.md`'s fix-round step says the same thing from the other end.
-
-```bash
 pnpm josh gate --verbose   # every check's output, passing ones included
-pnpm josh gate --force     # run the four checks even on a tree already recorded green
+pnpm josh gate --force     # re-run even on a tree already recorded green
+pnpm josh gate --no-unit   # the three static checks only (CI only)
 ```
 
-`--verbose` and `--force` are the exceptions to the refusal below: the gate consumes them itself rather than forwarding them, so they cannot vanish into a sub-command the way a forwarded flag would. Every other argument is still refused, and the refusal names both the arguments it rejected and the flags it accepts:
-
-```
-josh gate takes no extra arguments — pass them to josh lint or josh check or josh cspell:dot or josh test:unit instead
-  refused: --workers=1
-  accepted here: --verbose --force
-```
-
-**The type check follows the application layer.** Three of the four checks are always the `josh` sub-command of the same name. The type check is not: a SvelteKit project type-checks with `svelte-check` behind `svelte-kit sync`, and `tsc --noEmit` there both misses every `.svelte` type error and fails on a clean checkout where `./$types` has not been generated. So the step is asked of the project's own toolkit:
-
-1. The toolkit shim is found by walking up from the working directory to a `node_modules/.bin` — the same walk pnpm performs, so a gate typed in a subdirectory resolves the toolkit its sibling checks resolve. It is never found through `pnpm <bin>`, which falls through to a globally installed toolkit and would run a SvelteKit type check on a project that is not one.
-2. That binary is run with no subcommand and the usage line it prints is read, the same way the `/verify-ui` skill decides whether a `shot` command exists. A toolkit being installed is not the command existing.
-3. The first of `check:ci` (the strict variant a gate wants) then `check` that the usage line names is used; `josh-app` is consulted before `josh-game`.
-4. When no installed toolkit names either, the step stays `pnpm josh check`.
-
-A project with no application toolkit — kit itself, a plain TypeScript package — therefore gets `tsc --noEmit`, unchanged. The probe runs concurrently with the other three checks, so it costs no wall-clock of its own.
-
-The refusal message above names the `josh` sub-commands, `josh check` among them; on a project whose type check resolves to a toolkit command, pass that check's arguments to the command its output header names instead.
-
-Like the composite commands below, `gate` forwards nothing to the four sub-commands, so it refuses extra arguments rather than discarding them:
-
-```bash
-$ pnpm josh gate --workers=1
-josh gate takes no extra arguments — pass them to josh lint or josh check or josh cspell:dot or josh test:unit instead
-```
-
-Refactoring still comes **before** the gate, and `/code-review` still comes after it — `josh gate` replaces the four checks between them, not the steps around them.
+- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
+- A tree recorded green is reused unless `--force` or the changed-file map moved.
+- Exit `1` if any check failed. Refuses any argument other than the three flags.
 
 ### `josh lint`
 
@@ -143,70 +37,34 @@ Check code with prettier and eslint.
 
 ```bash
 pnpm josh lint
-pnpm josh lint:prettier   # prettier only
-pnpm josh lint:eslint     # eslint only
 ```
 
 ### `josh lint:related`
 
-Check only the files the change touched — the lint check an implementation loop repeats between edits ([#1298](https://github.com/joshuafolkken/kit/issues/1298)).
+Check only the files the change touched — the lint check an implementation loop repeats between edits. Added in front of the whole-tree `josh lint`, never in place of it.
 
 ```bash
 pnpm josh lint:related                     # alias: josh lr
 pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
 ```
 
-**It is added in front of the whole tree, never in place of it.** `josh gate` keeps running `josh lint` over everything before the commit: a formatting or lint rule can be broken by a file the change never named — a shared config, a generated snapshot — and only the whole-tree run sees that. What the narrowing replaces is the repeat calls in between. Measured with `pnpm josh time` across four runs, those cost 47–188 seconds each, and 188 of them were 18% of one 1,043-second implementation phase.
-
-The changed files are the branch diff plus the untracked files beside it — the same reading `josh review:level`, `josh eval:scope`, `josh review:brief` and [`josh test:related`](#josh-testrelated) decide from, so what this narrows by is what those commands call the change. Prettier is given the whole narrowed list with `--ignore-unknown`, so a file it has no parser for is skipped rather than failing the run; eslint is given the same list with `--no-warn-ignored`, so a changed `.md` or an ignored file does not bury the findings in warnings. **Eslint is given a cache file of its own, `.eslintcache.related`** ([#1347](https://github.com/joshuafolkken/kit/issues/1347)). It shared the gate's until then, on the argument that eslint leaves the entries a run did not visit alone and a narrowed run therefore warmed the cache the whole-tree run reads. That holds for pruning and says nothing about two writers: `josh gate` lints the whole tree beside the review while an implementation loop calls this command between edits, and each eslint run rewrites its cache file whole from the copy it loaded at start-up — so on one file, a narrowed run finishing during the gate's rolled the cache back to its pre-gate state, and a whole-tree run finishing second discarded the narrowed one's entries. It is the same judgement [#1332](https://github.com/joshuafolkken/kit/issues/1332) made for the edit hook, applied to the second place it was needed; the warming given up is worth less than the entries no longer lost, since a file of its own is warm from its own second call onwards.
-
-**It prints what it narrowed by before it runs**, so a scoped run is never read as a whole one:
-
-```
-josh lint:related: 2 changed file(s) — checking only them.
-  - scripts/thing.ts
-  - docs/thing.md
-```
-
-**Both fallbacks end at the whole tree, and each says which one it was.** A narrowed run that checked nothing would report success, so the two are never silent and never merged into one message:
-
-```
-josh lint:related: the changed files could not be read — checking the whole tree instead.
-josh lint:related: no changed file is one prettier or eslint reads — checking the whole tree instead.
-```
-
-A path given as an argument that this cannot use — one the tree no longer holds, or one neither linter reads — is named on the console rather than dropped, so a typo is visible instead of being answered with a whole-tree run nobody asked for.
-
-**Flags are named rather than forwarded**, which is where this differs from [`josh test:related`](#josh-testrelated): that command has one child to forward to, this one has two that take different flags — `--fix` means something to eslint and nothing to `prettier --check`. A flag is reported as ignored instead of being sent to both or dropped in silence:
-
-```
-josh lint:related: ignored — prettier and eslint take different flags: --fix
-```
+- Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
+- Falls back to the whole tree (naming which case) when no changed file is lintable.
 
 ### `josh lines`
 
-Print how many code lines a file already has against the `max-lines` limit, and how many are left.
+Print how many code lines a file has against the `max-lines` limit and how many remain — so splitting is decided before writing.
 
 ```bash
-pnpm josh lines scripts/format-edited-file.ts scripts/josh/josh-logic.ts  # alias: josh ln
+pnpm josh lines scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts  # alias: josh ln
 ```
 
 ```
 limit 300 code lines · near from 255
-scripts/format-edited-file.ts  230/300 code lines (76%), 70 to spare
-scripts/josh/josh-logic.ts  179/300 code lines (59%), 121 to spare
+scripts/hooks/format-edited-file.ts  230/300 code lines (76%), 70 to spare
 ```
 
-**It answers before the writing starts, which is the whole point** ([#1425](https://github.com/joshuafolkken/kit/issues/1425)). `pnpm josh lint` reports the file line limit only once it has been broken — measured by hand on run #1406 (PR #1422, 45.8 minutes), **19.8% of the whole run, 543 seconds, went on reacting to `max-lines` after the implementation was already finished**: five gate runs, four `pnpm josh lint` runs, 115 seconds of tool execution and 353 seconds of model time in between. The splitting was correct work; deciding it after the fact rather than at design time was not. `CLAUDE.md` → Code Change Rules Step 0 is what makes a run consult this, and `prompts/collaboration-workflow/report-format.md` → 「行数予算は編集前に読む」 carries the procedure.
-
-- **`near from` is printed with every report.** "Near the limit" starts at 85% of the limit — 255 of 300, so 45 code lines of headroom, a little under two functions at the 25-line function limit. The boundary is printed rather than left implicit so a reader who sees the advice on one file can tell which side the next one is on.
-- **It never fails on a large file.** The limit is lint's to enforce, and a second command exiting non-zero on the same condition would be a second enforcement point for it — the door to satisfying a limit by counting differently rather than by splitting. A non-zero exit means the argument list was unusable. Nothing here changes the limit.
-- **The count is lint's own, not a second counting method.** `max-lines` runs with `skipBlankLines` and `skipComments`, so it is neither `wc -l` nor anything read off the text ([#1070](https://github.com/joshuafolkken/kit/issues/1070)); this command runs **the same eslint `pnpm josh lint` runs**, with `max-lines` lowered to `max: 0` so the rule reports unconditionally, and prints the number the rule itself reported. The eslint **CLI** is used rather than its in-process API because the two disagree: on eslint 10.10.0 with this repository's config, a file beginning with `#!` counts one line lower through `Linter.verify` / `ESLint#lintFiles` than through the CLI — 300 against the gate's 301 — and every `scripts/*.ts` entry point has a hashbang.
-- **A path with no number says so, and says which kind.** A path that is not a regular file — a typo, or a directory — prints `not counted: not a regular file`, because it was never sent to eslint and a row quoting eslint's verdict for it would answer a question nobody asked. Everything that did reach the probe without coming back with a number prints `not counted: no line count for this path`: a path eslint ignores, one no configuration covers, one it cannot parse, and a probe that could not run at all — which is why that wording does not name eslint. Neither prints a blank, which would read as zero. **A file eslint _did_ lint and this rule did not fire on has 0 code lines** — a comments-and-blank-lines module, since the counting skips both — and that is reported as `0/300` rather than as "not counted".
-- **Only regular files are read.** A directory is reported rather than expanded: every path asked about shares one eslint run, and one argument eslint cannot match makes it exit with no JSON at all, which would leave every other path in the call unanswered.
-- **Inline configuration is off for the probe** (`--no-inline-config`). A `/* eslint-disable max-lines */` at the top of a file silences the rule, and an inline directive beats the `--rule` override — so without this the probe would see no message and read a 500-line file as 0 code lines with `300 to spare`, which is the most dangerous direction this report can be wrong in.
-- The percentage is floored, not rounded, so it can never print `85%` on a file the advice has not warned about.
-- The function limit (25 code lines) is not this command's subject; `pnpm josh lint` reports it.
+- Count is lint's own (`skipBlankLines` / `skipComments`); `near from` marks 85%. Never fails on a large file — a non-zero exit means the argument list was unusable.
 
 ### `josh format`
 
@@ -214,13 +72,11 @@ Format code with prettier and eslint.
 
 ```bash
 pnpm josh format
-pnpm josh format:prettier  # prettier only
-pnpm josh format:eslint    # eslint only
 ```
 
 ### `josh format:edited`
 
-Format the single file an agent just edited, and carry the live round-trip density line. It is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `PostToolUse` event for the `Edit`, `Write` and `Bash` tools, and Claude Code pipes the tool call to it as JSON on stdin. The command reads `tool_input.file_path` out of that payload and runs `eslint --fix` and then `prettier --write` on that path alone.
+Format the single file an agent just edited. Not run by hand: `.claude/settings.json` wires it to `PostToolUse` and pipes the tool call as JSON on stdin; it reads `tool_input.file_path` and runs `eslint --fix` then `prettier --write` on that path alone.
 
 ```json
 "PostToolUse": [
@@ -231,84 +87,28 @@ Format the single file an agent just edited, and carry the live round-trip densi
 ]
 ```
 
-The matcher is the plain alternation rather than an anchored regex on purpose: Claude Code treats a matcher built only from letters, digits, `_`, `-`, spaces, `,` and `|` as an exact list of tool names, and reads anything else as an unanchored regular expression. `Edit|Write|Bash` therefore names three tools, while `^(Edit|Write|Bash)$` would depend on the regex path being available.
-
-**Adding `Bash` is what makes that choice load-bearing, because `Bash` is a prefix of `BashOutput` and the two forms fail in opposite directions.** Should the plain alternation be read as a regex after all, it is unanchored, so `Bash` also matches `BashOutput`: a few extra spawns while a background command is polled, and nothing worse — that payload names no file either, so the formatting half stays a no-op and the density line stays correct. Should the anchored form be read as an exact list, it matches no tool whose name is literally `^(Edit|Write|Bash)$`, which is none — the hook silently stops running and takes the formatting with it. A bounded overspend beats a silent no-op, so the list form stays.
-
-**`Bash` is named for the density line, not for formatting.** A shell payload names a command rather than a file, so the formatting half is a no-op for it and never guesses which path a `sed` line rewrote. Why the tool is in the matcher at all is under the density line below.
-
-**Why a subcommand rather than a shell one-liner in the settings file.** The settings file is copied verbatim into every consumer, so an inline command would be a second copy of this logic in each of them, un-upgradable and untested. As a subcommand the wiring stays one line and the behavior is single-sourced here.
-
-**eslint first, prettier last.** An `eslint --fix` that removes a now-unused disable directive leaves the whitespace behind it, so a prettier pass before eslint can hand back a file that `prettier --check` then rejects. Prettier having the last word is what keeps the hook's own output passing `pnpm josh lint`. `josh format` keeps the opposite order on purpose: it chains the two with `&&`, and `eslint --fix` exits non-zero whenever a non-autofixable error remains, so eslint first would mean one unused variable anywhere in the tree stops prettier from running at all. Here the two runs are independent, so the ordering is free to be the one that leaves the file correct.
-
-**It never fails.** A `PostToolUse` hook runs after the edit has already landed and cannot undo it, so nothing this command does is worth reporting as a failure: a payload it cannot parse, a path that no longer exists, a file type nothing here formats, and a formatter that exits non-zero on a half-written file all end the run quietly. What eslint could not fix is left for `pnpm josh lint` at the completion gate to report.
-
-**Only files inside the project.** A session can carry additional working directories, and a path in another checkout or a home-directory config file is governed by that tree's rules, not this one's — so anything outside the directory the hook runs in is left alone rather than rewritten to this project's prettier and eslint config. Each spawn is bounded at 15 seconds, and the bound is set against the worst-case run rather than one spawn: an edit to a config input plans eslint, prettier and `eslint_d restart`, and the first and last each have a second route behind the daemon — five spawns, 75 seconds, under the 90 the hook entry declares. That ordering is what keeps the script's bound the one that fires first. Neither number makes a kill safe — `prettier --write` rewrites in place, and any kill can leave the file truncated — but 15 seconds is two orders of magnitude beyond what formatting one file takes, so reaching it means something is already wrong.
-
-Only paths that prettier has an opinion about are touched (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.svelte`, `.json`, `.jsonc`, `.md`, `.yml`, `.yaml`, `.css`, `.html`), eslint runs on the code subset of those, `node_modules` and `.git` are skipped at any depth, and `dist` and `build` are skipped only as top-level directories — nested, they are ordinary source (`src/routes/build/+page.ts` is a route, not build output). That is the trade: a fraction of a second per edit against a whole-project lint run to see what one file's formatter made of it, and against formatting problems arriving in a batch at the end of the work instead of one at a time. The shims under `node_modules/.bin` are spawned directly rather than through `pnpm exec`, which removes two process starts from a chain that already holds `pnpm josh` and tsx.
-
-**The eslint run goes through a warm daemon.** Almost none of what this hook used to cost was the file. Measured on this repository, one cold `eslint --fix` on a single TypeScript file took 1.70s of a 2.50s hook, while a second lint inside the same process took 0.13s — the 1.6s between them is the flat config, its plugins and the type-aware program, rebuilt from nothing on every edit. `eslint_d` keeps one warm eslint behind a socket and forwards the same arguments to it, which brings that step to 0.08s and the whole hook from 2.50s to 0.84s. It runs the **project's own** eslint rather than the copy it bundles — the hook passes `ESLINT_D_MISS=fail`, so a project whose eslint the daemon cannot resolve is a refusal rather than a silent substitution — and the daemon exits after 15 minutes of inactivity (`ESLINT_D_IDLE`). Prettier has no daemon here — at 0.21s it is not what the hook spends its time on, and a second warm process would double what can go stale for very little.
-
-**The eslint run also carries cache flags, and they are there to protect the gate rather than to speed the hook up.** ESLint deletes whatever sits at `--cache-location` whenever it is started _without_ `--cache`, so this hook — which passed neither flag — destroyed `.eslintcache` on every single edit, and a run of 19 edits then paid a cold lint at both of its verification gates: 59.4s and 54.5s, against 3.0s warm ([#1332](https://github.com/joshuafolkken/kit/issues/1332)). It now passes `--cache --cache-strategy content --cache-location .eslintcache.edit`. **That location is the hook's own rather than the gate's on purpose:** the two run at the same time — `josh gate` lints the whole tree beside the review while this hook fires on every edit — and each eslint run rewrites its cache file whole from the copy it loaded at start-up, so two writers on one file silently discard each other's entries. A file of its own makes the hook structurally unable to degrade the cache the fix exists to protect. **Pruning is not the reason, though it reads like one**: `file-entry-cache` defaults `noPrune` to true, and a single-file run against the gate's full cache was measured byte-identical, so a shared file would keep the entries that run never visited. **What that location does _not_ have to solve is a rule-module edit** ([#1347](https://github.com/joshuafolkken/kit/issues/1347)): editing `eslint/rules/*.js` used to leave every entry in this file valid too, and the fix is one fingerprint in the shared config rather than anything per cache file — so this cache and the gate's are invalidated by the same value.
-
-**A config edit restarts the daemon.** ESLint re-reads the config _entry_ file on every request — it appends that file's mtime to the import URL — but the modules the entry imports carry no such query and stay in a long-lived daemon's module registry. Edit `eslint/rules/naming-convention.js` and then any source file, and without a restart the source file would be auto-fixed against the pre-edit rules for as long as the daemon lives, which reads as the rule change not working rather than as a stale process. So an edit to a config input — the root `eslint.config.*`, or anything under `eslint/` — plans one extra step after the formatters: `eslint_d restart`. Ordinary edits never pay for it.
-
-**Three startup routes, fastest first — and resolving the daemon is not the same as it starting.** The daemon is reached through node's own module resolution (`node <resolved eslint_d CLI>`) rather than a `node_modules/.bin` shim, because pnpm writes a shim only for a project's _direct_ dependencies and `eslint_d` is this package's dependency, not the consumer's. Behind it stand the project's own `node_modules/.bin` shim and then `pnpm exec`, so a project without the daemon behaves exactly as it did before one existed — and those routes are still tried when the daemon resolves but fails to run. A blocked loopback bind, a watch-limit refusal, a store it cannot write its own config file into, and the `ESLINT_D_MISS=fail` refusal above all end the same way: a non-zero exit with nothing written to stdout, which is what separates them from eslint's ordinary non-zero exit, where the problems it could not fix are printed. Without that retry the hook would silently stop fixing anything with eslint wherever the daemon cannot run — the "permanent silent no-op rather than a slower one" the shim fallback already existed to prevent, reintroduced one level up. The same package resolution serves `josh`'s tsx runner, which needs it for the other reason a shim fails: pnpm's shim hardcodes the store path of the version present when it was written, and a later bump prunes that path without regenerating the shim.
-
-**It also tells the run how often it is stopping to wait for a tool.** `josh time` has measured a run's round-trip density since [#1304](https://github.com/joshuafolkken/kit/issues/1304), and warns below 1.50 calls per round trip — but only once the run has ended, which is why run #1299 could go on issuing a single call in 159 of its 172 tool-issuing turns with the norm already shipped as prose in `CLAUDE.md`. This hook carries the same number back while there is still a turn left to change ([#1329](https://github.com/joshuafolkken/kit/issues/1329)). It reads the last 256 KB of the transcript Claude Code names in the hook payload, computes the density with the very function `josh time` reports — not a second copy of it — and counts the calls the newest assistant message issued by grouping the transcript lines that share its id, rather than guessing turn boundaries from the gaps between calls.
-
-One line comes back, and only when all four of these hold: the window holds at least ten round trips, the run is under the floor, the turn that just ran issued a single call, and five minutes have passed since the last line. It leaves through `hookSpecificOutput.additionalContext`, because a `PostToolUse` hook's plain stdout never reaches the model — so an ordinary edit still writes nothing at all to stdout. **The measurement rides this hook rather than one of its own**: a matcher covering every tool would put a process start in front of all ~250 calls of a run to say something on a handful of them. Measured on this repository, the reading adds 1.6 ms at the median to a hook that takes about 0.9 s, which is inside its own run-to-run variance.
-
-**Inside a forked agent the line describes that fork, not the session that delegated it** ([#1424](https://github.com/joshuafolkken/kit/issues/1424)). The payload's `transcript_path` names the **parent** session, whichever agent issued the call, so the reading a forked agent got back was the parent's calls per round trip — a number about a run the reader is not in, and one that cannot move while the fork is what is running. The fork is identified by a separate `agent_id`, and its own transcript sits at `<session-id>/subagents/agent-<agent-id>.jsonl`; the hook resolves that path first, and the throttle record follows it, which is what finally makes the per-session budget the record has always claimed a per-**run** one. **A named agent is answered with its own path whether or not that file exists yet, and never with the parent's** — the fork's first call has nothing written under it, and an unreadable transcript already ends as "no line", which is the honest answer for a run with no history. A payload naming no agent is answered with the path it carried, `null` included: the schema accepts that spelling rather than rejecting the whole payload over it, which would take the line off every edit of the main line in silence.
-
-**`Bash` was added to the matcher because the hook was missing the runs the line is for** ([#1337](https://github.com/joshuafolkken/kit/issues/1337)). Riding the edit hook was chosen on run #1299, where `Edit` was the most-called tool at 65 calls — but that run does not represent how these sessions work now. Of the ten most recent in this checkout, **seven called `Edit` and `Write` zero times**: they edit through `sed` and heredocs, and they are the same sessions measured at 1.00–1.31 against the 1.50 floor. The mechanism reached none of them.
-
-The widening was decided on measurement rather than on the obvious repair of naming every tool. One hook run is **0.53 s** here and about 0.4 s in a consumer, and essentially all of it is process startup — a payload naming no transcript costs the same as one that reads 256 KB of it, so bailing out before the read saves nothing measurable. `Bash` accounts for **88–100% of every call** in the seven sessions that were unreachable, so naming it alone reaches every one of them, at 4–67 s per run. Naming every tool on top of that would cost only 0–8 s more across the same ten sessions — the argument against it is not the money but that it buys no reach at all, while putting a process start in front of the read-only calls this hook has nothing to say about. The 256 KB window still holds 23–34 round trips in those sessions, comfortably past the ten the line requires, so it fires rather than merely arriving.
-
-**The matcher decides how often the check runs; the four conditions above decide how often anything is said.** Widening it does not raise the ceiling of one line per five minutes — it moves runs that were emitting none toward the ceiling that was already specified, at roughly 65 tokens a line.
+- eslint runs first (warm `eslint_d`, cache `.eslintcache.edit`), prettier last. Never fails; skips `node_modules` / `.git` at any depth, `dist` / `build` at top level.
+- Carries a density line via `hookSpecificOutput.additionalContext` under set conditions.
 
 ### `josh batch:guard`
 
-Refuse a tool call that would make a third consecutive single-call turn. Like `josh format:edited` it is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `PreToolUse` event, and Claude Code pipes the call it is about to run to it as JSON on stdin.
+Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. Wired to `PreToolUse` via `.claude/settings.json`, fed the pending call as JSON on stdin.
 
 ```json
 "PreToolUse": [
 	{
-		"matcher": "Bash",
+		"matcher": "Bash|Edit|Read|Write",
 		"hooks": [{ "type": "command", "command": "pnpm josh batch:guard", "timeout": 20 }]
 	}
 ]
 ```
 
-**The matcher names `Bash` alone, and the omission is deliberate.** The guard must never refuse a write: Claude Code denies one call of a turn and runs the rest, so a refused `Edit` leaves its siblings applied and itself not, and the reissued edit may no longer match the file they changed. Wiring it to `Edit` and `Write` would start a process that can only ever answer "allow". `Bash` is 88–100% of the calls in every session measured under the density floor, so the reach is unaffected. The exclusion is enforced in the script as well as in the matcher — a matcher is settings a consumer can widen, and the guarantee has to hold whatever the wiring says. Inside `Bash` the script scans the **whole line**, not its leading word: a chain is labelled by its first segment, so `cat notes.md && sed -i '' s/a/b/ src/x.ts` reads as `cat` and a leading-word test would call it a read. `sed`, `tee` and `dd` anywhere in the line make it a write, as does a `>` anywhere in it. Both over-match — a read-only `sed`, a `->` inside a grep pattern — which allows a call that could have been refused, the direction every rule here leans.
-
-**A forked agent is judged on its own transcript, and until [#1424](https://github.com/joshuafolkken/kit/issues/1424) it was judged on its parent's.** The payload names the parent session, whichever agent issued the call, and a parent's timeline is frozen for as long as a fork runs — the fork's lines go to the fork's file — so its open sequence either never reaches the limit or reaches it once and can never qualify again. Measured across **551 forked review agents** in this checkout the guard refused **zero** calls, while replaying the same transcripts through each fork's own file refuses 1–4 per review round. So the hook now resolves `<session-id>/subagents/agent-<agent-id>.jsonl` from the payload's `agent_id` and keys the refusal record on it, which is what makes "a delegated unit gets a budget of its own" below true rather than intended. **A named agent is answered with its own path whether or not that file exists yet, and never with the parent's.** The fork's first call has nothing written under it, and an unreadable transcript already ends as "no refusal"; falling back to the parent instead would judge the fork on a timeline it never ran _and_ spend the **parent's** refusal record, so the parent's own next third single-call turn would be admitted in silence. A payload naming no agent is answered with the path it carried, `null` included — the schema accepts that spelling rather than rejecting the whole payload over it, which would take the guard off every call of the main line.
-
-**It exists because describing the problem stopped working** ([#1390](https://github.com/joshuafolkken/kit/issues/1390)). [#1304](https://github.com/joshuafolkken/kit/issues/1304) distributed the batching norm as prose in `CLAUDE.md`; [#1329](https://github.com/joshuafolkken/kit/issues/1329) and [#1337](https://github.com/joshuafolkken/kit/issues/1337) put the live density line in front of the run while there were still turns left to change. Three consecutive runs measured afterwards came in at **1.10–1.12 calls per round trip against a 1.50 floor**, with 14–27% of their round trips recoverable ([#1344](https://github.com/joshuafolkken/kit/issues/1344)). Neither mechanism moved the number, so this one intervenes in the decision instead of reporting on it: `PostToolUse` runs after the round trip has been spent, `PreToolUse` can still stop the call.
-
-**Three is the limit, from the measurement rather than from taste.** #1344 found the longest bundleable sequence of each run at 3–5 turns, so refusing at the third catches most sequences while they still have turns left to save; four or more gives most of them back, and two would refuse the ordinary pair nobody calls a defect.
-
-**The judgement is the report's own, not a second one.** Whether a call is bundleable, what it names, and what counts as a run of single-call turns are decided by `time-bundle-call.ts` and `time-bundles.ts` — the modules `josh time` computes its `Bundling:` block from. A guard with an opinion of its own would refuse calls the end-of-run report then says were fine, and that report is how the change is verified.
-
-**What it cannot know is the size of the turn it is interrupting, and no field can be made to say.** Claude Code writes one line per content block and starts the first tool as soon as that block parses — measured on a live session, the later `tool_use` lines of one message arrive **1.4 to 15 seconds afterwards**. `stop_reason` is no help either: every line of a message carries the finished message's value, including the `thinking` line written before any tool ran. So at the instant the first call of a turn is judged, the turn looks single-call whatever it will turn out to be, and the guard decides on closed history alone. Where the interrupted turn was already batching, the refusal is a false positive costing one round trip — the price #1390 named and accepted before this was built, and bounded by the once-per-sequence record below. Reading the count anyway would have been worse than not reading it: it answers `1` for every turn at this point, so a guard written against it would refuse the first call of every batched turn while reporting that it had checked.
-
-Three things have to hold before a call is refused, and each one is a false positive the hook declines to make:
-
-- **Two single-call turns are already closed behind it**, with no batched turn, no human wait and no delegated unit in between. Closed is the operative word: a turn whose first call has already come back is still in flight and contributes nothing, or the verdict would change part-way through a turn — measured live, the first call of a two-call turn was admitted and the second refused.
-- **The call is bundleable, and it does not write.** Every mutation is outside the allow-list — `pnpm`, `git`, `node` and the `gh` write flags are all mutation words — so no `pnpm josh` command, no commit and no Issue write is reachable from here; the edit tools and `sed` are excluded on top of that, per the matcher note above. Both questions are asked **before the transcript is read**, so a `pnpm josh` call costs the hook's own start and nothing more.
-- **It names nothing the sequence already touched.** The search-then-read pair is a real dependency, and the same target test the report uses keeps the guard off it.
-
-**A refusal cannot repeat on the call in hand, and that is structural rather than likely.** The hook records the instant it last refused, keyed on the transcript so a delegated unit gets a budget of its own, and a sequence qualifies only if it _began_ after that instant. A refused call extends the sequence rather than restarting it and a sequence's start does not move between two calls seconds apart, so the second look at the same call can never qualify — and a turn can have at most one of its calls refused. The run has to batch (or issue a dependent, writing or non-bundleable call) before the guard has anything to say again.
-
-**What that argument does not cover is a sequence outliving the 256 KB window the hook reads.** The start it compares is the first span _in that window_, so an unbroken run of single-call turns longer than it — 23–34 round trips in these transcripts — presents a start that has moved forward and is refused a second time. That is bounded rather than a loop: one extra round trip per window of unbroken single-calling, which is behavior worth having. Closing it exactly would cost the mechanism its life, because the only test that does so — refuse only where the recorded instant is itself inside the window — silences the guard permanently once the window passes the last refusal. **The record is written before the refusal is made**: with nothing on record every sequence looks new, so a hook that could not write one must not refuse, or a temp directory it cannot write to would wedge the run. Every other failure allows the call too — a missing transcript, a payload that is not JSON, a tail caught mid-append.
-
-The refusal leaves through `hookSpecificOutput.permissionDecision`, which is the only shape that stops a call; plain stdout does not. An ordinary call writes nothing at all to stdout. Set `JOSH_BATCH_GUARD` to `off`, `0`, `false` or `no` — in the environment or in `.env` — to switch the guard off without editing the settings file. Unset is **on**, unlike `JOSH_EVAL`, because this is a distributed convention rather than an opt-in measurement. **The `.env` read is `process.loadEnvFile` inside the script rather than the `tsx_arguments` flag every other command uses**: declaring any `tsx_arguments` disqualifies a command from in-process dispatch ([#1342](https://github.com/joshuafolkken/kit/issues/1342)), which would put a second ~0.16 s tsx start in front of every `Bash` call — the exact hot path that change removed it from. It is node's own `--env-file` parser, so a value already in the environment still wins over the file's.
-
-**Verify it the way #1390 asks to be verified**: run `pnpm josh time --issue <N>` afterwards and read the `Bundling:` block. #1329 and #1337 were only known to have changed nothing because that measurement existed, and this mechanism is held to the same fixed point — the target is fewer than ten recoverable round trips per run.
+- `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
+- Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable. One refusal per run.
 
 ### `josh investigation:guard`
 
-Refuse a file read once the run has read the threshold's worth of files it has not edited **since its last delegated unit** ([#1460](https://github.com/joshuafolkken/kit/issues/1460)). Like `josh batch:guard` it is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `PreToolUse` event and Claude Code pipes the call it is about to run to it as JSON on stdin.
+Refuse a file read once the run has read the threshold's worth of un-edited files since its last delegated unit, pushing bulk investigation into a delegated unit. Wired to `PreToolUse`, fed the pending call as JSON on stdin.
 
 ```json
 "PreToolUse": [
@@ -319,55 +119,70 @@ Refuse a file read once the run has read the threshold's worth of files it has n
 ]
 ```
 
-**The rule it enforces already existed, and already failed as a rule.** [#1426](https://github.com/joshuafolkken/kit/issues/1426) put the threshold in two documents and in `scripts/delegation/delegation-policy.ts`, and stated that it is a count of reads actually made rather than a forecast. Run #1441 called `pnpm josh delegate investigation` once, at t+4.0 min of a 45.2-minute run, and after the unit returned the main line read **8 more files it did not edit** — over twice the threshold — with the question never asked again. None of the 8 appears in the 11 files that run merged, the stretch from the unit's return to the first `Edit` was 8.2 min (18% of the run), and 4 of the 5 largest tool-less stretches fall inside it. **A count kept in an agent's head is a one-shot judgement**: after a delegation the run remembers the step as done rather than the counter as zero.
+- On the `Bash` side only read-only lines are refused (`bat`, `cat`, `head`, `less`, `more`, `nl`, `sed`, `tail`); a delegation clears the pending set. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
+- Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
-**So the counting is done off the transcript.** A delegation clears the pending set, a read adds its files to it, and an **edit takes its file back out** — which is what makes the set mean "read and not edited" without asking the run to declare its intentions in advance, and what keeps [#1426](https://github.com/joshuafolkken/kit/issues/1426)'s rule that a file this run will edit is read in the main line. Nothing has to be remembered, so the second accumulation is indistinguishable from the first and the threshold necessarily fires again.
+### `josh rule:guard`
 
-**The matcher names `Read` and `Bash`, and both halves are load-bearing.** In this repository the reading is split between them: run #1441 issued 5 `Read` calls against 10 `cat`, 16 `sed` and 1 `tail`, so a `Read`-only wiring would miss the idiom that carries most of the text. On the `Bash` side the guard refuses only a line the batching guard would also have been willing to refuse — `is_guarded_call`, which treats `sed`, `tee`, `dd` and a `>` anywhere in the line as writing — because Claude Code denies one call of a turn and runs the rest, so a refused write would leave its siblings applied and itself not. A `sed -n` read is therefore **counted and never refused**; the refusal lands on the next call that is unambiguously a read. What counts as reading is narrower than `time-bundle-call.ts`'s `READ_COMMANDS`: `bat`, `cat`, `head`, `less`, `more`, `nl`, `sed` and `tail` print a file, while `grep`, `ls` and `wc` report _about_ one without putting its text in the prompt.
+Deliver a rule at the tool call that binds it, instead of carrying it resident in `CLAUDE.md` every turn. Wired to `PreToolUse` (on `Bash` alone), fed the pending call as JSON on stdin.
 
-**The run's own instructions are excluded, and that was found by the guard refusing its own author.** `CLAUDE.md`, anything under `prompts/` and anything under `.claude/skills/` are read to find out what to _do_ rather than how the subject works, nearly every run reads several of them, and no unit can be sent to read them on the main line's behalf — run #1441's own measurement excluded 5 of them by hand for the same reason. A call naming only those is never counted and never refused; `docs/` is not excluded, because product documentation is routinely the subject.
+```json
+"PreToolUse": [
+	{
+		"matcher": "Bash",
+		"hooks": [{ "type": "command", "command": "pnpm josh rule:guard", "timeout": 20 }]
+	}
+]
+```
 
-**A shell target and a tool's `file_path` are resolved before they are compared.** Claude Code requires `file_path` to be absolute, while a shell line carries the word as it was typed — so without that resolution a file read with `cat` and then edited with `Edit` would never cancel and would stay pending for the rest of the run, and reading it once each way would count twice. Two more conditions keep the refusal honest: the call must **actually add a file**, so re-reading something already pending — a second `sed -n` window, or a `Read` with a new `offset` — never trips it; and it is the **accumulated** count that has to reach the boundary, never the accumulated count plus the call's own targets, so one bundled multi-file read (`cat a.ts b.ts c.ts`, exactly the batching `CLAUDE.md` mandates) is not refused as the first call of a run. A shell glob is not counted at all — it resolves to a literal path containing `*`, which no edit can ever name.
+`scripts/rules/delivered-rules.ts` holds one row per relocated rule — an id, the trigger, and the refusal text.
 
-**One refusal per accumulation, re-armed by a delegation, or by the recorded refusal falling out of the window.** A run that reads on regardless is not refused a second time, so a false positive — three files it was about to edit — costs one round trip rather than wedging the run on the file it needs. **The second arm exists because the first one alone falls silent on a long run**: once the last delegation has scrolled out of the 256 KB tail there is no reset instant left to beat, and one stale stamp would disarm the rest of the session — on exactly the run lengths this was filed about. It is the same bound `josh batch:guard` documents for its own window, one extra refusal per window rather than silence, and it errs toward delegating. **The record is written before the refusal is made**: with nothing on record every later look at the same accumulation qualifies, so a hook that could not write one must not refuse. Every other failure allows the call too — a missing transcript, a payload that is not JSON, a tail caught mid-append. A hook firing inside a delegated unit is handed the _parent's_ transcript path and derives the fork's own file ([#1424](https://github.com/joshuafolkken/kit/issues/1424)), so a unit's reading is counted against the unit and never against the session that briefed it.
+**The rules it delivers today:**
 
-The refusal leaves through `hookSpecificOutput.permissionDecision`, the only shape that stops a call, and its `permissionDecisionReason` is the only text that reaches the model — so it names the count, `pnpm josh delegate investigation`, and the return shape a unit owes back. An ordinary call writes nothing at all to stdout. Set `JOSH_INVESTIGATION_GUARD` to `off`, `0`, `false` or `no` — in the environment or in `.env` — to switch it off without editing the settings file; unset is **on**, for the reason `JOSH_BATCH_GUARD` is. The `.env` read is `process.loadEnvFile` inside the script for the same in-process-dispatch reason ([#1342](https://github.com/joshuafolkken/kit/issues/1342)).
+- **Backlog WIP cap** — trigger is a `Bash` call that files an Issue (`gh issue create`, or a `title`-bearing POST to a path ending `/issues`).
+- **Issue comments** — trigger reads an Issue body without them (`gh issue view <N>`, or a `GET` ending `…/issues/<N>`); hands over `gh issue view <N> --comments`.
+- **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
+- **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
+- **The pre-gate cut row**: the trigger is a `Bash` call that runs `pnpm josh gate` from a **lane** working tree that **has not yet taken its cut**, handing over `pnpm josh run:cut <N>` with what each of its six verdicts obliges. It exists because the step was carried as prose and fired **0 times in 6 lane children**; `--resume`, `--end` and `--json` do not count as taking the cut. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source of the procedure.
 
-**Verify it the way #1390 asks to be verified**: run `pnpm josh time --issue <N>` afterwards and compare the pre-implementation phase — `plan` plus `setup`, or the run start to the first `Edit` where the phase table charges a delegated run to `pre-run` — against run #1441's hand-measured 15.4 min and 34%.
+Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery per run.
 
-### `josh cspell`
+### `josh pretool:guard`
 
-Run spell check.
+The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
+
+### `josh session:lang`
+
+Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit` so the value is injected every turn.
+
+```json
+{ "type": "command", "command": "pnpm josh session:lang", "timeout": 10 }
+```
+
+- Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English.
+
+### `josh cspell:dot`
+
+Run spell check, including dotfiles.
 
 ```bash
-pnpm josh cspell          # *.{ts,js,md,yaml,yml,json}
 pnpm josh cspell:dot      # includes dotfiles
 ```
 
 ### `josh test:unit`
 
-Run unit tests with vitest. Because a freshly-bootstrapped project may have no unit suite yet
-(and therefore no `vitest` installed), this command **skips gracefully (exit 0)** when `vitest`
-is not installed or when no `*.{test,spec}.{ts,js}` files exist — so CI and the local gate never
-block a project that has no unit tests yet. Once both `vitest` and at least one test file are
-present, it runs `vitest run` as usual.
+Run unit tests with vitest. **Skips gracefully (exit 0)** when `vitest` is not installed. Once `vitest` and at least one test file are present, runs `vitest run`.
 
 ```bash
 pnpm josh test:unit
 ```
 
-**A unit test that reaches GitHub fails the run.** In kit's own checkout `vitest.config.ts` arms a
-`globalSetup` guard (`scripts/test-network-guard.ts`) that puts a recording `gh` in front of the real
-one on `PATH`; if anything spawned it, the run ends with the invocations listed and a non-zero exit
-([#1353](https://github.com/joshuafolkken/kit/issues/1353)). The failure it exists for is invisible
-otherwise — a test that calls through still **passes**, just slowly and against whatever GitHub
-happens to answer, which is how one such test reached the 10-second test timeout in CI. The fix is
-always in the test: mock the read it forgot. An unreadable record is reported as a failure too rather
-than as "no violations", because a guard that cannot answer must not claim the run was clean.
+- `vitest` installed with **no** `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip.
+- Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
 
 ### `josh test:related`
 
-Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits ([#1257](https://github.com/joshuafolkken/kit/issues/1257)).
+Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits. Added in front of the whole `josh test:unit`, never in place of it.
 
 ```bash
 pnpm josh test:related                     # alias: josh tr
@@ -375,40 +190,11 @@ pnpm josh test:related scripts/thing.ts    # narrow by the given files instead
 pnpm josh test:related --silent            # flags are forwarded to vitest
 ```
 
-**A forwarded flag that takes a value is written `--flag=value`.** Anything not starting with `-` is read as a file to narrow by, so `--reporter verbose` would hand `verbose` to the narrowing — which then reports `verbose` as an argument it could not use and runs the **whole** suite — and a valueless `--reporter` to vitest; `--reporter=verbose` reaches vitest whole. An argument that is not a file this can relate a test to is named on the console rather than dropped, so a typo is visible instead of being answered with "nothing to narrow by".
-
-The changed files are the branch diff plus the untracked files beside it — the same reading `josh review:level`, `josh eval:scope` and `josh review:brief` decide from, so what this narrows by is what those commands call the change. The set is then handed to `vitest related`, which runs every test file whose module graph reaches one of them. Measured warm on kit: 384 files and 6,616 tests in 13.9s (110s of CPU) for the whole suite, against 31 files and 566 tests in 2.4s (7.9s of CPU) for a one-file change — and 110s of CPU is 84% of everything the gate's four checks spend.
-
-**It prints what it narrowed by before it runs**, so a scoped run is never read as a whole one:
-
-```
-josh test:related: 2 changed file(s) — running only the tests related to them.
-  - scripts/test-related.ts
-  - scripts/test-related-scope.ts
-```
-
-**It is added in front of the whole suite, never in place of it.** A test that breaks without importing what changed — a marker suite reading a document, a fixture compared against a generated file — is invisible to a module graph. The verification gate therefore still runs `josh test:unit` over everything before the commit, and that full run is what a merge rests on.
-
-**Two things make it fall back to the whole suite rather than run nothing**, and the printed line says which happened:
-
-| What happened                                                                     | What runs                                                    |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| The changed files could not be read (no repository, a failing git)                | The whole suite — `the changed files could not be read`      |
-| Nothing changed, or no changed file is one a test can import (a `.md`, a `.yaml`) | The whole suite — `no changed file is one a test can import` |
-
-The two are separate answers on purpose: an empty list is a change this cannot narrow by, an unreadable one is a change nobody read, and collapsing them would hide the second. A deleted path is dropped from the set for the same reason — it counts towards a narrowed run while contributing no test to it.
-
-A narrowed run can still match no test file — a new module nothing imports yet is the usual case. vitest prints `No test files found` and exits 0, which the gate's full run answers for a few minutes later.
-
-Like `josh test:unit`, it skips gracefully (exit 0) when `vitest` is not installed or the project has no test files, and says so naming itself.
+- Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when no changed file is importable; a narrowed run matching nothing prints `No test files found` and exits 0.
 
 ### `josh test:e2e`
 
-Run E2E tests with Playwright. Because `@playwright/test` is an optional peer dependency
-and a fresh project may have no e2e suite yet, this command **skips gracefully (exit 0)**
-when `@playwright/test` is not installed or when no `*.e2e.{ts,js}` files exist — so the
-`pre-push` hook never blocks a project that has opted out of e2e. Once both the package and
-at least one e2e file are present, it runs `playwright test` as usual.
+Run E2E tests with Playwright. **Skips gracefully (exit 0)** when `@playwright/test` is not installed or no `*.e2e.{ts,js}` files exist. Once both are present, runs `playwright test`.
 
 ```bash
 pnpm josh test:e2e
@@ -416,21 +202,13 @@ pnpm josh test:e2e
 
 ### `josh e2e:retry-check`
 
-Report whether the preview server process died during a failed E2E attempt. Invoked by the `ci.yml` this package distributes, between the two attempts of its E2E job; there is no reason to run it by hand except to see how a captured log would be read.
+Report whether the preview server process died during a failed E2E attempt. Invoked by the distributed `ci.yml` between the two attempts of its E2E job.
 
 ```bash
 pnpm josh e2e:retry-check   # alias: josh er
 ```
 
-It reads the preview server's debug log — the path `WRANGLER_LOG_PATH` names, `e2e-web-server-logs` by default, a directory or a single file — and looks for wrangler's report of a dead worker: `Error in ProxyController` **and** `Network connection lost.`, both in the same file. An assertion failure produces neither, so a suite that merely failed does not match. The verdict is written to `$GITHUB_OUTPUT` as `crashed`, and announced on the run as a notice.
-
-**It reports a fact; the workflow decides what to do with it.** That split is load-bearing rather than stylistic. The retry step ORs `E2E_RETRY_UNCONDITIONAL` in front of this output, so a push to the default branch retries whatever this command managed to say — its failure withholds a release, and a rule that can stop matching does not belong between a merge and its release ([#783](https://github.com/joshuafolkken/kit/issues/783)). A pull request has no such flag and retries only on the signature, so a genuinely failing suite still reports red on its first attempt ([#872](https://github.com/joshuafolkken/kit/issues/872)). Had the flag been passed down to this command instead, a step that errored — it carries `continue-on-error`, so that it can never be what fails a job — would publish nothing and cost the default branch the retry it must never lose.
-
-**Neither string is a signature on its own, and they must meet inside one file.** `Network connection lost.` sits in the `cause` of every observed crash, but workerd also logs it for any aborted in-flight request, so matching it alone would hand a retry to exactly the failing suite this rule exists to expose. The per-file rule is the same guard one level up: a run that restarted the server leaves one log per attempt, and reading them as one text would let an aborted request in the first meet a proxy error in the second ([#911](https://github.com/joshuafolkken/kit/issues/911)).
-
-**The pair has been read against real logs, not only reasoned about** ([#911](https://github.com/joshuafolkken/kit/issues/911)). It matches all 8 `e2e-web-server-log` artifacts game-kit retains, every one of them a genuine server death; and a run of game-kit's own suite that failed on an assertion with the server healthy throughout produces neither string anywhere in its log. Both logs are committed as fixtures the unit tests read, so a signature that stops describing wrangler's output turns into a red build rather than a silent change of behavior. One marker [#872](https://github.com/joshuafolkken/kit/issues/872) considered is deliberately unused: the bare `✘ [ERROR]` wrangler prints to the console appears in the healthy log too, three times, each an ordinary 404.
-
-**A missing log is deliberately not a crash.** A consumer whose preview script is not wrangler writes nothing there, and reading silence as a crash would retry every failing suite in that project. Both ways of being wrong are cheap, which is what makes a signature acceptable on a pull request at all: a false positive spends one extra E2E run and still reports red, since the second attempt fails too, and a false negative leaves the status quo of a human pressing re-run. Nothing about reading the log is fatal either — a path that is missing, unreadable, or not the shape expected all end at "no crash" rather than at a failed job.
+- Reads the preview server debug log (`WRANGLER_LOG_PATH`, default `e2e-web-server-logs`) and matches only when `Error in ProxyController` **and** `Network connection lost.` are in the same file. Verdict written to `$GITHUB_OUTPUT` as `crashed`; a missing/unreadable log ends at "no crash".
 
 ### `josh test`
 
@@ -440,7 +218,7 @@ Run unit tests followed by E2E tests.
 pnpm josh test
 ```
 
-`josh test` is a **composite command** and takes no extra arguments. Pass runner flags to the stage that understands them — `--workers`, `--grep` and `--headed` are Playwright's, `-u` is Vitest's, and a composite cannot route one vocabulary to both stages:
+`josh test` is a **composite command** and takes no extra arguments — pass runner flags to the stage that understands them:
 
 ```bash
 pnpm josh test:e2e --workers=1   # ✅ reaches Playwright
@@ -452,7 +230,7 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 ### `josh check`
 
-Type-check a SvelteKit project. Requires `@sveltejs/kit` in dependencies.
+Type-check a SvelteKit project. Requires `@sveltejs/kit`.
 
 ```bash
 pnpm josh check        # development mode
@@ -461,81 +239,47 @@ pnpm josh check:ci     # strict mode (--threshold error), used in CI
 
 ### `josh port`
 
-Print the port this project's dev server or preview server runs on, resolved from `PORT_SEED`.
+Print the port this project's dev or preview server runs on, resolved from `PORT_SEED`.
 
 ```bash
 pnpm josh port dev       # 5173 with no seed set
 pnpm josh port preview   # 4173 with no seed set
 ```
 
-Those two are for reading the number at a terminal. A `package.json` script that substitutes the number into a command line calls the binary without the `pnpm` wrapper — see the scripts below and the paragraph explaining why.
-
-Every kit-distributed SvelteKit project used to land on the same two ports, so a developer working across several of them on one machine could not run two previews at once — the second project's tooling either collided with the first or drifted onto an unpredictable port. `PORT_SEED` is a personal, non-committed integer in `.env` that offsets both ports together:
+- `PORT_SEED` is a personal `.env` integer; the offset on both ports is `seed × 10 + lane`, where `lane` is `JOSH_LANE_SEAT` (`0` for the main tree).
 
 ```bash
-PORT_SEED=1   # dev 5174, preview 4174
+PORT_SEED=1   # dev 5183, preview 4183   (seat 0: 1 × 10 + 0)
 ```
 
-Unset means seed `0` — today's numbers exactly — so CI and un-migrated projects are unaffected without doing anything. A blank `PORT_SEED=`, the shape `.env.example` ships and the natural way to turn a seed back off, means the same. One seed moves both ports, so a project can never end up with a dev port from one project and a preview port from another. An invalid seed (a non-integer, a negative, or one that would push a port past `65535`) is a hard error rather than a silent fall back to the default: a gate that quietly reverts to the shared port is the collision this exists to remove.
+- Distinct seeds stay in disjoint bands (seed 1 is `10..19`), seats `1..9` per project. Invalid seed (non-integer, negative, or above `99`) is a hard error. Only `PORT_SEED` and `PLAYWRIGHT_REUSE_SERVER` cross from `.env` into the process.
 
-This command and `playwright.config.ts` read one definition and one file. The config imports the same module directly (`import { ports } from '@joshuafolkken/kit/ports'`) and calls `ports.load_environment_file()` before resolving the ports, so the E2E suite follows the seed with no configuration — through `pnpm josh test:e2e`, a bare `pnpm exec playwright test` and the VS Code Playwright extension alike. This command calls the same loader, so the two cannot answer a consumer's `preview` script and its `webServer` with different numbers; in kit 1.85.0 they did, producing `4176` here and `4173` there and costing a consumer its whole E2E suite to a `webServer` timeout. A variable already set in the environment still wins over the file, so `PORT_SEED=2 pnpm josh test:e2e` overrides `.env` for one run.
+A `package.json` script substitutes the output into a command line, e.g. `"dev": "DEV_PORT=$(josh port dev) && vite dev --port $DEV_PORT --strictPort"`.
 
-Two settings cross from `.env` into the process, and no others: `PORT_SEED` and `PLAYWRIGHT_REUSE_SERVER` — the ones kit's own Playwright config reads. `CI` is deliberately excluded even though that config reads it too, because it describes the run rather than the project, and a value pinned in a file would make every local run claim to be CI. The file is parsed in full, by the same reader Node's `--env-file` uses, and every other key it carried is then taken back out of `process.env`. Playwright's `webServer` child inherits the test runner's environment wholesale, so keeping the rest would hand a consumer's `.env` secrets to the dev or preview server for the sake of two settings: a `CLOUDFLARE_API_TOKEN` sitting there is preferred by `wrangler` over the OAuth session it would otherwise use, and one short of the needed scopes turns a working preview into a `403`. A server that wants `.env` loads it in its own start script, which is where that choice belongs.
-
-This narrows what kit 1.87.0 did for the one version it shipped: that release loaded the whole file, so a `webServer` command and any E2E spec briefly saw every variable in `.env`. If a project came to rely on that — a spec reading a test account's password, say — load the file where it is needed rather than through the port loader: `process.loadEnvFile()` in a Playwright [global setup](https://playwright.dev/docs/test-global-setup-teardown) puts it back for the test process without also handing it to the server, and a `set -a; . ./.env; set +a` prefix in the start script does the same for a server that needs it.
-
-The file is looked for at the project root — the nearest directory at or above the working directory holding a `package.json` — and only there. That is the directory `pnpm run` hands a script, so it is the file the `webServer` command and this command both read. A `.env` beside the caller is deliberately not preferred over the root's: letting an `e2e/.env` of unrelated fixture data shadow the seed would re-create the timeout above. Resolving against the working directory alone used to do exactly that, leaving `pnpm exec playwright test` run from a subdirectory on seed `0` while its own server came up seeded.
-
-This command exists for the contexts that cannot import the definition — a `package.json` script substitutes its output into a command line:
-
-```json
-{
-	"scripts": {
-		"dev": "DEV_PORT=$(josh port dev) && vite dev --port $DEV_PORT --strictPort",
-		"preview": "PREVIEW_PORT=$(josh port preview) && wrangler dev --port $PREVIEW_PORT",
-		"preview:stop": "PREVIEW_PORT=$(josh port preview) && kill-port $PREVIEW_PORT"
-	}
-}
-```
-
-Two details in that shape are load-bearing, and dropping either one puts the substitution back where #825 found it.
-
-**`josh`, not `pnpm josh`.** `pnpm run` already puts `node_modules/.bin` on `PATH`, so the bare binary reaches the same command — and reaches it without a wrapper process writing to the stream the substitution reads. When `node_modules` is older than `package.json`, `pnpm` installs before running and puts the install log and every lifecycle script's output on **stdout**; `josh latest` and a branch switch both leave a tree in that state routinely. And in any project whose `package.json` defines a `josh` script — kit's does, and so does a consumer that wires one — `pnpm josh …` resolves to `pnpm run josh …`, which adds `[ELIFECYCLE] Command failed with exit code 1.` to that same stream when the command fails, so `$(pnpm josh port dev)` hands that sentence to `--port` on an invalid seed. Neither output is something this command can suppress from the inside — they belong to a process kit does not own. Calling the binary directly leaves kit in control of the whole stream, which is what turns "success prints the number and nothing else" from a hope into a promise.
-
-**`VAR=$(...) && cmd`, not the substitution inline.** A failed substitution does not stop the command it feeds: the shell supplies nothing and starts the server anyway, on whatever `--port` then parses as. Assigning first makes the resolver's failure the script's own exit status, so an invalid seed stops at kit's message naming the variable to fix instead of at a vite or wrangler argument error. If a teardown script needs to tolerate "nothing was listening", brace that tolerance — `PREVIEW_PORT=$(josh port preview) && { kill-port $PREVIEW_PORT || true; }` — because a trailing `|| true` binds to the whole chain and forgives the unresolved port along with the absent server.
-
-Success prints the number and nothing else; a missing or unknown argument prints usage to stderr and exits `1`. An unrecognized command name answers the same way — `josh` sends the error line **and** the help listing to stderr — so a script naming a command this kit does not have substitutes an empty string rather than the whole toolkit index.
-
-That listing is where #825 was found, and the remedy for the case that found it lives outside this file: the listing used to go to stdout, so a consumer whose installed kit predated `josh port` had the entire toolkit index substituted into `--port`. A kit old enough to lack the command is also old enough to lack the fix, so the guarantee above covers a mistyped or retired command name on a kit that carries it — not an outdated install. Pair the wiring with a `@joshuafolkken/kit` floor recent enough to have `josh port`.
-
-A busy port still **fails loudly** — nothing retries on another port. Incrementing the seed automatically would re-create the vite drift this replaces and would let a verification gate route silently around a stale server. `--strictPort` is what holds vite to that on the `dev` script: a bare `vite dev --port N` moves to the next free port when `N` is taken, and a dev server quietly on `N + 1` is invisible to Playwright, which waits on the seeded port until `webServer` times out. See [Local E2E aborts with "already used"](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used).
+- Call `josh`, **not** `pnpm josh` (the wrapper writes noise onto the read stream), and use `VAR=$(...) && cmd` so a failed resolve becomes the script's exit status.
+- Success prints the number only; a bad argument prints usage to stderr and exits `1`. A busy port fails loudly — `--strictPort` holds vite to it. See [Local E2E aborts with "already used"](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used).
 
 ### Composite commands and extra arguments
 
-A few `josh` commands chain several steps behind one name. They are implemented as a fixed shell script (`sh -c '<step> && <step>'`), and a shell script does not expand arguments appended to it — so anything typed after the command name would land in the shell's positional parameters and be discarded without a word.
+A few `josh` commands chain several steps behind one name, implemented as a fixed shell script that cannot expand appended arguments.
 
-**The convention: a composite command either forwards extra arguments deliberately, or refuses them. It never ignores them.** Today every composite refuses, exits `1`, and names the sub-commands that do accept arguments:
+**A composite command either forwards extra arguments deliberately, or refuses them. It never ignores them.** Today every composite refuses, exits `1`, and names the sub-commands that accept arguments:
 
 ```bash
 $ pnpm josh test --workers=1
 josh test takes no extra arguments — pass them to josh test:unit or josh test:e2e instead
 ```
 
-| Composite    | Pass arguments to instead                        |
-| ------------ | ------------------------------------------------ |
-| `test`       | `test:unit`, `test:e2e`                          |
-| `format`     | `format:prettier`, `format:eslint`               |
-| `latest`     | `latest:corepack`, `latest:update`, `audit`      |
-| `main:sync`  | — (chains raw `git` calls; nothing is forwarded) |
-| `main:merge` | — (chains raw `git` calls; nothing is forwarded) |
+| Composite | Pass arguments to instead                   |
+| --------- | ------------------------------------------- |
+| `test`    | `test:unit`, `test:e2e`                     |
+| `latest`  | `latest:corepack`, `latest:update`, `audit` |
 
-Every other command — the ones that invoke a single tool or script — forwards extra arguments exactly as before; `pnpm josh test:e2e --workers=1` reaches Playwright unchanged.
+Every other command forwards extra arguments as before. The refusal is driven by the command's **shape**, audited by a unit test on every commit.
 
-The refusal is driven by the **shape** of the command rather than a per-command opt-in, so a composite added later cannot reintroduce the silent discard by forgetting to declare itself. A unit test audits the whole command map on every commit.
+#### `VAR=$(...) && cmd`
 
-The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before.
-
----
+The assign-then-run shape [`josh port`](#josh-port)'s scripts use: a failed substitution does not stop the command it feeds, so assigning first makes the resolver's failure the script's own exit status instead of a downstream argument error.
 
 ## Project
 
@@ -543,89 +287,80 @@ Commands for setting up and maintaining a project.
 
 ### `josh init`
 
-Initialize config files in a new project.
+Initialize config files in a new project — creates or merges all managed config files, and reports two repository settings (Dependabot security updates, Allow auto-merge) that back the files it writes.
 
 ```bash
-pnpm josh init
+pnpm josh init   # create/merge config files
 ```
 
-Creates or merges all config files. See [init.md](./init.md) for the full list of files created and merged.
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing.
 
-`init` writes nothing and exits non-zero when the project is the distribution package's own repository, for the reason [`josh sync`](#josh-sync) does and through the same check — `init` calls the sync writers directly, and rewrites the project's `package.json` scripts and devDependencies on top of them ([#879](https://github.com/joshuafolkken/kit/issues/879)). See [init.md](./init.md#refused-inside-the-packages-own-repository).
-
-`init` also reports two **repository settings** as its last step, because it writes the two files that depend on them. The **Dependabot security updates** setting backs the npm-disabling `.github/dependabot.yml`, and the **Allow auto-merge** setting backs `.github/workflows/dependabot-auto-merge.yml` — a freshly scaffolded repository has both off by default. Each line is skipped when the project already had its own copy of the corresponding file, since `init` does not overwrite it and kit's change never landed. See [`josh doctor`](#josh-doctor) for the results each report can print and [docs/sync.md](./sync.md) for why the settings matter.
+See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 
 ### `josh sync`
 
-Overwrite managed files with the latest versions from the package.
+Overwrite managed files with the latest versions from the package. Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, workflow templates, and other managed files. Also realigns `devEngines.packageManager.version` with the `packageManager` pin so the two never drift.
 
 ```bash
-pnpm josh sync
+pnpm josh sync   # overwrite managed files
 ```
 
-Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, GitHub workflow templates, and other managed files. See [sync.md](./sync.md) for the full list. `sync` also realigns `devEngines.packageManager.version` in `package.json` with the `packageManager` pin so the two never drift apart (a mismatch reintroduces the pnpm `Cannot use both "packageManager" and "devEngines.packageManager"` warning).
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where syncing would overwrite the source with its own derived templates.
 
-`sync` writes nothing and exits non-zero when the project is the distribution package's own repository — inside kit, the copies run backwards and overwrite the source with its own derived templates ([#868](https://github.com/joshuafolkken/kit/issues/868)). See [sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository).
+See [sync.md](./sync.md) for the full file list.
+
+### `josh sync:scope`
+
+Report whether the current change touches a file `josh sync` distributes.
+
+```bash
+pnpm josh sync:scope           # the branch diff; alias: josh sys
+pnpm josh sync:scope --staged  # the staged diff instead
+pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
+```
+
+**Options:**
+
+- `--staged` — inspect the staged diff instead of the branch diff.
+- `--json` — emit `{"scope","reason"}` as JSON.
+
+**Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
 
 ### `josh propagate`
 
-Carry the release this repository just published into every consumer repository checked out next to it ([#863](https://github.com/joshuafolkken/kit/issues/863)).
+Carry the release this repository just published into every consumer repository checked out next to it. Runs only from the supplier's own clean, up-to-date default branch; waits for the exact published version to appear in the registry before touching any consumer.
 
 ```bash
 pnpm josh propagate                     # alias: josh pg
-pnpm josh propagate --dry-run           # report the targets and the steps without touching anything
-pnpm josh propagate --skip-publish-wait # for a release already known to be published
+pnpm josh propagate --dry-run           # report targets and steps, write nothing
+pnpm josh propagate --skip-publish-wait # release already known to be published
 ```
 
-Any other argument is refused with the usage line rather than ignored — a misspelled `--dryrun` that fell through would run the real write path against every consumer.
+**Options:**
 
-`--dry-run` writes nothing, so it also skips the publish wait and downgrades the supplier-side working tree check to a warning: the flag is reached for while work is still in progress, and refusing there would make it useless in exactly that situation.
+- `--dry-run` — report targets and steps without writing; skips the publish wait, opens no issues.
+- `--skip-publish-wait` — skip the registry poll for an already-published release.
 
-Publishing a release and consuming it are two different jobs, and only the first is automated: every merge auto-tags and publishes, and then a person opens app-kit, runs the upgrade, syncs the managed files, verifies, and opens a pull request — then does it again in the next consumer. `propagate` is that loop, run once.
+Per consumer, in order: working-tree check, `pnpm add -D @joshuafolkken/kit@<version>`, `pnpm josh sync`, verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
 
-**It waits for the publish first.** A merge is not a publish: the auto-tag and publish workflows run _after_ the merge commit lands, so a consumer told to upgrade the moment the pull request merged resolves the previous release. `propagate` polls the registry until **this repository's own declared version** — the one the merge published — actually appears. The target is that exact version, never "something newer": a consumer several releases behind would otherwise be satisfied by any publish at all, including one that predates the change being carried. The wait has a timeout, because a failed publish workflow never produces the version; on timeout, or on a registry that fails several probes in a row, **no consumer is touched at all**. A _single_ failed probe is not that — a rate limit or a 5xx would otherwise end a ten-minute wait seconds into it — so the wait keeps going until the failures are consecutive.
+The opposite direction — one consumer catching itself up from its own checkout — is [`josh adopt`](#josh-adopt).
 
-Then, for each consumer in turn:
+### `josh adopt`
 
-| Step               | What runs in the consumer's directory                                              |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| Working tree check | Clean tree, on the default branch, not behind its remote (fetched first)           |
-| Upgrade            | `pnpm add -D @joshuafolkken/kit@<version>`, plus kit's lockfile repair             |
-| Sync               | `pnpm josh sync`                                                                   |
-| Verify             | `pnpm josh lint && pnpm josh check && pnpm josh cspell:dot && pnpm josh test:unit` |
-| Open issue         | `POST repos/<consumer>/issues` — the upgrade issue the pull request will close     |
-| Pull request       | `pnpm josh git -y "Upgrade @joshuafolkken/kit to <version> #<N>"`                  |
-| Return             | `git checkout <default>` and pull                                                  |
+Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each one's managed files, verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](#josh-propagate), sharing the same step order.
 
-**The working tree check comes first because everything after it writes.** The upgrade rewrites the lockfile, the sync overwrites managed files, and `josh git` stages the whole tree — so a consumer with uncommitted work would have that work swept into the upgrade commit and pushed. A consumer that is dirty, parked on a feature branch, or behind its remote is refused before anything touches it. The remote is fetched before that comparison: without it both refs are pre-merge and the check passes in exactly the situation it exists for — the seconds after a pull request merged on GitHub.
+```bash
+pnpm josh adopt           # alias: josh ad
+pnpm josh adopt --dry-run # report the steps without touching anything
+```
 
-**The upgrade pins the exact version that was waited for**, rather than asking for the registry's latest. Asking for latest would defeat the wait: a release published while the run was in flight would be the one every consumer received.
+**Options:**
 
-**The issue is opened before the pull request because `josh git` requires one.** It derives the branch name and the `closes #N` line from the issue argument, so an upgrade with no issue could not open a pull request at all. `propagate` therefore **opens a GitHub issue in each consumer repository** — an outward-facing write, and the reason the command is scoped to repositories with the same owner. Merging the pull request closes it. When the upgrade and the sync changed nothing, no issue is opened at all and the consumer is reported as a skip; opening one and then failing on an empty commit is the alternative.
+- `--dry-run` — report the plan without writing.
 
-**It is created through REST rather than by running `gh issue create`.** That command goes through GraphQL, which a cloud session is answered 403 for, so propagation could not open the consumer's issue from one at all — while `POST repos/{owner}/{repo}/issues` is served normally (joshuafolkken/kit#1042). The issue body travels over standard input, so its multi-line markdown depends on no shell quoting, and the path names the consumer repository outright rather than relying on the directory the call is spawned in. **That request is bounded in time like every other step**, but by a shorter budget: the other steps go through the step runner and get 30 minutes — enough for a consumer's whole unit suite — while a single REST request gets 60 seconds, and a request that overruns it is reported as a failed step rather than holding the single-threaded runner open forever with no later consumer processed at all ([#1065](https://github.com/joshuafolkken/kit/issues/1065)). **A write that ran out of time is not proof the write did not land** — the request may have reached GitHub before the call was killed. Nothing looks for an issue a previous run may have opened, so a consumer reported as failed at the issue step is checked by hand before the run is repeated, alongside the uncommitted working tree that failure already leaves behind.
+Steps, in this repository's directory: working-tree check, `pnpm add -D <toolkit>@latest` (once per installed toolkit, base tier first), `pnpm josh sync` per toolkit's own CLI, verification gate ([`josh gate`](#josh-gate)), open issue, `pnpm josh git`, return to default branch.
 
-**The consumer is returned to its default branch last.** `josh git` leaves the checkout on the feature branch, and the next propagation's working tree check would refuse it for that — the consumer would silently stop receiving releases.
-
-Each step runs the **consumer's own** installed CLI from the consumer's directory, which is why the sync is an ordinary consumer-side sync and [#868](https://github.com/joshuafolkken/kit/issues/868)'s self-sync refusal never fires. Every step inherits its output, so a failure shows what failed rather than only an exit code, and each has a timeout so one hung step cannot hold the whole run open. A consumer stops at its first failing step — a failed verification gate never goes on to open an issue or a pull request — and **one consumer's failure never stops another**: the run continues and reports every consumer at the end, because knowing which consumers took the release is the whole point.
-
-**Which repositories are consumers is read, not listed.** The candidates come from the [repository map](#the-discovered-repository-map), so the owner restriction is inherited rather than restated — propagation _writes_, and a write aimed at somebody else's repository is worse than a read aimed at one. A candidate becomes a target when its own `package.json` declares a dependency on `@joshuafolkken/kit`, which is a fact about the checkout rather than a roster: a new consumer needs no change here, and a consumer that is not a published package at all (joshuafolkken-com) is covered, which a list of downstream package names could not do. Candidates that are not targets stay in the report as skips — a consumer silently missing from a run is the failure this command exists to remove.
-
-| Reported as    | Meaning                                                                                                                                                                                                                                                                 |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `✓ propagated` | Checked, upgraded, synced, verified, issue and pull request opened, returned to the default branch. (`would be propagated` in a dry run, which opens nothing.)                                                                                                          |
-| `✗ failed`     | A step failed; the step and its reason are named. The other consumers still ran. **A consumer that failed after the upgrade or the sync is left with those changes uncommitted** — its working tree needs clearing before the next run, which will otherwise refuse it. |
-| `– skipped`    | Already carries this release, does not depend on the package, had nothing to commit, has no local checkout, or has an unreadable `package.json`.                                                                                                                        |
-
-The skips are kept apart because they mean different things. A repository with no `package.json` at all — a Godot or Rust project sharing the parent directory — is simply _not downstream_, not damaged. A `package.json` that exists but cannot be parsed is reported as unreadable. And a mapped path that does not exist (only `JOSH_REPO_PATHS` can name one, since discovery scans directories that do) is reported, **never cloned**: propagation writes into a working tree, and creating one nobody asked for is not a step this command takes on its own. A consumer that is dirty or out of date is reported as a _failure_ rather than a skip — it was eligible and could not be processed.
-
-**`propagate` runs from the supplier's own repository, and only there** — and only when that repository is itself clean, on its default branch, and not behind its remote. Run from a checkout that is behind, the version it would carry is the _previous_ release, which is already published: the wait would pass and every consumer would be sent to a version that does not contain the change.
-
-That boundary is also the answer to who propagates when several sessions are running at once ([#861](https://github.com/joshuafolkken/kit/issues/861)): in the per-repository concurrency model there is one session per checkout, so the session standing in the supplier repository is the one that runs the command and the rest refuse. It is a convention enforced at the boundary, not a lock — two checkouts of the supplier would both pass it — which is why each consumer is _additionally_ refused unless its own working tree is clean.
-
-Because every merge publishes, propagating per pull request would bury the consumers in bump pull requests. Run it **once at the end** of an epic or a queue; it works standalone all the same.
-
-> To make `josh` available system-wide, install the kit globally (`pnpm add -g @joshuafolkken/kit`) instead of running an install subcommand. See [cli.md](./cli.md) for details.
+**Output / exit codes:** exits `0` on a skip (no toolkit declared, or all current with no file changed). Refused inside kit's own repository, when a runnable toolkit is missing or declared under `dependencies`, or when `@joshuafolkken/kit` is not a direct dependency. Stops at the open pull request — merging is [`josh followup`](#josh-followup)'s job.
 
 ---
 
@@ -635,90 +370,112 @@ AI-assisted git and notification helpers used in the day-to-day development loop
 
 ### `josh git`
 
-Interactive AI-assisted git commit workflow: stages changes, generates a commit message, and optionally pushes.
+Interactive AI-assisted git commit workflow: stages changes, generates a commit message, opens the pull request, and optionally pushes. When no issue argument is given, the issue number and title are derived from the current branch name (`<N>-<slug>`).
 
 ```bash
-pnpm josh git
-pnpm josh git -y          # run non-interactively (skip confirmation prompts)
-pnpm josh git -y "title"  # set commit message prefix
+pnpm josh git                            # interactive
+pnpm josh git -y                         # unattended (no TTY required)
+pnpm josh git -y "title"                 # set commit message prefix
+pnpm josh git -y "<title> #<N>"          # follow-up commit on the same branch
+pnpm josh git -y --skip-commit --skip-push  # open the PR without committing/pushing
 ```
 
-`-y` / `--yes` runs the workflow unattended — it also works without a TTY (e.g. an AI agent or CI shell). When no issue argument is supplied, the issue number and title are derived from the current branch name (`<N>-<slug>`), so recovery commands such as `pnpm josh pr` and `pnpm josh git -y --skip-commit --skip-push` create the PR without prompting.
+**Options:**
 
-**The command returns as soon as the pull request is open; it does not wait for the checks.** It prints the PR URL and a line naming `pnpm josh followup`, which is what waits and merges. Until [#1232](https://github.com/joshuafolkken/kit/issues/1232) it slept five seconds and then watched the rollup on a two-minute budget — measured at 119.8 seconds of one 1555-second run, 7.7% of it — and the answer decided nothing: only whether the watch timed out was read, and only to choose which message to print. `followup`'s own wait asks a stricter question (a `CLEAN` merge state, every required check green, no standing change request) and starts from scratch the moment `josh git` returns, so the same answer was being waited for twice. Nothing the merge requires was dropped; `followup` still blocks on every one of those checks.
+- `-y` / `--yes` — run non-interactively; works without a TTY (agent or CI shell).
+- `--skip-commit` / `--skip-push` — recover/open a PR without a new commit or push.
 
-**Running it a second time on the same branch makes a follow-up commit, not a second pull request.** The command reuses the branch it is already on when the issue prefix matches, and when a pull request for that branch is already open it reports it rather than creating another. That is the path the second review round takes when it fixes a finding in place: since [#1261](https://github.com/joshuafolkken/kit/issues/1261) the pull request opens _between_ the two rounds so CI overlaps the second, and a fix it produces is committed on top — **no second `pnpm josh bump`** (the version moves once per run). **Since [#1326](https://github.com/joshuafolkken/kit/issues/1326) that commit goes out before its gate**: the single check the fix reaches (`pnpm josh lint:related` and friends), then `pnpm josh git -y "<title> #<N>"` again, then `pnpm josh gate` started beside the CI cycle that push begins and joined before `pnpm josh followup --merge`. `pnpm josh followup --merge` waits on the head commit's checks, so the CI re-run that follow-up commit starts is the one the merge rests on — and a further push supersedes an in-flight cycle, which `ci.yml`'s `concurrency: cancel-in-progress: true` cancels rather than running to completion.
+**Behavior:** returns as soon as the PR is open and prints its URL — it does not wait for checks (`josh followup` does). Re-running on the same branch makes a follow-up commit and reuses the open PR. Each push is bounded at 120 s and retried once on timeout, the failure naming the command to re-run by hand.
 
-**Each push is bounded at 120 seconds and retried once** ([#1251](https://github.com/joshuafolkken/kit/issues/1251)). It used to be the one network call in this package with no budget at all: measured on [#1244](https://github.com/joshuafolkken/kit/pull/1244), the commit took 0.6 seconds and the push then sat silent for 8 minutes 13 seconds before it was found and killed by hand — about 9 minutes 50 seconds of a 72-minute run, with no way while waiting to tell a stalled push from a slow one. A healthy push here costs 22–33 seconds, so 120 leaves room for a large first push while failing a hang in a fraction of the time it used to take. Only a push killed on the budget is retried, and only once: a push the remote rejected answers the same way every time. When the retry times out too, the failure names the exact command to re-run by hand. The budget covers **one** push rather than the whole command — a bare push that has to fall back to `--set-upstream` is a second bounded push — and time spent at a credential prompt counts against it, since an inherited terminal cannot tell waiting on a person from waiting on a remote.
+Related: [`josh followup`](#josh-followup), [`josh pr`](#josh-pr).
 
-**The SSH keepalive is only added when nothing else decides how ssh is invoked.** With none of `GIT_SSH_COMMAND`, `core.sshCommand` and the legacy `GIT_SSH` set, the push runs under `ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3`, so a connection that dies mid-transfer is noticed in about 45 seconds instead of waiting on the TCP default. Set any of them and yours is used untouched: those options are OpenSSH's, and appending them to `plink` or to a wrapper script with a fixed argument list would fail on a usage error rather than push. Those setups keep the timeout above, and `ServerAliveInterval` belongs in their own ssh config, where it applies to every tool they run.
+### `josh pr`
 
-**Conflict diagnosis moved with it, and got faster.** `josh git` used to read `mergeStateStatus` once the watch reported the checks settled, which is why it could treat `BLOCKED` as a problem — at the point the command now returns, `BLOCKED` is simply what GitHub reports while a required check is queued. A `DIRTY` merge state ends `followup`'s wait instead, on its first poll (about ten seconds, against the two minutes the watch took to reach it), with `PR checks failed (merge conflict).` The one case not carried over is a pull request that is green but still `BLOCKED` — branch protection requiring an approving review, which this package's repositories do not set: that now reaches the timeout rather than a named failure.
+Create the pull request for the current issue branch — a recovery/standalone counterpart to `josh git` for when the branch is already committed and pushed. It derives the issue number and title from the branch name (`<N>-<slug>`) and generates the `closes #N` line.
+
+```bash
+pnpm josh pr   # open the PR for the current <N>-<slug> branch
+```
+
+**Behavior:** reports an existing open PR for the branch instead of opening a second one.
 
 ### `josh followup`
 
-AI-assisted PR follow-up workflow: waits for CI, checks AI reviewer findings, sends a completion notification, and optionally merges.
+AI-assisted PR follow-up workflow: waits for CI, checks AI-reviewer findings, sends the completion notification, and merges.
 
 ```bash
-pnpm josh followup "PR title #N"
-pnpm josh followup "PR title #N" --merge
-pnpm josh followup "PR title #N" --merge --notify-message "Implemented X:\n- change 1\n- change 2"
-pnpm josh followup "PR title #N" --merge --ai-review-ignore-reason "false positive"
+pnpm josh followup "PR title #N"                                    # merges (default)
+pnpm josh followup "PR title #N" --notify-message "Implemented X:\n- change 1"
+pnpm josh followup "PR title #N" --notify-message-file completion.md
+pnpm josh followup "PR title #N" --ai-review-ignore-reason "false positive"
+pnpm josh followup "PR title #N" --no-merge                         # do the work, leave the PR open
 ```
 
-On completion, the project's own version (from `package.json`, the value `josh bump` increments) is printed as the final line (`📦 project version: <v>`) and included in the completion Telegram body, so the just-shipped version is visible at the end of the workflow.
+**Options:**
 
-**A merged run also ends the round-1 review snapshot's life** ([#1441](https://github.com/joshuafolkken/kit/issues/1441)). `josh review:brief` records that snapshot once per run and never retakes it, so something has to say when a run is over — otherwise the next run's fix delta would be measured against the previous run's record. This is that point, after everything the run is for has been reported; the removal is swallowed, because the merge has already happened by then and a temp-directory problem must not turn a completed run into a failed one. **Nothing is cleared on `--no-merge`**, the same line `print_next_issues` and the epic auto-close already draw: the pull request is still open, so the run has not ended — and clearing there would let the next round-1 brief record a fresh snapshot against the already-fixed tree, which is the skip #1441 closed. A run that never reaches `followup` leaves the record behind too, which widens the next run's delta rather than narrowing it.
+- `--no-merge` — do the follow-up work but do not merge; leaves the PR open (the only flag that stops the merge). `--merge` is a deprecated no-op.
+- `--notify-message` — inline completion body; `\n` expands to newlines.
+- `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
+- `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
 
-**A merged run also emits its own timing report and appends it to `.time-history.jsonl`** ([#1471](https://github.com/joshuafolkken/kit/issues/1471)). Until then the measurement only ever happened when a person typed `diag`, so a run nobody asked about left no record at all — and comparing this run against the last one depended on somebody having remembered to measure the last one. Every `fullrun`, and every child of an `epicrun` or a `queue`, ends here, so this one seam records all of them. **It measures nothing of its own**: the report is built by `time_run.build_run_report`, the same builder [`josh time`](#josh-time) calls, and a second reader of the transcripts would be the second classification that makes two runs incomparable. What is printed is a short block — elapsed, turns, round trips, the per-round-trip cost, and the same figures against the previous recorded run — while the full tables stay where they were, behind `pnpm josh time --issue <N>` and the `diag` skill that reads them. **`--no-merge` records nothing**, the same line the round-1 clear and the epic auto-close draw: the pull request is still open and its CI wait is not over, so the record would compare part of a run against whole ones. **Nothing here can fail a run**: the merge has already happened, so a history that cannot be read or written prints one line naming the reason and the `pnpm josh time --issue <N>` that would take the measurement by hand. `JOSH_TIME_HISTORY=0` turns the whole step off for a checkout that does not want the file. **The measurement is not bounded by a timeout, deliberately**: `collect_issue_spans` reads the transcript corpus synchronously, so a timer cannot fire during the walk it would be bounding, and on the one `gh` await it could fire during, the builder keeps running afterwards — a run would print `unavailable`, print its completion banner, and then sit there until the walk it never cancelled finished. Measured here at about 7 seconds against runs of thirty minutes and up; bounding it for real needs cancellation inside the walk or a worker of its own.
+**Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
 
-**It prints how long each of its own stages took.** Since [#1349](https://github.com/joshuafolkken/kit/issues/1349) the command closes with one `followup stage: <name> <n> s` row per stage — `closes-check`, `context`, `checks-wait`, `coderabbit-comments`, `ai-review-comments`, `telegram`, `merge`, `completion-comment`, `epic-close` — followed by `followup stages total:`. Until then the 44 seconds a measured `--merge` invocation spent on itself could only be guessed at, and a guess made under time pressure falls on whichever stretch is easiest to cut rather than on the one that is long — the notification and the auto-close, which is where the merge gate lives. **The block is printed on a failed run too**, up to and including the stage that threw, which is named `interrupted`: a `followup` that exits non-zero on an AI-review blocker or a red check is the invocation whose wait was longest, so a block withheld there would be blind to exactly those. A short block on such a run is the run having stopped early rather than the printer having broken — the stages after the failure never ran. The `merge` row appears only on a run that merged, and every row is in seconds, `checks-wait` included, because the rows are read against each other. **The total is the sum of the stages rather than the command's whole wall clock** — the next-issue listing and the version line are printed by the workflow script after the stages end, so a `pnpm josh time` reading of the same span is a second or two longer and that gap is the tail. **Nothing reads the block yet**: the line prefix is declared as one constant so that a reader can be added without matching a string the printer is free to reword — the property `status-icons.ts` gives its icon, since `josh time`'s only way to see inside a single Bash span is what the command printed into the transcript — but `josh time` has no per-stage rows today, and a run of it over a `followup` span reports the span as a whole.
+**Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
-**The CI wait is 32 minutes by default.** The command polls the pull request's checks every 10 seconds and prints each poll (`Checking PR status… (n/193)`). The budget is derived from the CI this package distributes rather than picked as a round number: in `templates/workflows/ci.yml` the longest chain is the `e2e` job's 25-minute cap behind the 2-minute `playwright-image` job it needs, so 27 minutes is the longest run that workflow permits, and five minutes of runner-queue headroom goes on top. A unit test walks the `needs` graph of the workflows this package distributes and fails if any declared budget outgrows the wait, so the two cannot drift apart. A job that declares no `timeout-minutes` — `notify-auto-tag`, and the SonarQube job whose check the wait blocks on — is outside that derivation: GitHub's implicit 6-hour limit is longer than any wait worth having, so an uncapped job is a gap the budget cannot promise to cover rather than a reason to inflate it. A wait shorter than what the workflow itself permits gives up on a run that is still legitimately progressing — which is what the previous 180-second default did in every consumer whose suite includes E2E, making `JOSH_CI_TIMEOUT_SECONDS` something to remember on every invocation and, when it was forgotten, producing a red exit beside a CI that was still running (joshuafolkken/kit#851). A longer budget costs nothing when the checks are fast: polling returns as soon as they settle. **A failing check ends the wait as soon as it fails**, whether or not it is on the required list, and the command exits naming what fell over — `PR checks failed (failed checks: E2E).` A run whose `Checks`, `E2E` or `Security Audit` job goes red therefore reports in the time that job took, not in 32 minutes: previously only a required-list check (`SonarQube` by default, `JOSH_REQUIRED_CHECKS` to change it) ended the wait, because any other failure leaves GitHub reporting the pull request as `UNSTABLE` while the rollup still reads as pending, so the command ran its whole budget out and ended in `Timed out while waiting for PR checks to complete.` without naming a cause (joshuafolkken/kit#990). **This makes the gate report sooner, never looser** — no failing check gains a path to a merge, and the poll loop keeps CodeRabbit exempt under the temporary kit#753 policy, so a red or slow CodeRabbit review does not end the wait unless it has been put back on the required list. (The two-minute look-ahead that runs before the polling fails on any failed check, CodeRabbit's included — but that no longer ends the command: the look-ahead is exactly that, not a gate, so its failure is logged and the run falls through to the polling, where the one evaluator decides. Until joshuafolkken/kit#999 it escaped instead, which killed `followup` before the CodeRabbit exemption could apply at all — visible only on a repository whose checks all finish inside that window, since a slower suite times the look-ahead out first. **One exception keeps its old speed**: a branch with no checks at all fails just as a failed one does, and falling through there would trade a failure reported quickly for the whole budget spent waiting on a required check that is missing rather than pending — so when the pull request's own rollup is definitely empty the failure is rethrown. Definitely is the operative word: an answer that could not be read is not an empty rollup, and falls through like any other. Since joshuafolkken/kit#1028 the look-ahead is the same poll loop with a two-minute budget rather than a `gh pr checks --watch` subprocess — `gh pr checks` goes through GraphQL, which a cloud session is answered 403 for. It asks a deliberately weaker question than the merge gate does — have the checks settled, rather than is the pull request mergeable — and the live per-check table `gh` drew is replaced by the same `Checking PR status…` lines. An empty rollup counts as still waiting _during_ those two minutes, so a pull request whose checks have not registered yet is given time, and is asked once more at the end. **The look-ahead does not wait for CodeRabbit either**, which is what made it cost two minutes on every run rather than only on a slow one: CodeRabbit posts its `Review queued` commit status within seconds of the pull request opening and leaves it pending for the whole review — thirteen minutes on PR #1211 — so a look-ahead that counted it as pending always ran its budget out and printed the timeout note, before the polling applied the kit#753 exemption and merged anyway (joshuafolkken/kit#1217). Only the _pending_ reading is dropped: a CodeRabbit check that has already failed still ends the look-ahead exactly as before, and what happens to that answer is unchanged — it is logged and the run falls through. A rollup holding nothing _but_ CodeRabbit falls back to the whole rollup rather than being emptied by the skip, so such a pull request answers exactly what it answered before the exemption existed — still waiting while the review is queued, settled once it passes, failed once it fails. The skip is keyed on `CODERABBIT_CHECK_NAME`, the single constant the merge gate's own exemption is written in terms of, and `JOSH_REQUIRED_CHECKS` takes it back: a project that has put CodeRabbit on the required list is waited for again, so the look-ahead never settles on something the merge gate would still block.) **Three things still run the budget out**, because none of them is a failed check: a required check that never appears at all (`SonarQube` on a repository with no Sonar integration) is missing rather than failed, and nothing distinguishes it from one that has yet to start; and a merge state that never reaches `CLEAN` for a reason other than a conflict — a branch protection requiring the branch to be up to date, or an approving review — leaves every check green with nothing to name. **A conflict is the exception, and ends the wait on the first poll**: `DIRTY` is the one merge state no amount of waiting resolves, so since [#1232](https://github.com/joshuafolkken/kit/issues/1232) it is a failure named `merge conflict` rather than a 32-minute timeout — which is also where the conflict check `josh git` used to run after its own watch now lives. and a **standing change request on a pull request whose checks never settle** is now reported at the timeout rather than on the first poll — since joshuafolkken/kit#1043 the review listing is read only on a poll that would otherwise conclude the wait, which is what took the merge gate from four REST requests per poll to three (about 760 down to about 570 across a full 32-minute wait); the run is red either way, so the trade only ever moves a red result later, never a green one earlier. A job skipped by its own `if:` condition counts as passing, so conditional jobs never end the wait either. **What does end it is any non-success conclusion**, `cancelled` and `timed_out` included — the same rule the required list has always followed — so re-running a job you cancelled is no longer picked up by a wait already in progress: run `followup` again once it is green. Before the polling starts, `followup` also runs a two-minute look-ahead, so the worst case end to end is about 34 minutes.
-
-**A merge that went ahead without CodeRabbit says so on the console.** Whenever the merge gate opens with a CodeRabbit check that is not passing, `followup` prints one `⏭ CodeRabbit check skipped (kit#753): <name> was <status> at merge time` line per such check and carries the same note into the completion Telegram body. The skip covers waiting only: CodeRabbit findings that have already been posted go through the unchanged AI-review scan below, and unresolved line comments are still recorded (joshuafolkken/kit#1217).
-
-Set `JOSH_CI_TIMEOUT_SECONDS` to a positive number of seconds to override it in either direction; anything else falls back to the default. `followup` runs with `--env-file=.env`, so the variable is read from the project's `.env` as well as from the shell — **a leftover `JOSH_CI_TIMEOUT_SECONDS` left in `.env` as a workaround for the old default keeps overriding the new one**, so remove it after upgrading.
-
-An AI agent driving this command should give the tool call the longest timeout it allows and let the command finish: the wait can outlast a single tool call, and shell backgrounding (`&`) does not survive the call returning.
-
-While inspecting those children it also reports when the epic body declares a dependency chain (`#101 -> #102` under `Dependencies`) but **none** of the children carries a `blocked-by` relation, meaning the batch order was never recorded natively. The declaration is what triggers the check: an epic is created for every split, ordered or not, so its mere existence says nothing about ordering and warning on that alone would fire on every unordered batch. The check is deliberately weak — it never judges the shape of the chain, only its total absence — and it runs on every child's merge rather than at epic close, so the omission surfaces while it can still be corrected. What counts as a declaration is read from the same place `epic:next` reads its links: a line that is _nothing but_ a chain. An arrow inside a rationale paragraph is a recommendation, and reading one as a declaration made an epic that says `None — the children are independent` report this warning on every child's merge ([#1155](https://github.com/joshuafolkken/kit/issues/1155)).
-
-After the merge, `followup` also closes any completed epic. It looks for open issues labelled `epic` whose markdown task list references the issue this PR closed; when every other child in that list is already closed, the epic is closed with a comment naming its children. The just-closed issue is treated as closed without being queried, because GitHub applies the `closes #N` side effect asynchronously. An epic with a still-open child is left alone, and any failure in this step is reported as a warning rather than failing the run — the PR has already merged by then. A run whose comment landed but whose close was refused does not post a second copy: the announcement ends with an HTML comment marker naming the children it was posted for, and a later run that finds that marker closes without commenting again. The marker renders as nothing, so quoting the announcement in an ordinary issue comment no longer suppresses the next one, and an epic that was reopened and gained a child announces the enlarged batch on its own terms. Two cases are skipped on purpose: an epic whose task list tracks a child in **another repository** is never closed automatically (resolving that child's state would need a different repo, and ignoring it could close the epic while the child is open), and nothing runs at all on a `--no-merge` run, where the linked issue is still open.
-
-After a merged run (never on `--no-merge`, where the linked issue is still the current task), right before the final version line, up to five open issues are listed as next-run candidates (`🗒 Next issues (newest first):`), so the next task can be picked straight from the completion output. The newest 20 open issues are fetched and shown newest-first — a newer issue usually encodes the most current understanding of the backlog — excluding the just-completed issue (its `closes #N` close lands asynchronously), `epic`-labeled tracking issues (their children are the runnable work), and `in-progress`-labeled issues already claimed by a workflow. The display is purely informational: when `gh` is unavailable or returns something unexpected, it is skipped silently rather than failing a workflow whose merge already succeeded.
+Related: [`josh git`](#josh-git), [`josh observations:flush`](#josh-observationsflush), [`josh time`](#josh-time).
 
 ### `josh notify`
 
-Send a Telegram notification. Used for planning, confirmation, failure, and kickoff-retry alerts.
+Send a Telegram notification for planning, confirmation, failure, warning, and kickoff-retry alerts.
 
 ```bash
 pnpm josh notify --task-type planning --issue-url "https://..." --body="- bullet 1\n- bullet 2"
 pnpm josh notify --task-type confirmation --issue-url "https://..." --body="Waiting for approval"
 pnpm josh notify --task-type failure --issue-url "https://..." --body="Build failed"
+pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file reason.md
 ```
 
-Task types: `planning` 📋 · `completion` ✅ · `failure` ❌ · `kickoff_retry` 🔄 · `confirmation` ⏸️
+**Options:**
 
-**The repository in the header follows the URL the notification carries.** It is resolved in this order: an explicit `--repo-name`, then the repository the `--issue-url` names, then the repository the `--pr-url` names, then the repository the command is run in. The issue title is read from the `--issue-url`'s repository, so one URL is enough to describe an issue anywhere; a `--pr-url` names no issue, so it answers the repository only and no title is read from it (joshuafolkken/kit#994). Only a notification with no usable URL of either kind falls back to the working directory, which is what it always did. This matters wherever a workflow files an issue elsewhere and notifies about it — the upstream-interrupt rule opens the issue with `gh api repos/<owner>/<repo>/issues` and sends a `confirmation` right after, and the header used to name the repository the session happened to be running in while the link pointed upstream (joshuafolkken/kit#903).
+- `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️. Do not send `completion` or `warning` by hand — `josh followup` sends them.
+- `--body` / `--body=$'…'` — inline body; use `--body=$'…'` when it starts with `-`.
+- `--body-file` — read the body from a file (`-` reads stdin); use whenever the body carries a backtick or `$`. Passing both body forms is refused.
+- `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
 
-Note: do not use `--task-type completion` manually — always use `josh followup` instead, which automatically includes the PR URL.
+**Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+
+### `josh observations:flush`
+
+Commit the observation ledger (`docs/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. It is the ledger's only commit path — `josh git` excludes the ledger from staging.
+
+```bash
+pnpm josh observations:flush
+pnpm josh obf                 # alias
+```
+
+**Behavior:** refuses off the default branch (naming `pnpm josh ms`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand.
+
+Related: [`josh followup`](#josh-followup).
 
 ### `josh main:sync`
 
-Checkout `main` and pull the latest changes.
+Checkout the default branch and pull the latest changes with `git pull --ff-only` (the strategy is named by the command, not read from git config). Alias behavior is also reached as `pnpm josh ms`.
 
 ```bash
 pnpm josh main:sync
 ```
 
+**Behavior:** refuses inside a linked work tree (a lane) and exits non-zero — run it in the primary checkout instead; a lane's terminal step is `pnpm josh lane:close <issue-number>`. A default branch that has diverged fails loudly under `--ff-only` rather than growing a merge commit — the deliberate opposite of [`josh main:merge`](#josh-mainmerge). The same `--ff-only` pull is used by [`josh git`](#josh-git), `josh pr` and [`josh release`](#josh-release) when they start from the default branch.
+
 ### `josh main:merge`
 
-Pull the latest changes from `origin main` into the current branch.
+Bring the repository's default branch into the branch this checkout is on: fetches `origin/<default>` and merges it into the current branch.
 
 ```bash
 pnpm josh main:merge
 ```
+
+**Behavior:** the merge strategy is named by the command rather than read from git config, so a diverged branch — the state the command exists for — merges cleanly instead of aborting with `fatal: Need to specify how to reconcile divergent branches`. Merging (not rebasing) avoids the force push the distributed `.claude/settings.json` denies. A conflicting merge leaves git's report on screen and exits non-zero; resolve it as any merge.
 
 ---
 
@@ -726,7 +483,7 @@ pnpm josh main:merge
 
 ### `josh bump`
 
-Bump the package version in `package.json`.
+Bump the package version in `package.json`. Not part of the child flow — `josh release` raises the version instead.
 
 ```bash
 pnpm josh bump major
@@ -738,153 +495,59 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 
 ### `josh release`
 
-Release everything main has taken since the version last changed — one command, run by a person ([#1169](https://github.com/joshuafolkken/kit/issues/1169)).
+Release everything main has taken since the version last changed — one command, run by a person. It counts merges on main's first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag.
 
 ```bash
 pnpm josh release
 pnpm josh release --dry-run   # count and report, write nothing
 ```
 
-**A version is a property of main's history, not of a branch.** `josh bump` reads the local `package.json` and increments it, so two branches cut from the same version both claim the same next number — and git's three-way merge does not report two branches writing the same line to the same value as a conflict. What surfaces instead is one version carrying two issues, with the other version never existing. No smarter `bump` can fix that: two branches cannot both know they are next.
+**Options:**
 
-So the decision moves off the branch entirely. There is one place that decides, it runs when a person types this, and it looks only at main as it stands at that moment — which is why **no lock, no reserved number, no serial queue and no conflict detection is needed**.
+- `--dry-run` — count and report only; does not pull (a pull is a write).
+- `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (env) — tag-watch budget, default 30 minutes.
 
-What one invocation does:
+**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if the working tree is dirty, the checkout is not on the default branch, no version base can be found, or the `v<version>` tag never appears.
 
-1. **Counts `pending`** — the merge commits main has taken since the commit that last changed the version, **along main's own first-parent line**. Every pull request this repository merges lands as one merge commit there, so this is the count of merged pull requests, dependency updates included: a dependency update is a change worth shipping. The first-parent restriction is what keeps merges made _inside_ a pull request branch — GitHub's "Update branch" button, or a local `git merge main` — from each inflating the release by a minor.
-2. **Reports and stops when `pending` is zero.** Nothing is written, nothing is opened, and the exit code is 0.
-3. **Otherwise raises the version by `pending` minors**, commits it on `release/v<version>`, opens a pull request and merges it through the same gate every other pull request goes through — `wait_for_pr_success`, the one `josh followup` waits on.
-4. **Watches for the tag, and reports its absence as a failure.**
+### `josh release:scope`
 
-The merge is what starts the distribution chain that already exists: `ci.yml`'s `notify-auto-tag` dispatches, `auto-tag.yml` creates `v<version>`, and `publish.yml` / `production.yml` run off that tag.
+Say whether a release is owed, so the moment one is cut is not a judgement. Reads the same fetch-then-count as `josh followup`, so the two never disagree.
 
-#### The tag watch is the point of step 4
+```bash
+pnpm josh release:scope          # → required | skip | unknown ; alias: josh res
+pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
+```
 
-**A merged release pull request is not a released version.** Every link after the merge can fail silently, and one of them is known to: a later push to main cancels the release commit's CI run ([#1481](https://github.com/joshuafolkken/kit/issues/1481)), so nothing dispatches and nothing is tagged. An automatic release would have been picked up by the next cycle. **A release a person types has no next cycle**, so without the watch the person walks away believing something shipped when nothing did.
+| It answers | When                                                             |
+| ---------- | ---------------------------------------------------------------- |
+| `required` | main has taken at least one merge since the version last changed |
+| `skip`     | the count is zero                                                |
+| `unknown`  | the count could not be read                                      |
 
-The command therefore polls for `v<version>` and exits non-zero when it never appears, naming what did not happen rather than guessing which link broke. The budget is 30 minutes, overridable with `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`.
-
-#### Numbers are skipped, and the accounting still holds
-
-Release after three merges and `1.339.0` becomes `1.342.0` with **one** tag, `v1.342.0`; `v1.340.0` and `v1.341.0` never exist. What is preserved is "minors raised == issues shipped"; what is given up is "one issue, one tag". Which issue went into which release is recovered from the merge commits between two tags, which `.github/release.yml` already classifies. `scripts/version/publishable-range-check.ts`, the `prepack` gate, checks that published ranges still resolve and does not look at version distance at all, so a multi-minor jump passes it unchanged.
-
-#### It refuses to guess
-
-- The working tree must be clean and the checkout on the default branch — the count is only meaningful there, and the release commit is made on top of it. Both are checked before anything is read. A real run then pulls; **`--dry-run` does not**, because a pull is a write.
-- It searches back through the last 30 commits that touched `package.json` for the one that moved the version, and **a revision whose `package.json` cannot be read stops it declaring a base there** rather than being compared against a version several commits older. Finding no base at all, it says so and exits non-zero rather than picking one.
-- A `release/v<version>` branch that already exists is reported as a previous attempt that got as far as opening one — the wait for CI can throw and leave the branch and its pull request behind — rather than failing as git's `a branch named … already exists`.
+**Output / exit codes:** the verdict goes to stdout, the reason to stderr. Exit code is 0 for every verdict and 1 only for an unknown flag; `unknown` is a verdict, never read as `skip`.
 
 ### `josh version`
 
-Show the global install version, the current project version, and the latest published version — all in one report, regardless of how `josh` was invoked.
+Show the global-install version, the current project version, and the latest published version — plus the **running binary** (the install that actually executed, resolved from `import.meta.url`), the single source of truth for which `josh` produced the report. A not-installed target reports `not installed`; a stale one gets a `Run:` hint with the upgrade command. A release inside the `.npmrc` `minimum-release-age` window prints a `Held:` line. When the `josh` first on `PATH` is not the pnpm-global install, a PATH-shadowing warning names both paths and points to [`josh doctor --fix`](#josh-doctor).
 
 ```bash
-pnpm josh version   # alias: josh v
+pnpm josh version             # alias: josh v
+pnpm josh version --upgrade   # upgrade global + project to latest, then re-run fix-gh-packages
 ```
 
-`version` (and `version:upgrade`) always inspect **both targets**:
+**Options:**
 
-- **Global**: queried via `pnpm ls -g @joshuafolkken/kit`.
-- **Project**: read from `node_modules/@joshuafolkken/kit/package.json` in the current directory.
-
-In addition, `version` reports the **running binary** — the version and package directory of the install that actually executed, resolved from `import.meta.url`. The running binary is the single source of truth: the `Running:` line tells you which `josh` produced this very report, independent of the global/project query. This restores the guarantee that a stale or shadowing binary self-reports rather than hiding behind the `pnpm ls -g` number.
-
-A target that is not installed is reported as `not installed`. A stale target gets a `Run:` hint with the exact upgrade command (`pnpm add -g` for global, `pnpm add -D … && fix-gh-packages` for the project). `josh v` and `pnpm josh v` produce the same report.
-
-#### Release-age holds
-
-An upstream's **effective** install can be behind `Latest:` for a reason no upgrade clears. The repository-managed `.npmrc` sets `minimum-release-age`, which withholds a release from **unpinned** resolution until it has aged past that window. Measured on pnpm 11.22.0 with `minimum-release-age=1440`, against a release published 3.5 h earlier:
-
-```text
-pnpm add @joshuafolkken/kit@1.80.0   ->  1.80.0   (pnpm records a minimumReleaseAgeExclude entry)
-pnpm add @joshuafolkken/kit          ->  1.78.0
-```
-
-So a pinned `Run:` hint always installs and is **never** suppressed. What the window actually holds back is peer resolution — the mechanism behind an upstream's effective install ([#698](https://github.com/joshuafolkken/kit/issues/698)) — which is why the explanation appears there and nowhere else:
-
-```text
-@joshuafolkken/app-kit
-  Global:  1.78.0      ⚠ → 1.80.0
-  Held: 1.80.0 is inside the 24 h minimum-release-age window; an unpinned resolve lands on 1.78.0
-  Project:  1.80.0      ✓
-  Latest:  1.80.0
-```
-
-Since kit publishes several releases a day, a residual `⚠` right after a **successful** `version:upgrade` is the normal case rather than a failure — the `Held:` line says so instead of leaving the marker unexplained. An effective install below what an unpinned resolve reaches is genuinely stale and gets no such line.
-
-The publish timestamps come from the same GitHub Packages endpoint that resolves `Latest:`, fetched only when the effective install is behind `Latest:` and only when a window is actually configured; when they cannot be read the report renders exactly as it did before. `version:upgrade` is unchanged. See [#808](https://github.com/joshuafolkken/kit/issues/808).
-
-#### PATH shadowing warning
-
-When the `josh` first on `PATH` is **not** the pnpm-global install — for example a stale `~/.local/bin/josh` shim left behind by a project pinned below `v0.200.0` (see [the design note below](#design-per-project-installs-must-not-touch-the-global-path)) — `version` appends a warning naming both paths and the recovery command:
-
-```text
-⚠ PATH shadowing: the 'josh' first on PATH is not the pnpm-global install.
-  On PATH:     /Users/you/.local/bin/josh
-  pnpm global: /Users/you/Library/pnpm/bin/josh
-  Recover:     josh doctor --fix
-```
-
-Run [`josh doctor --fix`](#josh-doctor) to reclaim the global CLI. The warning is silent when there is no shadowing.
-
-### `josh version:upgrade`
-
-Upgrade `@joshuafolkken/kit` to the latest published version for **both** the global install and the current project.
-
-```bash
-pnpm josh version:upgrade   # alias: josh vu
-```
-
-Both `josh vu` and `pnpm josh vu` behave the same: the global install is upgraded with `pnpm add -g`, and the project devDependency with `pnpm add -D` followed by a re-run of `fix-gh-packages`. A target that is not installed or already up to date is skipped. Inside the kit repo itself there is no `node_modules/@joshuafolkken/kit`, so the project target is naturally skipped — no accidental self-install.
-
----
+- `--upgrade` — upgrade both the global install (`pnpm add -g`) and the project devDependency (`pnpm add -D` + `fix-gh-packages`); already-current or not-installed targets are skipped.
 
 ### `josh ranges`
 
-Check that every dependency range this package **publishes** still resolves for a consumer.
+Check that every dependency range this package **publishes** still resolves for a consumer. For each `dependencies` entry it runs `pnpm view <name>@<range> version` under safe-chain's shims, so the age-filtered view a consumer installs under is observed rather than modelled. `devDependencies`, peer ranges, and non-registry protocols (`workspace:*`, `catalog:`, `file:`, `link:`, git URLs) are set aside and printed, not probed.
 
 ```bash
 pnpm josh ranges   # alias: josh r
 ```
 
-```
-✔ 18 published dependency range(s) resolve against the registry.
-```
-
-**Why this is not obvious.** `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` governs **pnpm's** `minimum-release-age` and nothing else. The `preinstall` hook installs `@aikidosec/safe-chain`, which applies its **own** age policy and has no knowledge of that list — a package excluded there is still hidden by safe-chain until it ages in. So a dependency floor can be pinned to a release that consumers cannot see, and the install fails naming a version that demonstrably exists and is still tagged `latest`:
-
-```
-[ERR_PNPM_NO_MATCHING_VERSION] No matching version found for tsx@4.23.5
-The latest release of tsx is "4.23.4".
-ℹ Safe-chain: Some package versions were suppressed due to minimum age requirement.
-```
-
-An existing lockfile hides this completely — `pnpm install --frozen-lockfile` succeeds because the resolution is already recorded. It only surfaces when a consumer **re-resolves**: `pnpm patch`, adding or removing a dependency, `--no-frozen-lockfile`, or a fresh clone whose lockfile no longer matches configuration.
-
-**How the check works.** For each entry in `dependencies` it runs `pnpm view <name>@<range> version`. Where safe-chain's shims are on `PATH`, that query returns the same **filtered** view a consumer installs under — the policy is observed rather than modelled, so there is no threshold to guess and keep in sync. `devDependencies` are excluded (a consumer never installs them) and so are peer ranges (satisfied from the consumer's own tree).
-
-Dependencies that resolve **outside** the registry — `workspace:*`, `catalog:`, `file:`, `link:`, git URLs — are set aside rather than probed: the registry has no answer for them, and this command also runs in consumer repos where those protocols are ordinary. They are printed, never dropped in silence, because a guard that quietly narrows its own coverage reports success for exactly the dependencies it never looked at:
-
-```
-⏭ Not checked — resolved outside the registry: @local/shared@workspace:*
-```
-
-A range counts as resolved only when the output contains a version `semver` can parse. "Output is non-empty" is not enough: safe-chain appends its own `ℹ Safe-chain: Some package versions were suppressed…` notice to stdout, so a query that answered nothing still comes back with text. The check **fails closed** otherwise — a probe that cannot answer at all (network error, auth failure) is reported as unresolvable, because a false stop costs one re-run and a false pass publishes a package nobody can install.
-
-**Where it runs, and how strong it is in each place.**
-
-| Trigger                              | safe-chain shims active?                              | Catches                                             |
-| ------------------------------------ | ----------------------------------------------------- | --------------------------------------------------- |
-| `josh latest`, after `latest:update` | yes, on a developer machine                           | age suppression **and** a floor that does not exist |
-| `prepack` (`pnpm publish`)           | no — the publish job installs with `--ignore-scripts` | a floor that does not exist                         |
-
-The `josh latest` run is the primary detector: it fires immediately after the ranges are rewritten, on the machine whose registry view matches a consumer's. The `prepack` run is a backstop — it still blocks a publish, but without the shims it sees the unfiltered registry and cannot tell that a floor is merely being withheld. Run `josh ranges` by hand any time a floor is raised outside those two paths.
-
-Probing a `@joshuafolkken/*` dependency needs `NODE_AUTH_TOKEN` for GitHub Packages. `josh latest` exports it before chaining here (the same prelude `latest:update` relies on), so the composite always has it; a bare `josh ranges` in a project with scoped dependencies needs `export NODE_AUTH_TOKEN=$(gh auth token)` first, or those entries fail closed and are reported as unresolvable.
-
-The probes are one registry request per runtime dependency, run in sequence — a few seconds for a package with a couple of dozen `dependencies`, which is the cost `josh latest` now carries.
-
-**Fixing a violation.** Lower the floor to a release already outside the age window — `^4.23.4` instead of `^4.23.5`. Nothing is given up: the caret still admits the newer version once it ages in, and because `package.json` is the only file that changes, `pnpm install` keeps the already-resolved newer version in the lockfile. Raising the floor further is the intuitive move and the wrong one.
+**Output / exit codes:** fails closed — a range resolves only when the output contains a `semver`-parsable version; a probe that cannot answer (network, auth) is reported unresolvable. Probing `@joshuafolkken/*` dependencies needs `NODE_AUTH_TOKEN` — run `export NODE_AUTH_TOKEN=$(gh auth token)` first for a bare invocation. To fix a violation, lower the floor to a release already outside the age window (e.g. `^4.23.4` instead of `^4.23.5`).
 
 ---
 
@@ -897,34 +560,19 @@ Diagnose — and optionally repair — PATH shadowing of the global `josh`.
 ```bash
 pnpm josh doctor          # alias: josh dr — diagnose only
 pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
+pnpm josh doctor --ports  # also print the per-repository port-seed table
 ```
 
-`doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`). When the PATH `josh` differs from the pnpm-global one, it prints the same shadowing warning as `josh version` plus the recovery command.
+`doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`), warning when the two differ and printing the recovery command. In a kit consumer it also prints a **Consumer setup** section — one-line `✓` / `⚠` verdicts for the kit plugin, git `core.hooksPath`, `CLAUDE.md`, and secretlint — plus the repository's **Dependabot security updates** and **Allow auto-merge** settings (`enabled` / `disabled` / `could not be read`; auto-merge also `paused`). None of these ever fail the command, and `doctor` never changes a repository setting.
 
-`doctor` also reports the repository's **Dependabot security updates** setting, the prerequisite the distributed `.github/dependabot.yml` depends on once npm version updates are disabled ([#803](https://github.com/joshuafolkken/kit/issues/803)). `josh sync` prints the same line unconditionally, and `josh init` prints it when it actually wrote the config — see [docs/sync.md](./sync.md) for why it runs there too. Unlike those two, `doctor` reports only where the prerequisite exists: it skips the line outside a git work tree, and skips it in a repository that has no distributed `.github/dependabot.yml`. `doctor` diagnoses the global install and is routinely run from a home directory or from a clone of an unrelated project, where a Dependabot warning — and an enabling command aimed at someone else's repository — would be noise. Past that gate it always reports, including when the lookup fails, since a broken or unauthenticated `gh` must surface as `could not be read` rather than as silence. One of four results is printed:
+**Options:**
 
-| Result              | Meaning                                                                                                                                                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled`           | Security advisories can open npm pull requests.                                                                                                               |
-| `paused`            | The setting is on but paused, so no advisory PR is opened. Resume it from the repository's Security → Dependabot page; the enable API does not clear a pause. |
-| `disabled`          | Off — npm advisories open no pull request. The enabling command is printed, addressed at the resolved repository.                                             |
-| `could not be read` | The setting could not be queried (a 404, or a token without the scope). Reported as unchecked, **not** as off.                                                |
-
-The check never fails the command: an unreadable setting is GitHub-side state kit cannot verify, not a broken install. `doctor` does not enable the setting either — changing a repository setting is the maintainer's call.
-
-`doctor` reports the repository's **Allow auto-merge** setting on the same terms, as the prerequisite of the distributed `.github/workflows/dependabot-auto-merge.yml` ([#834](https://github.com/joshuafolkken/kit/issues/834)). Without it `gh pr merge --auto` fails with `Auto-merge is not allowed for this repository`, and every github-actions bump the workflow would have merged sits green and unmerged. The gate here is a workflow containing `gh pr merge --auto`, matched rather than the filename: a consumer's own auto-merge workflow needs the same setting, and a same-named workflow that never calls the command creates no prerequisite at all. `josh sync` prints the line unconditionally, and `josh init` prints it when the workflow is present. One of three results is printed:
-
-| Result              | Meaning                                                                                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `enabled`           | The auto-merge workflow can enable auto-merge on a Dependabot pull request.                                                                                        |
-| `disabled`          | Off — the workflow fails and Dependabot pull requests stay open. The enabling command is printed, addressed at the resolved repository.                            |
-| `could not be read` | The setting could not be queried (no admin access, or a failed request). Reported as unchecked, **not** as off — a token without the scope simply omits the field. |
-
-The two reports are independent: a consumer synced before #834 has the Dependabot config and no auto-merge workflow, and a repository that only ever added its own auto-merge workflow has the second prerequisite without the first. When at least one applies, the repository name is resolved once and shared by both. `--fix` does not enable this setting either, for the same reason it does not enable Dependabot security updates.
+- `--fix` — remove a shadowing binary **only if it is a kit shim** (its body references `@joshuafolkken/kit` or the removed `install-bin` script); any other binary is left and reported for manual review. Also the one-shot recovery for an old project that re-created the global shim.
+- `--ports` — additionally print the port-seed table (see below).
 
 #### The discovered repository map
 
-`doctor` prints the **repository map** — every checkout on this machine that belongs to the same GitHub owner as the repository the command is standing in, with its local path ([#869](https://github.com/joshuafolkken/kit/issues/869)). Other commands need to know where a sibling repository lives before they can carry a release into it or dispatch a run to it; `doctor` is where a wrong map becomes visible, because the alternative is finding out when a write lands in the wrong checkout.
+`doctor` prints the **repository map** — every checkout on this machine that belongs to the same GitHub owner as the current repository, with its local path — so other commands can locate a sibling before writing into it.
 
 ```text
 Repositories (same owner, discovered next to this one):
@@ -932,39 +580,43 @@ Repositories (same owner, discovered next to this one):
   joshuafolkken/kit       /Users/example/Development/kit
 ```
 
-Discovery is automatic, not registered: `doctor` scans the parent directory of the current repository **one level deep**, reads each work tree's `origin` remote, and keys the map by what that remote says. Four remote spellings all normalize to the same `owner/repo` — `git@github.com:owner/repo.git`, an SSH host alias (`git@github-work:owner/repo.git`), HTTPS with credentials and a trailing slash (`https://user@github.com/owner/repo.git/`), and plain HTTPS. **The directory name is never used as the repository name** — a checkout in a directory called `kit-experiment` whose `origin` points at `game-kit` is mapped as `game-kit`.
+Discovery is automatic: `doctor` scans the parent directory one level deep, reads each work tree's `origin` remote, and keys the map by that remote's normalized `owner/repo` (SSH, host-alias SSH, credentialed HTTPS, and plain HTTPS all normalize the same). **The directory name is never used as the repository name** — a checkout in `kit-experiment` whose `origin` points at `game-kit` maps as `game-kit`.
 
-**The owner restriction is unconditional and cannot be overridden.** Only repositories whose owner equals the current repository's owner enter the map — the same first-party test the AI documents define. A parent directory routinely holds work belonging to other accounts and organizations, and a map that included them would let tooling file issues against, or push to, a repository that is not yours. Remotes on any host other than GitHub are excluded before the owner is even compared, as are directories with no remote at all.
+**The owner restriction is unconditional and cannot be overridden.** Only repositories whose owner equals the current repository's owner enter the map, so tooling can never write to someone else's repository. Remotes on any host other than GitHub are excluded before the owner is even compared, as are directories with no remote at all.
 
-`JOSH_REPO_PATHS` is the escape hatch for the exceptions — a repository that is not a sibling, or one checked out twice — set in the personal, non-committed `.env`:
+`JOSH_REPO_PATHS` is the escape hatch for non-sibling or twice-checked-out repositories, set in the personal `.env`:
 
 ```bash
 JOSH_REPO_PATHS=joshuafolkken/game-kit=/Users/example/elsewhere/game-kit,joshuafolkken/kit=/Users/example/kit-review
 ```
 
-Entries are `owner/repo=/absolute/path`, comma-separated, and an override wins over the discovered path for the same repository. It is a way in, never a way around: an override naming a different owner is dropped exactly like a discovered sibling would be, and a malformed entry is dropped rather than failing the command — the printed map is what shows you it did not take effect. Outside a git work tree no map is printed at all, since there is no current owner to anchor it against.
+Entries are `owner/repo=/absolute/path`, comma-separated; an override wins over the discovered path for the same repository. It is a way in, never a way around: an override naming a different owner is dropped exactly like a discovered sibling would be, and a malformed entry is dropped rather than failing the command. Outside a git work tree no map is printed, since there is no owner to anchor it.
 
-`--fix` is your go-ahead to repair: it reads the shadowing binary and, **only if it is a kit shim** (its body references `@joshuafolkken/kit` or the removed `install-bin` script), removes it so the pnpm-global `josh` reclaims `PATH` precedence. Any other shadowing binary is left untouched and reported for manual review — `doctor` never deletes a file it cannot positively identify as a stale kit shim.
+With `--ports`, `doctor` additionally prints each discovered repository's **port seed** and its resolved dev / preview ports, and flags any seed held by more than one repository:
 
-#### Design: per-project installs must not touch the global PATH
+```text
+Port seeds (dev / preview, and repositories sharing one):
+  joshuafolkken/app-kit   seed 0   dev 5173   preview 4173
+  joshuafolkken/kit       seed 1   dev 5183   preview 4183
+  ⚠ seed 0 is shared by: joshuafolkken/app-kit, joshuafolkken/game-kit
+```
 
-A per-project dependency's lifecycle hook (`postinstall` / `prepare`) must **never** write to a shared, user-level `PATH` location. Versions prior to `v0.200.0` shipped an `install-bin.ts` `postinstall` that wrote `~/.local/bin/josh` via `os.homedir()`; a single `pnpm install` in any such old project would silently clobber the global `josh` and point it at that project's stale kit. That shim write was removed in [#446](https://github.com/joshuafolkken/kit/pull/446) and must not return — the current kit installs its global CLI only via `pnpm add -g` (bin under `pnpm bin -g`), and a regression test (`scripts/no-global-shim-write.test.ts`) fails if any lifecycle hook or source file reintroduces a shared-PATH write.
-
-**Migration / cleanup.** Projects pinned `< v0.200.0` still carry the old `install-bin.ts` and will re-create the shim whenever they are reinstalled. Upgrade those projects to `>= v0.200.0` (`pnpm add -D @joshuafolkken/kit@latest`). For one-shot recovery when an old project has re-created the shim, run `josh doctor --fix`.
+It never rewrites a `.env` — the seed is a personal per-machine setting, so the report names the clash and a person resolves it. A malformed seed is reported as `PORT_SEED could not be read`.
 
 ### `josh overrides`
 
 Check that the dependency overrides have not drifted after a dependency update.
 
 ```bash
-pnpm josh overrides
+pnpm josh overrides           # verify overrides unchanged
+pnpm josh overrides --save    # snapshot current merged overrides
 ```
 
-Run after `pnpm update` or `josh latest` to confirm no override was silently removed.
+Reads **both** locations — the `overrides:` block in `pnpm-workspace.yaml` and legacy `pnpm.overrides` in `package.json` — merging them (a workspace entry wins a key collision) and printing where they came from. An empty `pnpm.overrides` is never treated as "no overrides".
 
-**Both locations are read.** pnpm 11 declares overrides in the `overrides:` block of `pnpm-workspace.yaml`; `pnpm.overrides` in `package.json` is the legacy location. The check merges the two (a workspace entry wins a key collision, matching pnpm's own precedence) and prints where they came from — `✔ overrides unchanged (2 from pnpm-workspace.yaml)`, or `no overrides found in pnpm-workspace.yaml or package.json` when there genuinely are none. Reading only `package.json` is what let a project whose overrides live in the YAML report a false all-clear ([#740](https://github.com/joshuafolkken/kit/issues/740)), so an empty `pnpm.overrides` is never treated as "no overrides".
+**Options:**
 
-`--save` writes the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.
+- `--save` — write the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.
 
 ### `josh audit`
 
@@ -974,46 +626,37 @@ Run a security audit against the lockfile.
 pnpm josh audit
 ```
 
+The scanner is looked up on `PATH` first, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`). With neither present the audit exits non-zero and prints how to get one — it is never skipped or weakened.
+
+### `josh audit:provision`
+
+Install the pinned `osv-scanner` when `josh audit` cannot find one. Wired to the `SessionStart` hook of the distributed `.claude/settings.json` so the pre-push audit has a scanner.
+
+```bash
+pnpm josh audit:provision           # no-op if a scanner is already present
+pnpm josh audit:provision --force   # ignore backoff, allow a longer download
+```
+
+**Options:**
+
+- `--force` — ignore the 6-hour failure backoff and allow a longer download window; the command to run after fixing a network problem.
+
+**Output / exit codes:** the version is pinned and its SHA256 verified before install. Any failure (network, non-OK response, checksum mismatch, no published build) is reported and exits `0` — the missing scanner surfaces at the pre-push audit instead.
+
 ### `josh reconcile-templates`
 
-Keep the distributed templates in sync with the root files they come from. There are two kinds of pair:
-
-- **Copy pairs** — the template is a byte-for-byte copy of its root source. `.gitignore` → `templates/gitignore` is a copy pair: edit root `.gitignore`, and the template is regenerated automatically. (The dotless `templates/gitignore` exists because npm strips a literal `.gitignore` from the published package; it is renamed back to `.gitignore` when copied into a consumer.)
-- **Tripwire pairs** — the template intentionally diverges from its root source. `sonar-project.properties` → `templates/sonar-project.properties` is a tripwire pair: a source edit is recorded as a hash and only forces a conscious review, never automatic propagation.
+Keep the distributed templates in sync with the root files they come from. **Copy pairs** are byte-for-byte copies regenerated automatically (`.gitignore` → `templates/gitignore`); **tripwire pairs** intentionally diverge and only force a conscious review via a recorded hash (`sonar-project.properties` → `templates/sonar-project.properties`).
 
 ```bash
 pnpm josh reconcile-templates           # regenerate copy templates + record tripwire hashes
 pnpm josh reconcile-templates --check    # verify templates are in sync; non-zero on drift
 ```
 
-Tripwire hashes live in `.template-source-manifest.json` at the repo root (kit-internal; not distributed). A pre-commit hook runs `--check` whenever a tracked source or copy template is staged: a copy pair that is out of date, or a tripwire source that changed without being reconciled, blocks the commit. Run `pnpm josh reconcile-templates` (reviewing any tripwire template first), then commit the regenerated copies and updated manifest alongside the source.
+**Options:**
 
-### `josh sync-workflow-pins`
+- `--check` — verify only; exits non-zero on drift. A pre-commit hook runs this when a tracked source or copy template is staged.
 
-Keep the action SHA pins in `templates/workflows/*` in sync with `.github/workflows/*`. The runtime workflows are the single source of truth for pins; the distributed templates intentionally diverge in structure (steps, commands, comment language), so only the `uses:` SHA pins are propagated.
-
-```bash
-pnpm josh sync-workflow-pins           # rewrite template pins to match the runtime workflows
-pnpm josh sync-workflow-pins --check    # verify pins are in sync; non-zero on drift
-```
-
-Dependabot bumps the runtime workflows under `.github/workflows/` only — its `github-actions` ecosystem cannot scan `templates/` — so an action bump always leaves the templates behind. **This is no longer something you have to fix.** Consumer workflows have their pins resolved from `.github/workflows/*` at the moment `josh init` / `josh sync` writes them, so a stale template ref never reaches a consumer and never fails CI. The command remains available for keeping the committed templates tidy; running it is optional housekeeping, not a step in any workflow. The command errors if a single action is pinned to conflicting SHAs across the runtime workflows.
-
-What _is_ still enforced is that every action used by `templates/workflows/*` also appears in `.github/workflows/*` — an action with no runtime counterpart has no canonical pin to resolve from, so its template ref would ship verbatim. See joshuafolkken/kit#747.
-
-### `josh sync-dependabot-pins`
-
-Automate the template-pin refresh over one or more Dependabot action-bump PRs. For each PR number it checks out the PR branch, runs the same sync as `sync-workflow-pins`, and — when pins drifted — commits the template update and pushes it back to the PR branch, then restores the branch you started on.
-
-> **No longer required to unblock a Dependabot PR.** This command existed because template drift used to fail the kit's own CI, making every action bump a manual fix-up. Pins are now resolved when a consumer workflow is written, so a Dependabot PR that touches only `.github/workflows/**` is green on its own. Use this command when you want the committed templates to read as current — not because a PR is stuck. See joshuafolkken/kit#747.
-
-```bash
-pnpm josh sdp 578 641              # sync + push template pins for each Dependabot PR
-pnpm josh sync-dependabot-pins 578
-pnpm josh sdp --dry-run 578 641    # print the plan per PR; no checkout, commit or push
-```
-
-`--dry-run` performs no git side effects (no checkout, commit or push), so it is safe to run against an uncommitted working tree — for example while verifying the command itself before committing. Only template pins under `templates/workflows/` are staged, so unrelated working-tree changes are never committed to a Dependabot PR. As a safety guard the command only commits when the checked-out branch is a `dependabot/…` branch; a mistyped or non-Dependabot PR number is skipped without any commit.
+Tripwire hashes live in `.template-source-manifest.json` (kit-internal, not distributed).
 
 ### `josh latest`
 
@@ -1026,45 +669,19 @@ pnpm josh latest:update     # update dependencies only
 pnpm josh latest:scope      # → required | skip — does this run have to update?  (alias: ls)
 ```
 
-**`josh latest:scope` says whether a run has to update at all**, and the workflow commands ask it instead of updating unconditionally ([#1215](https://github.com/joshuafolkken/kit/issues/1215)). It prints `required` or `skip` on stdout and the reason on stderr, exactly as `josh review:level` and `josh eval:scope` do, so `$(pnpm josh latest:scope)` reads the answer and a person reads the reason. The input is **when `josh latest` last finished in this checkout** and nothing else — a judgement made under time pressure resolves toward "probably still fresh" exactly when a stale dependency matters most, which is why the answer is a command rather than a paragraph. **No record answers `required`**: a fresh checkout, a cleared temp directory, or a chain that fell over halfway all land there, and none of them is evidence that anything is current. The record is written by the `josh latest` chain itself as its last step, so only a chain that completed counts. The window is **12 hours**, moved in either direction by `JOSH_LATEST_MAX_AGE_HOURS` — a value that is not a positive number falls back to the default rather than disabling the update. The record lives in the temp directory keyed to the checkout, so each work tree answers for itself and an epic spanning repositories updates each one on its own schedule. `--record` is the write half used by the chain; it prints nothing on stdout, so a caller capturing the command is never handed a scope by the invocation that only meant to note a run down. **The vulnerability net does not move with the frequency**: `pnpm audit` runs inside `josh latest`, but the `Security Audit` CI job runs on every pull request and is one of the required checks `josh followup` waits on, so nothing merges without a fresh audit whatever this command answered locally.
+`josh latest` never lowers a version: a supply-chain age gate can make the registry report an older release as newest, so `latest:update` rolls the whole tree back rather than writing a silent downgrade. It reports the overrides verdict itself and separately fails the run if `pnpm-lock.yaml` no longer honours an unconditional override.
 
-**`josh latest` never lowers a version.** A supply-chain guard that withholds releases younger than a minimum age (this repo runs `@aikidosec/safe-chain` from `preinstall`) makes the registry report an _older_ release as the newest available. `pnpm update --latest` would then write that older version into `package.json` and `pnpm-lock.yaml` — a silent downgrade attributed to whatever task happened to run the update.
+#### `josh latest:scope`
 
-`latest:update` therefore compares the direct-dependency versions before and after the update. If any of them moved down, it restores both files to exactly what it found and says so:
+Prints `required` or `skip` on stdout (reason on stderr) — whether this checkout must update. Read the answer with `$(pnpm josh latest:scope)`; workflow commands ask it instead of updating unconditionally. No completion record answers `required` (fresh checkout, cleared temp dir, or a half-finished chain). The freshness window is **12 hours**, overridable via `JOSH_LATEST_MAX_AGE_HOURS`. The record is per-checkout, and `--record` is the write half used by the chain (prints nothing on stdout).
 
-```
-⏮ Keeping tsx@^4.23.5 (newest allowed is ^4.23.1) — the newest allowed version is older than the installed one.
-   The update was rolled back and no dependency changed: while a pin sits above the newest
-   allowed version, the whole tree cannot be resolved. Re-run once the newer release is
-   no longer withheld.
-```
+#### `josh latest:corepack`
 
-Three details worth knowing:
+Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`), staying within `devEngines`. It temporarily widens the exact `devEngines` pin so corepack's `devEngines` validation accepts a newer patch, then realigns `devEngines.packageManager.version` byte-for-byte (integrity suffix included) with the `packageManager` pin. If the registry can't answer, the pnpm bump is skipped with a notice and nothing is widened.
 
-- **The whole update is rolled back, not just the offending package.** Excluding it from the update targets would not exclude it from resolution: while an installed version sits above the newest allowed one, that version is unresolvable and `pnpm` fails the entire tree with `ERR_PNPM_NO_MATCHING_VERSION`. The real choice is between a downgrade and no update, and no update is the safer one.
-- **The command still exits `0`.** The tree is left byte-identical to what it found, nothing is broken, and every workflow that runs `josh latest` in its preamble would otherwise stop for a condition that resolves itself.
-- **The condition is transient.** The newer release is normally still published and still tagged `latest`; only the age gate is hiding it. A later run picks the upgrade up with no intervention.
+#### `josh latest:update`
 
-Note what the rollback deliberately does **not** do: the floor that is above the newest allowed version stays in `package.json`, because restoring the tree is the whole point. That pin is fine for this repo — the lockfile still resolves it — but it is unusable for anyone re-resolving against the published package. Catching that is [`josh ranges`](#josh-ranges)' job, not this one.
-
-`latest:update` skips **held-back** and **overridden** packages instead of blindly bumping everything. `typescript` is currently held back at `6.x`: its `7.x` release is the native (Go) port that exposes no `SyntaxKind`, which crashes the type-aware ESLint stack (`typescript-eslint`, `eslint-plugin-sonarjs`, `ts-api-utils`) at rule-load time. The hold-back is removed to fix forward once that stack supports the native API. **Every** package named by an override is also skipped — whether the key carries a version selector (`"some-pkg@>=5": "^4"`) or not (`svelte: ^5.55.7`) — read from **both** the `overrides:` block in `pnpm-workspace.yaml` and `pnpm.overrides` in `package.json`, so an override declared in either place is honoured. Skipped packages are printed as `⏭ Skipping held-back / overridden packages: …`.
-
-An override declares the resolution the project has chosen, so updating that package is never useful and is actively harmful in two ways: past a lower-bound cap the tree stops resolving, and for a bare key `pnpm update --latest` rewrites the `package.json` range and leaves that **raw** range in the lockfile importer instead of the override-applied one. The resolved version is unchanged, but `pnpm install --frozen-lockfile` then rejects the lockfile with `ERR_PNPM_OUTDATED_LOCKFILE` (kit [#744](https://github.com/joshuafolkken/kit/issues/744)).
-
-`latest:update` also reports the overrides verdict itself, so it does not depend on anyone remembering which file to open afterwards: `✔ overrides unchanged (<n> from <file>)` when nothing moved, or `⚠ overrides changed (…)` followed by the added / removed / changed entries.
-
-That verdict covers the overrides **file**; a second check covers the **lockfile**. `latest:update` compares every importer specifier against the overrides that apply unconditionally, and fails the run when one no longer matches:
-
-```
-✖ pnpm-lock.yaml no longer honours the overrides — CI cannot install it:
-  svelte (importer .): lockfile ^5.56.8, override ^5.55.7
-
-  Restore it with: git checkout HEAD -- pnpm-lock.yaml && pnpm install
-```
-
-This exists because no other local gate covers the case. The distributed `pnpm-workspace.yaml` sets `trustLockfile: true`, which makes `pnpm install --frozen-lockfile` pass locally on the very lockfile CI refuses — so lint, `tsc`, cspell, unit and E2E all go green on a tree that cannot be installed. Overrides whose key carries a version selector are not compared: such a key rewrites only the dependents whose declared range matches it, which the lockfile alone does not record.
-
-`latest:corepack` pins pnpm to the newest release on the project's **current major** (derived from `packageManager`), so on the normal path it stays within `devEngines`. The target version is resolved from the registry (`pnpm view pnpm@<major> version`, through safe-chain's age-filtered view) rather than a dist-tag, because pnpm publishes its per-major tag `latest-<major>` only for superseded majors — while the pinned major is the current one, no such tag exists and a tag-based pin would skip on every run. It falls back to `pnpm@latest` only if the major can't be parsed. Because `corepack use` validates the resolved version against `devEngines` **before** writing `packageManager`, an exact `devEngines.packageManager.version` pin (kept exact to avoid the pnpm dual-declaration warning) would otherwise reject any newer patch and block every bump. To avoid that, `latest:corepack` temporarily widens the pin to the bare major before invoking corepack. Since the query runs through the same age-filtered registry view a consumer installs under, a release still inside the minimum-release-age window simply resolves to the previous release; if the registry cannot answer at all, the pnpm bump is skipped with a notice instead of failing — nothing is widened, the pin is left where it is, and `latest:update` and `audit` still run. The same non-fatal skip (with rollback of the temporary widening) applies when corepack itself fails. Whatever the outcome, the run ends by realigning `devEngines.packageManager.version` with the `packageManager` pin so the two stay in exact match (avoiding the pnpm dual-declaration warning). That alignment is **not** conditional on a bump: an up-to-date repository skips the bump on every run, so a manifest that arrived with the two fields out of step would otherwise keep the warning forever (kit#773). It rewrites nothing when they already match, so a run that changes no version still leaves `package.json` untouched. "Exact" means byte-identical, **`+sha512…` Corepack integrity suffix included** — pnpm compares the two fields as raw strings, so a bare `11.18.0` alongside `pnpm@11.18.0+sha512…` still warns. The suffix is semver build metadata, which range checks ignore, so corepack and pnpm both keep resolving the pin as the plain version.
+Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (overrides read from both `pnpm-workspace.yaml` and `package.json`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`.
 
 ---
 
@@ -1080,103 +697,31 @@ Validates commit message format. Installed as a commit-msg hook by `josh init`.
 
 ### `josh secretlint-scan`
 
-Runs [secretlint](https://github.com/secretlint/secretlint) over the paths passed as arguments. Wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`.
+Runs [secretlint](https://github.com/secretlint/secretlint) over the staged paths passed as arguments. Wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`. When secretlint is installed the scan runs and its exit code is forwarded, so a detected secret blocks the commit; when it is not installed the wrapper prints a notice and exits `0`.
 
-It exists because secretlint resolves from the **consumer** project — `josh init` / `josh sync` add it to the consumer devDependencies, since pnpm's isolated `node_modules` never exposes a kit dependency's bin to the consumer's `pnpm exec`. Upgrading kit therefore activates the hook one `josh sync` + `pnpm install` ahead of the binary. A bare `pnpm exec secretlint` turns that window into a hard failure on every commit; this wrapper prints an actionable notice and exits `0` instead:
-
-```text
-⚠️  secretlint is not installed — skipping the staged-file secret scan.
-   The kit pre-commit hook ships ahead of the dependency it needs.
-   Run `pnpm josh sync && pnpm install` to provision it.
-```
-
-When secretlint **is** installed the scan runs as normal and its exit code is forwarded, so a detected secret still blocks the commit. Skipping is safe as a fallback because the scan is defense in depth ahead of GitHub push protection and PR-time scanners, not the only gate.
-
-The wrapper owns the CLI flags: `--no-glob` is always passed, because lefthook substitutes literal paths and a SvelteKit route directory such as `(app)` or `[id]` would otherwise reach secretlint's glob engine as a pattern. Secret masking and the `.gitignore` cascade are both on by default in secretlint v13, so no flag is needed for either.
+**Options:** always passes `--no-glob` so lefthook's literal paths (e.g. SvelteKit `(app)` / `[id]` directories) are not treated as glob patterns.
 
 ### `josh pre-push-unit`
 
-Run the unit suite for the pre-push hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green ([#1334](https://github.com/joshuafolkken/kit/issues/1334)). Wired in by `lefthook/base.yml` as the pre-push `test-unit` command; it replaces the bare `pnpm exec vitest run` that hook used to carry.
+Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green. Wired in by `lefthook/base.yml` as the pre-push `test-unit` command. Reuse requires the gate's file map, base commit and non-empty record to match, plus an empty `git status --porcelain` so the pushed HEAD equals the verified tree; otherwise the whole suite runs. A project with no vitest prints a skip notice; one with vitest but no test file fails.
 
 ```bash
 pnpm josh pre-push-unit                    # alias: josh ppu
 JOSH_PRE_PUSH_FORCE=1 git push             # run the suite even on a tree recorded green
 ```
 
-Measured on [#1326](https://github.com/joshuafolkken/kit/issues/1326): `pnpm josh git -y` took 40 seconds, 15.9 of them this suite — started 40 seconds after `pnpm josh gate` had printed all four checks green on the same tree, with nothing edited in between. The record existed; the hook was the one reader that never looked at it.
-
-**Which pushes that saving reaches is decided by where the last gate ran.** `josh bump` rewrites `package.json` immediately before the commit, so a run whose gate finished _before_ the bump leaves a record that does not cover the pushed tree, and this hook runs the whole suite exactly as it did — the safe direction, and not a regression. The saving lands where a gate ran after the last edit to the tree, which in the workflow's own order (`bump` → `gate` → `josh git -y`) is the common case.
-
-**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply here unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, an advanced default branch, an empty map, a missing record and a red gate (which writes none) each run the whole suite exactly as before. A hook that answered that question differently from the gate beside it would be two commands disagreeing about one tree.
-
-**One condition is added on top, and it only ever narrows.** A commit changes nothing outside the checkout; a push puts code where CI and other people read it, so an unverified commit reaching the remote is the failure this must not have. The gate's record describes the **working tree**, and a push carries **HEAD** — the same thing only while nothing is uncommitted. So the reuse also requires `git status --porcelain` to be empty, untracked files included: commit half of a green tree and the map still matches while the commit being pushed is a tree no check has read. `josh git` commits before it pushes, which is exactly the state that satisfies this; anything else, including a status that could not be read at all, runs the suite.
-
-The output claims the result rather than the omission, because a line reading "unit tests skipped" is indistinguishable from "not verified" while the push it precedes goes on to the remote:
-
-```
-✔ this tree is already green — the unit tests passed on it at 2026-09-04T06:32:02.592Z (`pnpm josh gate`), and this push carries that same tree.
-  Reusing that result; nothing was re-run. `JOSH_PRE_PUSH_FORCE=1 git push` runs them anyway.
-```
-
-The escape hatch is an environment variable rather than the gate's `--force` flag because the hook's command line belongs to `lefthook/base.yml` — nobody types this invocation, so a flag would be unreachable at the moment it is wanted. `pnpm josh audit`, the hook's other command, is untouched: the gate does not run it, so it is not a duplicate of anything.
-
-When the suite does run it goes through the same guard [`josh test:unit`](#josh-testunit) uses, so a project with no vitest or no test files prints a skip notice instead of failing the push.
+**Output:** on reuse, prints that the tree is already green and nothing was re-run.
 
 ### `josh pre-commit-type-check`
 
-Type-check the whole project for the pre-commit hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green ([#1381](https://github.com/joshuafolkken/kit/issues/1381)). Wired in by `lefthook/base.yml` as the pre-commit `type-check` command; it replaces the bare `pnpm exec tsc --noEmit` that hook used to carry.
+Type-checks the whole project for the pre-commit hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green. Wired in by `lefthook/base.yml` as the pre-commit `type-check` command; runs `pnpm exec tsc --noEmit` when it runs. Reuse requires the gate's file map, base commit and non-empty record to match, that every `git status --porcelain` entry be fully staged (so the committed index equals the verified tree), and that the gate's type-check step be `tsc --noEmit` (projects using a `josh-app` / `josh-game` `check:ci` shim always run the full check). Nothing is forwarded to `tsc`; an argument other than `--force` is refused.
 
 ```bash
 pnpm josh pre-commit-type-check             # alias: josh ptc
 JOSH_PRE_COMMIT_FORCE=1 git commit          # type-check even on a tree recorded green
 ```
 
-Measured in kit: `pnpm exec tsc --noEmit` over the whole project takes 3.8–4.4s warm, and every commit paid it seconds after the gate had printed the same project-wide type check green on the same tree — twice per `fullrun`, which commits twice.
-
-**It is the one project-wide check the pre-commit hook had left.** The hook runs its commands in parallel, so its wall time is the longest of them: the staged-file `cspell`, `prettier` and `eslint` commands cost 0.3–1.0s each and are a **narrower scope** than the gate's project-wide run, so they are untouched — skipping them would buy about half a second in exchange for trading a narrow reading for a recorded wide one. `prevent-main-commit` and `secretlint` are untouched for a different reason: the gate does not run either, so neither is a duplicate of anything.
-
-**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, an advanced default branch, an empty map, a missing record and a red gate (which writes none) each run the whole project type check exactly as before.
-
-**Two conditions are added on top, and both only ever narrow.**
-
-- **The commit has to carry the recorded tree.** The record describes the **working tree**; a commit carries the **index**. Stage half of a green tree and the map still matches while the commit being made is a tree no check has read. So the reuse also requires every `git status --porcelain` entry to be staged in full — an unstaged edit (` M`), a partially staged file (`MM`) and an untracked file (`??`) each send the hook back to the full check, as does a status that could not be read at all. `pnpm josh git` stages before it commits, which is exactly the state that satisfies this.
-- **The gate's type check has to be this type check.** The record says the four checks were green; it does not say _which_ type check ran, and [that step is resolved per project](#josh-gate) ([#934](https://github.com/joshuafolkken/kit/issues/934)) — a project carrying a `josh-app` or `josh-game` shim has the toolkit's `check:ci` as its gate step, where this hook's is `tsc --noEmit`. Reusing across that difference would skip `tsc --noEmit` on the strength of a different check, so on such a project the hook runs the whole type check exactly as it always did. The saving therefore lands on kit and on plain TypeScript projects, whose gate step _is_ `pnpm josh check`.
-
-**The set of checks is unchanged.** When it runs, it runs the same `pnpm exec tsc --noEmit` the hook always ran; what changes is only whether an already-passed check is executed again on an unchanged tree. **Nothing is forwarded to `tsc`**, and an argument other than `--force` is refused rather than dropped: `tsc --noEmit <file>` ignores `tsconfig.json`, so forwarding a path would silently narrow the very check this command exists to run in full.
-
-The output claims the result rather than the omission, because a line reading "type check skipped" is indistinguishable from "not verified" while the commit it precedes goes ahead on the strength of it:
-
-```
-✔ this tree is already green — the type check passed on it at 2026-09-06T02:41:17.104Z (`pnpm josh gate`), and this commit carries that same tree.
-  Reusing that result; nothing was re-run. `JOSH_PRE_COMMIT_FORCE=1 git commit` runs it anyway.
-```
-
-That sentence is built in one place for all three readers — the gate's own skip, this hook and [`josh pre-push-unit`](#josh-pre-push-unit) — so a claim this load-bearing cannot drift into three different claims.
-
-### `josh hook:install`
-
-Install git hooks via lefthook.
-
-```bash
-pnpm josh hook:install
-```
-
-### `josh hook:uninstall`
-
-Uninstall git hooks.
-
-```bash
-pnpm josh hook:uninstall
-```
-
-### `josh hook:commit` / `josh hook:push`
-
-Run pre-commit or pre-push hooks manually (useful for debugging).
-
-```bash
-pnpm josh hook:commit
-pnpm josh hook:push
-```
+**Output:** on reuse, prints that the tree is already green and nothing was re-run.
 
 ---
 
@@ -1184,119 +729,78 @@ pnpm josh hook:push
 
 Helpers for AI-assisted development workflows.
 
-### `josh prep`
+### `josh issue:read`
 
-Pre-implementation preparation: reads context and primes the AI for a task.
-
-```bash
-pnpm josh prep
-```
-
-### `josh issue`
-
-Fetch GitHub issue details for use in an AI-assisted workflow.
+Print each issue's title, state, body and every comment in one call, replacing separate `gh api` body and comments reads.
 
 ```bash
-pnpm josh issue 42
+pnpm josh issue:read 1715                    # alias: josh ird
+pnpm josh issue:read 1715 1567 1605          # several numbers, read concurrently
 ```
+
+Attribute each block by its `issue:` line, never by position. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any number went unanswered. Any non-numeric token refuses the whole call.
 
 ### `josh issue:state`
 
-Print each issue's state, labels, and whether it is one a run must stop on — in the spelling the workflow documents compare against.
+Print each issue's state, labels and whether a run must stop on it, in the spelling the workflow documents compare against.
 
 ```bash
-pnpm josh issue:state 42
-pnpm josh issue:state 42 43 44
-pnpm josh issue:state 42 43 --repo joshuafolkken/app-kit
+pnpm josh issue:state 42                                   # single-number shape
+pnpm josh issue:state 42 43 44                             # each block headed by `issue:`
+pnpm josh issue:state 42 43 --repo joshuafolkken/app-kit   # a child in another repo
 ```
 
-```
-state: CLOSED
-labels: in-progress
-human_review: no
-```
+**Options:**
 
-Several numbers are read in one process, concurrently and under the same bound `epic:bundle`'s reference lookup uses, and each block names the number it belongs to ([#1302](https://github.com/joshuafolkken/kit/issues/1302)):
+- `--repo <owner/repo>` — read a child in another repository; applies to every number.
 
-```
-issue: 42
-state: CLOSED
-labels: in-progress
-human_review: no
-
-issue: 43
-state: OPEN
-labels: (none)
-human_review: no
-```
-
-It replaces the two reads the workflow documents used to prescribe — `gh issue view <N> --json state --jq .state` and `gh issue view <N> --json state,labels --jq …` — with one call that answers both. Those go through GraphQL, which a cloud session is answered 403 for, and that read is `epic-child`'s verifier: the whole reason a child of an epic may be delegated is that the parent re-reads the child's state from GitHub rather than trusting the unit's summary ([#1054](https://github.com/joshuafolkken/kit/issues/1054)).
-
-The state is printed as `OPEN` / `CLOSED` / `MERGED`, not as REST's lower-case `open` / `closed`. That mapping is [#1024](https://github.com/joshuafolkken/kit/issues/1024)'s, single-sourced in `scripts/git/git-gh-rest-state.ts` — which is the reason this is a command rather than a `gh api` line written into the documents, where the casing rule would have had to be restated.
-
-- **`human_review:` answers whether the issue carries [`needs-human-review`](#needs-human-review--the-opposite-label)** ([#1132](https://github.com/joshuafolkken/kit/issues/1132)) — a run reads that line rather than matching the label string itself. GitHub keeps the spelling a label was created with, so an issue whose label reads `Needs-Human-Review` is the same label and an eye comparing against the lowercase string misses it; the run then does not stop and the artifact ships, which is the one thing that label exists to prevent. The line is decided through `has_any_label`, the case-insensitive comparison every other workflow label already reaches its decision through. **A run asks once, before implementing** — `epic:next` prints a bare issue number and `fullrun` / `queue` are handed one, so nothing has read the labels by the time work would start, and the check is a call of its own made the moment the number is in hand. The confirmation an `epicrun` makes _after_ a delegated child returns reads the same line for free, but that is too late to decide whether to degrade.
-- `--repo <owner/repo>` reads a child in another repository, which a cross-repository epic needs. Its state is a GitHub fact, so no checkout there is required. It applies to every number of the call.
-- **A single number's report is unchanged, deliberately.** `.claude/skills/workflow-commands/SKILL.md` §2z and `.claude/skills/diag/SKILL.md` read those three lines verbatim, and §2z's `needs-human-review` stop is decided from them — so the `issue:` heading appears only when several numbers were passed ([#1302](https://github.com/joshuafolkken/kit/issues/1302)).
-- **Attribute a block by its `issue:` line, never by position.** A number that produced no state prints no block, so counting blocks off against the numbers passed misreads every one after the gap — and a `diag` table mixes closed issues with numbers quoted from prose that resolve to nothing.
-- **A token that is not a bare number refuses the whole call**, printing the usage. `#1262` copied out of a table is that token, and dropping it would answer fewer numbers than were asked for and still exit zero — with one number left, in the single-number shape, so nothing in the output would say a number went unanswered. A number repeated in one call is read once.
-- **An unrecognized flag refuses the call too, rather than being dropped for looking like one** ([#1355](https://github.com/joshuafolkken/kit/issues/1355)). `--rep=owner/repo` used to be discarded before the check above ever saw it, so the call fell back to the session's repository and printed a confident state for a _different_ repository's issue of that number — the same misread a `--repo` with nothing after it is refused for. Only the positions `--repo` itself occupied are consumed, so a second flag or a repeated value is a token nobody read, and it is refused rather than removed.
-- **A non-zero exit is never a state.** A number that resolves to nothing prints `does not resolve`; a read that failed — a rate limit, expired auth, a dropped connection — prints `could not read` and says explicitly that this is not "the issue is open". `gh issue view` exited non-zero with an empty stdout for both, and a loop reading that as "not CLOSED" reports a child as failed because nobody could reach GitHub. **One such number never costs the others their answer**: the states that were read are still printed, each failure names its own number on stderr, and the exit is non-zero because at least one number went unanswered.
+State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue carries `needs-human-review`, matched case-insensitively. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any went unanswered.
 
 ### `josh issue:scout`
 
-Before an issue is filed, answer the two questions every `new` entry point asks first: has this already been filed, and which epic does it belong to ([#1252](https://github.com/joshuafolkken/kit/issues/1252)).
+Before an issue is filed, answer the two questions every filing asks: has this already been filed, and which epic does it belong to.
 
 ```bash
-pnpm josh issue:scout "Stop the gate re-running after every edit"                      # alias: josh isc
+pnpm josh issue:scout "Stop the gate re-running after every edit"   # alias: josh isc
 pnpm josh issue:scout "<title>" --body "follows on from #1246"
 ```
 
-```
-Duplicates: 1 candidate(s) — read these before filing.
-  #1249  0.71  Report a distributed document's remaining resident budget at edit time, not at the gate (epic #1153)
-Epic: Add it to the epic that already tracks a related issue (Tier A — do it).
-  Target epic: #1153
-  Related: #1246
+**Options:**
+
+- `--body "<text>"` — supply prose references (`#N`) so the epic half has a number to work from; without one it prints `Epic: not asked`.
+
+The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
+
+### `josh stash:pop`
+
+Pop the stash whose message matches, and no other. The stash is a repository-wide stack every work tree shares, so a bare `git stash pop` — or a positional `stash@{n}` read before another lane pushed — takes whichever entry now sits on top; that is how one lane's parked work reached another's tree (joshuafolkken/kit#2050). This resolves the selector from the message immediately before the pop, targeting the entry itself rather than a position that moves.
+
+```bash
+pnpm josh stash:pop "backlogrun: parked #2028"                 # alias: josh sp
+pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # into a lane's work tree
 ```
 
-Both answers were assembled by hand before this existed, and differently every time. A measured `fullrun new` spent **7 minutes 32 seconds — 22% of the run** listing open epics, fetching each one's children, reading a body and running six duplicate searches before implementation began; the session that measured it then filed work two open issues already covered, one of them filed **three minutes earlier by another session**. The same two answers now take about four seconds.
+**Options:** `--dir <path>` applies the pop in that work tree (`git -C <path>`); without it the pop lands in the current checkout. The stack is shared, so it reads the same either way.
 
-- **The duplicate half compares titles**, as a token overlap: the words each title uses, without the ones every title carries. Two issues about one job are written weeks apart by different sessions and share vocabulary rather than word order — which is what rules out whole-string edit distance and the maintained packages built on it. Bodies are not compared: they are written in the session language, and a token overlap over Japanese prose measures nothing.
-- **The whole open listing is scored, with no prefix and no early exit.** The issue this search exists to catch is the one another session filed minutes ago, and where that one sits in the listing is the single thing nobody controls.
-- **A weak match is not reported.** A candidate has to share at least two significant words _and_ clear a similarity of `0.35`; below that the answer is `none`, because a list nobody trusts is read once and skipped afterwards — the failure this command exists to end rather than reproduce. At most five are shown, and the headline says `N of M` when more cleared the bar than fit — a cap that reported the shown count as the found count would state a truncation as a complete answer.
-- **An epic is never a duplicate candidate**, and the epic tracking one _is_ printed beside it. A container reported as "already filed as #E" sends the caller to run an epic that has no implementation of its own; the epic beside a candidate is the other thing being asked — where similar work already lives.
-- **The epic half needs a number to work from, and says so when it has none.** Its signals are prose references and recorded dependencies, so a title-only draft gives it nothing to decide from and it prints `Epic: not asked` rather than "file it standalone" — a scan reported as empty where none was possible is the confident wrong answer every other gap line here exists to prevent. Pass `--body "…#<N>…"` when the work follows an existing issue; otherwise the epic printed beside a duplicate is the placement answer.
-- **A summary that names an epic outright is answered with that epic.** `epic:bundle` excludes an epic from its candidate pool — a container is not a sibling — so `--body "part of epic #1153"` reaches `none` on its own and would be told to file standalone with the epic it named never mentioned. A person naming the epic is the strongest signal there is, the same thing `into <target>` means, so it is reported ahead of whatever the candidate search concluded.
-- **The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, called rather than restated** — the same strong signals, and the same branches — all of which are Tier A since [#1339](https://github.com/joshuafolkken/kit/issues/1339). Only two things differ, and both follow from the subject not existing yet: `none` prints "file it standalone" rather than "an epic already tracks it", which a draft cannot be, and the `blocked-by` relations are not read at all. A draft has no number, so no recorded dependency can name it and it declares none of its own — the reads cannot change either half of the answer, and skipping them takes one request per open issue off the command a run makes before every filing.
-- **A reference the open listing cannot show is still read**, exactly as `epic:bundle` reads it ([#947](https://github.com/joshuafolkken/kit/issues/947)): a draft's summary naming a parent that merged minutes ago is the ordinary case, not the exception.
-- **It does not replace `epic:bundle`, which still runs after the filing.** This one answers about an issue that does not exist yet, from a title; that one answers about an issue that does, from its number and its recorded relations. A run makes both calls.
-- The listing's own cuts are reported the same way, so `none` is never quietly an assertion about data that never arrived.
+**Verdicts:** `popped` and `conflicted` (exit 0), `no-match` and `ambiguous` (exit 1). A pop that applies but leaves conflicts is `conflicted` — the stash is on the tree, resolve the conflicts and continue. A message matching no stash, or more than one, is refused rather than guessed at — pass a message that identifies exactly one entry.
 
 ### `josh epic`
 
-Create the epic issue that tracks a batch of child issues from one split, from the child issue numbers.
+Create the epic issue that tracks a batch of child issues from one split. Satisfies all four mechanical requirements (`epic` label, task-list child rows, machine-readable `Dependencies`, an `Execution` run command) by construction.
 
 ```bash
 pnpm josh epic "Epic: split the parser work" 101 102 103
 pnpm josh epic "Epic: staged rollout" 101 102 --ordered
 pnpm josh epic "Epic: ..." 101 102 --rationale-file rationale.md
-git log -1 --format=%B | pnpm josh epic "Epic: ..." 101 102 --rationale-file -
 ```
 
-An epic has four mechanical requirements, three of which fail **silently** when they are got wrong — the epic simply never auto-closes, or an unrecorded batch order is never reported. This command satisfies all four by construction:
+**Options:**
 
-| Requirement           | How the command satisfies it                                                        |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `epic` label          | ensures the label exists, then creates the issue with it                            |
-| task-list child rows  | renders children as `- [ ] #N`, the only syntax the auto-close reads                |
-| `Dependencies` form   | the arrow chain with `--ordered`, otherwise the literal `None — the children are …` |
-| children-only `queue` | prints the `queue` command from the children; the epic is never included            |
+- `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
+- `--rationale-file <path|->` — split rationale prose (`-` reads stdin).
+- `--origin <owner/repo#N>` — backlink when the split originated in another repository.
 
-- `--ordered` declares that **the argument order is the dependency order**. The command then writes the arrow chain _and_ records the matching `blocked-by` relation down the same chain, so the declared order and the native relations come from one input and cannot disagree. The relation goes through the REST dependencies endpoint (`gh api`), so it does not depend on the `gh` CLI's version ([#1026](https://github.com/joshuafolkken/kit/issues/1026)). That endpoint names the blocker by its **database id** rather than its issue number, and does not check that the id belongs to this repository — so the command resolves the id from the number before writing, and a resolution that fails is a failed relation rather than a relation pointing somewhere else. It is applied **after** the issues exist rather than as part of creating them, which is what keeps a failure costing only the relation: the count is reported and the run still succeeds, because the epic and its task list are already correct.
-- `--rationale-file <path>` supplies the split rationale prose; `-` reads stdin, matching the `--input -` the REST writes use. Omitting it leaves a visible placeholder rather than a blank section.
-- `--origin <owner/repo#N>` adds the backlink used when the split itself originated in another repository. It is written as prose — a checkbox row referencing another repository disables the auto-close by design.
-
-The manual `gh` procedure remains documented in `prompts/collaboration-workflow/issue-template.md` as the fallback for environments where `josh` is unavailable.
+The `Execution` section prints `backlogrun #<E> --only`. A `blocked-by` write that fails is reported as a count while the epic and task list stay correct.
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
@@ -1304,15 +808,7 @@ The manual `gh` procedure remains documented in `prompts/collaboration-workflow/
 pnpm josh epic --promote 858 101 102 103 [--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]
 ```
 
-The discussion that concludes "this is really three issues" almost always happens _inside_ an existing issue, and that discussion is usually the split rationale itself. Creating a separate epic leaves two issues tracking one topic, so `--promote` **appends** the epic's sections to the issue instead of replacing its body ([#865](https://github.com/joshuafolkken/kit/issues/865)).
-
-Everything else matches `josh epic`: the `epic` label is ensured and applied, the children are rendered as task-list rows, `Dependencies` is written in the machine-readable form, and `--ordered` records the whole `blocked-by` chain. A promoted issue therefore passes `pnpm josh epic:check <N>` exactly as a created one does. `--rationale-file` and `--origin` mean the same thing they do on a creation.
-
-**Re-running it is refused, not repeated.** A second append would leave two task lists in one body, and the auto-close would read whichever it matched first. The check is on the body rather than the label alone, since a label can be applied by hand without the sections.
-
-Promote when the issue is a request, a discussion or a container. When the issue is itself one of the deliverables — a bug report that turns out to need three separate fixes — keep it as a child and create a new epic instead; promoting the report would leave the report with nowhere to live.
-
-**The `Execution` section now prints `epicrun #<E>`**, for both creation and promotion. `epicrun` takes the epic rather than a list of children: it re-reads the state from GitHub each round, so an interrupted run resumes without anyone retyping the remaining numbers, and a child that needs a decision is parked rather than ending the run ([#861](https://github.com/joshuafolkken/kit/issues/861)). Epics created before this change still say `queue …` in that section and are unaffected — nothing reads it, the auto-close reads the task list and `epic:check` never looks at it.
+Appends the epic's sections to the existing issue instead of replacing its body, so discussion and epic stay on one issue. Otherwise matches `josh epic`. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
 
 #### `josh epic --add` — insert children into an existing epic
 
@@ -1323,385 +819,198 @@ pnpm josh epic --add 893 894 --after 890      # #894 starts once #890 is done
 pnpm josh epic --add 893 894 --decision-file why.md   # …and record why, in one call
 ```
 
-Discovering mid-run that something else has to happen first used to have no tool behind it. The procedure said "add it to the epic's task list and record the dependency", but an epic's dependencies live in **three places at once** — and editing the body by hand updates one of them:
+Writes all three places an epic's order lives — the task list, the `## Dependencies` arrow declaration, and the native `blocked-by` relations — from one input, so they cannot disagree.
 
-| Where it lives                          | What reads it                                     |
-| --------------------------------------- | ------------------------------------------------- |
-| the `- [ ] #N` task list                | the epic auto-close                               |
-| the `## Dependencies` arrow declaration | [`josh epic:next`](#josh-epicnext)                |
-| the native `blocked-by` relations       | `epic:next` again, as the authority for execution |
+**Options:**
 
-A body edited on its own leaves the declaration and the relations disagreeing, `epic:next` reports `declaration_mismatch`, and its verdict is `error` — which is `epicrun`'s stopping condition 3. So the one command that was supposed to keep an unattended run going stopped it instead ([#890](https://github.com/joshuafolkken/kit/issues/890)). `--add` writes all three from one input.
+- `--before <M>` — insert before `#M`, re-pointing what `#M` was waiting on so the chain is never broken.
+- `--after <M>` — start after `#M`; branches when `#M` already has a successor, extends when it is a tail.
+- `--order-before <M>` / `--order-after <M>` — move the task-list row only; write no `blocked-by` relation.
+- `--decision-file <path|->` — record why the child was placed.
+- `--remove <E> <M> <N> [<N2> …]` — delete a declared order from the body and the relations; each consecutive pair is one link.
 
-- **`--before <M>` re-points what `#M` was waiting on.** Inserting `#894` before `#891` in `#890 -> #891 -> #892` drops `#890 -> #891` and records `#890 -> #894` and `#894 -> #891`, so the chain is never left broken. The relations come from diffing the declaration before against the declaration after, which is why the re-pointing needs no special case.
-- **No position declares no order at all.** The child is added to the task list, and every chain in `## Dependencies` is left exactly as it stood — no chain is extended, no chain is created, and no `blocked-by` is recorded for the new child. That holds whether the epic declares no chain, one, or several. Until [#1253](https://github.com/joshuafolkken/kit/issues/1253) the additions were appended to the **last declared chain**, which read out of "appends to the end" as readily as the task list did: an unrelated child added to an epic that mixes ordered and unordered children — the normal state, per [#949](https://github.com/joshuafolkken/kit/issues/949) — came out blocked by whatever issue happened to sit at that chain's tail, so `epic:next` withheld it as blocked with neither a park nor a `needs-decision` label to show that it was stuck. An order is recorded **only** where `--before` or `--after` names one. Giving a position to an unordered epic starts a chain naming just those two issues; the other children stay unordered, which is what the absence of a chain has always meant.
-- **"Left exactly as it stood" is the section's text, not just its links.** A declaration the insertion computes unchanged is not re-rendered at all, because the rewrite collects every chain line at the first one's index — which would file each chain's rationale line under whichever chain ended up above it, in exchange for a body that was going to be identical. A positioned insertion still re-renders, since it has a new order to write.
-- **An order for that child is declared later by naming a position, which needs a child the epic does not track yet.** `--add` refuses an insertion whose children are all tracked already, so ordering two children the epic has is [#1162](https://github.com/joshuafolkken/kit/issues/1162)'s scope rather than this command's — the same boundary `--decision-file` runs into below.
-- **`#M` does not have to be in the declared order.** An epic that mixes ordered and unordered children leaves a child out of every chain legitimately, and a position against such a child adds a **new** chain line beside the existing ones rather than being refused ([#949](https://github.com/joshuafolkken/kit/issues/949)). The chains already declared are left exactly as they were. Before this, the refusal left a prerequisite discovered against an unordered child with nowhere to be recorded, and the documented next step — hand-editing the body — is the one thing this command exists to avoid.
-- **`#M` must be a child of the epic**, or nothing is written and the command exits non-zero. That is now the only reason a position is refused.
-- **Nothing is written unless all three places will agree.** The rewritten body is parsed back before it is sent, and a round trip that does not reproduce the computed order is reported instead of written. The same holds when the epic **already** records a relation its body never declares: that is reconciled by a person, not guessed at.
-- **A declaration the command cannot position within is refused, not rewritten.** `#M` named by two separate chain lines does not identify one place, and a declaration naming the same issue twice is already claiming that issue blocks itself.
-- **A declared link that was never recorded is repaired rather than refused.** A body can legitimately run ahead of the relations — an epic written before `josh` recorded them, or one whose recording failed — so `--add` records the missing ones along with its own. A failure is reported as a count while the body stays correct — the same treatment `--ordered` gives it.
-
-**`--decision-file <path|->` records why the child was placed here, in the same call** ([#1350](https://github.com/joshuafolkken/kit/issues/1350)). An auto-decided placement has to be written in **two** places — the epic's `## Decisions` and a comment on each child — and until now no command wrote the epic half, so a run read the body, edited it and `PATCH`ed it back: the hand edit this command exists to avoid. Measured on runs #1333 and #1349, that detour is where the post-merge bookkeeping spent its round trips, and the two most recent placements skipped the epic half entirely rather than pay for it.
-
-- **The epic half costs no round trip.** The record is folded into the body edit the insertion already makes, so a `--decision-file` insertion is the same one request. The child half is one comment per addition, applied concurrently and **counted rather than thrown**: the insertion has landed by then, so a refused comment is reported as `⚠️ N of M child comment(s) could not be posted` while `📝 Decision recorded on the epic and N child issue(s).` is the clean answer.
-- **The record's text is the caller's**, exactly as `--rationale-file`'s is: which epic was taken, which was rejected, why and the date is a judgement. What the command contributes is the placement — appended at the **end** of the `## Decisions` section, which is a log read downwards — and the section is created at the end of the body when the epic has none.
-- **The section ends at the next heading of the same or a higher level**, not at any heading: `## Decisions` is written as one `###` entry per decision, so a `##` section that stopped at the first `###` would place every later record outside it. **The same rule now scopes the `Dependencies` rewrite**, which used to stop at a heading of any level — so a declaration line beneath a `###` subheading inside `## Dependencies` is read as part of that section rather than as a stray line outside it. That is the reading a person already gives the body; nothing else about the rewrite changed.
-- **Three inputs are refused before anything is written**: a record that says nothing, a record carrying a line that is _nothing but_ a dependency chain, and the flag given without a usable path (last on the line, followed by another flag, or repeated). The chain refusal is the load-bearing one — a bare `#890 -> #894` line is read as part of the declaration wherever it sits in the body, so such a record would add a dependency nobody declared; quote the order inside backticks, or fence it, and the same sentence is accepted. **It names the line number rather than quoting the line**: the record is a file the caller handed over, and echoing a line of it into stderr would put arbitrary file content in the console. The missing-path refusal matters because the flag is passed precisely when the record has to exist: read as "none was asked for", a shell that ate the path would land the insertion, write no record and exit 0 — success reported for half the job.
-- **It records a decision about a child being _inserted_.** An insertion whose children are all tracked already is refused (`Every issue given is already tracked by this epic`), so a decision about an existing child — `epic:plan` phase 2's usual case — is not what this flag serves; [#1162](https://github.com/joshuafolkken/kit/issues/1162) is the entry point for already-tracked children that would.
-- **A cross-repository refusal names the flag rather than relaying it.** The suggested command runs in another checkout, where a relative path does not exist and `-` cannot be re-read from a consumed stdin, so the refusal asks for `--decision-file` again with a path that checkout can read.
-- **Leaving the flag off writes no record and posts no comment.** The insertion itself is what it always was.
-
-**A target that is not an epic is refused with both ways out named.** The message reads `#N does not carry the epic label, so it is not an epic.`, followed by the two remedies: promote it with `josh epic --promote <N> <N...>` when it is a request, a discussion or a container, or create a new epic over both when it is itself one of the deliverables. The command never promotes on its own — promotion rewrites the target into a container, and which arm applies depends on what the target is. Naming both is what keeps the refusal one command away from actionable, which is what the `into <target>` suffix needs of it ([#985](https://github.com/joshuafolkken/kit/issues/985)).
-
-**A cross-repository target is refused with the command to run instead**, not with the usage line. `pnpm josh epic --add joshuafolkken/kit#909 985 --after 970` in the wrong checkout answers with `pnpm josh epic --add 909 985 --after 970` and points at `pnpm josh doctor` for where that checkout is — the children and the positioning flag are carried over from the parsed invocation, so nothing the person typed is silently dropped. `owner/repo#N` is a legal thing to type after `into`, and the answer is a different checkout rather than a different spelling; the usage line would have read as "that form does not exist". **An invocation that is also wrong in some other way still gets the usage line**: the suggestion is only offered when replacing the target with its bare number would parse, so a mistyped positioning flag falls through to the usage line rather than being folded into a suggested command as an extra child. A reference that names **this** repository is not a refusal at all — it is the same insertion written longer, and the command performs it.
-
-**The prose execution block in an epic body is out of scope.** Some epics carry a hand-written list of `epicrun` lines for a person to type in order — a _fourth_ place the order appears, and the only one `--add` does not touch. It has no defined syntax to parse, and [#900](https://github.com/joshuafolkken/kit/issues/900) removes the need for such a block entirely by making a meta epic runnable, at which point `epicrun #<E>` on one line replaces it. Until then, an epic that carries one needs that block updated by hand after an insertion: the declaration and the relations will agree, so `epic:next` reports nothing, and a person typing the old list is the only thing that notices.
+Nothing is written unless all three places will agree. `#M` must be a child of the epic; a position naming an issue being placed, or a hub the declaration cannot position within, is refused without writing. A cross-repository target is refused with the bare-number command to run instead.
 
 ### `josh epic:next`
 
-List an epic's runnable children, bundled per repository ([#860](https://github.com/joshuafolkken/kit/issues/860)).
+List an epic's runnable children, bundled per repository. All state lives on GitHub, so asking again after any interruption gives the same answer.
 
 ```bash
 pnpm josh epic:next 858                            # alias: josh en
 pnpm josh epic:next 858 --repo joshuafolkken/kit   # just the next child for one repository
+pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free lane there
 ```
 
-Running an epic's children today means handing `queue` a list a person ordered by hand. When a run is interrupted, "where did we get to" is answered by a person reading the issue list again — which is why it cannot be the base of an unattended run. `epic:next` answers it mechanically, and **all of the state lives on GitHub**: there is no local state file, so asking again after any interruption gives the same answer.
+**Options:**
 
-**Every runnable child is returned, not one.** The children are bundled by repository so a caller can run one per repository at the same time. Returning a single candidate would close off cross-repository parallelism in the design itself, making the command slower than the person opening several editors it is meant to replace.
+- `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
+- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6.
 
-```text
-Runnable children (one per repository may run at a time):
-  joshuafolkken/kit
-    #861
-    #870
-  Waiting on time:
-    #862
-```
-
-Each bundle names the local checkout a runner would work in, from the [repository map](#the-discovered-repository-map). A repository with no checkout here is reported as `(no local checkout)` rather than cloned.
-
-Every open child appears exactly once in the report, so nothing is silently dropped. A child that could not be read is **not** dropped either — it stops the command. Dropping it is wrong in both directions: an epic whose children all failed to read would look like an epic with no open children, and one missing child leaves whatever it blocks looking unblocked.
-
-**An epic in another repository is referenced as `owner/repo#N`** — `pnpm josh epic:next joshuafolkken/kit#858 --repo joshuafolkken/app-kit`. A bare `#N` resolves to _this_ repository's issue of that number, a different issue entirely, so the qualification is required rather than optional ([#864](https://github.com/joshuafolkken/kit/issues/864)). Children in other repositories are written in the epic's task list as `owner/repo#N` or a full issue URL, and their state is read against that repository through `gh api` — no clone is needed to learn it.
-
-**A `blocked-by` relation that crosses a repository is read as one** ([#1126](https://github.com/joshuafolkken/kit/issues/1126)). REST records and returns such a relation, but the read used to keep only the issue number — and a number alone cannot say which repository it names, since issue numbers are unique per repository. Every blocker was therefore resolved against the **blocked child's own** repository, where it named a different issue or none at all; the graph then dropped it, and the child ran as though nothing blocked it. It also made the publish check below unreachable: every blocker arrived carrying the blocked child's repository, so "same repository" always held and the closed blocker was called resolved without the registry ever being consulted. Relations now carry the repository REST names in `repository_url`, and a relation with none falls back to the repository the issue itself was read in — which is what an unqualified relation has always meant.
-
-`epic:audit` asks a pair of children in two different repositories the same order question as any other pair, which it could not do before ([#1128](https://github.com/joshuafolkken/kit/issues/1128) lifted the exemption that stood while such an order could not be recorded at all). **The finding is a warning rather than an error**: an error fails the audit `epicrun` runs before its first child, so every epic written before this capability existed would stop at step one — [#1010](https://github.com/joshuafolkken/kit/issues/1010) is what that looks like. A pair inside one repository is unchanged and still an error.
-
-**A warning does not make that pair safe, and it is worth being plain about this.** The finding fires exactly when nothing orders the two, so there is no relation for `epic:next` to read and the child is still offered as runnable — it can start before the work it cites. What the change buys is that this used to be silent and is now said. Making it safe would mean stopping, which is what the decision declined for epics that predate the capability. Clearing a warning means recording the relation, and [`josh epic --add`](#josh-epic) cannot write a cross-repository one yet ([#1138](https://github.com/joshuafolkken/kit/issues/1138)) — until it can, that is a `dependencies/blocked_by` request by hand.
-
-**A dependency that crosses a repository is not satisfied when the blocking issue closes.** Merging kit's issue does not publish kit: the merge, the auto-tag and the publish run one after another. A consumer child told it may start at that moment installs the previous release, or fails outright — which surfaces as "it breaks sometimes", the hardest kind to diagnose. Such a dependency resolves only when the blocker is closed **and** the version its default branch declares has appeared in the registry, and the evaluation is an AND **in that order**: while the blocker is still open the registry is never consulted, so a run never sits waiting on a publish from the moment it starts. The target is that exact version, never "something newer" — a consumer several releases behind would otherwise be satisfied by a publish that predates the change. The publish check is [`josh propagate`](#josh-propagate)'s own, shared rather than restated.
-
-**A repository that publishes no package is not something to wait for** ([#1129](https://github.com/joshuafolkken/kit/issues/1129)). The publish check above answers "not yet" forever for a package that will never appear, so a closed blocker in a website repository — anything that ships no npm package — waited until the run's own eight-hour timeout with nothing an operator could edit to clear it. That state only became reachable with [#1126](https://github.com/joshuafolkken/kit/issues/1126).
-
-The answer is read from the **blocker repository's own manifest**, not from the registry: no `package.json` on its default branch, or one declaring `private` that is not a workspace root, means it ships nothing and a closed blocker there is resolved. **A private workspace root is excluded** ([#1134](https://github.com/joshuafolkken/kit/issues/1134)) — such a root is private by convention while the packages under it publish, so reading one as shipping nothing would start a dependent before its blocker's release existed. Only whether the repository _is_ a workspace is asked; the members are not enumerated, so a workspace whose members are all private waits when it need not. **A workspace is what declares members**, not what has a `pnpm-workspace.yaml` — `josh sync` distributes that file to every consumer whatever its layout, carrying `overrides` and the like, so its presence alone would read every private project as a workspace. A workspace file nobody could read leaves the layout unknown and the dependency waiting. That is the safe direction, because waiting ends at the run's own timeout and resolving early does not end at all. Deliberately not the registry, which answers 404 both for a package that was never published _and_ for one this token may not see — a renamed repository, a private package, a missing `read:packages` scope — so resolving on a registry 404 would start a consumer child before its blocker's release existed. A manifest 404 carries no such ambiguity: the repository's issues are already being read, so access is established and what is missing is the file. A read that merely failed is told apart by HTTP status rather than by `gh`'s error text, and keeps the dependency waiting.
-
-With `--repo`, standard output carries exactly one token — the issue number when there is a child to run, otherwise the verdict (`wait`, `stop` or `complete`) — so `answer=$(josh epic:next 858 --repo joshuafolkken/kit)` captures something a loop can branch on. Every explanation goes to standard error. `run` never appears there: it would mean another repository has work, which for this session is something to wait on, so it is reported as `wait`.
-
-**One child per repository, whichever epic it belongs to.** Before `--repo` hands back a number, the repository is asked whether anything is already running in it: if **any** open issue there carries `in-progress` and is not parked, the answer is `wait` and the holders are named on standard error ([#925](https://github.com/joshuafolkken/kit/issues/925)). A parked issue is excluded because `needs-decision` outranks `in-progress` in the classification too, and a run that had just set a child aside would otherwise be held back by it. The contended resource is one working tree, one `main` and one `package.json` that `josh bump` rewrites, and none of them cares which epic a child belongs to — while the classification sorts only the children the epic tracks, so a second `epicrun` in the same checkout used to answer "nothing of mine is in progress" and both ran.
-
-The check is made **only when there is a candidate to offer**: consulted on `stop` or `complete` as well, an unrelated `in-progress` issue would turn a finished epic into a permanent `wait`.
-
-It is advisory rather than atomic. The label is applied by whoever implements the child, _after_ this read, so two sessions starting in the same instant can both see an idle repository; what the check closes is the window that actually occurs, where a session already running a child holds the label for the whole of it. An abandoned label therefore holds the repository until somebody removes it — which is why the holders are named on standard error, and why [`epicrun`](../.claude/skills/workflow-commands/epicrun.md)'s stale rule applies to any open issue in the repository rather than to the epic's children alone.
-
-A listing that could not be read is **not** an idle repository — the answer is `wait` rather than the child, since reading a failed read as "nothing is running" is the one direction a guard like this may not fail in. It is not an exit either: the listing swallows a passing rate limit into the same failure, so exiting would end an unattended run over a blip, while a persistent failure is already caught by the unreadable-child anomaly before this read happens.
-
-A listing that was **cut short** lands on the same side ([#1067](https://github.com/joshuafolkken/kit/issues/1067)). Since the paging applies a page ceiling to every listing, a well-formed but incomplete answer with no visible holder is a third thing — and "no holder in the rows I was given" is not "no holder". It answers `wait` too, with its own message: the cause is a listing the paging could not read to the end, so `gh auth status` is green and clearing a stale label would not change it.
-
-**The candidate is confirmed against its own relations listing before it is handed over** ([#1121](https://github.com/joshuafolkken/kit/issues/1121)). A child's blockers are normally read from the issue's `issue_dependencies_summary`, and the listing request is skipped entirely when that summary counts zero — which is what keeps a pass over the whole backlog to one request per issue. The summary is GitHub's own count and it can be wrong: measured on [#1111](https://github.com/joshuafolkken/kit/issues/1111), it read `total_blocked_by: 0` while the listing returned a real, unremovable relation. [#1113](https://github.com/joshuafolkken/kit/issues/1113) re-reads such a child when the epic body _declared_ the missing link, which closes the direction that makes this command exit 1 on a graph with nothing to fix. A relation that was recorded but never declared leaves no trace in the body, so nothing marks the child as a suspect — and there the mistake runs the other way: the child is offered, and an unattended run implements it before its prerequisite.
-
-So the one candidate `--repo` is about to return is asked for its relations directly. When the listing agrees with the summary the child is offered, as before. When it disagrees, that child's blockers are replaced and the whole classification is run again — re-running the classifier rather than testing the listing for emptiness is what makes a blocker that is already closed, or one in another repository whose release has published, come out right without a second copy of those rules. If the child is no longer runnable it is **withheld**, and the next candidate in the same repository is confirmed in its place; a healthy sibling is not made to wait for one child whose counter is stale, because nobody repairs that counter and the wait would never clear. When every candidate is withheld, the verdict is read off the corrected graph.
-
-The cost is one request per candidate confirmed — one in the ordinary case, where the first candidate is offered, and at most the size of the repository's bundle when every one of them is withheld. It is spent only where it can change an answer: **after** the exclusion above, since a busy repository is handed nothing, and not at all when the repository has no candidate. A listing that could not be read withholds the candidate rather than confirming it — "could not tell" is not "nothing blocks it", and this is the one direction the guard may not fail in, because that answer _starts_ work.
-
-**The remaining children are sorted by whether waiting helps — never by which label they carry.**
-
-| Bucket              | What is in it                                                                           | What the caller does |
-| ------------------- | --------------------------------------------------------------------------------------- | -------------------- |
-| Runnable            | Open, not parked, not already being worked on, and every dependency resolved            | Run it               |
-| Waiting on time     | Being worked on elsewhere, waiting on a release, or blocked by something in this bucket | Wait and ask again   |
-| Waiting on a person | Carries `needs-decision`, or is blocked by something in this bucket                     | Stop and report      |
-
-Reading the labels instead would fail in a specific, ordinary state. The moment kit's child closes and app-kit's child is waiting for the release to publish, there is no runnable child, nothing carries `in-progress` (kit's child is closed) and nothing carries `needs-decision` (nothing was parked). A label-based reading sees "nothing running, nothing parked" and stops — in the one situation where it should wait.
-
-**Blocking is followed transitively.** A child behind a release-waiting child is waiting on time; a child behind a parked one is waiting on a person, however long the chain. Where both apply, the person wins: waiting would not release a parked blocker whatever the other one does.
-
-The verdict follows from the buckets, and waiting is checked before stopping — a run that stopped while something was still resolving on its own would abandon an epic that was going to finish.
-
-| Verdict  | When                                                              | Exit code |
-| -------- | ----------------------------------------------------------------- | --------- |
-| run      | At least one child is runnable                                    | 0         |
-| wait     | Nothing runnable, but something resolves on its own               | 0         |
-| stop     | Nothing resolves on its own; the remaining children need a person | 0         |
-| complete | No open child is left                                             | 0         |
-| error    | The dependency graph is unusable                                  | 1         |
-
-`--repo` answers `wait` for three things that are not verdicts of the epic at all: the repository is already running something, the `in-progress` listing for it could not be read, and that listing was cut short before it ended. All three are reported on standard error, and none of them changes the exit code — the aggregate form, which does not consult the exclusion, says so there too.
-
-**Whether a dependency is resolved is a replaceable rule.** By default a dependency is resolved once the blocking child is closed. That is not enough across repositories — kit's issue closes before the package is published — so [#864](https://github.com/joshuafolkken/kit/issues/864) replaces the rule with one that also waits for the publish. The extension point is what keeps that condition in one place rather than duplicated per caller.
-
-**Two things stop the command instead of being worked around.**
-
-- **A circular dependency.** Hand-added `--add-blocked-by` edges can make `#1` wait for `#2` while `#2` waits for `#1`, and every session would then wait forever. The children that can never start are named — including the ones stuck _behind_ the cycle, since those never become runnable either.
-- **A disagreement between the epic body and the relations.** The body's `Dependencies` section is the human-readable record; the `blocked-by` relations are the authority for execution. When they disagree — an epic written before `josh` recorded the relations, a recording that failed, or a relation hand-added since — the command reports both directions and refuses to pick a winner, because silently following either implements in an order nobody agreed to.
-
-  Only a line that is _nothing but_ a chain counts as a declaration. An epic whose Dependencies section is followed by prose recommending an execution order (`推奨実行順: #869 -> #863 -> …`) is stating a suggestion, not a dependency, and reading those arrows as declarations reported four disagreements against relations that were correct. **Every reader of the body answers from that one definition** — the link reading here, `epic:check`'s "is an order declared at all", and `josh epic --add`'s rewrite, which protects an arrow outside the `Dependencies` section as prose. Until [#1155](https://github.com/joshuafolkken/kit/issues/1155) the existence reading used a pattern of its own that matched anywhere in the body, so two readers of one epic answered the same question differently.
-
-The body is parsed through the same module the epic auto-close uses, so "what the auto-close tracks" and "what this command reads" cannot drift apart.
+Several leading epic arguments merge into one candidate pool per repository. A cross-repository dependency resolves only when the blocker is closed **and** its declared version has published. `run`/`wait`/`stop`/`complete` exit `0`; an unusable graph (cycle, or body/relations disagreement) exits `1`.
 
 ### `josh epic:bundle`
 
-Say whether a newly filed issue belongs with ones already in the backlog ([#873](https://github.com/joshuafolkken/kit/issues/873)).
+Say whether a newly filed issue belongs with ones already in the backlog. It finds candidates and recommends; it writes nothing.
 
 ```bash
 pnpm josh epic:bundle 874   # alias: josh eb
 ```
 
-"Two or more always means an epic" already holds when one request is split on the spot. It does not reach the other way in: two issues filed days apart that turn out to be the front and back of one job are executed separately, in whatever order, with the reasoning recorded nowhere.
+Only two things count as a signal: the two issues referring to each other in prose, or an already-recorded `blocked-by`. A similar title never counts on its own.
 
-Run it right after an issue is filed — by `kickoff`, `fullrun` or `halfrun`, or by any Tier A filing during implementation, including inside an `epicrun`. **The command finds candidates and recommends; it writes nothing.** The machine's job is to surface what it found, not to decide.
+| Candidates                                     | What to do                                          | Tier |
+| ---------------------------------------------- | --------------------------------------------------- | ---- |
+| The new issue itself already has an epic       | Nothing                                             | —    |
+| Already a child of an epic                     | Add to that epic                                    | A    |
+| Spread across an epic and its own parent       | Add to the inner epic                               | A    |
+| Spread across different epics                  | Choose the one you recommend, add to it, record why | A    |
+| In no epic, two or more counting the new issue | Create an epic                                      | A    |
+| No strong signal / listing cut short           | Nothing                                             | —    |
 
-**Only two things count as a signal**: the two issues referring to each other in prose, or a `blocked-by` already recorded between them. **A similar title never counts on its own** — "related" expands without limit, and a threshold is what keeps an unrelated issue out of the bundle. The candidate search is [`josh epic:audit`](#josh-epicaudit)'s implicit-dependency analysis, shared rather than repeated: one reads inside an epic and the other across the backlog, but what they read is the same prose references.
-
-An issue belongs to at most one epic, because that is what a task list can express — so there is a branch:
-
-| Candidates                                         | What to do                                                                                     | Tier |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---- |
-| **The new issue itself already has an epic**       | Nothing — an issue belongs to at most one, and moving it between epics is not what this is for | —    |
-| Already a child of an epic                         | **Add to that epic**; do not create a second one                                               | A    |
-| Spread across **different** epics                  | **Choose the one you recommend, add to it, and record why**                                    | A    |
-| In no epic, and two or more counting the new issue | **Create an epic** for them                                                                    | A    |
-| No strong signal                                   | Nothing                                                                                        | —    |
-
-Bundling is reversible — an epic is editable and a child can be removed — so it needs no confirmation, and **that includes the spread row**: one `epic --add` moves an issue to a different epic, so choosing between two candidate epics is Tier A. Record what was taken, what was rejected and why, on both the issue and the epic ([#1339](https://github.com/joshuafolkken/kit/issues/1339)). **The spread row is not a proposal to merge epics** — it fires whenever related issues sit in different epics, an epic and its own parent included.
-
-**When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies`, on an addition as much as on a new epic: without it the batch survives and the reason it is a batch does not. An order **nobody declared is not invented** — only relations already recorded are carried over.
-
-**A reference the open backlog cannot show is read directly.** The candidate search scans open issues, which left a window of minutes in which the command could answer correctly: a follow-up issue names its parent, and the parent's pull request merges right after — on [#943](https://github.com/joshuafolkken/kit/issues/943) the gap between filing and the parent closing was about three minutes. Past it, `Nothing to bundle.` was printed with exit 0, asserting there was no relation rather than that the command had stopped being able to see one. Every issue number the subject's body names is now read on its own, whatever its state ([#947](https://github.com/joshuafolkken/kit/issues/947)):
-
-- **A closed reference counts only when an open epic already tracks it** — the answer worth recovering is "add it to that epic". Creating an epic over a closed issue would build one whose other child is already finished: nothing for a run to execute.
-- **An open reference counts either way** — missing from the listing means the listing was capped, not that the issue is unrelated.
-- The lookup is one request per reference, capped per issue and batched like the relation reads. **A read that fails, and a reference the cap never reached, are both reported as gaps** rather than folded into "no relation found" — a guard that truncated in silence would put the command back to asserting there was no relation when it had merely stopped looking.
-- **The backlog and epic listings report their own cuts too** ([#1067](https://github.com/joshuafolkken/kit/issues/1067)). Each can stop either because it filled the command's 200-row cap or because the paging reached its 500-row page ceiling, and the `⚠` line names which — the first is a number this command sets, the second is not, so a reader who wants the answer widened is sent to the one that would move. The two listings stay separately reported: what an unseen backlog issue hides is a bundle candidate, and what an unseen epic hides is the epic that already tracks one.
-- **A number that turns out to be a pull request is not a candidate.** The issue read answers for one as readily as for an issue, and a merged PR reports a state that is not `CLOSED` — so without the check, "the fix landed in #952" would put a pull request among a proposed epic's children.
-- **A number that does not exist is not a gap either** ([#957](https://github.com/joshuafolkken/kit/issues/957)). A typo, or a number belonging to another repository quoted in prose, is dropped in silence — it is neither a candidate nor something the command reports it could not read. Reported as a gap it printed `⚠ Could not read #N.` above the verdict, and [#950](https://github.com/joshuafolkken/kit/issues/950)'s rule — a warning above `Nothing to bundle.` is not an answer, stop and report — then stopped an unattended run for a reference that never existed. **The two are told apart by HTTP status, not by `gh`'s wording**: 404 is nothing at that number, while 403 and 429 are a rate limit and 5xx is the server. GitHub answers 404 rather than 403 for an issue the token may not see, so as not to leak its existence — the two cannot be separated by any reading of the status, and they do not have to be here: the command probes the repository whose open issues it has just listed, so a number it cannot see there is a number that is not there. The read itself does not carry the status — it surfaces a failure as `gh`'s stderr text — so the classification is one extra REST request, spent **only** after a read has already failed and only by the caller that needs the distinction. That last part is why it is opt-in: the backlog's own relation reads cover up to two hundred issues, and a rate limit that failed all of them would spend two hundred more probes finding out why; the classified path is capped at twenty references, so the worst case is twenty.
-- Only the subject's own prose is followed. The reverse — a closed issue naming the subject — would mean scanning every closed issue, and is not needed: a follow-up issue naming its parent is what the filing procedure requires.
-
-The whole open backlog is scanned every time. It was thirteen issues when this was written, so there is no index and no cache; add one when the number makes it necessary, not before.
-
-### `josh epic:plan`
-
-Print every child of an epic as one JSON document, so the epic's decisions can be made in one batch ([#862](https://github.com/joshuafolkken/kit/issues/862)).
-
-```bash
-pnpm josh epic:plan 858   # alias: josh el
-```
-
-Most of the stops an implementation makes could have been answered _before_ it started. Arriving scattered through the run is what forces a person to wait through it, asking per child asks the same question several times, and the answers end up only in a conversation nobody can read back. The output carries each child's number, title, body, labels, `blockedBy` and state.
-
-| Phase      | What happens                                                         |
-| ---------- | -------------------------------------------------------------------- |
-| 0 — audit  | [`josh epic:audit`](#josh-epicaudit); fix what it finds (Tier A)     |
-| 1 — triage | Read the plan; sort each decision into `auto`, `ask` or `defer`      |
-| 2 — decide | Put every `ask` to the person **as one question for the whole epic** |
-| 3 — run    | `epicrun` runs to the end                                            |
-
-**Phase 0 is not optional.** A batch decision made on a plan that contradicts itself has to be made again once the contradiction surfaces.
-
-Answers are recorded in **both** the epic's `## Decisions` section and a comment on each child they apply to. One without the other leaves either the child's reader without the reasoning or the epic without the decision. **Recording a decision removes that child's `needs-decision` label** — without that, a child stays parked after the answer arrived.
-
-**An epic whose task list tracks nothing is an empty plan, not a failure** — a checked row is still a tracked row, so a finished epic yields closed children rather than an empty list, and an epic that genuinely tracks nothing is a real answer. An epic whose **body could not be read at all** — a bad number, a failed lookup — is a failure, because an empty plan there is indistinguishable from a finished one.
-
-**A child that could not be read makes the command exit non-zero**, not merely warn. It is named on standard error and left out of the plan, and a consumer capturing standard output would otherwise act on a plan missing a child — a decision made without knowing about it.
+Prints an `Order:` line with an `Evidence:` block, or `Order: none declared — do not invent one`. Exit is `0` for a verdict, non-zero only when a listing could not be read. A cut epic listing withholds every placing verdict.
 
 ### `josh epic:audit`
 
-Read an epic's children against each other and report what contradicts what ([#870](https://github.com/joshuafolkken/kit/issues/870)).
+Read an epic's children against each other and report what contradicts what — where `epic:check` verifies one epic's format, this reads inside the children.
 
 ```bash
 pnpm josh epic:audit 858   # alias: josh ea
 ```
 
-`epic:check` verifies **one epic's format**. Nothing verified that the children agree — and a hand audit of a real epic found two contradictions that would have stalled the implementation while `epic:check` reported all four of its requirements as passing throughout. Work that only surfaces when a person thinks to go looking for it cannot be the basis of an unattended run.
+| Check                | Level     | What it means                                                                                                  |
+| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| Implicit dependency  | warning   | A child's body names another child, and nothing orders the two.                                                |
+| Order contradiction  | **error** | Acceptance criteria name another child with nothing ordering them (warning once either closes, or cross-repo). |
+| Unresolved reference | warning   | A body cites an issue that does not exist or is already closed.                                                |
+| Nested epic          | warning   | A task-list row points at another epic.                                                                        |
+| Orphan child         | warning   | An issue names this epic as parent but the task list does not track it.                                        |
+| Orphan search        | **error** | The open-backlog search could not be read — re-run the audit.                                                  |
+| Unjustified order    | **error** | The body declares an order between two open children and nothing records why.                                  |
 
-The graph's own properties — a cycle, and a body declaring one order while the `blocked-by` relations record another — are taken from [`josh epic:next`](#josh-epicnext)'s detection rather than re-derived here. What this command adds is reading _inside_ the children:
-
-| Check                | Level     | What it means                                                                                                                                                                             |
-| -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Implicit dependency  | warning   | A child's body names another child of the same epic, and nothing orders the two.                                                                                                          |
-| Order contradiction  | **error** | A child's **acceptance criteria** name another child, and nothing orders the two — it can run first. A warning instead once both children are closed, and for a pair in two repositories. |
-| Unresolved reference | warning   | A body cites an issue that does not exist, or one already closed.                                                                                                                         |
-| Orphan child         | warning   | An issue names this epic as its parent but the epic's task list does not track it.                                                                                                        |
-| Orphan search        | **error** | The search for those issues could not read the open backlog — a rate limit, expired auth.                                                                                                 |
-| Orphan search        | warning   | That search stopped before the end of the backlog: its 500-issue page cap, or its 50-match cap.                                                                                           |
-
-**Only errors change the exit code.** The implicit-dependency check sees only that one child mentioned another, which is as true of a real missing dependency as of a design note about what comes next. Failing on both would make those notes unwritable, so the machine's job is to stop an omission going unnoticed, not to decide.
-
-**A forward reference the other child already depends on is not reported.** When `#860`'s criteria say `#864` will extend a hook it provides, and `#864` is declared to depend on `#860`, the criteria are satisfiable exactly as written. Verified against a real epic: without that suppression, four of five errors were forward references of that shape.
-
-What remains an error is a name in the acceptance criteria with **nothing ordering the two at all** — the criteria are where a child states what it must deliver, so a deliverable named there that nothing guarantees will exist first is the contradiction. A child citing another purely as an example still trips it; that is the residual cost of a check the machine cannot make semantically, and rewording or declaring the dependency clears it.
-
-**Unless the pair is in two repositories, in which case it is a warning** ([#1128](https://github.com/joshuafolkken/kit/issues/1128)) — such an order only became recordable with [#1126](https://github.com/joshuafolkken/kit/issues/1126), so an error would stop every epic written before it at step one. That warning does not make the pair safe: the child is still offered as runnable, and what changed is that the risk used to be silent. Recording the relation clears it, and [`josh epic --add`](#josh-epic) cannot write a cross-repository one yet ([#1138](https://github.com/joshuafolkken/kit/issues/1138)).
-
-**And unless both children are closed, in which case it is also a warning** ([#1010](https://github.com/joshuafolkken/kit/issues/1010)). The whole force of the error is that the criteria's child _can run first_; once neither child has any execution left, that is no longer true of either, and the finding cannot describe anything that will happen. Left as an error it is permanent — every epic that ever forgot to declare an order fails its audit from then on, and `epicrun` runs the audit before its first child, so the epic stops at step one for a contradiction nothing can trip over. It was confirmed on a real epic: the audit was red while `epic:next` handed back a runnable child perfectly happily.
-
-**Demoted rather than dropped, and the choice was made on the output.** The acceptance criteria are part of the body, so the same pair also matches the implicit-dependency check, which stays quiet only while this one reports the pair. Drop the finding and the pair reappears one line lower as `implicit dependency` — the report is not one line shorter, and the message has lost the one thing worth reading in it, that the name is in the **acceptance criteria**. Since the brevity a drop would buy does not exist, the history stays visible at the level matching what is left to go wrong. Closed is asserted rather than inferred: a state the audit cannot confirm as `CLOSED` (a `MERGED` pull request among them) keeps the error.
-
-**The two `orphan search` findings are about the search, not about the children** ([#1033](https://github.com/joshuafolkken/kit/issues/1033)). The orphan check lists the open issues and matches their bodies client-side; a listing that could not be read used to arrive as an empty result, so a rate limit produced a clean audit that had looked at nothing. It is an error now, and the response is to **re-run the audit** — there is no contradiction to fix and no design choice to park, so neither the Tier A rule below nor a `needs-decision` park applies. If it keeps failing, check `gh auth status` and the rate limit. The warning form means the scan stopped early — at its 500-issue page cap, or once 50 open bodies mentioned the epic — so it covered the newest part of the backlog only; the audit still passes, and an orphan expected further down has to be looked for by hand.
-
-**Run it without being asked** — at the start of an `epicrun`, as [`josh epic:plan`](#josh-epicplan)'s phase 0, and right after a child is added or a dependency changed. **Fixing what it finds is Tier A**: re-pointing a dependency or correcting prose is reversible and will otherwise stall the work, so do it without asking and record the reasoning on the Issue. Park with `needs-decision` only when the contradiction is a design choice nobody has made.
-
-**One thing it cannot check** belongs to the planning step instead. A child introducing a new label, command, state or artifact leaves existing code referencing that concept; three such gaps were found by hand on one epic. List those references and confirm some child owns updating them — label names are single-sourced in `scripts/git/issue-labels.ts`, so consumers can be traced from there.
+Only errors change the exit code. Run it at the start of a `backlogrun` epic run and after a child or dependency changes. Fixing what it finds is Tier A; park with `needs-decision` only when the contradiction is an unmade design choice.
 
 ### `josh epic:check`
 
-Check an existing epic against the same four requirements and report each as pass or fail.
+Check an existing epic against the same four requirements and report each as pass or fail. Use on hand-made epics, epics predating `josh epic`, and after editing an epic body.
 
 ```bash
 pnpm josh epic:check 700
 ```
 
-Exits `0` when every requirement is satisfied and `1` otherwise, so it works as a gate. Use it on epics created by hand, on epics that predate `josh epic`, and after editing an epic body. The checks reuse the very parser the auto-close runs on (`scripts/git/git-epic-parse.ts`), so "what the auto-close can read" and "what this command accepts" are one definition rather than two that can drift.
-
-```
-✔ epic label — the `epic` label is applied
-✔ child task list — 2 child issue(s) tracked: #101, #102
-✖ dependencies section — neither a line that is only `#N -> #M` nor the `None — ...` literal found; an arrow sharing its line with anything else is prose, and prose order is not machine-readable
-✔ auto-close eligibility — every tracked child is in this repository
-
-❌ Epic #700 does not satisfy every requirement.
-```
-
-The dependencies check wants **exactly one** of the two machine-readable forms. Neither present is the ambiguous middle it was written for — "there is no order" and "the order was never written down" then read alike. Both present is a contradiction, and it used to pass while the report named only the half that contradicted the other ([#1155](https://github.com/joshuafolkken/kit/issues/1155)):
-
-```
-✖ dependencies section — a chain (`#N -> #M`) and the `None — ...` literal are both declared; they contradict each other
-```
-
-An epic written before [#1155](https://github.com/joshuafolkken/kit/issues/1155) can start failing this check without its body changing, and the verdict is the accurate one: a chain sharing its line with a rationale (`#101 -> #102 (#102 needs the API from #101)`) or buried in a prose bullet was never read by `epic:next`, so the check used to call machine-readable a body from which the run read no order at all. Fix such an epic by putting the chain on a line of its own and moving the rationale to the next line; `josh epic --add` and `josh epic --promote` refuse the epic until then, and their refusals name this command.
+**Output / exit codes:** exits `0` when every requirement is satisfied, `1` otherwise, so it works as a gate. The dependencies check wants exactly one of the two machine-readable forms — neither present is ambiguous, both present is a contradiction.
 
 ### `josh auto-ok:next`
 
-Print the next opted-in issue an unattended run may pick up outside an epic ([#906](https://github.com/joshuafolkken/kit/issues/906)).
+Print the next opted-in standalone issue an unattended run may pick up outside an epic. Read-only; ranks newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open.
 
 ```bash
 pnpm josh auto-ok:next                 # alias: josh ao
 pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
-pnpm josh auto-ok:next --exclude 906,912 --exclude 918   # skip several
-```
-
-An epic's task list is not the whole backlog. An issue small enough to need no human judgment sits there forever unless somebody puts it in an epic, so the `auto-ok` label opts one in: [`epicrun`](../.claude/skills/workflow-commands/epicrun.md) picks up opted-in issues once the epic's own children are done.
-
-**Only a person applies `auto-ok`.** Typing `epicrun #<E>` approves the merges inside `#<E>` and nothing outside it, and this label is the only way a person extends that approval past the epic's edge — a label an agent could apply to itself would let an unattended run widen its own authorization, which is not a guard at all. An agent typing the command on an explicit instruction in the same turn is executing the person's decision, not making one.
-
-`--exclude <N>` drops issues from the answer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — a pickup loop names it here so it cannot be handed back and re-implemented. It takes a comma-separated list and may be repeated, so a loop past its second pickup can name **every** issue it has already run: `closes #N` can fail to fire at all — a reference dropped from a PR body — and the `in-progress` label is not a guard the procedure itself trusts (joshuafolkken/kit#996).
-
-**The `🗒 Next issues` display is not filtered the same way, on purpose.** It is read by a person, who
-can see a blocked issue, judge that the blocker is nearly done or does not really block it, and start
-anyway; the pickup feeds an unattended run, which has none of that judgement. So the display can name
-an issue `auto-ok:next` refuses — the same row is information to one reader and an instruction to the
-other (joshuafolkken/kit#1005).
-
-**An issue whose prerequisite is still open is not offered.** The pickup reads the same native `blockedBy` relation `epic:next` builds its graph from, and skips any candidate declaring a blocker that has not closed. `auto-ok` says the issue needs no decision; it says nothing about ordering, so without this an unattended run could start an issue before the work it depends on (joshuafolkken/kit#996).
-
-Standard output carries exactly one token — the issue number, or `none` — so `answer=$(pnpm josh auto-ok:next)` captures something a loop can branch on. Every explanation goes to standard error.
-
-| Answer      | Meaning                                                    | Exit code |
-| ----------- | ---------------------------------------------------------- | --------- |
-| `<number>`  | Run that issue as a `fullrun`, then ask again              | 0         |
-| `none`      | No open issue carries the label                            | 0         |
-| _(nothing)_ | The listing could not be read — **not** the same as `none` | 1         |
-
-The command is read-only and never applies or removes the label. It ranks candidates with the same function the `🗒 Next issues (newest first)` display uses at the end of every workflow — newest first, skipping `epic`, `in-progress` and `needs-decision` — so the pickup starts exactly what that list has just named as next. A second ordering would contradict it.
-
-**Opting in is the default absence.** Nothing creates the label, and a repository that does not have it is not an error: `gh` answers an empty listing, the command answers `none`, and an `epicrun` finishes exactly as it did before the label existed. Create it once where it is wanted:
-
-```bash
+# create the label once, where wanted:
 gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
 ```
 
-The listing is capped at 200 issues, and the paging behind it stops after 500 rows whatever the cap says ([#1067](https://github.com/joshuafolkken/kit/issues/1067)). The listing is newest first, so either cut drops the oldest opted-in issues — reported as a `⚠` on standard error rather than ranked silently, because the answer is still an opted-in issue but may not be the one the order promises. The warning names which cut stopped it: a reader who wants the answer widened reaches for the command's own cap in one case and for the paging's ceiling in the other.
+- `--exclude <N>` — drop issues from the answer; comma-separated, repeatable.
+
+stdout is one token — the issue number, or `none`, or empty with exit 1 if the listing could not be read; explanations to stderr.
+
+### `josh backlog:next`
+
+Order the whole opted-in backlog in one command — standalone `auto-ok` issues plus the children of every epic whose root carries `auto-ok`. Read-only. Tokens are bare numbers scoped to the repository.
+
+```bash
+pnpm josh backlog:next                 # alias: josh bl
+pnpm josh backlog:next --exclude 1630  # skip the issue just merged
+```
+
+- `--exclude <N>` — drop issues from every bucket; comma-separated, repeatable.
+
+stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
+
+### `josh backlog:plan`
+
+The whole backlog rendered as a plan a person reads before a run starts — four sections on stdout, using `backlog:next`'s own classification. Separate because that command's stdout is bare tokens a loop branches on.
+
+```bash
+pnpm josh backlog:plan                 # alias: josh blp
+pnpm josh backlog:plan --exclude 1630  # after #1630 merged
+```
+
+- `--exclude <N>` — same exclusion as `backlog:next`.
+
+Sections: **Ready now** (runnable children, grouped by repository = the parallelism), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
+
+### `josh backlog:budget`
+
+Say whether a `backlogrun` may start more work, keep watching, or finish. Read-only. Maps `backlog:next`'s answer into a budget verdict.
+
+```bash
+pnpm josh backlog:budget --answer candidates --started "$started" --active "$active"   # alias: josh bb
+pnpm josh backlog:budget --answer exhausted  --started "$started" --active "$active" --idle 60
+pnpm josh backlog:budget --answer candidates --started "$started" --active "$active" --merged 3 --running 2 --max 5
+```
+
+- `--answer <candidates|exhausted|blocked|parked|unreadable>` — `backlog:next`'s answer, mapped.
+- `--started` / `--active` — when the invocation began / when it last had work (required unless the watch is off).
+- `--idle <minutes>` — after candidates run out, keep polling this long (default 30; `--idle 0` turns the watch off).
+- `--max <count>` — issues one invocation may take (default unlimited); `--merged` and `--running` count against it.
+- `--json` — collapse verdict and reason into `{"budget": "<verdict>", "reason": "…"}`.
+
+stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), or empty with exit 1 if the invocation is unreadable. The whole-run bound (8 hours) is decided here and outranks both budgets, but a `parked` or `unreadable` answer outranks the bound. A watch polls every 5 min.
 
 ### `needs-human-review` — the opposite label
 
-`auto-ok` widens unattended execution past an epic's edge; **`needs-human-review` withholds its last step** ([#1125](https://github.com/joshuafolkken/kit/issues/1125)). An issue carrying it is implemented and taken through the verification gate as usual, and then nothing is committed, pushed, opened as a pull request or merged: the working tree is left uncommitted and unstashed, a `confirmation` notification goes out carrying the resume command, and the run stops there rather than starting the next issue.
-
-It exists for work whose quality no test can judge — a published article, or a choice among generated candidates. Writing "run this with `halfrun`" in the issue body has no force, and pre-applying `needs-decision` is worse than useless: that label stops the issue being **started**, so the artifact a person is meant to look at is never produced.
-
-The two labels sit on opposite sides of a run, and the code says so. `needs-decision` is in `NOT_DIRECTLY_RUNNABLE_LABELS` and in the busy check's parked set; `needs-human-review` is in neither. Excluded from the first it would never be offered; treated as parked in the second, the repository would be handed to the next child while the stopped one's uncommitted work is still in the checkout.
-
-**Only a person applies or removes it**, at the same strength as `auto-ok` — a mark a run can clear for itself is not a mark. Create it once where it is wanted:
+The inverse of `auto-ok`: implemented and taken through the verification gate as usual, then nothing is committed, pushed, opened as a PR or merged — the working tree is left uncommitted, a `confirmation` notification carries the resume command, and the run stops. For work no test can judge. Only a person applies or removes it.
 
 ```bash
 gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f description="Implement and verify, but stop before committing so a person can look"
 ```
 
-The behavior it triggers belongs to the workflow commands rather than to any `josh` subcommand: [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workflow-commands/SKILL.md) → §2z is the single source of the definition.
+Single source: [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workflow-commands/SKILL.md) → §2z.
+
+### `already-done` — the exit for work that is already merged
+
+The exit for a run that verifies its issue's work is already in `main`: nothing to implement, and it cannot close the issue (Tier C). Not `needs-decision` — that waits for an answer; this one has its answer and only the close is outstanding. A run applies it; only a person removes it, by closing the issue.
+
+```bash
+gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it"
+```
+
+Procedure: [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workflow-commands/SKILL.md) → §2g.
 
 ### `josh review:brief`
 
-Print the whole `/code-review` invocation — the level, what `josh gate` has already proved, and the target ([#1241](https://github.com/joshuafolkken/kit/issues/1241)).
+Print the whole `/code-review` invocation — level, what `josh gate` proved, target and checkout. Pass the output to `/code-review`; the level is on line one.
 
 ```bash
 pnpm josh review:brief            # round 1; alias: josh rb
-pnpm josh review:brief --round 2  # the verification pass, scoped to the fix delta
+pnpm josh review:brief --round 2  # verification pass, scoped to the fix delta
+pnpm josh review:brief --level-only          # the level alone (pre-commit review)
+pnpm josh review:brief --level-only --json   # level and reason, machine-readable
 ```
 
-Pass the whole output to `/code-review`. The level is on the first line, so `$(pnpm josh review:brief)` still starts with the answer `josh review:level` gives.
+- `--round 2` — target is round 1's fixes and nothing else (widened back to the whole change when the record's change base no longer matches).
+- `--level-only` — print the level alone (level to stdout, reason to stderr); bypasses the scoped-green refusal.
+- `--staged`, `--json` — the staged diff; machine-readable level and reason.
 
-**It exists because `/code-review` runs in a forked process that reads none of this repository's documents.** Only the invocation argument reaches it, so a rule written in `prompts/review.md` — "do not re-run what the gate proved", "the second round reads the fix delta" — has nothing to bind to. Measured on [#1240](https://github.com/joshuafolkken/kit/pull/1240): both rounds re-ran the unit suite `josh gate` had just passed, both fumbled the runner (`npx vitest`, then a retry), and round 2 re-read the whole diff — 439 seconds on a seven-file change, with the second round taking 90% of the first.
+It refuses to compose a brief when the scoped checks have never been green on this tree; run `pnpm josh lint:related && pnpm josh test:related`, then reissue.
 
-What the brief carries:
+The brief prints the `reviewer` profile; pass its model and effort explicitly to the review subagent.
 
-| Part                  | Where it comes from                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| The level             | `josh review:level`, reused rather than decided again                                                         |
-| "Already verified"    | The record `josh gate` writes when all four checks pass, **and only if its digests still match this tree**    |
-| "Running now"         | The marker `josh gate` keeps for as long as its checks run, **and only if its digests still match this tree** |
-| The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                   |
-| The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed                   |
+#### The review level
 
-**`--round 2` is taken after the commit, and `package.json` is in its target for that reason.** Since [#1261](https://github.com/joshuafolkken/kit/issues/1261) the pull request opens between the rounds, so `pnpm josh bump minor` has run by the time this is asked and the bumped `package.json` counts as a path whose digest moved since round 1. That is expected. It is also why the bump goes **in front of** the gate that precedes the commit: taken before the bump, the gate's record no longer matches the tree and this brief answers `Not verified`, which sends the review agent back to the unit suite the gate had just passed.
-
-**Only one half is mechanical.** The round-2 target _is_ the scope handed over, so a narrowed round stays narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so whether it obeys is measured rather than assumed.
-
-**It never claims a gate it cannot prove.** The gate's record holds a digest per changed path; if any of them has moved since — or there is no record at all — the brief prints `Not verified` and asserts nothing about lint, the type check, the spell check or the unit tests. Re-run `pnpm josh gate` after applying fixes and the record catches up.
-
-**A gate still running is its own answer** ([#1242](https://github.com/joshuafolkken/kit/issues/1242)). The workflow starts `josh gate` alongside the review rather than in front of it — the two read the same tree and neither writes to it — so at the moment the brief is composed the checks have usually not finished. `josh gate` keeps a marker for as long as it runs and clears it on the way out, green or red, and the brief prints `Running now`: **no result is claimed**, the review agent is told not to run the unit suite the gate is running beside it, and the run joins the gate's own result before committing. Without this state a running gate is indistinguishable from one that never ran, and the review re-runs everything — the cost [#1241](https://github.com/joshuafolkken/kit/issues/1241) had just removed.
-
-**The round-1 snapshot is what makes `--round 2` mechanical.** The implementation and the review's fixes are uncommitted in the same tree, so `git diff` cannot say which side of the review a change fell on. Round 1 records a digest per changed path; round 2 compares and names exactly the paths that moved. With no snapshot it falls back to the whole change: a missing record must widen a review, never narrow it.
-
-**It is recorded once per run and never retaken** ([#1441](https://github.com/joshuafolkken/kit/issues/1441)). A second round-1 invocation — a bare `pnpm josh review:brief` re-run after round 1's fixes are in — keeps the record it finds and says so on stderr, naming when that record was taken. Retaking it used to be one command away from a wrong answer: the record would describe the **fixed** tree, the fix delta would read empty, and `josh review:round2 --round-1-closed` would skip the second round over fix code nobody had read. The record's lifetime is one run, and `josh followup` removes it at the end of a run that **merged** so the next run takes its own; a run that stops earlier — or one invoked with `--no-merge`, where the pull request is still open — leaves it behind, and the next run's delta is then measured from further back: wider, which costs a round 2 rather than skipping one.
-
-### `josh review:level`
-
-Print the `/code-review` level this change is reviewed at ([#966](https://github.com/joshuafolkken/kit/issues/966)).
-
-```bash
-pnpm josh review:level            # the branch diff; alias: josh rl
-pnpm josh review:level --staged   # the staged diff
-pnpm josh review:level --json     # the level and the reason, machine-readable
-```
-
-The level goes to stdout and the reason to stderr, so `$(pnpm josh review:level)` reads the level and a person still sees why.
-
-**The decision takes no judgement.** "This one is small" is a judgement made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped. So the input is the list of changed paths and nothing else, and the rule is a command rather than a paragraph — a rule an agent applies from memory is one it can talk itself out of.
+`pnpm josh review:brief --level-only` prints the `/code-review` level this change is reviewed at. The input is the list of changed paths and nothing else.
 
 | Every changed path is…                                                                   | Level    | Rounds  |
 | ---------------------------------------------------------------------------------------- | -------- | ------- |
 | **inert** — `.editorconfig`, `.gitignore`, `LICENSE`, `CHANGELOG.md`, `*.code-workspace` | `low`    | 1       |
 | anything else                                                                            | `medium` | up to 2 |
 
-**One non-inert path decides the whole change** — a review reads the change, not a subset of it. An empty diff also takes `medium`: answering `low` to "nothing changed" would hand a reduced level to a caller that failed to read the diff. The branch form counts untracked files too, since `git diff` never lists them and a change that adds a whole new module would otherwise look empty.
-
-**Three things that look inert are not**: `.vscode/**`, `.gitattributes` and `.prettierignore` are all in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`, so a defect in one reaches a consumer. **Documentation is not inert either** — `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` stay at `medium`. The "Non-runtime updates" exception exempts them from _testing_, which asks whether an automated test could have caught the defect; this asks whether a human reading the diff is the only thing that can. Measured on [#963](https://github.com/joshuafolkken/kit/issues/963) and [#965](https://github.com/joshuafolkken/kit/issues/965), both documentation-only by that classification: a `medium` review found ten real defects in each — pointers into removed sections, citations naming the wrong file — in artifacts distributed to every consumer.
+One non-inert path decides the whole change; an empty diff also takes `medium`. Three things that look inert are not — `.vscode/**`, `.gitattributes` and `.prettierignore` are written into every consumer by `josh init` / `josh sync`. Documentation is not inert either: `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` stay `medium`.
 
 ### `josh review:round2`
 
-Say whether the second `/code-review` round is due, or may be skipped entirely ([#1433](https://github.com/joshuafolkken/kit/issues/1433)).
+Say whether the second `/code-review` round is due, or may be skipped. Run it once round 1's fixes are in.
 
 ```bash
 pnpm josh review:round2                     # → required ; alias: josh r2
@@ -1709,27 +1018,28 @@ pnpm josh review:round2 --round-1-closed    # → required | skip
 pnpm josh review:round2 --json              # the verdict and the reason, machine-readable
 ```
 
-The verdict goes to stdout and the reason to stderr, so `$(pnpm josh review:round2 --round-1-closed)` reads the verdict and a person still sees why. Run it once round 1's fixes are in and **before** `/code-review` is invoked a second time.
+- `--round-1-closed` — the caller states every round-1 High/Medium finding closed and none was filed or deferred; its absence answers `required`.
+- `--json` — machine-readable verdict and reason.
 
-**Every measure before this one narrowed round 2; this one asks whether it is due.** [#1219](https://github.com/joshuafolkken/kit/issues/1219) redefined its question, [#1241](https://github.com/joshuafolkken/kit/issues/1241) carried that question into the forked agent, and the wall clock did not move — because a round's span follows its **turn count** (`r = +0.80`) rather than the size of what it reads (`r = -0.15` for round 2 against how much of round 1 it repeats; round 1 against churn was re-measured at a larger sample and its coefficient retired, so read it from `prompts/review.md` → "Round 1's cost does track the change size, and splitting is still not how to cut it" rather than from a number here). The saving is in not forking an agent at all, which is what a skip buys and a lighter round does not.
+`skip` on **Arm A** (the fix delta is empty) or **Arm B** (every path in the fix delta is inert by [`josh review:brief --level-only`](#josh-reviewbrief)'s classification); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one non-inert path. Full reasoning: `prompts/review.md`.
 
-| Answer     | When                                                                                                                       |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `skip`     | **Arm A** — the fix delta is empty: round 1's findings closed without an edit, so there is no unreviewed fix code          |
-| `skip`     | **Arm B** — every path in the fix delta is inert by [`josh review:level`](#josh-reviewlevel)'s classification              |
-| `required` | anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, and one non-inert path among inert ones |
+### `josh review:attest`
 
-**`--round-1-closed` is the one input no command can read for itself**, so the caller states it: every round-1 High/Medium finding closed, by a fix in this working tree or as a verified false positive, and none was filed or deferred. It is a report of a fact round 1 already wrote down, not a judgement — and its absence is the safe answer, so a run that forgets it pays a round rather than skipping one. Every other uncertainty resolves the same way.
+Record, or verify, which checkout a `/code-review` actually read — it is forked into the session's working directory, so a lane run can be reviewed from the wrong tree. `josh review:brief` prints a nonce; `attest <nonce>` reads the checkout it is run in and exits non-zero when that is not the briefed one.
 
-The fix delta is the same comparison [`josh review:brief --round 2`](#josh-reviewbrief) makes — the same round-1 snapshot, the same digest comparison over the same reading of "changed" — so the two commands cannot disagree about what round 1 fixed. Each computes it when asked; what is shared is the record and the code, not one command's result.
+```bash
+pnpm josh review:attest <nonce>   # run by the review, from the checkout it read
+pnpm josh review:attest --check   # run by the run, before it acts on the review; alias: josh ra
+```
 
-**Ask it before `josh bump minor`, never after.** The bump rewrites `package.json`, which is not inert, so a delta taken afterwards carries that write and answers `required` whatever round 1 did — the condition would then never fire in the flow it was built for.
+- `<nonce>` — attest the checkout the review read.
+- `--check` — verify before acting; `josh followup` asks again before merging.
 
-**A prompt fix and a test fix both answer `required`, deliberately.** The condition the issue arrived with exempted anything that is not a runtime code path; that is rejected on the measurement recorded under `josh review:level` — two documentation-only diffs, ten real defects found in each by a `medium` review, none of them covered by a test. A test file is the verification that guards a runtime path, and an assertion a fix weakened still passes. The full reasoning, how a skip is recorded on the Issue, and when the condition is withdrawn are in `prompts/review.md` → "When round 2 is skipped entirely, and when it is not".
+Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded and nothing attested it — a refusal, not a pass), `mismatch` (a different root, branch or HEAD), `not-required` (no brief recorded in this checkout inside a run's lifetime). All three fields are checked; scoped to a checkout that briefed a review, expiring after eight hours.
 
 ### `josh delegate`
 
-Say whether a step of a run may go to a cheaper execution tier ([#969](https://github.com/joshuafolkken/kit/issues/969)).
+Say whether a step of a run may go to a cheaper execution tier. Verdict to stdout, reason to stderr.
 
 ```bash
 pnpm josh delegate gate-fix   # → delegate ; alias: josh dg
@@ -1737,20 +1047,17 @@ pnpm josh delegate review     # → keep
 pnpm josh delegate --list     # the enumeration, and what was rejected and why
 ```
 
-The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <step>)` reads the verdict and a person still sees why.
+**The list is the whole of the rule: anything not on the list is `keep`.** A step earns its place by naming how a wrong result is caught — by something in the parent tier that costs less than redoing the step.
 
-**The list is the whole of the rule: anything not on the list is `keep`.** A step nobody classified must not be delegated because nobody said it could not be. The direction matters — a missed entry costs money, while a wrong `delegate` costs correctness and does so quietly.
+| Step              | Delegatable because                                                                                                        |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `gate-fix`        | `pnpm josh gate` re-runs; a wrong fix fails it again, naming the file                                                      |
+| `epic-child`      | the parent reads the child's state from GitHub, so a child reported done but not merged shows as still open                |
+| `followup-filing` | the parent reads the filed Issue with `pnpm josh issue:state <new>`, so one reported filed but not created shows as absent |
+| `survey`          | the reported locations are checked directly; a fabricated or missed one fails one `grep`                                   |
+| `investigation`   | the parent opens the cited lines; an unsupported conclusion fails there, far cheaper than redoing the reading              |
 
-**A step earns its place by naming how a wrong result is caught**, by something that runs in the parent tier and costs less than redoing the step. "Unlikely to be wrong" does not qualify, and most candidates fail here: a notification body, a decision-log comment and a status read all ship their mistakes with nothing left to disagree with them. `--list` shows those as rejected with the reason rather than omitting them, so the next person to propose one finds the answer instead of re-deriving it.
-
-| Step            | Delegatable because                                                                                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `gate-fix`      | `pnpm josh gate` is re-run; a wrong fix fails it again and the failure names the file                                                                                                |
-| `epic-child`    | the parent reads the child's state from GitHub rather than from the summary, so a child reported done but not merged is still open — the failure shows instead of the loop moving on |
-| `survey`        | the reported locations are checked directly; a fabricated or missed one does not survive one `grep` of what it claimed                                                               |
-| `investigation` | the parent opens the cited lines; a conclusion those lines do not support fails there, and reading a handful of cited regions costs far less than redoing the reading                |
-
-**These were considered and kept**, so the next person to propose one finds the reason instead of re-deriving it. `pnpm josh delegate <step>` answers `kept deliberately` for these, distinguishing them from a step that is merely unlisted:
+**These were considered and kept**; `pnpm josh delegate <step>` answers `kept deliberately` for them, distinguishing them from a step that is merely unlisted:
 
 | Step               | Kept because                                                                            |
 | ------------------ | --------------------------------------------------------------------------------------- |
@@ -1762,637 +1069,288 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
 
-**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast** ([#1426](https://github.com/joshuafolkken/kit/issues/1426)). The read that takes the count of files the run will not edit up to it is where the pre-implementation reading goes to a unit of its own; the ones below it stay in the main line and the unit is not sent back over them, because delegating costs two extra main-line turns — about 18 seconds at the 8.8 s of model wait per turn measured on run #1406 — while one subject file of that run's average size is re-sent on every remaining turn and the turns following its large reads ran 43–72 s against that same 8.8 s average. What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` is what prints the count: the verdict command prints the verifier. **A delegation resets the counter rather than spending it** ([#1460](https://github.com/joshuafolkken/kit/issues/1460)) — run #1441 asked the question once and then read 8 more unedited files without asking again, so the counting moved out of the agent's head and into `josh investigation:guard` below. The rule is `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
+**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it** — the counting moved into `josh investigation:guard`.
 
-**The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step of a run, or one whole child of a batch ([#984](https://github.com/joshuafolkken/kit/issues/984)). Both are rows of the one enumeration above rather than two mechanisms, which is why `epic-child` is answered by this same command. **One row covers both batch entry points**: an epic's child under `epicrun` and one issue of a `queue` are the same unit — same brief, same summary, same `pnpm josh issue:state` verifier — so the queue was wired to this row rather than given one of its own ([#1149](https://github.com/joshuafolkken/kit/issues/1149)).
+**The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
 ### `josh run:hold` / `josh run:release`
 
-Say whether another run already holds this working tree, and claim it when it does not ([#1091](https://github.com/joshuafolkken/kit/issues/1091)).
+Guard a working tree so only one run holds it at a time — `run:hold` claims it, `run:release` clears the claim. The unit is the working tree, so two lanes of one repository key differently.
 
 ```bash
-pnpm josh run:hold 1091                            # alias: josh rh
-pnpm josh run:hold                                 # a `new` entry point, before the issue exists
-pnpm josh run:release                              # alias: josh rr
+pnpm josh run:hold 1091          # claim for issue 1091; alias: josh rh
+pnpm josh run:release 1091       # release this run's own record; alias: josh rr
+pnpm josh run:release --force    # clear a record left by a run that has ended
 ```
 
-**The unit is the working tree, not the repository.** `epicrun` already asks `epic-busy.ts` whether a _repository_ has a child in flight, and that read must not be reused here: what these entry points contend for is one branch, one index and one uncommitted diff, and a linked work tree has its own three — so a repository-scoped answer would stop a second work tree's legitimate run, which is exactly the parallelism a later epic is meant to buy. The record is keyed to `git rev-parse --absolute-git-dir`, which is `.git` in the main work tree and `.git/worktrees/<name>` in a linked one, so two work trees of one repository key differently and two commands in the same work tree key alike.
+**Options:** `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
 
-**It exists because the guard `epicrun` has never covered the entry points a person types.** On 2026-08-30 one session held #1071 in this checkout while another `fullrun new` filed #1090 and implemented nine files in the same tree; a person noticed one command before `pnpm josh git -y` would have committed those nine files onto the other run's branch. **A guard that depends on someone watching is not a guard**, and unattended execution is the whole premise.
+**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an existing branch/PR, or a merged/closed PR), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`.
 
-| Answer     | Meaning                                                                  | Exit code |
-| ---------- | ------------------------------------------------------------------------ | --------- |
-| `hold`     | The tree was free (or the record had expired) and this run now holds it  | 0         |
-| `busy`     | Another run holds it — **stop before filing anything**                   | 0         |
-| `unknown`  | The work tree's git directory could not be read; nothing was established | 1         |
-| `released` | `run:release` cleared a record that was there                            | 0         |
-| `none`     | `run:release` found nothing to clear                                     | 0         |
+### `josh run:carry`
 
-Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)` captures something a loop can branch on. Every explanation goes to standard error, and it names the holder, the time the record was written, the pid that wrote it, and `pnpm josh run:release` as the way to clear a stale one.
-
-**An unreadable record answers `busy`, never `hold`.** A present record that cannot be parsed is the state a guard must not fall open on, because the run that wrote it is the one whose uncommitted work would be trampled — the same reason `epic-busy.ts` refuses to report an unreadable listing as an idle repository.
-
-**A claim never overwrites a record that is already there.** Overwriting is the thing being prevented; the person who knows the other run has ended clears it with `pnpm josh run:release`.
-
-**Two claims racing for one tree cannot both win.** The claim on a tree that read as free is an exclusive create rather than a write, so of two sessions typing an entry point in the same second exactly one is told `hold` and the other is told `busy` — a plain write would tell both of them they won, which is the incident reproduced by the guard meant to stop it.
-
-**The record does not outlive the run in either direction.** A normally finished run releases it inside `pnpm josh followup` on the merge — the one seam every `fullrun`, and every child of an `epicrun` or a `queue`, passes through, so nothing has to remember to type the release. An abnormally ended one is covered by age: a record older than **8 hours** is replaced rather than honoured, which is longer than any measured run and short enough to be gone by the next working day. **The pid is recorded for the person reading the stop, never as the liveness test** — the process that claims the tree is a short-lived `josh run:hold`, so it has exited before anything reads the record back. A `taken_at` that is not a date is read as expired rather than as current, because a record nothing could ever expire is the one state the expiry exists to make impossible.
-
-**Age alone never frees a tree, because some holds are held across a person's latency.** `halfrun`'s stop before commit and a `needs-human-review` stop both leave uncommitted work in the tree deliberately, and no age can be chosen that covers a person going home for the night. **An expired record over a tree that still has uncommitted changes answers `busy`** and says to commit, stash, or release once the work is done; only an expired record over a clean tree is replaced. A tree state that could not be read counts as dirty, for the reason every other unreadable state here blocks.
-
-**Claim it in the checkout the run will edit.** The record is keyed to the work tree the command runs in, so a cross-repository entry point resolves the target repository's checkout from `pnpm josh doctor` before claiming; claiming in the session's own tree would guard the one tree that run never touches.
-
-The entry points that ask it, and where in each procedure, are `.claude/skills/workflow-commands/SKILL.md` → "2f. The working-tree hold — one run per tree".
-
-### `josh run:preflight`
-
-Say what an interrupted run left in this working tree, and what the rule says to do about it before the next child starts ([#926](https://github.com/joshuafolkken/kit/issues/926)).
+Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` continues the authorized run instead of starting a second one.
 
 ```bash
-pnpm josh run:preflight 926   # alias: josh rp
+pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"   # alias: josh rc
+pnpm josh run:carry --json                          # read the record back in a resumed session
+pnpm josh run:carry --cut --owner "$PPID"           # hand the record off before a cut
+pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"  # adopt a record no cut handed off
 ```
 
-Standard output carries exactly one token, so `answer=$(pnpm josh run:preflight 926)` captures something a loop can branch on. Every explanation goes to standard error: what was found, and the exact commands that recover it.
+**Options:**
 
-| Answer    | What it found                                                                   | What the caller does                                                            |
-| --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `clean`   | Clean tree, HEAD on the default branch, no branch or pull request for the issue | Start the child                                                                 |
-| `reclaim` | Uncommitted changes, or HEAD off the default branch                             | Stash with `-u`, switch back, record the stash on the issue, then **ask again** |
-| `resume`  | A branch for the issue, or an open pull request, is still there                 | Reuse it and run the whole verification gate from the start                     |
-| `park`    | The pull request for the issue is merged or closed                              | Park the child with `needs-decision` and a comment                              |
-| `unknown` | The tree could not be read — exits non-zero                                     | Stop. It is not "the tree is clean"                                             |
+- `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
+- `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
 
-**The precedence between those states is fixed, and the first row is why it has to be.** A `resume` or a `park` decided over a dirty tree would hand the next child a checkout it cannot switch, so the tree is reclaimed first and the question asked again on the clean tree — rather than two answers being merged into one. The child is not read at all once the tree already answers `reclaim`: the verdict would be `reclaim` whatever it said, so the `gh` round trip is not spent.
+**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
-**It is re-askable, which `josh run:hold` deliberately is not.** A claim asked twice answers `busy`, because the second ask is a second run. This command reads state and writes nothing, so "reclaim, then ask again" is a procedure rather than a contradiction. The two guard different things and neither replaces the other: `run:hold` asks whether another **live** run owns this tree, this asks what a **dead** one left in it.
+### `josh run:wake`
 
-**A branch is found by pattern, not by name.** `pnpm josh git` builds `<N>-<slug>`, and the slug is not derivable from an issue number, so the read is `git branch --list '<N>-*'` — which matches whatever the title was and never matches `<N><digit>-…`. **Remote-tracking branches are searched too**, with the remote name stripped back off: a run interrupted on another machine, or in a checkout since re-cloned, leaves the branch on the remote with no local counterpart, and a local-only search would answer `clean` over an open pull request. The same listing answers `git_command.branch_exists`, so there is one reading rather than two.
+Continue a cut `backlogrun` by waking the next session from outside the conversation. It reads the carry record and wakes only on `carried`, handed off by `run:carry --cut`.
 
-**The pull request is reached through its head branch, which is the limit of what this command sees.** A branch that exists in neither place — deleted after a merge, say — takes its pull request out of view with it, and the answer is `clean`. Where more than one branch matches, a **decided** pull request on any of them outranks an open one on another, so a retry branch cannot hide a merged pull request behind itself. **An unreadable `gh` is never read as an absent pull request**: existence is asked through `pr_exists`, which throws on a lookup it could not complete ([#1048](https://github.com/joshuafolkken/kit/issues/1048)), and that reaches the caller as `unknown` rather than as `resume` over work somebody already merged.
+```bash
+pnpm josh run:wake --start                 # launch the detached supervisor; alias: josh rw
+pnpm josh run:wake --list                  # supervisor state, cut/wake counts, latest progress line
+pnpm josh run:wake --stop                  # stop it
+pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
+```
 
-**The stash this command prescribes is the one sanctioned stash that is never popped.** What it moves aside belongs to a run that has ended, not to the run doing the stashing, so the Issue comment naming it is the only thing that can ever bring it back. The enumeration of flows that may stash automatically is `prompts/collaboration-workflow/operating-rules.md`.
+`scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local
+`sqlite_home` and `--ephemeral`, retaining native auth/config. Unclaimed wakes try thrice.
 
-The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "Preflight — reclaim what an interrupted run left, before the next child starts".
+**Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
+
+### `josh run:cut`
+
+Cut a dispatched lane child before the verification gate. OpenAI uses its lane supervisor; Anthropic
+relaunches directly. With no matching supervisor, OpenAI returns `failed` before writing the cut.
+
+```bash
+pnpm josh run:cut 1839            # take the cut and hand it to a fresh process; alias: josh rct
+pnpm josh run:cut --resume 1839   # a fresh process's entry check
+pnpm josh run:cut --end           # clear the record
+```
+
+**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`. `run:cut --resume <N>`: `fresh`, `resume`, `stale`, `busy`, or `handed-off`.
+
+### `josh run:liveness`
+
+Say whether the delegated unit running a child is still working, or stopped without reporting. Two traces decide it: whether the transcript grew, and whether a child process is alive.
+
+```bash
+pnpm josh run:liveness 1169 --output <path> --process none   # alias: josh rv
+pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 --repo joshuafolkken/app-kit
+```
+
+**Options:**
+
+- `--output <path>` — absolute, under the home or temp directory; a symlink is followed and size compared as well as mtime.
+- `--process alive | none` — the result of the caller's own `pgrep -laf` against the child's checkout.
+- `--window <min>` — silent window the file must be frozen for (default 30); `--gap <sec>` — spacing between samples (default 5); `--repo <owner/name>`.
+
+**Output / exit codes:** stdout is one token; stderr explains. `alive`, `stopped`, `settled` exit 0; `undetermined` exits 1. Growth in the transcript answers `alive` on its own. Two `undetermined` answers in a row is a check fault; the caller stops polling rather than escalating to `stopped`.
+
+### `josh run:prep`
+
+Bundles the reads a run makes before its first edit into one call; alias `rp`.
+
+### `josh run:merge`
+
+Collapses a `backlogrun` merge event into one call (joshuafolkken/kit#2024); alias `rmg`. The parent
+calls it once at a child's return and reads back the next child number — or a control verdict.
+
+```bash
+next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID")
+pnpm josh run:merge <N> --owner "$PPID"   # backlog offer (no epic)
+```
+
+Confirms the child from GitHub and, by what it turned out to be, does the post-merge steps: a **merged**
+child (CLOSED) is counted into the carry record (which resets the failure streak), then `main:sync`,
+`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
+or `already-done`) is left alone; a **failed** child has its stale `in-progress` dropped, is parked with
+`needs-decision`, and is counted against the consecutive-failure guard.
+
+**Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
+`epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
+`over` (the merge crossed the shared 150,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
+before its commit — stop), `stop` (the consecutive-failure guard tripped), and `retry` (the child's
+state could not be read).
+
+**Options:**
+
+- `--epic <E> --repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
+- `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
+
+### `josh run:progress`
+
+Report an unattended run's progress once it has gone quiet — the one josh command meant to be started and left running in the background.
+
+```bash
+pnpm josh run:progress --output <path>           # alias: josh rg
+pnpm josh run:progress --once                    # five labelled lines now, whatever the clock says
+pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
+```
+
+**Options:**
+
+- `--mark` — record that a real report happened without printing a line (keeps the last line for `run:wake --list`).
+- `--interval <min>` — silence interval (default 20; also `JOSH_PROGRESS_INTERVAL_MINUTES`, then `josh.progress_interval_minutes`).
+- `--hours <n>` — how long the watcher lives (default 1); `--repo <owner/name>` scopes the read.
+
+**Output / exit codes:** stdout carries only the five labelled progress lines; notices go to stderr. `--once` with no run recorded prints nothing and exits 0; an unreadable listing exits 1. It sends no Telegram; `JOSH_PROGRESS=0` reports nothing (`--mark` still records).
+
+### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
+
+Open and close a lane: one linked git work tree with its own branch and its own port seat. `lane:open` cuts from `refs/remotes/origin/<default>` (falling back to the local branch), attaches to an existing `<N>-lane` branch, installs dependencies (`pnpm install --frozen-lockfile`), and warms the gate caches from the main checkout.
+
+```bash
+pnpm josh lane:open 1490    # prints the lane directory on stdout; alias: josh lno
+pnpm josh lane:close 1490   # alias: josh lnc
+pnpm josh lane:close --all
+pnpm josh lane:list         # alias: josh lnl
+pnpm josh lane:prune        # alias: josh lnp
+```
+
+**Options:**
+
+- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree.
+
+**Settings:**
+
+- `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
+- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 6); applied by `josh epic:next`.
+
+**Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
+
+#### `josh lane:output`
+
+Record — or read back — where the delegated unit running this lane's child writes, so a session that did not open the lane can still poll it.
+
+```bash
+pnpm josh lane:output 1713 /abs/path/to/agent-7.jsonl   # record it; prints the path back
+pnpm josh lane:output 1713                              # read it; prints the path, or `none`
+```
+
+The record lives in the lane's own `.env`; a lane whose `.env` cannot be read is refused rather than replaced.
+
+**Output / exit codes:** the recorded path prints on stdout. `none` prints and exits non-zero (the lane is open but its child is not handed over yet).
+
+#### `josh lane:dispatch`
+
+Start a lane's child as a detached OS process, so cutting this session abandons nothing. Alias `josh lnd`.
+
+```bash
+pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
+```
+
+The invoking CLI selects the worker provider: Codex sessions use a detached
+non-AI supervisor for Codex generations, while Claude Code sessions run unchanged `claude -p`.
+SQLite stays lane-local; worker rollout files persist for active-usage cuts. Native auth/config stay
+put. The printed PID is the supervisor's.
+
+**Before it launches, it applies the `in-progress` label to `#<N>`** (creating the label if missing), so the lane counts as busy from the dispatch rather than only once the child's own `fullrun` reaches its apply — that window used to be tens of minutes. If the label cannot be applied it launches nothing and refuses; if the launch then fails it removes the label again, leaving no `in-progress` on an idle issue.
+
+**Options:**
+
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `opus`, `sonnet`, and `opus`. Codex keeps its provider-specific model.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `high`, `medium`, and `high`.
+
+Blank means unset. The inherited agent session identifier selects the provider; a missing or
+conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
+refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
+defaults to `gpt-5.6-sol` with scheduler/worker/reviewer efforts `high`/`medium`/`high`. Legacy
+`JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
+evaluation procedure](./backlogrun-worker-evaluation.md).
+
+**Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 
 ### `josh cost`
 
-Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).
+Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 150,000 limit; `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
 
 ```bash
-pnpm josh cost                  # the newest session — the run that just finished; alias: josh co
-pnpm josh cost --session <id>   # one named session
-pnpm josh cost --issue 962      # one issue, across every session that touched it
-pnpm josh cost --all            # every issue in this project, plus a grand total
-pnpm josh cost --json           # the same figures, machine-readable
+pnpm josh cost --cut             # compare billed input per request with the shared 150,000 context-cut threshold
+pnpm josh cost --over <tokens>   # compare with an explicit limit; alias: josh co
+pnpm josh cost --cut --path <dir> # Anthropic project or current OpenAI worktree
 ```
 
-[`josh epicrun`](#josh-epicnext)'s budget guard needs a number it can cite, and until this command there was no way to produce one — nothing read the `usage` Claude Code records for every request, so "did that change make a run cheaper?" had no answer at all.
+**Options:** either threshold prints `over` / `under` on stdout and measured input per request on stderr. `--path <dir>` selects another Anthropic project; OpenAI accepts only linked checkouts of the current project. OpenAI workers persist each generation's rollout, whose pre-terminal `token_count` events are read only when thread ID and normalized project cwd match.
 
-**A cost is not tokens times one rate.** The four kinds of input are priced differently, and this is not a rounding difference:
+**Output / exit codes:** no threshold selector prints usage; absent provider usage exits non-zero and says where it looked; a session with no requests says so rather than answering a verdict.
 
-| Kind                      | Price         | Why it is kept apart                                                                          |
-| ------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
-| Uncached input            | base          | The rate the others are multiples of.                                                         |
-| Cache write, 5-minute TTL | 1.25x base    | The default TTL.                                                                              |
-| Cache write, 1-hour TTL   | **2x base**   | What this project's sessions use — folding it into the 5-minute rate under-reports every run. |
-| Cache read                | **0.1x base** | Where nearly all of a long session's input lands.                                             |
-| Output                    | 5x base       | Priced from the model's own output rate.                                                      |
+### `josh doc:section`
 
-Measured on one real request: `cache_read_input_tokens` 97,190 against `input_tokens` 2. An estimate that picked any single rate would be wrong by more than an order of magnitude.
+Print one section of a markdown document, so a `` `X.md` → "Heading" `` pointer costs a heading rather than a whole file.
 
-**One API response is written to the transcript as several lines** — one per content block, all carrying the _same_ `usage` object. Measured: 20 assistant lines for 8 requests. The unit of aggregation is therefore `requestId`, never the line; summing lines over-reports a real session by roughly 3x.
-
-**A delegated unit's transcript is read too, and it is not beside the session's** ([#1285](https://github.com/joshuafolkken/kit/issues/1285)). `epicrun` and `queue` run every child in a delegated unit, and `gate-fix` / `survey` delegate one step of a run; each unit writes to `~/.claude/projects/<slug>/<session-id>/subagents/agent-<agentId>.jsonl`, a subdirectory of the session that delegated it rather than a file beside it. Listing only the session files therefore reported a whole batch as the parent's wait: epic #1272's four merged children each printed as "CI wait only", and `--all` under-counted the same corpus by 13,953 requests / $2,549 against 32,254 / $4,131. The discovery is **one walk** — `cost-transcript.ts`'s, shared with [`josh time`](#josh-time) — so neither command has a second idea of where a transcript lives. A unit is named `<session-id>/agent-<agentId>` and `--session` accepts that form; **the no-argument scope still means the session**, because a unit is part of a run rather than a run of its own and it writes the newer file whenever a session delegates.
-
-**Billed input is split into resident and history.** The resident baseline is the first request's whole input — system prompt, tool schemas, `CLAUDE.md`, the skills index — because that is what was in context before any work happened, and every later request re-reads it. What the run paid for the resident half is that baseline times the request count; the conversation is the remainder. It is an estimate and says so, but the two shares reconstruct the billed input exactly, so a reader can check it.
-
-**The resident block is decomposed, and the history with it** ([#1151](https://github.com/joshuafolkken/kit/issues/1151)). Measuring the resident block is not decomposing it: 51,782 tokens per request was a known figure for months while nobody could say how much of it was `CLAUDE.md`, so "where would trimming help" was a guess rather than a reading. Two tables answer that, printed on the whole-session scope only — both are read from one transcript's own lines, and an issue's slice or a `--all` corpus has no single session to read them from. `--json` carries the same figures under `measurement`, so another run consumes them instead of writing a script.
-
-```
-Resident breakdown (baseline 51,735 tok, measured; rows estimated):
-  CLAUDE.md                                                57,841 B     19,287   37.3%
-  skills index (frontmatter)                                2,148 B        716    1.4%
-  UserPromptSubmit hooks                                    1,019 B        340    0.7%
-  harness: system prompt, tool schemas, MCP instructions                31,392   60.7%
-  MCP servers declared (svelte) load their tool schemas and instructions
-  on every request; both are served by the server, so they sit inside the harness row.
-
-Context composition (blocks written to this session's transcript; estimated except thinking):
-  tool_result                           116       67,245   42.9%
-  Bash command bodies                   109       28,673   18.3%
-  thinking                                        42,438   27.1%  (measured)
-  text                                   11       13,477    8.6%
-  tool_use inputs (excl. Bash bodies)   116        4,781    3.1%
-  total                                          156,614
+```bash
+pnpm josh doc:section <file.md> "<heading>"   # alias: josh ds
+pnpm josh doc:section backlogrun.md "The hand-off"
 ```
 
-**The transcript cannot decompose the resident block, and the report does not pretend otherwise.** Claude Code writes no system prompt and no tool schemas into the transcript, so the only honest decomposition is from the other side: size the parts the repository itself controls, and report the difference from the measured baseline as **one named remainder** rather than distributing it over the rows that could be measured. The baseline is the only measured figure in that table, and the remainder absorbs the estimator's error instead of hiding it. The skills index is sized from each `SKILL.md`'s frontmatter and not its body — Claude Code lists a skill by name and description, and counting the body would price an on-demand file as resident and report the whole skill split as having achieved nothing.
+**Options / behavior:**
 
-**Tokens are estimated with two terms, not one bytes-per-token ratio.** A single ratio is wrong by a factor of three across this project's own content: English markdown runs about 3 characters per token while Japanese runs about one token per character at 3 bytes each. Both constants were calibrated against this repository's transcripts, at the one place where a real count sits beside real text — an assistant response whose content is only `text` blocks and whose `thinking_tokens` is 0, where `output_tokens` is the count of exactly that text. A least-squares fit over 238 such responses put the wide-character coefficient at 0.991 tokens. The ASCII term is taken from the one clean reading in that set — the responses that are almost entirely ASCII, at 2.97 characters per token. The other two readings are denser (2.12 from subtracting the wide term across the whole set, 1.8–2.6 from how the baseline moved as `CLAUDE.md` grew) and each is denser for a reason that does not apply to a document like `CLAUDE.md`: the first measures markdown scaffolding embedded in Japanese, which tokenizes far denser than prose, and the second attributes to `CLAUDE.md`'s bytes the tokens of every other resident surface that grew in the same commits. **The residual error therefore runs one way**: if 3 is too generous, the rows sized from repository files under-count and the difference falls into the harness remainder, which is an upper bound on what cannot be decomposed and the sized rows a lower bound on what can. **Thinking is the one row that is not estimated**: its text is never written to the transcript, so the count comes from the API's own `thinking_tokens`.
+- A bare name resolves inside `.claude/skills/workflow-commands/`; anything that resolves as a path is taken as one.
+- The section prints verbatim with its subsections (a `##` heading carries its `###` children).
+- The heading matches as a prefix, exact match first; two prefix matches is a refusal naming both.
+- Fenced blocks are skipped so a `#`-column comment inside a fence does not end the section early.
 
-**The sized rows are read from the working tree, not from the session.** `CLAUDE.md`, the skills index and the hook commands are measured as they are on disk now, while the baseline belongs to whichever session is being reported. On the newest session — the default — the two agree; on an older `--session <id>` they can differ by however much those files have changed since, and the harness remainder silently absorbs the drift.
+**Output / exit codes:** an unresolvable heading exits non-zero and lists the document's own headings.
 
-**The resident budget is now held in tokens as well as bytes.** `scripts/workflow-skills.test.ts` caps each AI document at `RESIDENT_CEILING_BYTES` with `RESIDENT_HEADROOM_BYTES` to spare; the token pair is **derived** from those two rather than chosen beside them, so for pure ASCII — one byte, one character — the two are the same limit rather than two limits to reconcile. That is what "does not contradict the byte ceiling" has to mean, and it is a second _unit_ rather than a second, tighter guard. The two differ only where a byte buys a different number of tokens: every non-ASCII character costs one token, so a two-byte one costs a token per two bytes against ASCII's three and the token ceiling binds first, while a four-byte one costs a token per four and the byte ceiling does. Japanese, at three bytes per character, lands exactly on the conversion, and there the two ceilings coincide.
+### `josh read:set`
 
-**Resident this project does not use is recorded rather than removed.** `.mcp.json` declares the `svelte` MCP server, whose tool schemas and server instructions load on every request although kit is a tooling package with no Svelte source. The report names the declared servers and places them inside the harness remainder, which is the granularity the data supports — the schemas are served by the server, so nothing in the repository can size them. **The file is deliberately not forked into "kit's own" and "what consumers get":** `josh init` copies `.mcp.json` into consumers, the consumers of `@joshuafolkken/app-kit` and `@joshuafolkken/game-kit` are SvelteKit apps for which the server is correct, and kit is the source of what it distributes — a local copy that differed from the distributed one is the drift `josh sync` exists to prevent, and it would stop kit's own runs from exercising the file consumers receive. The lever that actually removes the cost for one project is Claude Code's own per-project MCP enablement, which is personal and uncommitted, so it can be switched off here without changing what ships. The two `UserPromptSubmit` hooks are the other per-request surface the repository controls, and they are used: they inject 1,019 bytes into every user turn and appear as their own row.
+Say what a workflow entry point reads before it starts, and what that read costs.
 
-**Attribution to an issue reads the branch.** `josh git` names a branch `<N>-<slug>`, so the branch carries the issue number — but a child is implemented on the default branch, because `josh git` only creates the branch at commit time. A request made on the default branch is therefore attributed to the nearest issue branch that appears **later** in the same session, falling back to the nearest earlier one for the tail after a merge. Attribution is per session: concatenating sessions first would let one session's trailing branch claim the next session's opening requests.
+```bash
+pnpm josh read:set              # every entry point; alias: josh rs
+pnpm josh read:set backlogrun   # one of them
+pnpm josh read:set backlogrun --json
+```
 
-**The project's transcript directory is its working directory as a slug** — every character that is not a letter, digit or hyphen becomes a hyphen, so `~/Development/my_project` reads from `-Users-…-Development-my-project`. Verified against a real probe: a directory named `slug_probe.dir` produced `slug-probe-dir`.
+Two figures under one definition, which is what makes a before and an after comparable:
 
-**`--over <tokens-per-request>` answers a hand-off question instead of printing a table.** It prints `over` or `under` on stdout and the measured figure on stderr, comparing the session's billed input divided by its request count against the limit. Per request rather than in total, because the total only says the session was long — the ratio says what the _next_ turn will cost, which is what a hand-off decision turns on. `epicrun` uses it after a merged child ([#968](https://github.com/joshuafolkken/kit/issues/968)); measured across one run of six children in one context, the figure went from 222k during the first child to 645k during the sixth. **Since [#1212](https://github.com/joshuafolkken/kit/issues/1212) it asks only after a child that ran in the parent's own context** — a run whose children go to isolated units adds 4,000–5,000 per child and would never reach the limit — **and `over` on its own no longer ends the session**: the run compacts and continues, because everything the next child needs it reads back from GitHub. It still stops where the session cannot continue at all — it cannot compact and its context is exhausted — and prints the resume command there.
+| Figure   | What it counts                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `whole`  | Every file in the set read in full, the cross-referenced ones included — what a run pays with no way to fetch a heading |
+| `scoped` | The set's own files in full plus the referenced **sections** alone — what the same run pays with `josh doc:section`     |
 
-**Nothing is ever silently zero.** An absent transcript exits non-zero and says where it looked — for every scope, `--all` and `--issue` included; a scope with no requests attributed says so in words rather than printing a table of zeroes; a model the price table does not know is reported as unpriced and the total is labelled a floor; and lines that could not be read are counted and printed. Locally generated `<synthetic>` assistant messages are skipped — they were never sent to the API, so counting them would inflate the request count.
+- **The set is derived, never transcribed.** The files come from `SKILL.md` → "1. Which file to read" and the sections from the `` `X.md` → "Heading" `` references those files carry.
+- `SKILL.md`'s own cross-references are not counted; a reference into a file the entry already reads whole, into `CLAUDE.md`, or into a `prompts/` topic is not counted either.
+- **An unresolvable reference is charged at its whole file** — reporting it at zero would let a broken pointer read as a saving.
+- A file cited more than once is charged once, over the union of the lines its references cover.
+- Each file row names the tool that can deliver it whole; a file over the Bash cap is marked `Read (over the Bash cap)` — one `Read` call per file, never `cat`.
+- A `-- read at the point of use, not at the entry --` block lists `latest-gate.md`, `followup.md`, `chain-rule.md` and `background-commands.md` with their costs; they are listed, not counted in `whole`/`scoped`.
+- `total read` sums the scoped entry read and the point-of-use documents that entry actually reaches — the figure a before/after compares.
+- **`lane-child` is a synthetic entry**, not a table keyword: `pnpm josh read:set lane-child` prints the trimmed set a dispatched lane child (`JOSH_LANE_CHILD`) reads — it drops the point-of-use documents the parent owns (child dispatch, lane opening, the progress watcher and the hand-off) and reads the entry-only `SKILL.md` sections (§2a/§2c/§2e/§2i/§3) at the section level, so its `total read` falls well below a normal `fullrun`'s (joshuafolkken/kit#2021).
+
+**Output / exit codes:** an unrecognized keyword is refused with the known ones listed, rather than reporting a saving of zero.
 
 ### `josh time`
 
-Report where a run's wall clock went, read from the same transcripts `josh cost` prices ([#1267](https://github.com/joshuafolkken/kit/issues/1267)) and, for the part no transcript records, from GitHub ([#1268](https://github.com/joshuafolkken/kit/issues/1268)).
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `scripts/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
+
+Report where a run's wall clock went, read from the same transcripts `josh cost` prices and, for the part no transcript records (CI, merge), from GitHub.
 
 ```bash
-pnpm josh time                  # the most recently merged run — the fullrun that just finished; alias: josh tm
-pnpm josh time --issue <number> # one issue's whole run, from the fullrun invocation to the merge
-pnpm josh time --session <id>   # one named session on its own
-pnpm josh time --epic <number>  # a whole epicrun, child by child, with the per-turn trend across them
-pnpm josh time --last <runs>    # the last <runs> merged runs as a distribution — min, median and max per phase and per check
-pnpm josh time --period <days>  # the backlog over the last <days> days — lanes, idle, serialization and throughput
-pnpm josh time --top <rows>     # cap the per-tool, per-josh-command, segment and per-invocation tables at <rows> each
+pnpm josh time                  # the last run tree, wall clock and cost by role; alias: josh tm
+pnpm josh time --run            # the same run-tree scope, named explicitly
 pnpm josh time --json           # the same figures, machine-readable
+pnpm josh time --path <dir>     # read another project's transcripts from this checkout
 ```
 
-**`--top <rows>` caps the two tables a reader ranks off, and says what it withheld** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). `--json` carries every row of `by_tool` and `by_josh_command` by default, and an epic pays for both once per child — which is what `diag` reads whole every time it measures a batch. The cap is applied to the record both renderings are made from, so it means the same thing with and without `--json`, and a cut table adds a note — `by_tool: showing the top 5 of 34 rows — 29 withheld by --top` — because a table that silently stops at five reads as though the rest were zero. **Without the flag the output is unchanged, byte for byte**: `josh time` is used for hand investigation as well as by `diag`, and a call that wants the tail must not have been narrowed underneath it. It narrows the row tables only — the four shares, the phases, the round trips and the per-CI-check table are whatever they were — and a non-positive or unparsable value is refused rather than read as "carry every row". `by_check` is left uncapped on purpose: its rows are one per CI job, so cutting them would hide a check rather than a tail. Since [#1311](https://github.com/joshuafolkken/kit/issues/1311) the `segments` and `by_invocation` tables are cut by the same flag and noted the same way — both grow with the length of the run rather than with the number of distinct commands, which is the unbounded growth the cap exists for — and a capped `segments` no longer sums to the elapsed time, which is exactly what its note says. Since [#1387](https://github.com/joshuafolkken/kit/issues/1387) `rework.files` is cut too, for the same reason: it grows with the number of files a run edited, which reaches sixty in one session here. It is ordered dropped-first, so the cut keeps the findings, and the two counts beside it remain totals over what was measured.
+**Options:**
 
-**Every merged run now records itself, so the sample accumulates without anyone asking for it** ([#1471](https://github.com/joshuafolkken/kit/issues/1471)). [`josh followup`](#josh-followup) calls the same builder this command uses and appends the run's headline figures — elapsed, turns, tool calls, round trips and the two per-round-trip costs — as one JSON line in `.time-history.jsonl` at the repository root, keeping the newest 200 runs and dropping the oldest. The file is gitignored, so it is per checkout, and a line that does not parse is skipped rather than taking the earlier records with it. It is deliberately **not** a copy of the report: it carries the figures two runs are compared on and nothing else, because the tables are reproducible from `pnpm josh time --issue <N>` and a file that held them would grow without making any comparison possible that these numbers do not already support.
+- `--run` (default) — the whole run tree, wall clock led beside dollars. The additional report scopes (`--issue`/`--session`/`--epic`/`--last`/`--period`) and the `--instructions`/`--top` modifiers they carried were retired with no rule or decision reading them (#2017).
+- `--path <dir>` — aim the read at another project (absolute path); keeps the `cwd` behavior when absent.
+- `--json` — the run tree, machine-readable.
 
-**`--period <days>` reports the backlog rather than one run** ([#1470](https://github.com/joshuafolkken/kit/issues/1470)). Every other scope answers where one run's wall clock went; what actually wants shortening is the time until the backlog is empty, and with several runs in flight that time is not readable from any one of them. It reads `.time-history.jsonl` — the accumulation the paragraph above describes, and the only source, so nothing here measures a second time — and reports, in one table per question: **issues finished per day**, **per-lane busy and idle time** with the effective throughput against the lane count, **the stretches the work serialized on**, each named by the run that held the only busy lane, and **the wall clock another run was hiding** told apart from the wall clock that was exposed with nothing else running.
+**Output:** the run-tree report `josh cost --run` builds — a header (session count, active wall clock, total dollars, run and merge counts, and counts of transcripts outside this run and unreadable ones), a by-role breakdown (cost and wall clock with their shares, session and request counts, preamble tokens), and a per-session list. When the run this checkout carries is unfinished, a run-state block (read from `run:carry` / `run:wake`) leads the report so a cut, handed-off or stalled run is surfaced at the front rather than buried. An unmeasured figure prints `not measured` rather than a zero.
 
-**Lanes are derived from the wall clock, not read from a field.** Parallel lanes are the subject of [#1473](https://github.com/joshuafolkken/kit/issues/1473) and do not exist yet, so a `lane` column on the run record would be written by nobody; instead the runs are packed, in start order, into the lowest-numbered lane that was free when each began, which makes the lane count exactly the peak number of runs in flight at once. **With nothing overlapping the answer is one lane**, said out loud in the report's notes — the honest reading of a backlog that has only ever been worked serially, rather than a table of empty lanes. Idle is measured against the window the runs themselves cover, first start to last end, because measuring it against the calendar period would price the nights nobody was working as lane idle time. A record written before [#1470](https://github.com/joshuafolkken/kit/issues/1470) added `started_at` / `ended_at` carries no window; it is excluded from the lane table and counted in the notes, never placed at the epoch.
-
-Every issue filed to make `fullrun` faster has come out of a **hand measurement**: the session record restored by eye, a throwaway script written for that one run, and a classification that differed from the last one. `josh cost` reads what a run was billed and there was nothing on the other axis, so "did that change make a run shorter?" had no answer anyone could compare across two runs.
-
-**The sample below is one run end to end** — `pnpm josh time --issue 1379`, the run that shipped [#1379](https://github.com/joshuafolkken/kit/issues/1379) — so each block can be read against the ones around it: the price the `Bundling:` rows multiply out is the one the `Round trips:` block above them prints, and both divide by the same round-trip count. Blocks pasted from different runs read as one report and cannot be checked at all ([#1395](https://github.com/joshuafolkken/kit/issues/1395)). The segment and per-invocation tables the same invocation also prints are shown further down, on a different run that is named where they appear.
-
-```
-issue #1379 — 27.2 min elapsed
-  2 transcript(s)
-  PR #1380 merged
-  1.2 min of the merge command was waiting on CI — the phase table charges it to `ci`
-
-Where the wall clock went:
-  model wait               14.1 min   52.0%
-  tool execution           13.1 min   48.0%
-  human wait                0.0 min   0.0%
-  CI wait                   0.0 min   0.0%
-
-By phase (in run order):
-  plan                                not detected
-  setup                     0.5 min   1.7%
-  implement                 3.6 min   13.4%
-  gate                      0.6 min   2.4%
-  rework                    5.8 min   21.2%
-  review                    6.9 min   25.3%
-  pr                        0.9 min   3.3%
-  wrapup                    1.3 min   4.6%
-  ci                        1.2 min   4.3%
-  merge                     0.8 min   2.8%
-  wait                      0.0 min   0.0%
-  wait-outside              0.0 min   0.0%
-  pre-run                   4.8 min   17.6%
-  post-run                  0.9 min   3.3%
-  other                     0.0 min   0.0%
-
-Round trips:
-  tool calls                    108   over 156 turn(s)
-  round trips                   101   1.07 calls per round trip
-  batched turns                   7   94 single-call turn(s)
-  cost per round trip        15.9 s   model wait 8.1 s
-  ⚠ independent calls are going out one per turn (floor 1.50 calls per round trip)
-
-Model gap per round trip:
-  model gap                   3.8 s   min 0.0 s · p90 14.8 s · max 189.5 s
-
-Longest model gaps (descending):
-  01:30:49 → 01:33:59       189.5 s   pre-run · 11.6% of elapsed
-  01:42:57 → 01:43:42        44.3 s   rework · 2.7% of elapsed
-  …
-
-Bundling:
-  bundleable sequences           15   longest 8 turn(s)
-  recoverable round trips        25   24.8% of 101 round trip(s)
-  recoverable wait          3.4 min   at 8.1 s model time per round trip
-
-Single checks:
-  single checks                   8   6 in the rework phase · 45.9 s of tool time
-  repeat calls                    3   same command and arguments
-  answered nothing new            0   0.0 s · no edit between the two calls
-  recoverable check time    0.0 min   at 8.1 s model time per round trip
-
-Failure re-runs:
-  failed calls                    2   of 108 call(s), 59 outcome unreadable
-  re-run after failure      0.0 min   0.3% of tool execution
-
-Change size:
-  files changed                   6   in the merged diff
-  lines added                   254   of 263 changed line(s)
-  lines deleted                   9   of 263 changed line(s)
-  edited, never landed            1   of 6 file(s) edited
-  edited outside the tree         1   could not have reached any diff
-
-Edited files (never landed first, then by edit count):
-  scripts/verification-gate.ts        2   never reached the merged diff
-  scripts/josh-verdict.test.ts       10   in the merged diff
-  …
-
-By tool (descending):
-  Skill                     6.9 min   2 call(s) · 2 round trip(s) · 2 alone
-  Bash: pnpm                5.0 min   25 call(s) · 21 round trip(s) · 16 alone
-  Edit                      0.7 min   39 call(s) · 39 round trip(s) · 39 alone
-  …
-
-By josh command (descending):
-  josh followup             1.9 min   1 call(s)
-  josh git                  0.9 min   2 call(s)
-  …
-```
-
-**The partition is by gap, not by pair.** Every span is the interval between two consecutive dated lines, classified by the **later** one: a span ending at an assistant line is model wait, one ending at a tool result is that tool's execution, one ending at a typed prompt is human wait. So the three shares reconstruct the elapsed time **exactly**, and a reader can check them instead of trusting them. Pairing each `tool_use` with its own `tool_result` instead would double-count parallel calls and leave the shares summing to more than the run took — which is the property that makes two runs comparable.
-
-**The `Single checks:` block is about the probing in front of that gate, not the gate itself** ([#1383](https://github.com/joshuafolkken/kit/issues/1383)). `CLAUDE.md` has said **one gate per run, not one per edit** since [#1246](https://github.com/joshuafolkken/kit/issues/1246), and the single checks — `josh lint:related`, `josh test:related`, `josh cspell:dot` and the type check — are where that rule sends an implementation loop instead. Nothing measured whether the loop then repeated _them_. **Two calls are the same call only if they named the same files**, so the signature is the subcommand plus its arguments, sorted and with shell redirections dropped — read while the tool input is still in hand, since a span keeps none. `answered nothing new` is the narrow figure the rule in `prompts/review.md` → "A single check answers once per tree" is about: a repeat that only a model turn sat between, whose answer was therefore known before it was asked. **It under-reports on purpose** — a repeat separated by a plain `Read` is not counted, because nothing here can prove that call changed no file — and a consumer project's type check is `josh-app check:ci`, which is not a `pnpm josh <cmd>` call at all and so is invisible. The zero above is the honest reading of that run rather than an empty block: all three of its repeats followed an edit.
-
-**The same elapsed time is also read along the run, not only as totals** ([#1311](https://github.com/joshuafolkken/kit/issues/1311)). A phase row says the gate cost 0.6 minutes and cannot say whether its four runs sat together or were spread across the hour, and `josh gate 4 call(s)` is the same row whether the four were even or whether the last took three times the first — which is what the hand-built reports these tables replace did say. **A segment is a maximal stretch of the run in one phase**, named by the phase that spent the most of it and by the busiest command inside it; a phase change lasting under half a minute is absorbed rather than given a row of its own, because a real run alternates — a gate call, the turn that read it, another gate call — and a strict reading yields dozens of rows nobody can read. **The absorbed time is still counted**: every span lands in exactly one segment, so the segments reconstruct the same total the phases do, less the CI share no span covers. **The per-invocation table lists each call's own duration in run order**, for commands called more than once only — one duration is what the per-command table already printed — and the two fragments of a call that bracketed a delegated unit are rejoined by the id they share rather than counted as two calls. The two blocks, on the run of [#1309](https://github.com/joshuafolkken/kit/issues/1309) rather than on the run above:
-
-```
-Segments (in run order):
-  18:05:18 → 18:12:09       6.9 min   pre-run · Bash: python3
-  18:12:09 → 18:13:05       0.9 min   setup · Bash: pnpm
-  18:13:05 → 18:18:50       5.8 min   implement · Edit
-  18:18:50 → 18:23:38       4.8 min   review · Skill
-  18:23:38 → 18:28:43       5.1 min   rework · Bash: pnpm
-  18:28:43 → 18:29:26       0.7 min   pr · Bash: pnpm
-  …
-
-Per invocation (repeated commands):
-  Skill                     8.8 min   2 call(s): 276.6 s, 248.8 s
-  josh git                  1.0 min   3 call(s): 23.2 s, 7.5 s, 28.1 s
-  josh gate                 0.6 min   4 call(s): 1.7 s, 17.1 s, 16.6 s, 2.2 s
-  …
-```
-
-**`josh gate` is four short calls there because the gate is started in the background** and the span measures the call that launched it, not the checks it ran — the same reason that run's `gate` phase is 1.6% of it. **A row here is not the same total as the row of the same name in `By tool`**, and deliberately: a `pnpm josh <cmd>` call is keyed by its subcommand, exactly as in the per-`josh <cmd>` table. On that same run of #1309, `By tool` prints `Bash: pnpm 5.1 min` and this table prints `Bash: pnpm 0.2 min` — what is left of it once the `josh` calls have rows of their own.
-
-**The round-trip block counts what a duration cannot see** ([#1304](https://github.com/joshuafolkken/kit/issues/1304)). Once the verification commands were cut, a run's wall clock stopped being set by how long the tools ran and started being set by **how many times it stopped to wait for one**: on `fullrun #1295` the read-only `Bash` calls and the `Edit` calls together executed for about 54 seconds while the turns they sat in cost 600–850. So the report prints the calls, the **round trips** they were issued in — one per group of calls a single turn issued together — and the density between them. A run that batches nothing has as many round trips as calls, and below **1.50 calls per round trip** the block says so in a line rather than leaving the reader to divide. The four runs it was set from measured 1.13, 1.04, 1.03 and 1.00. Cutting the count is [`turn-batching.md`](https://github.com/joshuafolkken/kit/blob/main/prompts/collaboration-workflow/turn-batching.md); this only reports it.
-
-**It also says which tool the round trips belong to** ([#1385](https://github.com/joshuafolkken/kit/issues/1385)). A density is one number for the whole run, and one number cannot name what to batch: run #1379 — the run the sample above is taken from — reported `108 calls / 101 round trips / 1.07` and the warning beneath it, and three consecutive runs went by without the figure moving. Hand-measuring the same run found the answer one column away — of its round trips only a handful issued several tools at once, and **every** `Edit` call went out alone, splitting the change into a turn per edit. So each `by_tool` row now carries `round_trip_count` and `alone_in_turn_count` beside its call count — `Edit 39 call(s) · 39 round trip(s) · 39 alone` — and the block carries `batched turns` against single-call turns for the run as a whole. **The pair is not derivable from the density**: over 101 round trips, 1.07 is 7 turns of two calls against 94 single-call ones as readily as 3 turns issuing three and four calls against 98 — and the second run has less than half as much batching to build on. **`by_josh_command` deliberately carries neither**, because a `josh` subcommand is a `Bash` call under another name and its round trips are already the `Bash` row's — printing them twice would report one trip under two labels of one report. A row's counts are a **measured** zero where the tool called nothing countable; the withholding is one level up, on the block, so a scope with `span_count: 0` prints `not measured` for the turn split exactly as it does for the counts above it.
-
-**A turn is an assistant message, and a round trip is one message's calls** ([#1406](https://github.com/joshuafolkken/kit/issues/1406)). Both counts were read off the transcript's _lines_ until this issue reconciled them against a hand read of run #1399, and both were wrong in the same way. Claude Code writes **one line per content block** and repeats the message id on each, and the harness returns each result as soon as it has one — so a turn that issued three calls reaches the timeline as `use → result → use → result → use → result`, its calls separated by that turn's own model spans. Counting model spans reported #1399's **41 turns as 79**; grouping tool spans by adjacency reported its **40 round trips as 47**, of which 3 were said to be batched where 8 were. The turn is now read off the message id, with the old adjacency rule kept as the fallback for a span carrying none, so the three quantities read as follows:
-
-| Figure                | What it counts                                                                    | What it is not                                                   |
-| --------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `turn_count`          | Assistant messages the run's model spans came from                                | Not model spans, and not transcript lines                        |
-| `round_trip_count`    | Times the run stopped for results — one per message that issued at least one call | Not calls, and not runs of adjacent tool spans                   |
-| `categories.model_ms` | Total duration of every model span                                                | Not per-turn, so splitting a message across lines never moved it |
-
-- **The three were not equally wrong, and that is the reconciliation's point.** `model_ms` is a _duration_ summed over the same lines the turn count counted, so it was right all along — #1399's `5.93 min` against the hand read's `4.5 min ＋ 1.4 min` is one figure and its own decomposition, not a disagreement. The **1.4 min** is the CI the merge command waited on **inside** its own Bash span: it lives in `categories.tool_ms`, `categories.ci_ms` stays `0`, and the phase table charges it to `ci` while subtracting it from `merge`. Nothing about it is unmeasured, and the note under the header says so on every run that has one.
-- **Re-measured, #1399 reads `50 calls over 41 turns / 40 round trips / 1.25` with 8 batched turns against 32 single-call ones** — the hand read exactly. Every figure quoted in the paragraphs above from a run measured before this change (#1379's `101 round trips`, #1299's `172 tool-issuing turns`) was taken under the adjacency rule and reads high.
-- **The live hook line moved with it**, since [#1329](https://github.com/joshuafolkken/kit/issues/1329) reuses this same count: a turn that batches is no longer told it did not.
-
-**The bundling block says how much of that count was avoidable** ([#1344](https://github.com/joshuafolkken/kit/issues/1344)). A density under the floor says independent calls went out one per turn; it does not say how many of them could actually have gone out together, and three runs in a row sat at 1.10–1.12 with both the end-of-run warning and the live hook line already shipped. The estimate of what batching would return was arithmetic on the floor — bundle 136 calls to 1.50 and 33 round trips disappear — which assumed every call was bundleable. This block reads the run instead. **A sequence is consecutive single-call round trips whose calls are of a bundleable kind and do not touch one another's targets**; a sequence of `n` turns could have been one, so it holds `n - 1` avoidable round trips, and the third row multiplies the total by the **model** share of the trip price — the part batching removes, since a tool's own execution is paid whichever turn it is issued from.
-
-- **The kind is an allow-list.** `Read`, `Grep`, `Glob`, `Edit`, `Write`, `WebFetch` and `WebSearch`, plus a `Bash` call whose leading command inspects (`cat`, `sed`, `grep`, `gh`, …) and whose line holds no mutation word anywhere in it. A tool nobody classified is **not** bundleable: an unlisted tool counted as one would inflate the figure this block exists to establish. `git` is deliberately absent, because `git status` and `git switch` are one word apart and the label carries only the leading word.
-- **The dependency test is on the inputs, because no result text is kept.** Two calls whose targets are equal — or where one names a directory the other reads inside of — are treated as ordered, which catches the search-then-read pair. A person's typed prompt, the tail of a call that bracketed a delegated unit, and a turn that already issued several calls each break a sequence.
-- **The error is stated in both directions.** It **under-reports** where the target test finds an overlap that was not a dependency, and where a chained command was excluded for a mutation word it never used as one. It **over-reports** where a call named no target at all, since a dependency that exists only in the earlier call's output is invisible. On the three runs it was built from it read 27, 14 and 25 avoidable round trips — 3.3, 2.4 and 3.7 minutes — against the 33 the estimate assumed for the last of them.
-- **Its own walk read a turn by adjacency too, and that inflated every figure above** ([#1406](https://github.com/joshuafolkken/kit/issues/1406)). A batched turn whose results arrived one at a time read as several single-call turns, so the block offered the run the very bundling that turn had already done. Run #1399's `recoverable round trips 8 — 0.9 min` was **entirely** that artifact: re-measured, it is `0`, and its `longest 6` sequence was six calls belonging to two turns that had each issued three. Every avoidable-round-trip figure quoted above was taken before the fix and reads high.
-
-**A count cannot be ranked against a phase, so the block also prices one round trip** ([#1307](https://github.com/joshuafolkken/kit/issues/1307)). `diag` ranks candidates by the minutes each would save per run, and `101 round trips` is not minutes — so the counts sat in the report while the ranking was assembled from the phase table beside them, and the 2026-09-04 `diag` left round-trip reduction off its candidate table altogether. The row prints what one trip cost and the **model wait** inside it: on the run above, 15.9 seconds each, of which 8.1 was the model composing the turn that issued the call. Multiplying that by the trips a proposed change would remove is the estimate the table wanted — the same run's 39 `Edit` calls executed for 0.7 minutes and cost about 10 minutes of round trips. **The model share is printed rather than left to be derived** because it is the part batching actually removes: a tool's own execution is paid whichever turn it was issued from.
-
-**And a mean cannot say whether a run was slow everywhere or slow once, so the block beneath it prints the spread** ([#1386](https://github.com/joshuafolkken/kit/issues/1386)). Run #1379's price row read `model wait 8.13 s`; hand-measuring the same run found the mean hiding a spread, and the block above now prints it — 3.8 s at the median, 14.8 s at p90 and a **maximum of 189.5 s**, one uninterrupted stretch charged to `pre-run`, 11.6% of a 1,632-second run and arithmetically invisible in the 8.1 beside it. The two runs a mean of 8 seconds can describe need opposite fixes: batching removes many small round trips and touches one long think not at all. So `model gap per round trip` prints `min` / `median` / `p90` / `max` through the same `Distribution` record `--last` reports its spreads from — `p90` is new to that record and joined it rather than being computed beside it, so the two scopes cannot come to disagree about what an even-sized sample's middle is; `--last`'s own table still prints `median`, `min – max` and a sample count, because a sample of five runs has no separate ninetieth to print. `Longest model gaps` lists the longest few **by length rather than in run order** — the treatment the segment table already gets — each with the phase it was spent in and its share of the run. The mean above it is unchanged.
-
-- **It is the mean's distribution, not a second measurement.** The stretches come from the same walk `model_ms_per_round_trip` is summed from, so a round trip opened with nothing pending — the call that follows a person typing — is a stretch of **zero** rather than one that did not happen, and the median can never sit above a price the same report prints.
-- **The phase is what makes one row actionable.** Twenty minutes of thinking during `implement` and the same twenty during `rework` are different findings, and the classification is `time_phases.classify`'s rather than a second one — so the row agrees with the phase table by construction.
-- **Withheld rather than zeroed, in the two shapes the neighboring blocks already use.** A scope with `span_count: 0` prints `not measured`, because a median of `0.0 s` would report the fastest possible run for a scope nobody read; a transcript that _was_ read but made no round trip prints `no tool call to divide`, exactly as the price row above it does.
-
-**The numerator is what a round trip is made of, not what the run did while one was outstanding.** Two exclusions, both in the direction that would otherwise over-state a saving and get a cut ranked above one worth more. **Human wait and CI wait are out**: a round trip does not cause them, and a price that folded them in would be multiplied out as a saving and then counted a second time against the `wait` and `ci` rows of the very table it was carried into — on one measured 73.3-minute session, 28.8 minutes of it nobody at the keyboard, that alone would have priced each of its 146 round trips at 30.1 seconds against a real 17.6. **The model wait of a turn that called nothing is out too**: the answer that ends a reply and the turn that stops to wait for a person composed nothing batching could give back, and the run above spent 156 turns on 101 round trips. Both figures divide by the round trips rather than by the turns, for the same reason. Where there was no round trip to divide by, the row says `no tool call to divide` and the JSON's `ms_per_round_trip` / `model_ms_per_round_trip` are the same withheld answer the counts give, never a measured zero.
-
-**The failure block separates work from rework** ([#1309](https://github.com/joshuafolkken/kit/issues/1309)). A row saying `josh gate 3.8 min 4 call(s)` cannot say whether the four runs were four pieces of work or one piece done four times, and on the run this was filed from **three of five gate runs were failures** — one spell-check test half a second over its timeout, one resident-document size violation whose own test ran in five milliseconds. Neither was slow; both were re-run. So every span now carries how its call came back, and the block prints the calls that failed and the time spent on the attempts that followed them. **A re-run is the next call of the same command after one that failed**, not every repeat: the gate runs once beside the review and again over the bumped tree by design, and counting repeats alone would charge that to failure. The identity a repeat is judged on is the josh subcommand where there is one and the tool label otherwise — the same key the two tables below are built on.
-
-**The outcome is the tool call's, and a josh check's own words are read on top of it** ([#1361](https://github.com/joshuafolkken/kit/issues/1361)). The base reading is the `is_error` the harness writes on a tool result, which reports whether the _call_ failed rather than whether the command inside it did: `pnpm josh gate 2>&1 | tail -40` exits with `tail`'s status, so a red gate read through a pipe came back as a call that succeeded. Measured over this machine's kit transcripts from 2026-09-04 onward, that was **13 of the 13 gate runs that printed a failure line** — none of them counted, which is exactly the rework the block exists to expose. So a result whose call ran `pnpm josh <cmd>` is also read for the failure line josh itself printed (`✗ verification gate failed: lint`), and one found there marks the call failed whatever the pipe reported. **The promotion goes one way only** — a call the harness already marked failed stays failed — and it is confined to josh's own output, whose format this repository owns; the icon is shared with the commands that print it rather than restated, so a rename breaks the build instead of the count. **A command's own verdict outranks the lines it forwarded** ([#1374](https://github.com/joshuafolkken/kit/issues/1374)): `josh gate` prints the body of a step that skipped or passed with warnings, and that body is eslint's, svelte-check's, vitest's or cspell's — one of them opening a line with the failure icon would make a _green_ gate a failed call and charge the next gate run as rework. So the gate's own `✔ verification gate passed` / `✗ verification gate failed` line is read first and settles the call, built from the same prefix the reader matches. A per-command list of failure-line patterns was rejected instead: tight enough to exclude a third-party warning, it is a list of per-command shapes, and the next josh command to print a failure line is silently not counted. Commands that state no verdict — `josh health`, `josh propagate` — are read from the icon exactly as before. What remains invisible is a non-josh command inside a pipeline and a body truncated past its failure line, which keeps the figure a floor rather than a ceiling — a lower one than before. **Where no outcome was readable at all the two rows say `not measured`** — a fifth of the tool results in the transcripts measured carry no `is_error` (a file read, an answered question), and a run of only those failed nothing _that was seen_, which is not the same as failing nothing. Where some outcomes _were_ readable, how many were not is printed beside the failure count rather than folded into it; on the withheld rows it is not repeated, because there it would be the call count the round-trip block prints two lines above.
-
-**The last two blocks reconcile what the run edited against what it merged** ([#1387](https://github.com/joshuafolkken/kit/issues/1387)). The failure block above catches a command re-run after it failed; it cannot catch a change of approach, where nothing failed and the work was thrown away anyway. Hand-measuring run #1379 found `scripts/verification-gate.ts` **edited twice and absent from the merged diff**, which every scope of this command read as ordinary implementation. So one extra request — `repos/{owner}/{repo}/pulls/<N>/files` — is joined to the transcript's own `Edit` / `Write` calls, and both readings come out of it: which paths never landed, and how large the diff that did land was. **The change size is what makes two runs comparable at all**: 27 minutes on a 254-line change and 27 on a 4-line one are the same line in every other block here, and the second is not the same run.
-
-- **The two sides are made comparable by the work tree, which is passed in rather than guessed.** A transcript names `/Users/…/kit/scripts/x.ts` and a diff names `scripts/x.ts`; the only thing relating them is the repository root, and the command already knows it — it is the very directory the transcripts were found by. So an edited path is relativized against it and then compared **for equality**. Learning the root from a matching pair instead was tried and is wrong: `README.md` in a diff is the tail of `docs/README.md` in a transcript, so one basename collision both reports an abandoned file as landed and poisons the root every other row is printed through.
-- **An edit outside the work tree is counted apart, never called rework.** A scratchpad script or a temporary file can never appear in any diff, so calling it "never landed" would inflate the headline number on ordinary runs — `CLAUDE.md` tells agents to use a scratchpad. It gets one summary row and no path, because those paths are absolute and local to whoever ran the session.
-- **The edit count survives the reconciliation**, because repeatedly editing one file that _did_ land is the same signal at lower confidence. Rows are ordered dropped-first and then by count, so the finding stays above the display cap on a run that touched thirty files.
-- **Three states for the diff read, and two of them withhold.** `read` prints everything. `refused` — a rate-limited request, or a pull request with more files than the single page carries, which cannot be told from a truncated one — prints `not measured` for all four size rows, marks every row `not reconciled`, and says so in a note the `--epic` and `--last` tables carry too; `dropped_count` stays 0 there because nothing was reconciled, never because nothing was dropped. `absent` is a scope that never had a pull request — a `--session` report — and prints **no block at all**, the rule `CI wait` already follows. A scope with `span_count: 0` prints `not measured` for the file table, on the criterion every transcript figure here is withheld on.
-- **It under-reports a file rewritten only through the shell** — `sed -i` is not an `Edit` call — and over-reports nothing: a path is called dropped only where a diff that _was_ read does not name it, and only for a file inside the tree.
-
-**One run is not a sample.** [#1262](https://github.com/joshuafolkken/kit/issues/1262) recorded "tool execution 59% / model 39%" from a single hand-measured run; three real sessions measured by this command put tool execution at 25–40% and human wait at 17–44%. All three of the sessions [#1267](https://github.com/joshuafolkken/kit/issues/1267) restored by hand reproduce here to within 0.4 points.
-
-**A Bash call is bundled under the command it actually runs.** Taking the literal first word put `Bash: cd` at the top of every table — 82 calls and 12.1 minutes of one measured session, naming the one part of the command that did no work — so the chain is split into segments and each segment walked **word by word** past its `VAR=…` assignments and its wrappers (`time`, `env`, `sudo`) to the command position. A segment that only navigates (`cd`, `export`, `source`) runs nothing and yields no name, and a call nothing could be named for stays under the bare `Bash` rather than under the word that was rejected. `pnpm josh <cmd>` invocations get a second table of their own, keyed by subcommand and read **only at a segment's command position** — searched loosely, `git commit -m "ran pnpm josh gate"` was charged to `josh gate`, and this repository's own commit messages name subcommands constantly.
-
-**The per-tool totals say which command is slow; the phase breakdown says which _stage_ is long** ([#1269](https://github.com/joshuafolkken/kit/issues/1269)). Every issue filed to make `fullrun` faster has been about a stage — one review round instead of two, the gate started beside the review — and [#1262](https://github.com/joshuafolkken/kit/issues/1262)'s split rationale ("verification commands 465s / code review 326s / edits and format hook 143s / CI wait and merge 125s") was one run classified by hand. **The boundaries are decided from recognizable commands, never from how long an interval was**: `gate`, `pr` and `merge` are the spans of `pnpm josh gate` / `josh git` / `josh pr` / `josh followup`, read off the same subcommand name the josh table is keyed by rather than detected a second time; `review` is the `code-review` skill call, which carries the whole review because the skill runs it and hands back the findings; `plan` runs from the start to the plan comment posted to the Issue, `implement` from the first edit to the first gate, and `rework` from that first gate to the pull request. A boundary guessed from durations would move whenever a run got faster, which is the one thing a measurement meant to compare two runs must not do.
-
-**`rework` is a window of its own because a run does not stop editing at its first gate** ([#1281](https://github.com/joshuafolkken/kit/issues/1281)). A `fullrun` is edit → gate → fix what it caught → gate again → review → fix what _that_ caught, and with `implement` ending at the first gate every one of those fixes fell into `other`: **35.7%** of that same 73.3-minute session — now split three ways as the 12.4% named `rework`, the 6.0% still in `other`, and the 17.3% that [#1290](https://github.com/joshuafolkken/kit/issues/1290) moved to `wait` — against 3.0 minutes of `implement`. The totals still reconstructed elapsed time exactly, so it was never an arithmetic defect — it under-reported implementation to the one question the breakdown exists to answer. Measured across epic [#1272](https://github.com/joshuafolkken/kit/issues/1272)'s merged children, rework runs **19–25% of a run**, and `other` falls by exactly that much. **It closes at the pull request rather than at the review start**, because a review's own findings are fixed after it: closing the window earlier would send that half straight back into `other`, which is the same defect one stage further along. `pnpm josh git` / `pnpm josh pr` is the first instant a run demonstrably stopped changing code, and it is a command name rather than a duration. A run with no gate after its first edit reports `rework` as **`not detected`** rather than as zero, and one that stopped before its pull request — a `halfrun` — runs the window to the end of what was measured.
-
-**A window collects intervals, and waiting for a person is an interval — so `wait` is a phase of its own** ([#1290](https://github.com/joshuafolkken/kit/issues/1290)). Every span ending at a typed prompt used to be charged to whichever window it sat in, which is how that 73.3-minute session reported `plan` as **32.4 minutes / 44.2%** when 16.2 of those minutes were nobody at the keyboard; its `other` fell from 23.3% to 6.0% for the same reason. `rework` shows it most reliably rather than most severely: its window falls back to the end of what was measured when no pull request was opened, and the run that opens none is a `halfrun`, which **by specification** stops after the gate and waits for a person — so exactly where the fallback applies, the whole wait was charged to rework and the row reported how long somebody waited instead of how long the rework took. **It is a phase rather than a share of `other`**, because a run that stalls on a person is a fact about the run and the remainder would hide it behind everything else that landed there. Nothing moves out of a command phase: a human span's closing event is a typed prompt, which names no tool, so `gate`, `review`, `pr` and `merge` are untouched and **the wait rows equal the human-wait category above them exactly** — an invariant the two halves of the report can be cross-checked against, and one that became a sum rather than a single row when [#1331](https://github.com/joshuafolkken/kit/issues/1331) split the phase at the run's edges. A run with nobody waiting on it — every delegated child of an `epicrun` — reports both wait rows as a measured **`0.0 min`** and every other row exactly as before.
-
-**`setup`, `wrapup`, `pre-run` and `post-run` are the remainder cut into the regions it was made of** ([#1299](https://github.com/joshuafolkken/kit/issues/1299)). `other` prints with `is_detected: true`, so it ranked as a **measured** block nobody could propose a cut against — 19–63% of each of the four runs the issue was filed from, and larger in every one of them than the biggest named phase. Measured across six merged runs it is two stretches and almost nothing else, so each becomes a window decided from boundary markers exactly as `implement` and `rework` are: **`setup`** runs to the first edit (reading the issue, normalizing its title, `git switch main && git pull`, the dependency-update question, and the turns spent settling the approach) and **`wrapup`** from the pull request onward (the second review round's fixes, the follow-up filing, the completion summary). **`pre-run` and `post-run` are what a run _is not_**: a run is not a session, and spans are attributed to an issue by branch — filled forward before the branch exists and backward after the merge — so a session that ran a `diag` before the keyword was typed and filed the next issue after the merge contributes both to this run. One measured run charged **9.9 minutes of a following conversation** to itself. Their boundaries are the `workflow-commands` skill call or the `in-progress` label, whichever came first, and the **last** `josh followup` — the last, because `followup` exits non-zero on a review blocker and is re-run. **They are two rows rather than one**, because a run has one of those boundaries far more often than none — a `halfrun` never merges, a delegated unit never loads the skill its parent did — and a single row detected on either would print `0.0 min` as a measurement for the half it never checked. That same floor is what every other window's search now starts from, so an edit made before the keyword was typed no longer opens `implement` ahead of the run. Across the same six runs `other` falls to **0.0 min** in every one. Three things deliberately stay where they are: `josh ms` and the report written after the merge are charged to `post-run` with whatever followed them (under a minute, against the 9.9 above); a run whose pull request never merged has no boundary to close `wrapup` at, so it runs to the end of what was measured exactly as `rework` does when no pull request was opened, and `post-run` prints `not detected` beside it; and **a person's wait stays out of both region rows** — it goes to `wait` or, since [#1331](https://github.com/joshuafolkken/kit/issues/1331), to `wait-outside`, so `pre-run` and `post-run` keep reporting work rather than idleness.
-
-**`wait` is cut at the same two edges, because the largest row in the table was the one nothing could be proposed against** ([#1331](https://github.com/joshuafolkken/kit/issues/1331)). Measured on three merged `fullrun`s it was **29–49% of the run** and the single largest phase in one of them, and it held two different things at once: time the run stalled on a person, which a proposal can cut, and time the session was idle before the keyword was typed or after the merge, which is not the run's at all. That is the distinction #1299 drew for `other`, never drawn here only because `wait` was pinned to the category total. **`wait` now collects the human spans inside the run and `wait-outside` those on either side of it**, decided from the same two boundaries `pre-run` and `post-run` rest on, and the split is what the three measured runs were waiting for: #1298's 34.0 minutes is **4.0 inside / 30.0 outside**, #1304's 20.3 is **0.0 / 20.3**, and #1299's 22.2 is **21.4 / 0.8** — so two of the three runs had almost nothing to cut where the single row said they had the most. **The invariant becomes a sum**: `wait` + `wait-outside` equals the human-wait category exactly, and the two are detected on the transcript half together — printed together or withheld together, because a report showing one and hiding the other could not be cross-checked at all. **A wait is placed by where it started**, exactly as every other span is, so a session idle across the keyword is charged wholly to `wait-outside`: splitting the interval at the boundary is the one thing that would stop every span landing in exactly one phase, and nobody was waiting on a run that had not started. `wait-outside` is **not ranked** for the same reason `pre-run` and `post-run` are not — a cut proposed against it would cut a different piece of work.
-
-`gate` and `review` **overlap on purpose** — the gate is started beside the review rather than in front of it — so the command's own phase wins over whichever window its span sits in; a sequential reading would charge the gate to the review and hide exactly what the change was for. Anything belonging to no phase — after the four regions above have taken theirs — is kept as **`other`** rather than discarded, so the phases still reconstruct the elapsed time exactly — exactly in the milliseconds `--json` carries, while each printed row is rounded to a tenth on its own, so a column can add up a tenth away from the header — and a phase whose marker never appeared prints **`not detected`** rather than `0.0 min` — "did not run" and "this transcript could not be read for it" are different answers, and a measured zero asserts the first when only the second may be true. `--json` carries the same breakdown, `is_detected` included.
-
-**A run is measured from its `fullrun` invocation to the merge, and neither source can say that alone** ([#1268](https://github.com/joshuafolkken/kit/issues/1268)). The transcript stops at the last line anyone wrote, so PR #1263's `createdAt 08:57:20Z → mergedAt 09:00:32Z` — 3 minutes 12 seconds of CI wait and merge — appears in no session file; GitHub has no timestamp for the planning, implementation, gate and review that precede the pull request. And **one run is not one session**: a scan of the 25 most recent transcripts barely finds the branch for issue #1256, because that `fullrun` ran in a different one. So `--issue <N>` joins the two on the issue number — every session attributed to it by branch through `cost_attribute`, unchanged and not copied, plus the pull request's `created_at`, each check-run and `merged_at` from `gh api`.
-
-```
-issue #1257 — 129.4 min elapsed
-  2 transcript(s)
-  PR #1264 merged
-  2.3 min of the merge command was waiting on CI — the phase table charges it to `ci`
-
-Where the wall clock went:
-  model wait               34.7 min   26.8%
-  tool execution           24.7 min   19.1%
-  human wait               70.0 min   54.1%
-  CI wait                   0.0 min   0.0%
-```
-
-**CI wait is the part of the open→merge window no span already covers**, not the window itself. `followup --merge` waits for CI _inside_ a Bash tool span that is already counted, so adding the window whole would count it twice and leave the four shares summing to more than the run took — the property that makes two runs comparable. Where the run sat watching its own merge, the honest figure is therefore near zero, and the 3 minutes PR #1263 spent unattended is the case the category exists for. **No sample on this page still shows that case** — every `CI wait` row any of them prints reads `0.0 min` — and the reason is [#1285](https://github.com/joshuafolkken/kit/issues/1285) rather than a run that never waited: a delegated unit's own `pnpm josh followup --merge` span now covers the whole open→merge window. The `ci` **phase** beside those rows is not zero, because the two answer different questions — the paragraph below. The per-check table is informational for the same reason the categories are not: CI jobs run in parallel, so their durations overlap and are never summed into a share.
-
-**The `ci` phase and the `CI wait` share answer two different questions** ([#1384](https://github.com/joshuafolkken/kit/issues/1384)). The share is the paragraph above — the part of the window no span covers. The phase adds what the merge command itself sat waiting for: `josh time` reads the check-runs of **every commit of the pull request**, so a run that pushed twice produces one CI window per cycle, and the part of a window that no span _other than `josh followup`_ covers is charged to `ci` and taken off `merge`. A cycle that ran beside the second review round or beside a gate cost the run nothing extra and stays out of it. Measured on PR #1380 — the pull request of the run the sample above is taken from — whose second cycle ran with nothing else in flight: `ci` went from `0.0 min` to **70.3 seconds** of a 116.7-second merge command, and `merge` from 116.7 to 46.4. The two figures therefore differ on any run that watched its own merge, so a note under the heading says by how much: _1.2 min of the merge command was waiting on CI — the phase table charges it to `ci`_. **A negative `merge_gap` is not evidence that the run did not wait**: `followup --merge` waits for the checks, so they always finish before the merge, and reading the sign as an answer is half of why the phase reported zero. Where the commit listing or a commit's check-runs could not be read the phase prints `not detected` rather than `0.0 min` — the same distinction `span_count: 0` makes for the transcript shares, and the false zero that had `diag` rank a CI proposal last as work with no wall clock behind it.
-
-**A withheld row leaves its minutes in the denominator, so the table says so in a line of its own** ([#1392](https://github.com/joshuafolkken/kit/issues/1392)). `categories.ci_ms` stays inside `elapsed_ms` whether or not the cycles could be read, so a run with three measured minutes of the open→merge window that no span covers prints a `ci` row with no figure while those three minutes still shrink every other row's share — and the column stops adding up with nothing accounting for the difference. The note above says in prose _why_ the row is withheld; it does not make the arithmetic readable. So a footnote under the rows prints what they leave out, naming the row it belongs to:
-
-```
-  ci                                  not detected
-  merge                     4.0 min   13.3%
-  …
-  withheld from the rows    3.0 min   10.0% · ci · counted in the elapsed total
-```
-
-It is printed only where a withheld row actually holds time: most withheld phases are a window whose boundary was never found, which collects no span either, and a `0.0 min` footnote would be the confident zero the withholding exists to prevent. **`elapsed_ms` and `is_detected` are untouched** — the two alternatives were to print the share under a heading whose cycle detail is unknown, which reinterprets [#1384](https://github.com/joshuafolkken/kit/issues/1384)'s shipped criterion, and to drop the withheld part out of the denominator, which moves the definition the four category shares reconstruct. The complaint was that the difference could not be read off the table, so what changed is that the difference is printed. `--json` was correct throughout and carries the same `duration_ms` it always did.
-
-**Each check row says what it concluded and where its finish sat relative to the merge** ([#1310](https://github.com/joshuafolkken/kit/issues/1310)). A duration alone cannot be ranked: on the run this was added for, `E2E`, `auto-merge` and `Notify Auto Tag` all printed `0.0 min` — one of them skipped, the others completed at once — and the longest row in the table finished **after** the merge, where it cannot have delayed anything. So every row carries GitHub's own `conclusion` (`success`, `failure`, `skipped`, whatever it sent, and `no conclusion recorded` where it sent none), a zero-length row says which of the two zeroes it is (`skipped · did not run` against `success · completed instantly`), and a row that finished past the merge says how far past it (`success · finished 4.0 min after the merge`). Under the table sits the one sentence the table is read for — `the merge waited on SonarQube — the last check to finish before it` — which names the **latest finisher among the checks that ran and finished before the merge**, not the longest one: a job that started early and ran ten minutes was over long before a two-minute job that started last. **"Finished last" and "the merge waited on it" are two claims, and only the first is always true**, so the second is made only where the merge followed within a minute; where CI went green and a person merged an hour later — a `halfrun` picked up the next morning, a pull request left for review — it says `unit was the last check to finish, 63.0 min before the merge — the merge itself waited on something else` instead of charging that hour to CI. A set whose every row was skipped or landed after the merge says so rather than naming one. Only `skipped` is left out of the candidates, and no other conclusion is: a job that failed or was cancelled still finished, and the merge still sat behind it until it did. `--json` carries the same two fields per row, `conclusion` and a signed `merge_gap_ms` — positive means the check finished after the merge.
-
-**A run no transcript was attributed to prints `not measured` for the three transcript shares, not `0.0 min`** ([#1295](https://github.com/joshuafolkken/kit/issues/1295)). The merge was read and the CI wait is real, but model wait, tool execution and human wait totalled zero because nothing was read — and three zeroes above `CI wait 3.2 min 100.0%` read as a run that spent its whole length in CI. The criterion is whether any span was read at all, which is the same one `--epic` withholds its own category rows on and the one `wait`, `wait-outside` and `other` are detected on, so the two tables cannot disagree about it and `wait` + `wait-outside` stays equal to the `human wait` row. **A transcript that _was_ read keeps its measured zero** — "nothing was read" and "read, and genuinely zero" are exactly the two answers the row keeps apart — and `--json` carries the raw milliseconds either way, with `span_count` saying which state the report is in.
-
-**Two sessions with a gap between them leave time that belonged to nobody.** The header states what was accounted for — the sum of the four shares — and a gap of a minute or more between the wall window and that sum is named in a note rather than charged to the run.
-
-**Two sessions running _at once_ make that sum exceed the window, and that is named too** ([#1330](https://github.com/joshuafolkken/kit/issues/1330)). `--issue 1299` reported `77.6 min elapsed` beside a window of 49.9 minutes and said nothing about the difference, so the headline read as a run half again as long as the time it actually occupied, and every phase percentage was a share of the inflated figure. **The excess is reported rather than subtracted**, because there is nothing to subtract: both sessions really worked in the minutes they shared, and the per-session grouping that resolves a delegated unit against its parent exists precisely so one session's intervals are never removed from another's. So a note names the total, the window, how much was counted twice — `the shares total 77.6 min over a 49.9 min window — 27.6 min of it wall clock concurrent sessions shared, …` — and, because the point of the figure is ranking the phases, the denominator those percentages are taken against, which is what the `…` above stands in for and the `#1261` row of the `--epic` sample below prints in full. **`--epic` prints it too**, on a child whose merge was read: that filter exists to explain a missing GitHub half, and every completed child passes it, so without the exception the note would be hidden from exactly the rows whose minutes it qualifies — and those minutes are summed into the batch total. A run whose sessions did not overlap prints no such note and is unchanged.
-
-**Before either of those, the sessions that were never this run's are separated out** ([#1428](https://github.com/joshuafolkken/kit/issues/1428)). Attribution is by branch, and a branch belongs to the **checkout** rather than to a session — so every session open in the same work tree while an issue's branch was checked out was attributed to that issue, whatever it was doing. Two sessions in one work tree is ordinary: a run in the first, an epic being planned or measured in the second. Run #1412 read as **145 round trips, 208 tool calls and 31.1 minutes of model wait** against a hand count of 56 / 77 / 7.9, because a session busy with `josh epic` for 45 minutes across the same window was summed into every one of them — and `diag` ranks what to cut by those figures, so the contaminated reading put `wrapup 8.4 min` first where the hand reading of the same region was 37 seconds. **The discriminator is the `workflow` marker the phase breakdown already uses** — loading the `workflow-commands` skill, or writing the `in-progress` label — because a session that never opened a workflow on this issue did not run it; recognizing the boundary a second way would let the `pre-run` row and this separation disagree about which session a run began in. A left-out session is **named with its minutes** — `1 concurrent session(s) left out — af63e9d6-… (45.1 min) — no workflow marker attributes them to this run` — and the transcript count above it is the kept sessions' own, so the note and the spans beneath it are about one set. The same reading of #1412 is now **66 round trips, 93 tool calls and 12.7 minutes**, over a window that starts where the session did rather than where the other session did. **Nothing is excluded unless something is kept**: where no session carries the marker — the keyword typed while a previous branch was still checked out — every span comes back and the report says `2 sessions are attributed to issue #N and none carries a workflow marker — the run could not be separated from them, …`, because `0.0 min` excluded and "could not be separated" are different answers and only one of them is a measurement. A delegated unit follows the session that delegated it, and a run measured in one session is unchanged.
-
-**`--epic <E>` measures a whole batch, child by child** ([#1271](https://github.com/joshuafolkken/kit/issues/1271)). An `epicrun` is several `fullrun`s, so every slow stage is paid once per child — and which child was long, and whether the run got slower as it went, had no answer that did not start with running `--issue` by hand for each number in the epic body. The children are enumerated by the **epic body parser** (`scripts/git/git-epic-parse.ts`), the one reader of a task list, and each child is measured by exactly the code `--issue` uses; a second enumeration would disagree with `epic:next` about what the batch is, and a second measurement would disagree with `--issue` about what a run took. **The block below and the `--issue 1257` block above are one measurement read through two invocations** — `pnpm josh time --epic 1262` and the `pnpm josh time --issue 1257` inside it — so the `#1257` row here carries exactly the figures that block prints, and the two can be checked against each other rather than read side by side on trust ([#1399](https://github.com/joshuafolkken/kit/issues/1399)). Its `…` rows are children left out for length, never rows from another run.
-
-```
-epic #1262 — 22 child(ren), 13 timed, 1118.7 min elapsed
-  9 child(ren) have nothing measured and are reported as "not run" — each row says why
-
-By child (in execution order):
-  #1257                   129.4 min   model 34.7 min / tool 24.7 min / human 70.0 min / CI 0.0 min
-  #1256                    28.3 min   model 11.6 min / tool 16.7 min / human 0.0 min / CI 0.0 min
-  #1260                   200.2 min   model 29.1 min / tool 15.9 min / human 155.2 min / CI 0.0 min
-  …
-  #1261                   162.4 min   model 48.1 min / tool 32.8 min / human 81.5 min / CI 0.0 min
-      the shares total 162.4 min over a 69.0 min window — 93.4 min of it wall clock concurrent sessions shared, and every share and phase percentage is of the 162.4 min
-  …
-  #1266                               not run
-      no session transcript is attributed to issue #1266
-      no pull request found for issue #1266 among the 500 most recently updated — the CI wait is unknown
-  …
-
-Where the batch's wall clock went:
-  model wait              355.9 min   31.8%
-  tool execution          274.3 min   24.5%
-  human wait              488.5 min   43.7%
-  CI wait                   0.0 min   0.0%
-
-Model wait per turn (in execution order):
-  #1257                       4.7 s
-  #1256                       3.7 s
-  #1260                       7.7 s
-  …
-  rising 46% across 13 children
-```
-
-**The per-turn trend is the point of the batch scope, not a decoration.** [#1153](https://github.com/joshuafolkken/kit/issues/1153) measured one context's token cost growing — `$0.257` per request on a 463-request run against `$0.108` on a 16-request one — and nothing said whether the same growth shows up in _time_. Model wait divided by the run's turns is that measurement, printed per child and compared across the batch. **Execution order is when each child ran**, read from what was measured rather than from the order the body lists them: an epic's rows are written before the batch starts, and a child can run out of that order or not at all.
-
-**A batch's children are measured from the delegated units' transcripts** ([#1285](https://github.com/joshuafolkken/kit/issues/1285)). `epicrun` runs every child in a delegated unit, so a run that read only the session files saw the parent waiting and none of the work — epic #1272's four merged children all printed as `no transcript`, and after the fix as 37.7 / 47.8 / 35.0 / 18.8 minutes with a model-and-tool breakdown each. The discovery is [`josh cost`](#josh-cost)'s and is shared, not copied. **The parent's wait and the unit's work are not both counted**: a session holds one `Agent` span across the whole time the unit runs, so the unit's spans are kept whole and the parent's are reduced by what they cover — the same interval subtraction the CI wait already used. Where nothing was delegated the subtraction is the identity, so such a run reports exactly as it did before. One consequence is worth expecting: the CI wait of a delegated child usually reads `0.0 min`, because the unit's own `pnpm josh followup --merge` span already covers the open→merge window.
-
-**A child is reported in four states, and three of them are not a duration of zero.** `not run` is a child nothing was measured for; `no transcript` is one that merged with no session transcript attributed, so only its CI wait is known and the three transcript shares are **withheld** rather than printed as `0.0 min`; `not merged` is a run that did not finish; only the fourth is fully measured. **The sample above shows two of them** — `not run` and the fully measured one — because [#1285](https://github.com/joshuafolkken/kit/issues/1285) attributed the delegated units' transcripts and no child of #1262 reports `no transcript` any more; the other two states are described here rather than printed there. The batch totals follow the same rule one level up — a half no child contributed to prints `not measured`, not a summed zero. **A row whose merge was not read carries the child's own notes beneath it**, because `not run` covers "the batch never reached it" and "the pull request listing could not be read" alike, and a status printed alone would report a rate-limited `gh` as an idle batch. `--json` carries each child's whole report, phase breakdown included, exactly as `--issue` carries one run's.
-
-**`--last <N>` reports the last N merged runs as a distribution, because one run is not a sample** ([#1312](https://github.com/joshuafolkken/kit/issues/1312)). [`diag`](https://github.com/joshuafolkken/kit/blob/main/.claude/skills/diag/SKILL.md) already required that a verdict rest on more than one reading, and nothing here could produce the spread that asks for: the 2026-09-04 measurement ran `--issue` five times by hand, lined the rows up in an editor, and still left two verdicts as "cannot tell" with no way to say whether the cause was variance or too few readings. The runs are the N most recently **merged** pull requests whose head branch names an issue — the rule `pnpm josh time` with no argument already resolves "the run that just finished" by, extended from one run to N — and each is measured by exactly the code `--issue` and `--epic` use, so no scope can report a different figure for the same run. **Min, median and max rather than a mean and a deviation**: the question is whether an effect is larger than the spread, and three endpoints answer it without assuming a distribution five readings could never establish. The median goes in the duration column and the range beside it, with the **sample count** at the end — which is the point of the whole table:
-
-```
-the last 9 merged run(s) — 9 of 9 fully measured
-
-By run (newest merge first):
-  #1311                    40.9 min   measured
-  #1310                    25.8 min   measured
-  …
-
-Where the wall clock went (median, then min – max):
-  model wait               14.6 min   9.7 min – 23.6 min · 9 run(s)
-  tool execution           13.3 min   10.0 min – 17.4 min · 9 run(s)
-
-By phase (in run order, median, then min – max):
-  plan                                not measured
-  implement                 5.2 min   1.1 min – 14.5 min · 9 run(s)
-  review                    5.7 min   3.8 min – 8.8 min · 9 run(s)
-  …
-
-By CI check (descending by median, jobs overlap):
-  Checks                    1.5 min   1.4 min – 1.6 min · 9 run(s)
-  SonarQube                 1.5 min   1.4 min – 1.8 min · 9 run(s)
-  …
-```
-
-**A reading nobody could take is excluded, never counted as zero** — the property the whole scope rests on. A phase absent from two of five runs is **three samples and says so**, so a row is never dragged toward zero by the runs that never reached that stage; a phase no run detected prints `not measured` exactly as it does for one run; and a run that merged with **no session transcript attributed** is left out of the transcript-side rows entirely, with a note saying how many were excluded and why — it still contributes its CI wait, because that half _was_ read. The run list under the heading is what makes the sample checkable: a distribution whose readings nobody can name is not one a reader can verify. `--top` reaches each run's own tables exactly as it reaches an epic's children, and the distribution tables themselves are left uncapped for the reason `by_check` is — their rows are bounded by the vocabulary rather than by the length of a run. **Nothing about the measurement is new**: the runs are chosen here and measured by the same fan-out `--epic` goes through, so a second reading of a run cannot exist to disagree with the first.
-
-**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the flags that pick a scope, and naming more than one of `--issue` / `--session` / `--epic` / `--last` / `--period` is refused rather than answered silently. `--period` with no run history to read exits non-zero and says the file is written by `josh followup`, rather than printing a period in which nothing happened. `--last` with no merged run to resolve exits non-zero too, rather than printing a distribution of zeroes. An epic that could not be read exits non-zero too — an epic that tracks no children is a real, empty answer and says so instead. The same distinction reaches inside a batch ([#1352](https://github.com/joshuafolkken/kit/issues/1352)): a child of `--epic`, or a run of `--last`, whose report could not be **built** at all is printed as `failed` rather than as `not run`, counted in its own note, and makes the command exit non-zero — where `not run` stays the ordinary answer for a child the batch simply never reached, and keeps the exit code at 0. The per-check table draws it too: a check-run read that was refused says so in a note instead of leaving an empty `By CI check` table that reads as a run GitHub recorded no checks for. And `--last` says when two merged pull requests named one issue ([#1365](https://github.com/joshuafolkken/kit/issues/1365)): the older is folded into the newer, because both halves of that issue's measurement are the same and keeping both would put one run into the distribution twice — but the fold is now **named** rather than silent, the note carrying the pull request numbers and `--json` the same numbers in `collapsed_pulls`, so a set called "the last 5" cannot be built from six merges with nothing saying so. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row unless `--top <rows>` asks for fewer, which says how many it withheld in a note rather than stopping silently.
-
-### `josh layers`
-
-List the checks that run in more than one verification layer, read from this project's own
-configuration.
-
-```bash
-pnpm josh layers          # alias: josh ly
-pnpm josh layers --json   # every row, for a script or another report
-```
-
-```
-Verification layers — 5 read: gate, pre-commit, commit-msg, pre-push, ci
-
-  Repeated across layers
-  cspell                   3 layers   gate (project) · pre-commit (staged) · ci (project)
-  eslint                   3 layers   gate (project) · pre-commit (staged) · ci (project)
-  prettier                 3 layers   gate (project) · pre-commit (staged) · ci (project)
-  type-check               3 layers   gate (project) · pre-commit (project) · ci (project)
-  unit-tests               3 layers   gate (project) · pre-push (project) · ci (project)
-  dependency-audit         2 layers   pre-push (project) · ci (project)
-  dependency-install       2 layers   pre-push (project) · ci (project)
-
-  One layer only
-  branch-guard              1 layer   pre-commit (project)
-  …
-```
-
-**It is not part of `josh time`, and that is a design decision rather than an omission**
-(joshuafolkken/kit#1313, under epic joshuafolkken/kit#1315). `josh time` reads Claude Code's session
-transcripts, and this repetition is invisible there in principle: a hook's seconds are buried inside
-`josh git`'s 33–39 seconds, and CI's appear only as a per-check duration with nothing to compare
-them against. Saying which check runs in which layer needs the configuration files, which is a
-different reading of a different source.
-
-**Nothing here is written down as today's answer.** The four sources are re-read on every run: the
-gate's checks come from `gate-plan.ts`, which is `josh gate`'s own declaration of what it runs;
-`lefthook.yml` is followed through its `extends` list, so the kit-internal file and the distributed
-`lefthook/base.yml` are both read; every hook section carrying `commands` or `setup` becomes a
-layer, so a hook added tomorrow is picked up without editing anything; and CI is every job of every
-workflow a **pull request** triggers — a `push`-only workflow runs after the merge and is not
-something a run waits for.
-
-**The scope column is what says how much of a repeat is really the same work.** A hook command
-carrying one of lefthook's file-list placeholders — `{staged_files}`, `{push_files}`, `{files}` —
-sees only the files the hook handed it and is reported as `staged`; everything else, `{all_files}`
-included, is `project`. That is how kit's pre-commit `tsc --noEmit` shows up as a whole-project type
-check sitting beside four staged-only ones.
-
-**Not every repeated row is a check to remove**, which is the other half of reporting rather than
-deciding. `dependency-install` repeats between the pre-push `setup` and CI's install step and is
-supposed to: `lefthook/base.yml` records at length (joshuafolkken/kit#813) why that barrier exists.
-The row is there because it is real repeated work, not because it is a candidate.
-
-**It reports on the working directory, and there is deliberately no flag naming another checkout.**
-A file system path taken off the command line and handed straight to `readdir` / `readFile` is a
-traversal waiting for a wrong argument, and what such a flag bought was a diagnostic convenience —
-the command's use is "which checks repeat in the project I am in", where the installed kit _is_
-that project's gate.
-
-**A `josh` sub-command it cannot resolve is reported, not dropped.** The name appears in an
-`unresolved josh commands:` note, so a hook rewired to a new target surfaces as a name to classify
-rather than vanishing out of the table with nothing to say it had. **Expanding is not resolving**: a
-target that carries its own command line — `josh hook:commit`, which runs the whole pre-commit hook —
-is judged by what that expansion reached, and one that reached no check is reported by name exactly
-like a target nothing knew about (joshuafolkken/kit#1367). Reporting only the names that failed to
-expand would have left the loudest case silent, since a step running the whole of another layer is
-the one worth seeing in a duplication report.
-
-**It reports and changes nothing.** Which repeats are worth removing is a decision about what a hook
-should guard — a red pre-push suite still catches what a local gate was never run for — so this
-command puts the list in front of whoever makes that decision and stops there.
-
-### `josh bench`
-
-Measure what a verification command costs with its cache cold and with it warm, by running it twice.
-
-```bash
-pnpm josh bench                      # alias: josh bn — the four gate checks
-pnpm josh bench gate                 # the whole gate, all three caches cleared
-pnpm josh bench lint --repeat 3      # three cycles, the median of each phase
-pnpm josh bench --json               # every row, for a script or another report
-```
-
-```
-Cold and warm cost — 4 command(s) measured
-
-  lint                      128.4 s   warm 2.9 s · 44.3× faster · cleared .eslintcache
-  test:unit                  18.2 s   warm 18.0 s · 1.0× faster · no cache cleared
-  cspell:dot                  8.4 s   warm 1.4 s · 6.0× faster · cleared .cspellcache
-  check                       3.8 s   warm 1.4 s · 2.7× faster · cleared .tsbuildinfo
-```
-
-**It is not part of `josh time`, and that is a design decision rather than an omission**
-([#1314](https://github.com/joshuafolkken/kit/issues/1314), under epic
-[#1315](https://github.com/joshuafolkken/kit/issues/1315)). `josh time` reads Claude Code's session
-transcripts and reports what a past run took; a transcript records one reading of a command in
-whatever cache state that run happened to be in, so the difference between a cold and a warm one
-exists nowhere in it. The answer has to be measured, which is a different act on a different source
-— the same judgement `josh layers` was split out on.
-
-**Cold is produced, not assumed.** One cycle per target is: remove that target's caches, run it, run
-it again. The second run reads the caches the first one wrote, so the pair is a measurement rather
-than a claim about the state the checkout was in when you typed the command.
-
-**The clearing is defined per target.** `josh lint` writes only the eslint cache, so measuring it
-clears only that — clearing all three first would report a cold type check and a cold spell check as
-part of the lint's own cost. `josh bench gate` clears all three, because the gate writes all three.
-
-**The gate is measured with `--force`, and without it that row would be a fiction.** `josh gate`
-reuses a green result recorded on an unedited tree ([#1328](https://github.com/joshuafolkken/kit/issues/1328)),
-so the warm reading — taken seconds after a green cold one, with nothing edited in between — would be
-the skip notice rather than a run, and a green record already on disk would skip both readings. The
-flag is what makes the pair a measurement, and the gate accepts it precisely because a person may know
-something outside the tree moved, which is exactly what this command has just done to its caches.
-
-**Nothing outside the gate's own cache files is ever removed, and nothing survives the run.** The
-removable set is `GATE_CACHE_FILES` in `scripts/josh/josh-command-types.ts` — the gate's own
-declaration of what it writes — and every entry of it is git-ignored and spell-check-excluded, which
-`scripts/josh/gate-cache-flags.test.ts` already asserts. So a run changes no tracked file and leaves
-nothing in `git status`; the warm run rewrites each cleared cache before the command exits, and a
-cache that did not come back is reported in a note rather than left silent. The edit hook's
-`.eslintcache.edit` is **not** in that set and is refused outright: a second writer on that file is
-[#1332](https://github.com/joshuafolkken/kit/issues/1332) exactly.
-
-**A gate running on this tree stops the command before it removes anything, and the question is asked
-again before every clearing.** `josh gate` is started beside `/code-review` and holds its three caches
-open for the whole of it, so clearing them mid-flight would corrupt the run paying for them. A default
-run is minutes long and clears a target's caches before each cold reading, so a check once at start-up
-would walk straight into a gate a hook or another session started after it; once a gate is running the
-readings are void anyway, and the run stops rather than finishing with figures nobody can use. The
-in-flight marker carries the gate's pid, so one left behind by a killed process blocks nothing.
-
-**Stopping keeps the readings it already took** ([#1369](https://github.com/joshuafolkken/kit/issues/1369)).
-The abort's rationale is that a reading taken beside a gate measures neither of them, and that does not
-reach backwards: the targets finished _before_ the gate started were measured on a tree nothing else was
-running on. So their rows are printed, the targets the run never reached print `not measured`, and a note
-says the run was interrupted and how many cycles each unfinished target managed — `cycles not finished:
-cspell:dot 0 of 1, test:unit 0 of 1`. Discarding them made a user pay several minutes again because a
-pre-commit hook started a gate thirty seconds ago.
-
-```
-Cold and warm cost — 2 command(s) measured
-
-  lint                      128.4 s   warm 2.9 s · 44.3× faster · cleared .eslintcache
-  check                       3.8 s   warm 1.4 s · 2.7× faster · cleared .tsbuildinfo
-  cspell:dot                          not measured
-  test:unit                           not measured
-
-  interrupted by josh gate starting on this tree; cycles not finished: cspell:dot 0 of 1, test:unit 0 of 1
-```
-
-**An interruption has its own exit code, `2`.** `0` still means every target asked for was measured and
-`1` still means the measurement produced nothing usable, so anything that only asks whether the run
-finished reads non-zero exactly as before; the third value is what lets a caller tell a gate holding the
-caches — worth retrying in a minute — from a red check that wants fixing. It is also on the report
-itself, as `is_interrupted`, so a `--json` consumer reads the fact rather than inferring it from a note's
-wording.
-
-**A command that keeps no cache says so.** `josh test:unit` declares none — vitest's cache lives under
-`node_modules`, and emptying that is a reinstall rather than a cold run — so its two readings measure
-the operating system's page cache and run-to-run noise, and the row is labelled `no cache cleared`
-rather than presenting the difference as a cache effect.
-
-**A reading whose command exited non-zero is excluded from the figures and counted**, and its output
-is written to stderr once per target — not once per phase per cycle — so the red check is visible
-rather than only tallied. A check that stops at its
-first error has measured how long it took to find that error, not what the check costs; averaging it
-in is how a red tree comes to look like a cache win. A target whose every reading failed prints
-`not measured`, never a zero — and **a report in which nothing at all was measured exits non-zero**,
-so a `--json` consumer cannot read success off an empty answer.
-
-**A ratio below one is printed as a slowdown.** The figure is cold ÷ warm, and on a target that clears
-no cache noise routinely puts the warm reading above the cold one; `0.9× faster` would assert a cache
-win the measurement contradicts, so the row says `1.1× slower` instead.
-
-**`--repeat` takes the median, not the mean**, for the reason every timing table in this package does:
-one reading interrupted by a background build moves a mean of three by seconds and a median not at
-all. It is capped at 9 — one cycle of the default set is already two runs of every gate check, and a
-cold lint alone is measured in minutes.
-
-**The whole gate is left out of the default set**, since it is the sum of the four checks and
-measuring both would double the wall clock to print the same seconds twice. Name it to get it.
+**Output / exit codes:** an absent or untimed transcript exits non-zero and says where it looked.
 
 ### `josh eval`
+
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository.
 
 Run the agent rule-compliance scenarios and report how many held.
 
@@ -2403,64 +1361,11 @@ JOSH_EVAL_MODEL=opus pnpm josh eval     # a different model (default: sonnet)
 JOSH_EVAL_CONCURRENCY=2 pnpm josh eval  # fewer sessions at a time (default: 5)
 ```
 
-Each scenario replays a representative situation against a real Claude session in a throwaway
-sandbox carrying the documents and skills kit distributes, then judges it on the tool calls the run
-made — never on what it said. That is what makes it usable for deciding whether a document change
-worked: the `n/m` line is a number you can compare before and after an edit, where prose could only
-be argued about.
+Each scenario replays a situation against a real Claude session in a throwaway sandbox carrying the documents and skills kit distributes, then judges it on the tool calls the run made — never on what it said. The `n/m` line is a number you can compare before and after a document change. Needs the `claude` CLI on `PATH`; it is deliberately not part of CI. See [docs/eval.md](./eval.md) for the scenario format.
 
-Exits `0` only when every scenario held. It needs the `claude` CLI on `PATH` and is deliberately not
-part of CI — every scenario costs tokens and minutes, so it is run when a distributed document,
-skill or hook changes. See [docs/eval.md](./eval.md) for the scenario format and how to add one.
+**Options:**
 
-**Scenarios run up to five at a time**, so the suite's wall-clock is close to its slowest scenario
-rather than the sum of all of them ([#1144](https://github.com/joshuafolkken/kit/issues/1144)).
-`JOSH_EVAL_CONCURRENCY` lowers the width; a value that is not a positive integer is refused rather
-than replaced by the default.
+- `JOSH_EVAL_MODEL` — the model to run against (default `sonnet`).
+- `JOSH_EVAL_CONCURRENCY` — how many sessions run at once (default `5`); a non-positive-integer value is refused.
 
-The run's last line is a verdict rather than only a count — `held`, `blocked` or `unmeasured` — because
-the exit code is `0` only when every scenario passed, so a failed run and one that measured nothing
-exit alike. `blocked` stops a merge; `unmeasured` does not, but is reported.
-
-**Before the first session it records what it is about to measure** — a content hash per file under
-the measured paths, written to a temp-directory file keyed to this checkout
-([#1152](https://github.com/joshuafolkken/kit/issues/1152)). That is what lets the run start
-alongside `/code-review` and still be checked for staleness afterwards, with
-[`josh eval:scope --since-eval`](#josh-evalscope). **Only a whole-suite run writes it** — a named
-re-run (`pnpm josh eval <name>`, what a `blocked` verdict asks for) leaves the record alone, so a
-one-scenario reading can never stand in for the suite's measurement. A run that cannot write it says
-so and continues, which leaves the check with no record — and no record answers `required`. The file
-is created owner-only and exclusively, after unlinking whatever was at the path, so a predictable
-name in a shared temp directory cannot redirect the write or plant a record the check would trust.
-
-### `josh eval:scope`
-
-Say whether this change has to be measured by `josh eval` ([#907](https://github.com/joshuafolkken/kit/issues/907)).
-
-```bash
-pnpm josh eval:scope              # → required | skip ; alias: josh es
-pnpm josh eval:scope --staged     # the staged diff
-pnpm josh eval:scope --since-eval # what a review changed under a concurrent run
-pnpm josh eval:scope --json       # the scope and the reason, machine-readable
-```
-
-The scope goes to stdout and the reason to stderr, so `$(pnpm josh eval:scope)` reads the scope and a person still sees why.
-
-**The measurement is opt-in, and off unless `JOSH_EVAL` turns it on** ([#1235](https://github.com/joshuafolkken/kit/issues/1235)). Unset — the state of every checkout that was never told about the variable — answers `skip` whatever the diff holds, with a reason line naming the switch rather than the paths, so an unexpected `skip` leads to the switch instead of into the trigger set. `JOSH_EVAL=on pnpm josh eval:scope` restores the table below exactly as it was; `1`, `true` and `yes` read the same, and every other value, including `off`, leaves it off. It gates this command and `--since-eval` with it — never `josh eval` itself, which still runs when a person types it. The command loads `.env` when the file is there, so a checkout that wants the measurement back keeps `JOSH_EVAL=on` on a line of it rather than prefixing every gate; a value set in the environment still wins over the file. The reason it is off, and what a run then owes its completion report: [docs/eval.md](./eval.md) → "When it runs".
-
-**The decision takes no judgement**, exactly as `josh review:level`'s does: the input is the list of changed paths and nothing else. "This edit is only wording" is a judgement made under cost pressure, and cost pressure resolves it toward `skip` at the moment a regression is most likely to ship.
-
-| Any changed path is…                                                                                             | Scope      |
-| ---------------------------------------------------------------------------------------------------------------- | ---------- |
-| **measured** — `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/skills/**`, `prompts/**`, `.claude/settings.json` | `required` |
-| anything else                                                                                                    | `skip`     |
-
-The measured set is derived from what the eval sandbox copies rather than restated here, so it cannot claim a path no scenario reads. **One measured path decides the whole change** — the suite measures the distribution, not the file that changed. **An empty diff answers `required`**: `skip` there would hand a caller that failed to read the diff the same answer as one that measured. The harness and the scenarios themselves (`scripts/eval/**`, `evals/scenarios/**`) do not fire it — changing the ruler is not changing what it measures. `.claude/settings.json` is the one coarse entry: the sandbox drops hooks that invoke the toolchain, so a change to only such a hook answers `required` and no scenario can observe it.
-
-The gate asks about the branch diff. `--staged` is for a pre-commit reading, and the empty-list rule bites hardest there: an empty index answers `required`, which costs five real Claude sessions rather than `review:level`'s free `medium`.
-
-**`--since-eval` asks the same question of a different diff — the one `/code-review` itself produced** ([#1152](https://github.com/joshuafolkken/kit/issues/1152)). The gate starts `josh eval` when the review starts, since neither writes to the working tree; the suite therefore measures the documents as they stood at that moment, and a review that then edited a measured path leaves the verdict describing a tree that no longer exists. This flag compares the record `josh eval` wrote before its first session against the tree now: `skip` means the review changed nothing the scenarios can see and the concurrent verdict stands, `required` means it edited a measured path — or that no record exists — and the suite runs again. Git cannot answer this: the implementation and the review's fixes are uncommitted in the same tree, so a diff cannot say which side of the review a change fell on.
-
-Two differences from the branch reading, both deliberate. **An empty result answers `skip` here**, the opposite of the branch reading's empty diff: the paths come from walking the trigger's own set rather than from a caller's diff, so nothing found is the positive fact that nothing moved. And **`--staged` alongside it is refused rather than resolved** — one asks about the index, the other about a recorded run, and answering one of them silently would answer a question nobody asked. The reason line names when the recorded run started, so a record left by some other loop is visible rather than assumed away.
-
-Where the answer is used, what a failure does, and why an epic's completion does not run the suite a second time: [docs/eval.md](./eval.md) → "When it runs".
+**Output / exit codes:** exits `0` only when every scenario held. The last line is a verdict — `held`, `blocked`, `unmeasured` or `unreachable`; `blocked` stops a merge, the others are reported but do not. Three whole-suite runs ending on the same non-`held` verdict print a `Warning: N runs in a row…` line above the verdict.

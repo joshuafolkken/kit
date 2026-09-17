@@ -60,7 +60,7 @@ describe('is_no_op_upgrade_command with several pins', () => {
 	})
 
 	it('ignores unscoped path segments that are not version pins', () => {
-		const command = `pnpm add -D ${KIT}@${INSTALLED_KIT} && node_modules/.bin/tsx node_modules/${KIT}/scripts/fix-gh-packages.ts`
+		const command = `pnpm add -D ${KIT}@${INSTALLED_KIT} && node_modules/.bin/tsx node_modules/${KIT}/scripts/gh/fix-gh-packages.ts`
 
 		expect(is_no_op_upgrade_command(command, CURRENT)).toBe(true)
 	})

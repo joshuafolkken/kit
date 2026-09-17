@@ -10,29 +10,23 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	overrides: {
-		script: 'scripts/overrides-check.ts',
+		script: 'scripts/overrides/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',
 		category: 'Maintenance',
 	},
 	audit: {
-		script: 'scripts/security-audit.ts',
+		script: 'scripts/security/security-audit.ts',
 		description: 'Run security audit',
+		category: 'Maintenance',
+	},
+	'audit:provision': {
+		script: 'scripts/security/security-audit-provision.ts',
+		description: 'Install the pinned osv-scanner when the audit cannot find one (no-op if present)',
 		category: 'Maintenance',
 	},
 	'reconcile-templates': {
 		script: 'scripts/sync/reconcile-templates.ts',
 		description: 'Record template source hashes (--check to verify drift)',
-		category: 'Maintenance',
-	},
-	'sync-workflow-pins': {
-		script: 'scripts/sync/sync-workflow-pins.ts',
-		description: 'Sync template workflow action pins from .github/workflows (--check to verify)',
-		category: 'Maintenance',
-	},
-	'sync-dependabot-pins': {
-		script: 'scripts/sync/sync-dependabot-pins.ts',
-		description:
-			'Sync template workflow pins for Dependabot action-bump PRs (--dry-run to preview)',
 		category: 'Maintenance',
 	},
 	latest: {

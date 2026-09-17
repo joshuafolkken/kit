@@ -26,6 +26,11 @@ const HTML_URL_FILTER = '.html_url'
 const ISSUE_URL = `https://github.com/joshuafolkken/kit/issues/${ISSUE_NUMBER}`
 const MULTILINE_BODY = 'first line\n\n- second `line`\n'
 const LABEL_NAME = 'epic'
+const DELETE_METHOD = 'DELETE'
+// A label this repository carries whose `:` is a character the path would otherwise read.
+const ROUTE_LABEL_NAME = 'route:tier-a'
+const ENCODED_COLON = '%3A'
+const ENCODED_ROUTE_LABEL = `route${ENCODED_COLON}tier-a`
 const LABEL_DESCRIPTION = 'Tracks a batch of child issues from one split'
 const HASH_COLOR = '#5319e7'
 const BARE_COLOR = '5319e7'
@@ -311,6 +316,39 @@ describe('issue_add_label', () => {
 		mocked_api.mockRejectedValue(new Error(WRITE_FAILED))
 
 		expect(await git_gh_issue_write.issue_add_label(ISSUE_NUMBER, LABEL_NAME)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#1794: the marker a run writes before it implements has to come back off when the
+// run's pull request merges, and the name travels in the path rather than in a body.
+describe('issue_remove_label', () => {
+	// No body: the name is the whole request, and a body would promote the call to POST.
+	it('deletes the named label from the issue', async () => {
+		await git_gh_issue_write.issue_remove_label(ISSUE_NUMBER, LABEL_NAME)
+
+		expect(first_request()).toMatchObject({
+			path: `${ISSUE_LABELS_PATH}/${LABEL_NAME}`,
+			method: DELETE_METHOD,
+		})
+		expect(first_request().body).toBeUndefined()
+	})
+
+	// A label is free to contain a character that means something in a path — `route:tier-a` is one
+	// this repository actually carries — and an unencoded one addresses a path that is not the label's.
+	it('encodes a label name that would otherwise change the path', async () => {
+		await git_gh_issue_write.issue_remove_label(ISSUE_NUMBER, ROUTE_LABEL_NAME)
+
+		expect(first_request().path).toBe(`${ISSUE_LABELS_PATH}/${ENCODED_ROUTE_LABEL}`)
+	})
+
+	// Unlike the four `boolean` writers above: its caller is the post-merge cleanup guard, which reads
+	// a thrown error as the failure to report and a return as the step having been done.
+	it('throws when the delete fails rather than answering false', async () => {
+		mocked_api.mockRejectedValue(new Error(WRITE_FAILED))
+
+		await expect(git_gh_issue_write.issue_remove_label(ISSUE_NUMBER, LABEL_NAME)).rejects.toThrow(
+			WRITE_FAILED,
+		)
 	})
 })
 

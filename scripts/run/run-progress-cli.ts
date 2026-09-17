@@ -1,0 +1,518 @@
+#!/usr/bin/env tsx
+import { setTimeout as sleep } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
+import { gh_spawn } from '#scripts/gh/gh-spawn'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { run_progress, type ProgressState } from './run-progress'
+import { run_progress_clock } from './run-progress-clock'
+import { run_progress_config } from './run-progress-config'
+import { run_progress_read, type ObservationRead } from './run-progress-read'
+
+// `josh run:progress` — the background watcher that breaks a long silence with one line of
+// observations, and `--mark`, which tells its clock that a real report just happened
+// (joshuafolkken/kit#1520).
+//
+// **This is the one josh command that is meant to be started and left running.** Every other one
+// answers once and the parent's own loop drives it; that shape was rejected here on purpose, because
+// a parent that waits and reports spends one of its own turns per heartbeat — 36 of them in a
+// three-hour run, taken at the point its context is largest. So the loop lives here, the parent
+// starts it in the background, and all the parent does is relay what appears.
+//
+// **Standard output carries the progress line and nothing else**, the way `run:liveness` keeps its
+// verdict there: a relaying parent should never have to tell a report apart from an explanation.
+// Notices go to standard error.
+//
+// **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
+// `scripts/git/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
+// a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages
+// that do need to interrupt someone.
+
+const SUCCESS_EXIT_CODE = 0
+const FAILURE_EXIT_CODE = 1
+const ARGV_OFFSET = 2
+// How often the loop wakes to look at the clock — not how often it reports. It is short relative to
+// the interval so that a `--mark` written by the run is noticed promptly, and long enough that a
+// watcher left running overnight costs nothing measurable.
+const TICK_SECONDS = 30
+// How long a tick that printed nothing waits before it reads again.
+//
+// **A decline deliberately does not move the report clock** — the first child to appear is reported at
+// once rather than waiting out an interval the repository spent idle. Without a cooldown, though, that
+// same property re-reads GitHub every 30 seconds for the watcher's whole life, and a batch stacks one
+// fresh watcher per child, so the listings accumulate into secondary-rate-limit territory and would
+// themselves start producing the unreadable listings this branch exists to handle. Two minutes keeps
+// "reported at once" true to within a fraction of the twenty-minute interval and takes the call count
+// down with it.
+const DECLINE_RETRY_SECONDS = 120
+// The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
+const NO_RETRY = 0
+// A watcher outlives the turn that started it, so something has to end it. One hour is three of the
+// default twenty-minute intervals: long enough that the bound never truncates a report, short enough
+// that a watcher left waiting on a run that has already merged is gone within the hour. It is
+// deliberately **not** `run:hold`'s eight-hour expiry — that holds an uncommitted working tree across
+// a person's latency and is trampled by being short (joshuafolkken/kit#1091), while a watcher holds
+// only a heartbeat the caller restarts on the next interval, so the two guard different things and
+// only one has anything to lose by being short.
+const DEFAULT_MAX_HOURS = 1
+const MS_PER_HOUR = 3_600_000
+const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
+const DISABLED_VALUE = '0'
+
+const USAGE =
+	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark'
+const DISABLED_NOTICE = `\`${ENVIRONMENT_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
+const MARKED_NOTICE =
+	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
+// A dispatched lane child carries `JOSH_LANE_CHILD`, and only the outermost run reports progress — a
+// child that started a watcher of its own would be the second one this command's whole design refuses
+// (joshuafolkken/kit#1947). The decision used to live in prose the child read as "start none"; the mark
+// makes it mechanical, so a bare `fullrun #N` handed to a lane no longer reads itself as outermost.
+const LANE_CHILD_NOTICE =
+	'This session is a dispatched lane child (`JOSH_LANE_CHILD`), so no progress watcher is started — the outermost run reports for every child.'
+const IDLE_NOTICE =
+	'No run has started in this checkout (no hold, carried budget, or lane) and no open issue carries `in-progress`, so there is nothing to report.'
+const UNREADABLE_NOTICE =
+	'The `in-progress` listing could not be read, so nothing is reported. That is not "nothing is running" — check `gh auth status` and ask again.'
+const FAILED_TICK_PREFIX =
+	'A progress reading failed, so nothing is reported for it. The watcher is still running, and will read again after the cooldown:'
+const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_MAX_HOURS)} by default) ran out before the run had been quiet for a whole interval, so there is nothing to report. Starting another \`--wait\` resumes the same clock.`
+// The repository name is only ever printed, never written against, so the bounded lookup is the right
+// one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
+// watcher neither running nor saying so.
+const REPO_LOOKUP_TIMEOUT_MS = 10_000
+
+const DECLINE_NOTICES: Readonly<Record<'idle' | 'unreadable', string>> = {
+	idle: IDLE_NOTICE,
+	unreadable: UNREADABLE_NOTICE,
+}
+
+const DECLINE_EXIT_CODES: Readonly<Record<'idle' | 'unreadable', number>> = {
+	// A repository with nothing running is an answer, and the command answered it.
+	idle: SUCCESS_EXIT_CODE,
+	// Nothing was established, so a caller must not proceed as though it had — the same fail-closed
+	// reading `run:hold` and `run:liveness` give an unreadable record.
+	unreadable: FAILURE_EXIT_CODE,
+}
+
+interface WatchOptions {
+	interval_ms: number
+	max_ms: number
+	output_paths: ReadonlyArray<string>
+	repo: string
+	tick_ms: number
+}
+
+interface EmitContext {
+	last_ms: number
+	now_ms: number
+	state: ProgressState | undefined
+}
+
+type DeclineKind = Exclude<ObservationRead['kind'], 'observed'>
+
+// A union rather than an optional field, so a caller that wants the reason has to establish that
+// there is one — the reason exists exactly when no line went out. `line` is the exact string printed,
+// handed back so the caller can persist it verbatim for `josh run:wake --list` to relay
+// (joshuafolkken/kit#1910).
+type EmitResult = { kind: DeclineKind } | { kind: 'observed'; state: ProgressState; line: string }
+
+interface WatchLoop {
+	// When the run last reported anything. Only a printed line moves it.
+	last_ms: number
+	// No read is attempted before this instant — the cooldown a declined tick sets.
+	retry_at_ms: number
+	// The notice already printed for the decline streak in progress, so a repeating condition is said
+	// once rather than every cooldown.
+	said: string | undefined
+	state: ProgressState | undefined
+}
+
+const FRESH_LOOP: Omit<WatchLoop, 'last_ms'> = {
+	retry_at_ms: NO_RETRY,
+	said: undefined,
+	state: undefined,
+}
+
+function is_disabled(): boolean {
+	return process.env[ENVIRONMENT_KEY] === DISABLED_VALUE
+}
+
+function report_usage(): number {
+	console.error(USAGE)
+
+	return FAILURE_EXIT_CODE
+}
+
+function report_disabled(): number {
+	console.error(DISABLED_NOTICE)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// A lane child declining a watcher is a normal, expected state rather than a fault — the outermost run
+// covers it — so it exits success like a disabled reporter, not failure like an unreadable listing.
+function report_lane_child(): number {
+	console.error(LANE_CHILD_NOTICE)
+
+	return SUCCESS_EXIT_CODE
+}
+
+function report_decline(kind: DeclineKind): number {
+	console.error(DECLINE_NOTICES[kind])
+
+	return DECLINE_EXIT_CODES[kind]
+}
+
+/**
+ * Read, decide, and print — or say nothing at all.
+ *
+ * The caller is told which of the three happened rather than only whether a line went out, because
+ * the watch loop stays quiet about a repository with nothing running while a hand-typed `--once`
+ * deserves an answer.
+ */
+async function emit(options: WatchOptions, context: EmitContext): Promise<EmitResult> {
+	const read = await run_progress_read.read_observations({
+		now_ms: context.now_ms,
+		output_paths: options.output_paths,
+		repo: options.repo,
+	})
+
+	if (read.kind !== 'observed') return { kind: read.kind }
+
+	const key = run_progress.observation_key(read.observations)
+	const state = run_progress.next_state(context.state, key, context.now_ms)
+
+	// The interval reaches the line from the options rather than being resolved a second time, so the
+	// schedule printed and the clock `step` consults are one number (joshuafolkken/kit#1726). Both
+	// reporting forms come through here, which is what puts the field on `--wait` and `--once` alike.
+	const line = run_progress.format_line(read.observations, {
+		interval_ms: options.interval_ms,
+		now_ms: context.now_ms,
+		quiet_since_ms: context.last_ms,
+		unchanged_since_ms: state.unchanged_since_ms,
+	})
+
+	console.info(line)
+
+	return { kind: 'observed', state, line }
+}
+
+/**
+ * A tick that printed nothing: say why once, and hold off reading again for the cooldown.
+ *
+ * **The reason reaches standard error even in watch mode.** A listing that could not be read is not
+ * "nothing is running", and a watcher that swallowed it would go silent for hours in exactly the way
+ * that is indistinguishable from an idle repository — the confident absence the three-way read exists
+ * to prevent. It is said once per streak rather than once per cooldown, so a condition that lasts an
+ * afternoon costs one line rather than a hundred and forty.
+ */
+function decline(loop: WatchLoop, now_ms: number, notice: string): WatchLoop {
+	if (loop.said !== notice) console.error(notice)
+
+	const cooldown_ms = DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
+
+	return { ...loop, retry_at_ms: now_ms + cooldown_ms, said: notice }
+}
+
+// A read that threw is a tick that produced nothing, and it is handled as one rather than being
+// allowed to end the watcher. **This is the whole reason the loop has a guard**: every reading below
+// it spawns a process or touches the temp directory, so one `git worktree list` that cannot fork
+// under load — the very load this command exists to report — would otherwise take the reporting down
+// silently for the rest of an unattended run, with the parent not waiting on it and nothing saying why.
+function to_notice(error: unknown): string {
+	return `${FAILED_TICK_PREFIX} ${error instanceof Error ? error.message : String(error)}`
+}
+
+async function attempt(
+	options: WatchOptions,
+	target: string,
+	loop: WatchLoop,
+	now_ms: number,
+): Promise<WatchLoop> {
+	const result = await emit(options, { last_ms: loop.last_ms, now_ms, state: loop.state })
+
+	if (result.kind !== 'observed') return decline(loop, now_ms, DECLINE_NOTICES[result.kind])
+
+	run_progress_read.mark(target, now_ms, result.line)
+
+	return { ...FRESH_LOOP, last_ms: now_ms, state: result.state }
+}
+
+/**
+ * One wake-up.
+ *
+ * **The record is re-read every time rather than kept in memory**: `--mark` is written by another
+ * process, and a watcher that trusted its own copy would go on counting from its last heartbeat and
+ * print one straight after the run's real report — which is the single thing this command is built
+ * not to do.
+ *
+ * **A tick that printed nothing does not move the report clock.** A decline now means no run has
+ * started here at all, so the silence has not been broken and the first report is emitted at once
+ * instead of waiting out an interval spent idle; what a decline moves instead is the read cooldown.
+ */
+async function step(options: WatchOptions, target: string, loop: WatchLoop): Promise<WatchLoop> {
+	const now_ms = Date.now()
+
+	if (now_ms < loop.retry_at_ms) return loop
+
+	const last_ms = run_progress_read.read_last_report(target) ?? loop.last_ms
+
+	// **A tick that was not due ends the decline streak**, because no read was attempted and so this
+	// tick is not part of one. Without that, two unrelated outages either side of a quiet period read
+	// as one streak: the first prints its notice, and the second — hours later, and permanent — is
+	// deduplicated away against it, leaving the watcher silent in exactly the way the notice exists to
+	// prevent.
+	if (!run_progress.is_due(last_ms, now_ms, options.interval_ms)) {
+		return { ...loop, last_ms, said: undefined }
+	}
+
+	try {
+		return await attempt(options, target, { ...loop, last_ms }, now_ms)
+	} catch (error) {
+		return decline({ ...loop, last_ms }, now_ms, to_notice(error))
+	}
+}
+
+/**
+ * The loop both reporting forms are, with one difference between them.
+ *
+ * `watch` runs until `--hours` expires; `--wait` stops at the first line it prints
+ * (joshuafolkken/kit#1576). Everything else — where the clock is seeded from, the tick, the decline
+ * cooldown `step` keeps — is one implementation on purpose: two copies would let a fix to the bound or
+ * to the initial silence reach one form and not the other, and `--wait` is the form a run starts.
+ */
+// The silence this loop starts from: the record where there is one, and otherwise the moment it began
+// watching, so a first line on a tree with no record reports the wait it actually did.
+function seed_loop(target: string, started_ms: number): WatchLoop {
+	return { ...FRESH_LOOP, last_ms: run_progress_read.read_last_report(target) ?? started_ms }
+}
+
+// `state` is set by the one branch of `step` that printed a line and by no other, so this asks "was
+// anything reported" without keeping a second copy of the loop's own bookkeeping.
+function has_reported(loop: WatchLoop, should_stop_on_report: boolean): boolean {
+	return should_stop_on_report && loop.state !== undefined
+}
+
+// Why the loop stopped, so `drive` prints the bound-expired notice only when the bound is what
+// expired — not when `josh followup` ended the watcher, which is a clean stop with nothing to report.
+type WatchExit = 'reported' | 'ended' | 'bound'
+
+// The record the watcher writes to say it is alive, resolved once at the start. `begin_life` refreshes
+// it, so a `--wait` the caller restarts cleanly replaces a record an earlier one left behind.
+async function begin_watch(): Promise<string> {
+	const life = await run_progress_read.live_target()
+
+	run_progress_clock.begin_life(life)
+
+	return life
+}
+
+// Which non-reporting exit the loop took: its liveness record removed by `josh followup`, or the
+// `--hours` bound running out. Kept out of `run_ticks` so its loop carries one branch rather than two.
+function final_exit(life: string): WatchExit {
+	return run_progress_clock.is_life_ended(life) ? 'ended' : 'bound'
+}
+
+// The loop both reporting forms share, reading its own liveness record at the top of each pass — the
+// `run-wake-loop.ts` `run_loop` shape (joshuafolkken/kit#1727). A record gone means `josh followup`
+// removed it at the merge, so the watcher stops at once instead of waiting out its bound
+// (joshuafolkken/kit#1821); `--wait` also stops at the first line it prints, and otherwise the loop
+// runs until `--hours` expires.
+async function run_ticks(
+	options: WatchOptions,
+	target: string,
+	life: string,
+	should_stop_on_report: boolean,
+): Promise<WatchExit> {
+	const started_ms = Date.now()
+	let loop = seed_loop(target, started_ms)
+
+	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
+		await sleep(options.tick_ms)
+		loop = await step(options, target, loop)
+
+		if (has_reported(loop, should_stop_on_report)) return 'reported'
+	}
+
+	return final_exit(life)
+}
+
+async function drive(options: WatchOptions, should_stop_on_report: boolean): Promise<number> {
+	const target = await run_progress_read.stamp_target()
+	const life = await begin_watch()
+	const exit = await run_ticks(options, target, life, should_stop_on_report)
+
+	if (exit === 'bound' && should_stop_on_report) console.error(WAIT_EXPIRED_NOTICE)
+
+	return SUCCESS_EXIT_CODE
+}
+
+async function watch(options: WatchOptions): Promise<number> {
+	return await drive(options, false)
+}
+
+// The manual form of the same reading: one line now, whatever the clock says. An explicit ask is not
+// a heartbeat, so the silence check is not applied to it — but it still records the report, because a
+// line the person has just read is one the watcher must not repeat.
+async function once(options: WatchOptions): Promise<number> {
+	const target = await run_progress_read.stamp_target()
+	const now_ms = Date.now()
+	const last_ms = run_progress_read.read_last_report(target) ?? now_ms
+	const result = await emit(options, { last_ms, now_ms, state: undefined })
+
+	if (result.kind !== 'observed') return report_decline(result.kind)
+
+	run_progress_read.mark(target, now_ms, result.line)
+
+	return SUCCESS_EXIT_CODE
+}
+
+/**
+ * One interval of silence, one line, and then exit — the form that reports where a long-running
+ * command cannot (joshuafolkken/kit#1576).
+ *
+ * **The exit is the whole point.** A harness that only delivers a background command's standard
+ * output *when that command exits* — Claude Code is one — relays nothing at all from `watch`, which
+ * by design never exits: `epicrun #1474` was measured at 2h36m without a single progress line while
+ * children were in flight. This form waits the same clock out and then ends, so the line it printed
+ * is delivered; the caller relays it and starts the next one.
+ *
+ * **The clock is still this command's, not the caller's.** It is the watch loop itself, a tick at a
+ * time, rather than a second reading of the same record — so a real report elsewhere pushes the next
+ * line out and a declined reading takes the same cooldown. That is what keeps joshuafolkken/kit#1570
+ * intact: the caller arms no timer of its own.
+ *
+ * **One at a time is the caller's part rather than this loop's.** The record is read before the `gh`
+ * reads and written after them, so two of these running at once could both find the same silence due
+ * and both print; `backlogrun.md` starts exactly one, which is where that is guaranteed.
+ *
+ * **A decline is not an exit.** A decline now means no run has started here at all — no hold, no
+ * carried budget, no lane, and no `in-progress` child — so a genuinely idle repository keeps the loop
+ * waiting instead of ending it; returning there would hand the caller an instant answer to restart,
+ * and the documented restart makes that a poll rather than a heartbeat. Once a run has started the
+ * loop reports and exits even before the first child carries `in-progress` (joshuafolkken/kit#1900).
+ */
+async function wait_once(options: WatchOptions): Promise<number> {
+	return await drive(options, true)
+}
+
+async function mark_now(): Promise<number> {
+	run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
+	console.error(MARKED_NOTICE)
+
+	return SUCCESS_EXIT_CODE
+}
+
+const OPTIONS = {
+	hours: { type: 'string' },
+	interval: { type: 'string' },
+	mark: { type: 'boolean' },
+	once: { type: 'boolean' },
+	output: { type: 'string', multiple: true },
+	repo: { type: 'string' },
+	wait: { type: 'boolean' },
+} as const
+
+interface ParsedValues {
+	hours?: string
+	interval?: string
+	mark?: boolean
+	once?: boolean
+	output?: Array<string>
+	repo?: string
+	wait?: boolean
+}
+
+function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
+	try {
+		return parseArgs({ args: [...argv], options: OPTIONS }).values
+	} catch {
+		return undefined
+	}
+}
+
+// A hand-typed `--interval` outranks the environment, the environment outranks the interval the
+// repository commits, and that outranks the twenty-minute default. Every step goes through the same
+// reader, so an unusable value falls back rather than ending an unattended run over an optional
+// setting — `run-progress-config.ts` → `resolve_interval_ms` is where that order is written down.
+function to_interval_ms(raw: string | undefined): number {
+	return run_progress_config.resolve_interval_ms(raw)
+}
+
+function to_max_ms(raw: string | undefined): number {
+	const hours = Number(raw)
+	const is_usable = raw !== undefined && Number.isFinite(hours) && hours > 0
+
+	return (is_usable ? hours : DEFAULT_MAX_HOURS) * MS_PER_HOUR
+}
+
+function to_options(values: ParsedValues): WatchOptions | undefined {
+	const repo = values.repo ?? gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS)
+
+	if (repo === undefined) return undefined
+
+	return {
+		interval_ms: to_interval_ms(values.interval),
+		max_ms: to_max_ms(values.hours),
+		output_paths: values.output ?? [],
+		repo,
+		tick_ms: TICK_SECONDS * run_progress.MS_PER_SECOND,
+	}
+}
+
+async function run_watch(values: ParsedValues): Promise<number> {
+	const options = to_options(values)
+
+	if (options === undefined) return report_usage()
+	if (values.once === true) return await once(options)
+	if (values.wait === true) return await wait_once(options)
+
+	return await watch(options)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const values = read_arguments(argv)
+
+	if (values === undefined) return report_usage()
+	// `--mark` comes first, so a lane child still records its own real reports for the parent's clock;
+	// what it must not do is run a watcher, which every reporting form below would.
+	if (values.mark === true) return await mark_now()
+	if (lane_child_marker.is_child_of(process.cwd())) return report_lane_child()
+	if (is_disabled()) return report_disabled()
+
+	return await run_watch(values)
+}
+
+async function main(argv: ReadonlyArray<string>): Promise<void> {
+	process.exitCode = await run(argv)
+}
+
+const run_progress_cli = {
+	DECLINE_RETRY_SECONDS,
+	DEFAULT_MAX_HOURS,
+	DISABLED_NOTICE,
+	FAILED_TICK_PREFIX,
+	FRESH_LOOP,
+	IDLE_NOTICE,
+	LANE_CHILD_NOTICE,
+	MARKED_NOTICE,
+	TICK_SECONDS,
+	UNREADABLE_NOTICE,
+	USAGE,
+	WAIT_EXPIRED_NOTICE,
+	main,
+	read_arguments,
+	report_decline,
+	run,
+	step,
+	to_interval_ms,
+	to_max_ms,
+	to_options,
+	wait_once,
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
+
+export type { EmitContext, EmitResult, WatchLoop, WatchOptions }
+export { run_progress_cli }

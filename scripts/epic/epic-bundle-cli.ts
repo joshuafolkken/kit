@@ -1,16 +1,21 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { bounded_pool } from '#scripts/bounded-pool'
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
-import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
+import {
+	epic_bundle,
+	type BacklogIssue,
+	type BundleAction,
+	type BundleDecision,
+} from './epic-bundle'
+import { epic_bundle_evidence } from './epic-bundle-evidence'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
+import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
 import { epic_issue } from './epic-issue'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
@@ -29,27 +34,29 @@ const USAGE = 'Usage: josh epic:bundle <issue-number>'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the backlog cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
 
-const epic_schema = z.object({ number: z.number(), body: z.string().nullable() })
 // The backlog listing asks for the title too (joshuafolkken/kit#1252). Kept apart from the epic
 // listing's schema rather than made optional on one: the epic listing does not ask for the field, and
 // a schema that tolerates its absence everywhere would let a missing title pass unnoticed here.
-const backlog_schema = epic_schema.extend({ title: z.string().nullable() })
+//
+// `blocked_by_count` is the blocker count GitHub already puts in the listing response
+// (joshuafolkken/kit#1736). It is **nullish rather than defaulted**, and that is the whole safety of
+// the read below: a row the listing carries no summary for must not be read as a row with no
+// blockers, because that reading is what would silently drop a relation instead of costing a
+// request. Nothing in today's pipeline is expected to arrive without one — the response carries the
+// summary on every issue, and `git-gh-issue-list.ts` filters pull requests, which are what lack it,
+// out client-side — so this tolerates a shape the listing is not supposed to hand over rather than
+// describing one it does.
+const backlog_schema = epic_schema.extend({
+	title: z.string().nullable(),
+	blocked_by_count: z.number().nullish(),
+})
 
-// Which epic tracks each issue, from the epics' own task lists. An issue belongs to at most one,
-// because that is what a task list can express.
-function build_epic_index(
-	epics: ReadonlyArray<{ number: number; body: string }>,
-): Map<number, number> {
-	const index = new Map<number, number>()
+type BacklogRow = z.infer<typeof backlog_schema>
 
-	for (const epic of epics) {
-		for (const child of git_epic_parse.parse_task_list_issue_numbers(epic.body)) {
-			index.set(child, epic.number)
-		}
-	}
-
-	return index
-}
+// The epic index is `epic-index.ts`'s, shared with the `auto-ok` pickup since
+// joshuafolkken/kit#1633: both commands ask which epic tracks an issue, and a second copy of the
+// task-list read would answer differently the first time that shape moved.
+const { build_epic_index } = epic_index
 
 function to_epic_field(epic: number | undefined): { epic?: number } {
 	return epic === undefined ? {} : { epic }
@@ -68,14 +75,15 @@ async function epic_issue_relations(
 	return parsed === undefined ? undefined : epic_issue.blocker_references_of(parsed, repo)
 }
 
-// One read per backlog issue, a few at a time.
+// One read per backlog issue *that has blockers*, a few at a time.
 //
 // Since joshuafolkken/kit#1024 a read is `gh api`: one REST request for the issue, and a second to
 // its `dependencies/blocked_by` endpoint unless the issue's own dependency summary reports exactly
-// zero blockers — an absent summary is not a zero, so it pays too. The backlog rows are issues
-// rather than pull requests — the issue listing endpoint serves both, and `git-gh-issue-list.ts`
-// filters the pull requests out client-side — so every row here carries that summary, and a
-// backlog with no declared blockers costs exactly one request per issue.
+// zero blockers. That second request was already skipped on a zero; the first one was not, so the
+// command still paid one request for every open issue in the repository — a cost that grows with the
+// backlog and made the command heavier exactly as more issues made it more useful
+// (joshuafolkken/kit#1736). The listing that produced these rows already carries that same summary,
+// so the zero is known *before* the read rather than inside it, and the read is skipped outright.
 //
 // One read would do if `gh` exposed the reverse of `blockedBy`, but it does not (`blocks` is not a
 // JSON field), so a dependency declared on the *other* issue is only visible by asking that issue.
@@ -85,15 +93,24 @@ async function epic_issue_relations(
 // read from passing as an answer (joshuafolkken/kit#873). The pool itself is `bounded-pool.ts`,
 // shared with the reference reads below it and with the eval suite (joshuafolkken/kit#1144).
 const RELATION_CONCURRENCY = 8
+const NO_BLOCKERS = 0
 
+// GitHub's own count, not an inference from what was read. Strictly `=== 0`, so a row carrying no
+// summary at all answers `false` and keeps its read: an absent count says nothing about whether the
+// issue has blockers, and treating the two alike is the one way this shortcut could lose a
+// relation. Skipping is cheap and wrong-in-silence; reading is a request and always right.
+function has_no_blockers(row: BacklogRow): boolean {
+	return row.blocked_by_count === NO_BLOCKERS
+}
+
+// Every row still gets an entry, in order, so the index alignment `fetch_backlog` relies on is the
+// same whether a row was read or answered from the listing.
 async function fetch_relations(
-	numbers: ReadonlyArray<number>,
+	rows: ReadonlyArray<BacklogRow>,
 	repo: string,
 ): Promise<Array<Array<IssueReference> | undefined>> {
-	return await bounded_pool.bounded_map(
-		numbers,
-		RELATION_CONCURRENCY,
-		async (number) => await epic_issue_relations(String(number), repo),
+	return await bounded_pool.bounded_map(rows, RELATION_CONCURRENCY, async (row) =>
+		has_no_blockers(row) ? [] : await epic_issue_relations(String(row.number), repo),
 	)
 }
 
@@ -147,13 +164,13 @@ interface BacklogOptions {
 // The relations, or an empty list each when the caller asked for none. Every issue still gets a row,
 // so the index alignment `fetch_backlog` relies on holds either way.
 async function read_relations(
-	numbers: ReadonlyArray<number>,
+	rows: ReadonlyArray<BacklogRow>,
 	repo: string,
 	options: BacklogOptions | undefined,
 ): Promise<Array<Array<IssueReference> | undefined>> {
-	if (options?.include_relations === false) return numbers.map(() => [])
+	if (options?.include_relations === false) return rows.map(() => [])
 
-	return await fetch_relations(numbers, repo)
+	return await fetch_relations(rows, repo)
 }
 
 async function fetch_backlog(
@@ -169,11 +186,7 @@ async function fetch_backlog(
 	// Same reason as `fetch_epics`: an unparseable listing is not an empty backlog.
 	const rows = parse_json_array_or_undefined(json, backlog_schema)
 	if (rows === undefined) return { issues: [], unreadable: [], is_readable: false }
-	const relations = await read_relations(
-		rows.map((row) => row.number),
-		repo,
-		options,
-	)
+	const relations = await read_relations(rows, repo, options)
 
 	return {
 		is_readable: true,
@@ -205,32 +218,11 @@ function headline(decision: BundleDecision): string {
 	return ACTION_LINES[decision.action] ?? ''
 }
 
-interface FetchedEpics {
-	epics: Array<{ number: number; body: string }>
-	// The listing is cut short like the backlog's. An epic past the cut is invisible, so the issue it
-	// tracks reads as tracked by nothing and the command recommends creating a second epic over it —
-	// the duplicate that joshuafolkken/kit#943 exists to prevent, arriving with exit 0
-	// (joshuafolkken/kit#950).
-	cutoff: ScanCutoff
-}
-
-// The epics currently open, so a candidate can be matched to the one already tracking it.
-//
-// A failed read is reported rather than treated as "there are no epics": without the list, the
-// guard that keeps an epic out of its own children's candidates is off, and an issue an epic already
-// tracks is told to create a second one — confidently, and with exit 0.
+// The epics currently open, at this command's own listing limit. A failed read stays `undefined` and
+// is reported: without the list, an issue an epic already tracks is told to create a second one —
+// confidently, and with exit 0 (joshuafolkken/kit#950).
 async function fetch_epics(): Promise<FetchedEpics | undefined> {
-	const { json, is_capped } = await git_gh_command.issue_list_by_label(EPIC_LABEL, BACKLOG_LIMIT)
-	if (json === undefined) return undefined
-	// Not `parse_json_array_safe`: it answers `[]` for a response that is not JSON at all, which is
-	// indistinguishable from "no epics are open" — the silent absence this whole rule is about.
-	const rows = parse_json_array_or_undefined(json, epic_schema)
-	if (rows === undefined) return undefined
-
-	return {
-		cutoff: cutoff_of(rows.length, BACKLOG_LIMIT, is_capped),
-		epics: rows.map((row) => ({ number: row.number, body: row.body ?? '' })),
-	}
+	return await epic_index.fetch_epics(BACKLOG_LIMIT)
 }
 
 function format_numbers(numbers: ReadonlyArray<number>): string {
@@ -255,17 +247,38 @@ function format_order(
 	const members = backlog.filter((issue) => decision.candidates.includes(issue.number))
 	const children = epic_bundle.bundle_children(subject, members)
 
+	// The evidence goes under the order rather than beside the verdict: what it explains is the
+	// order, and a reader checking one reads straight on into the other (joshuafolkken/kit#1737).
 	return [
 		`  Children: ${format_numbers(children)}`,
 		format_links(epic_bundle.bundle_dependency_links(subject, members)),
+		...epic_bundle_evidence.format_evidence(subject, members),
 	]
 }
 
+// The verdicts that put the subject into an epic. Each one asserts that no epic already tracks it —
+// `create_epic` asserts as much about the candidates too — and that negative is exactly what a cut
+// epic listing cannot establish (joshuafolkken/kit#1697). `none` is absent on purpose: it either
+// names the epic it *found* tracking the subject, which a cut cannot unseat, or reports no candidate
+// at all, which says nothing about epics.
+const PLACING_ACTIONS: ReadonlySet<BundleAction> = new Set<BundleAction>([
+	'add_to_epic',
+	'create_epic',
+	'ask',
+])
+
+// `is_membership_established` is what separates "no epic tracks these" from "their epics were never
+// read".
 function format_decision(
 	decision: BundleDecision,
 	subject: BacklogIssue,
 	backlog: ReadonlyArray<BacklogIssue>,
+	is_membership_established: boolean,
 ): string {
+	if (!is_membership_established && PLACING_ACTIONS.has(decision.action)) {
+		return epic_bundle_gaps.unconfirmed_membership(format_numbers(decision.candidates)).join('\n')
+	}
+
 	const lines = [headline(decision), `  ${decision.reason}`]
 
 	if (decision.candidates.length > 0) {
@@ -351,10 +364,12 @@ function warn_about_gaps(backlog: FetchedBacklog): void {
 	warn_cutoff(epic_bundle_gaps.epic_gap(backlog.epic_cutoff ?? NO_CUTOFF, BACKLOG_LIMIT))
 }
 
-function report_decision(subject: BacklogIssue, issues: ReadonlyArray<BacklogIssue>): number {
-	const others = issues.filter((issue) => issue.number !== subject.number)
+function report_decision(subject: BacklogIssue, backlog: FetchedBacklog): number {
+	const others = backlog.issues.filter((issue) => issue.number !== subject.number)
+	const is_established = epic_bundle_gaps.is_membership_established(backlog.epic_cutoff)
+	const decision = epic_bundle.decide_bundle(subject, others)
 
-	console.info(format_decision(epic_bundle.decide_bundle(subject, others), subject, others))
+	console.info(format_decision(decision, subject, others, is_established))
 
 	return SUCCESS_EXIT_CODE
 }
@@ -366,7 +381,7 @@ async function report_widened(subject: BacklogIssue, backlog: FetchedBacklog): P
 
 	warn_about_gaps(widened)
 
-	return report_decision(subject, widened.issues)
+	return report_decision(subject, widened)
 }
 
 // The recommendation for one issue, from the open backlog around it.
@@ -418,7 +433,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
 // a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
 // command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#1005).
+// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first (joshuafolkken/kit#1005).
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

@@ -1,0 +1,352 @@
+#!/usr/bin/env tsx
+import { fileURLToPath } from 'node:url'
+import { agent_argv } from '#scripts/agent/agent-argv'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { git_command } from '#scripts/git/git-command'
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
+import { detached_launch } from './detached-launch'
+import { run_cut, type CutState, type RunCut } from './run-cut'
+import { run_cut_args, type Request } from './run-cut-args'
+
+// `josh run:cut` — the record that lets a lane child end its process before the gate and a fresh one
+// resume from it (joshuafolkken/kit#1839). `run:cut <N>` writes the record and relaunches a fresh
+// `fullrun #<N>`; the fresh process runs `run:cut --resume <N>` at its entry, which verifies the tree
+// against the record and hands the run on to the gate. **Turning `argv` into a request is
+// `run-cut-args.ts`'s**; what is here acts on the record and relaunches.
+//
+// The contract is `run:hold`'s and `run:carry`'s: **standard output carries exactly one token** and
+// every explanation goes to standard error, so a loop can branch on `answer=$(pnpm josh run:cut 12)`.
+// `--json` is the one exception, and it is still one line: the whole record has to reach a resuming
+// session.
+
+const ARGV_OFFSET = 2
+const SUCCESS_EXIT_CODE = 0
+const FAILURE_EXIT_CODE = 1
+
+const CUT_VERDICT = 'cut'
+const RESUME_VERDICT = 'resume'
+// An implementation-phase resume: the fresh process continues implementing rather than going to the
+// gate (joshuafolkken/kit#1933). It is a distinct token so the resuming child branches on it without
+// re-reading the record.
+const RESUME_IMPL_VERDICT = 'resume-impl'
+const FRESH_VERDICT = 'fresh'
+const STALE_VERDICT = 'stale'
+const HANDED_OFF_VERDICT = 'handed-off'
+const BUSY_VERDICT = 'busy'
+const NOT_A_LANE_VERDICT = 'not-a-lane'
+const UNREADY_VERDICT = 'unready'
+const FAILED_VERDICT = 'failed'
+const ENDED_VERDICT = 'ended'
+const UNREADABLE_VERDICT = 'unreadable'
+const UNKNOWN_VERDICT = 'unknown'
+
+function report(verdict: string, code: number): number {
+	console.info(verdict)
+
+	return code
+}
+
+function report_stale(cut_record: RunCut): number {
+	console.error(run_cut.stale_message(cut_record))
+
+	return report(STALE_VERDICT, FAILURE_EXIT_CODE)
+}
+
+function report_busy(cut_record: RunCut): number {
+	console.error(run_cut.busy_message(cut_record))
+
+	return report(BUSY_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// A successor already resumed this cut; a process woken after its own hand-off is told to stop rather
+// than to investigate (joshuafolkken/kit#1935). It is a benign, non-failing stop.
+function report_handed_off(cut_record: RunCut): number {
+	console.error(run_cut.handed_off_message(cut_record))
+
+	return report(HANDED_OFF_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+function report_unreadable(): number {
+	console.error(run_cut.unreadable_message())
+
+	return report(UNREADABLE_VERDICT, FAILURE_EXIT_CODE)
+}
+
+function report_unknown(): number {
+	console.error(run_cut.unknown_message())
+
+	return report(UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// A cut is only meaningful on a lane branch whose implementation is uncommitted. On the default
+// branch, or with a clean tree, there is nothing to carry across the boundary.
+function refuse_unready(state: CutState): number {
+	console.error(
+		`Not ready to cut on ${state.branch} (dirty: ${String(state.is_dirty)}); a cut needs an uncommitted lane branch. Nothing was cut.`,
+	)
+
+	return report(UNREADY_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// The exclusive create lost, so a cut is already in flight for this tree — the double-cut guard. The
+// standing record is described rather than a bare token, so the reader sees which run holds it.
+function report_cut_exists(target: string): number {
+	const read = run_cut.read_cut(target)
+
+	if (read.kind === 'carried' || read.kind === 'expired') return report_busy(read.cut)
+
+	console.error('A cut is already in flight for this tree, so nothing was cut again.')
+
+	return report(BUSY_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// A relaunch failure clears the record so the current process can carry on to the gate itself — the
+// run is never lost to a failed hand-off, and the failure is reported rather than passed off as a cut.
+function report_relaunch_failure(target: string, note: string): number {
+	run_cut.end_cut(target)
+	console.error(
+		`Relaunch failed: ${note}. The cut was cleared so this process can continue to the gate.`,
+	)
+
+	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
+}
+
+function report_missing_supervisor(issue: string): number {
+	console.error(
+		`The OpenAI supervisor for #${issue} is not live, so this nested process was not cut and can continue. Re-dispatch the lane to recover the supervisor.`,
+	)
+
+	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
+}
+
+function relaunch(target: string, lane: LaneInfo): number {
+	const notes: Array<string> = []
+	// The relaunched child is given a resume-specific prompt, not the record's bare `fullrun #<N>`
+	// (joshuafolkken/kit#2022), so it goes straight to `run:cut --resume` without reading the
+	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
+	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
+	const invocation = lane_child_invocation.resume_invocation(lane.issue)
+	const built =
+		lane.profile === undefined
+			? agent_argv.resolve_in(invocation, agent_role_profile.WORKER, lane.directory)
+			: agent_argv.with_profile_in(invocation, lane.profile, lane.directory)
+
+	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
+
+	const result = detached_launch.launch(
+		{
+			argv: built.argv,
+			cwd: lane.directory,
+			log_path: lane_dispatch_log.default_log_path(lane),
+			profile: built.profile,
+			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
+			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
+			// since the parent-session strip runs on the way in.
+			env: lane_child_marker.env_for(lane.issue),
+		},
+		(note) => {
+			notes.push(note)
+		},
+	)
+
+	if (result.kind === 'failed') return report_relaunch_failure(target, result.note)
+
+	if (notes.length > 0) console.error(notes.join('\n'))
+
+	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+async function is_lane_branch(state: CutState): Promise<boolean> {
+	const default_branch = await git_command.get_default_branch()
+
+	return state.branch !== default_branch && state.is_dirty
+}
+
+// An expired record is a fresh process that never started; it is cleared so the next cut can begin
+// rather than being wedged behind a stale file the exclusive create would refuse forever.
+function clear_expired(target: string): void {
+	if (run_cut.read_cut(target).kind === 'expired') run_cut.end_cut(target)
+}
+
+function is_openai_lane(lane: LaneInfo): boolean {
+	return lane.profile?.provider === 'openai'
+}
+
+function has_matching_supervisor(lane: LaneInfo, issue: string): boolean {
+	if (!is_openai_lane(lane)) return true
+
+	return openai_lane_supervisor.active(lane.directory)?.issue === issue
+}
+
+interface CutRequest {
+	branch: string
+	issue: string
+	phase: string
+}
+
+function finish_cut(target: string, lane: LaneInfo, request: CutRequest): number {
+	const started = run_cut.begin_cut(target, request)
+	if (started === undefined) return report_cut_exists(target)
+
+	return is_openai_lane(lane) ? report(CUT_VERDICT, SUCCESS_EXIT_CODE) : relaunch(target, lane)
+}
+
+async function cut(target: string, issue: string, phase: string): Promise<number> {
+	const lane = await lane_registry.find_open_lane(issue)
+
+	if (lane === undefined) return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
+
+	const state = await run_cut.current_state()
+
+	if (!(await is_lane_branch(state))) return refuse_unready(state)
+
+	clear_expired(target)
+	if (!has_matching_supervisor(lane, issue)) return report_missing_supervisor(issue)
+
+	return finish_cut(target, lane, { issue, branch: state.branch, phase })
+}
+
+// **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two
+// racing resumes only one wins the create and the loser is answered `busy`.
+// An implementation-phase cut resumes back into implementation; a pre-gate one into the gate. The
+// resuming child is told which by the verdict rather than reconstructing it from the record
+// (joshuafolkken/kit#1933).
+function resume_verdict_for(cut_record: RunCut): string {
+	return cut_record.phase === run_cut.IMPLEMENTATION_PHASE ? RESUME_IMPL_VERDICT : RESUME_VERDICT
+}
+
+function adopt(target: string, cut_record: RunCut): number {
+	const adopted = run_cut.adopt_cut(target, cut_record)
+
+	if (adopted === undefined) return report_busy(cut_record)
+
+	return report(resume_verdict_for(cut_record), SUCCESS_EXIT_CODE)
+}
+
+async function verify_and_adopt(
+	target: string,
+	cut_record: RunCut,
+	issue: string,
+): Promise<number> {
+	const state = await run_cut.current_state()
+	const verdict = run_cut.classify_resume(cut_record, {
+		issue,
+		current_branch: state.branch,
+		is_dirty: state.is_dirty,
+		is_held: state.is_held,
+	})
+
+	if (verdict === HANDED_OFF_VERDICT) return report_handed_off(cut_record)
+
+	if (verdict === 'stale') return report_stale(cut_record)
+
+	return adopt(target, cut_record)
+}
+
+async function resume(target: string, issue: string): Promise<number> {
+	const read = run_cut.read_cut(target)
+
+	if (read.kind === 'none') return report(FRESH_VERDICT, SUCCESS_EXIT_CODE)
+
+	if (read.kind === 'unreadable') return report_unreadable()
+
+	if (read.kind === 'expired') return report_stale(read.cut)
+
+	return await verify_and_adopt(target, read.cut, issue)
+}
+
+function read_json(target: string): number {
+	const read = run_cut.read_cut(target)
+	const cut_record = read.kind === 'carried' || read.kind === 'expired' ? read.cut : undefined
+
+	console.info(JSON.stringify({ verdict: read.kind, cut: cut_record }))
+
+	return read.kind === 'unreadable' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+}
+
+function end(target: string): number {
+	run_cut.end_cut(target)
+
+	return report(ENDED_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+// A bare cut is the pre-gate boundary; `--impl` is the implementation-phase one (joshuafolkken/kit#1933).
+function cut_phase(is_implementation: boolean): string {
+	return is_implementation ? run_cut.IMPLEMENTATION_PHASE : run_cut.PRE_GATE_PHASE
+}
+
+async function act(target: string, request: Request): Promise<number> {
+	if (request.kind === 'cut') {
+		return await cut(target, request.issue, cut_phase(request.is_implementation))
+	}
+
+	if (request.kind === 'resume') return await resume(target, request.issue)
+
+	if (request.kind === 'read') return read_json(target)
+
+	return end(target)
+}
+
+async function answer(request: Request): Promise<number> {
+	const directory = await run_cut.worktree_directory()
+
+	if (directory === undefined) return report_unknown()
+
+	return await act(run_cut.cut_path(directory), request)
+}
+
+function refuse(): number {
+	console.error(run_cut_args.USAGE)
+
+	return FAILURE_EXIT_CODE
+}
+
+// Every path out prints exactly one token, including the ones nobody planned: an empty standard
+// output matches no verdict, which a resume entry check reads as "not a resume" and would let a fresh
+// process re-implement over a cut it should have carried.
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = run_cut_args.read_arguments(argv)
+
+	if (parsed === undefined) return refuse()
+
+	const request = run_cut_args.to_request(parsed)
+
+	if (request === undefined) return refuse()
+
+	try {
+		return await answer(request)
+	} catch {
+		return report_unknown()
+	}
+}
+
+async function main(argv: ReadonlyArray<string>): Promise<void> {
+	process.exitCode = await run(argv)
+}
+
+const run_cut_cli = {
+	BUSY_VERDICT,
+	CUT_VERDICT,
+	ENDED_VERDICT,
+	FAILED_VERDICT,
+	FRESH_VERDICT,
+	HANDED_OFF_VERDICT,
+	NOT_A_LANE_VERDICT,
+	RESUME_IMPL_VERDICT,
+	RESUME_VERDICT,
+	STALE_VERDICT,
+	UNKNOWN_VERDICT,
+	UNREADABLE_VERDICT,
+	UNREADY_VERDICT,
+	USAGE: run_cut_args.USAGE,
+	main,
+	run,
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
+
+export { run_cut_cli }

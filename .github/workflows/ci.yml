@@ -7,8 +7,14 @@ on:
   pull_request:
     branches: [main]
 
+# A push run is grouped by the commit it carries, so a later push to main never cancels an earlier
+# one. Without the sha every push to main shares one group — `github.ref` is `refs/heads/main` for
+# all of them — and the run that reaches `notify-auto-tag` for the commit that changed the version
+# disappears: no tag, no publish, and nothing reported as failed (joshuafolkken/kit#1481).
+# The sha is added for `push` only: added unconditionally it would also stop a new push to a pull
+# request from cancelling that pull request's older runs, which is the saving this block exists for.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 
 # Which browsers the plain-runner fallback downloads when the MCR image could not be resolved.
@@ -83,8 +89,21 @@ jobs:
             echo "::warning::Playwright image ${image} could not be resolved on MCR (HTTP ${status}). Running on the plain runner and installing ${browsers} instead (set the JOSH_PLAYWRIGHT_BROWSERS repository variable to change the list)."
           fi
 
-  checks:
-    name: Checks
+  # joshuafolkken/kit#1226 split the gate's four checks across two runners. The unit suite is the only
+  # one that fans out across every core — 8.5 of them on the machine `scripts/gate/gate-plan.ts` measures —
+  # so on a 4-core GitHub runner it and the other three spent the whole job taking cores off each
+  # other: measured here, 121 seconds for the job with 106 of them inside the one gate step, against
+  # a theoretical floor of the unit suite alone.
+  #
+  # **The required status check did not move, and that is the point of the third job below.** GitHub
+  # matches a required context by the check-run name, which is a job's `name:`, and a required
+  # context that no longer names a job is not enforced — while a job absent from the list can go red
+  # without blocking a merge from the web UI. Splitting into two *named* jobs would therefore have
+  # needed a ruleset edit to stay as strict as it was, and left every merge between the two
+  # unguarded. So the two halves run under new names and `Checks` stays exactly what the ruleset
+  # already requires: a job that is green only when both halves are.
+  static-checks:
+    name: Static Checks
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -129,10 +148,47 @@ jobs:
           # `eslint/config-fingerprint.js` now invalidates the entries themselves; this key has to move
           # with it, or a rule edit would restore a cache whose every entry is stale, lint cold, and
           # save nothing back under the key it already hit — a cold lint on every later run.
-          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}
+          # joshuafolkken/kit#2030: `${{ github.sha }}` on the tail makes every run save a fresh entry
+          # under a new key, and the sha-less prefix in `restore-keys` restores the newest previous one
+          # first — so the cache tracks `main` instead of freezing on the first commit that hit the
+          # config-hash key and never re-saving. The config-hash body above still cold-invalidates on a
+          # rule edit exactly as before; the sha only ever adds a save, never suppresses one.
+          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
             ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-eslint-cache-
+
+      # `.tsbuildinfo` and `.cspellcache` were not cached in CI at all, so the type check and spell
+      # check ran cold on every run. Both are content-addressed — `tsc` records its compiler options
+      # inside the build-info file and cspell records a content hash of every config and dictionary it
+      # loaded — so restoring an older entry is never wrong; the tool re-checks only what changed
+      # (`scripts/lane/lane-cache.ts` relies on the same property when it warms a fresh lane). The sha
+      # tail plus a sha-less `restore-keys` prefix is the same save-fresh-every-run shape as the eslint
+      # cache above (joshuafolkken/kit#2030). The gate writes both files to the repo root:
+      # `josh check` runs `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` and `josh
+      # cspell:dot` runs `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`.
+      - name: Setup TypeScript build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: tsbuildinfo-cache
+        with:
+          path: |
+            .tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-tsbuildinfo-
+
+      - name: Setup cspell cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cspell-cache
+        with:
+          path: |
+            .cspellcache
+          key: ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-cspell-cache-
 
       - name: Setup safe-chain
         run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
@@ -159,16 +215,16 @@ jobs:
       #
       # `--verbose` prints every check's body, not only the failing ones. Locally the quiet form is
       # right — the gate runs many times per issue and the bodies pile up in the conversation — but a
-      # CI log is read once, after the fact, by someone who cannot re-run it: the unit summary's test
-      # count is what says the suite actually ran, and without it a green log looks the same whether
-      # vitest executed six thousand tests or none.
+      # CI log is read once, after the fact, by someone who cannot re-run it, and a check that passed
+      # with warnings is invisible in a quiet log.
       #
-      # **The unit step goes through `josh test:unit`, which skips rather than fails when vitest is
-      # absent or nothing matches the test glob.** That is deliberate and not new — the distributed
-      # `templates/workflows/ci.yml` has routed through the same guard for exactly this reason, and
-      # `scripts/ci-yml-unit-step.test.ts` pins it; this repository's own workflow was the one
-      # calling vitest directly. The skip prints its notice either way, and `--verbose` is what keeps
-      # the count beside it.
+      # **`--no-unit` selects the three checks, and selecting is not skipping** (joshuafolkken/kit#1226).
+      # The unit suite runs in the `unit` job below, through the same `josh test:unit` this step used
+      # to reach, so the set of checks CI enforces is unchanged — what moved is which runner each one
+      # is on. The flag is also the *only* thing that makes the split safe on the local side:
+      # `scripts/gate/verification-gate.ts` withholds the green-gate record and the in-flight marker on a
+      # `--no-unit` run, so this narrower gate can never let a later full `pnpm josh gate` be skipped,
+      # nor tell `josh review:brief` that a unit suite it did not run has passed.
       #
       # Two things are given up. GitHub's per-step timing and log grouping: the run shows one `Run
       # verification gate` step instead of five named ones, and the gate's own summary names which
@@ -177,7 +233,104 @@ jobs:
       # cancelled with nothing printed — where a serial step streamed. That costs one local
       # `pnpm josh gate` to identify, and it is the price of the all-failures-in-one-pass summary.
       - name: Run verification gate
-        run: pnpm josh gate --verbose
+        run: pnpm josh gate --verbose --no-unit
+
+  # The other half of the gate, on a runner of its own. It carries the same setup steps as
+  # `static-checks` rather than sharing them: a GitHub job is its own machine, so every job that
+  # needs Node sets Node up, and this workflow already writes that preamble once per job. The
+  # single-source alternative — a local composite action under `.github/actions/` — is ruled out by
+  # `scripts/ci/ci-yml-action-parity.test.ts`, which pins the set of action names in this file to the
+  # set in `templates/workflows/ci.yml`; a local action cannot appear in a distributed template,
+  # because the template travels to consumers without it.
+  #
+  # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `gate-plan.ts` leaves
+  # any machine below its measured 11 cores uncapped, so vitest sizes its own pool from the runner
+  # exactly as it did inside the gate step.
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Resolve pnpm store path
+        run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm store cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Setup safe-chain
+        run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
+
+      - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # **Through `josh test:unit`, never `vitest run` directly, and that is what makes a job split
+      # safe rather than a hole.** The guard decides between a skip and a failure, and
+      # https://github.com/joshuafolkken/kit/issues/1224 settled which is which: vitest absent is a
+      # project with no unit suite yet, so it skips and the job stays green, while vitest present
+      # with nothing matching the test glob is a broken state and fails the job. Calling vitest here
+      # would give that second half back — a job that ran zero tests and reported success — and the
+      # split would have moved the check into a place that enforces less than the gate step did.
+      # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
+      # `scripts/test/test-unit-guard.ts`.
+      - name: Run unit tests
+        run: pnpm josh test:unit
+
+  # **The required status check. `Checks` is a name the branch ruleset already requires, and this job
+  # is what keeps that name meaning what it meant** (joshuafolkken/kit#1226) — every check the single
+  # `Checks` job used to run has passed. It runs no checks itself; it reads the two halves' results.
+  #
+  # `if: always()` is load-bearing and not a formality. Without it the job inherits the default "run
+  # only if every dependency succeeded", so a red `unit` would *skip* this job — and GitHub counts a
+  # skipped check as a passing one on the status rollup, which is precisely how a merge once went
+  # through with an E2E suite that never ran (see the `Detect E2E` job below, and
+  # https://github.com/joshuafolkken/kit/issues/991). A skipped aggregator would have reproduced that
+  # defect on the unit suite. Running always and failing explicitly is the only shape that cannot.
+  #
+  # The results are read from the environment rather than interpolated into the script. `needs.*.result`
+  # is a GitHub-controlled enum and not attacker-controlled, but a `${{ }}` expression spliced into a
+  # shell body is the pattern to keep out of a workflow regardless of the value's provenance.
+  checks:
+    name: Checks
+    needs: [static-checks, unit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Require both halves of the verification gate
+        env:
+          STATIC_RESULT: ${{ needs.static-checks.result }}
+          UNIT_RESULT: ${{ needs.unit.result }}
+        run: |
+          echo "Static Checks: ${STATIC_RESULT}"
+          echo "Unit Tests: ${UNIT_RESULT}"
+          if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'success' ]; then
+            exit 0
+          fi
+          echo "::error::the verification gate did not pass on both runners"
+          exit 1
 
   security:
     name: Security Audit
@@ -206,7 +359,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The same rule `scripts/test-e2e-guard.ts` applies locally, so a suite that runs under
+      # The same rule `scripts/test/test-e2e-guard.ts` applies locally, so a suite that runs under
       # `pnpm josh test:e2e` is a suite CI runs too. Every `*.e2e.{ts,js}` outside `node_modules`
       # counts, at any depth; the guard's glob leaves dot-directories out by default, which is what
       # the second prune term reproduces. The config filename is deliberately not consulted any
@@ -215,7 +368,7 @@ jobs:
       # GitHub recorded it as skipped, the status-check list counted the skip as a pass, and the
       # merge went through with the suite never run. The same held for a spec kept anywhere but
       # `tests` or `src/routes` (joshuafolkken/kit#991). The agreement is executed rather than
-      # asserted in prose: `scripts/ci-yml-e2e-detect.test.ts` runs this very script against
+      # asserted in prose: `scripts/ci/ci-yml-e2e-detect.test.ts` runs this very script against
       # fixtures and compares its verdict to the guard's.
       #
       # One difference from the guard is deliberate and one-sided. The guard also skips when

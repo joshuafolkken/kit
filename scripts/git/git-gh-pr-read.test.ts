@@ -15,6 +15,7 @@ import {
 	RATE_LIMITED,
 	rest_pull,
 	rest_pull_page,
+	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import {
 	forget_pr_numbers,
@@ -37,7 +38,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const PR_BODY = 'closes #1027'
 const NO_PULL_REQUEST = { [pr_lookup_path()]: EMPTY_LISTING }
 
-function stub(routes: Record<string, string>): void {
+function stub(routes: Record<string, GhApiAnswer>): void {
 	mocked_api.mockImplementation(gh_api_routes(routes))
 }
 
@@ -99,6 +100,34 @@ describe('the branch to pull request number resolution', () => {
 
 		await git_gh_pr_read.pr_get_number(PR_BRANCH)
 		forget_pr_numbers()
+		await git_gh_pr_read.pr_get_number(PR_BRANCH)
+
+		expect(lookup_calls()).toBe(2)
+	})
+})
+
+// joshuafolkken/kit#1446: `josh followup` now asks two of those readers about the same branch in the
+// same tick. A memo that remembers only a *resolved* number leaves both of them missing an empty map,
+// so overlapping the reads would cost the very request the memo exists to save. A suite of its own
+// because the describe above is at its line limit.
+describe('the branch to pull request number resolution — two readers in one tick', () => {
+	it('resolves a branch once when two readers ask together', async () => {
+		stub(pr_routes())
+
+		await Promise.all([git_gh_pr_read.pr_get_body(PR_BRANCH), git_gh_pr_read.pr_get_url(PR_BRANCH)])
+
+		expect(lookup_calls()).toBe(1)
+	})
+
+	// Sharing a lookup never turns into remembering an absence: the pending entry is dropped as soon
+	// as it settles, so the reader after it looks again.
+	it('does not remember a failed lookup that two readers shared', async () => {
+		mocked_api.mockRejectedValue(gh_failure())
+
+		await Promise.all([
+			git_gh_pr_read.pr_get_number(PR_BRANCH),
+			git_gh_pr_read.pr_get_number(PR_BRANCH),
+		])
 		await git_gh_pr_read.pr_get_number(PR_BRANCH)
 
 		expect(lookup_calls()).toBe(2)

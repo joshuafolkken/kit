@@ -101,8 +101,10 @@ function start_chain(additions: ReadonlyArray<number>, position: InsertPosition)
 	return { chains: [chain_for(additions, position)] }
 }
 
-// A second declaration alongside the existing ones. Every other chain is copied through untouched:
-// the target had no order, so nothing that was declared about anything else changes.
+// A second declaration alongside the existing ones. Every other chain is copied through untouched,
+// so nothing that was declared about anything else changes. Two callers reach it: a target that no
+// chain names yet, and a `--after` whose target already has a successor — a branch rather than a
+// splice (joshuafolkken/kit#1080).
 function add_chain(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -135,6 +137,84 @@ function insert_outside_chains(
 	return not_a_child_error(position.target)
 }
 
+// Whether the chain names anything after `target`, which is what separates a branch from a tail
+// append.
+function has_successor(chain: Chain, target: number): boolean {
+	return chain.indexOf(target) < chain.length - 1
+}
+
+// `--after <M>` where the declaration already names something after `#M`. Splicing there puts the
+// additions between `#M` and that successor, which records `#N -> #<successor>` — an order nobody
+// declared, and the second of joshuafolkken/kit#1080's two paths. What `--after <M>` states is that
+// `#M` must finish first, and a fan-out (`#A -> #B` beside `#A -> #C`) already expresses exactly
+// that, so the addition becomes a chain line of its own and the existing one is left as it stood.
+// Appending after the tail is not a branch: with no successor to displace it keeps extending the
+// chain, which is what the operator asking for a tail append means.
+//
+// A branch needs no one chain to be identified — the addition becomes a line of its own either way —
+// so a target several chains name is only ambiguous while one of them could still be *extended*.
+// With a successor in every chain that names it, the answer is the same new line whichever chain a
+// reader picks, and refusing would send the second branch at one fan-out point to the hand edit this
+// command exists to avoid: declaring `#1107 -> #1100` beside `#1107 -> #1099` must not leave `#1107`
+// impossible to position against.
+function is_branching_after(
+	chains: Chains,
+	indices: ReadonlyArray<number>,
+	position: InsertPosition,
+): boolean {
+	if (position.kind !== 'after') return false
+
+	return indices.every((index) => has_successor(chains[index] ?? [], position.target))
+}
+
+function to_ambiguous_position_error(position: InsertPosition): string {
+	return `${to_issue_reference(position.target)} appears in more than one declared chain, so "${position.kind}" does not identify one place; edit the declaration by hand.`
+}
+
+// The hub refusal, asked of a declaration the caller names rather than of the one an insertion is
+// about to work from.
+//
+// A relocation splices its child out of every chain before re-inserting it, and that can **collapse**
+// an ambiguity rather than resolve it: with `#890 -> #891` beside `#892 -> #891`, moving `#892` before
+// `#891` leaves one chain naming `#891`, and the insertion then splices into a place nobody
+// identified — recording `#890 -> #892`, an order the caller never asked for, and dropping
+// `#890 -> #891`, one they never asked to lose. So the plan asks this of the declaration as it stands
+// (joshuafolkken/kit#1701).
+//
+// **`before` is the only kind that can do it, and asking it of `after` too refuses the very case this
+// Issue is about.** A `before` splices its child in *front* of the target, so the child inherits
+// whatever that target was waiting on in the chain that happened to survive — a predecessor out of a
+// chain nobody named. An `after` cannot: with a successor it branches into a line of its own, and
+// without one it extends a tail, and in both the only relation recorded is the one the position asked
+// for. So `--after #891` moving `#892` out of `#892 -> #891` correctly flips the pair to
+// `#890 -> #891 -> #892`, which is exactly the reorder this command was given a move for.
+function find_position_ambiguity(
+	chains: Chains,
+	position: InsertPosition | undefined,
+): string | undefined {
+	if (position?.kind !== 'before') return undefined
+	if (chains_containing(chains, position.target).length < AMBIGUOUS_MATCH_COUNT) return undefined
+
+	return to_ambiguous_position_error(position)
+}
+
+// Where a position that is not a branch lands: `--before` always, and `--after` at a chain's tail.
+// Inserting between two references re-points the pair, which is what keeps `--before` from leaving
+// the chain broken.
+function splice_into_chain(
+	chains: Chains,
+	index: number,
+	additions: ReadonlyArray<number>,
+	position: InsertPosition,
+): InsertOutcome {
+	const chain = chains[index] ?? []
+	const at = chain.indexOf(position.target) + (position.kind === 'after' ? 1 : 0)
+
+	return {
+		chains: replace_chain(chains, index, [...chain.slice(0, at), ...additions, ...chain.slice(at)]),
+	}
+}
+
 function insert_at_position(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -145,19 +225,13 @@ function insert_at_position(
 	const [index] = indices
 
 	if (index === undefined) return insert_outside_chains(chains, additions, position, tracked)
+	if (is_branching_after(chains, indices, position)) return add_chain(chains, additions, position)
 
 	if (indices.length >= AMBIGUOUS_MATCH_COUNT) {
-		return {
-			error: `${to_issue_reference(position.target)} appears in more than one declared chain, so "${position.kind}" does not identify one place; edit the declaration by hand.`,
-		}
+		return { error: to_ambiguous_position_error(position) }
 	}
 
-	const chain = chains[index] ?? []
-	const at = chain.indexOf(position.target) + (position.kind === 'after' ? 1 : 0)
-
-	return {
-		chains: replace_chain(chains, index, [...chain.slice(0, at), ...additions, ...chain.slice(at)]),
-	}
+	return splice_into_chain(chains, index, additions, position)
 }
 
 // No position given: nothing was declared about the additions, so the declaration is copied through
@@ -248,6 +322,59 @@ function find_insertion_error(
 	return declared === undefined ? undefined : already_declared_error(declared)
 }
 
+// A reorder expressed as a removal followed by the ordinary insertion. Splicing the child out of
+// every chain that names it closes the chain around it — `#A -> #N -> #B` becomes `#A -> #B` — so the
+// re-insertion goes through `insert_children` unchanged, and the relations to drop still fall out of
+// diffing the declaration before against the declaration after (joshuafolkken/kit#1701).
+//
+// A chain left with one reference declares nothing and is dropped rather than rendered as a bare
+// `#N`, which the parser would read as prose. Its remaining child simply has no order any more,
+// which is the state an epic mixing ordered and unordered children is already in.
+function remove_children(chains: Chains, children: ReadonlyArray<number>): Array<Array<number>> {
+	const dropped = new Set(children)
+
+	return chains
+		.map((chain) => chain.filter((issue_number) => !dropped.has(issue_number)))
+		.filter((chain) => chain.length > 1)
+}
+
+// Where a chain has to be cut: the index of every reference whose incoming link the caller named.
+function break_indices(chain: Chain, dropped: ReadonlySet<string>): Array<number> {
+	return chain
+		.map((blocked, index) => {
+			const blocker = chain[index - 1]
+
+			return blocker !== undefined && dropped.has(format_dependency_link({ blocker, blocked }))
+				? index
+				: -1
+		})
+		.filter((index) => index !== -1)
+}
+
+function split_chain(chain: Chain, dropped: ReadonlySet<string>): Array<Array<number>> {
+	const bounds = [0, ...break_indices(chain, dropped), chain.length]
+
+	return bounds.slice(0, -1).map((start, index) => chain.slice(start, bounds[index + 1]))
+}
+
+// A declared order removed: every chain is cut at each named link, and **the ends are never
+// reconnected** (joshuafolkken/kit#1712). `#A -> #B -> #C` minus `#B -> #C` leaves `#A -> #B`, and
+// removing a middle child's two links leaves `#A` and `#C` with no order rather than `#A -> #C`.
+//
+// Reconnecting would declare an order nobody stated, which is exactly what the audit shipped beside
+// this reports as unjustified — a command whose whole purpose is to delete a declaration must not
+// write one. It is also the difference from `remove_children` above, which takes a *node* out of a
+// chain and closes it, because a relocation is re-inserting that node somewhere else in the same
+// breath.
+//
+// A piece left with one reference declares nothing and is dropped, for the reason `remove_children`
+// drops one: its child simply has no order any more.
+function remove_links(chains: Chains, links: ReadonlyArray<DependencyLink>): Array<Array<number>> {
+	const dropped = new Set(links.map((link) => format_dependency_link(link)))
+
+	return chains.flatMap((chain) => split_chain(chain, dropped)).filter((chain) => chain.length > 1)
+}
+
 function insert_children(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -269,6 +396,14 @@ const git_epic_chains = {
 	render_chains,
 	links_of,
 	diff_links,
+	find_position_ambiguity,
+	// Exported since joshuafolkken/kit#1738 so `--order-before` / `--order-after` can pass the
+	// declaration through by the same function `--add` without a position uses. An order-only move is
+	// "leave the declaration exactly as it stood" applied to a call that *does* name a position, so a
+	// second copy of the passthrough would be the clone `CLAUDE.md` prohibits.
+	keep_declaration,
+	remove_children,
+	remove_links,
 	insert_children,
 }
 

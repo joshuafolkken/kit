@@ -7,11 +7,23 @@ const GATE_FIX = 'gate-fix'
 const UNLISTED = 'anything-nobody-listed'
 const REVIEW = 'review'
 const EPIC_CHILD = 'epic-child'
-const QUEUE_CHILD = 'queue-child'
+const FOLLOWUP_FILING = 'followup-filing'
+const ISSUE_COMMENT = 'issue-comment'
+const BACKLOG_CHILD = 'backlogrun-child'
+// The keyword the widened `epic-child` row has to name, asserted in two places.
+const BACKLOGRUN_LABEL = '`backlogrun`'
 const INVESTIGATION = 'investigation'
 const DIAGNOSIS = 'diagnosis'
 // One title shared by the two rows that each assert their own membership.
 const DELEGATABLE_CASE = 'is delegatable'
+// Titles and a verifier string shared by the epic-child and followup-filing blocks — both are
+// whole-procedure units the parent verifies by re-reading GitHub state.
+const STATE_VERIFIER_CASE = 'names the parent-side state read as its verifier'
+const NOT_SUMMARY_CASE = 'does not rest on the summary the unit returns'
+const ISSUE_STATE_READ = 'pnpm josh issue:state'
+const KEPT_DELIBERATELY = 'kept deliberately'
+// The first line `--list` writes, and nothing else writes it: it is what says the listing ran.
+const LIST_HEADING = 'delegatable:'
 
 // joshuafolkken/kit#969: which steps may run in a cheaper tier is decided by an enumeration, and
 // everything not enumerated is kept. The direction of the default is the whole safety argument — a
@@ -88,8 +100,8 @@ describe('epic-child is a second unit on the one mechanism', () => {
 	// `in-progress`, which `epic:next` buckets as waiting on time before it looks at any blocker, so
 	// it answers `wait` rather than reporting the failure. A verifier naming it would contradict the
 	// documents in the same change.
-	it('names the parent-side state read as its verifier', () => {
-		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('pnpm josh issue:state')
+	it(STATE_VERIFIER_CASE, () => {
+		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain(ISSUE_STATE_READ)
 	})
 
 	// joshuafolkken/kit#1054: `gh issue view` goes through GraphQL, which a cloud session is answered
@@ -103,24 +115,25 @@ describe('epic-child is a second unit on the one mechanism', () => {
 		expect(delegation_policy.reason_for(EPIC_CHILD)).not.toContain('epic:next')
 	})
 
-	it('does not rest on the summary the unit returns', () => {
+	it(NOT_SUMMARY_CASE, () => {
 		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('not from the summary')
 	})
 
 	// joshuafolkken/kit#1149 widens the unit from "an epic's child" to "one child of a batch", so a
-	// `queue`'s issues run isolated too. The widening has to be in the row the command prints: a
-	// `queue` asking `josh delegate epic-child` reads `--list` to learn what it is agreeing to, and a
-	// row that still says "epic" reads as an answer about someone else's run.
-	it('covers a queued issue as well as an epic child', () => {
+	// `backlogrun`'s named issues run isolated too (joshuafolkken/kit#1984 folded in the old `queue`).
+	// The widening has to be in the row the command prints: a `backlogrun` asking
+	// `josh delegate epic-child` reads `--list` to learn what it is agreeing to, and a row that still
+	// says "epic" reads as an answer about someone else's run.
+	it('covers a backlogrun named issue as well as an epic child', () => {
 		const step = delegation_policy.find_step(EPIC_CHILD)
 
-		expect(step?.does).toContain('`queue`')
-		expect(step?.does).toContain('`epicrun`')
+		expect(step?.does).toContain(BACKLOGRUN_LABEL)
+		expect(step?.does).toContain("epic's child")
 	})
 
 	// The single-source half. A second row would be a second mechanism in everything but name — same
 	// brief, same summary, same verifier — and the two would drift from the first edit onward.
-	it.each([QUEUE_CHILD, 'batch-child'])(
+	it.each([BACKLOG_CHILD, 'batch-child'])(
 		'keeps %s off the list rather than cloning the row',
 		(name) => {
 			expect(delegation_policy.find_step(name)).toBeUndefined()
@@ -130,23 +143,74 @@ describe('epic-child is a second unit on the one mechanism', () => {
 
 	it('stays one row for both entry points', () => {
 		const covering = delegation_policy.DELEGATABLE_STEPS.filter((step) =>
-			step.does.includes('`queue`'),
+			step.does.includes(BACKLOGRUN_LABEL),
 		)
 
 		expect(covering.map((step) => step.name)).toStrictEqual([EPIC_CHILD])
 	})
 })
 
+// joshuafolkken/kit#1892 puts the late-run follow-up filing chain on this same enumeration. It is a
+// whole sub-procedure of a run, verified exactly as `epic-child` is — the parent re-reads the filed
+// Issue from GitHub rather than trusting the unit's summary. Filing an Issue is verifiable in a way a
+// bare `issue-comment` (still rejected) is not, which is the boundary the last case guards.
+describe('followup-filing is a third unit on the one mechanism', () => {
+	it(DELEGATABLE_CASE, () => {
+		expect(delegation_policy.verdict_for(FOLLOWUP_FILING)).toBe(delegation_policy.DELEGATE_VERDICT)
+	})
+
+	// The parent-side state read, not the returned summary: a unit checking its own report is no
+	// verifier, the same trap `epic-child` avoids.
+	it(STATE_VERIFIER_CASE, () => {
+		expect(delegation_policy.reason_for(FOLLOWUP_FILING)).toContain(ISSUE_STATE_READ)
+	})
+
+	it(NOT_SUMMARY_CASE, () => {
+		expect(delegation_policy.reason_for(FOLLOWUP_FILING)).toContain("not the unit's summary")
+	})
+
+	// The whole chain is the unit, so the row names each step an agent has to run.
+	it('covers the whole filing chain', () => {
+		const step = delegation_policy.find_step(FOLLOWUP_FILING)
+
+		expect(step?.does).toContain('issue:scout')
+		expect(step?.does).toContain('epic:bundle')
+		expect(step?.does).toContain('epic --add')
+	})
+
+	// The boundary against the rejected row it most resembles: filing an Issue is verifiable because
+	// the parent reads it back, while a decision-log comment is the record with nothing to check it.
+	it('leaves the rejected issue-comment kept', () => {
+		expect(delegation_policy.verdict_for(ISSUE_COMMENT)).toBe(delegation_policy.KEEP_VERDICT)
+		expect(delegation_policy.reason_for(ISSUE_COMMENT)).toContain(KEPT_DELIBERATELY)
+	})
+})
+
+// What a call writes to stdout. The listing and a verdict both exit 0, so the output is the only
+// thing that tells them apart — which is why the assertions below read it rather than the code.
+function captured_info(act: () => void): Array<string> {
+	const written: Array<string> = []
+	const info_spy = vi.spyOn(console, 'info').mockImplementation((line: string) => {
+		written.push(line)
+	})
+	const error_spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	// `finally`, so a throw inside `act` cannot leave the console mocked for the rest of the file:
+	// the leaked spy would fail later tests and point the report at the wrong one.
+	try {
+		act()
+	} finally {
+		info_spy.mockRestore()
+		error_spy.mockRestore()
+	}
+
+	return written
+}
+
 // What `--list` actually writes for one step, captured rather than reconstructed: the row is what an
 // agent reads, and the fields it is built from can carry the number while the printed row does not.
 function listed_row(step_name: string): string | undefined {
-	const written: Array<string> = []
-	const spy = vi.spyOn(console, 'info').mockImplementation((line: string) => {
-		written.push(line)
-	})
-
-	delegation_cli.print_list()
-	spy.mockRestore()
+	const written = captured_info(() => delegation_cli.print_list())
 
 	return written.find((line) => line.includes(step_name))
 }
@@ -213,7 +277,7 @@ describe('delegation_policy.reason_for', () => {
 
 	// The two kinds of `keep` are different answers: one was judged, the other was never considered.
 	it('tells a deliberate rejection apart from an unlisted step', () => {
-		expect(delegation_policy.reason_for(REVIEW)).toContain('kept deliberately')
+		expect(delegation_policy.reason_for(REVIEW)).toContain(KEPT_DELIBERATELY)
 		expect(delegation_policy.reason_for(UNLISTED)).toContain('kept by default')
 	})
 })
@@ -264,5 +328,15 @@ describe('delegation_cli.run', () => {
 
 	it('still accepts the one flag it has', () => {
 		expect(delegation_cli.run(['--list'])).toBe(0)
+	})
+
+	// joshuafolkken/kit#1096: the guard trimmed and the branch did not, so a padded `--list` passed as
+	// a known flag and then fell through to a verdict about a step of that name. Both paths exit 0, so
+	// the exit code cannot tell them apart — the listing itself is what the assertion has to read.
+	it.each([[' --list'], ['--list '], ['  --list  ']])('lists on the padded %j', (padded) => {
+		const written = captured_info(() => delegation_cli.run([padded]))
+
+		expect(written[0]).toBe(LIST_HEADING)
+		expect(written).not.toContain(delegation_policy.KEEP_VERDICT)
 	})
 })

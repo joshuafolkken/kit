@@ -1,10 +1,13 @@
 // Single definition of the dev and preview port numbers for every kit consumer.
 //
-// Both ports move together from one personal, non-committed `PORT_SEED` (see `.env`), so a machine
-// running several kit projects at once can give each one its own pair instead of every project
-// landing on vite's default 5173 and the wrangler preview's 4173. Unset — or left blank, the shape
-// `.env.example` ships — means seed 0, today's numbers exactly, which is what keeps CI and every
-// un-migrated consumer working untouched.
+// Both ports move together from a personal, non-committed `PORT_SEED` (see `.env`) and, inside a
+// lane, its seat `JOSH_LANE_SEAT`, so a machine running several kit projects — and several lanes of
+// one — can give each its own pair instead of every project landing on vite's default 5173 and the
+// wrangler preview's 4173. The offset is `seed × 10 + lane`: seat 0 is the main work tree, so a
+// project that never opens a lane sits on `seed × 10`, and an unset — or blank, the shape
+// `.env.example` ships — seed is 0, today's numbers exactly, which is what keeps CI and every
+// un-migrated consumer working untouched. Multiplying the seed is what makes distinct seeds occupy
+// disjoint bands (seed 1 is 10..19, seed 2 is 20..29) with no convention for anyone to break.
 //
 // This module is plain committed JavaScript rather than a `dist/`-built library like `./version`
 // because `playwright.config.ts` imports it, and that config is loaded by kit's own type check,
@@ -14,6 +17,11 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 const PORT_SEED_KEY = 'PORT_SEED'
+// The lane's seat, written into a lane's own `.env` by `lane:open` and 0 (the main work tree)
+// everywhere else. It is a separate key from `PORT_SEED` on purpose: the lane's `.env` keeps its
+// project's seed unchanged and adds this, so the file says plainly which number is the project's
+// and which is the seat, and the multiplication that combines them lives only here.
+const LANE_SEAT_KEY = 'JOSH_LANE_SEAT'
 const ENV_FILE_NAME = '.env'
 const PACKAGE_FILE_NAME = 'package.json'
 // What `.env` is allowed to contribute to this process, and through it to the `webServer` child:
@@ -21,23 +29,29 @@ const PACKAGE_FILE_NAME = 'package.json'
 // config reads it — it describes the run, not the project, and a value pinned in a file would make
 // every local run claim to be CI. Everything else in `.env` belongs to the consumer's application,
 // which loads the file in its own start script when it wants it (#826).
-const PROJECT_ENVIRONMENT_KEYS = new Set([PORT_SEED_KEY, 'PLAYWRIGHT_REUSE_SERVER'])
+const PROJECT_ENVIRONMENT_KEYS = new Set([PORT_SEED_KEY, LANE_SEAT_KEY, 'PLAYWRIGHT_REUSE_SERVER'])
 const DEV_PORT_BASE = 5173
 const PREVIEW_PORT_BASE = 4173
 const MIN_SEED = 0
-const MAX_PORT = 65_535
-// The dev base is the higher of the two, so bounding it bounds both ports.
-const MAX_SEED = MAX_PORT - DEV_PORT_BASE
+// `offset = seed × 10 + lane`. Keeping every seed's whole band below 1000 is what makes one
+// project's preview port (4173 + offset) unable to land on another's dev port (5173 + offset):
+// that would need the two offsets to differ by exactly 1000, which no offset under 1000 can. From
+// `seed × 10 + 9 < 1000` the seed ceiling is 99, and the seat runs 0..9.
+const SEED_LANE_MULTIPLIER = 10
+const MAX_LANE = 9
+const MAX_SEED = 99
 
 const INTEGER_PATTERN = /^\d+$/u
 
 /**
+ * @param {string} key
  * @param {string} raw
+ * @param {number} max
  * @returns {never}
  */
-function fail_invalid_seed(raw) {
+function fail_invalid(key, raw, max) {
 	throw new Error(
-		`${PORT_SEED_KEY} must be an integer between ${MIN_SEED} and ${MAX_SEED}, got ${JSON.stringify(raw)}. ` +
+		`${key} must be an integer between ${MIN_SEED} and ${max}, got ${JSON.stringify(raw)}. ` +
 			`Unset it to use the default ports (dev ${DEV_PORT_BASE}, preview ${PREVIEW_PORT_BASE}).`,
 	)
 }
@@ -45,38 +59,71 @@ function fail_invalid_seed(raw) {
 /**
  * An unset variable and a blank one are one case, not two: `.env.example` ships the key with no
  * value, so both spell "I have not set this". Reading them through one funnel is also what keeps
- * `resolve_seed` inside the complexity limit.
+ * `resolve_bounded` inside the complexity limit.
  *
  * @param {Record<string, string | undefined>} environment
+ * @param {string} key
  * @returns {string}
  */
-function read_trimmed_seed(environment) {
-	const raw = environment[PORT_SEED_KEY]
+function read_trimmed(environment, key) {
+	const raw = environment[key]
 
 	return raw === undefined ? '' : raw.trim()
 }
 
 /**
- * Resolve the offset applied to both base ports.
+ * Resolve one bounded, non-negative integer from the environment.
  *
  * An unset variable is the documented default and yields 0, and a blank one means the same thing:
  * `.env.example` ships the key with no value, so blank is the shape of "I have not set this" and
- * of turning a seed back off, never of a typo. Every genuinely malformed shape — a non-integer, a
+ * of turning it back off, never of a typo. Every genuinely malformed shape — a non-integer, a
  * negative, an out-of-range number — throws instead of falling back to 0: a silent fallback would
  * put two projects back on one port, which is the failure this module exists to remove.
+ *
+ * @param {Record<string, string | undefined>} environment
+ * @param {string} key
+ * @param {number} max
+ * @returns {number}
+ */
+function resolve_bounded(environment, key, max) {
+	const trimmed = read_trimmed(environment, key)
+	if (trimmed.length === 0) return MIN_SEED
+	if (!INTEGER_PATTERN.test(trimmed)) fail_invalid(key, trimmed, max)
+
+	const value = Number(trimmed)
+	if (value > max) fail_invalid(key, trimmed, max)
+
+	return value
+}
+
+/**
+ * The project's port seed, 0..99.
  *
  * @param {Record<string, string | undefined>} [environment]
  * @returns {number}
  */
 function resolve_seed(environment = process.env) {
-	const trimmed = read_trimmed_seed(environment)
-	if (trimmed.length === 0) return MIN_SEED
-	if (!INTEGER_PATTERN.test(trimmed)) fail_invalid_seed(trimmed)
+	return resolve_bounded(environment, PORT_SEED_KEY, MAX_SEED)
+}
 
-	const seed = Number(trimmed)
-	if (seed > MAX_SEED) fail_invalid_seed(trimmed)
+/**
+ * The lane's seat, 0..9 — 0 (the main work tree) when unset.
+ *
+ * @param {Record<string, string | undefined>} [environment]
+ * @returns {number}
+ */
+function resolve_lane(environment = process.env) {
+	return resolve_bounded(environment, LANE_SEAT_KEY, MAX_LANE)
+}
 
-	return seed
+/**
+ * The offset applied to both base ports: `seed × 10 + lane`.
+ *
+ * @param {Record<string, string | undefined>} [environment]
+ * @returns {number}
+ */
+function resolve_offset(environment = process.env) {
+	return resolve_seed(environment) * SEED_LANE_MULTIPLIER + resolve_lane(environment)
 }
 
 /**
@@ -85,7 +132,7 @@ function resolve_seed(environment = process.env) {
  * @returns {number}
  */
 function offset_from(base, environment) {
-	return base + resolve_seed(environment)
+	return base + resolve_offset(environment)
 }
 
 /**
@@ -201,8 +248,9 @@ function load_environment_file(directory = process.cwd()) {
 const ports = {
 	load_environment_file,
 	resolve_seed,
+	resolve_lane,
 	resolve_development_port,
 	resolve_preview_port,
 }
 
-export { ENV_FILE_NAME, PORT_SEED_KEY, PROJECT_ENVIRONMENT_KEYS, ports }
+export { ENV_FILE_NAME, LANE_SEAT_KEY, PORT_SEED_KEY, PROJECT_ENVIRONMENT_KEYS, ports }

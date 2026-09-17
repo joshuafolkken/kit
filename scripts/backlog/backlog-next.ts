@@ -1,0 +1,363 @@
+import { fileURLToPath } from 'node:url'
+import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
+import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
+import { epic_index } from '#scripts/epic/epic-index'
+import { epic_next } from '#scripts/epic/epic-next'
+import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
+import type { EpicView } from '#scripts/epic/epic-next-views'
+import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
+import { git_gh_command } from '#scripts/git/git-gh-command'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { backlog_pool } from './backlog-pool'
+
+// `josh backlog:next` — what the whole opted-in backlog may run next (joshuafolkken/kit#1630).
+//
+// The answer used to be split in two, and neither half could give it. `epic:next` has the dependency
+// graph and the execution wave, but its input is **one epic's task list**. `auto-ok:next` sees the
+// whole backlog, but it orders by the display's newest-first ranking and reads no dependency at all.
+// So there was no route that asked the backlog itself what may start.
+//
+// This command is that route, and it is glue rather than a third implementation: the epic half runs
+// through `epic:next`'s own read → classify → report pipeline unchanged, the standalone half through
+// `auto-ok:next`'s own listing and runnability rules, and the verdict comes from
+// `epic_report.decide_verdict` so it cannot drift from what `epic:next` means by the same word.
+
+const ARGV_OFFSET = 2
+const SUCCESS_EXIT_CODE = 0
+const FAILURE_EXIT_CODE = 1
+
+const USAGE = 'Usage: josh backlog:next [--exclude <issue-number>[,<issue-number>...]]...'
+
+const REPO_UNREADABLE_MESSAGE =
+	'Could not read this repository from `gh`, so an epic child could not be told from an issue elsewhere. That is not "nothing is runnable" — check `gh auth status` and ask again.'
+
+// Why a read of the opted-in listing failed, in `auto-ok:next`'s own words. Reworded here, the two
+// commands would explain the same failure differently to the same person.
+const READ_FAILURES: Readonly<Record<Exclude<OptedInRead['kind'], 'read'>, string>> = {
+	blockers_unreadable: auto_ok_cli.BLOCKERS_UNREADABLE_MESSAGE,
+	unexpected_shape: auto_ok_cli.UNEXPECTED_SHAPE_MESSAGE,
+	unreadable: auto_ok_cli.UNREADABLE_MESSAGE,
+}
+
+// What `retry` says that `error` cannot (joshuafolkken/kit#1663).
+//
+// The anomaly `epic:next` raises for a child it could not read tells the reader to check
+// `gh auth status` and that the issue exists — correct for the failure it was written for, and
+// actively misleading for a name resolution that never reached GitHub at all. Neither the issue nor
+// the credentials were the problem there, and the graph itself may be perfectly resolvable.
+const RETRY_MESSAGE =
+	'GitHub did not answer, so a child of the dependency graph could not be read. This is a transport failure and not an unusable graph — the listings this command already read prove `gh` and the credentials work. Ask again after a short wait.'
+
+// `epic:next`'s verdicts, in this command's spelling, plus the one it has no word for.
+//
+// `complete` becomes `none` because a backlog is never finished the way one epic is — the token says
+// "nothing to hand back", which is the same thing `auto-ok:next` prints, so a loop reading either
+// command branches on one word. `run` never reaches standard output at all: the numbers do.
+//
+// **`retry` is this command's own and is deliberately not added to `EpicVerdict`.** `epic:next` has
+// no failure path that could emit it, so widening the shared union would give every consumer of it a
+// member none of them can produce — and `VERDICT_LINES` a line nothing ever prints. The token is a
+// backlog-level answer about the transport, not a reading of one epic's graph.
+type BacklogVerdict = EpicVerdict | 'retry'
+
+const VERDICT_TOKENS: Readonly<Record<BacklogVerdict, string>> = {
+	complete: auto_ok_cli.NONE_TOKEN,
+	error: 'error',
+	retry: 'retry',
+	run: 'run',
+	stop: 'stop',
+	wait: 'wait',
+}
+
+type OptedIn = Extract<OptedInRead, { kind: 'read' }>
+type Tracking = Extract<TrackingRead, { kind: 'read' }>
+
+// Everything the answer is assembled from, read once and passed down rather than re-fetched.
+interface PoolContext {
+	opted_in: OptedIn
+	tracking: Tracking
+	repo: string
+	exclude: ReadonlyArray<number>
+}
+
+// One token per line on standard output: the runnable issue numbers of **this** repository, in the
+// order they may be started, or the single verdict word when there is nothing to offer here. Every
+// explanation is on standard error, so `answers=$(pnpm josh backlog:next)` captures something a loop
+// can branch on.
+//
+// **The tokens are scoped to this repository, which is `epic:next --repo`'s shape exactly.** An epic
+// may track a child elsewhere, and a bare number would send the loop reading this to *this*
+// repository's issue of that number — a different issue (joshuafolkken/kit#1016). Qualifying it
+// instead was tried and is worse: `--exclude` parses bare integers, so a loop feeding a qualified
+// token back would be answered with a usage error rather than an exclusion. So a child elsewhere
+// stays out of the tokens, and `run` becomes `wait` when this repository has none — the same mapping
+// `epic_next.repo_verdict` makes, and for the same reason: the work is real, it is simply not work
+// this checkout can start. It is still on standard error, under its own repository and checkout.
+function tokens_of(result: EpicNextResult, repo: string): ReadonlyArray<string> {
+	if (result.verdict !== 'run') return [VERDICT_TOKENS[result.verdict]]
+	const here = epic_report.candidates_for_repo(result, repo)
+	if (here.length === 0) return [VERDICT_TOKENS.wait]
+
+	return here.map((child) => String(child.number))
+}
+
+// A listing that was cut short is reported rather than answered from silently: an opted-in issue
+// past the cut is still runnable, and an epic past the cut leaves its children reading as untracked.
+// An epic past the cut leaves its children reading as untracked, which is true of any answer this
+// command reaches — including one that never read a graph at all.
+function warn_epic_gap(context: PoolContext): void {
+	const epics = epic_bundle_gaps.epic_gap(context.tracking.cutoff, auto_ok_cli.LISTING_LIMIT)
+
+	if (epics !== undefined) console.error(epics)
+}
+
+function warn_gaps(context: PoolContext, has_answer: boolean): void {
+	const listing = auto_ok_cli.truncation_note(context.opted_in.cutoff, has_answer)
+
+	if (listing !== undefined) console.error(listing)
+	warn_epic_gap(context)
+}
+
+function report(result: EpicNextResult, context: PoolContext): number {
+	warn_gaps(context, result.verdict === 'run')
+	console.error(epic_report.format_result(result))
+
+	for (const token of tokens_of(result, context.repo)) console.info(token)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// The two halves as one result. The epic half is already classified by `epic:next`; the standalone
+// half is classified here; the verdict is decided from the merge, so a backlog with a runnable epic
+// child and nothing else says `run` exactly as one with a runnable standalone issue does.
+function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNextResult {
+	const graphs = views.map((view) => view.snapshot.children)
+	const standalone = backlog_pool.standalone_rows(context.opted_in.issues)
+	const from_epics = backlog_pool.drop_excluded(
+		backlog_pool.epic_classification(views),
+		context.exclude,
+		context.repo,
+	)
+	const from_standalone = backlog_pool.classify_standalone(standalone, {
+		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
+		exclude: context.exclude,
+		repo: context.repo,
+		// The settled set the views were classified against, so a standalone row and an epic child weigh
+		// the same blocker the same way.
+		running:
+			views[0]?.running ?? backlog_pool.running_set(graphs, context.opted_in.issues, context.repo),
+	})
+
+	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads
+	// `(no local checkout)`, including this repository's own — the misreport joshuafolkken/kit#864
+	// fixed on that path.
+	return epic_report.build_result(
+		backlog_pool.merge_classifications(from_epics, from_standalone),
+		[
+			...views.flatMap((view) => view.result.anomalies),
+			...backlog_pool.cross_epic_cycles(graphs, backlog_pool.to_children(standalone, context.repo)),
+		],
+		repo_discovery.discover_repositories(PROJECT_ROOT),
+	)
+}
+
+// The epic half and the standalone half settled against each other: an epic child a person has to
+// resolve can make a standalone row wait on that person, and that row can in turn hold an epic child.
+// Each pass only shrinks the set, so the walk ends at the first pass that removes nothing
+// (joshuafolkken/kit#1943).
+function settled_views(
+	reads: ReadonlyArray<EpicRead>,
+	running: ReadonlySet<string>,
+	context: PoolContext,
+): ReadonlyArray<EpicView> {
+	const views = epic_next.views_of(reads, running)
+	const settled = backlog_pool.settle_standalone(
+		views[0]?.running ?? running,
+		context.opted_in.issues,
+		context.repo,
+	)
+
+	return settled.size === running.size ? views : settled_views(reads, settled, context)
+}
+
+// Nothing to classify means no epic was read, so `views_of`'s registry resets and its own checkout
+// discovery are not needed. `combine` builds the map either way, so what this saves is the second
+// walk rather than the only one.
+//
+// The running set covers the standalone rows as well as every read graph, so an epic child waiting on
+// an opted-in standalone issue waits rather than stops (joshuafolkken/kit#1943).
+function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): ReadonlyArray<EpicView> {
+	if (reads.length === 0) return []
+
+	const graphs = reads.map((read) => read.snapshot.children)
+
+	return settled_views(
+		reads,
+		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo),
+		context,
+	)
+}
+
+// The reads and the classification, with none of the printing `backlog:next` then does with them.
+//
+// `backlog:plan` renders this same pool as a plan a person reads before the run starts
+// (joshuafolkken/kit#1652), so the seam is cut here rather than a second read-and-classify path
+// being written beside it: the plan and the run cannot disagree about what may start, because there
+// is one answer and two renderings of it. `undefined` is the refusal — already reported.
+async function resolve(context: PoolContext): Promise<EpicNextResult | undefined> {
+	const references = backlog_pool
+		.opted_in_epics(context.opted_in.issues)
+		.map((number) => ({ number }))
+	const { reads, notices, refusal } = await epic_next_read.read_snapshots(references, context.repo)
+
+	for (const notice of notices) console.error(notice)
+
+	if (refusal !== undefined) {
+		console.error(refusal)
+
+		return undefined
+	}
+
+	return combine(views_from(reads, context), context)
+}
+
+// Whether the `error` verdict is really a transport failure wearing the graph's clothes.
+//
+// **The answer comes from the reads that failed, not from a request made afterwards**
+// (joshuafolkken/kit#1690). joshuafolkken/kit#1663 asked a reachability probe here, once the answer
+// was otherwise final — and a connection that dropped for a few hundred milliseconds failed the read
+// at t=0 and answered that probe `reachable`, leaving the verdict `error` for a fault that had
+// already healed. Judging one request from a different one cannot be made reliable, so the failed
+// request carries its own nature instead: `epic:next` marks the anomaly from the status GitHub wrote
+// on the failed response, and this reads the mark.
+function is_transport_failure(result: EpicNextResult): boolean {
+	if (result.verdict !== 'error') return false
+
+	return result.anomalies.some((anomaly) => anomaly.is_unreachable === true)
+}
+
+// The unusable-graph report is withheld here rather than printed beside the retry: its anomaly lines
+// name issues and credentials, which is exactly the wrong place to send the reader. **The epic gap is
+// not withheld with it** — it says nothing about issues or credentials, and a run that spends its
+// retries and then ends still has to have been told its epic listing was cut short.
+//
+// The opted-in listing's own truncation note is withheld, because both of its tails assert something
+// this path did not do: one says an answer was produced, the other that every issue in the listing
+// was excluded. Nothing was excluded here — the graph was never read.
+function report_retry(context: PoolContext): number {
+	warn_epic_gap(context)
+	console.error(RETRY_MESSAGE)
+	console.info(VERDICT_TOKENS.retry)
+
+	return SUCCESS_EXIT_CODE
+}
+
+async function answer_pool(context: PoolContext): Promise<number> {
+	const result = await resolve(context)
+
+	if (result === undefined) return FAILURE_EXIT_CODE
+	if (is_transport_failure(result)) return report_retry(context)
+
+	return report(result, context)
+}
+
+// A backlog nobody has opted into answers `none` before either listing below is asked for.
+function report_none(): number {
+	console.error(auto_ok_cli.NONE_OPTED_IN_MESSAGE)
+	console.info(auto_ok_cli.NONE_TOKEN)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// The two reads that stand between the opted-in listing and the pool. Extracted for the same reason
+// `resolve` is: `backlog:plan` needs the identical context, and a second copy of these two failure
+// branches would be a second place for them to be worded differently. `undefined` is the failure —
+// already reported.
+async function context_of(
+	opted_in: OptedIn,
+	exclude: ReadonlyArray<number>,
+): Promise<PoolContext | undefined> {
+	const tracking = await auto_ok_cli.fetch_tracking(opted_in.issues.length)
+
+	if (tracking.kind !== 'read') {
+		console.error(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
+
+		return undefined
+	}
+
+	const repo = await git_gh_command.repo_get_name_with_owner()
+
+	if (repo === undefined) {
+		console.error(REPO_UNREADABLE_MESSAGE)
+
+		return undefined
+	}
+
+	return { opted_in, tracking, repo, exclude }
+}
+
+async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
+	if (opted_in.issues.length === 0) return report_none()
+
+	const context = await context_of(opted_in, exclude)
+
+	if (context === undefined) return FAILURE_EXIT_CODE
+
+	return await answer_pool(context)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const options = auto_ok_cli.parse_options(argv, USAGE)
+
+	if (options.usage !== undefined) {
+		console.error(options.usage)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const opted_in = await auto_ok_cli.fetch_opted_in()
+
+	if (opted_in.kind !== 'read') {
+		console.error(READ_FAILURES[opted_in.kind])
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await answer(opted_in, options.exclude ?? [])
+}
+
+// `process.exitCode` rather than `process.exit()`, for the reason `auto-ok:next` records: the whole
+// contract is `answers=$(pnpm josh backlog:next)`, and exiting outright can cut the pipe before it
+// has drained.
+async function main(argv: ReadonlyArray<string>): Promise<void> {
+	process.exitCode = await run(argv)
+}
+
+const backlog_next = {
+	USAGE,
+	REPO_UNREADABLE_MESSAGE,
+	RETRY_MESSAGE,
+	READ_FAILURES,
+	VERDICT_TOKENS,
+	tokens_of,
+	warn_epic_gap,
+	warn_gaps,
+	report,
+	combine,
+	views_from,
+	resolve,
+	is_transport_failure,
+	report_retry,
+	context_of,
+	answer_pool,
+	report_none,
+	answer,
+	run,
+	main,
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
+
+export { backlog_next }
+export type { BacklogVerdict, OptedIn, PoolContext }

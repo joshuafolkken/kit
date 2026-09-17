@@ -1,0 +1,545 @@
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import type { FollowupStage } from '#scripts/git/git-followup-stages'
+import { time_background } from './time-background'
+import { time_bundle_call } from './time-bundle-call'
+import { time_followup_stage } from './time-followup-stage'
+import { time_markers, type PhaseMarker } from './time-markers'
+import { time_reported_failure } from './time-reported-failure'
+import { time_shell } from './time-shell'
+import { time_single_check } from './time-single-check'
+import { time_transcript_line, type Block, type TranscriptLine } from './time-transcript-line'
+import { time_writes } from './time-writes'
+
+const { NO_MESSAGE_ID, parse_line } = time_transcript_line
+
+// Turning a session transcript into timed spans (joshuafolkken/kit#1267).
+//
+// `cost-*` reads the same files for what a run was billed. This reads the other axis: where its wall
+// clock went. Discovery and reading are `cost-transcript.ts`'s and are reused rather than copied;
+// what is here is the arithmetic, which has no counterpart on the cost side.
+//
+// **Reading one line is `time-transcript-line.ts`'s** since joshuafolkken/kit#1406, when this file
+// passed its length limit — the schemas, the two records a line yields and the parse that produces
+// them. `NO_MESSAGE_ID` and `parse_line` are re-exported below under the names they always had, so
+// the move changed no call site. `cost_blocks`' three type constants are still imported rather than
+// restated.
+//
+// **The partition is by gap, not by pair.** Every span is the interval between two consecutive
+// events, classified by the *later* one: a span ending at an assistant line is model wait, one
+// ending at a tool result is that tool's execution, one ending at a user prompt is human wait.
+// Classifying by pairs instead would double-count parallel tool calls and leave the three shares
+// summing to something other than the elapsed time — the property that makes two runs comparable.
+// Measured against the three sessions joshuafolkken/kit#1267 restored by hand: 49.6 / 73.3 / 54.6
+// minutes, every share within 0.4 points of the hand figure.
+
+const ASSISTANT_TYPE = 'assistant'
+const USER_TYPE = 'user'
+const UNKNOWN_TOOL = 'unknown'
+
+type SpanCategory = 'model' | 'tool' | 'human'
+
+const MODEL_CATEGORY: SpanCategory = 'model'
+const TOOL_CATEGORY: SpanCategory = 'tool'
+const HUMAN_CATEGORY: SpanCategory = 'human'
+
+// How the call this span paid for came back (joshuafolkken/kit#1309).
+//
+// **Three answers rather than two.** `unknown` is not a polite `ok`: a fifth of the tool results in
+// the transcripts measured carry no `is_error` at all — a file read, an answered question — and
+// folding those into `ok` would report a run as having failed nothing when nothing was read. It is
+// also what a model span and a human span carry, since neither is a call and neither has an outcome
+// to have.
+type SpanOutcome = 'ok' | 'failed' | 'unknown'
+
+const OK_OUTCOME: SpanOutcome = 'ok'
+const FAILED_OUTCOME: SpanOutcome = 'failed'
+const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
+
+// What the result closing a span says about the call it belongs to, beyond the label read off the
+// call itself. Two fields rather than one because both are answers about the *result* line and
+// neither can be recovered from a span afterwards.
+//
+// **`call_id` is what makes two fragments of one call identifiable as one call.** A span bracketing a
+// delegated unit comes back from `time_overlap.trim` as a head and a tail, and the two are told apart
+// from a *different* call of the same tool only by this id — a label cannot do it, because two
+// `Task` calls issued in the same turn share one.
+interface ResultFacts {
+	call_id: string
+	outcome: SpanOutcome
+	// Which guard refused the call this result closed, and `''` for every non-refusal
+	// (joshuafolkken/kit#1913). Carried here for the reason `outcome` is: the result block is gone by
+	// the time the per-guard refusal breakdown aggregates, and only what was read off it survives.
+	refusal_guard: string
+	// The id the harness assigned when it took this call's command into the background, and `''` for
+	// every other result (joshuafolkken/kit#1662). Fourth field for the reason the others are here:
+	// the launch's body is the only place the id is written, and the body is gone by the time
+	// anything places the command on the timeline.
+	background_id: string
+	// The stage rows a `pnpm josh followup` call printed into its own output
+	// (joshuafolkken/kit#1445). Third field for the reason the two above are here: the result block is
+	// gone by the time anything aggregates, so what a table wants from it has to be read off it now.
+	// Empty for every span that is not a measured `followup` invocation.
+	followup_stages: ReadonlyArray<FollowupStage>
+}
+
+const NO_RESULT: ResultFacts = {
+	call_id: '',
+	outcome: UNKNOWN_OUTCOME,
+	refusal_guard: '',
+	background_id: time_background.NO_BACKGROUND,
+	followup_stages: time_followup_stage.NO_STAGES,
+}
+
+// What a tool span is labelled with. `josh_command` is empty for everything that is not a
+// `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
+//
+// `marker` names the workflow boundary the call is, for the phase breakdown that slices the same
+// spans by stage (joshuafolkken/kit#1269). It is carried here rather than re-derived later because
+// the tool's *input* is what decides it, and a span keeps no input — only the label read off it.
+//
+// `is_bundleable` and `targets` are carried for exactly that reason too (joshuafolkken/kit#1344).
+// Whether a call could have gone out beside another, and what it names, are both read off the input —
+// so a module asking about them after the fact would have nothing to read. `time-bundle-call.ts`
+// decides both; the rule each one follows is stated there.
+//
+// `check_key` is the fourth, and the third time this reason has applied (joshuafolkken/kit#1383). Two
+// runs of one verification check are the same call only if they named the same files, and the files
+// are in the input — so `josh_command` alone cannot say, and nothing downstream could recover it.
+// `time-single-check.ts` decides it.
+//
+// `message_id` is the fifth, and it is the one that says which *turn* a call belongs to
+// (joshuafolkken/kit#1406). It is read off the line the `tool_use` block sat on rather than off the
+// result that closes the span, because a `tool_result` line carries no message id at all — so a span
+// that did not keep it here could never be attributed to the turn that issued it.
+//
+// `writes` is the sixth, and it is what `targets` could not say (joshuafolkken/kit#1472). `targets`
+// names what a call mentioned; `marker` says a call was *an* edit but not of what, and for a tool
+// outside `BUNDLEABLE_TOOLS` it arrived with no target at all. So a consumer subtracting edits from
+// reads — `investigation-reads.ts` — had nothing to subtract for `MultiEdit` / `NotebookEdit`, and
+// nothing at all to tell an in-place `sed -i` from the `sed -n` it shares a label with.
+// `time-writes.ts` decides it, from the input this span is about to discard.
+// `issue` is the seventh, and it is the one `branch` could not carry (joshuafolkken/kit#1617). Under
+// lanes the session writing the transcript stays on the default branch while the work runs in a linked
+// work tree, so `branch` names no issue on any line of the run; the `in-progress` label call does, and
+// like every field above it that answer is read off the *input* a span is about to discard.
+// `time_markers.NO_ISSUE` for every call that declares nothing, which is all but one call per run.
+interface ToolCall {
+	label: string
+	josh_command: string
+	// Every josh subcommand the call ran, where `josh_command` is only the first (joshuafolkken/kit#1883).
+	// A chained `pnpm josh lint:related && pnpm josh test:related` carries both; the count tables expand
+	// it so the ones `josh_command` drops are still counted.
+	josh_commands: ReadonlyArray<string>
+	check_key: string
+	marker: PhaseMarker
+	is_bundleable: boolean
+	targets: ReadonlyArray<string>
+	// Carried beside `targets` because sharing a target means something different depending on it: a
+	// second write to one file is independent work, a read of a file just written is not
+	// (joshuafolkken/kit#1509).
+	is_writing: boolean
+	// Whether this is a subagent launch whose prompt builds on an earlier launch's finding
+	// (joshuafolkken/kit#1854). Carried for the reason every field here is — the prompt it is read from
+	// is the input, and a span keeps none. `time-agent-bundles.ts` reads it.
+	has_prior_reference: boolean
+	writes: ReadonlyArray<string>
+	message_id: string
+	issue: number
+	// The background run this call reads the output of, and `''` for every other call
+	// (joshuafolkken/kit#1662). It is the eighth field carried for the reason the seven above are:
+	// the id sits in the command string, which a span does not keep, and it is the only thing that
+	// says a `tail` two turns later is the join of a command started minutes ago.
+	reads_background: string
+}
+
+const NO_CALL: ToolCall = {
+	label: '',
+	josh_command: '',
+	josh_commands: [],
+	check_key: time_single_check.NO_CHECK,
+	marker: time_markers.NO_MARKER,
+	message_id: NO_MESSAGE_ID,
+	writes: [],
+	issue: time_markers.NO_ISSUE,
+	reads_background: time_background.NO_BACKGROUND,
+	...time_bundle_call.not_bundleable(),
+}
+const UNKNOWN_CALL: ToolCall = {
+	label: UNKNOWN_TOOL,
+	josh_command: '',
+	josh_commands: [],
+	check_key: time_single_check.NO_CHECK,
+	marker: time_markers.NO_MARKER,
+	message_id: NO_MESSAGE_ID,
+	writes: [],
+	issue: time_markers.NO_ISSUE,
+	reads_background: time_background.NO_BACKGROUND,
+	...time_bundle_call.not_bundleable(),
+}
+
+// `ended_ms` is the absolute instant the span closed, so `[ended_ms - duration_ms, ended_ms]` is the
+// interval it occupied. A duration alone cannot say *when*, and two things need that: the CI wait,
+// which is the part of the PR-open→merge window no span covers (joshuafolkken/kit#1268), and the
+// phase breakdown that slices the same array by boundary (joshuafolkken/kit#1269).
+//
+// `branch` rides along for the same reason `cost-usage.ts` carries it on a record: it is what
+// `cost_attribute` reads to decide which issue the span belongs to.
+// The two `ResultFacts` fields are carried for the same reason `marker` is: the result block is gone
+// by the time anything aggregates, and only what was read off it survives.
+interface Span extends ToolCall, ResultFacts {
+	category: SpanCategory
+	duration_ms: number
+	// What the call itself took, before any of its minutes were handed to a delegated unit
+	// (joshuafolkken/kit#1591). Carried beside `duration_ms` rather than derived from it, because
+	// nothing downstream could recover it: `time_overlap.trim` replaces `duration_ms` and keeps no
+	// record of what it replaced.
+	//
+	// **The two answer different questions, and a report needs both.** `duration_ms` is this span's
+	// share of the run's wall clock, so the subtraction shortens it wherever a unit covered the same
+	// minutes — without that the four category shares stop reconstructing `elapsed_ms`, which is the
+	// double count joshuafolkken/kit#1287 fixed. This one is what a per-invocation row is asked for:
+	// a `Skill` call that really ran for five minutes was printed as 65 ms, because 65 ms is all the
+	// subtraction had left of it.
+	//
+	// It survives that subtraction because `trim` copies the span and overwrites only `duration_ms`
+	// and `ended_ms`, so every fragment of one call carries the same value — which is why the tables
+	// that read it count the first fragment and drop the continuations rather than summing them.
+	own_duration_ms: number
+	ended_ms: number
+	branch: string
+	// Whether this span is the *remainder* of a call whose middle was given to a delegated unit, cut
+	// out by `time_overlap.trim` (joshuafolkken/kit#1304). One call comes back as two spans there, so
+	// anything counting calls rather than intervals has to skip the second — the round-trip block and
+	// the per-tool table's `call_count` both do. Every span the transcript itself yields is `false`;
+	// only the subtraction sets it.
+	is_continuation: boolean
+	// The `pnpm josh <cmd>` this span ran *beside*, where it sits inside a backgrounded command's
+	// window, and `''` everywhere else (joshuafolkken/kit#1662). It is resolved after the walk rather
+	// than read off a call, because the window is not known until the join that closes it has been
+	// seen — so it has `is_continuation`'s shape rather than `marker`'s: every span the walk yields is
+	// empty, and only `time_background.positioned` sets it.
+	background_command: string
+	// When the harness said the command this span launched had finished, and `NO_FINISH` where nothing
+	// said (joshuafolkken/kit#1696). It is the notice's own instant rather than a reading's, so it is
+	// keyed to the launch by id at parse time — the notice sits on a line of its own, which is why no
+	// field read off this span's own result could carry it.
+	background_ended_ms: number
+}
+
+interface TimelineEvent extends ToolCall, ResultFacts {
+	timestamp_ms: number
+	branch: string
+	category: SpanCategory
+}
+
+// The whole session: when it started, when it ended, and what it spent the interval on.
+interface Timeline {
+	started_ms: number
+	ended_ms: number
+	spans: Array<Span>
+}
+
+// Everything but Bash: the tool's own name is the label, and nothing it runs is a shell command to
+// read a check key, a josh command or a declared issue off.
+function non_bash_call(name: string, input: unknown, message_id: string): ToolCall {
+	return {
+		label: name,
+		josh_command: '',
+		josh_commands: [],
+		check_key: time_single_check.NO_CHECK,
+		marker: time_markers.tool_marker(name, input),
+		message_id,
+		writes: time_writes.tool_writes(name, input),
+		issue: time_markers.NO_ISSUE,
+		// A non-Bash tool joins a backgrounded command too — `BashOutput` carries the shell id in a
+		// field of its own, `Monitor` names the same `…/tasks/<id>.output` path in a command — so the
+		// same reader is asked here rather than the field being left empty for every tool but `Bash`.
+		reads_background: time_background.read_id_of(input),
+		...time_bundle_call.tool_facts(name, input),
+	}
+}
+
+function bash_call(input: unknown, message_id: string): ToolCall {
+	const command = time_shell.bash_command(input)
+	const josh_command = time_shell.josh_command_of(command)
+
+	return {
+		label: time_shell.bash_label(command),
+		josh_command,
+		josh_commands: time_shell.josh_commands_of(command),
+		check_key: time_single_check.check_key(josh_command, command),
+		marker: time_markers.bash_marker(command),
+		message_id,
+		writes: time_writes.bash_writes(command),
+		issue: time_markers.bash_issue(command),
+		reads_background: time_background.read_id_of(input),
+		...time_bundle_call.bash_facts(command),
+	}
+}
+
+function to_tool_call(name: string, input: unknown, message_id: string): ToolCall {
+	if (name !== cost_blocks.BASH_TOOL) return non_bash_call(name, input, message_id)
+
+	return bash_call(input, message_id)
+}
+
+// Identified calls only. A `tool_use` written without an `id` would otherwise be registered under
+// the empty string, where the next result that carries no `tool_use_id` would match it and be
+// labelled with an unrelated tool — a wrong name where `UNKNOWN_TOOL` is the honest one.
+// A `tool_use` block with the assistant message it was written under, which is the turn that issued
+// it (joshuafolkken/kit#1406). The pair is kept rather than the block alone because the id lives on
+// the *line* and the flatten below is where it would otherwise be lost.
+interface IssuedCall {
+	block: Block
+	message_id: string
+}
+
+function tool_use_blocks(lines: ReadonlyArray<TranscriptLine>): Array<IssuedCall> {
+	return lines.flatMap((line) =>
+		line.blocks
+			.filter((block) => block.type === cost_blocks.TOOL_USE_TYPE && block.id !== '')
+			.map((block) => ({ block, message_id: line.message_id })),
+	)
+}
+
+// Every call in the session, keyed by the id its result carries back. Built over the whole file
+// first because a result can arrive many lines after the call that issued it.
+function collect_calls(lines: ReadonlyArray<TranscriptLine>): Map<string, ToolCall> {
+	return new Map(
+		tool_use_blocks(lines).map(({ block, message_id }) => [
+			block.id,
+			to_tool_call(block.name, block.input, message_id),
+		]),
+	)
+}
+
+// The first result on the line names the span. Claude Code writes one result per line, so this is
+// the whole of it in practice; were it ever to write several, the gap would be charged to the first
+// of them rather than divided — the three-way split stays exact either way, and only the per-tool
+// table would be approximate.
+function result_block(line: TranscriptLine): Block | undefined {
+	return line.blocks.find((block) => block.type === cost_blocks.TOOL_RESULT_TYPE)
+}
+
+// One line's contribution to the timeline, with the two fields every event carries read from the
+// line in one place. Written once rather than spelled out at each of the three return sites, which
+// is what let `branch` be added without a fourth chance to forget it.
+function event_of(
+	line: TranscriptLine,
+	category: SpanCategory,
+	call: ToolCall,
+	result: ResultFacts = NO_RESULT,
+): TimelineEvent {
+	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, ...result, ...call }
+}
+
+// A result that carried no `is_error` is `unknown` rather than `ok`: the tools that report no
+// outcome — a file read, an answered question — would otherwise be counted as calls that succeeded,
+// and a run whose whole transcript was written by them would report a measured zero failures.
+//
+// **What the command said outranks what the harness recorded, in one direction only**
+// (joshuafolkken/kit#1361). A josh check run inside a pipeline exits with the pipe's status, so the
+// harness writes `is_error: false` over a red gate; the failure line the command printed is the only
+// surviving evidence, and it is read *before* the field. The reverse never happens — a call the
+// harness marked failed is failed whatever it printed.
+function outcome_of(result: Block, call: ToolCall): SpanOutcome {
+	if (time_reported_failure.is_reported_failure(call.josh_command, result.has_failure_line)) {
+		return FAILED_OUTCOME
+	}
+
+	if (result.is_error === undefined) return UNKNOWN_OUTCOME
+
+	return result.is_error ? FAILED_OUTCOME : OK_OUTCOME
+}
+
+function facts_of(result: Block, call: ToolCall): ResultFacts {
+	return {
+		call_id: result.result_id,
+		outcome: outcome_of(result, call),
+		refusal_guard: result.refusal_guard,
+		background_id: result.background_id,
+		followup_stages: result.followup_stages,
+	}
+}
+
+// A user line is one of two things, and only its blocks tell them apart: a tool result the harness
+// wrote back, or a person typing.
+function user_event(line: TranscriptLine, calls: ReadonlyMap<string, ToolCall>): TimelineEvent {
+	const result = result_block(line)
+
+	if (result === undefined) return event_of(line, HUMAN_CATEGORY, NO_CALL)
+
+	const call = calls.get(result.result_id) ?? UNKNOWN_CALL
+
+	return event_of(line, TOOL_CATEGORY, call, facts_of(result, call))
+}
+
+function to_event(
+	line: TranscriptLine,
+	calls: ReadonlyMap<string, ToolCall>,
+): TimelineEvent | undefined {
+	// **A model span carries the message its own line belongs to**, which is what makes a turn
+	// countable: Claude Code writes one line per content block and repeats the id on each, so the
+	// lines are what a naive count sees and the id is what says how many turns they were
+	// (joshuafolkken/kit#1406).
+	if (line.type === ASSISTANT_TYPE) {
+		return event_of(line, MODEL_CATEGORY, { ...NO_CALL, message_id: line.message_id })
+	}
+
+	return line.type === USER_TYPE ? user_event(line, calls) : undefined
+}
+
+// Sorted rather than trusted in file order. Claude Code writes a few lines microseconds out of
+// order, and an unsorted walk turns those into negative durations — clamping them would break the
+// one property this partition has, that the shares add up to the elapsed time.
+function to_events(
+	lines: ReadonlyArray<TranscriptLine>,
+	calls: ReadonlyMap<string, ToolCall>,
+): Array<TimelineEvent> {
+	return lines
+		.map((line) => to_event(line, calls))
+		.filter((event): event is TimelineEvent => event !== undefined)
+		.toSorted((left, right) => left.timestamp_ms - right.timestamp_ms)
+}
+
+// The span is named by the event that *closes* it, so the branch is that event's too: the work the
+// interval paid for is the work the later line records, and taking the opening line's branch would
+// attribute the first span after a `josh git` to whatever preceded the branch.
+// The two durations of a span that nothing has taken a share of yet, which is every span a
+// transcript itself yields and every span a test builds (joshuafolkken/kit#1591). Written once here
+// so no builder can set one and forget the other — the drift would be silent, and would surface as a
+// per-invocation row disagreeing with the transcript it was read from.
+function equal_durations(duration_ms: number): Pick<Span, 'duration_ms' | 'own_duration_ms'> {
+	return { duration_ms, own_duration_ms: duration_ms }
+}
+
+// The four background fields of a span nothing backgrounded, which is every span a test builds
+// (joshuafolkken/kit#1662). Written once here for the reason `equal_durations` above is: three
+// fixtures assemble a `Span` literal, and a field added to two of them is a drift that surfaces only
+// as a table disagreeing with the transcript it was read from.
+type BackgroundFields = Pick<
+	Span,
+	'background_id' | 'reads_background' | 'background_command' | 'background_ended_ms'
+>
+
+function no_background(): BackgroundFields {
+	const none = time_background.NO_BACKGROUND
+
+	return {
+		background_id: none,
+		reads_background: none,
+		background_command: none,
+		background_ended_ms: time_background.NO_FINISH,
+	}
+}
+
+// When the harness said each backgrounded command ended, keyed by the id it assigned. Named so the
+// signature below fits the line, and because the map is a fact about the whole transcript rather than
+// about any one span.
+type FinishedAt = ReadonlyMap<string, number>
+
+// The same four fields on a span the walk yields, which is where three of them are still empty:
+// `background_command` is resolved after the walk by `time_background.positioned`, and the instant the
+// command ended comes from a notification line of its own rather than from this event.
+function background_fields(event: TimelineEvent, finished: FinishedAt): BackgroundFields {
+	return {
+		background_id: event.background_id,
+		reads_background: event.reads_background,
+		background_command: time_background.NO_BACKGROUND,
+		background_ended_ms: finished.get(event.background_id) ?? time_background.NO_FINISH,
+	}
+}
+
+// The four result-borne fields a span keeps, spread into `to_spans` so that builder stays inside its
+// line limit — `background_id`, the fifth `ResultFacts` field, is set by `background_fields` instead.
+function result_facts_of(
+	event: TimelineEvent,
+): Pick<ResultFacts, 'call_id' | 'outcome' | 'refusal_guard' | 'followup_stages'> {
+	return {
+		call_id: event.call_id,
+		outcome: event.outcome,
+		refusal_guard: event.refusal_guard,
+		followup_stages: event.followup_stages,
+	}
+}
+
+function to_spans(events: ReadonlyArray<TimelineEvent>, finished: FinishedAt): Array<Span> {
+	return events.slice(1).map((event, index) => ({
+		category: event.category,
+		label: event.label,
+		josh_command: event.josh_command,
+		josh_commands: event.josh_commands,
+		check_key: event.check_key,
+		marker: event.marker,
+		is_bundleable: event.is_bundleable,
+		targets: event.targets,
+		is_writing: event.is_writing,
+		has_prior_reference: event.has_prior_reference,
+		writes: event.writes,
+		message_id: event.message_id,
+		issue: event.issue,
+		branch: event.branch,
+		...result_facts_of(event),
+		is_continuation: false,
+		...background_fields(event, finished),
+		ended_ms: event.timestamp_ms,
+		...equal_durations(event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms)),
+	}))
+}
+
+function parse_timeline(text: string): Timeline {
+	const lines = text
+		.split('\n')
+		.map((line) => parse_line(line))
+		.filter((line): line is TranscriptLine => line !== undefined)
+	const events = to_events(lines, collect_calls(lines))
+
+	return {
+		started_ms: events[0]?.timestamp_ms ?? 0,
+		ended_ms: events.at(-1)?.timestamp_ms ?? 0,
+		// **The positioning happens here rather than in a caller** (joshuafolkken/kit#1662): a launch and
+		// the call that reads its output are in one transcript, and by the time spans have been merged
+		// across sessions and trimmed they are fragments rather than calls.
+		spans: time_background.positioned(to_spans(events, time_background.finished_at(lines))),
+	}
+}
+
+// **"No span was read" is the one criterion every scope withholds a transcript figure on**
+// (joshuafolkken/kit#1295). A run whose transcript could not be attributed, a child of an epic in
+// that state, and a batch no child contributed to are the same fact asked at three scales, and each
+// used to spell it out for itself — which is how the run scope came to print three `0.0 min` rows
+// beside the epic scope's `not measured` for the very same child.
+//
+// It takes the count rather than the array so the three callers can pass what they hold: the spans
+// themselves before a report exists, and `TimeReport.span_count` afterwards.
+function has_transcript_data(span_count: number): boolean {
+	return span_count > 0
+}
+
+const time_spans = {
+	ASSISTANT_TYPE,
+	MODEL_CATEGORY,
+	TOOL_CATEGORY,
+	HUMAN_CATEGORY,
+	OK_OUTCOME,
+	FAILED_OUTCOME,
+	UNKNOWN_OUTCOME,
+	NO_MESSAGE_ID,
+	UNKNOWN_TOOL,
+	has_transcript_data,
+	equal_durations,
+	no_background,
+	// Re-exported so the suites that measure how a command is read keep asking one namespace, and so
+	// `time-shell.ts` moving out of this file changed no call site (joshuafolkken/kit#1344).
+	bash_label: time_shell.bash_label,
+	josh_command_of: time_shell.josh_command_of,
+	josh_commands_of: time_shell.josh_commands_of,
+	to_tool_call,
+	parse_line,
+	parse_timeline,
+}
+
+export type { ResultFacts, Span, SpanCategory, SpanOutcome, Timeline }
+export { time_spans }
+
+export { type Block, type TranscriptLine } from './time-transcript-line'

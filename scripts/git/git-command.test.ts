@@ -66,7 +66,7 @@ describe('the status reading names its untracked-files mode', () => {
 
 // joshuafolkken/kit#907: with git's default quoting, a path containing a non-ASCII byte comes back
 // C-quoted, and a classifier matching a path prefix answers no for a file it should have matched.
-// `josh eval:scope` fails toward `skip` there — a change it exists to measure would go unmeasured.
+// `josh review:level` reads these same paths, so a dropped match would misjudge the review depth.
 describe('the path listings turn git path quoting off', () => {
 	it.each(['diff_main_names', 'diff_cached_names', 'untracked_names'] as const)(
 		'%s asks git for unquoted paths',
@@ -150,12 +150,12 @@ describe('git_command.diff_main', () => {
 	})
 })
 
-const SYMBOLIC_REF_MAIN = 'refs/remotes/origin/main'
+const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
 const NON_PREFIX_OUTPUT = 'something-else'
 
 describe('git_command.get_default_branch', () => {
 	it('returns branch name parsed from symbolic ref output', async () => {
-		execa_mock.state.stdout = SYMBOLIC_REF_MAIN
+		execa_mock.state.stdout = ORIGIN_MAIN_REF
 
 		const { git_command } = await import('./git-command')
 		const result = await git_command.get_default_branch()
@@ -271,7 +271,36 @@ describe('git_command.fetch_branch', () => {
 	})
 })
 
-// joshuafolkken/kit#926: `run:preflight` needs the branch an interrupted run left, not merely whether
+// joshuafolkken/kit#1659: `josh main:merge` needs the opposite of `merge_fast_forward`. `--ff-only`
+// here would reproduce the `git pull` abort it replaced, on the diverged branch that is the only
+// reason to run the command at all.
+describe('git_command.merge_branch', () => {
+	const DEFAULT_BRANCH = 'main'
+
+	it('merges the branch without restricting it to a fast-forward', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.merge_branch(DEFAULT_BRANCH)
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['merge', `origin/${DEFAULT_BRANCH}`])
+	})
+})
+
+// joshuafolkken/kit#1683: the pull left behind when joshuafolkken/kit#1659 fixed `josh main:merge`.
+// A bare `git pull` with neither `pull.rebase` nor `pull.ff` set aborts on a diverged branch, so the
+// strategy is passed rather than inherited — and it is `--ff-only`, because every caller is on the
+// default branch bringing it up to date and none of them is asking to absorb divergence.
+describe('git_command.pull_fast_forward', () => {
+	it('names the reconcile strategy rather than inheriting it from the git configuration', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.pull_fast_forward()
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['pull', '--ff-only'])
+	})
+})
+
+// joshuafolkken/kit#926: `run:hold`'s preflight check needs the branch an interrupted run left, not merely whether
 // one exists, so the boolean is expressed on top of the listing rather than beside it.
 describe('git_command.branch_names', () => {
 	const ISSUE_BRANCH_PATTERN = '926-*'

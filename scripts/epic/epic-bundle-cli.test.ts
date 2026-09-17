@@ -32,12 +32,15 @@ function issue(number: number, overrides: Partial<BacklogIssue> = {}): BacklogIs
 	return { number, repo: REPO, body: '', blocked_by: [], ...overrides }
 }
 
+// Rendered with the epics read in full, which is the ordinary case. The verdict that fires when they
+// were not is `epic-bundle-membership.test.ts`'s.
 function render(decision: BundleDecision, subject: BacklogIssue): string {
-	return epic_bundle_cli.format_decision(decision, subject, [])
+	return epic_bundle_cli.format_decision(decision, subject, [], true)
 }
 
-// Looked up through a variable key, as the command itself does: a literal key would be rewritten to
-// dot notation by `dot-notation` and then rejected by `noPropertyAccessFromIndexSignature`.
+// Looked up through a variable key, as the command itself does. A literal key used to be rewritten
+// to dot notation by `dot-notation` and then rejected by `noPropertyAccessFromIndexSignature`;
+// joshuafolkken/kit#1783 switched that fix off, so matching the command is the whole reason now.
 function action_line(action: BundleDecision['action']): string {
 	return epic_bundle_cli.ACTION_LINES[action] ?? ''
 }

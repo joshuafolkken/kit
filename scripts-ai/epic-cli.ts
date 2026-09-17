@@ -1,12 +1,12 @@
-import { readFileSync } from 'node:fs'
 import type { InsertKind, InsertPosition } from '../scripts/git/git-epic-chains'
 import { git_epic_parse, type ExternalChild } from '../scripts/git/git-epic-parse'
+import { cli_body } from '../scripts/josh/cli-body'
+import { epic_cli_argv, ISSUE_NUMBER_PATTERN } from './epic-cli-argv'
+import { epic_cli_remove } from './epic-cli-remove'
 
 // Parsing lives apart from the entry point so the argument rules can be asserted without spawning a
 // process or reaching GitHub. The entry point is then a thin shell around these two functions.
 
-const STDIN_PATH = '-'
-const STDIN_FD = 0
 const ORDERED_FLAG = '--ordered'
 const RATIONALE_FLAG = '--rationale-file'
 const ORIGIN_FLAG = '--origin'
@@ -14,26 +14,35 @@ const PROMOTE_FLAG = '--promote'
 const ADD_FLAG = '--add'
 const BEFORE_FLAG = '--before'
 const AFTER_FLAG = '--after'
+// The same two places with the declaration withheld: move the task-list row and write neither the
+// dependency declaration nor the `blocked-by` relation (joshuafolkken/kit#1738). They exist because
+// `epic:next` offers children in task-list order, so "no dependency, but run this one first" had no
+// spelling at all — only a false dependency, or a row nobody would reach.
+const ORDER_BEFORE_FLAG = '--order-before'
+const ORDER_AFTER_FLAG = '--order-after'
 // The decision record for an insertion, read the same way `--rationale-file` is read for a creation:
 // from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
 // contributes is placing it in the epic's `## Decisions` and on each child (joshuafolkken/kit#1350).
 const DECISION_FLAG = '--decision-file'
-const FLAG_PREFIX = '--'
-// Which flags consume the argument after them. Per parser rather than module-wide: `--before` takes
-// a value only under `--add`, and treating it as one everywhere had `josh epic "T" 101 102 --after
-// 103` silently drop #103 from the new epic instead of ignoring an unknown flag (joshuafolkken/kit#890).
+// Which flags consume the argument after them — per parser, for the reason `epic-cli-argv.ts` gives.
 const VALUE_FLAGS: ReadonlySet<string> = new Set([RATIONALE_FLAG, ORIGIN_FLAG])
-const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([BEFORE_FLAG, AFTER_FLAG, DECISION_FLAG])
-// `--add` refuses a flag it does not know, unlike creation and promotion which ignore one. A typo
-// there costs a flag; here a mistyped positioning flag would leave its value positional, so the
-// target becomes a child to add and the insertion silently lands at the end (joshuafolkken/kit#890).
+const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	BEFORE_FLAG,
+	AFTER_FLAG,
+	ORDER_BEFORE_FLAG,
+	ORDER_AFTER_FLAG,
+	DECISION_FLAG,
+])
 const ADD_KNOWN_FLAGS: ReadonlySet<string> = new Set([
 	ADD_FLAG,
 	BEFORE_FLAG,
 	AFTER_FLAG,
+	ORDER_BEFORE_FLAG,
+	ORDER_AFTER_FLAG,
 	DECISION_FLAG,
 ])
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
+
+const { count_flag, is_value_unusable, read_flag_value } = epic_cli_argv
 
 interface CreateArguments {
 	title: string
@@ -53,34 +62,11 @@ interface PromoteArguments {
 	origin?: string | undefined
 }
 
-function read_flag_value(argv: ReadonlyArray<string>, flag: string): string | undefined {
-	const index = argv.indexOf(flag)
-	if (index === -1) return undefined
-
-	return argv[index + 1]
-}
-
-function is_flag(argument: string): boolean {
-	return argument.startsWith(FLAG_PREFIX)
-}
-
-// A value-taking flag's argument must not be mistaken for a child issue number, so the argument
-// directly after one is dropped along with the flag itself.
-function is_flag_value(
-	argv: ReadonlyArray<string>,
-	index: number,
-	value_flags: ReadonlySet<string>,
-): boolean {
-	return value_flags.has(argv[index - 1] ?? '')
-}
-
 function to_positional_arguments(
 	argv: ReadonlyArray<string>,
 	value_flags: ReadonlySet<string> = VALUE_FLAGS,
 ): Array<string> {
-	return argv.filter(
-		(argument, index) => !is_flag(argument) && !is_flag_value(argv, index, value_flags),
-	)
+	return epic_cli_argv.to_positional_arguments(argv, value_flags)
 }
 
 // Deduplicated because a repeated number would render a duplicate task-list row, and with
@@ -136,13 +122,16 @@ function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments 
 	}
 }
 
-// `--add <E> <N...> [--before <M> | --after <M>]`: the epic to insert into, then the children. The
-// epic comes first for the same reason it does under `--promote`, so the children stay a bare list
-// of numbers (joshuafolkken/kit#890).
+// `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]`: the epic
+// to insert into, then the children. The epic comes first for the same reason it does under
+// `--promote`, so the children stay a bare list of numbers (joshuafolkken/kit#890).
 interface AddArguments {
 	epic_number: number
 	children: Array<number>
 	position?: InsertPosition | undefined
+	// `--order-before` / `--order-after` rather than `--before` / `--after`: the row moves and nothing
+	// else is written (joshuafolkken/kit#1738).
+	is_order_only?: boolean | undefined
 	decision_path?: string | undefined
 }
 
@@ -151,66 +140,82 @@ function is_addition(argv: ReadonlyArray<string>): boolean {
 	return argv.includes(ADD_FLAG)
 }
 
-// The outcome of reading `--before` / `--after`: the position, nothing, or a refusal. One shape for
-// all three so the caller branches on a field rather than on a value's type.
+// The outcome of reading a positioning flag: the position, nothing, or a refusal. One shape for all
+// three so the caller branches on a field rather than on a value's type. `is_order_only` rides on the
+// same value because one flag decides both halves — where the row goes, and whether a dependency is
+// written behind it (joshuafolkken/kit#1738).
 interface PositionOutcome {
 	position?: InsertPosition
+	is_order_only?: boolean
 	is_refused: boolean
 }
 
 const NO_POSITION: PositionOutcome = { is_refused: false }
 const REFUSED_POSITION: PositionOutcome = { is_refused: true }
 
-// The raw target of whichever positioning flag was given. Both flags at once leaves no single
-// position — refused rather than resolved by precedence, which would silently pick one.
-function count_flag(argv: ReadonlyArray<string>, flag: string): number {
-	return argv.filter((argument) => argument === flag).length
+// The four positioning flags as one table: the place each one names, and whether a dependency is
+// written behind the row it moves. **One table rather than two branches** (joshuafolkken/kit#1738) —
+// `--order-before` asks the same placement question `--before` does, so a second parsing path could
+// come to disagree with this one about what a repeated flag or a non-numeric target means.
+interface PositionFlag {
+	flag: string
+	kind: InsertKind
+	is_order_only: boolean
 }
 
-// More than one positioning flag names more than one place, whether they are the same flag twice or
-// one of each. `read_flag_value` would answer with the first, which is a silent choice rather than a
-// refusal — the same hazard the two-different-flags case was already refused for.
+const POSITION_FLAGS: ReadonlyArray<PositionFlag> = [
+	{ flag: BEFORE_FLAG, kind: 'before', is_order_only: false },
+	{ flag: AFTER_FLAG, kind: 'after', is_order_only: false },
+	{ flag: ORDER_BEFORE_FLAG, kind: 'before', is_order_only: true },
+	{ flag: ORDER_AFTER_FLAG, kind: 'after', is_order_only: true },
+]
+
+// More than one positioning flag names more than one place, whether they are the same flag twice, one
+// of each direction, or a dependency-writing flag beside an order-only one. `read_flag_value` would
+// answer with the first, which is a silent choice rather than a refusal — and here the silent choice
+// would decide whether a `blocked-by` is written at all.
 function is_position_ambiguous(argv: ReadonlyArray<string>): boolean {
-	return count_flag(argv, BEFORE_FLAG) + count_flag(argv, AFTER_FLAG) > 1
+	return POSITION_FLAGS.reduce((total, entry) => total + count_flag(argv, entry.flag), 0) > 1
 }
 
-function read_position_target(
-	argv: ReadonlyArray<string>,
-): { kind: InsertKind; raw: string } | undefined {
-	if (is_position_ambiguous(argv)) return undefined
-	const before = read_flag_value(argv, BEFORE_FLAG)
-	if (before !== undefined) return { kind: 'before', raw: before }
-	const after = read_flag_value(argv, AFTER_FLAG)
+interface PositionTarget extends PositionFlag {
+	raw: string
+}
 
-	return after === undefined ? undefined : { kind: 'after', raw: after }
+function to_position_target(
+	argv: ReadonlyArray<string>,
+	entry: PositionFlag,
+): PositionTarget | undefined {
+	const raw = read_flag_value(argv, entry.flag)
+
+	return raw === undefined ? undefined : { ...entry, raw }
+}
+
+function read_position_target(argv: ReadonlyArray<string>): PositionTarget | undefined {
+	if (is_position_ambiguous(argv)) return undefined
+
+	return POSITION_FLAGS.map((entry) => to_position_target(argv, entry)).find(
+		(found) => found !== undefined,
+	)
 }
 
 // A target that is not an issue number is refused for the same reason two flags are: guessing would
 // insert somewhere.
 function parse_position(argv: ReadonlyArray<string>): PositionOutcome {
-	const has_flag = argv.includes(BEFORE_FLAG) || argv.includes(AFTER_FLAG)
+	const has_flag = POSITION_FLAGS.some((entry) => argv.includes(entry.flag))
 	const target = read_position_target(argv)
 	if (target === undefined) return has_flag ? REFUSED_POSITION : NO_POSITION
 	if (!ISSUE_NUMBER_PATTERN.test(target.raw)) return REFUSED_POSITION
 
-	return { position: { kind: target.kind, target: Number(target.raw) }, is_refused: false }
+	return {
+		position: { kind: target.kind, target: Number(target.raw) },
+		is_order_only: target.is_order_only,
+		is_refused: false,
+	}
 }
 
 function has_unknown_flag(argv: ReadonlyArray<string>): boolean {
-	return argv.some((argument) => is_flag(argument) && !ADD_KNOWN_FLAGS.has(argument))
-}
-
-// A value-taking flag given without a usable value: last on the line, or followed by another flag.
-// **Refused rather than read as "none was asked for"** — `--decision-file` is passed precisely because
-// the record has to exist, so a shell that ate the path would otherwise land the insertion, write no
-// record, post no comment and exit 0: success reported for half the job. Repeated, it names two
-// records, which is refused for the reason two positioning flags are (joshuafolkken/kit#1350).
-function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
-	if (!argv.includes(flag)) return false
-	if (count_flag(argv, flag) > 1) return true
-	const value = read_flag_value(argv, flag)
-
-	return value === undefined || is_flag(value)
+	return epic_cli_argv.has_unknown_flag(argv, ADD_KNOWN_FLAGS)
 }
 
 // Whether *this* is why the insertion could not be read, so the refusal can say so. Without it the
@@ -242,6 +247,7 @@ function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefi
 	return {
 		...subject,
 		position: outcome.position,
+		is_order_only: outcome.is_order_only,
 		decision_path: read_flag_value(argv, DECISION_FLAG),
 	}
 }
@@ -278,7 +284,11 @@ function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTa
 // instruction the epic itself does not record.
 function format_add_arguments(local: AddArguments): string {
 	const { position } = local
-	const suffix = position === undefined ? '' : ` --${position.kind} ${String(position.target)}`
+	// The order-only prefix rides along, since it is what decides whether the other checkout writes a
+	// dependency — a suggestion that dropped it would be a different instruction (joshuafolkken/kit#1738).
+	const prefix = local.is_order_only === true ? '--order-' : '--'
+	const suffix =
+		position === undefined ? '' : ` ${prefix}${position.kind} ${String(position.target)}`
 
 	return `${[local.epic_number, ...local.children].map(String).join(' ')}${suffix}`
 }
@@ -326,12 +336,11 @@ function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
 	return Number(raw)
 }
 
-// `-` reads stdin, matching `gh issue create --body-file -`. Shared by the two `*-file` flags rather
-// than spelled out per flag, so the stdin form cannot come to mean one thing under `--rationale-file`
-// and another under `--decision-file`.
-function read_file_or_stdin(path: string): string {
-	return readFileSync(path === STDIN_PATH ? STDIN_FD : path, 'utf8')
-}
+// `-` reads stdin, matching `gh issue create --body-file -`. The reader is `cli_body`'s, shared with
+// `josh notify --body-file` and `josh followup --notify-message-file` rather than copied per entry
+// point (joshuafolkken/kit#1198), so the stdin form cannot come to mean one thing here and something
+// else there.
+const { read_file_or_stdin } = cli_body
 
 // An omitted path yields an empty rationale, which the body builder replaces with a visible
 // placeholder rather than a blank section.
@@ -349,6 +358,7 @@ function read_decision(decision_path: string | undefined): string | undefined {
 const epic_cli = {
 	is_promotion,
 	is_addition,
+	...epic_cli_remove,
 	find_cross_repo_add_target,
 	is_decision_path_unusable,
 	resolve_local_add,
@@ -367,9 +377,13 @@ export {
 	AFTER_FLAG,
 	BEFORE_FLAG,
 	DECISION_FLAG,
+	ORDER_AFTER_FLAG,
+	ORDER_BEFORE_FLAG,
 	ORDERED_FLAG,
 	ORIGIN_FLAG,
 	PROMOTE_FLAG,
 	RATIONALE_FLAG,
 }
+export { REMOVE_FLAG } from './epic-cli-remove'
 export type { AddArguments, CreateArguments, CrossRepoAddTarget, PromoteArguments }
+export type { RemoveArguments } from './epic-cli-remove'

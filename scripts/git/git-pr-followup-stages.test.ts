@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred_answer, type DeferredAnswer } from './deferred-answer-fixture'
 import { git_followup_stages } from './git-followup-stages'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
-// joshuafolkken/kit#1349: nobody knew what `followup --merge` spent its 44 seconds on, because the
+// joshuafolkken/kit#1349: nobody knew what `followup` spent its 44 seconds on, because the
 // command timed none of its own stages. What is pinned here is that every stage reaches the console,
 // in the order it ran — including on the **failed** run, which is the invocation whose wait is
 // longest and the one a block withheld would hide.
@@ -27,6 +28,8 @@ vi.mock('./git-gh-command', () => ({
 
 vi.mock('./git-pr-checks', () => ({
 	git_pr_checks: { wait_for_pr_success: vi.fn() },
+	DEFAULT_STABLE_READS: 2,
+	WATCH_CONFIRMED_STABLE_READS: 1,
 }))
 
 // `has_ignore_reason` is part of the factory even though this suite never reaches it: it is a named
@@ -41,14 +44,45 @@ vi.mock('./git-pr-ai-review', () => ({
 	},
 }))
 
+// The same rule as the auto-close below, applied to the managed config-file gate: the real one reads
+// the branch diff of whatever tree this suite runs in, so a timing suite would measure `git diff` —
+// and the stage sequence pinned here would flip to the interrupted one the moment the working copy
+// held a distributed change (joshuafolkken/kit#1578). The implementation goes inside `vi.fn` so it
+// survives a reset; `run_review_checks` spreads the result.
+vi.mock('./git-pr-managed-config', () => ({
+	git_pr_managed_config: { handle_managed_config_changes: vi.fn(async () => []) },
+}))
+
 vi.mock('./telegram-notify', () => ({
-	telegram_notify: { send: vi.fn() },
+	telegram_notify: { send: vi.fn(), send_or_report: vi.fn() },
 }))
 
 // Mocked rather than left real: the auto-close reads GitHub, and a timing suite that reached the
 // network would measure the network.
 vi.mock('./git-epic-close', () => ({
 	git_epic_close: { close_completed_epics: vi.fn() },
+}))
+
+// The same rule as the auto-close above, applied to the path that suite missed. `notify_completion`
+// asks this collaborator for the unreleased-merge line, and the real one resolves the tip by running
+// `git fetch origin main` — a live round trip, about 4 seconds per test on the machine it was found
+// on, once for every case here that calls `run`. This suite is a *timing* suite, so it was reporting
+// the network as the `telegram` stage's cost. `git-pr-followup.test.ts` mocks the same collaborator
+// the same way (joshuafolkken/kit#1077), and since joshuafolkken/kit#1515 the network guard in
+// `scripts/test/test-network-guard.ts` covers `git` as well as `gh`, so either mock going missing fails the
+// suite outright instead of quietly slowing it down.
+// The post-merge tail reaches the observation-ledger flush (joshuafolkken/kit#1810); its behavior is
+// `git-followup-flush.test.ts`, so it is a no-op here.
+vi.mock('./git-followup-flush', () => ({
+	git_followup_flush: { flush_ledger_step: vi.fn() },
+}))
+
+vi.mock('./git-followup-pending', () => ({
+	git_followup_pending: {
+		MERGE_PENDING_NOTE: '',
+		pending_release_line: vi.fn(),
+		read_pending: vi.fn(),
+	},
 }))
 
 const { git_gh_command } = await import('./git-gh-command')
@@ -58,6 +92,11 @@ const { telegram_notify } = await import('./telegram-notify')
 const { git_epic_close } = await import('./git-epic-close')
 
 const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
+
+const PR_URL = 'https://github.com/owner/repo/pull/1'
+// The pull request body every case here answers with, so the `closes #N` keyword and the issue number
+// in `BASE_INPUT` cannot drift apart.
+const CLOSES_BODY = 'closes #42'
 
 const BASE_INPUT: FollowupInput = {
 	branch_name: 'test-branch',
@@ -69,20 +108,24 @@ const BASE_INPUT: FollowupInput = {
 	should_merge: false,
 }
 
-function answer_every_call(): void {
+function answer_github_reads(): void {
 	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
 	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
-	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue('https://github.com/owner/repo/pull/1')
-	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
+	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
+	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue(CLOSES_BODY)
+	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
+	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+}
+
+function answer_every_call(): void {
+	answer_github_reads()
 	vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
 		rollup: [],
 		merge_state_status: undefined,
 		review_decision: undefined,
 	})
-	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
-	vi.mocked(telegram_notify.send).mockResolvedValue()
-	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
 	vi.mocked(git_epic_close.close_completed_epics).mockResolvedValue()
 }
 
@@ -99,15 +142,13 @@ function printed_stages(): Array<string> {
 }
 
 const MERGED_RUN_STAGES: ReadonlyArray<string> = [
-	STAGE.closes_check,
-	STAGE.context,
+	STAGE.closes_and_context,
 	STAGE.checks_wait,
 	STAGE.coderabbit_comments,
 	STAGE.ai_review_comments,
 	STAGE.telegram,
 	STAGE.merge,
-	STAGE.completion_comment,
-	STAGE.epic_close,
+	STAGE.completion_and_epic_close,
 ]
 
 beforeEach(() => {
@@ -136,6 +177,128 @@ describe('git_pr_followup.run — the stage block on a run that finished', () =>
 	})
 })
 
+// joshuafolkken/kit#1539: a step after the merge is cleanup, and the merge cannot be taken back. Its
+// failure used to end the process, which discarded the steps after it — the working-tree hold release
+// among them — and returned a non-zero exit that `epicrun` and `queue` read as a failed child.
+describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
+	const FAILURE = new Error('502 Bad Gateway')
+
+	beforeEach(() => {
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+	})
+
+	it('resolves, so a merged run is not reported as a failed one', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await expect(git_pr_followup.run({ ...BASE_INPUT, should_merge: true })).resolves.toBeDefined()
+	})
+
+	it('reports every stage, so the block still names where the run went', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(printed_stages()).toStrictEqual([...MERGED_RUN_STAGES])
+	})
+
+	it('names the step that failed rather than passing silently', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		const warned = vi.mocked(console.warn).mock.calls.map(([line]) => String(line))
+
+		expect(warned.join('\n')).toContain('The epic auto-close')
+	})
+
+	it('keeps merging the pull request', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+	})
+})
+
+// joshuafolkken/kit#1564: the completion notification is sent on the way to the merge, where a throw
+// would leave a reviewed, green pull request unmerged. It goes through the tolerant send, which
+// reports the failure and answers `false`; the throwing form belongs to `pnpm josh notify`, whose
+// whole job is the notification.
+describe('git_pr_followup.run — a notification that reached nobody', () => {
+	it('sends through the tolerant form rather than the throwing one', async () => {
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(telegram_notify.send_or_report)).toHaveBeenCalledTimes(1)
+		expect(vi.mocked(telegram_notify.send)).not.toHaveBeenCalled()
+	})
+
+	// A completion notification is never re-sent by hand: `--task-type completion` populates no PR
+	// link, and re-running `followup` after the merge is not a re-send. So this caller passes none.
+	it('offers no recovery command for a completion notification', async () => {
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(telegram_notify.send_or_report)).toHaveBeenCalledWith(
+			expect.objectContaining({ task_type: 'completion' }),
+			undefined,
+		)
+	})
+
+	it('merges the pull request even when the notification was not delivered', async () => {
+		vi.mocked(telegram_notify.send_or_report).mockResolvedValue(false)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+	})
+})
+
+// joshuafolkken/kit#1446: the four reads in front of the check wait need nothing from one another,
+// and were sent one at a time for 5.5 of `followup`'s measured 45.8 seconds. **What is pinned is the
+// property, not the wall clock** — a duration measured on a mocked call is not a fact about
+// anything, so the batch is observed by answering the body read last and asking what had already
+// gone out.
+describe('git_pr_followup.run — the reads in front of the check wait', () => {
+	// The number only the pull request body knows, so the recovered case cannot pass on the input's.
+	const RECOVERED_ISSUE = '77'
+	let body_read: DeferredAnswer<string>
+
+	beforeEach(() => {
+		body_read = deferred_answer<string>()
+		vi.mocked(git_gh_command.pr_get_body).mockReturnValue(body_read.promise)
+	})
+
+	it('issues the notification reads while the body read is still outstanding', async () => {
+		const run = git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		await vi.waitFor(() => {
+			expect(vi.mocked(git_gh_command.repo_get_name_with_owner)).toHaveBeenCalled()
+			expect(vi.mocked(git_gh_command.pr_get_url)).toHaveBeenCalled()
+			expect(vi.mocked(git_gh_command.issue_get_title)).toHaveBeenCalledWith(
+				BASE_INPUT.issue_number,
+			)
+		})
+		body_read.answer(CLOSES_BODY)
+		await run
+	})
+
+	// The one genuine dependency of the batch (joshuafolkken/kit#1539): with no number on the command
+	// line, the pull request body is what names the issue, so this read alone waits for it — and the
+	// other three still do not.
+	it('waits for the body only where the issue number has to come from it', async () => {
+		const run = git_pr_followup.run({ ...BASE_INPUT, issue_number: undefined, should_merge: true })
+
+		await vi.waitFor(() => {
+			expect(vi.mocked(git_gh_command.repo_get_name_with_owner)).toHaveBeenCalled()
+		})
+
+		expect(vi.mocked(git_gh_command.issue_get_title)).not.toHaveBeenCalled()
+		body_read.answer(`closes #${RECOVERED_ISSUE}`)
+		await run
+
+		expect(vi.mocked(git_gh_command.issue_get_title)).toHaveBeenCalledWith(RECOVERED_ISSUE)
+	})
+})
+
 describe('git_pr_followup.run — the stage block on a run that failed', () => {
 	const FAILURE = new Error('AI review blocker')
 
@@ -149,8 +312,7 @@ describe('git_pr_followup.run — the stage block on a run that failed', () => {
 		)
 
 		expect(printed_stages()).toStrictEqual([
-			STAGE.closes_check,
-			STAGE.context,
+			STAGE.closes_and_context,
 			STAGE.checks_wait,
 			STAGE.coderabbit_comments,
 			STAGE.interrupted,

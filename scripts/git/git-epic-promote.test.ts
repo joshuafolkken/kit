@@ -74,7 +74,7 @@ describe('git_epic_promote.build_promoted_body — what the tooling reads', () =
 	})
 
 	it('names the epic in the run command, since the number is already known', () => {
-		expect(promote()).toContain(`epicrun #${String(EPIC_NUMBER)}`)
+		expect(promote()).toContain(`backlogrun #${String(EPIC_NUMBER)} --only`)
 	})
 
 	it('carries the supplied rationale', () => {

@@ -1,4 +1,4 @@
-import { yaml_document } from '#scripts/yaml-document'
+import { yaml_document } from '#scripts/yaml/yaml-document'
 import { overrides_check } from './overrides-logic'
 import { lockfile_importers_schema, type LockfileImporter } from './schemas'
 

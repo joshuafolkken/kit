@@ -19,7 +19,7 @@
 
 ### 明示的な起動が必須（MANDATORY）
 
-`kickoff` / `halfrun` / `fullrun` / `queue` ワークフロー（`#N` および `new` バリアントを含む）は、ユーザーが**現在のターンのプロンプト**にキーワードを入力していない限り、絶対に開始してはならない。
+`kickoff` / `halfrun` / `fullrun` / `backlogrun` ワークフロー（`#N` および `new` バリアントを含む）は、ユーザーが**現在のターンのプロンプト**にキーワードを入力していない限り、絶対に開始してはならない。
 
 - 「実装して」「修正して」「PR を出して」などの会話的な依頼は暗黙の起動ではない。タスクがこれらのワークフローに該当すると判断した場合でも、依頼の形状から起動を推測してはならない
 - 「`halfrun new` を実行してもよいですか？」「`fullrun` を回しますか？」のような確認質問もしてはならない。確認プロンプトは明示的な起動の代替にはならない
@@ -33,7 +33,7 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
 - `fullrun` の auto-merge は `fullrun` の指示自体に含まれるため許可される（本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)）。それ以外の状況で勝手にマージしてはならない
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
 - 「チェックが全部 green だから次のステップに進む」は承認ではない
-- **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `deny`（`Bash(gh pr merge*)`）で機械的に遮断されている。** `fullrun` の auto-merge は `pnpm josh followup --merge` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけである。**ただし deny は実装であって規則ではない** — パターンが取りこぼす綴りを禁じているのは本節の規則のほうである
+- **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `deny`（`Bash(gh pr merge*)`）で機械的に遮断されている。** `fullrun` の auto-merge は `pnpm josh followup` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけである。**ただし deny は実装であって規則ではない** — パターンが取りこぼす綴りを禁じているのは本節の規則のほうである
 - **同じ規則が禁じる force push とブランチ削除も deny に載っている**（joshuafolkken/kit#1062）。`Bash(git push *--force*)` / `Bash(git push * -f)` はフラグを引数の後ろに書いた綴りを、`Bash(git push *--delete*)` / `Bash(git branch -d*)` / `Bash(git branch -D*)` / `Bash(gh api *DELETE*git/refs/heads/*)` はブランチ削除を止める。**それでも deny は規則より狭い** — `git -C` を前置した綴り、短縮フラグをまとめた綴り（`git push -uf`）は全エントリを素通りし、ルール文字列は `:` をリテラルとして照合できないため `git push origin :branch` も拒否されない。**「マージ経路は deny が保証している」とは読まないこと**
 - **共有状態に影響する操作（このセクションの対象＝Tier C）は迷ったら確認する。** 確認のコストは低いが、意図しない操作の巻き戻しは高コスト
 - ただしこの「迷ったら確認」は Tier C に限る。**可逆な実装・設計判断（Tier A）は別ルール**（CLAUDE.md「Decision autonomy」の3層ポリシー）に従い、明確に優位な選択肢は確認せず自動で選んで記録する — 本当に甲乙つけがたい（Tier B）ときだけ確認する。下記「意思決定の自律ポリシー」を参照
@@ -50,11 +50,12 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
   - **未追跡ファイルの中身**: `git diff --no-index /dev/null <new-file>`（staging 不要）。あるいは単にファイルを直接読む
 - **staging してよいのは次の 2 ケースだけ**:
   1. ユーザーが**そのターンで明示的に**ステージを指示した
-  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `queue` の起動に含まれるコミット手順。`halfrun` はコミットしないので含まれない）
+  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `backlogrun` の起動に含まれるコミット手順。`halfrun` はコミットしないので含まれない）
 - 上記以外で staging が必要だと考えたときは、**実行せずに先に確認する**
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
-- **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`queue` の手順 1、`epicrun` のラン開始時の `josh latest`（`queue` の手順 1 と同じ場面）、「別パッケージ起因の問題は割り込み Issue で対応する」、および `epicrun` の子を始める前の preflight（`pnpm josh run:preflight <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926）。**この 5 番目だけが `git stash pop` を伴わない。前の 4 つはいずれも直後に `git stash pop` で復元することが手順に含まれている。** 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`SKILL.md` §2d）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
-- **この禁止は kit 配布の `.claude/settings.json` の `deny`（`Bash(git add*)` / `Bash(git stage*)` / `Bash(git rm*)` / `Bash(git mv*)` / `Bash(git reset*)` / `Bash(git restore --staged*)` / `Bash(git restore -S*)` / `Bash(git commit -a*)` / `Bash(git commit --all*)`）で機械的にも遮断されている。** `pnpm josh git` は node スクリプト内部から git を起動するため影響を受けず、承認済みのコミットフロー（上記ケース 2）は従来どおり動く。**deny には「そのターンでユーザーが明示指示した」という例外がないため、上記ケース 1 も AI 側では実行できない** — その場合はユーザー自身の端末で実行してもらう（ユーザーの手元では従来どおり動く）。恒久的な機械的保証のほうが、コマンド 1 本で回避できる例外より価値が高いという判断（joshuafolkken/kit#850）
+- **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`backlogrun` のラン開始時の `josh latest`、「別パッケージ起因の問題は割り込み Issue で対応する」、および `backlogrun` が epic の子を始める前の preflight（`pnpm josh run:hold <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926, joshuafolkken/kit#1965）。**この 5 番目だけが復元を伴わない。前の 4 つはいずれも直後に `pnpm josh stash:pop "<メッセージ>"` で復元することが手順に含まれている**（stash はリポジトリ単位の 1 本のスタックを全 work tree が共有するため、位置指定や引数なしの `git stash pop` は別のレーンが最後に積んだ stash を取り込む — メッセージで対象を特定する。joshuafolkken/kit#2050）。 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`SKILL.md` §2d）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
+- **この禁止は kit 配布の `.claude/settings.json` の `deny`（`Bash(git add*)` / `Bash(git stage*)` / `Bash(git rm*)` / `Bash(git mv*)` / `Bash(git reset*)` / `Bash(git restore --staged*)` / `Bash(git restore -S*)` / `Bash(git commit*)`）で機械的にも遮断されている。** `pnpm josh git` は node スクリプト内部から git を起動するため影響を受けず、承認済みのコミットフロー（上記ケース 2）は従来どおり動く。**deny には「そのターンでユーザーが明示指示した」という例外がないため、上記ケース 1 も AI 側では実行できない** — その場合はユーザー自身の端末で実行してもらう（ユーザーの手元では従来どおり動く）。恒久的な機械的保証のほうが、コマンド 1 本で回避できる例外より価値が高いという判断（joshuafolkken/kit#850）
+- **`Bash(git commit*)` だけはステージング操作ではないが、同じ deny に入っている。** `git add` を拒否されたエージェントが次に手を伸ばすのが `git commit -a`（追跡済みファイルをまとめてステージしてコミットする）であり、それも拒否されると素の `git commit -m` である。フラグ単位で塞いでいる限りこの退避路は最後の 1 本が残るため、joshuafolkken/kit#1075 でサブコマンド全体へ広げた。**ユーザーが明示的にコミットを指示した場合も AI 側では実行できない点は上と同じ** — 承認済みのコミットは `pnpm josh git` を通す
 - **「拒否される操作」と「禁止された操作」は同じ集合ではない。** deny に載っているのは上記の直接実行だけで、このセクションが同じく禁じている `git checkout -- <path>` / `git restore <path>` は実行できてしまう。**ツールが通したことを許可と読み替えてはならない** — 何をしてよいかを決めるのは deny ではなくこのルールである
 - このルールは横断ドキュメント（CLAUDE.md「Git Rules」→「Never stage or mutate the git index on your own」）のカノニカル参照
 
@@ -82,7 +83,7 @@ AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎる�
 
 **自動判断の記録**: 本来確認すべき Tier A の分岐を自動判断したときは、候補と理由を記録する:
 
-- Issue 駆動ワークフロー内（`kickoff` / `halfrun` / `fullrun` / `queue`）: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="..."` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する
+- Issue 駆動ワークフロー内（`kickoff` / `halfrun` / `fullrun` / `backlogrun`）: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="..."` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する
 - Issue が存在しない会話タスク: 同じ内容を「Auto-decided: `<choice>` over `<alt>` because `<reason>`」の1行として応答に明示する
 
 ### 確認待ちで停止するときの Telegram 通知（`confirmation`）
@@ -101,9 +102,13 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<�
 
 手順の単一ソースは `.claude/skills/workflow-commands/SKILL.md` → 「2f. The working-tree hold — one run per tree」にある。ここに書くのは、キーワードが打たれていないターンでも読まれる位置に、引き金だけを置くためである。
 
-`fullrun` / `halfrun` / `kickoff` は、**他の何よりも先に `pnpm josh run:hold` を実行し、その答えに従う**。`busy` または `unknown` なら、`confirmation` Telegram を送って停止する — **起票もブランチ作成もファイル編集もしない**。`new` 系の入口では起票より前に問う。起票してから気付けば、掃除すべき副作用が残るためである。
+`fullrun` / `halfrun` は、**他の何よりも先に `pnpm josh run:hold` を実行し、その答えに従う**。`busy` または `unknown` なら、`confirmation` Telegram を送って停止する — **起票もブランチ作成もファイル編集もしない**。`new` 系の入口では起票より前に問う。起票してから気付けば、掃除すべき副作用が残るためである。
 
-**判定の単位は作業ツリーであり、リポジトリではない。** `epicrun` が使う `epic-busy.ts` はリポジトリに問う読み取りで、「1 リポジトリにつき同時 1 子」を実装している。これらの入口が奪い合う資源は 1 本のブランチ・1 つの index・1 つの未コミット差分であり、別 worktree ならそれらは別々に存在するので競合しない。ここでリポジトリ単位の判定を使うと、正当な 2 本目まで止まる。**`epicrun` 側の既存ガードは変更しない** — 両者は別の資源を守っており、片方が片方を置き換えることはできない（joshuafolkken/kit#1091）。
+**`kickoff` は対象外である**（joshuafolkken/kit#1799）。このガードが守るのは 1 本のブランチ・1 つの index・1 つの未コミット差分であり、`kickoff` はそのいずれにも触れない — Issue を読み、タイトルを正規化し、計画を投稿し、通知して止まる、そのすべてが GitHub 側の操作である。取得させると、そのランが決して乱さない資源のために、無関係なランの実行中ずっと計画作業が止まっていた。取得しない以上、解除もしない。
+
+**解除は、どのランのものかを名乗る**（joshuafolkken/kit#1799）。`pnpm josh run:release <N>` は記録が `<N>` を名乗るときだけ削除し、引数なしの形は未採番ランの記録だけを削除する。それ以外のランの記録なら `held` を返して何も消さない。以前はそこにある記録を無条件に消していたため、`busy` の停止メッセージが案内する復旧手順そのものが、稼働中のランの作業ツリーを解放する経路になっていた。本当に放棄された記録を消すのは `pnpm josh run:release --force` だけである。
+
+**判定の単位は作業ツリーであり、リポジトリではない。** `backlogrun` が使う `epic-busy.ts` はリポジトリに問う読み取りで、「1 リポジトリにつき同時 1 子」を実装している。これらの入口が奪い合う資源は 1 本のブランチ・1 つの index・1 つの未コミット差分であり、別 worktree ならそれらは別々に存在するので競合しない。ここでリポジトリ単位の判定を使うと、正当な 2 本目まで止まる。**`backlogrun` 側の既存ガードは変更しない** — 両者は別の資源を守っており、片方が片方を置き換えることはできない（joshuafolkken/kit#1091）。
 
 ### overrides の保護（`pnpm-workspace.yaml` / `package.json` の両方を見る）
 

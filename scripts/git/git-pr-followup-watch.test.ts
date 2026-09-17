@@ -16,10 +16,13 @@ vi.mock('./git-gh-command', () => ({
 
 vi.mock('./git-pr-checks', () => ({
 	git_pr_checks: { wait_for_pr_success: vi.fn() },
+	DEFAULT_STABLE_READS: 2,
+	WATCH_CONFIRMED_STABLE_READS: 1,
 }))
 
 const { git_gh_command } = await import('./git-gh-command')
-const { git_pr_checks } = await import('./git-pr-checks')
+const { git_pr_checks, DEFAULT_STABLE_READS, WATCH_CONFIRMED_STABLE_READS } =
+	await import('./git-pr-checks')
 
 const BRANCH_NAME = 'test-branch'
 const WATCH_EXIT_ONE = 'gh api reported a failing check on the branch: CodeRabbit'
@@ -66,7 +69,7 @@ describe('run_checks — the watch never decides the outcome', () => {
 		watch_fails()
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
-		expect(wait).toHaveBeenCalledWith(BRANCH_NAME)
+		expect(wait).toHaveBeenCalledWith(BRANCH_NAME, DEFAULT_STABLE_READS)
 	})
 
 	it('still reaches the evaluator when the watch succeeds', async () => {
@@ -79,6 +82,45 @@ describe('run_checks — the watch never decides the outcome', () => {
 	it('skips the watch but still polls when asked to', async () => {
 		await expect(run_with_watch(true)).resolves.toStrictEqual(SNAPSHOT)
 		expect(watch).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2029: once the watch has seen every check finish, the poll after it need only
+// agree once. The extra interval two stable reads spent was re-proving a run the watch already
+// confirmed — but the shortened window is not a weaker gate.
+describe('run_checks — a confirmed watch shortens the wait', () => {
+	it('asks for a single stable read when the watch confirmed completion', async () => {
+		watch.mockResolvedValue({ timed_out: false })
+
+		await run_with_watch()
+
+		expect(wait).toHaveBeenCalledWith(BRANCH_NAME, WATCH_CONFIRMED_STABLE_READS)
+	})
+
+	// A timed-out watch gave up with checks still pending, so it never spanned the pending→settled
+	// window and cannot stand in for the second stable read.
+	it('keeps the default stable reads when the watch timed out', async () => {
+		watch.mockResolvedValue({ timed_out: true })
+
+		await run_with_watch()
+
+		expect(wait).toHaveBeenCalledWith(BRANCH_NAME, DEFAULT_STABLE_READS)
+	})
+
+	// No watch ran, so nothing confirmed completion and the full stable-read window stands.
+	it('keeps the default stable reads when the watch is skipped', async () => {
+		await run_with_watch(true)
+
+		expect(wait).toHaveBeenCalledWith(BRANCH_NAME, DEFAULT_STABLE_READS)
+	})
+
+	// The single poll still evaluates the full merge gate, so a check that turned red after the watch
+	// is surfaced rather than merged past.
+	it('surfaces a check that turned red after the watch confirmed completion', async () => {
+		watch.mockResolvedValue({ timed_out: false })
+		wait.mockRejectedValue(new Error(EVALUATOR_FAILURE))
+
+		await expect(run_with_watch()).rejects.toThrow(EVALUATOR_FAILURE)
 	})
 })
 
@@ -123,7 +165,7 @@ describe('run_checks — a pull request with no checks still fails fast', () => 
 		watch_fails()
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
-		expect(wait).toHaveBeenCalledWith(BRANCH_NAME)
+		expect(wait).toHaveBeenCalledWith(BRANCH_NAME, DEFAULT_STABLE_READS)
 	})
 
 	// The read refines the swallow; it is not a gate of its own, so a read that fails must not turn

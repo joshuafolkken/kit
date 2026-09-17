@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const repo_get_name_with_owner_mock = vi.hoisted(() => vi.fn())
 const issue_get_title_mock = vi.hoisted(() => vi.fn())
+const telegram_send_mock = vi.hoisted(() => vi.fn())
+const error_handle_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('node:util', () => ({ parseArgs: vi.fn().mockReturnValue({ values: {} }) }))
 vi.mock('../scripts/git/git-gh-repo', () => ({
@@ -11,8 +13,10 @@ vi.mock('../scripts/git/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_get_title: issue_get_title_mock },
 }))
 vi.mock('../scripts/git/telegram-notify', () => ({
-	telegram_notify: { send: vi.fn() },
+	telegram_notify: { send: telegram_send_mock },
 }))
+// Mocked because the real one ends in `process.exit(1)`, which would take the test runner with it.
+vi.mock('../scripts/git/git-error', () => ({ git_error: { handle: error_handle_mock } }))
 vi.mock('./environment-loader', () => ({ load_optional_environment: vi.fn() }))
 
 const REPO_NAME_WITH_OWNER = 'owner/my-repo'
@@ -38,6 +42,32 @@ const { telegram_test } = await import('./telegram-test')
 beforeEach(() => {
 	repo_get_name_with_owner_mock.mockReset()
 	issue_get_title_mock.mockReset()
+	telegram_send_mock.mockReset()
+	error_handle_mock.mockReset()
+})
+
+// joshuafolkken/kit#1564: this command *is* the notification, so a send that reached nobody has to
+// leave a non-zero exit code rather than a warning and a 0. `git_error.handle` is what produces it.
+describe('telegram_test.run_cli — a send that reached nobody', () => {
+	it('hands the failure to the error handler, which exits non-zero', async () => {
+		const failure = new Error('Telegram is not configured: TELEGRAM_BOT_TOKEN is required')
+
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
+		telegram_send_mock.mockRejectedValue(failure)
+
+		await telegram_test.run_cli()
+
+		expect(error_handle_mock).toHaveBeenCalledWith(failure)
+	})
+
+	it('leaves the error handler alone when the send succeeded', async () => {
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
+		telegram_send_mock.mockResolvedValue(undefined)
+
+		await telegram_test.run_cli()
+
+		expect(error_handle_mock).not.toHaveBeenCalled()
+	})
 })
 
 describe('telegram_test.fetch_repo_name — the working directory lookup', () => {

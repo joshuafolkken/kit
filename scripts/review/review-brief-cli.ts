@@ -1,24 +1,40 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { scoped_green } from '#scripts/gate/scoped-green'
+import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { git_command } from '#scripts/git/git-command'
+import { path_decision } from '#scripts/josh/path-decision'
+import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
-import { review_level } from './review-level'
+import { review_checkout, type ReviewCheckout } from './review-checkout'
+import { review_level, type ReviewLevel } from './review-level'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
 // `josh review:brief` — print the whole `/code-review` invocation, not just the level
 // (joshuafolkken/kit#1241).
 //
-// `josh review:level` still answers the level and is unchanged; this command reuses it rather than
-// deciding again, so the two can never disagree. What it adds is everything else the forked review
-// agent cannot find out for itself: whether the gate has passed **or is running** on this tree
-// (joshuafolkken/kit#1242 — the two are started together, so "still running" is the usual answer at
-// this point), how this project runs its unit tests, and — on round 2 — which files the first
-// round's fixes touched.
+// The level is decided in-process by the `review_level` module and is also exposed on its own as
+// `--level-only` (joshuafolkken/kit#1927 folded the former `josh review:level` command in here), so
+// the level a brief prints and the level `--level-only` answers can never disagree. What the full
+// brief adds is everything else the forked review agent cannot find out for itself: whether the gate
+// has passed **or is running** on this tree (joshuafolkken/kit#1242 — the two are started together,
+// so "still running" is the usual answer at this point), how this project runs its unit tests, and —
+// on round 2 — which files the first round's fixes touched.
 
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh review:brief [--round <1|2>]'
+const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
 const ROUND_FLAG = '--round'
+// `review:level` folded in here (joshuafolkken/kit#1927): it was a second command deciding the same
+// thing `review:brief` already prints on its first line, so it is now a mode of this one. `--level-only`
+// answers the level alone — for a pre-commit review run outside any workflow — and, unlike the full
+// brief, it never refuses on the scoped-green gate: the level takes no judgement and reads the changed
+// paths and nothing else. `--staged` and `--json` are passed straight through, exactly as the old
+// command took them.
+const LEVEL_ONLY_FLAG = '--level-only'
+const LEVEL_KEY = 'level'
 const FIRST_ROUND = 1
 const FAILURE_EXIT_CODE = 1
 // The flag and its value; anything else is a usage error rather than a round.
@@ -73,7 +89,16 @@ function kept_note(taken_at: string): string {
 // The write is swallowed for the same reason the gate's is: the brief has already been printed and
 // is correct, so a temp-directory problem must not turn it into a non-zero exit. What a missing
 // snapshot costs is a round 2 that reviews the whole change — wider, never narrower.
-function record_round_one(round: number, tree: Record<string, string>, target?: string): void {
+// **The base is recorded beside the file map** (joshuafolkken/kit#1537). The map is a diff against
+// `change_base`, and `change_base` is recomputed on every invocation — so without the commit it was
+// measured against, round 2 cannot tell a fix from a base that moved under it, and reports the
+// difference between two incomparable sets as round 1's fixes.
+function record_round_one(
+	round: number,
+	tree: Record<string, string>,
+	base: string | undefined,
+	target?: string,
+): void {
 	if (round !== FIRST_ROUND) return
 
 	try {
@@ -85,35 +110,146 @@ function record_round_one(round: number, tree: Record<string, string>, target?: 
 			return
 		}
 
-		review_stamps.round_one_stamp.write(tree, target)
+		review_stamps.round_one_stamp.write(tree, target, base)
 	} catch {
 		/* no record widens the next round rather than narrowing it */
 	}
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const round = parse_round(argv)
+// **Recorded before it is printed, and the write is not swallowed** (joshuafolkken/kit#1522). The
+// nonce the brief prints is a contract the run enforces later; a brief that printed one it had
+// failed to record would hand the review a command that cannot succeed and the run a check that
+// answers `not-required` — the guard gone, silently, which is the shape this whole record exists to
+// remove.
+async function open_contract(): Promise<{ checkout: ReviewCheckout; nonce: string }> {
+	const checkout = await review_checkout.read_checkout()
 
-	if (round === undefined) {
-		console.error(USAGE)
+	// Keyed on the root git just answered with, never on `process.cwd()`: the check made before the
+	// merge asks git the same question, and the two hash different keys the moment one of them runs
+	// from a subdirectory — a mismatch that would drop the guard with nothing printed.
+	return { checkout, nonce: review_attest.record_target(checkout, checkout.root) }
+}
 
-		return FAILURE_EXIT_CODE
-	}
+interface ComposeRequest {
+	round: number
+	paths: ReadonlyArray<string>
+	tree: Record<string, string>
+	base: string
+	profile: AgentProfile
+}
 
-	// One reading, used for both halves. Read twice, the level could describe a different change from
-	// the digests printed beside it — and it would cost four git spawns to do so.
-	const paths = await changed_paths.read_changed_paths(false)
-	const tree = await review_tree.read_changed_tree(paths)
+async function compose_brief(request: ComposeRequest): Promise<string> {
+	const { round, paths, tree, base, profile } = request
 	const stamps = {
 		gate: review_stamps.gate_stamp.read(),
 		in_flight: review_stamps.in_flight_stamp.read(),
 		round_one: review_stamps.round_one_stamp.read(),
 	}
 
-	console.info(review_brief.compose({ level: review_level.level_for(paths), round, tree, stamps }))
-	record_round_one(round, tree)
+	return review_brief.compose({
+		level: review_level.level_for(paths),
+		profile,
+		round,
+		tree,
+		stamps,
+		// Resolved by the caller rather than printed as a `$(…)` the forked agent would expand: a
+		// subshell that fails expands to nothing, and the bare `git diff` left behind lists only the
+		// unstaged working tree — a review silently narrowed to a fraction of the change
+		// (joshuafolkken/kit#1527). One reading is shared with the record written below, so the commit
+		// the map is stored against is the same one the brief printed (joshuafolkken/kit#1537).
+		base,
+		...(await open_contract()),
+	})
+}
+
+// **What is printed and what is recorded are two readings of one thing** (joshuafolkken/kit#1537).
+// `commit` is what the record stores and round 2 compares, and it has to be a commit: `change_base`
+// degrades to the default-branch *name* when `merge-base` cannot answer, and two rounds storing that
+// same name compare equal while the ref moves under them — the guard failing open, which is the
+// failure it exists to prevent. Where it cannot be resolved the printed command keeps `change_base`'s
+// answer, which still runs, and the record is written without a base so the next round widens.
+async function read_bases(): Promise<{ base: string; commit: string | undefined }> {
+	const commit = await change_base.resolved()
+
+	return { base: commit ?? (await git_command.change_base()), commit }
+}
+
+// **The refusal goes to stderr and the exit code, never into the brief** (joshuafolkken/kit#1511).
+// A line printed inside a brief is read by the review agent as one more fact about the tree; what has
+// to happen here is that no brief is composed at all, since composing one is what starts round 1 —
+// and this command is where `review:attest` mints the nonce a round is counted against, so there is
+// no countable round that does not pass through it. Nothing is recorded either: writing the round-1
+// snapshot against a tree the scoped checks have never read would measure round 2's delta from it.
+function report_error(message: string): number {
+	console.error(message)
+
+	return FAILURE_EXIT_CODE
+}
+
+// Why a change was reduced, or which path forced the default — moved here verbatim from the old
+// `review:level` command so `--level-only` says why rather than only what.
+function format_reason(paths: ReadonlyArray<string>, level: ReviewLevel): string {
+	if (level === review_level.REDUCED_LEVEL) {
+		return 'every changed path is inert — it neither executes nor instructs'
+	}
+
+	const deciding = review_level.deciding_paths(paths)
+
+	if (deciding.length === 0) return 'no changed paths; the default level stands'
+
+	return `changed paths that execute or instruct: ${path_decision.format_path_list(deciding)}`
+}
+
+// The level alone, over `path_decision` — the same reading `review:round2` shares — so `--staged`,
+// `--json` and the usage handling are the ones the old command had, not a second copy.
+async function run_level(argv: ReadonlyArray<string>): Promise<number> {
+	return await path_decision.run_path_decision(argv, {
+		usage: USAGE,
+		key: LEVEL_KEY,
+		decide: (paths) => review_level.level_for(paths),
+		explain: format_reason,
+	})
+}
+
+interface ChangeReading {
+	base: string
+	commit: string | undefined
+	paths: ReadonlyArray<string>
+	tree: Record<string, string>
+}
+
+// One reading, used by every half below. Read twice, the level could describe a different change from
+// the digests printed beside it — and it would cost four git spawns to do so.
+async function read_change(): Promise<ChangeReading> {
+	const { base, commit } = await read_bases()
+	const paths = await changed_paths.read_changed_paths(false)
+	const tree = await review_tree.read_changed_tree(paths)
+
+	return { base, commit, paths, tree }
+}
+
+async function run_review(round: number, reading: ChangeReading): Promise<number> {
+	const { base, commit, paths, tree } = reading
+	const refusal = scoped_green.refusal_for(tree, commit)
+
+	if (refusal !== undefined) return report_error(refusal)
+	const resolved = agent_role_profile.resolve(agent_role_profile.REVIEWER)
+
+	if (resolved.kind === 'rejected') return report_error(resolved.note)
+	console.info(await compose_brief({ round, paths, tree, base, profile: resolved.profile }))
+	record_round_one(round, tree, commit)
 
 	return 0
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
+
+	const round = parse_round(argv)
+
+	if (round === undefined) return report_error(USAGE)
+
+	return await run_review(round, await read_change())
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -122,12 +258,16 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const review_brief_cli = {
 	FIRST_ROUND,
+	format_reason,
 	KEPT_NOTE_PREFIX,
 	kept_note,
+	LEVEL_ONLY_FLAG,
 	main,
 	parse_round,
 	record_round_one,
+	report_error,
 	run,
+	run_level,
 	USAGE,
 }
 

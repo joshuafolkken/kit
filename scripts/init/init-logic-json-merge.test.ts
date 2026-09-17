@@ -171,7 +171,7 @@ describe('init_logic_json_merge.merge_package_scripts', () => {
 
 const POSTINSTALL_KEY = 'postinstall'
 const LEFTHOOK_CMD = 'lefthook install'
-const FIX_GH_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
+const FIX_GH_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts'
 
 describe('init_logic_json_merge.merge_package_script_suffix - append', () => {
 	it('appends cmd to existing script when cmd is absent', () => {

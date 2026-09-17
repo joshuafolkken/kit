@@ -27,12 +27,20 @@ interface ConfirmContext {
 	children: ReadonlyArray<EpicChild>
 	resolve: ResolveDependency
 	read_blockers: BlockersReader
+	// The issues this invocation may run, so a re-classified candidate weighs an outside blocker exactly
+	// as `decide` did (joshuafolkken/kit#1943). Absent, the classifier's own default applies.
+	running?: ReadonlySet<string> | undefined
 }
 
-// The answer for one repository: the child to offer, or the verdict that stands in its place when
+// The answer for one repository: the children to offer, or the verdict that stands in its place when
 // every candidate was withheld.
+//
+// A list rather than one child since joshuafolkken/kit#1491: a repository runs as many children at
+// once as it has free lanes, and how many that is comes from the caller as `wanted`. The type says
+// nothing about lanes or epics — it is a list and a verdict, so the same walk serves one lane, six,
+// or a caller that has not been written yet.
 interface RepoAnswer {
-	child?: EpicChild
+	children: ReadonlyArray<EpicChild>
 	verdict: EpicVerdict
 }
 
@@ -44,7 +52,16 @@ interface CandidateVerdict {
 	children: ReadonlyArray<EpicChild>
 }
 
+// What a walk of the bundle produced: the children confirmed for a lane, and the graph with every
+// correction the walk learned along the way applied.
+interface ConfirmWalk {
+	children: ReadonlyArray<EpicChild>
+	confirmed: ReadonlyArray<EpicChild>
+}
+
 const NO_ANOMALIES = 0
+const NO_LANES = 0
+const ONE_LANE = 1
 
 // Blocker sets, compared as sets: the listing and the summary-derived read need not agree on order,
 // and a difference in order is not a difference in dependencies.
@@ -81,12 +98,12 @@ function with_blockers(
 function is_still_runnable(
 	child: EpicChild,
 	children: ReadonlyArray<EpicChild>,
-	resolve: ResolveDependency,
+	context: ConfirmContext,
 ): boolean {
 	const key = epic_graph.key_of(child)
 
 	return epic_classify
-		.classify_children(children, resolve)
+		.classify_children(children, context.resolve, context.running)
 		.runnable.some((candidate) => epic_graph.key_of(candidate) === key)
 }
 
@@ -125,12 +142,10 @@ function warn_withheld(candidate: EpicChild, listed: ReadonlyArray<IssueReferenc
 
 // Relations the listing recovered that this epic does not track as a child.
 //
-// `classify_children` drops such a blocker — "a blocker outside the epic is somebody else's problem"
-// is `epic_graph`'s standing rule, and it applies to a relation the summary counted honestly exactly
-// as it does to one it missed, so withholding only here would offer a child with a declared outside
-// blocker while refusing the identical child whose counter went stale. The candidate is therefore
-// still offered. What is new is that the run has just paid a request to learn the relation exists, so
-// the discard is named rather than silent (joshuafolkken/kit#1121).
+// `classify_children` weighs such a blocker since joshuafolkken/kit#1943, so a candidate that is still
+// offered here has only outside blockers the classifier found finished. The relation is still named,
+// because the run has just paid a request to learn it exists and the graph holds nothing to order it
+// against (joshuafolkken/kit#1121).
 function untracked_blockers(
 	listed: ReadonlyArray<IssueReference>,
 	children: ReadonlyArray<EpicChild>,
@@ -145,7 +160,7 @@ function warn_untracked(candidate: EpicChild, untracked: ReadonlyArray<IssueRefe
 
 	console.warn(
 		`⚠ #${String(candidate.number)} is offered although its relations listing names ${named}: ` +
-			'this epic does not track those, and its graph holds nothing to order them against',
+			'this epic does not track those, and every one of them is already finished',
 	)
 }
 
@@ -181,34 +196,44 @@ async function confirm_one(
 	}
 
 	const children = with_blockers(context.children, candidate, listed)
-	const is_confirmed = is_still_runnable(candidate, children, context.resolve)
+	const is_confirmed = is_still_runnable(candidate, children, context)
 
 	warn_recovered(candidate, listed, children, is_confirmed)
 
 	return { is_confirmed, children }
 }
 
-// The bundle walked from its head until a candidate confirms.
+// The bundle walked from its head until `wanted` candidates have confirmed, or the bundle runs out.
 //
 // Walking on rather than making the whole repository wait is the recorded decision on
 // joshuafolkken/kit#1108: a healthy sibling should not be held for one child whose counter is stale,
 // and nobody repairs that counter — so the next poll would put the same child at the head and answer
 // the same way, and the wait would never clear. The worst case is one request per candidate, and it
 // happens only when every candidate is withheld, where the epic is broken and stopping is right.
-async function confirm_candidate(
+//
+// **It stops the moment the caller's appetite is met**, so asking for one child costs exactly what
+// it cost before joshuafolkken/kit#1491: the walk ends at the first confirmation.
+//
+// Recursive rather than a loop with two exits, because the corrected graph has to be threaded from
+// one candidate to the next: a second candidate is classified against what the first read
+// established rather than against the stale snapshot.
+async function confirm_candidates(
 	candidates: ReadonlyArray<EpicChild>,
 	context: ConfirmContext,
-): Promise<CandidateVerdict & { child?: EpicChild }> {
-	let { children } = context
+	wanted: number,
+): Promise<ConfirmWalk> {
+	const [candidate, ...rest] = candidates
 
-	for (const candidate of candidates) {
-		const verdict = await confirm_one(candidate, { ...context, children })
-
-		children = verdict.children
-		if (verdict.is_confirmed) return { is_confirmed: true, children, child: candidate }
+	if (candidate === undefined || wanted <= NO_LANES) {
+		return { children: context.children, confirmed: [] }
 	}
 
-	return { is_confirmed: false, children }
+	const verdict = await confirm_one(candidate, context)
+	const taken = verdict.is_confirmed ? [candidate] : []
+	const next = { ...context, children: verdict.children }
+	const walk = await confirm_candidates(rest, next, wanted - taken.length)
+
+	return { children: walk.children, confirmed: [...taken, ...walk.confirmed] }
 }
 
 // The verdict once every candidate was withheld, read off the corrected graph rather than assumed.
@@ -216,24 +241,28 @@ async function confirm_candidate(
 // `repo_verdict` maps that to `wait`, exactly as it does for a repository that never had a candidate.
 function withheld_verdict(
 	children: ReadonlyArray<EpicChild>,
-	resolve: ResolveDependency,
+	context: ConfirmContext,
 ): EpicVerdict {
 	return epic_report.decide_verdict(
-		epic_classify.classify_children(children, resolve),
+		epic_classify.classify_children(children, context.resolve, context.running),
 		NO_ANOMALIES,
 	)
 }
 
 // The answer for one repository. An empty bundle costs no request and re-derives the verdict the
 // caller already had, so the path a repository with nothing to offer takes is unchanged.
+//
+// `wanted` defaults to one lane, so a caller written before joshuafolkken/kit#1491 asks for exactly
+// what it used to get.
 async function answer_for_repo(
 	candidates: ReadonlyArray<EpicChild>,
 	context: ConfirmContext,
+	wanted: number = ONE_LANE,
 ): Promise<RepoAnswer> {
-	const outcome = await confirm_candidate(candidates, context)
-	if (outcome.child !== undefined) return { child: outcome.child, verdict: 'run' }
+	const outcome = await confirm_candidates(candidates, context, wanted)
+	if (outcome.confirmed.length > NO_LANES) return { children: outcome.confirmed, verdict: 'run' }
 
-	return { verdict: withheld_verdict(outcome.children, context.resolve) }
+	return { children: [], verdict: withheld_verdict(outcome.children, context) }
 }
 
 const epic_candidate_confirm = {
@@ -241,7 +270,7 @@ const epic_candidate_confirm = {
 	untracked_blockers,
 	with_blockers,
 	is_still_runnable,
-	confirm_candidate,
+	confirm_candidates,
 	withheld_verdict,
 	answer_for_repo,
 }

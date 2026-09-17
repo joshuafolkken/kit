@@ -1,10 +1,16 @@
 ## 常駐ドキュメントと skill の分担（何を常駐に残すか）
 
-`CLAUDE.md` は毎ターン全文が読み込まれる。したがって常駐に書ける量は有限で、`scripts/workflow-skills.test.ts` の `RESIDENT_CEILING_BYTES` がその上限を固定している。**どの規則を常駐に残すかは、書き手の重要度判断ではなく次の 1 問で決める。**
+`CLAUDE.md` は毎ターン全文が読み込まれる。したがって常駐に書ける量は有限で、`scripts/claude/workflow-skills.test.ts` の `RESIDENT_CEILING_BYTES` がその上限を固定している。**どの規則を常駐に残すかは、書き手の重要度判断ではなく次の 1 問で決める。**
+
+> **その規則が効き始める瞬間を、1 件のツール呼び出しとして名指しできるか。**
+
+**名指しできる規則は、規則本文を常駐から出す**（joshuafolkken/kit#1524）。`prompts/collaboration-workflow/rule-delivery.md` の列挙表に 1 行加え、フックがその呼び出しを拒否して規則本文を突きつける — 常駐の散文より安く、かつ**拒否は読み飛ばせない**。ただし**フックが届くのは Claude Code だけ**なので、常駐側にはトリガと判断基準の 1 行が残る（[`rule-delivery.md`](./rule-delivery.md) →「常駐側に残すのはトリガと判断基準の 1 行」）。名指しできない規則は、次の問いに進む。
 
 > **その規則は、skill がロードされていないターンでも効く必要があるか。**
 
 答えが yes の規則だけが常駐に残り、それ以外は skill へ置いて常駐からは導線だけを張る。判定の入力は「その規則が最初に効き始めるのはコマンド開始の前か後か」の 1 点だけであり、規則の重要さは入力に含まれない。
+
+**第 1 問が先に来るのは、届ける手段が増えたからである。** 旧来この一覧は第 2 問だけで決まっていたが、それは「規則を届ける手段が常駐しかない」時代の基準だった。`PreToolUse` / `PostToolUse` / `UserPromptSubmit` が稼働している以上その前提は成立せず、joshuafolkken/kit#1344 と joshuafolkken/kit#1460 は**常駐していながら一度も発火していなかった規則が実在した**ことを計測で示している。**移設は削除ではない** — 規則本文は消えず、より強い経路に移る。
 
 **この一覧の対象範囲は、オンデマンド側に対応する手順を持つ常駐規則である** — skill であれ、オンデマンドで読むプロンプトであれ、常駐の記述が導線を張っている先を持つもの。判定基準が問うているのはまさにその規則群であり、いずれも「移せたはずだが、名前を挙げるに足る理由で残った」ものである。この範囲の中では網羅的であり、対応する手順を持つ規則がここに載らずに常駐へ入っていれば、判定基準に照らされていない。
 
@@ -12,26 +18,29 @@
 
 **範囲の外にある常駐規則はこの一覧に載らないのが正常である。** 命名規約、品質上限、Code Change Rules、Package-First などには移す先が存在せず、判定基準が問う「skill がロードされていないターンでも効くか」という問い自体が成り立たない。一覧に無いことは欠落ではない（joshuafolkken/kit#955）。
 
-範囲の中で yes になる規則は次で全部であり、いずれも 3 文書すべてに残っていることをマーカーテストが表明している（大半は `scripts/workflow-skills.test.ts`、UI 検証ゲートは `scripts/verify-ui-skill.test.ts`、後追い起票は `scripts/review-followup-bundle-document-rule.test.ts`、ファイル編集の禁止は `scripts/inline-edit-rule.test.ts`、ターン内バッチングは `scripts/turn-batching-rule.test.ts`）。
+範囲の中で常駐に残る規則は次で全部であり、いずれも `CLAUDE.md` に残っていることをマーカーテストが表明している（大半は `scripts/claude/workflow-skills.test.ts`、UI 検証ゲートは `scripts/claude/verify-ui-skill.test.ts`、後追い起票は `scripts/document/document-markers.test.ts`、ファイル編集の禁止は `scripts/document/document-markers.test.ts`）。**引き金つき配送へ移した規則は、常駐にあることではなく発火することで固定される** — ターン内バッチングは `scripts/rules/turn-batching-rule.test.ts`、WIP 上限は `scripts/backlog/backlog-manufacturing-rule.test.ts`、機構そのものは `scripts/rules/delivered-rules.test.ts` である。
 
 - **明示起動の必須**（「指示されていない行動は取らない」）— そもそもワークフローを開始してよいかを決める規則なので、ユーザーがキーワードを打った瞬間、つまり skill を読むより前に効く必要がある
 - **停止時の `confirmation` 通知** — これを要する停止の大半（別パッケージ起因の割り込み、Tier C の確認）は、ワークフローのキーワードが一度も打たれていないターンで起きる
 - **`overrides` の保護**と **`devEngines` の保護** — 依存更新コマンドはどのターンでも走りうる。`dependency-update` skill をロードしないターンでも走り、skill を読む頃には pin は既に書き換わっている
 - **UI 検証ゲート** — 画面に出る変更は、実際にレンダリング結果を見るまで完了ではない。撮影の手順は `verify-ui` にある。このゲートが効くのは UI 変更の完了を報告する瞬間であり、ワークフローのキーワードが打たれておらず skill が何もロードされていないターンであることが多い
-- **ルール準拠計測の発火（`pnpm josh eval:scope`）** — 配布ドキュメントの変更は、ワークフローのキーワードを一度も打たないターンで完了報告されることが多い（「`CLAUDE.md` のこの表現を直して」がその典型）。発火条件が読めるのはその場でなければならず、手順本体は `.claude/skills/workflow-commands/eval-gate.md` にある
 - **レビュー上限後の後追い起票の手順** — 起票して `epic:bundle` で EPIC へ繋ぎ直すところまで。コミット前セルフレビューはワークフローの外でも回るので、そこで起票された Issue も同じように孤児になる。完全な手順は `prompts/review.md` →「Review round cap」にある
-- **バックログの WIP 上限（オープン 30 件）** — 起票はワークフローのキーワードを打っていないターンでも起きる（別パッケージ起因の起票、ワークフロー外のセルフレビューから出た後追い起票、会話中に記録したくなった気付き）。ワークフローの中でしか効かない上限は、バックログを最も速く増やしていた経路を数え落とす。常駐に残すのは件数の数え方・起票しない判断・実行が詰まる起票の除外だけで、手順と数字を動かす条件は [`wip-cap.md`](./wip-cap.md) にある（joshuafolkken/kit#1469）
 - **`josh epic:*` のうちコマンドの外側で効く 3 件** — 決定の記録による `needs-decision` の解除、`epic:audit` の指摘を直すのが Tier A であること、別リポジトリの EPIC を `owner/repo#N` で参照すること。いずれも `epic:*` コマンドを走らせていないターン（Issue を起票した直後、決定を書いた瞬間）に効く
 - **編集後の本文をコマンドに載せない禁止** — ファイル編集はどのターンでも起き、**編集の直前にロードされる skill は存在しない**。オンデマンド側に置くとこの規則は一度も発火せず、書いたのに削除したのと同じ振る舞いになる。実測値・可否表・根拠は [`file-edits.md`](./file-edits.md) にあり、常駐に残すのは指示と判断基準（「本文を丸ごと運ぶか」であってツール名ではない）だけである（joshuafolkken/kit#1150）。**Edit 自体を全文へ広げる形も同じ規則の一部である** — 数行の指摘に対する全文書き直しは、ツールを替えただけで同じコストを払っている。常駐にはその禁止の一句だけを置き、全文を書いてよい 3 条件は同じ指し先にある（joshuafolkken/kit#1260）
-- **独立した呼び出しを同じターンに載せる規則** — ツールの呼び出しもどのターンでも起き、**呼び出しの直前にロードされる skill は存在しない**。上の禁止と同じ理由で、同じ場面（編集の直前）で同時に効く。常駐に残すのはトリガと判断基準（「依存の有無」であって呼び出しの種類ではない）だけで、実測値・却下した機構案・ゲートを弱めない条件は [`turn-batching.md`](./turn-batching.md) にある（joshuafolkken/kit#1304）
+
+**第 1 問で「名指しできる」となり、引き金つき配送へ移したもの**（joshuafolkken/kit#1524）。いずれも本文は消えておらず、規則が効く瞬間にフックが突きつける。列挙表と、引き金が発火しないターンの意味は [`rule-delivery.md`](./rule-delivery.md) にある。
+
+- **独立した呼び出しを同じターンに載せる規則** — 引き金は `pnpm josh batch:guard`（単発呼び出しのターンが 3 つ続いた次の `Bash`）。常駐していた間の実測が示したのは、**常駐は効いていなかった**という事実である（数値は指し先）。実測値・却下した機構案・ゲートを弱めない条件は [`turn-batching.md`](./turn-batching.md) にある（joshuafolkken/kit#1304、#1390、#1524）
+- **バックログの WIP 上限（オープン 30 件）** — 引き金は `pnpm josh rule:guard`（Issue を作成する `Bash`）。配送文が件数の数え方・起票しない判断・2 つの免除・**割り込みの 3 条件**をそのまま運ぶ。3 条件を落とすと「重大かどうか」が判断に戻るため、配送文からも削っていない（joshuafolkken/kit#1518）。手順と数字を動かす条件は [`wip-cap.md`](./wip-cap.md) にある（joshuafolkken/kit#1469、#1524）
+- **本文をシェルの二重引用符に載せない** — 引き金は `pnpm josh rule:guard`（本文値にバッククォートか `$` を含む `Bash`）。**常駐側に 1 行が残っているのは、ここが「削除してよい」側ではないからである** — 配送は Claude Code にしか届かず、正規表現が知っている綴り（`-f body=` ／ `--body` ／ `--notify-message`）だけが規則の適用範囲になってはならない。実測・安全な綴り・引き金の死角は [`shell-body.md`](./shell-body.md) にある（joshuafolkken/kit#1198）
 
 no になり skill 側に本体を置くものの例:
 
 - 分割判定（`.claude/skills/workflow-commands/split-assessment.md`）
-- 実行中に前提 Issue が判明した場合の入口別手順（`fullrun.md` / `halfrun.md` / `.claude/skills/workflow-commands/epicrun.md`）
-- `epicrun` の単独 Issue 受理と park-and-continue（`.claude/skills/workflow-commands/epicrun.md`）
+- 実行中に前提 Issue が判明した場合の入口別手順（`fullrun.md` / `halfrun.md` / `.claude/skills/workflow-commands/backlogrun.md`）
+- `backlogrun` の単独 Issue 受理と park-and-continue（`.claude/skills/workflow-commands/backlogrun.md`）
 - 検証ゲートとマージ連鎖（`.claude/skills/workflow-commands/chain-rule.md` / `followup.md`）
-- `auto-ok` の拾い上げと「ラベルを付けるのは人だけ」（`.claude/skills/workflow-commands/epicrun.md`）。書き込みの禁止は普通なら常駐側に来るが、`auto-ok` はそれを禁じているドキュメント以外のどこにも存在しないため、それらを開かないターンではそもそも到達しない
+- `auto-ok` の拾い上げと「ラベルを付けるのは人だけ」（`.claude/skills/workflow-commands/backlogrun.md`）。書き込みの禁止は普通なら常駐側に来るが、`auto-ok` はそれを禁じているドキュメント以外のどこにも存在しないため、それらを開かないターンではそもそも到達しない
 
 ### 指し先になった話題ファイルは引用しない
 
@@ -47,7 +56,7 @@ no になり skill 側に本体を置くものの例:
 
 **話題ファイル自体は残す。** 索引（`prompts/collaboration-workflow.md`）は全話題ファイルを列挙しており、正典を人が読むときの入口はそこにある。指し先になった話題ファイルは「本文がどこへ行ったか」の記録として索引から辿られるものであり、他の文書からの引用で辿られるものではない。例外は単一ソースである skill 自身で、自分の指し先を名指すのは逆向きの参照だから 2 回読みを生まない。
 
-`scripts/pointer-citation-document-rule.test.ts` がこれを固定する。**縮小した話題ファイルは冒頭に「この規則の単一ソースは …」の宣言文を置くこと** — 検査はこの宣言文で指し先を機械的に検出し、そこに書かれた skill が実在すること、および他の文書がその話題ファイルを引用していないことを確かめる。宣言文が入口なので、横展開で新しく縮小された話題も、この規則の対象へ自動で入る。
+`scripts/rules/pointer-citation-document-rule.test.ts` がこれを固定する。**縮小した話題ファイルは冒頭に「この規則の単一ソースは …」の宣言文を置くこと** — 検査はこの宣言文で指し先を機械的に検出し、そこに書かれた skill が実在すること、および他の文書がその話題ファイルを引用していないことを確かめる。宣言文が入口なので、横展開で新しく縮小された話題も、この規則の対象へ自動で入る。
 
 **この基準は努力目標ではない。** 常駐に手順を書き戻すと、その分の予算を次に本当に常駐が要る規則が既存の文章から取り返すことになる。上限に張り付いた状態で 1 文を足すために別の文を削ると、**削る対象はマーカーで固定されていなかった箇所から選ばれる** — 規則の重要度ではなく、テストに拾われていなかったかどうかで残る文が決まる（joshuafolkken/kit#951）。上限そのものを引き上げる対処は、上限が防いでいる状態の追認にあたるので採らない。
 
@@ -63,6 +72,7 @@ no になり skill 側に本体を置くものの例:
 
 **非対称なリスクがあるので、迷ったら回収を選ぶ。** 回収を選んで足りなかった場合の損失は「もう一度考える」だけだが、引き上げを選んで間違っていた場合の損失は、常駐面が毎ターン全文読まれるコストとして恒久的に乗り続ける。しかも上限は一度上げると次の判断の基準線になるので、誤りが自己修復しない。
 
-**引き上げは Tier C として扱う。** `scripts/workflow-skills.test.ts` で常駐予算を決めている定数——`RESIDENT_CEILING_BYTES`、`RESIDENT_HEADROOM_BYTES`、および書き戻しを検知する下限 `RE_INLINE_GUARD_HEADROOM_BYTES`——の**緩和**は、上の 3 条件を示した上でユーザーの明示指示を得てから行う。条件が揃っていること自体は、変更してよいという指示ではない。**どれか 1 つだけを名指しすると、そのとき実際に効いている限界が対象外になる** — 上限に余裕があっても下限に張り付いていれば、緩めたくなるのは下限のほうであり、そこが素通しなら禁止は形だけになる。締める向きの変更（上限を下げる、下限を上げる）はこの禁止の対象外である。
+**引き上げは Tier C として扱う。** `scripts/claude/workflow-skills.test.ts` で常駐予算を決めている定数——`RESIDENT_CEILING_BYTES`、`RESIDENT_HEADROOM_BYTES`、および書き戻しを検知する下限 `RE_INLINE_GUARD_HEADROOM_BYTES`——の**緩和**は、上の 3 条件を示した上でユーザーの明示指示を得てから行う。条件が揃っていること自体は、変更してよいという指示ではない。**どれか 1 つだけを名指しすると、そのとき実際に効いている限界が対象外になる** — 上限に余裕があっても下限に張り付いていれば、緩めたくなるのは下限のほうであり、そこが素通しなら禁止は形だけになる。締める向きの変更（上限を下げる、下限を上げる）はこの禁止の対象外である。
 
 - このルールは横断ドキュメント（CLAUDE.md「Shorthand Commands」）および `.claude/skills/workflow-commands/SKILL.md`「What stays resident, and what is read from here」のカノニカル参照
+- **常駐ルールを「どこまで常駐させるか」の本体は `.claude/skills/workflow-commands/rule-residency.md` にある**（joshuafolkken/kit#1797）。常駐可否を決める 2 つの問いは `SKILL.md` §3 に残り、トリガ＋ポインタの形・常駐ルールの列挙・引退経路とその 3 条件・`rule:value` の測定結果はそちらへ移した。**発火するのはこれらの文書を編集するターンだけで、Issue を実行するターンでは一度も読まれない**ので、ワークフローの起動読み取りから外してある

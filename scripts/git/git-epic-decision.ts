@@ -1,4 +1,5 @@
-import { git_epic_parse } from './git-epic-parse'
+import { git_epic_parse, type DependencyLink } from './git-epic-parse'
+import { format_replaced_relations } from './git-epic-reference'
 import { git_epic_sections, type BodyLines, type SectionRange } from './git-epic-sections'
 
 // Placing a decision record inside an epic body's `## Decisions` section.
@@ -60,7 +61,7 @@ function to_record_lines(record: string): Array<string> {
 }
 
 // A body with no `## Decisions` section at all: the section is created at the end, which is where
-// every epic that has one carries it (`epic:plan` writes it there, after `## Progress`).
+// every epic that has one carries it (`epic --add --decision-file` writes it there, after `## Progress`).
 function to_new_section(lines: ReadonlyArray<string>, record: string): Array<string> {
 	return [...lines, BLANK_LINE, DECISIONS_HEADING, ...to_record_lines(record)]
 }
@@ -91,6 +92,30 @@ function append_decision(body: string, record: string): string {
 	)
 }
 
+// The record as it will actually be written, with the relations this insertion replaced appended to
+// it (joshuafolkken/kit#1711).
+//
+// **A positioned `--add` discards the `blocked-by` relation the child already had, and until now the
+// record said nothing about it.** On joshuafolkken/kit#1703 that overwrote a decision whose reasoning
+// was written down, twice in four minutes, leaving the body's declaration, the native relations and
+// the recorded decision disagreeing with one another. The record is the artifact read months later, so
+// it is where what was replaced has to survive — the console line scrolls away.
+//
+// **The policy is to report, not to refuse.** Re-pointing a position is what joshuafolkken/kit#1701
+// deliberately added, so refusing an invocation that carries no `--decision-file` would close a
+// working route to force a record; naming what was dropped costs the caller nothing and loses nothing.
+//
+// `undefined` stays `undefined`: an insertion that records no decision gains none here, and an
+// insertion that replaced nothing gains no line.
+function append_replacements(
+	record: string | undefined,
+	links: ReadonlyArray<DependencyLink>,
+): string | undefined {
+	if (record === undefined || links.length === 0) return record
+
+	return [record.trimEnd(), BLANK_LINE, format_replaced_relations(links)].join('\n')
+}
+
 // What happened to the child half of the record, phrased as a count for the reason the relation report
 // is: the useful signal is whether every child now carries the reasoning, not which comment was
 // refused. The epic half is never reported here — it rode on the body edit, so it landed or the
@@ -103,9 +128,42 @@ function format_decision_report(input: { total: number; failures: number }): str
 	return `⚠️  ${String(input.failures)} of ${String(input.total)} child comment(s) could not be posted; the epic's \`${DECISIONS_HEADING}\` entry is intact.`
 }
 
+// The heading a creation writes its reasoning under. Beside a pattern exactly as `DECISIONS_HEADING`
+// is, and tied to `git_epic_body`'s own literal by a test that reads a body the builder produced
+// rather than by a string comparison (joshuafolkken/kit#1712).
+const RATIONALE_HEADING_PATTERN = /^#{1,6}[ \t]+Split rationale\b/u
+
+function read_section(body: string, heading: RegExp): string {
+	const input = git_epic_sections.to_body_lines(body)
+	const range = git_epic_sections.find_section_range(input, heading)
+	if (range === undefined) return ''
+
+	return input.lines.slice(range.start, range.end).join('\n')
+}
+
+// Every place the epic body itself records why something was decided: the `## Decisions` log an
+// insertion or a removal appends to, **and** the `## Split rationale` a creation writes.
+//
+// Both, not just the first. `josh epic … --ordered` declares a whole chain and records its reasoning
+// under `## Split rationale`, writing no `## Decisions` at all — so a reader that looked only at
+// `## Decisions` would report every correctly-documented ordered epic as unjustified the moment it
+// was created (joshuafolkken/kit#1712). It is this module's because the heading patterns are: a
+// second reader with its own copies is one that comes to disagree with the writers about where a
+// record goes.
+function read_recorded_reasons(body: string | undefined): string {
+	if (body === undefined) return ''
+
+	return [
+		read_section(body, DECISIONS_HEADING_PATTERN),
+		read_section(body, RATIONALE_HEADING_PATTERN),
+	].join('\n')
+}
+
 const git_epic_decision = {
 	DECISIONS_HEADING,
 	append_decision,
+	append_replacements,
+	read_recorded_reasons,
 	find_decision_error,
 	format_decision_report,
 }

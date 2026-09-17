@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { afterAll, describe, expect, it } from 'vitest'
 import { eval_stamp } from './eval-stamp'
 import {
@@ -33,7 +34,7 @@ describe('eval_stamp.files_under', () => {
 	it('expands a directory entry to the files beneath it', () => {
 		const files = eval_stamp.files_under(SKILL_ENTRY)
 
-		expect(files).toContain('.claude/skills/workflow-commands/eval-gate.md')
+		expect(files).toContain('.claude/skills/workflow-commands/fullrun.md')
 		expect(files.every((file) => file.startsWith(`${SKILL_ENTRY}/`))).toBe(true)
 	})
 
@@ -116,7 +117,7 @@ describe('eval_stamp.stamp_path', () => {
 	it('is a json file in the temp directory keyed to this checkout', () => {
 		const target = eval_stamp.stamp_path()
 
-		expect(path.dirname(target)).toBe(tmpdir())
+		expect(path.dirname(target)).toBe(PLATFORM_TEMP_ROOT)
 		expect(path.basename(target)).toMatch(/^josh-eval-stamp-[\da-f]+\.json$/u)
 	})
 
@@ -163,6 +164,54 @@ describe('eval_stamp.write_stamp and read_stamp', () => {
 		const second = eval_stamp.read_stamp(eval_stamp.write_stamp(target))
 
 		expect(second?.files[STAMP_DOCUMENT]).toBeDefined()
+	})
+})
+
+describe('eval_stamp.complete_stamp', () => {
+	it('marks the record as belonging to a run that finished', () => {
+		const target = path.join(scratch, 'completed.json')
+
+		eval_stamp.write_stamp(target)
+		eval_stamp.complete_stamp(target)
+
+		expect(eval_stamp.read_stamp(target)?.completed_at).toBeDefined()
+	})
+
+	// The completion is an amendment rather than a second measurement: writing the record afresh here
+	// would take the tree as the run left it and later compare that tree against itself, which is the
+	// one answer the record exists to withhold (joshuafolkken/kit#1164).
+	it('leaves what the run measured, and when, where they were', () => {
+		const target = path.join(scratch, 'unmoved.json')
+		const started = eval_stamp.read_stamp(eval_stamp.write_stamp(target))
+
+		eval_stamp.complete_stamp(target)
+
+		expect(eval_stamp.read_stamp(target)).toMatchObject({
+			taken_at: started?.taken_at,
+			files: started?.files,
+		})
+	})
+
+	// A run whose record never got written has nothing to assert a completion about, and inventing
+	// one here would manufacture exactly the vouching the field exists to withhold.
+	it('writes nothing when there is no record to complete', () => {
+		const target = path.join(scratch, 'nothing-to-complete.json')
+
+		expect(eval_stamp.complete_stamp(target)).toBeUndefined()
+		expect(eval_stamp.read_stamp(target)).toBeUndefined()
+	})
+
+	// The path is one per checkout, so a second whole-suite run started beside the first overwrites
+	// the record with its own. Completing that one would describe a run still going, or killed, as
+	// finished — the false `skip` this field exists to prevent, arriving from the other side.
+	it('refuses to complete a record another run wrote', () => {
+		const target = path.join(scratch, 'someone-elses-run.json')
+		const planted = { taken_at: STAMP_STARTED_AT, files: {}, pid: process.pid + 1 }
+
+		writeFileSync(target, JSON.stringify(planted))
+
+		expect(eval_stamp.complete_stamp(target)).toBeUndefined()
+		expect(eval_stamp.read_stamp(target)?.completed_at).toBeUndefined()
 	})
 })
 

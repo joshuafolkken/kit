@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { CANONICAL_DOC, read_repo_file } from '#scripts/ai-document-fixture'
+import { CANONICAL_DOC, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { create_base_config } from './base.js'
 import { code_quality_rules } from './rules/code-quality.js'
@@ -27,7 +27,7 @@ import { sonarjs_rules } from './rules/sonarjs.js'
 // configuration — the rule objects and the tests-block override in `base.js` — and a suite under
 // `rules/` could not import the latter without a banned parent-relative import.
 
-const REVIEW_PROMPT = 'prompts/review.md'
+const REVIEW_RUBRIC = 'prompts/review-rubric.md'
 const REFACTORING_PROMPT = 'prompts/refactoring.md'
 const CODING_STANDARDS = 'prompts/coding-standards.md'
 
@@ -105,7 +105,7 @@ const DOCUMENT_SPECS: ReadonlyArray<DocumentSpec> = [
 		test_override: ENGLISH_OVERRIDE,
 	},
 	{
-		path: REVIEW_PROMPT,
+		path: REVIEW_RUBRIC,
 		marker: '**Quality limits**:',
 		phrases: ENGLISH_PHRASES,
 		test_override: ENGLISH_OVERRIDE,
@@ -126,7 +126,7 @@ const COUNTING_DOCUMENTS: ReadonlyArray<string> = [
 	REFACTORING_PROMPT,
 ]
 
-const ENGLISH_DOCUMENTS: ReadonlyArray<string> = [CANONICAL_DOC, REVIEW_PROMPT]
+const ENGLISH_DOCUMENTS: ReadonlyArray<string> = [CANONICAL_DOC, REVIEW_RUBRIC]
 
 function rule_entry(rules: RuleSet, name: string): ReadonlyArray<unknown> {
 	const entry = rules[name]

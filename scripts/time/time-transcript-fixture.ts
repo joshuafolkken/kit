@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost/cost-transcript'
-import { time_markers } from './time-markers'
-import { time_spans, type Span } from './time-spans'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
 // The transcript files the timing tests measure, written once rather than in each test file
 // (joshuafolkken/kit#1284).
@@ -16,7 +16,13 @@ const CWD = '/Users/someone/Development/kit'
 const MINUTE_MS = 60_000
 const ISSUE = 1268
 const BRANCH = '1268-measure-a-run'
+// The branch a lane run's session stays on for the whole of it, since the lane is a checkout the
+// session only ever shells into.
+const DEFAULT_BRANCH = 'main'
 const CALL_ID = 'a'
+// The tool a fixture call names unless a case says otherwise. Reading is what most of these
+// transcripts are made of, and a case about writes names its own.
+const READ_TOOL = 'Read'
 const AGENT_CALL_ID = 'g'
 // The skill whose load `time-markers.ts` reads as the instant a run opens.
 const WORKFLOW_SKILL = 'workflow-commands'
@@ -69,7 +75,7 @@ function prompt_line(minute: number, branch: string): string {
 	})
 }
 
-function call_line(minute: number, branch: string, name = 'Read', id = CALL_ID): string {
+function call_line(minute: number, branch: string, name = READ_TOOL, id = CALL_ID): string {
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp: at(minute),
@@ -78,12 +84,32 @@ function call_line(minute: number, branch: string, name = 'Read', id = CALL_ID):
 	})
 }
 
-function result_line(minute: number, branch: string, id = CALL_ID): string {
+// `content` is a parameter so a suite can hand the result a body worth reading — the stage block
+// `pnpm josh followup` prints, which `time-followup-stage.ts` reads back off it
+// (joshuafolkken/kit#1445). Defaulted, so every existing caller is unchanged.
+function result_line(minute: number, branch: string, id = CALL_ID, content = 'ok'): string {
 	return JSON.stringify({
 		type: 'user',
 		timestamp: at(minute),
 		gitBranch: branch,
-		message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+		message: { content: [{ type: 'tool_result', tool_use_id: id, content }] },
+	})
+}
+
+// The same result the harness writes back for a call it denied, or one that threw: a `tool_result`
+// carrying `is_error` (joshuafolkken/kit#1764). A refused read is written to the transcript exactly
+// like any other call, so a suite about what a guard counts needs to be able to say one failed.
+function error_result_line(
+	minute: number,
+	branch: string,
+	id = CALL_ID,
+	content = 'denied',
+): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_result', tool_use_id: id, content, is_error: true }] },
 	})
 }
 
@@ -105,40 +131,46 @@ function delegating_lines(branch: string = BRANCH): Array<string> {
 	]
 }
 
-// A `pnpm josh <cmd>` call, which is what a phase is read off (joshuafolkken/kit#1384). `call_line`
-// above carries no tool input, so every span it writes belongs to no command phase at all — and a
-// suite measuring where the merge command sat cannot express its subject without one.
-function josh_call_line(minute: number, branch: string, command: string, id = CALL_ID): string {
+// One `tool_use` line carrying its input, named by the tool (joshuafolkken/kit#1472). `call_line`
+// above carries no input at all, and the three builders below each used to write this same object
+// with one field changed — a clone that would have needed a fourth copy the moment a suite wanted a
+// tool none of them names, which `MultiEdit` and `NotebookEdit` now do.
+interface ToolLine {
+	name: string
+	input: unknown
+	id?: string
+}
+
+function tool_call_line(minute: number, branch: string, call: ToolLine): string {
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp: at(minute),
 		gitBranch: branch,
-		message: { content: [{ type: 'tool_use', name: 'Bash', id, input: { command } }] },
+		message: {
+			content: [{ type: 'tool_use', name: call.name, id: call.id ?? CALL_ID, input: call.input }],
+		},
 	})
+}
+
+// A `pnpm josh <cmd>` call, which is what a phase is read off (joshuafolkken/kit#1384). `call_line`
+// above carries no tool input, so every span it writes belongs to no command phase at all — and a
+// suite measuring where the merge command sat cannot express its subject without one.
+function josh_call_line(minute: number, branch: string, command: string, id = CALL_ID): string {
+	return tool_call_line(minute, branch, { name: 'Bash', input: { command }, id })
 }
 
 // An `Edit` call naming the file it edits (joshuafolkken/kit#1387). `call_line` above carries no tool
 // input, so every span it writes names no target at all — and a suite measuring which edits reached the
 // merged diff cannot express its subject without one.
 function edit_call_line(minute: number, branch: string, file_path: string, id = CALL_ID): string {
-	return JSON.stringify({
-		type: 'assistant',
-		timestamp: at(minute),
-		gitBranch: branch,
-		message: { content: [{ type: 'tool_use', name: 'Edit', id, input: { file_path } }] },
-	})
+	return tool_call_line(minute, branch, { name: 'Edit', input: { file_path }, id })
 }
 
 // A `Skill` call, which is what the `workflow` boundary is read off (joshuafolkken/kit#1428). The
 // skill name rides in the tool input, exactly as `time-markers.ts` reads it — so a suite about which
 // session actually ran a run cannot express its subject without one.
 function skill_call_line(minute: number, branch: string, skill: string, id = CALL_ID): string {
-	return JSON.stringify({
-		type: 'assistant',
-		timestamp: at(minute),
-		gitBranch: branch,
-		message: { content: [{ type: 'tool_use', name: 'Skill', id, input: { skill } }] },
-	})
+	return tool_call_line(minute, branch, { name: 'Skill', input: { skill }, id })
 }
 
 // The same three minutes as `issue_lines`, opened by the workflow marker every entry point writes —
@@ -149,6 +181,24 @@ function run_lines(offset: number, branch: string = BRANCH): Array<string> {
 		prompt_line(offset, branch),
 		skill_call_line(offset + CALL_MINUTE, branch, WORKFLOW_SKILL),
 		result_line(offset + RESULT_MINUTE, branch),
+	]
+}
+
+// The call in which a run states, in its own transcript, which issue it is running.
+function label_command(issue: number): string {
+	return `gh api repos/joshuafolkken/kit/issues/${String(issue)}/labels -f 'labels[]=in-progress'`
+}
+
+// The shape a lane run leaves behind (joshuafolkken/kit#1617): the same three minutes as
+// `issue_lines`, but every one of them on the **default** branch, because the session writing the
+// transcript never left it — the work ran in a linked work tree the session only shelled into. So the
+// `in-progress` label call is the one line naming the issue, and being the workflow marker as well it
+// makes this a session `time_sessions.separate` keeps rather than excludes.
+function lane_lines(offset: number, issue: number = ISSUE): Array<string> {
+	return [
+		prompt_line(offset, DEFAULT_BRANCH),
+		josh_call_line(offset + CALL_MINUTE, DEFAULT_BRANCH, label_command(issue)),
+		result_line(offset + RESULT_MINUTE, DEFAULT_BRANCH),
 	]
 }
 
@@ -166,21 +216,33 @@ function concurrent_lines(branch: string = BRANCH): Array<string> {
 // Code writes one line per content block and repeats the message id on each, which is what lets a
 // turn's calls be counted exactly. `call_line` above stays untagged: every existing caller measures
 // spans, where the id plays no part, and giving each of them a distinct one would say nothing.
-// `input` rides along for the suites that need a call to name something (joshuafolkken/kit#1390): the
-// batching guard reads the target off the input, so a case about a call that depends on an earlier one
-// cannot be expressed without it. Defaulted, so every caller predating it writes exactly the line it
-// always did.
+// The call below rides along for the suites that need a turn's call to name something
+// (joshuafolkken/kit#1390): the batching guard reads the target off the input, so a case about a call
+// that depends on an earlier one cannot be expressed without it. Defaulted, so every caller predating
+// it writes exactly the line it always did.
+
+// What a fixture turn's call is, beyond its position on the grid. **The tool name is a field rather
+// than a fifth parameter** because a write-span sequence is what pins the batching guard's target test
+// (joshuafolkken/kit#1762): with `Read` spans alone, both the shipped test and the one it replaced
+// answer the same, so the case proves nothing.
+interface FixtureCall {
+	name?: string
+	input?: unknown
+}
+
 function turn_call_line(
 	minute: number,
 	message_id: string,
 	id: string,
-	input: unknown = {},
+	call: FixtureCall = {},
 ): string {
+	const content = { type: 'tool_use', name: call.name ?? READ_TOOL, id, input: call.input ?? {} }
+
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp: at(minute),
 		gitBranch: BRANCH,
-		message: { id: message_id, content: [{ type: 'tool_use', name: 'Read', id, input }] },
+		message: { id: message_id, content: [content] },
 	})
 }
 
@@ -207,20 +269,52 @@ function turn_lines(turn: number, calls: number): Array<string> {
 // A turn whose calls have gone out and none has come back — the shape a transcript has at the instant
 // a `PreToolUse` hook reads it (joshuafolkken/kit#1390). One call per target, so a case can say which
 // of them a later call would depend on.
-function open_turn_lines(turn: number, targets: ReadonlyArray<string>): Array<string> {
+function open_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
 	return call_ids(turn, targets.length).map((id, index) =>
-		turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id, { file_path: targets[index] }),
+		turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id, {
+			name,
+			input: { file_path: targets[index] },
+		}),
 	)
 }
 
 // The same turn, closed by the results that give its calls spans. A span exists only once its result
 // has come back, which is exactly why the open half above is a builder of its own.
-function target_turn_lines(turn: number, targets: ReadonlyArray<string>): Array<string> {
+function target_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
 	const results = call_ids(turn, targets.length).map((id) =>
 		result_line(turn_minute(turn) + 1, BRANCH, id),
 	)
 
-	return [...open_turn_lines(turn, targets), ...results]
+	return [...open_turn_lines(turn, targets, name), ...results]
+}
+
+// The body the harness writes back for a call this guard denied (joshuafolkken/kit#1979). It opens
+// with the ⛔ and the `batching` token `time-transcript-line.ts` reads a refusal's guard off, so a span
+// built from it carries `refusal_guard: 'batching'`.
+const BATCHING_REFUSAL_BODY = '⛔ batching: reissue this in one turn'
+
+// A refused turn: the same open-then-result shape as `target_turn_lines`, but each result is the ⛔
+// body above rather than `ok` — so `time_spans` reads it as a span carrying this guard's refusal label.
+// A refused call is written to the transcript like any other, and the batch guard's re-issue test looks
+// for exactly this shape when it decides not to refuse the identical call a second time.
+function refused_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
+	const results = call_ids(turn, targets.length).map((id) =>
+		error_result_line(turn_minute(turn) + 1, BRANCH, id, BATCHING_REFUSAL_BODY),
+	)
+
+	return [...open_turn_lines(turn, targets, name), ...results]
 }
 
 // A whole stretch of identical turns, which is what the live-density reading is measured against: at
@@ -290,22 +384,36 @@ function total_span_ms(spans: ReadonlyArray<{ duration_ms: number }>): number {
 // One tool span, named and placed on the minute grid, for the suites that test the arithmetic rather
 // than the reading. Here rather than beside each of them because two suites now assert against spans
 // built exactly this way, and a builder that drifted would let them disagree about what a span is.
+// The fields no case varies, written once so a new `Span` field lands in one literal — the pattern
+// `time-span-fixture.ts` and `time-phase-fixture.ts` use, and what keeps `span` inside its line limit.
+const UNVARIED_SPAN = {
+	category: time_spans.TOOL_CATEGORY,
+	josh_command: '',
+	josh_commands: [],
+	refusal_guard: '',
+	check_key: '',
+	marker: time_markers.NO_MARKER,
+	is_bundleable: false,
+	is_writing: false,
+	has_prior_reference: false,
+	targets: [],
+	writes: [],
+	message_id: time_spans.NO_MESSAGE_ID,
+	issue: time_markers.NO_ISSUE,
+	branch: 'main',
+	call_id: '',
+	outcome: time_spans.UNKNOWN_OUTCOME,
+	followup_stages: [],
+	is_continuation: false,
+	...time_spans.no_background(),
+} satisfies Partial<Span>
+
 function span(label: string, ended_minute: number, duration_minutes: number): Span {
 	return {
-		category: time_spans.TOOL_CATEGORY,
+		...UNVARIED_SPAN,
 		label,
-		josh_command: '',
-		check_key: '',
-		marker: time_markers.NO_MARKER,
-		is_bundleable: false,
-		targets: [],
-		message_id: time_spans.NO_MESSAGE_ID,
-		branch: 'main',
-		call_id: '',
-		outcome: time_spans.UNKNOWN_OUTCOME,
-		is_continuation: false,
 		ended_ms: ended_minute * MINUTE_MS,
-		duration_ms: duration_minutes * MINUTE_MS,
+		...time_spans.equal_durations(duration_minutes * MINUTE_MS),
 	}
 }
 
@@ -322,14 +430,19 @@ const time_transcript_fixture = {
 	call_line,
 	edit_call_line,
 	josh_call_line,
+	error_result_line,
 	result_line,
 	skill_call_line,
+	tool_call_line,
 	turn_call_line,
 	turn_lines,
 	open_turn_lines,
 	target_turn_lines,
+	refused_turn_lines,
 	density_text,
 	issue_lines,
+	lane_lines,
+	label_command,
 	run_lines,
 	delegating_lines,
 	concurrent_lines,

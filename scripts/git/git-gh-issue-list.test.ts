@@ -57,7 +57,7 @@ function api_paths(): Array<string> {
 // listing answers `{ json, is_capped }` to every caller since joshuafolkken/kit#1067, so the two
 // halves are asserted by the cases each one belongs to rather than through one wider assertion.
 async function list_json(request: IssueListRequest): Promise<string | undefined> {
-	const outcome = await git_gh_issue_list.issue_list_open(request)
+	const outcome = await git_gh_issue_list.issue_list(request)
 
 	return outcome.json
 }
@@ -80,7 +80,7 @@ function serve(pages: ReadonlyArray<string>, blockers: string = EMPTY_PAGE): voi
 // The body search is the one listing the page ceiling applies to, so every case about the ceiling
 // goes through it. `SEARCH_TERM` matches nothing the filler rows carry unless a row says so.
 async function search_outcome(limit: number): Promise<IssueListOutcome> {
-	return await git_gh_issue_list.issue_list_open({
+	return await git_gh_issue_list.issue_list({
 		json_fields: BODY_FIELDS,
 		limit,
 		body_term: SEARCH_TERM,
@@ -115,7 +115,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 })
 
-describe('issue_list_open — the request', () => {
+describe('issue_list — the request', () => {
 	it('reads the REST listing rather than gh issue list', async () => {
 		serve([rest_issue_page([{}])])
 
@@ -163,7 +163,34 @@ describe('issue_list_open — the request', () => {
 	})
 })
 
-describe('issue_list_open — the answer', () => {
+// joshuafolkken/kit#1679: the duplicate scan has to see the issue that closed an hour ago, so the
+// state and the sort became parameters. The defaults are what the six original callers send.
+describe('issue_list — the state and the sort', () => {
+	it('asks for closed issues when the state says so', async () => {
+		serve([rest_issue_page([{}])])
+
+		await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY, state: 'closed' })
+
+		expect(api_paths()[0]).toContain(`${CURRENT_REPO_ISSUES}?state=closed`)
+	})
+
+	// Ordering a closed listing by `created` ranks it by when each issue was filed, which says nothing
+	// about when it closed — so the sort travels with the state rather than being fixed beside it.
+	it('orders by the sort it was given', async () => {
+		serve([rest_issue_page([{}])])
+
+		await list_json({
+			json_fields: SUMMARY_FIELDS,
+			limit: LIMIT_MANY,
+			state: 'closed',
+			sort: 'updated',
+		})
+
+		expect(api_paths()[0]).toContain('sort=updated&direction=desc')
+	})
+})
+
+describe('issue_list — the answer', () => {
 	// The field names are still `gh issue list --json`'s: `createdAt` from `created_at`, and the
 	// state upper-cased, which is what every reader downstream compares against.
 	it('answers in the field names gh answered in', async () => {
@@ -212,7 +239,7 @@ describe('issue_list_open — the answer', () => {
 	})
 })
 
-describe('issue_list_open — the paging', () => {
+describe('issue_list — the paging', () => {
 	// A full page means there may be more, and a filter that discards most of one is why the paging
 	// continues rather than answering short — the behavior `gh issue list --limit` had.
 	it('reads a further page while the last one was full', async () => {
@@ -247,7 +274,7 @@ describe('issue_list_open — the paging', () => {
 
 // joshuafolkken/kit#1033: the body search below matches nothing on a normal run, so "stop once
 // `limit` rows are selected" never fires and the paging read the whole open backlog every time.
-describe('issue_list_open — the page ceiling', () => {
+describe('issue_list — the page ceiling', () => {
 	// A page the filter empties is still a full page, so the paging continues — which is exactly the
 	// shape that has no natural end short of the backlog running out.
 	it('stops paging at the ceiling and says the scan was cut short', async () => {
@@ -273,7 +300,7 @@ describe('issue_list_open — the page ceiling', () => {
 
 		serve([...pages, EMPTY_PAGE])
 
-		const outcome = await git_gh_issue_list.issue_list_open({
+		const outcome = await git_gh_issue_list.issue_list({
 			json_fields: BODY_FIELDS,
 			limit: LIMIT_MANY,
 		})
@@ -307,7 +334,7 @@ describe('issue_list_open — the page ceiling', () => {
 	})
 })
 
-describe('issue_list_open — the search replacement', () => {
+describe('issue_list — the search replacement', () => {
 	// `--search "<term> in:body"` went through the search API, which a session bound to its
 	// configured repositories is refused. The one caller only ever looked for a literal `#<epic>`.
 	it('keeps only the rows whose body carries the term', async () => {
@@ -337,7 +364,7 @@ describe('issue_list_open — the search replacement', () => {
 	})
 })
 
-describe('issue_list_open — the search replacement, term boundaries', () => {
+describe('issue_list — the search replacement, term boundaries', () => {
 	// The same body with the term standing on its own is a match — the guard refuses a trailing
 	// digit, not every occurrence.
 	it('matches the term where it is not followed by a digit', async () => {
@@ -367,7 +394,7 @@ describe('issue_list_open — the search replacement, term boundaries', () => {
 	})
 })
 
-describe('issue_list_open — the blocker relations', () => {
+describe('issue_list — the blocker relations', () => {
 	// A listing carries no `blockedBy`; REST serves it from each issue's own dependencies endpoint,
 	// and the `auto-ok` pickup fails open without it.
 	it('answers blockedBy for a row that declares a blocker', async () => {

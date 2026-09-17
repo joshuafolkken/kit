@@ -70,8 +70,8 @@ function read_tree(): Record<string, string> {
 // its fixes can delete or rename a measured file between the walk and the read. `undefined` — "the
 // tree could not be read" — travels the same way a missing record does, so the caller answers
 // `required`. Letting the throw escape would kill the process before anything reached stdout, and a
-// caller capturing `$(pnpm josh eval:scope --since-eval)` would read an empty string where the whole
-// point of the command is to insist on a measurement.
+// caller reading the record would read an empty string where the whole point is to insist on a
+// measurement.
 function try_read_tree(
 	read: () => Record<string, string> = read_tree,
 ): Record<string, string> | undefined {
@@ -87,19 +87,27 @@ function write_stamp(target: string = stamp_path()): string {
 	return access.write(read_tree(), target)
 }
 
+// The record's other half. `write_stamp` says a run measured this tree; this says that run reached a
+// verdict (joshuafolkken/kit#1164). Best-effort in the same direction as the write: a completion that
+// could not be recorded leaves the record incomplete, and an incomplete record answers `required`.
+function complete_stamp(target: string = stamp_path()): string | undefined {
+	return access.complete(target)
+}
+
 function read_stamp(source: string = stamp_path()): EvalStamp | undefined {
 	return access.read(source)
 }
 
 // Every path here is a measured one by construction — the tree is walked from the trigger's own list
 // — so an empty result is the positive fact "nothing the scenarios can see has changed", never an
-// unread diff. That is the distinction `eval_trigger.scope_for_measured_changes` is named for.
+// unread diff.
 function changed_since(stamp: EvalStamp, tree: Record<string, string>): ReadonlyArray<string> {
 	return file_map_stamp.changed_since(stamp, tree)
 }
 
 const eval_stamp = {
 	changed_since,
+	complete_stamp,
 	files_under,
 	read_stamp,
 	read_tree,

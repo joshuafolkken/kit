@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { change_base } from '#scripts/git/change-base'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
@@ -7,8 +8,8 @@ import { review_tree } from './review-tree'
 
 // `josh review:round2` — say whether the second review round is due (joshuafolkken/kit#1433).
 //
-// A command rather than a paragraph in `prompts/review.md`, for the reason `josh review:level` and
-// `josh eval:scope` are commands: a rule an agent applies from memory is a rule an agent can talk
+// A command rather than a paragraph in `prompts/review.md`, for the reason `josh review:level` is a
+// command: a rule an agent applies from memory is a rule an agent can talk
 // itself out of, and this one is argued against every time it is reached, because the round it asks
 // for costs a forked agent and a few minutes. The question and the evidence behind the answer are in
 // `review-round2.ts`; everything here is the invocation.
@@ -53,10 +54,15 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 
 	const { verdict, reason } = review_round2.decide({
+		// The commit the tree below is a diff against, so the snapshot can be refused when it was taken
+		// against a different one — and the resolved commit rather than `git_command.change_base`, whose
+		// fallback is a ref name that moves and would compare equal to itself
+		// (joshuafolkken/kit#1537).
+		base: await change_base.resolved(),
 		is_round_one_closed: options.is_round_one_closed,
 		snapshot: review_stamps.round_one_stamp.read(),
 		// No paths argument: `read_changed_tree` reads them itself, from the one definition of
-		// "changed" `josh review:level`, `josh eval:scope` and `josh review:brief` all decide from.
+		// "changed" `josh review:level` and `josh review:brief` all decide from.
 		// Passing our own reading would be a second definition, which is the drift that module exists
 		// to prevent.
 		tree: await review_tree.read_changed_tree(),

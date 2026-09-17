@@ -11,6 +11,8 @@ const SEED = 1
 const INVALID_SEED = 'abc'
 const FILE_SEED = 3
 const FILE_SEED_TEXT = String(FILE_SEED)
+// The offset is `seed × 10 + lane`, and these seed-only cases run at the main work tree's seat 0.
+const SEED_MULTIPLIER = 10
 const PREVIEW_ARGUMENTS = ['preview']
 const SUCCESS_EXIT_CODE = 0
 
@@ -56,13 +58,13 @@ describe('playwright.config PORT_SEED', () => {
 	it('offsets the local dev port by the seed', async () => {
 		const web_server = await load_seeded_web_server(undefined, String(SEED))
 
-		expect(web_server.port).toBe(DEV_PORT + SEED)
+		expect(web_server.port).toBe(DEV_PORT + SEED * SEED_MULTIPLIER)
 	})
 
 	it('offsets the CI preview port by the same seed', async () => {
 		const web_server = await load_seeded_web_server(CI_ON, String(SEED))
 
-		expect(web_server.port).toBe(PREVIEW_PORT + SEED)
+		expect(web_server.port).toBe(PREVIEW_PORT + SEED * SEED_MULTIPLIER)
 	})
 
 	// Falling back to the shared default here would silently undo the whole point of the seed.
@@ -81,14 +83,14 @@ describe('playwright.config PORT_SEED from .env', () => {
 		write_seed_file(FILE_SEED_TEXT)
 		const web_server = await load_file_seeded_web_server(undefined)
 
-		expect(web_server.port).toBe(DEV_PORT + FILE_SEED)
+		expect(web_server.port).toBe(DEV_PORT + FILE_SEED * SEED_MULTIPLIER)
 	})
 
 	it('offsets the CI preview port by the seed written in .env', async () => {
 		write_seed_file(FILE_SEED_TEXT)
 		const web_server = await load_file_seeded_web_server(CI_ON)
 
-		expect(web_server.port).toBe(PREVIEW_PORT + FILE_SEED)
+		expect(web_server.port).toBe(PREVIEW_PORT + FILE_SEED * SEED_MULTIPLIER)
 	})
 
 	it('keeps the historical ports for a project that has no .env', async () => {
@@ -117,7 +119,7 @@ describe('playwright.config PORT_SEED from .env', () => {
 		write_seed_file(FILE_SEED_TEXT)
 		const web_server = await load_file_seeded_web_server(CI_ON)
 
-		expect(web_server.port).toBe(PREVIEW_PORT + FILE_SEED)
+		expect(web_server.port).toBe(PREVIEW_PORT + FILE_SEED * SEED_MULTIPLIER)
 		expect(port_command.run(PREVIEW_ARGUMENTS)).toStrictEqual({
 			text: String(web_server.port),
 			exit_code: SUCCESS_EXIT_CODE,
@@ -138,7 +140,7 @@ describe('playwright.config PORT_SEED from a subdirectory', () => {
 
 		const web_server = await load_file_seeded_web_server(undefined)
 
-		expect(web_server.port).toBe(DEV_PORT + FILE_SEED)
+		expect(web_server.port).toBe(DEV_PORT + FILE_SEED * SEED_MULTIPLIER)
 	})
 })
 

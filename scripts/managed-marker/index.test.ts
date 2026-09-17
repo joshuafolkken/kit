@@ -16,7 +16,7 @@ const PACKAGE_ROOT = path.resolve(SELF_DIR, '..', '..')
 const EXPORT_KEY = './managed-marker'
 const EXPORT_TYPES = './dist/managed-marker/index.d.ts'
 const EXPORT_DEFAULT = './dist/managed-marker/index.js'
-const BUILD_STEP = 'tsx scripts/build-managed-marker.ts'
+const BUILD_STEP = 'tsx scripts/build/build-managed-marker.ts'
 
 function read_manifest(): z.infer<typeof exports_schema> {
 	const raw = readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8')

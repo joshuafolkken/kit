@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { plan_commands } from '#scripts/format-edited-file'
+import { plan_commands } from '#scripts/hooks/format-edited-file'
 import { PACKAGE_DIR, package_path } from '#scripts/init/init-paths'
-import { ESLINT_ARGS } from '#scripts/lint-parallel'
-import { yaml_config_fixture } from '#scripts/yaml-config-fixture'
+import { CSPELL_ARGS } from '#scripts/lint/cspell-cached'
+import { ESLINT_ARGS } from '#scripts/lint/lint-parallel'
+import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
 import {
@@ -26,7 +27,7 @@ const GITIGNORE_PATHS: ReadonlyArray<string> = ['.gitignore', 'templates/gitigno
 const DISTRIBUTED_CSPELL_CONFIG = 'cspell/index.yaml'
 // A file that really is in the repository and really is one the edit hook formats, so `plan_commands`
 // below answers with the command the hook would run rather than with nothing.
-const HOOK_SOURCE = 'scripts/format-edited-file.ts'
+const HOOK_SOURCE = 'scripts/hooks/format-edited-file.ts'
 
 interface CspellConfig {
 	ignorePaths?: Array<string>
@@ -57,11 +58,7 @@ describe('verification gate cache flags', () => {
 	})
 
 	it('spell-checks from a content-addressed cache at a named location', () => {
-		expect(command_line_of('cspell:dot')).toContain(CSPELL_CACHE_FLAGS.join(' '))
-	})
-
-	it('keeps the eslint cache the other two were modelled on', () => {
-		expect(command_line_of('lint:eslint')).toContain(ESLINT_CACHE_FLAGS.join(' '))
+		expect(CSPELL_ARGS.join(' ')).toContain(CSPELL_CACHE_FLAGS.join(' '))
 	})
 
 	// `josh lint` runs `lint-parallel.ts`, never the `lint:eslint` map entry, so asserting only the
@@ -138,7 +135,7 @@ describe('a rule-module edit invalidates both sides', () => {
 // hook and the gate do. Each eslint run rewrites its cache file whole from the copy it loaded at
 // start-up, so on one file the run that finished last discarded the other's entries.
 // That the scoped lint actually runs against its own location is asserted where the arguments are
-// built, in `scripts/lint-related-scope.test.ts`; what belongs here is the property no single command
+// built, in `scripts/lint/lint-related-scope.test.ts`; what belongs here is the property no single command
 // can state — that the three locations are three files.
 //
 // **The three are the runs a workflow can have in flight at once**, not every eslint run in the

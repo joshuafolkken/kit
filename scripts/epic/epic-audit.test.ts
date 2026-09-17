@@ -205,10 +205,12 @@ describe('epic_audit_checks.find_order_contradictions', () => {
 	})
 })
 
-// Both children closed means neither has any execution left, so the sentence that makes an
-// undeclared order a contradiction — "it can run first" — is no longer true of either. An epic that
-// forgot to declare an order would otherwise fail its audit forever, stopping every future `epicrun`
-// on it at the first step (joshuafolkken/kit#1010).
+// A pair can only run out of order while both children still have execution left, so the sentence
+// that makes an undeclared order a contradiction — "it can run first" — is false as soon as either
+// end closes: a closed naming child has already run, and a closed named child has already delivered
+// what the criteria ask for. An epic that forgot to declare an order would otherwise fail its audit
+// forever, stopping every future `epicrun` on it at the first step (joshuafolkken/kit#1010 demoted
+// the both-closed pair, joshuafolkken/kit#1597 the two that close on one side).
 describe('epic_audit_checks.find_order_contradictions — a pair with nothing left to run', () => {
 	it('demotes the finding to a warning when both children are closed', () => {
 		const findings = epic_audit_checks.find_order_contradictions(
@@ -231,19 +233,38 @@ describe('epic_audit_checks.find_order_contradictions — a pair with nothing le
 		expect(messages(contradictions)).toContain('#869')
 		expect(epic_audit_checks.find_implicit_dependencies(children, REPO, contradictions)).toEqual([])
 	})
+})
 
-	it('keeps the error while the child naming the other is still open', () => {
+// One end closed settles the pair on its own, and the two ends settle it for different reasons — so
+// each is asserted separately, beside the both-open case they are the exception to.
+describe('epic_audit_checks.find_order_contradictions — one end closed', () => {
+	// The named child is closed, so what its criteria ask for already exists and nothing is left to
+	// run before. The wording names the end that closed rather than claiming both did.
+	it('demotes the finding once the child that is named has closed', () => {
 		const findings = epic_audit_checks.find_order_contradictions(
 			[child(860, ACCEPTANCE_BODY), closed(child(869, ''))],
 			REPO,
 		)
 
-		expect(findings[0]?.level).toBe('error')
+		expect(findings[0]?.level).toBe('warning')
+		expect(messages(findings)).toContain('#869 is closed')
 	})
 
-	it('keeps the error while the child that is named is still open', () => {
+	// The naming child has already run, which is the case joshuafolkken/kit#1597 was filed for: it
+	// cannot run first any more, and the error was permanent because a closed body cannot be fixed.
+	it('demotes the finding once the child naming the other has closed', () => {
 		const findings = epic_audit_checks.find_order_contradictions(
 			[closed(child(860, ACCEPTANCE_BODY)), child(869, '')],
+			REPO,
+		)
+
+		expect(findings[0]?.level).toBe('warning')
+		expect(messages(findings)).toContain('#860 is closed')
+	})
+
+	it('keeps the error while both children are still open', () => {
+		const findings = epic_audit_checks.find_order_contradictions(
+			[child(860, ACCEPTANCE_BODY), child(869, '')],
 			REPO,
 		)
 

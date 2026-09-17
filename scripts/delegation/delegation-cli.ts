@@ -33,13 +33,20 @@ function print_list(): number {
 const LIST_FLAG = '--list'
 const FLAG_PREFIX = '-'
 
+// Every reading of the argument goes through this one function, because the guard and the branch
+// disagreeing about surrounding whitespace is the defect itself: the guard trimmed and `run` did
+// not, so `josh delegate ' --list'` passed as a known flag and then fell through to a verdict about
+// a step called ` --list` (joshuafolkken/kit#1096). The policy lookup trims too, which is why
+// `josh delegate ' --help'` had already slipped past an untrimmed guard (joshuafolkken/kit#969).
+function normalized(argument: string): string {
+	return argument.trim()
+}
+
 // A step name never starts with a dash, so anything that does is a flag — and the only flag this
 // command has is `--list`. Without this, `josh delegate --help` answered `keep`: a mistyped
 // invocation would read as a verdict about a step called `--help` (joshuafolkken/kit#969).
 function is_unknown_flag(argument: string): boolean {
-	// Trimmed, because the policy lookup trims too: without it `josh delegate ' --help'` slipped past
-	// the guard and answered `keep` for a step called ` --help`.
-	const trimmed = argument.trim()
+	const trimmed = normalized(argument)
 
 	return trimmed.startsWith(FLAG_PREFIX) && trimmed !== LIST_FLAG
 }
@@ -50,7 +57,7 @@ function is_refused(argv: ReadonlyArray<string>): boolean {
 
 	if (first === undefined || rest.length > 0) return true
 
-	return first.trim() === '' || is_unknown_flag(first)
+	return normalized(first) === '' || is_unknown_flag(first)
 }
 
 function run(argv: ReadonlyArray<string>): number {
@@ -61,13 +68,14 @@ function run(argv: ReadonlyArray<string>): number {
 	}
 
 	const [first = ''] = argv
+	const argument = normalized(first)
 
-	if (first === LIST_FLAG) return print_list()
+	if (argument === LIST_FLAG) return print_list()
 
 	// The verdict alone on stdout so `$(josh delegate <step>)` reads it; the reason on stderr so a
 	// person sees why without a shell having to parse around it.
-	console.info(delegation_policy.verdict_for(first))
-	console.error(delegation_policy.reason_for(first))
+	console.info(delegation_policy.verdict_for(argument))
+	console.error(delegation_policy.reason_for(argument))
 
 	return 0
 }

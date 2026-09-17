@@ -1,36 +1,9 @@
-import { execa } from 'execa'
-import { git_utilities } from './constants'
-import { create_spawn_error, get_exit_code } from './git-execa-error'
+import { PORCELAIN_FLAG } from './constants'
 import { git_push_transport } from './git-push-transport'
-
-async function exec_git_command_read(arguments_: Array<string>): Promise<string> {
-	const git_cmd = git_utilities.get_git_command_for_spawn()
-	// execa runs the binary directly with an argument array and no `shell` option, so CLI
-	// args cannot break out of a shell sandbox; the git command and args are internally
-	// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-	const { stdout } = await execa(git_cmd, arguments_) // NOSONAR
-
-	return stdout.trimEnd()
-}
-
-async function exec_git_command_with_output(
-	command: string,
-	arguments_list: Array<string>,
-): Promise<void> {
-	const git_command_bin = git_utilities.get_git_command_for_spawn()
-
-	try {
-		// execa runs the binary directly with an argument array and no `shell` option, so CLI
-		// args cannot break out of a shell sandbox; the git command and args are internally
-		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		await execa(git_command_bin, [command, ...arguments_list], { stdio: 'inherit' }) // NOSONAR
-	} catch (error) {
-		throw create_spawn_error(command, get_exit_code(error))
-	}
-}
+import { git_spawn } from './git-spawn'
 
 async function branch(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', '--abbrev-ref', 'HEAD'])
+	return await git_spawn.read(['rev-parse', '--abbrev-ref', 'HEAD'])
 }
 
 // **`--untracked-files=normal` is passed rather than inherited** (joshuafolkken/kit#1381). Every
@@ -41,7 +14,7 @@ async function branch(): Promise<string> {
 // pre-push hook reuses a record for a commit that does not contain them. Naming git's own default
 // makes the reading answer to this codebase rather than to whoever ran it.
 async function status(): Promise<string> {
-	return await exec_git_command_read(['status', '--porcelain', '--untracked-files=normal'])
+	return await git_spawn.read(['status', PORCELAIN_FLAG, '--untracked-files=normal'])
 }
 
 // The absolute path every other git command's output is relative to. Asking git rather than reading
@@ -49,7 +22,15 @@ async function status(): Promise<string> {
 // onto the working directory resolves to nothing, and a digest map built that way collapses to
 // "every file absent" — which compares *equal* to another such map (joshuafolkken/kit#1241).
 async function repository_root(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', '--show-toplevel'])
+	return await git_spawn.read(['rev-parse', '--show-toplevel'])
+}
+
+// The commit this checkout is sitting on, as opposed to `change_base_commit`'s commit a change is
+// measured against. Read by `josh review:brief` to say which tree a review was
+// briefed on, so a review that read a different one can be told apart from one that read this one
+// (joshuafolkken/kit#1522).
+async function head_commit(): Promise<string> {
+	return await git_spawn.read(['rev-parse', 'HEAD'])
 }
 
 // Both git directories this checkout has, absolute, one per line. In the main work tree they are the
@@ -57,19 +38,25 @@ async function repository_root(): Promise<string> {
 // `<repo>/.git`, and the commit-message file lives under the first. Asking git rather than assuming
 // a directory named `.git` is what makes a bare repository and a `--separate-git-dir` clone answer
 // correctly too (joshuafolkken/kit#1106).
+// Exported so a caller that must ask the same question **synchronously** asks it with the same
+// arguments rather than a second spelling of them (joshuafolkken/kit#1864). `git_spawn` is
+// asynchronous throughout and a `PreToolUse` guard is synchronous by contract, so the one place that
+// needs it runs these arguments itself — sharing the list is what keeps that from becoming a clone.
+const GIT_DIRECTORY_ARGUMENTS: ReadonlyArray<string> = [
+	'rev-parse',
+	'--absolute-git-dir',
+	'--path-format=absolute',
+	'--git-common-dir',
+]
+
 async function git_directories(): Promise<Array<string>> {
-	const output = await exec_git_command_read([
-		'rev-parse',
-		'--absolute-git-dir',
-		'--path-format=absolute',
-		'--git-common-dir',
-	])
+	const output = await git_spawn.read([...GIT_DIRECTORY_ARGUMENTS])
 
 	return output.split('\n').filter((line) => line !== '')
 }
 
 async function diff_cached(file_path: string): Promise<string> {
-	return await exec_git_command_read(['diff', '--cached', file_path])
+	return await git_spawn.read(['diff', '--cached', file_path])
 }
 
 const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
@@ -78,7 +65,7 @@ const DEFAULT_BRANCH_FALLBACK = 'main'
 
 async function get_default_branch(): Promise<string> {
 	try {
-		const output = await exec_git_command_read(['symbolic-ref', 'refs/remotes/origin/HEAD'])
+		const output = await git_spawn.read(['symbolic-ref', 'refs/remotes/origin/HEAD'])
 		const trimmed = output.trim()
 
 		if (trimmed.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) {
@@ -91,10 +78,74 @@ async function get_default_branch(): Promise<string> {
 	return DEFAULT_BRANCH_FALLBACK
 }
 
-async function diff_main(file_path: string): Promise<string> {
-	const default_branch = await get_default_branch()
+const MERGE_BASE_COMMAND = 'merge-base'
 
-	return await exec_git_command_read(['diff', default_branch, '--', file_path])
+// **The ref the default branch is actually at**, which is not the same thing as its name
+// (joshuafolkken/kit#1535). `get_default_branch` returns the bare name, and git resolves that to the
+// *local* `refs/heads/<default>` — a ref nothing in this workflow advances, because merges happen on
+// GitHub and the default branch is checked out in no work tree. This is the single source both the
+// lane's start point and `change_base` below resolve through, so a lane cut from
+// `refs/remotes/origin/<default>` is measured against that same commit. Measured without it: a lane
+// cut from a remote-tracking ref three commits ahead reported those three commits' files as its own.
+//
+// It falls back to the bare name where there is no remote-tracking ref — a fresh `git init`, a clone
+// with no `origin` — which is the reading every caller had before. The one case it reads differently
+// is a local default branch *ahead* of the remote, which this workflow does not produce and
+// `prevent-main-commit.ts` exists to stop.
+async function reference_exists(reference: string): Promise<boolean> {
+	try {
+		await git_spawn.read(['rev-parse', '--verify', '--quiet', reference])
+
+		return true
+	} catch {
+		return false
+	}
+}
+
+async function default_branch_reference(): Promise<string> {
+	const default_branch = await get_default_branch()
+	const remote_reference = `${REFS_REMOTES_ORIGIN_PREFIX}${default_branch}`
+
+	return (await reference_exists(remote_reference)) ? remote_reference : default_branch
+}
+
+// The commit this branch was cut from — and the base every "changed" reading below measures
+// against, in place of the default branch itself.
+//
+// **A two-dot `git diff <default-branch>` compares a moving *ref* to the working tree, and in a
+// linked work tree that ref is shared with every other lane** (joshuafolkken/kit#1527). So when one
+// lane merges, an unmerged lane's diff picks that lane's files up in reverse: files this branch
+// never touched arrive in `josh review:brief`'s target list, in the digest map `josh gate` stamps,
+// and in `josh review:round2`'s fix delta.
+//
+// **The merge base is the fixed point that removes it**, because it is a commit rather than a ref:
+// an advance of the default branch that this branch is an ancestor of does not move it. It is also
+// the right answer at both points of a run, and a lane passes through both — with the work still
+// uncommitted `HEAD` is the cut commit and the merge base is that same commit, so the diff is the
+// uncommitted work; once the branch commits, `HEAD` moves ahead while the merge base stays put, so
+// the diff is the branch's whole change plus anything still uncommitted. `<default-branch>...HEAD`
+// answers neither, because a three-dot diff ends at `HEAD` and a lane's work is uncommitted for
+// most of its run.
+//
+// **It never reports less than the old reading did.** The new set is the branch's own change; the
+// old one was that same set plus the inverse of whatever the default branch had advanced by — so
+// this narrows the reading and cannot hide a file the branch actually changed.
+//
+// In a checkout sitting on the default branch the merge base *is* that branch's commit, so nothing
+// changes there. A repository with no common ancestor to find falls back to the previous reading
+// rather than failing the callers, all of which treat a throw as "nothing can be reused".
+async function change_base(): Promise<string> {
+	const default_branch = await default_branch_reference()
+
+	try {
+		return await git_spawn.read([MERGE_BASE_COMMAND, default_branch, 'HEAD'])
+	} catch {
+		return default_branch
+	}
+}
+
+async function diff_main(file_path: string): Promise<string> {
+	return await git_spawn.read(['diff', await change_base(), '--', file_path])
 }
 
 // Names only, for callers that classify a change rather than read it — `josh review:level` decides
@@ -104,8 +155,8 @@ async function diff_main(file_path: string): Promise<string> {
 // `core.quotePath=false` is not cosmetic. With git's default, a path containing any non-ASCII byte
 // comes back C-quoted — `"prompts/\343\202\263.md"` — and a classifier testing `startsWith('prompts/')`
 // against a string that begins with a quote character answers no. `review:level` fails safe there
-// (non-inert wins), but `josh eval:scope` would answer `skip` for a change it is meant to measure,
-// so the quoting is turned off at the source all three readers share (joshuafolkken/kit#907).
+// (non-inert wins), but a classifier that answered `skip` would drop a change it is meant to catch,
+// so the quoting is turned off at the source every reader shares (joshuafolkken/kit#907).
 const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
 
 // Repository-root-relative paths, whatever the checkout is configured to prefer. `diff.relative` is
@@ -115,34 +166,61 @@ const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
 // at the source rather than leaving each caller to discover the configuration.
 const NO_RELATIVE_PATHS = '--no-relative'
 
-// The commit the default branch points at. Every "changed" reading below is a diff against that
-// branch, so a set of changed paths — or a map of their digests — means nothing without it: fetch an
-// advanced default branch and rebase onto it, and each digest can stay identical while the rest of
-// the tree is replaced by code no check has read (joshuafolkken/kit#1328).
-async function default_branch_commit(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', await get_default_branch()])
+// **Rename detection is turned off because this listing is a description of a tree, not a summary of
+// a change** (joshuafolkken/kit#1533). With git's default `diff.renames=true`, a rename prints only
+// its *destination*: `git diff --name-only <base>` across a commit that moved `scripts/init-logic.ts`
+// to `scripts/init/init-logic.ts` names the second path and never the first.
+//
+// That omission is what breaks `josh gate`'s reuse. The green record it compares is `base` plus a
+// digest per listed path, and the whole claim that the record still describes the tree rests on one
+// property: **every path that differs from `base` is in the list**, so `base` plus the digests
+// determines the tracked tree completely. A rename's source path differs from `base` — it is gone —
+// and it is not in the list. So a tree in which the file was renamed away and a tree in which it has
+// since come back produce the *same* record: the returned file matches `base`, so it enters no diff,
+// while the destination is an addition either way. The gate then reuses a green taken on the first
+// tree for the second, without running one check on it, and a duplicated module that lint, the type
+// check and the unit suite would all have failed on is committed on a "passed".
+//
+// Off, a rename is listed as its two halves — a delete and an add — and the delete is what makes the
+// two trees compare unequal. `review-tree.ts` already records a listed path the tree does not hold
+// as `ABSENT_DIGEST` rather than dropping it, which is exactly the entry this flag produces.
+//
+// **Every other reader moves in the safe direction.** `josh review:level` sees
+// one more path and can only widen; `josh lint:related` and `josh test:related` drop what the tree
+// no longer holds through `changed-file-scope.ts`, which they already had to do for a plain delete.
+const NO_RENAME_DETECTION = '--no-renames'
+
+// The commit `change_base` resolves to. Every "changed" reading below is a diff against it, so a set
+// of changed paths — or a map of their digests — means nothing without it: fetch an advanced default
+// branch and rebase onto it, and each digest can stay identical while the rest of the tree is
+// replaced by code no check has read (joshuafolkken/kit#1328). A rebase still invalidates a stamp
+// taken against it — the rebase moves `HEAD`, and with it the merge base — while another lane
+// merging into the shared default branch no longer does, because it moves neither
+// (joshuafolkken/kit#1527).
+async function change_base_commit(): Promise<string> {
+	return await git_spawn.read(['rev-parse', await change_base()])
 }
 
 async function diff_main_names(): Promise<string> {
-	const default_branch = await get_default_branch()
-
-	return await exec_git_command_read([
+	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'diff',
 		NAME_ONLY_FLAG,
 		NO_RELATIVE_PATHS,
-		default_branch,
+		NO_RENAME_DETECTION,
+		await change_base(),
 		'--',
 	])
 }
 
 async function diff_cached_names(): Promise<string> {
-	return await exec_git_command_read([
+	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'diff',
 		'--cached',
 		NAME_ONLY_FLAG,
 		NO_RELATIVE_PATHS,
+		NO_RENAME_DETECTION,
 	])
 }
 
@@ -161,7 +239,7 @@ async function diff_cached_names(): Promise<string> {
 const WHOLE_TREE_PATHSPEC = ':/'
 
 async function untracked_names(): Promise<string> {
-	return await exec_git_command_read([
+	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'ls-files',
 		'--others',
@@ -185,7 +263,7 @@ async function untracked_names(): Promise<string> {
 async function fetch_branch(branch_name: string): Promise<string> {
 	const refspec = `+refs/heads/${branch_name}:refs/remotes/origin/${branch_name}`
 
-	return await exec_git_command_read(['fetch', 'origin', refspec])
+	return await git_spawn.read(['fetch', 'origin', refspec])
 }
 
 // The fast-forward `gh pr checkout` ran after its fetch, for the case the branch is already local.
@@ -196,19 +274,56 @@ async function fetch_branch(branch_name: string): Promise<string> {
 // `--ff-only` is the whole point — a branch that has diverged fails loudly rather than growing a
 // merge commit nobody asked for, which is the behavior the CLI had.
 async function merge_fast_forward(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['merge', '--ff-only', `origin/${branch_name}`])
+	return await git_spawn.read(['merge', '--ff-only', `origin/${branch_name}`])
+}
+
+// The merge `josh main:merge` runs, and the deliberate opposite of the one above: **no `--ff-only`**,
+// because the branch it is called on has diverged whenever the command is worth typing at all
+// (joshuafolkken/kit#1659). Naming the strategy here is the whole fix — `git pull` decides it from
+// `pull.rebase` / `pull.ff`, and with neither set it decides nothing and aborts.
+//
+// `with_output` rather than `read`: a merge that conflicts has to put git's own report in front of
+// the person, which is what the `git pull` this replaced did.
+async function merge_branch(branch_name: string): Promise<void> {
+	await git_spawn.with_output('merge', [`origin/${branch_name}`])
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['checkout', '-b', branch_name])
+	return await git_spawn.read(['checkout', '-b', branch_name])
 }
 
 async function checkout(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['checkout', branch_name])
+	return await git_spawn.read(['checkout', branch_name])
 }
 
 async function commit(message: string): Promise<void> {
-	await exec_git_command_with_output('commit', ['-m', message])
+	await git_spawn.with_output('commit', ['-m', message])
+}
+
+// **`-d` rather than `-D`, and that is the safety rather than a preference** (joshuafolkken/kit#1785).
+// The one caller is a rollback that removes a branch it created moments earlier, so `-d`'s refusal to
+// delete a branch holding an unmerged commit is exactly the net it wants: a rollback can never be the
+// thing that destroys a commit.
+async function delete_branch(branch_name: string): Promise<void> {
+	await git_spawn.read(['branch', '-d', branch_name])
+}
+
+// How many commits `tip` holds that `base` does not. **`0` is the answer that distinguishes a flush
+// branch carrying the only copy of an appended line from one an aborted flush merely left behind**,
+// and the two get opposite advice (joshuafolkken/kit#1785).
+// **Output that is not a count throws rather than parsing to `0`.** `Number('')` is `0`, and `0` is
+// the answer that says a branch holds nothing — so a read that came back empty or unparseable would
+// report "nothing is stranded" about a branch nobody measured, which is the one wrong answer that
+// loses work. `count_merges` guards the same way and falls back to `0` instead, because there a
+// missing count means an empty range rather than a claim about somebody's commits.
+async function commit_count_beyond(base: string, tip: string): Promise<number> {
+	const range = `${base}..${tip}`
+	const output = await git_spawn.read(['rev-list', '--count', range])
+	const parsed = Number(output)
+
+	if (output.length > 0 && Number.isFinite(parsed)) return parsed
+
+	throw new Error(`\`git rev-list --count ${range}\` printed \`${output}\` rather than a count`)
 }
 
 function is_exit_code_128(cause: unknown): boolean {
@@ -224,7 +339,7 @@ function is_upstream_not_set_error(error: unknown): boolean {
 	return cause !== undefined && is_exit_code_128(cause)
 }
 
-// Both pushes go through `git_push_transport` rather than `exec_git_command_with_output`, which is
+// Both pushes go through `git_push_transport` rather than `git_spawn.with_output`, which is
 // what gives them a timeout and an SSH keepalive the local git commands beside them do not need
 // (joshuafolkken/kit#1251). The thrown error keeps the same `cause.exit_code` shape, so the 128
 // fallback below reads it exactly as it did.
@@ -248,12 +363,30 @@ async function push(): Promise<void> {
 	}
 }
 
-async function pull(): Promise<void> {
-	await exec_git_command_with_output('pull', [])
+// **`--ff-only` is named here rather than read out of whoever's git configuration is in force**
+// (joshuafolkken/kit#1683). A bare `git pull` decides its strategy from `pull.rebase` / `pull.ff`,
+// and with neither set — the state of a checkout nobody has configured — it decides nothing and
+// aborts the moment the two sides have each moved:
+//
+//     fatal: Need to specify how to reconcile divergent branches
+//
+// This is joshuafolkken/kit#1659's defect at the second of that issue's two `git pull` sites, left
+// there deliberately because the callers and the conditions differ. Every caller turns out to want
+// the same thing: it is on the default branch, bringing it up to date before doing something else —
+// `main-sync.ts` for `josh ms`, `release-cli.ts` / `release-publish.ts` around the release pull
+// request, `scripts-ai/prep.ts` before it snapshots the overrides, and `git-branch.ts` →
+// `pull_latest` — reached from `scripts-ai/git-workflow.ts`, so it runs on every `josh git` /
+// `josh pr` started from the default branch, which makes it the hottest of the five rather than a
+// dormant one. **None of them is
+// asking to absorb divergence**, so `merge_branch`'s reasoning inverts here: a default branch that
+// has diverged is a state to fail loudly on rather than to grow a merge commit over. The name says
+// which of the two this is, as `merge_fast_forward` does beside `merge_branch`.
+async function pull_fast_forward(): Promise<void> {
+	await git_spawn.with_output('pull', ['--ff-only'])
 }
 
 // Every local branch matching a `git branch --list` pattern, one name per line. The boolean below is
-// this same read, expressed on top of it rather than beside it: `run:preflight` needs the name
+// this same read, expressed on top of it rather than beside it: `run:hold`'s preflight check needs the name
 // itself, because the pull request an interrupted run left behind is keyed by its head branch and the
 // slug is not derivable from an issue number alone (joshuafolkken/kit#926).
 const SHORT_NAME_FORMAT = '--format=%(refname:short)'
@@ -264,7 +397,7 @@ async function list_branches(
 	pattern: string,
 ): Promise<Array<string>> {
 	try {
-		const output: string = await exec_git_command_read([
+		const output: string = await git_spawn.read([
 			'branch',
 			'--list',
 			SHORT_NAME_FORMAT,
@@ -295,12 +428,27 @@ async function branch_exists(branch_name: string): Promise<boolean> {
 	return names.length > 0
 }
 
-async function add_tracked(): Promise<void> {
-	await exec_git_command_read(['add', '-u'])
+// Everything `:/` matches is the repository root and everything under it, so this stages exactly what
+// the bare `git add -u` it replaced did — from any directory, since `:/` is anchored to the root
+// rather than to the process's working directory.
+const ALL_PATHS_PATHSPEC = ':/'
+
+function exclude_pathspec(file_path: string): string {
+	return `:(exclude,top)${file_path}`
+}
+
+// Every tracked modification, minus the paths the caller names (joshuafolkken/kit#1756). **The
+// positive pathspec is not decoration**: a pathspec list made only of exclusions matches nothing at
+// all, so `ALL_PATHS_PATHSPEC` is what the exclusions are subtracted from. The one caller is
+// `git-staging.ts`, which keeps the observation ledger out of every ordinary commit.
+async function add_tracked(excluded_paths: ReadonlyArray<string>): Promise<void> {
+	const exclusions = excluded_paths.map((file_path) => exclude_pathspec(file_path))
+
+	await git_spawn.read(['add', '-u', '--', ALL_PATHS_PATHSPEC, ...exclusions])
 }
 
 async function add_path(file_path: string): Promise<void> {
-	await exec_git_command_with_output('add', ['--', file_path])
+	await git_spawn.with_output('add', ['--', file_path])
 }
 
 // Main's own line of history. Both reads below restrict themselves to it, and for one reason: a
@@ -308,17 +456,27 @@ async function add_path(file_path: string): Promise<void> {
 // answers about everything ever merged instead of about main (joshuafolkken/kit#1169).
 const FIRST_PARENT_FLAG = '--first-parent'
 
-// The commits that touched `file_path` along the current branch's own first-parent line, newest
-// first. **`--first-parent` is what keeps the answer about main's history rather than about
-// everything ever merged into it**: a child's own commits are not main's, and the version question
+// The commits that touched `file_path` along `tip`'s own first-parent line, newest first.
+// **`--first-parent` is what keeps the answer about main's history rather than about everything ever
+// merged into it**: a child's own commits are not main's, and the version question
 // (joshuafolkken/kit#1169) is asked of main.
-async function log_first_parent(limit: number, file_path: string): Promise<Array<string>> {
-	const output = await exec_git_command_read([
+//
+// **`tip` is not decoration.** `--first-parent` only reads as "main's line" when the walk starts on
+// main; started on a feature branch it walks that branch's commits first, and any merge main took
+// after the branch was cut is not an ancestor at all. A caller that is not on main names the ref it
+// means — `origin/main`, say — rather than inheriting `HEAD` (joshuafolkken/kit#1486).
+async function log_first_parent(
+	limit: number,
+	file_path: string,
+	tip = 'HEAD',
+): Promise<Array<string>> {
+	const output = await git_spawn.read([
 		'log',
 		FIRST_PARENT_FLAG,
 		'--format=%H',
 		`-n`,
 		String(limit),
+		tip,
 		'--',
 		file_path,
 	])
@@ -329,7 +487,7 @@ async function log_first_parent(limit: number, file_path: string): Promise<Array
 // One blob at one revision — `git show <ref>:<path>`. It throws when the path is absent there, which
 // the caller reads as "no version at this revision" rather than as an error.
 async function show_file(spec: string): Promise<string> {
-	return await exec_git_command_read(['show', spec])
+	return await git_spawn.read(['show', spec])
 }
 
 // **`--first-parent` is what makes this a count of pull requests rather than of merge commits.**
@@ -353,31 +511,38 @@ function merge_count_arguments(range: string): Array<string> {
 // throws**, as every read here does; the `isFinite` guard is only for output that is not a number,
 // and zero is the safe answer there because zero means "nothing to release".
 async function count_merges(range: string): Promise<number> {
-	const output = await exec_git_command_read(merge_count_arguments(range))
+	const output = await git_spawn.read(merge_count_arguments(range))
 	const parsed = Number(output.trim())
 
 	return Number.isFinite(parsed) ? parsed : 0
 }
 
 const git_command = {
+	GIT_DIRECTORY_ARGUMENTS,
 	branch,
 	status,
 	repository_root,
+	head_commit,
 	git_directories,
 	diff_cached,
 	diff_cached_names,
 	diff_main,
-	default_branch_commit,
+	change_base,
+	change_base_commit,
 	diff_main_names,
 	untracked_names,
 	get_default_branch,
+	default_branch_reference,
 	fetch_branch,
 	merge_fast_forward,
+	merge_branch,
 	checkout_b,
 	checkout,
 	commit,
+	commit_count_beyond,
+	delete_branch,
 	push,
-	pull,
+	pull_fast_forward,
 	branch_exists,
 	branch_names,
 	branch_names_remote,

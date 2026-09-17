@@ -11,15 +11,26 @@ const josh_mock = vi.hoisted(() => {
 
 vi.mock('./josh-logic', () => ({
 	josh_logic: {
-		format_help: (): string => josh_mock.state.format_help_return,
+		format_help: (_is_all?: boolean): string => josh_mock.state.format_help_return,
+		// #1928 cut the unknown-command answer to a single line — the error line plus a "did you mean",
+		// no full listing. This process's only job is to route it to stderr with an empty stdout.
 		format_unknown_command: (cmd: string): string =>
-			`${josh_mock.UNKNOWN_PREFIX}${cmd}\n\n${josh_mock.state.format_help_return}`,
+			`${josh_mock.UNKNOWN_PREFIX}${cmd}. Run 'josh --help' to list commands.`,
 		// The real one answers with a promise, because a script the dispatcher runs in its own
 		// process is awaited rather than spawned (joshuafolkken/kit#1342).
 		run_command: async (_cmd: string, _arguments: Array<string>): Promise<number> =>
 			josh_mock.state.run_command_return,
 	},
+	// The consumer check resolves the project root by ascending to the nearest package.json; the
+	// identity stand-in is enough for the doctor mock below (joshuafolkken/kit#1988).
+	find_package_directory: (start: string): string => start,
 	UNKNOWN_COMMAND_EXIT_CODE: josh_mock.UNKNOWN_COMMAND_EXIT_CODE,
+}))
+
+// This process runs in kit itself, so the consumer check is false — every command stays listed and
+// runnable, which is the behavior every case below asserts (joshuafolkken/kit#1988).
+vi.mock('#scripts/doctor/doctor-consumer', () => ({
+	doctor_consumer: { is_kit_consumer: (): boolean => false },
 }))
 
 const PROCESS_EXIT_CALLED = 'process.exit called'
@@ -69,6 +80,17 @@ describe('josh.ts — help command', () => {
 		expect(vi.mocked(console.info)).toHaveBeenCalledWith(HELP_OUTPUT)
 		expect(vi.mocked(console.error)).not.toHaveBeenCalled()
 	})
+
+	// `--all` in the command slot is a help request too (joshuafolkken/kit#1928): it prints the
+	// listing, maintenance commands included, rather than resolving a command named `--all`.
+	it('prints help to stdout for a bare --all', async () => {
+		process.argv = [...ARGV_BASE, '--all']
+
+		await import('./josh')
+
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(HELP_OUTPUT)
+		expect(vi.mocked(console.error)).not.toHaveBeenCalled()
+	})
 })
 
 describe('josh.ts — unknown command', () => {
@@ -90,19 +112,19 @@ describe('josh.ts — unknown command', () => {
 		expect(vi.mocked(console.info)).not.toHaveBeenCalled()
 	})
 
-	it('reports the command name and the help listing on stderr', async () => {
+	it('reports the command name on stderr without the full help listing', async () => {
 		await expect(import('./josh')).rejects.toThrow(PROCESS_EXIT_CALLED)
 
 		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
 			expect.stringContaining(`${josh_mock.UNKNOWN_PREFIX}${UNKNOWN_CMD}`),
 		)
-		expect(vi.mocked(console.error)).toHaveBeenCalledWith(expect.stringContaining(HELP_OUTPUT))
+		expect(vi.mocked(console.error)).not.toHaveBeenCalledWith(expect.stringContaining(HELP_OUTPUT))
 	})
 })
 
 // joshuafolkken/kit#1342: a script command now writes its output through this process, and
 // `process.exit` truncates a piped stdout at its buffer size — losing the failure summary
-// `scripts/verification-gate.ts` writes last. The code is recorded and node exits on its own.
+// `scripts/gate/verification-gate.ts` writes last. The code is recorded and node exits on its own.
 describe('josh.ts — command with non-zero exit code', () => {
 	it('records the exit code without calling process.exit', async () => {
 		josh_mock.state.run_command_return = FAILURE_EXIT_CODE

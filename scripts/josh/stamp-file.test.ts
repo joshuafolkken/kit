@@ -1,7 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
+import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 import { stamp_file } from './stamp-file'
 
 // joshuafolkken/kit#1215: the record mechanics `josh eval` had were needed a second time by
@@ -12,6 +13,13 @@ const TEST_PREFIX = 'josh-stamp-file-test-'
 const ORIGINAL_CONTENT = 'someone else owns this'
 const EXAMPLE_PREFIX = 'josh-example-stamp-'
 const PAYLOAD = { ran_at: '2026-09-02T00:00:00.000Z' }
+// Two per-process temp directories that differ, as a launcher's and a woken session's did.
+const TEMP_DIRECTORY_VARIABLE = 'TMPDIR'
+const LAUNCHER_TEMP_DIRECTORY = '/var/folders/launcher/T'
+const WOKEN_TEMP_DIRECTORY = '/Users/woken/T'
+const SHARED_ROOT = '/opt/shared/josh'
+const FIRST_ACCOUNT = 501
+const SECOND_ACCOUNT = 502
 
 const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
 
@@ -25,7 +33,7 @@ describe('stamp_file.stamp_path', () => {
 	it('is a json file in the temp directory keyed to this checkout', () => {
 		const target = stamp_file.stamp_path(EXAMPLE_PREFIX)
 
-		expect(path.dirname(target)).toBe(tmpdir())
+		expect(path.dirname(target)).toBe(PLATFORM_TEMP_ROOT)
 		expect(path.basename(target)).toMatch(
 			new RegExp(String.raw`^${EXAMPLE_PREFIX}[\da-f]+\.json$`, 'u'),
 		)
@@ -47,6 +55,44 @@ describe('stamp_file.stamp_path', () => {
 		expect(stamp_file.stamp_path(EXAMPLE_PREFIX, '/projects/one')).not.toBe(
 			stamp_file.stamp_path(EXAMPLE_PREFIX, '/projects/two'),
 		)
+	})
+})
+
+describe('stamp_file.stamp_path across processes and accounts', () => {
+	// joshuafolkken/kit#1909: the handoff's reader is a different process than its writer, so the path
+	// must not move with either one's `TMPDIR`. A `run:wake`-launched session resolved a different
+	// directory than its launcher and began the carried budget again from nothing.
+	it('resolves the same record regardless of this process TMPDIR', () => {
+		try {
+			vi.stubEnv(TEMP_DIRECTORY_VARIABLE, LAUNCHER_TEMP_DIRECTORY)
+			const as_launcher = stamp_file.stamp_path(EXAMPLE_PREFIX)
+
+			vi.stubEnv(TEMP_DIRECTORY_VARIABLE, WOKEN_TEMP_DIRECTORY)
+			const as_woken = stamp_file.stamp_path(EXAMPLE_PREFIX)
+
+			expect(as_woken).toBe(as_launcher)
+			expect(path.dirname(as_launcher)).toBe(PLATFORM_TEMP_ROOT)
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+
+	// joshuafolkken/kit#1909: the shared root is shared between accounts too, so a root that is the same
+	// path for two accounts — a globally installed package directory — must still name two files.
+	it.skipIf(process.getuid === undefined)('keeps two accounts apart on one root', () => {
+		const spy = vi.spyOn(process, 'getuid')
+
+		try {
+			spy.mockReturnValue(FIRST_ACCOUNT)
+			const as_first = stamp_file.stamp_path(EXAMPLE_PREFIX, SHARED_ROOT)
+
+			spy.mockReturnValue(SECOND_ACCOUNT)
+			const as_second = stamp_file.stamp_path(EXAMPLE_PREFIX, SHARED_ROOT)
+
+			expect(as_second).not.toBe(as_first)
+		} finally {
+			spy.mockRestore()
+		}
 	})
 })
 

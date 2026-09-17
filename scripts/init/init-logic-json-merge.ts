@@ -2,7 +2,7 @@ import { config_merge } from '#scripts/config-merge/index'
 import { json_format } from '#scripts/config-merge/json-format'
 import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { patch_json_key } from '#scripts/config-merge/patch-json-key'
-import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/schemas'
+import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/lib/schemas'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
 import { kit_base_preset } from './kit-base-preset'
@@ -42,7 +42,6 @@ function merge_tsconfig_extends(content: string, entry: string, base_directory: 
 
 function extract_compiler_options(content: string): Record<string, unknown> {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['compilerOptions']
 	if (raw === undefined) return {}
 
@@ -203,7 +202,6 @@ const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
@@ -223,7 +221,6 @@ function merge_development_dependencies(
 	additions: Record<string, string>,
 ): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['devDependencies']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const to_add = missing_entries(existing, additions)
@@ -252,7 +249,6 @@ function merge_development_engines(content: string, value: Record<string, unknow
 
 function has_package_scripts_marker(content: string, marker: string): boolean {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return false
 	const scripts = string_record_schema.parse(raw)
@@ -262,7 +258,6 @@ function has_package_scripts_marker(content: string, marker: string): boolean {
 
 function merge_package_script_suffix(content: string, key: string, cmd: string): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return content
 	const scripts = string_record_schema.parse(raw)
@@ -273,9 +268,28 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	return serialize_package_json({ ...parsed, scripts: { ...scripts, [key]: updated_value } })
 }
 
+// Rewrite one substring inside one script, leaving the rest of it alone. It exists for upgrading a
+// clause kit itself wrote into a consumer's script in an earlier version: the rest of that script is
+// the consumer's, so replacing the whole value would discard their own steps. A `from` that is not
+// present returns the content untouched, which is what makes repeated `josh init` runs idempotent.
+function replace_in_package_script(content: string, key: string, from: string, to: string): string {
+	const parsed = parse_jsonc(content)
+	const raw = parsed['scripts']
+	if (raw === undefined) return content
+	const scripts = string_record_schema.parse(raw)
+	const existing = scripts[key]
+	if (!existing?.includes(from)) return content
+
+	return serialize_package_json({
+		...parsed,
+		// The replacer is a function so `to` is inserted verbatim: passed as a string, a `$&` or `$1`
+		// inside it would be read as a substitution pattern rather than as the text it is.
+		scripts: { ...scripts, [key]: existing.replace(from, () => to) },
+	})
+}
+
 function remove_script_with_marker(content: string, key: string, marker: string): string {
 	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return content
 	const scripts = string_record_schema.parse(raw)
@@ -314,6 +328,7 @@ const init_logic_json_merge = {
 	merge_json_object,
 	merge_package_scripts,
 	merge_package_script_suffix,
+	replace_in_package_script,
 	remove_script_with_marker,
 	has_package_scripts_marker,
 	merge_development_dependencies,

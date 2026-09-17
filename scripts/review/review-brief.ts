@@ -1,4 +1,6 @@
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { review_checkout, type ReviewCheckout } from './review-checkout'
 
 // The text `josh review:brief` prints — the `/code-review` invocation, composed from what the run
 // already knows (joshuafolkken/kit#1241).
@@ -19,8 +21,66 @@ import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 const TEST_COMMAND_LINE =
 	'- The unit suite is `pnpm josh test:unit`. Do not reach for `npx vitest`; it is not how this project runs them.'
 
-const WHOLE_CHANGE_TARGET =
-	'Target: the whole change — `git diff main` plus the untracked files beside it.'
+// **The checkout block, and why the target below names a path instead of assuming one**
+// (joshuafolkken/kit#1522). `/code-review` is forked by the harness and inherits the session's
+// working directory, so during a lane run it starts in a tree that holds the previous child's
+// already-merged code. Reading that tree, it finds nothing wrong and says so — and the run reads
+// that silence as a clean review. Neither half of this block is a paragraph a person has to remember
+// to type: the path is generated from `git rev-parse --show-toplevel` in the checkout the run is
+// implementing in, and the nonce is written to a record before it is printed.
+// **The root is interpolated rather than left as a placeholder.** Every other path this brief prints
+// is absolute for one reason — a forked agent resolves a relative path against its own tree — and a
+// literal `<path>` in the line that says *how* to run the commands undoes exactly that: copied
+// verbatim it fails, and the agent falls back to the checkout it inherited, which is the wrong one.
+function checkout_warning(root: string): string {
+	return `You do not inherit that working directory. Run every command for this review against it — \`git -C ${root} …\` — and read no file outside it.`
+}
+
+function attest_line(nonce: string): string {
+	return `Attest before you report: run \`pnpm josh review:attest ${nonce}\` from the checkout you actually read. A non-zero exit means it was not the one above — report \`REVIEW TARGET MISMATCH\` and no findings. Never report "no findings" without that command having passed: a review of the wrong tree finds nothing wrong, and the run cannot tell that apart from approval (joshuafolkken/kit#1522).`
+}
+
+// **The rubric is handed over by path, not pasted in** (joshuafolkken/kit#1927). `/code-review` runs
+// in a forked process that reads none of this repository's documents, so the severity tests, the nine
+// categories and the output format never reached it — the review scored the diff on whatever the
+// forked skill happened to carry. The reviewer has file access (it already runs `git -C <root> …` and
+// `pnpm josh review:attest`), so the brief names the rubric's absolute path and requires it be read
+// and applied before anything is reported. Absolute because a forked agent resolves a relative path
+// against the tree it was spawned in, which is the wrong one during a lane run.
+const RUBRIC_RELATIVE_PATH = 'prompts/review-rubric.md'
+
+function rubric_line(root: string): string {
+	return `Rubric: read \`${root}/${RUBRIC_RELATIVE_PATH}\` first and apply it — it is the severity tests, the round output format, the nine categories and the stop conditions this review is scored against. You do not carry them otherwise, so a review that skips it is scored on the wrong rules.`
+}
+
+function checkout_block(checkout: ReviewCheckout, nonce: string): string {
+	return [
+		`Checkout: ${review_checkout.describe_checkout(checkout)}`,
+		checkout_warning(checkout.root),
+		attest_line(nonce),
+	].join('\n')
+}
+
+// `-C <root>` rather than a bare `git diff`, so the command works from whatever directory the
+// forked agent happens to be sitting in rather than only from the right one.
+//
+// **The base is the merge base, not `main` itself** (joshuafolkken/kit#1527). A linked work tree
+// shares the `main` ref with every other lane, so a two-dot `git diff main` run in an unmerged lane
+// lists whatever another lane merged in the meantime — in reverse. This line is a command the forked
+// agent runs, so printing the old spelling would hand it exactly the mixed-in listing the reading
+// itself no longer produces.
+//
+// **The base is resolved here and embedded as a value, never printed as a `$(…)` substitution.** A
+// subshell that fails expands to the empty string, and `git -C <root> diff` with no revision exits 0
+// listing only the *unstaged* working tree — so a `merge-base` that could not answer would silently
+// narrow the review to a fraction of the change and the agent would report "no findings" on code it
+// never read. `git_command.change_base` already degrades to the default branch name instead, which
+// is the previous command and fails loudly rather than open.
+function whole_change_target(root: string, base: string): string {
+	const command = `git -C ${root} diff ${base}`
+
+	return `Target: the whole change — \`${command}\` plus the untracked files beside it.`
+}
 
 const ROUND_TWO_HEADING =
 	'Round 2 — a verification pass over the fix delta, not a second full review.'
@@ -28,7 +88,9 @@ const ROUND_TWO_HEADING =
 const ROUND_TWO_QUESTION =
 	'Ask whether each first-round finding closed and whether the fix itself introduced a defect. Do not re-read the parts of the diff no fix touched.'
 
-const NO_SNAPSHOT_LINE = `No round-1 snapshot was recorded, so the fix delta cannot be named. ${WHOLE_CHANGE_TARGET}`
+function no_snapshot_line(root: string, base: string): string {
+	return `No round-1 snapshot was recorded, so the fix delta cannot be named. ${whole_change_target(root, base)}`
+}
 
 const EMPTY_DELTA_LINE =
 	'The fix delta is empty — nothing changed since round 1, so there is nothing for a verification pass to read.'
@@ -68,15 +130,42 @@ function in_flight_line(taken_at: string): string {
 // a `finally`, and a `finally` does not run when the gate is killed — Ctrl-C, Stop, SIGTERM — so an
 // interrupted gate leaves the file on disk with the tree it was reading still intact. Believed on the
 // digests alone it would say a gate is running for as long as nobody edits that tree, about a process
-// that no longer exists: exactly the state the record must never describe. The written `pid` is what
-// separates the two, and a marker with none is read as not running, which falls back to `Not verified`.
+// that no longer exists: exactly the state the record must never describe.
+//
+// **The written pid alone did not separate the two** (joshuafolkken/kit#1245). It names whatever holds
+// that number now, so once the operating system reissued it the abandoned marker passed the liveness
+// probe again and this line went back to printing `Running now` about nothing — the same untrue
+// sentence, reached by a longer route. The record therefore carries the writing process's start time
+// beside its pid, and `is_writer_running` requires the pair. A marker carrying neither, or one whose
+// platform cannot report a start time, is read as not running and falls back to `Not verified`.
 function live_marker(
 	stamp: FileMapStamp | undefined,
 	tree: Record<string, string>,
 ): FileMapStamp | undefined {
 	const matched = matching_stamp(stamp, tree)
 
-	if (matched === undefined || !file_map_stamp.is_process_alive(matched.pid)) return undefined
+	if (!file_map_stamp.is_writer_running(matched)) return undefined
+
+	return matched
+}
+
+// **Matching digests are not enough for the green claim** (joshuafolkken/kit#1537). The map covers
+// the paths the change makes changed, so a merge of the default branch that touches nothing the
+// branch touches leaves every digest identical while the tree gains code the gate never read —
+// and the brief would tell the reviewer that lint, the type check, the spell check and the unit tests
+// passed on "this exact tree". The gate already records the commit it measured against, and
+// `gate-skip.ts` already refuses reuse on it; this is the same refusal for the same record.
+//
+// **The in-flight marker is deliberately left alone.** It carries no base, and it claims no result:
+// the worst a moved base does there is report that a gate is running, which is true.
+function green_stamp(
+	stamp: FileMapStamp | undefined,
+	tree: Record<string, string>,
+	base: string,
+): FileMapStamp | undefined {
+	const matched = matching_stamp(stamp, tree)
+
+	if (matched === undefined || !file_map_stamp.describes_base(matched, base)) return undefined
 
 	return matched
 }
@@ -86,8 +175,9 @@ function live_marker(
 function gate_line(
 	stamps: { gate: FileMapStamp | undefined; in_flight: FileMapStamp | undefined },
 	tree: Record<string, string>,
+	base: string,
 ): string {
-	const green = matching_stamp(stamps.gate, tree)
+	const green = green_stamp(stamps.gate, tree, base)
 
 	if (green !== undefined) return verified_line(green.taken_at)
 
@@ -98,31 +188,167 @@ function gate_line(
 	return NOT_VERIFIED_LINE
 }
 
-function format_paths(paths: ReadonlyArray<string>): string {
-	return paths.map((relative) => `  ${relative}`).join('\n')
+// Absolute, for the same reason the round-1 target carries `-C`: git prints repository-root-relative
+// paths, and a forked agent sitting in another checkout resolves them against that one — where the
+// same relative path names a different file, or none.
+function format_paths(root: string, paths: ReadonlyArray<string>): string {
+	return paths.map((relative) => `  ${root}/${relative}`).join('\n')
 }
 
-function round_two_target(delta: ReadonlyArray<string>): string {
-	if (delta.length === 0) return EMPTY_DELTA_LINE
+// **An empty target has two readings, and only one of them is "nothing changed"**
+// (joshuafolkken/kit#1537). Since the delta is intersected with the change, round 1's fixes can be
+// real and still leave no target — a fix that reverts a file to its base content takes that path out
+// of `git diff` altogether. Printing "nothing changed since round 1" there would contradict the
+// `Not in this change` list directly below it, which is the self-disagreement this whole change
+// exists to remove.
+const NOTHING_LEFT_LINE =
+	'The fix delta is empty once reconciled against this change — every path the comparison offered has left it, so there is nothing here for a verification pass to read.'
 
-	return `Target: only these files, which are the ones round 1's fixes changed:\n${format_paths(delta)}`
+function round_two_target(root: string, scope: RoundTwoScope): string {
+	if (scope.target.length > 0) {
+		return `Target: only these files, which are the ones round 1's fixes changed:\n${format_paths(root, scope.target)}`
+	}
+
+	return scope.dropped.length > 0 ? NOTHING_LEFT_LINE : EMPTY_DELTA_LINE
+}
+
+// **What round 2 is sent to read, reconciled against the change it is meant to cover**
+// (joshuafolkken/kit#1537). The delta alone is not that list. It is the difference between two file
+// maps, each one a diff against `change_base` **as it stood when that map was taken** — and nothing
+// used to record which commit that was. Move the base between the rounds, which is exactly what a
+// resumed run's merge of the default branch does, and the two maps stop covering the same set of
+// paths: their difference then names files the branch never touched and misses files it did.
+//
+// The three fields are the whole reconciliation, and the run needs all three rather than the first:
+// `target` is what to read, `dropped` is what the comparison offered that this change does not
+// contain, and `carried` counts what this change contains that round 1 already read. A brief that
+// printed `target` alone would still be silently disagreeing with `git diff` — the failure the Issue
+// was filed on — it would just be disagreeing in a smaller way.
+//
+// **`recorded_at` is present exactly when the round is narrow.** It is the timestamp of the record the
+// delta was measured from, and its absence is what says the round was widened — so the block below
+// branches on this one decision rather than making a second one of its own.
+interface RoundTwoScope {
+	recorded_at: string | undefined
+	target: ReadonlyArray<string>
+	dropped: ReadonlyArray<string>
+	carried: ReadonlyArray<string>
+}
+
+function sorted_names(names: ReadonlyArray<string>): ReadonlyArray<string> {
+	return [...names].toSorted((left, right) => left.localeCompare(right))
+}
+
+// A record that cannot be compared widens the round to the whole change rather than narrowing it, so
+// every path the change touches is a target. This is the same direction joshuafolkken/kit#1241 chose
+// for a missing record, extended to a record that is present and unusable.
+function whole_change_scope(tree: Record<string, string>): RoundTwoScope {
+	return {
+		recorded_at: undefined,
+		target: sorted_names(Object.keys(tree)),
+		dropped: [],
+		carried: [],
+	}
+}
+
+// `tree`'s keys are this change's paths — `git diff <base>` plus the untracked files beside it — so
+// intersecting against them is what keeps a path the change does not contain out of the target.
+function delta_scope(
+	delta: ReadonlyArray<string>,
+	tree: Record<string, string>,
+	recorded_at: string,
+): RoundTwoScope {
+	const target = delta.filter((name) => Object.hasOwn(tree, name))
+
+	return {
+		recorded_at,
+		target,
+		dropped: delta.filter((name) => !Object.hasOwn(tree, name)),
+		carried: sorted_names(Object.keys(tree).filter((name) => !target.includes(name))),
+	}
+}
+
+// A type predicate rather than two spellings of the same condition: the scope and the printed block
+// must never disagree about whether the record was usable.
+function is_comparable(snapshot: FileMapStamp | undefined, base: string): snapshot is FileMapStamp {
+	return snapshot !== undefined && file_map_stamp.describes_base(snapshot, base)
+}
+
+function round_two_scope(
+	snapshot: FileMapStamp | undefined,
+	tree: Record<string, string>,
+	base: string,
+): RoundTwoScope {
+	if (!is_comparable(snapshot, base)) return whole_change_scope(tree)
+
+	return delta_scope(file_map_stamp.changed_since(snapshot, tree), tree, snapshot.taken_at)
+}
+
+const BASE_MOVED_PREFIX = 'The change base moved since round 1 was recorded'
+
+function base_moved_line(snapshot: FileMapStamp, root: string, base: string): string {
+	const recorded = snapshot.base ?? 'a commit it did not record'
+
+	return `${BASE_MOVED_PREFIX} — round 1 measured this change against ${recorded}, this round measures it against ${base}. The two file maps therefore cover different sets of files, and their difference is not the fix delta. ${whole_change_target(root, base)}`
+}
+
+function widened_line(snapshot: FileMapStamp | undefined, root: string, base: string): string {
+	if (snapshot === undefined) return no_snapshot_line(root, base)
+
+	return base_moved_line(snapshot, root, base)
+}
+
+function dropped_line(root: string, dropped: ReadonlyArray<string>): string {
+	return `Not in this change, so not a target here — the comparison offered them and \`git diff\` does not list them:\n${format_paths(root, dropped)}`
+}
+
+function carried_line(root: string, base: string, count: number): string {
+	return `${String(count)} further file(s) this change touches are byte-identical to round 1 and were read there, so they are deliberately out of scope. Reconcile before you report: \`git -C ${root} diff --name-only ${base}\` plus the untracked files beside it is this change, and every path in it is either a target above or one of those.`
+}
+
+function reconciliation(root: string, base: string, scope: RoundTwoScope): ReadonlyArray<string> {
+	return [
+		...(scope.dropped.length > 0 ? [dropped_line(root, scope.dropped)] : []),
+		...(scope.carried.length > 0 ? [carried_line(root, base, scope.carried.length)] : []),
+	]
+}
+
+// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the record
+// is round 1's own — written once per run, and kept by a later round-1 invocation rather than retaken
+// against the fixed tree — so this line says how far back the target below is measured from. A record
+// left behind by a run that never reached `josh followup` makes the target wider, and its timestamp is
+// the only thing that shows that from here.
+function narrow_block(
+	recorded_at: string,
+	scope: RoundTwoScope,
+	root: string,
+	base: string,
+): string {
+	return [
+		ROUND_TWO_HEADING,
+		`Round 1 was recorded at ${recorded_at}.`,
+		round_two_target(root, scope),
+		...reconciliation(root, base, scope),
+		ROUND_TWO_QUESTION,
+	].join('\n')
 }
 
 // `undefined` for the snapshot and "the whole change" as the answer: a missing record must widen the
 // review, never narrow it. A brief that silently reviewed nothing would be the cheapest possible run
 // and the most dangerous.
-function round_two_block(snapshot: FileMapStamp | undefined, tree: Record<string, string>): string {
-	if (snapshot === undefined) return `${ROUND_TWO_HEADING}\n${NO_SNAPSHOT_LINE}`
+function round_two_block(
+	snapshot: FileMapStamp | undefined,
+	tree: Record<string, string>,
+	root: string,
+	base: string,
+): string {
+	const scope = round_two_scope(snapshot, tree, base)
 
-	const delta = file_map_stamp.changed_since(snapshot, tree)
-	// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the
-	// record is round 1's own — written once per run, and kept by a later round-1 invocation rather
-	// than retaken against the fixed tree — so this line says how far back the target below is
-	// measured from. A record left behind by a run that never reached `josh followup` makes the target
-	// wider, and its timestamp is the only thing that shows that from here.
-	const taken = `Round 1 was recorded at ${snapshot.taken_at}.`
+	if (scope.recorded_at === undefined) {
+		return `${ROUND_TWO_HEADING}\n${widened_line(snapshot, root, base)}`
+	}
 
-	return `${ROUND_TWO_HEADING}\n${taken}\n${round_two_target(delta)}\n${ROUND_TWO_QUESTION}`
+	return narrow_block(scope.recorded_at, scope, root, base)
 }
 
 interface BriefStamps {
@@ -133,26 +359,40 @@ interface BriefStamps {
 
 interface BriefInput {
 	level: string
+	profile?: AgentProfile
 	round: number
 	tree: Record<string, string>
 	stamps: BriefStamps
+	checkout: ReviewCheckout
+	nonce: string
+	// The commit the change is measured against, resolved by the caller so the printed target carries
+	// a value rather than a subshell that can fail open (joshuafolkken/kit#1527).
+	base: string
 }
 
 const SECOND_ROUND = 2
 
 function target_block(input: BriefInput): string {
-	if (input.round < SECOND_ROUND) return WHOLE_CHANGE_TARGET
+	if (input.round < SECOND_ROUND) return whole_change_target(input.checkout.root, input.base)
 
-	return round_two_block(input.stamps.round_one, input.tree)
+	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
 }
 
-// The level alone on the first line, because `review:level`'s contract — a caller reading the answer
-// with `$(...)` — is the one thing a brief must not break.
+// The level alone on the first line, because the level-only mode's contract — a caller reading the
+// answer with `$(...)` — is the one thing a brief must not break.
 function compose(input: BriefInput): string {
+	const profile = input.profile ?? agent_role_profile.DEFAULT_PROFILES.reviewer
+
 	return [
 		input.level,
 		'',
-		gate_line(input.stamps, input.tree),
+		`Agent profile: ${agent_role_profile.describe(profile)}`,
+		'',
+		rubric_line(input.checkout.root),
+		'',
+		checkout_block(input.checkout, input.nonce),
+		'',
+		gate_line(input.stamps, input.tree, input.base),
 		TEST_COMMAND_LINE,
 		'',
 		target_block(input),
@@ -160,21 +400,33 @@ function compose(input: BriefInput): string {
 }
 
 const review_brief = {
+	attest_line,
+	BASE_MOVED_PREFIX,
+	base_moved_line,
+	carried_line,
+	checkout_block,
+	checkout_warning,
 	compose,
+	dropped_line,
 	EMPTY_DELTA_LINE,
 	gate_line,
+	green_stamp,
 	in_flight_line,
 	live_marker,
 	matching_stamp,
-	NO_SNAPSHOT_LINE,
+	no_snapshot_line,
+	NOTHING_LEFT_LINE,
 	NOT_VERIFIED_LINE,
+	rubric_line,
+	RUBRIC_RELATIVE_PATH,
 	ROUND_TWO_HEADING,
 	ROUND_TWO_QUESTION,
 	round_two_block,
+	round_two_scope,
 	SECOND_ROUND,
 	TEST_COMMAND_LINE,
-	WHOLE_CHANGE_TARGET,
+	whole_change_target,
 }
 
-export type { BriefInput, BriefStamps }
+export type { BriefInput, BriefStamps, RoundTwoScope }
 export { review_brief }

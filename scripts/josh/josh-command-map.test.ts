@@ -2,14 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { ALIASES, CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-map'
 
 const ALL_COMMAND_NAMES = Object.keys(COMMAND_MAP)
-const VERSION_UPGRADE_COMMAND = 'version:upgrade'
-const TEST_WATCH_COMMAND = 'test:watch'
-const TEST_UI_COMMAND = 'test:ui'
 const TEST_E2E_COMMAND = 'test:e2e'
 const TEST_UNIT_COMMAND = 'test:unit'
-const HEALTH_COMMAND = 'health'
 const ALL_ALIAS_KEYS = Object.keys(ALIASES)
 const DEVELOPMENT_CATEGORY = 'Development'
+const OPTIONAL_ENV_FILE_FLAG = '--env-file-if-exists=.env'
 
 function get_command(name: string): CommandEntry | undefined {
 	return COMMAND_MAP[name]
@@ -74,8 +71,8 @@ describe('COMMAND_MAP — command lookup by name', () => {
 		expect(entry?.category).toBe('Versioning')
 	})
 
-	it('resolves version:upgrade command with script and Versioning category', () => {
-		const entry = get_command(VERSION_UPGRADE_COMMAND)
+	it('resolves version command with script and Versioning category', () => {
+		const entry = get_command('version')
 
 		expect(entry?.script).toBeDefined()
 		expect(entry?.category).toBe('Versioning')
@@ -83,34 +80,10 @@ describe('COMMAND_MAP — command lookup by name', () => {
 })
 
 describe('COMMAND_MAP — new dev commands', () => {
-	it('resolves test:watch command with shell and Development category', () => {
-		const entry = get_command(TEST_WATCH_COMMAND)
-
-		expect(entry).toBeDefined()
-		expect(entry?.shell).toBeDefined()
-		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
-	})
-
-	it('resolves test:ui command with shell and Development category', () => {
-		const entry = get_command(TEST_UI_COMMAND)
-
-		expect(entry).toBeDefined()
-		expect(entry?.shell).toBeDefined()
-		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
-	})
-
-	it('resolves health command with script and Development category', () => {
-		const entry = get_command(HEALTH_COMMAND)
-
-		expect(entry).toBeDefined()
-		expect(entry?.script).toBeDefined()
-		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
-	})
-
 	it('routes test:e2e through the guard script instead of a raw shell command', () => {
 		const entry = get_command(TEST_E2E_COMMAND)
 
-		expect(entry?.script).toBe('scripts/test-e2e-guard.ts')
+		expect(entry?.script).toBe('scripts/test/test-e2e-guard.ts')
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})
@@ -118,24 +91,27 @@ describe('COMMAND_MAP — new dev commands', () => {
 	it('routes test:unit through the guard script instead of a raw shell command', () => {
 		const entry = get_command(TEST_UNIT_COMMAND)
 
-		expect(entry?.script).toBe('scripts/test-unit-guard.ts')
+		expect(entry?.script).toBe('scripts/test/test-unit-guard.ts')
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})
 })
 
 describe('COMMAND_MAP — tsx_arguments', () => {
-	it('followup command has tsx_arguments with env-file flag', () => {
+	// joshuafolkken/kit#1564: the optional form, not merely "an env-file flag". Both commands are run
+	// where no `.env` exists — a cloud session carries `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` as
+	// environment variables — and the mandatory form aborts before the script's first line there.
+	it('followup command reads .env only when it exists', () => {
 		const entry = get_command('followup')
 
 		expect(entry?.tsx_arguments).toBeDefined()
-		expect(entry?.tsx_arguments?.some((flag) => flag.includes('env-file'))).toBe(true)
+		expect(entry?.tsx_arguments).toContain(OPTIONAL_ENV_FILE_FLAG)
 	})
 
-	it('notify command has tsx_arguments with env-file flag', () => {
+	it('notify command reads .env only when it exists', () => {
 		const entry = get_command('notify')
 
-		expect(entry?.tsx_arguments?.some((flag) => flag.includes('env-file'))).toBe(true)
+		expect(entry?.tsx_arguments).toContain(OPTIONAL_ENV_FILE_FLAG)
 	})
 
 	// #820 put a `--env-file-if-exists=.env` flag here so `josh port` and `playwright.config.ts`
@@ -149,16 +125,6 @@ describe('COMMAND_MAP — tsx_arguments', () => {
 
 	it('lint command has no tsx_arguments', () => {
 		expect(get_command('lint')?.tsx_arguments).toBeUndefined()
-	})
-
-	// joshuafolkken/kit#1235: the measurement is opt-in, and a person keeps that preference in `.env`
-	// rather than typing it in front of every gate. Without the flag the file is never read and the
-	// command answers `skip` with no complaint — a switch that fails silently in the direction of
-	// doing nothing. The optional form because `.env` need not exist.
-	it('eval:scope command reads .env so the opt-in switch can live there', () => {
-		expect(
-			get_command('eval:scope')?.tsx_arguments?.some((flag) => flag.includes('env-file')),
-		).toBe(true)
 	})
 })
 
@@ -187,10 +153,6 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 		expect(get_alias('fu')).toBe('followup')
 	})
 
-	it('resolves vu alias to version:upgrade', () => {
-		expect(get_alias('vu')).toBe(VERSION_UPGRADE_COMMAND)
-	})
-
 	it('resolves tu alias to test:unit', () => {
 		expect(get_alias('tu')).toBe('test:unit')
 	})
@@ -201,26 +163,6 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 })
 
 describe('ALIASES — new command aliases', () => {
-	it('resolves tw alias to test:watch', () => {
-		expect(get_alias('tw')).toBe(TEST_WATCH_COMMAND)
-	})
-
-	it('resolves tui alias to test:ui', () => {
-		expect(get_alias('tui')).toBe(TEST_UI_COMMAND)
-	})
-
-	it('resolves he alias to health', () => {
-		expect(get_alias('he')).toBe(HEALTH_COMMAND)
-	})
-
-	it('resolves swp alias to sync-workflow-pins', () => {
-		expect(get_alias('swp')).toBe('sync-workflow-pins')
-	})
-
-	it('resolves sdp alias to sync-dependabot-pins', () => {
-		expect(get_alias('sdp')).toBe('sync-dependabot-pins')
-	})
-
 	it('resolves dr alias to doctor', () => {
 		expect(get_alias('dr')).toBe('doctor')
 	})

@@ -2,6 +2,56 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Coined for the retirement of `josh cost` reports no rule or decision read (#2016): a column,
+  # scope or module is "readerless" when nothing consumes its value. Used in the CLI comments, the
+  # tests and `docs/josh-commands.md` to name what was removed and why the `--over` verdict stays.
+  - readerless
+  # Wrapped in backticks, as a past participle. `josh epic --add` writes the relation it replaced into
+  # the decision record with the chain in a code span, because a line that is nothing but `#A -> #B` is
+  # read as a dependency declaration anywhere in an epic body (joshuafolkken/kit#1711) — the code and
+  # the docs both have to say why the span is there.
+  - backticked
+  # The highest-but-one effort level the agent CLI accepts, between `high` and `max`. It is one of the
+  # `--effort` values a dispatched lane child is allowed (joshuafolkken/kit#1932), so `detached-launch.ts`
+  # names it in its allowlist and the docs quote the full set verbatim.
+  - xhigh
+  # The system call that replaces a process image, which is what `spawn` reaches without a shell.
+  # `run-wake-session.ts` names it to say why a NUL byte in an argument is the one character that has
+  # to be rejected: it terminates the string there, so the argument that runs is a prefix of the one
+  # that was checked (joshuafolkken/kit#1719).
+  - execve
+  # The C library call Node names in a name-resolution failure, and the error code it carries. The
+  # `backlog:next` reference quotes one verbatim as the failure that used to be reported as an
+  # unusable dependency graph (joshuafolkken/kit#1663) — the literal text a reader greps for.
+  - getaddrinfo
+  - ENOTFOUND
+  # The registry host `docs/cloud-session.md` lists among the outbound hosts a cloud container has to
+  # allow (joshuafolkken/kit#1565). It is the domain `registry.npmjs.org`, not a prose word.
+  - npmjs
+  # The mount option that refuses to execute anything on a filesystem. `security-audit.ts` names it
+  # as one of the reasons a provisioned osv-scanner can exist and still not be runnable
+  # (joshuafolkken/kit#1563), which is why existence alone is not the check.
+  - noexec
+  # git's own spelling of the `commit.gpgsign` config key, carried on `-c` by the throwaway
+  # repository `lane-change-base.test.ts` builds so a signing setup on the machine cannot fail its
+  # commits.
+  - gpgsign
+  # git's own name for the log of where a ref has been. It is the only evidence joshuafolkken/kit#1530
+  # left behind, and `test-repository-guard.ts` cites it three times as the reason the guard has to
+  # name what it caught.
+  - reflog
+  # What `josh review:attest` calls a review that read a checkout other than the one it was briefed
+  # on (joshuafolkken/kit#1522). cspell derives "targeted" but not the "mis-" compound.
+  - mistargeted
+  # To price something wrongly. `cost-dollar-composition.ts` uses it to say why one blended rate over
+  # models of different prices would misprice both — cspell derives "price" but not the "mis-" compound.
+  - misprice
+  # The things that depend on a given one — British spelling of "dependents". `epic-next-views.ts` uses
+  # it for the issues a blocked or parked issue holds up for a person to resolve.
+  - dependants
+  # `git rev-parse --show-toplevel`, quoted in `docs/josh-commands.md` as the source of the checkout
+  # root the review brief prints. git's own spelling of the flag.
+  - toplevel
   # What `josh lint:related` calls a file the two linters read (joshuafolkken/kit#1298), matching
   # the "relatable" the sibling unit narrowing already uses for a file a test can import.
   - lintable
@@ -21,6 +71,10 @@ words:
   # its counterpart uses for the first of those alone. Neither reaches a distributed file.
   - untimed
   - unstarted
+  # What `propagate-git-failure.ts` calls a branch `josh git` committed to and could not push — the
+  # state a consumer's pre-push hook leaves behind (joshuafolkken/kit#1417). It reaches no
+  # distributed file: the word appears only in that module's own unit suite.
+  - unpushed
   # What `time-ci.ts` does with a CI cycle the merge command sat waiting for: it moves from the
   # `merge` phase to `ci` (joshuafolkken/kit#1384). All three forms are needed — cspell's
   # dictionaries derive none of them from another — and none reaches a distributed file.
@@ -43,18 +97,23 @@ words:
   - issuecomment
   - frontmatter
   - toolkits
-  # `worktrees` is not here: it appears in a skill `josh sync` copies, so it lives in the
-  # distributed dictionary instead (joshuafolkken/kit#1092). The singular reaches no copied file.
-  - worktree
+  # Neither `worktrees` nor `worktree` is here: both appear in skills `josh sync` copies, so they
+  # live in the distributed dictionary instead (joshuafolkken/kit#1092, joshuafolkken/kit#1587 for
+  # the singular, which `epicrun.md` needs to name the `git worktree add` git refuses to reach).
   - gitdir
   - commondir
   - precheck
   - backlinks
-  - bundleable
   # A call the investigation guard is allowed to refuse at all (joshuafolkken/kit#1460). It reaches no
   # distributed file — only `scripts/delegation/` — so it stays in this config rather than the
   # dictionary `josh sync` publishes.
   - refusable
+  - runnability
+  # The outcome `josh lane:dispatch` answers with when a lane's log path could not be recorded
+  # (joshuafolkken/kit#1749), and the anchor of `docs/josh-commands.md` → "`josh run:wake`", which a
+  # document-rule test quotes verbatim.
+  - unrecordable
+  - runwake
   - fromjson
   - dryrun
   - overridability
@@ -66,9 +125,9 @@ words:
   - myorg
   - myrepo
   - ncurc
-  # The `tsc --noEmit` flag, folded to lower case: `josh layers` matches its tool signatures
-  # against a lowercased command line, so the pattern cannot keep the camel case that would let
-  # the spell checker split it (joshuafolkken/kit#1313).
+  # The `tsc --noEmit` flag, folded to lower case: a lowercased command line is matched against
+  # tool signatures, so the pattern cannot keep the camel case that would let the spell checker
+  # split it (joshuafolkken/kit#1313).
   - noemit
   - unstub
   - appleboy
@@ -77,18 +136,47 @@ words:
   - packument
   - EBADDEVENGINES
   - sonarlint
-  - tssecurity
   - inlines
   - extensionless
   - triaging
   - mnemecha
   - waneccha
   - ENOENT
+  # The errno a `--stop` gets when it may not signal the supervisor it just unrecorded
+  - EPERM
   - ELIFECYCLE
   # The id prefix the API gives a tool_use block. The eval suite's directory name, `evals`, is in
   # the distributed dictionary instead — a copied skill cites it (joshuafolkken/kit#1092).
   - toolu
-  # In the wrangler stack traces quoted verbatim in `scripts/e2e-retry-check-crash-fixture.ts`. Not
+  # In the wrangler stack traces quoted verbatim in `scripts/test/e2e-retry-check-crash-fixture.ts`. Not
   # in the distributed dictionary beside `workerd`, because that fixture is one of the `*-fixture.ts`
   # files `package.json` keeps out of the published package — no consumer ever spell-checks it.
   - miniflare
+  # `ps`'s own name for the field that prints a process's start time, and the name of the `ps`
+  # implementation Linux ships. Both are quoted in `scripts/josh/process-identity.ts`, which pairs
+  # that start time with a pid so a reissued pid cannot pass as the process that wrote a record
+  # (joshuafolkken/kit#1245). They stay in this local list because neither reaches a distributed file.
+  - lstart
+  - procps
+  # The plural of `pid`, which cspell's dictionaries carry only in the singular. Used where the
+  # comment is about several of them at once — `process-identity-fixture.ts` and the suite that
+  # exercises the reissued-pid case.
+  - pids
+  # The `git log --oneline` flag, quoted in the read-only cases that pin what the piped-verification
+  # rule must not catch (joshuafolkken/kit#1556).
+  - oneline
+  # GitHub's own name for the combined status of a commit's checks — the thing that counts a skipped
+  # job as a passing one, which is why `.github/workflows/ci.yml` explains it twice
+  # (joshuafolkken/kit#991, joshuafolkken/kit#1226). A dictionary cspell enables for markdown already
+  # carries it, so `docs/josh-commands.md` has used it for some time; the workflow is YAML, where
+  # that dictionary is off, so the word has to be declared here to be spelled the same in both.
+  - rollup
+  # What `scripts/time-runtime/time-history.ts` calls `scripts/time/`: the report directory that is
+  # deliberately left out of the package, so the recorder must not statically pull it into a
+  # distributed command's closure (joshuafolkken/kit#2003). cspell derives "distributable" but not
+  # the "un-" compound.
+  - undistributable
+  # What `scripts/rules/lane-park.ts` calls a lane child's decision-stop that has not yet recorded its
+  # park on the Issue (joshuafolkken/kit#2034) — the state the delivered rule refuses. It reaches no
+  # distributed file: the word appears only in that module, its two suites and the enumeration.
+  - unparked

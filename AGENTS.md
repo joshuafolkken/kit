@@ -8,7 +8,7 @@ it is Claude-specific — the naming conventions, quality limits, code-change ru
 gate, git rules and collaboration workflow apply to whatever agent is doing the work.
 
 Rules that only apply while a particular command is running are not in `CLAUDE.md` either. It routes
-to them, and the routing is part of the rules: read `.claude/skills/<name>/SKILL.md` when
+to them, and the routing is part of the rules: read the `<name>` skill when
 `CLAUDE.md` tells you to, and `prompts/*.md` when it names one.
 
 There is no include directive here, only the sentence above. `GEMINI.md` carries an `@CLAUDE.md`

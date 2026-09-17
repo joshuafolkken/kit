@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
-import { package_version_schema } from '#scripts/schemas'
-import { resolve_spawn_exit } from '#scripts/spawn-exit'
+import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
+import { package_version_schema } from '#scripts/lib/schemas'
+import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
+import { command_suggest } from './command-suggest'
 import {
 	ALIASES,
 	CATEGORY_ORDER,
@@ -14,6 +15,7 @@ import {
 } from './josh-command-map'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 import { josh_in_process } from './josh-in-process'
+import { kit_only } from './kit-only'
 
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
@@ -88,6 +90,26 @@ function read_package_version(): string {
 
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`
 const USAGE = 'Usage: josh <command> [options]'
+const ALL_HINT = "Run 'josh --all' to also list kit-maintenance commands."
+
+// The help splits by audience: `josh --help` shows the commands a kit user runs day to day, and
+// `josh --all` adds the kit-maintenance ones below (joshuafolkken/kit#1928). These are the
+// maintenance set — publishing, propagating and reconciling kit itself, plus the git-hook internals
+// that lefthook invokes rather than a person. Membership lives here, one reviewable list, rather than
+// as a flag threaded through every command entry.
+const MAINTENANCE_COMMANDS: ReadonlySet<string> = new Set([
+	'release',
+	'release:scope',
+	'propagate',
+	'reconcile-templates',
+	'audit:provision',
+	'eval',
+	'secretlint-scan',
+	'prevent-main-commit',
+	'check-commit-message',
+	'pre-push-unit',
+	'pre-commit-type-check',
+])
 
 function build_alias_lookup(): Map<string, string> {
 	const lookup = new Map<string, string>()
@@ -118,33 +140,68 @@ function format_category_section(
 	return [`${category}:`, ...lines].join('\n')
 }
 
-function format_help(): string {
+// A consumer never sees a kit-only command; inside kit the maintenance split (`--help` vs `--all`) is
+// all that hides anything (joshuafolkken/kit#1988).
+function is_visible_command(
+	cmd: string,
+	entry: CommandEntry,
+	is_all: boolean,
+	is_consumer: boolean,
+): boolean {
+	if (is_consumer && kit_only.is_kit_only(entry)) return false
+
+	return is_all || !MAINTENANCE_COMMANDS.has(cmd)
+}
+
+function collect_visible(
+	is_all: boolean,
+	is_consumer: boolean,
+): Map<CommandCategory, Array<[string, CommandEntry]>> {
 	const by_category = new Map<CommandCategory, Array<[string, CommandEntry]>>(
 		CATEGORY_ORDER.map((cat) => [cat, []]),
 	)
 
 	for (const [cmd, entry] of Object.entries(COMMAND_MAP)) {
-		by_category.get(entry.category)?.push([cmd, entry])
+		if (is_visible_command(cmd, entry, is_all, is_consumer)) {
+			by_category.get(entry.category)?.push([cmd, entry])
+		}
 	}
 
-	const alias_lookup = build_alias_lookup()
-	const sections = CATEGORY_ORDER.map((cat) =>
-		format_category_section(cat, by_category.get(cat) ?? [], alias_lookup),
-	)
-
-	return [HEADER, '', sections.join('\n\n'), '', USAGE].join('\n')
+	return by_category
 }
 
-// `josh <unknown>` used to answer on two streams: the error line on stderr and the help listing on
-// stdout. A shell substituting `$(josh port dev)` captures stdout alone, so the whole listing
-// became the port argument — how #825 surfaced, on a consumer whose kit predated `josh port`. That
-// install cannot be rescued from here (a kit without the command is also a kit without this fix);
-// what this does guarantee is that every kit carrying it answers a name it cannot resolve — a typo,
-// a retired command — with an empty stdout. Composing both halves into one string is what lets the
-// caller put them on the same stream; `josh` and `josh help` still print the listing to stdout,
-// because there the listing is the answer rather than the diagnosis.
+// `josh --help` lists the day-to-day commands; `josh --all` adds the kit-maintenance ones. A category
+// left empty once the maintenance commands are filtered out is dropped rather than printed as a bare
+// heading (joshuafolkken/kit#1928).
+function format_help(is_all = false, is_consumer = false): string {
+	const by_category = collect_visible(is_all, is_consumer)
+	const alias_lookup = build_alias_lookup()
+	const sections = CATEGORY_ORDER.map((cat) => [cat, by_category.get(cat) ?? []] as const)
+		.filter(([, entries]) => entries.length > 0)
+		.map(([cat, entries]) => format_category_section(cat, entries, alias_lookup))
+	const footer = is_all ? USAGE : `${USAGE}\n${ALL_HINT}`
+
+	return [HEADER, '', sections.join('\n\n'), '', footer].join('\n')
+}
+
+// Every name a user could type — the canonical commands and their aliases — ranked by edit distance
+// so `josh gat` points at `gate` (joshuafolkken/kit#1928).
+function all_command_names(): Array<string> {
+	return [...Object.keys(COMMAND_MAP), ...Object.keys(ALIASES)]
+}
+
+// `josh <unknown>` answers on stderr with a short line rather than the whole listing. A shell
+// substituting `$(josh port dev)` captures stdout alone, so a name this kit cannot resolve — a typo,
+// a retired command — must leave that stream empty rather than dump the toolkit index there, how #825
+// surfaced. It used to print the full help here; #1928 cut that to one line plus a "did you mean"
+// when a close command exists, so the diagnosis is readable and the stdout contract is unchanged.
+// `josh` and `josh --help` still print the listing to stdout, because there it is the answer rather
+// than the diagnosis.
 function format_unknown_command(cmd: string): string {
-	return `Unknown command: ${cmd}\n\n${format_help()}`
+	const suggestion = command_suggest.closest_command(cmd, all_command_names())
+	const hint = suggestion === undefined ? '' : ` Did you mean '${suggestion}'?`
+
+	return `Unknown command: ${cmd}.${hint} Run 'josh --help' to list commands.`
 }
 
 // A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and
@@ -205,27 +262,55 @@ async function run_script_entry(
 	return spawn_script_entry(entry, script_path, script_arguments)
 }
 
-async function run_command(cmd: string, subcommand_arguments: Array<string>): Promise<number> {
-	const resolved = resolve_alias(cmd)
-	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
+// The exit a command answers with before it runs, or `undefined` to go ahead: a consumer is refused a
+// kit-only command with guidance, and a composite command rejects extra arguments
+// (joshuafolkken/kit#1988).
+function pre_dispatch_exit(
+	resolved: string,
+	entry: CommandEntry,
+	subcommand_arguments: Array<string>,
+	is_consumer: boolean,
+): number | undefined {
+	if (is_consumer && kit_only.is_kit_only(entry)) {
+		console.error(kit_only.notice(resolved))
 
-	if (!entry) return UNKNOWN_COMMAND_EXIT_CODE
+		return USAGE_ERROR_EXIT_CODE
+	}
 
 	const rejection = composite_arguments.reject_extra_arguments(
 		resolved,
 		entry,
 		subcommand_arguments,
 	)
+	if (rejection === undefined) return undefined
+	console.error(rejection)
 
-	if (rejection !== undefined) {
-		console.error(rejection)
+	return USAGE_ERROR_EXIT_CODE
+}
 
-		return USAGE_ERROR_EXIT_CODE
-	}
-
+async function dispatch_entry(
+	entry: CommandEntry,
+	subcommand_arguments: Array<string>,
+): Promise<number> {
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
 	return await run_script_entry(entry, subcommand_arguments)
+}
+
+async function run_command(
+	cmd: string,
+	subcommand_arguments: Array<string>,
+	is_consumer = false,
+): Promise<number> {
+	const resolved = resolve_alias(cmd)
+	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
+
+	if (!entry) return UNKNOWN_COMMAND_EXIT_CODE
+
+	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
+	if (early_exit !== undefined) return early_exit
+
+	return await dispatch_entry(entry, subcommand_arguments)
 }
 
 const josh_logic = {
@@ -239,9 +324,10 @@ const josh_logic = {
 export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'
 export type { TsxRunner }
-export { SPAWN_ERROR_EXIT_CODE } from '#scripts/spawn-exit'
+export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {
+	find_package_directory,
 	josh_logic,
 	resolve_alias,
 	resolve_tsx_executable,

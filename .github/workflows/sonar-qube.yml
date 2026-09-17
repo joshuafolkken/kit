@@ -5,6 +5,14 @@ on:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+# A push run is grouped by the commit it carries, so a later push to main never cancels an earlier
+# one; without the sha every push to main shares one group and the run for the commit that changed
+# the version could be cancelled. The sha is added for `push` only so that a new push to a pull
+# request still cancels that pull request's older, superseded scans — the saving this block exists
+# for (joshuafolkken/kit#2025). Kept in the same form as ci.yml.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: true
 jobs:
   sonarqube:
     name: SonarQube

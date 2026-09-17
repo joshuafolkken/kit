@@ -1,4 +1,5 @@
-import { josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
+import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { find_package_directory, josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
 
 const ARGV_OFFSET = 2
 
@@ -7,9 +8,12 @@ const ARGV_OFFSET = 2
 // routing that path to stderr for #825 would otherwise have left `josh --help` printing nothing a
 // pipe could read.
 const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
+// `josh --all` (and `josh --help --all`) lists the kit-maintenance commands the default help hides
+// (joshuafolkken/kit#1928). A bare `--all` in the command slot is a help request, not a command.
+const ALL_FLAG = '--all'
 
-function print_help(): void {
-	console.info(josh_logic.format_help())
+function print_help(is_all: boolean, is_consumer: boolean): void {
+	console.info(josh_logic.format_help(is_all, is_consumer))
 }
 
 // Both halves go to stderr. The help listing is a diagnosis here, not the answer, and a shell
@@ -21,7 +25,7 @@ function handle_unknown(cmd: string): never {
 }
 
 // `process.exit` truncates a piped stdout at its buffer size, and since joshuafolkken/kit#1342 the
-// output at risk is the script's own — `scripts/verification-gate.ts` writes its per-check blocks
+// output at risk is the script's own — `scripts/gate/verification-gate.ts` writes its per-check blocks
 // and its failure summary through this process, and sets `process.exitCode` rather than exiting for
 // exactly that reason. Recording the code and letting node exit when the loop drains keeps every
 // byte, and it leaves the last word with a script that finishes work after module evaluation
@@ -36,15 +40,17 @@ function record_exit_code(exit_code: number): void {
 // before it because the in-process branch replaces `process.argv` with the script's own.
 async function main(): Promise<void> {
 	const cmd = process.argv[ARGV_OFFSET]
+	const is_all = process.argv.includes(ALL_FLAG)
+	const is_consumer = doctor_consumer.is_kit_consumer(find_package_directory(process.cwd()))
 
-	if (!cmd || HELP_COMMANDS.has(cmd)) {
-		print_help()
+	if (!cmd || cmd === ALL_FLAG || HELP_COMMANDS.has(cmd)) {
+		print_help(is_all, is_consumer)
 
 		return
 	}
 
 	const subcommand_arguments = process.argv.slice(ARGV_OFFSET + 1)
-	const exit_code = await josh_logic.run_command(cmd, subcommand_arguments)
+	const exit_code = await josh_logic.run_command(cmd, subcommand_arguments, is_consumer)
 
 	if (exit_code === UNKNOWN_COMMAND_EXIT_CODE) handle_unknown(cmd)
 

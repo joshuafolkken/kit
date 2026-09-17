@@ -9,12 +9,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	},
 	version: {
 		script: 'scripts/version/version-check.ts',
-		description: 'Show global, project, and latest @joshuafolkken/kit versions',
-		category: 'Versioning',
-	},
-	'version:upgrade': {
-		script: 'scripts/version/version-update.ts',
-		description: 'Upgrade @joshuafolkken/kit to latest for both global and project',
+		description: 'Show kit versions; --upgrade updates the global and project install',
 		category: 'Versioning',
 	},
 	// A `script` entry, not a shell one: script paths resolve against the kit package root, so this
@@ -32,6 +27,14 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	release: {
 		script: 'scripts/release/release-cli.ts',
 		description: 'Release the merges main has taken since the version last changed',
+		category: 'Versioning',
+	},
+	// The read-only half of the one above (joshuafolkken/kit#1582). `release --dry-run` cannot
+	// answer this question: it refuses off the default branch and on a dirty tree, which is every
+	// position a run asks it from. A `script` entry for the same reason `release` is one.
+	'release:scope': {
+		script: 'scripts/release/release-scope-cli.ts',
+		description: 'Say whether a release is owed, from the unreleased merges on main',
 		category: 'Versioning',
 	},
 }

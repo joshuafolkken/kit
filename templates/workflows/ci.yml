@@ -7,8 +7,14 @@ on:
   pull_request:
     branches: [main]
 
+# A push run is grouped by the commit it carries, so a later push to the default branch never
+# cancels an earlier one. Without the sha every such push shares one group — `github.ref` is
+# `refs/heads/main` for all of them — and the run that would have reported the commit that changed
+# the version disappears with nothing reported as failed (joshuafolkken/kit#1481).
+# The sha is added for `push` only: added unconditionally it would also stop a new push to a pull
+# request from cancelling that pull request's older runs, which is the saving this block exists for.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 
 # Which browsers the plain-runner fallback downloads when the MCR image could not be resolved.
@@ -143,10 +149,24 @@ jobs:
           # `eslint/config-fingerprint.js` now invalidates the entries themselves; this key has to move
           # with it, or a rule edit would restore a cache whose every entry is stale, lint cold, and
           # save nothing back under the key it already hit — a cold lint on every later run.
-          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}
+          # joshuafolkken/kit#2054: the commit sha makes each run save its warmed cache under a fresh
+          # key, while the sha-less prefix restores the newest entry from an earlier run.
+          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
             ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-eslint-cache-
+
+      - name: Setup cspell cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cspell-cache
+        with:
+          path: |
+            .cspellcache
+          key: ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-cspell-cache-
 
       - name: Setup safe-chain
         run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
@@ -157,7 +177,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run spell check
-        run: pnpm exec cspell . --dot
+        run: pnpm josh cspell:dot
 
       - name: Prepare
         run: pnpm prepare
@@ -225,7 +245,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # The same rule `scripts/test-e2e-guard.ts` applies locally, so a suite that runs under
+      # The same rule `scripts/test/test-e2e-guard.ts` applies locally, so a suite that runs under
       # `pnpm josh test:e2e` is a suite CI runs too. Every `*.e2e.{ts,js}` outside `node_modules`
       # counts, at any depth; the guard's glob leaves dot-directories out by default, which is what
       # the second prune term reproduces. The config filename is deliberately not consulted any
@@ -234,7 +254,7 @@ jobs:
       # GitHub recorded it as skipped, the status-check list counted the skip as a pass, and the
       # merge went through with the suite never run. The same held for a spec kept anywhere but
       # `tests` or `src/routes` (joshuafolkken/kit#991). The agreement is executed rather than
-      # asserted in prose: `scripts/ci-yml-e2e-detect.test.ts` runs this very script against
+      # asserted in prose: `scripts/ci/ci-yml-e2e-detect.test.ts` runs this very script against
       # fixtures and compares its verdict to the guard's.
       #
       # One difference from the guard is deliberate and one-sided. The guard also skips when
@@ -408,7 +428,7 @@ jobs:
       # instead of re-deriving it. It is a kit command rather than shell in this file because this
       # is the one part of the chain that can be wrong without anyone noticing: a signature that
       # stops matching silently stops retrying. As a script it has unit tests
-      # (`scripts/e2e-retry-check.test.ts`) that fail the build when the rule drifts; as a `run:`
+      # (`scripts/test/e2e-retry-check.test.ts`) that fail the build when the rule drifts; as a `run:`
       # block it would have none. The log it reads is wrangler's own debug output, already captured
       # for the artifact below — not Playwright's reporter output, which is reshaped between
       # releases and would need re-deriving each time.

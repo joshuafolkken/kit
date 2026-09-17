@@ -11,6 +11,7 @@ import {
 	pr_reviews_path,
 	pr_routes,
 	status_pages,
+	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import {
 	forget_pr_numbers,
@@ -26,7 +27,7 @@ import {
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
 
-// The merge gate's snapshot, assembled from four REST reads. `pnpm josh followup --merge` decides a
+// The merge gate's snapshot, assembled from four REST reads. `pnpm josh followup` decides a
 // pull request is green from this value, so the assertions here are about the whole round trip: what
 // the reads ask for, and what `evaluate_pr_state` then makes of the answer (joshuafolkken/kit#1028).
 
@@ -48,7 +49,7 @@ function routes(input: {
 	check_runs?: string
 	statuses?: string
 	reviews?: string
-}): Record<string, string> {
+}): Record<string, GhApiAnswer> {
 	return pr_routes(input.pull ?? {}, {
 		[commit_check_runs_path()]: input.check_runs ?? check_runs_pages([PASSING_RUN]),
 		[commit_status_path()]: input.statuses ?? status_pages([]),

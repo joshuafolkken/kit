@@ -1,5 +1,5 @@
-import { string_array_schema } from '#scripts/schemas'
-import { yaml_document } from '#scripts/yaml-document'
+import { string_array_schema } from '#scripts/lib/schemas'
+import { yaml_document } from '#scripts/yaml/yaml-document'
 import { dump, type DumpOptions } from 'js-yaml'
 import { list_patch, type ListEntryMatcher } from './list-patch'
 

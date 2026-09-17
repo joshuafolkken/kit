@@ -1,4 +1,6 @@
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { SEPARATOR_LINE } from './constants'
+import { git_gh_issue_read } from './git-gh-issue-read'
 import { git_prompt } from './git-prompt'
 
 interface IssueInfo {
@@ -62,23 +64,53 @@ function parse_issue_input(input: string): IssueInfo {
 
 const BRANCH_NUMBER_PATTERN = /^(\d+)-(.+)$/u
 
-function derive_issue_input_from_branch(branch_name: string): string {
+// A lane's branch is `<N>-lane` (joshuafolkken/kit#1490), so its second segment is the fixed word
+// `lane` rather than a slug of the title — de-slugging it produced commit messages like `lane #1465`
+// on joshuafolkken/kit#1586. The shape is recognized through `lane_paths.lane_branch` rather than a
+// second copy of the suffix, so the two ends cannot drift apart (joshuafolkken/kit#1590).
+function is_lane_branch(branch_name: string, issue_number: string): boolean {
+	return branch_name === lane_paths.lane_branch(issue_number)
+}
+
+const EXAMPLE_ISSUE_NUMBER = '42'
+
+function argument_hint(issue_number: string): string {
+	return `Provide an issue argument like "title #${issue_number}".`
+}
+
+// Never falls back to the branch's own word: `lane` is not a title, and a commit message cannot be
+// rewritten once it is on the default branch. Failing loudly leaves the caller one argument away.
+async function lane_issue_title(branch_name: string, issue_number: string): Promise<string> {
+	const title = await git_gh_issue_read.issue_get_title(issue_number)
+
+	if (title === undefined) {
+		throw new Error(
+			`Cannot read the title of issue #${issue_number} for lane branch "${branch_name}". ${argument_hint(issue_number)}`,
+		)
+	}
+
+	return title
+}
+
+async function derive_issue_input_from_branch(branch_name: string): Promise<string> {
 	const match = BRANCH_NUMBER_PATTERN.exec(branch_name)
 
 	if (match === null) {
 		throw new Error(
-			`Cannot derive issue info from branch "${branch_name}" in non-interactive mode. Provide an issue argument like "title #42".`,
+			`Cannot derive issue info from branch "${branch_name}" in non-interactive mode. ${argument_hint(EXAMPLE_ISSUE_NUMBER)}`,
 		)
 	}
 
 	const [, number = '', slug = ''] = match
-	const title = slug.replaceAll('-', ' ').trim()
+	const title = is_lane_branch(branch_name, number)
+		? await lane_issue_title(branch_name, number)
+		: slug.replaceAll('-', ' ').trim()
 
 	return `${title} #${number}`
 }
 
-function derive_from_branch(branch_name: string): IssueInfo {
-	const parsed = parse_issue_input(derive_issue_input_from_branch(branch_name))
+async function derive_from_branch(branch_name: string): Promise<IssueInfo> {
+	const parsed = parse_issue_input(await derive_issue_input_from_branch(branch_name))
 
 	// Pin to the actual branch so a non-round-tripping slug never triggers a branch switch.
 	return { ...parsed, branch_name }
@@ -116,7 +148,7 @@ async function resolve_and_display(input: ResolveIssueInput): Promise<IssueInfo>
 	if (input.cli_input !== undefined) return await get_and_display(input.cli_input)
 
 	if (input.is_non_interactive) {
-		const issue_info = derive_from_branch(input.current_branch)
+		const issue_info = await derive_from_branch(input.current_branch)
 
 		display_issue_info(issue_info)
 

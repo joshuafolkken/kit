@@ -107,24 +107,33 @@ function rest_pull_page(rows: ReadonlyArray<Record<string, unknown>>): string {
 	return `[${rows.map((row) => rest_pull(row)).join(',')}]`
 }
 
+// What one path answers with: the response body, or a thunk for a request whose *outcome* is the
+// thing under test. The thunk form was added for joshuafolkken/kit#1077, where `pr_merge` has to
+// arrange "the merge request failed and the pull request reads back merged" — two different outcomes
+// on two paths, which a body-only mapping cannot express. Written as a widening of this one router
+// rather than as a second one beside it.
+type GhApiAnswer = string | (() => Promise<string>)
+
 // A request routed by path rather than by call order: one read now asks for the repository name, the
 // branch lookup and the pull request, and a path with no route fails loudly instead of answering the
 // previous test's data.
-function gh_api_routes(routes: Record<string, string>): (request: GhApiRequest) => Promise<string> {
+function gh_api_routes(
+	routes: Record<string, GhApiAnswer>,
+): (request: GhApiRequest) => Promise<string> {
 	return async (request) => {
 		const answer = routes[request.path]
 
-		return answer === undefined
-			? await Promise.reject(new Error(`unexpected gh api path: ${request.path}`))
-			: await Promise.resolve(answer)
+		if (answer === undefined) throw new Error(`unexpected gh api path: ${request.path}`)
+
+		return typeof answer === 'string' ? answer : await answer()
 	}
 }
 
 // The routes every branch-keyed read needs: the branch lookup and the detail read.
 function pr_routes(
 	pull: Record<string, unknown> = {},
-	extra: Record<string, string> = {},
-): Record<string, string> {
+	extra: Record<string, GhApiAnswer> = {},
+): Record<string, GhApiAnswer> {
 	return {
 		[pr_lookup_path()]: rest_pull_page([{}]),
 		[pr_detail_path()]: rest_pull(pull),
@@ -148,6 +157,7 @@ function request_body(request: GhApiRequest): Record<string, unknown> {
 	return JSON.parse(request.body ?? '') as Record<string, unknown>
 }
 
+export type { GhApiAnswer }
 export {
 	check_runs_pages,
 	find_request,

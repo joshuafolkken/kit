@@ -1,5 +1,5 @@
 import { git_epic_parse, type DeclarationState } from './git-epic-parse'
-import { EPIC_LABEL } from './issue-labels'
+import { EPIC_LABEL, has_label_name } from './issue-labels'
 import { parse_json_object_safe } from './parse-json-array'
 import { epic_subject_schema } from './schemas'
 
@@ -38,8 +38,12 @@ function parse_epic_subject(raw_json: string | undefined): EpicSubject | undefin
 	}
 }
 
+// The membership test is `has_label_name` rather than `Array.includes` because GitHub keeps the
+// casing a label was created with and treats `Epic` and `epic` as one label. Compared literally, a
+// repository that predates these scripts was told to *add* a label it already carries — and GitHub
+// then refuses the addition as a duplicate, so the instruction could not be followed either.
 function check_label(subject: EpicSubject): CheckResult {
-	const is_passing = subject.labels.includes(EPIC_LABEL)
+	const is_passing = has_label_name(subject.labels, EPIC_LABEL)
 
 	return {
 		name: 'epic label',

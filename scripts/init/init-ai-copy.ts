@@ -1,19 +1,20 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { is_workflow_destination } from '#scripts/claude/workflow-destination'
+import { gh_spawn } from '#scripts/gh/gh-spawn'
+import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import {
 	classify_path,
 	copy_directory_failure,
 	directory_copy_blocker,
-} from '#scripts/directory-copy-guard'
-import { gh_spawn } from '#scripts/gh-spawn'
-import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
-import { is_workflow_destination } from '#scripts/workflow-destination'
+} from '#scripts/sync/directory-copy-guard'
 import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { init_sonar } from './init-sonar'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
+const CLAUDE_MD_FILENAME = 'CLAUDE.md'
 
 // Whether the existing file is a workflow that carries no header. A read failure answers "no": the
 // point is to warn, and a warning is not worth failing a command that used to open nothing.
@@ -178,10 +179,30 @@ function did_skip_ai_directory_copy(directory_name: string): boolean {
 	return !skip.is_blocked
 }
 
+// `josh init` writes the one-line CLAUDE.md import when the consumer has none, and — like every other
+// AI file — leaves an existing one untouched so a consumer's additions are never disturbed. `josh sync`
+// is what ensures the import line on an existing file (sync.ts). CLAUDE.md is no longer byte-copied
+// (joshuafolkken/kit#1878), so it is handled here rather than through AI_COPY_FILES.
+function did_skip_claude_md_import(): boolean {
+	const destination_path = path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME)
+
+	if (existsSync(destination_path)) {
+		console.info(`  ⏭ skipped   ${CLAUDE_MD_FILENAME} (already exists — run josh sync to update)`)
+
+		return true
+	}
+
+	writeFileSync(destination_path, init_logic.ensure_claude_md_import(undefined))
+	console.info(`  ✔ created   ${CLAUDE_MD_FILENAME}`)
+
+	return false
+}
+
 // Returns the repository name resolved for the Sonar config, so `josh init` can reuse it for the
 // security-updates report instead of spawning a second `gh repo view` (joshuafolkken/kit#805).
 // Resolving it here rather than in the caller keeps every AI-file write ahead of the network call.
 function run_ai_copies(): string | undefined {
+	const did_skip_claude_md = did_skip_claude_md_import()
 	const file_skips = init_logic
 		.get_ai_copy_files()
 		.map((filename) => did_skip_ai_file_copy(filename))
@@ -191,7 +212,9 @@ function run_ai_copies(): string | undefined {
 	const directory_skips = init_logic
 		.get_ai_copy_directories()
 		.map((directory_name) => did_skip_ai_directory_copy(directory_name))
-	const has_skips = [...file_skips, ...mapping_skips, ...directory_skips].some(Boolean)
+	const has_skips = [did_skip_claude_md, ...file_skips, ...mapping_skips, ...directory_skips].some(
+		Boolean,
+	)
 
 	const name_with_owner = gh_spawn.get_repo_name_with_owner()
 

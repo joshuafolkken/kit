@@ -27,8 +27,7 @@
 			"Bash(git reset*)",
 			"Bash(git restore --staged*)",
 			"Bash(git restore -S*)",
-			"Bash(git commit -a*)",
-			"Bash(git commit --all*)",
+			"Bash(git commit*)",
 			"Bash(gh pr merge*)",
 			"Bash(gh api *pulls/*/merge*)",
 			"Bash(gh api graphql*mergePullRequest*)",
@@ -39,38 +38,45 @@
 		"BASH_MAX_OUTPUT_LENGTH": "8000"
 	},
 	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "pnpm josh audit:provision",
+						"timeout": 180
+					}
+				]
+			}
+		],
 		"UserPromptSubmit": [
 			{
 				"matcher": "",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "echo 'MANDATORY before writing any implementation code: present the two-layer work summary in the session language — 3 plain sentences (Now / Change / Check) a non-programmer can follow. Name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen. Then Details, then every change with its test. Ordinary markdown, never wrapped in a code fence. Required in fullrun/halfrun/queue even when the Issue body was filled; presentation only, never a confirmation stop. Completion reports lead with Cause / Fix / Result. Tests are required for ALL changes; zero tests without explicit approval is a violation. Full rule: Code Change Rules Step 0 in CLAUDE.md.'"
+						"command": "echo 'MANDATORY before writing any implementation code: present the two-layer work summary in the session language — 3 plain sentences (Now / Change / Check) a non-programmer can follow. Name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen. Then Details, then every change with its test. Ordinary markdown, never wrapped in a code fence. Required in fullrun/halfrun/backlogrun even when the Issue body was filled; presentation only, never a confirmation stop. Completion reports lead with Cause / Fix / Result. Tests are required for ALL changes; zero tests without explicit approval is a violation. Full rule: Code Change Rules Step 0 in CLAUDE.md.'"
 					},
 					{
 						"type": "command",
 						"command": "echo 'Deleting a git-tracked file is reversible, so it is NOT Tier C — do not ask for confirmation on reversibility grounds. Still inspect the target first and surface anything that contradicts the task.'"
+					},
+					{
+						"type": "command",
+						"command": "if [ -f dist/hooks/session-lang.js ]; then node dist/hooks/session-lang.js; else pnpm josh session:lang; fi",
+						"timeout": 10
 					}
 				]
 			}
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash",
+				"matcher": "Bash|Edit|Read|Write",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "pnpm josh batch:guard",
-						"timeout": 20
-					}
-				]
-			},
-			{
-				"matcher": "Read|Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "pnpm josh investigation:guard",
+						"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi",
 						"timeout": 20
 					}
 				]
@@ -78,11 +84,11 @@
 		],
 		"PostToolUse": [
 			{
-				"matcher": "Edit|Write|Bash",
+				"matcher": "Edit|Write",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "pnpm josh format:edited",
+						"command": "if [ -f dist/hooks/format-edited.js ]; then node dist/hooks/format-edited.js; else pnpm josh format:edited; fi",
 						"timeout": 90
 					}
 				]

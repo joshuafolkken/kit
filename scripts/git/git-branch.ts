@@ -67,7 +67,7 @@ async function pull_latest(): Promise<void> {
 	await animation_helpers.execute_with_animation(
 		'Pulling latest from remote...',
 		async () => {
-			await git_command.pull()
+			await git_command.pull_fast_forward()
 
 			return 'Pulled latest from remote'
 		},
@@ -118,6 +118,10 @@ const git_branch = {
 	switch_to,
 	exists,
 	check_and_create_branch,
+	// Exported so a lane's branch name can be checked against the real matcher rather than against a
+	// second copy of the pattern (joshuafolkken/kit#1497). A copy is what let `lane/<N>` ship: nothing
+	// asserted that the name `lane:open` writes is one this function accepts.
+	has_same_issue_prefix,
 }
 
 export { git_branch }

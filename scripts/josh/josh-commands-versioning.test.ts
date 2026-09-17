@@ -1,21 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { VERSIONING_COMMANDS } from './josh-commands-versioning'
 
-const VERSION_UPGRADE_NOT_DEFINED = 'version:upgrade command not defined'
+const VERSION_NOT_DEFINED = 'version command not defined'
 
-describe('VERSIONING_COMMANDS version:upgrade', () => {
-	it('runs the version-update script that upgrades both global and project installs', () => {
-		const cmd = VERSIONING_COMMANDS['version:upgrade']
-		if (!cmd) throw new Error(VERSION_UPGRADE_NOT_DEFINED)
+// joshuafolkken/kit#1928 folded the old `version:upgrade` command into a `--upgrade` flag on
+// `version`, so the version surface is one command again.
+describe('VERSIONING_COMMANDS version', () => {
+	it('runs the version-check script that also serves --upgrade', () => {
+		const cmd = VERSIONING_COMMANDS['version']
+		if (!cmd) throw new Error(VERSION_NOT_DEFINED)
 
-		expect(cmd.script).toBe('scripts/version/version-update.ts')
+		expect(cmd.script).toBe('scripts/version/version-check.ts')
 	})
 
-	it('is a script entry rather than a static shell command', () => {
-		const cmd = VERSIONING_COMMANDS['version:upgrade']
-		if (!cmd) throw new Error(VERSION_UPGRADE_NOT_DEFINED)
+	it('documents the --upgrade flag in its description', () => {
+		const cmd = VERSIONING_COMMANDS['version']
+		if (!cmd) throw new Error(VERSION_NOT_DEFINED)
 
-		expect(cmd.shell).toBeUndefined()
+		expect(cmd.description).toContain('--upgrade')
 	})
 })
 
@@ -23,7 +25,6 @@ const RANGES_NOT_DEFINED = 'ranges command not defined'
 
 describe('VERSIONING_COMMANDS ranges', () => {
 	it('runs the guard that checks every published dependency range', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['ranges']
 		if (!cmd) throw new Error(RANGES_NOT_DEFINED)
 
@@ -31,7 +32,6 @@ describe('VERSIONING_COMMANDS ranges', () => {
 	})
 
 	it('is listed under Versioning so it appears beside bump in the command help', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['ranges']
 		if (!cmd) throw new Error(RANGES_NOT_DEFINED)
 
@@ -43,7 +43,6 @@ const RELEASE_NOT_DEFINED = 'release command not defined'
 
 describe('VERSIONING_COMMANDS release', () => {
 	it('runs the one command that decides a version from main history', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['release']
 		if (!cmd) throw new Error(RELEASE_NOT_DEFINED)
 
@@ -54,7 +53,6 @@ describe('VERSIONING_COMMANDS release', () => {
 	// against the kit package root, so it keeps working from a consumer checkout where the file lives
 	// under node_modules.
 	it('is a script entry listed under Versioning', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		const cmd = VERSIONING_COMMANDS['release']
 		if (!cmd) throw new Error(RELEASE_NOT_DEFINED)
 

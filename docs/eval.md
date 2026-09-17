@@ -42,111 +42,64 @@ nobody asked for is about to be compared against one that was.
 It needs the `claude` CLI on `PATH` and an authenticated account. Exit code is `0` only when every
 scenario held.
 
-## When it runs
+## When to run it
 
-Until [joshuafolkken/kit#907](https://github.com/joshuafolkken/kit/issues/907) the paragraph above was
-the whole rule — a sentence in a document, in no completion gate and no verification gate. So a pull
-request that rewrote one rule and regressed another had no detection path, and the suite went unpaid
-for. The trigger is now a command:
+`pnpm josh eval` is a **manual** command. Run it by hand when you change a distributed document, a
+skill or a hook and want to know whether the change moved what an agent does. It is **deliberately not
+part of CI**, and since [joshuafolkken/kit#1922](https://github.com/joshuafolkken/kit/issues/1922) it
+is wired into no verification or completion gate at all: one run is five real Claude sessions, and on
+the tree this shipped from the suite almost never reached `held`, so the wait it added to every
+distributed-document change was not worth paying automatically. The scenarios' unreliability is its own
+Issue; the command stays exactly so a `blocked` verdict's baseline and confirmation readings — and any
+diagnosis of the scenarios themselves — remain possible.
 
-```bash
-pnpm josh eval:scope            # → required | skip ; the reason on stderr
-pnpm josh eval:scope --staged   # about the staged diff
-```
-
-**The measurement is opt-in, and off unless `JOSH_EVAL` turns it on**
-([#1235](https://github.com/joshuafolkken/kit/issues/1235)). With the variable unset — the state of
-every checkout that was never told about it — `eval:scope` answers `skip` whatever the diff holds,
-and the reason line names the switch rather than the paths, so an unexpected `skip` leads to the
-switch instead of into the trigger set below.
-
-```bash
-JOSH_EVAL=on pnpm josh eval:scope   # decide from the changed paths again
-```
-
-`1`, `true` and `yes` read the same as `on`; every other value, including `off`, leaves it off. Unset
-is off because the quiet default had to cost nothing on a machine that has never heard of the
-variable — an explicit-`off` design would need that line written per machine, in a `.env` that is
-personal and non-committed, before the first run behaved as asked.
-
-**`.env` is where a checkout keeps the answer.** `eval:scope` loads it when it exists, so
-`JOSH_EVAL=on` on a line of that file turns the gate back on for every run in this checkout without
-prefixing anything; a value set in the environment still wins over the file, which is what makes a
-one-off `JOSH_EVAL=on pnpm josh eval:scope` override it. The file is personal and non-committed, so
-turning the measurement on is a per-machine decision rather than one made for everybody.
-
-**Why it is off**: one run is five real Claude sessions, and on the tree this shipped from the suite
-almost never reached `held` — so what the gate bought in practice was a wait, paid on every
-distributed-document change, which in this repository is most of them. The scenarios' unreliability is
-its own Issue; the switch is the default while that one is open, not a deletion of the gate. **A run
-that took no measurement says so in its completion report**, exactly as an `unmeasured` one does.
-
-**`pnpm josh eval` typed by a person still runs**, switch or no switch: it gates the trigger, never
-the suite. A measurement asked for in so many words is taken — which is how the scenarios get
-diagnosed at all, and what a `blocked` verdict's baseline and confirmation readings depend on.
-
-**The input is the set of changed paths and nothing else.** "This edit is only wording" is a judgement
-made under cost pressure, and cost pressure resolves it toward `skip` exactly when a regression is
-most likely to ship — the same reason `josh review:level` took the review level out of an agent's
-hands. The trigger set is derived from what the sandbox copies rather than restated, so it cannot
-drift from what a scenario can see: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/skills/**`,
-`prompts/**`, `.claude/settings.json`. One measured path decides the whole change; an empty path list
-answers `required`, because `skip` there would hand a caller that failed to read the diff the same
-answer as one that measured; and the harness and the scenarios themselves do not fire it — changing
-the ruler is not changing what it measures.
+**What is worth measuring** is a change under the paths a scenario can see: `CLAUDE.md`, `AGENTS.md`,
+`GEMINI.md`, `.claude/skills/**`, `prompts/**`, `.claude/settings.json`. That set is what the sandbox
+copies, so nothing outside it can be observed by a run. A change to only the harness or the scenarios
+(`scripts/eval/**`, `evals/scenarios/**`) changes the ruler rather than what it measures, and is not
+worth a run.
 
 One entry is coarser than what the suite can see. `.claude/settings.json` is copied through a filter
 that drops every hook invoking `pnpm` / `npm` / `yarn` / `npx` / `josh` ("Where a run happens" below),
-so a change to only such a hook answers `required` and no scenario observes it. That is reported
-rather than read as a measurement; narrowing the trigger would mean parsing the diff, which is the
-judgement the command exists to remove.
+so a change to only such a hook is something no scenario can observe.
 
-**Where it sits:** started when `/code-review` starts, read once the review has converged and before
-`pnpm josh followup --merge`, and **never inside `pnpm josh gate`** — the gate re-runs on every fix
-round and on every `epicrun` child, and the review rewrites the very prose being measured. The anchor
-is the merge rather than the commit because the commit sits between the two review rounds
-([joshuafolkken/kit#1261](https://github.com/joshuafolkken/kit/issues/1261)), and a `blocked` verdict
-has always stopped the merge rather than the commit.
-
-**The suite and the review overlap because neither writes.** Both only read the working tree — a
-review's fixes are applied after it reports — so the suite's wall-clock hides inside the review's
-instead of following it ([joshuafolkken/kit#1152](https://github.com/joshuafolkken/kit/issues/1152)).
-It was the longest serial stretch left in the gate: `pnpm josh gate` is 17s and already concurrent,
-CI is 95–120s and already parallel, and the suite alone runs 100s and up.
-
-**What the overlap costs is certainty, and it is bought back mechanically.** A run measures the
-documents as they stood when it started, so a review that then edited a measured path leaves the
-verdict describing a tree that no longer exists — and a stale result is never reported. `josh eval`
-writes a record of what it measured before its first session; once the review has converged,
-`pnpm josh eval:scope --since-eval` compares that record against the tree now. `skip` means the
-review changed nothing the scenarios can see and the concurrent verdict stands; `required` means it
-edited a measured path — or that there is no record at all — and the suite runs again. The common
-answer is `skip`: a review that lands no high/medium finding changes nothing. Only _when_ the
-measurement is taken changes; what a verdict does is untouched, and a concurrent run's output is read
-in full before its verdict is treated as an answer. Running the suite after the review instead is
-still correct, only slower.
-
-**Two things the record does not cover.** It is written only by a whole-suite run — a named re-run
-(`pnpm josh eval <name>`) leaves it alone, so a one-scenario reading can never stand in for the
-suite's measurement. And it describes the tree the suite read, which in a consumer is the installed
-`@joshuafolkken/kit` rather than the repository being reviewed (see "In a consumer project" below);
-`--since-eval` therefore answers `skip` there whatever the review changed, which is correct for what
-it measures and is not a statement about the consumer's own diff. The plain `pnpm josh eval:scope`
-is what asks about that.
-
-**The cost ceiling is on how often, not how many.** Every scenario runs, once per Issue. Selecting
-"the scenarios related to the change" is not available: a scenario declares the _rule_ it measures,
-never the _file_ the agent will read, and the `n/m` line is the unit of comparison — a subset's `n/m`
-cannot be compared against the whole suite's.
+**Every scenario runs on every invocation.** Selecting "the scenarios related to the change" is not
+available: a scenario declares the _rule_ it measures, never the _file_ the agent will read, and the
+`n/m` line is the unit of comparison — a subset's `n/m` cannot be compared against the whole suite's.
 
 **What a result does** is the last line of the run, because the exit code cannot carry it: `0` only
 when every scenario passed, so a failed run and one that measured nothing exit alike.
 
-| Verdict      | Meaning                                  | The merge                                                                    |
-| ------------ | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `held`       | every scenario held                      | continue                                                                     |
-| `blocked`    | a scenario failed — a measured violation | **stops the merge** — fix the prose its `→` line names, re-run that scenario |
-| `unmeasured` | a scenario produced no measurement (`?`) | does not block, and is stated in the completion report                       |
+| Verdict       | Meaning                                  | What to do                                                                 |
+| ------------- | ---------------------------------------- | -------------------------------------------------------------------------- |
+| `held`        | every scenario held                      | nothing — the change measured clean                                        |
+| `blocked`     | a scenario failed — a measured violation | fix the prose its `→` line names before merging, then re-run that scenario |
+| `unmeasured`  | a scenario produced no measurement (`?`) | nothing was measured — say so; it is not a pass                            |
+| `unreachable` | the suite could not reach the API (`⚠`)  | nothing was measured — say so, naming the connection                       |
+
+**`unreachable` is the narrow half of `unmeasured`.** Both leave the rules unmeasured and neither
+blocks a merge, so the fourth word buys nothing at the merge and everything at the report: a reader
+sent to the `?` lines to fix the harness or the prompt found nothing wrong with either, because the
+fault was a refused connection (joshuafolkken/kit#1197). Under its own word the suite says which one
+to look at, and a run of them three days running is visible as three of the same word.
+
+**One refused session earns the word; two stop the suite.** The verdict is `unreachable` as soon as a
+single `⚠` line appears, which says only that this run did not measure every scenario — the other
+four may have held, and every session may have run. What the second refusal adds is the stop: from
+there the suite starts no more sessions — the retries first, then any scenario still queued — because
+each one is a whole Claude session that meets the same refusal. **Which scenarios that actually saves
+depends on the width**, so read the `⚠` lines rather than the count: only the ones whose note says
+`session not started` were skipped, and on a run where every scenario was dequeued there are none.
+
+**At the shipped default it saves less than it looks like.** Five scenarios and a width of five means
+every scenario is dequeued before the first verdict returns, so no scenario is ever queued and the
+only sessions left to skip are retries — and a refused session is not retried in the first place. So
+on the run this was written for, where every session meets the same refusal, the tally skips nothing
+at all: the five sessions were already in flight, and none of them would have made a second attempt.
+What it does save is the mixed run — refusals accumulating while other scenarios come back merely
+inconclusive — where it stops up to three of those retries, and any suite wider than its pool, where
+everything still queued is skipped. Lower `JOSH_EVAL_CONCURRENCY` and the queue, and the saving,
+appear at five scenarios too.
 
 **A `blocked` verdict is confirmed, then attributed, before it blocks.** One scenario is one real
 Claude session, so its verdict is a sample rather than a fact: measured on
@@ -161,11 +114,11 @@ tree, and the attribution follows. A confirmation that measures nothing (`?`) is
 and if it still will not measure the whole run is reported `unmeasured`.
 
 **That is a trade, and not a uniformly favorable one.** A rule that stopped working outright fails
-both readings and still stops the merge; one that only _sometimes_ fires can pass the second reading
-and merge — at 7 failures in 10 readings it gets through about 3 times in 10, which is larger than
-the one-in-six false block being removed. What it buys is a gate that is reliable rather than one
-that is strictly stronger, and the reason is about behavior rather than probability: a gate that
-stops merges at random is one that runs learn to argue with, and the next real failure is then
+both readings and is a real regression; one that only _sometimes_ fires can pass the second reading
+and slip through — at 7 failures in 10 readings it gets through about 3 times in 10, which is larger
+than the one-in-six false alarm being removed. What it buys is a check that is reliable rather than
+one that is strictly stronger, and the reason is about behavior rather than probability: a check that
+fails at random is one people learn to argue with, and the next real failure is then
 attributed away with the reasoning the false ones taught. Filing the disagreement against the
 scenario is what keeps it honest — a rule failing half its readings surfaces as a ruler nobody can
 read rather than as silence.
@@ -182,13 +135,13 @@ surroundings, and the `?` line on each one names what actually happened (see "Ho
 judged") — and a run that printed no verdict line at all, an absent `claude`
 CLI included, is `unmeasured` too. **A run nobody saw hold is never reported as green.**
 
-**`unmeasured` is never evidence for the gate.** It does not block a merge, and that is a decision
-about who waits, not a statement that the rules held — the run reports what it did not learn, and
-saying so is required rather than optional. A completion report that lists the verdict without saying
-the measurement was not obtained has reported a pass it does not have. In particular, "measured and
-held" and "could not measure" must not both arrive as "nothing stopped the merge": the gate that
-kit#907 added exists to catch a distributed document degrading while every other check stays green,
-and an unmeasured run is exactly that gate not running (joshuafolkken/kit#1001).
+**`unmeasured` is never evidence that the rules held.** It is a statement about who could not measure,
+not that the rules held — the run reports what it did not learn, and saying so is required rather than
+optional. A report that lists the verdict without saying the measurement was not obtained has reported
+a pass it does not have. In particular, "measured and held" and "could not measure" must not both read
+as "nothing was wrong": the measurement kit#907 added exists to catch a distributed document degrading
+while every other check stays green, and an unmeasured run is exactly that not happening
+(joshuafolkken/kit#1001).
 
 **What an unmeasured scenario tells you now.** The report names what happened, because the cases need
 different fixes:
@@ -216,9 +169,28 @@ prevent anything, and under a pool it holds a slot for the whole time
 (joshuafolkken/kit#1144). **The retry itself is unchanged** — one attempt, only for an inconclusive
 verdict.
 
-**Do not read that as a solved problem.** The honest state is that the reason is visible and points at
-connectivity to the API rather than at pacing, and nothing here fixes it. To check where it stands
-after changing anything here:
+**The cause was found, and it was neither pacing nor width.** A session spawned from inside a Claude
+session inherited the parent's own `CLAUDE_CODE_MESSAGING_SOCKET` — a UNIX socket only the parent
+listens on — dialled it, and was refused; lowering `JOSH_EVAL_CONCURRENCY`, the suspected cause,
+made it worse. Removing that variable and the three beside it from the child's environment restored
+5/5 held in 54 seconds (joshuafolkken/kit#1158, carried into joshuafolkken/kit#1197). The harness now
+does that itself, in `session_environment`, so nothing has to be set by hand.
+
+**A proxy on this machine's own interface is removed with them** (joshuafolkken/kit#1760). Whatever
+wraps this machine's package manager may stand a scanning proxy up on a loopback port and write
+`HTTPS_PROXY` into everything the invocation spawns — and a session that inherits it dials that port
+instead of the API. `josh run:wake` is where it was found, because a detached supervisor outlives the
+invocation and the port is gone by the time it wakes anything; the eval suite spawns its sessions
+while that proxy is still listening, so it was never the one failing. It is removed here all the
+same: neither launcher starts a package install, and a proxy that exists to inspect package downloads
+has no business carrying a session's API traffic. **A proxy naming a real host is left exactly as it
+was**, so a machine that reaches the API through its network's proxy is untouched.
+
+**That fix does not retire the defense built beside it.** A connection can fail again for reasons
+that have nothing to do with an inherited socket, and the failure mode being closed here is the one
+where the suite pays for five sessions and returns `unmeasured` — so a refused connection is now
+reported under its own verdict and stops the suite starting further sessions, whatever caused it. To
+check where it stands after changing anything here:
 
 ```bash
 pnpm josh eval <one-scenario>   # must hold on its own
@@ -242,12 +214,6 @@ changed paths; the sandbox copies the documents from the installed `@joshuafolkk
 in kit rather than a local fix. A consumer's own project-local skill is outside what the suite can
 see at all.
 
-**An epic's completion does not run it a second time.** Because each child that touched the
-distribution ran every scenario and blocked on a failure, the gradual degradation an end-of-epic run
-would look for has already been measured; the full reasoning, and the answer to "an unattended run has
-no other instrument for output quality", is in
-`.claude/skills/workflow-commands/eval-gate.md`.
-
 ## Reading the output
 
 ```text
@@ -263,8 +229,8 @@ Running 5 scenario(s) on sonnet.
 Verdict: blocked — a scenario failed; fix the rule its → line names before merging
 ```
 
-The last line is what a run means for a merge, in one token — `held`, `blocked` or `unmeasured`
-("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
+The last line is what a run means for a merge, in one token — `held`, `blocked`, `unmeasured` or
+`unreachable` ("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
 the evidence**, and the calls the run actually made. The `→` line is the one to act on — it points at
 the rule, so a red scenario tells you which prose to change rather than only that something went
 wrong.

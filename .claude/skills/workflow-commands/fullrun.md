@@ -1,43 +1,188 @@
 # `fullrun` — Full execution (plan → implement → PR → completion notify)
 
-This command implements, commits, opens the PR and merges it. Read `chain-rule.md` before
-running the `/code-review` step and `followup.md` before the merge — the two rules a `fullrun`
-most often breaks live there, not here.
+This command implements, commits, opens the PR and merges it. **`chain-rule.md`, `followup.md` and
+`background-commands.md` are not entry reads** — the operational section named by `SKILL.md` is
+fetched in the turn that reaches it: before `/code-review`, before `pnpm josh followup`, and before
+backgrounding `pnpm josh gate`, respectively. The rules a `fullrun` most often breaks live there, not
+here.
 
+**Claim the working tree before anything else — `pnpm josh run:hold <N>`, or bare `pnpm josh run:hold`
+for `fullrun new`.** It is this command's first call: ahead of the title normalization, ahead of
+`git switch main && git pull`, and — on the `new` path — ahead of the `gh api … issues` call that
+files the Issue. For a cross-repository target, resolve that repository's checkout from
+`pnpm josh doctor` first and claim there. On `busy` or `unknown`, send a `confirmation` Telegram
+carrying what the command printed on stderr and stop: file nothing, branch nothing, edit nothing.
+`pnpm josh followup` releases the hold on the merge, so a completed `fullrun` needs no release step; a
+`fullrun` that stops on a split, a prerequisite or a third-party target ends with
+`pnpm josh run:release <N>` — bare where it entered as `new` (`SKILL.md` → §2f). A
+`needs-human-review` stop keeps the hold, because its tree carries uncommitted work. `SKILL.md` → §2f
+is the single source.
 
-**Claim the working tree before anything else — `pnpm josh run:hold <N>`, or bare `pnpm josh run:hold` for `fullrun new`.** It is this command's first call: ahead of the title normalization, ahead of `git switch main && git pull`, and — on the `new` path — **ahead of the `gh api … issues` call that files the Issue**, since a run stopped after the filing leaves behind the artifact it should not have created. **For a cross-repository target, resolve that repository's checkout from `pnpm josh doctor` first and claim there** — that resolution is a read and writes nothing, and a claim made in the session's own tree would guard the one tree this run never edits. On `busy` or `unknown`, send a `confirmation` Telegram carrying what the command printed on stderr and stop: file nothing, branch nothing, edit nothing. `pnpm josh followup` releases the hold on the merge, so a completed `fullrun` needs no release step; a `fullrun` that stops on a split, a prerequisite or a third-party target ends with `pnpm josh run:release`, because its tree carries nothing — and a `needs-human-review` stop keeps the hold, because its tree does. `SKILL.md` → §2f is the single source.
+**`in-progress` is applied the moment `run:hold` answers `hold`** — ahead of the title normalization
+and before implementation, so a `#N` counts as holding its lane from the claim rather than only once the
+work begins (the apply command is in the `fullrun #<N>` / `fullrun new` steps below; a `fullrun new` has
+no issue yet and applies it right after filing, step 3). **Every stop that leaves the tree clean removes
+the label in the same turn as `pnpm josh run:release`, with `gh api -X DELETE
+repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`** — the `cost --over` `over`
+stop, a split, a prerequisite discovered mid-run, and a third-party target (a `new` entry that stops
+before it files has nothing to remove). A `needs-human-review` stop keeps both the hold and the label,
+because the tree still carries uncommitted work. A lane child dispatched by `backlogrun` finds the label
+already applied by the parent at dispatch (`backlogrun-lanes.md` → "Concurrency"), so re-applying it here is
+idempotent.
 
-**The target repository is named in front of the Issue reference** — `fullrun joshuafolkken/app-kit#12`, `fullrun kit#new`. The definition is the same at every entry point: `SKILL.md` → "2c. The `owner/repo#` prefix". An implementing entry needs that repository's checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than cloning** when there is none, or when the tree there is not clean — the `new` path's stash step covers this session's repository, never someone else's checkout, and a prefix naming this repository changes nothing. A target whose owner is not this session's is third-party: Tier C, so it stops rather than filing.
+**A dispatched lane child asks whether it is a resume before any of the above — `pnpm josh run:cut
+--resume <N>`.** On `fresh` it proceeds exactly as this file describes, `run:hold` first. On `resume`
+it skips the title, the plan, the hold claim and the implementation, re-reads the issue body and
+comments for the plan and the recorded decisions, and goes straight to `pnpm josh gate`. At the
+pre-gate boundary — implementation done, before `pnpm josh gate` — it takes the cut with
+`pnpm josh run:cut <N>`: on `cut` the process ends its turn and a fresh one resumes here. This applies
+to a detached lane child alone; elsewhere `run:cut` answers `not-a-lane` and changes nothing. The
+boundary and its verdicts are `pre-gate-cut.md`, its single source.
+
+**A dispatched lane child records its park before it stops for a decision.** Before it sends the
+`confirmation` Telegram that ends its turn, a Tier B toss-up, a Tier C action, an upstream defect or a
+person-needing split is recorded on the Issue — `needs-decision` plus a comment carrying the question,
+the options and whether work was stashed — so the parent treats it as parked from GitHub state alone
+rather than reconstructing the question from a log. `pnpm josh rule:guard` refuses the stop notify
+until the park is recorded. The single source is `pre-gate-cut.md` → "A lane child records its park
+before it stops"; the park procedure itself is `backlogrun-park.md` → "park and continue".
+
+**Ask the session boundary in the same turn as the hold, and before anything else is started** —
+`pnpm josh cost --cut`. Branch on what the command answers, never on a judgement about how
+long the session feels. `under` — carry on. `over`, or a run it could not answer for — **stop here**,
+before the title is normalized and before a `new` entry files anything: send a `confirmation` Telegram
+carrying the figure printed on standard error and the resume command (the invocation as it was typed,
+in a fresh session — `fullrun #<N>` for a `#N` entry, `fullrun new` for a `new` one), run
+`pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run was dispatched
+by `backlogrun`** — that batch owns the same question at its own seam.
+`backlogrun-progress.md` → "The hand-off" is the single source of the check and of the shared 150,000 threshold — **a dispatched lane child does not perform this check and never reads that document** (its trimmed set is `pnpm josh read:set lane-child`).
+
+**Start the progress step once the hold is claimed, and start it without being asked** —
+`pnpm josh run:progress --wait` in the background, what it printed presented as-is when it
+exits, the next one started in that same turn, and `pnpm josh run:progress --mark` in the same turn as
+every real report this run makes. The procedure is `backlogrun-progress.md` → "Progress while the run is quiet",
+its single source for a top-level run; a `fullrun` running as a dispatched lane child (a `backlogrun` named issue or epic child) **starts none and never reads that document** — the outermost run reports for every child, so the child's read set omits it (`pnpm josh read:set lane-child`).
+
+**Read Issue `#N` and every comment on it before implementing** — `pnpm josh issue:read <N>`. A
+decision recorded after the body was written lives only in a comment, and between a body and a comment
+that disagree the later text is the agreement in force. `pnpm josh rule:guard` refuses the body-only
+read once per run. `SKILL.md` → §2g is the single source, including the two answers that stop the run
+rather than proceed.
+
+**One call gathers the mechanical reads before the first edit — `pnpm josh run:prep <N>`**
+(joshuafolkken/kit#1978): `issue:read`'s body/comments, `issue:state`'s state/labels/`human_review`,
+and `latest:scope`'s dependency scope in one report, run beside `pnpm josh run:hold` and
+`pnpm josh cost --cut` in the same turn — three round trips into one. The §2g stops, the §2z
+`human_review` stop and the dependency decision are read off it. Cross-repo issues keep
+separate commands; no `--repo`.
+
+**The target repository is named in front of the Issue reference** — `fullrun joshuafolkken/app-kit#12`,
+`fullrun kit#new`. The definition is `SKILL.md` → §2c. An implementing entry needs that repository's
+checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than cloning** when there
+is none, or when the tree there is not clean. A target whose owner is not this session's is
+third-party: Tier C, so it stops rather than filing.
 
 **A `needs-human-review` issue stops before the commit.** Implement it and take it through the
-verification gate as usual — **including `pnpm josh test:e2e`, which you run yourself, because with
-no pull request there is no CI E2E job and `followup --merge` is never reached** — then commit
-nothing, push nothing, open no pull request and merge nothing; leave the working tree uncommitted and unstashed, send a `confirmation` Telegram carrying
-the resume command, and stop. The label is applied only by a person, never by you, and it is **not**
-`needs-decision` — that one withholds a run's start, this one its end. Definition and the comparison:
-`SKILL.md` → §2z, which is the single source.
+verification gate as usual — including `pnpm josh test:e2e`, which you run yourself, because with no
+pull request there is no CI E2E job and `followup` is never reached — then commit nothing, push
+nothing, open no pull request and merge nothing; leave the working tree uncommitted and unstashed,
+send a `confirmation` Telegram carrying the resume command, and stop. The label is applied only by a
+person. Definition: `SKILL.md` → §2z.
 
-**Before implementing, run the scope assessment in `split-assessment.md`.** It is the same assessment `kickoff` makes, applied at the same strength, and **its default is not to split**: separability and a scope that clearly exceeds what one verification gate can confirm in one pass — the guide is about 10 changed files and about 400 changed lines — have to hold **together**, and either alone leaves the work as one Issue (joshuafolkken/kit#1469). Where both hold, two or more separately-mergeable deliverables always means an epic, with no count threshold and no ordering condition. **When it finds a split, file the children and the epic and then STOP** (each child carries the `route:split` label — joshuafolkken/kit#1083) — do not implement, and do not continue as an `epicrun`. Typing `fullrun` approved implementing and merging **one** Issue; a batch of N is a different authorization, and widening it silently would take a decision the person never made. Report what was filed and end with "Please run `epicrun #<E>` to execute this epic."
+**Before implementing, run the scope assessment in `split-assessment.md`.** Its default is not to
+split: separability and a scope that clearly exceeds what one verification gate can confirm in one
+pass (the guide is about 10 changed files and about 400 changed lines) have to hold **together**.
+Where both hold, two or more separately-mergeable deliverables always means an epic. **When it finds a
+split, file the children (each carrying the `route:split` label) and the epic and then STOP** — do not
+implement, and do not continue as a `backlogrun`. Typing `fullrun` approved implementing and merging
+**one** Issue; a batch of N is a different authorization. Report what was filed and end with "Please
+run `backlogrun #<E> --only` to execute this epic."
 
-**A prerequisite Issue discovered mid-run stops this command too — but files everything first.** When the work in hand turns out to need a *different* deliverable in this repository to land before it, that is neither a split nor an upstream defect: `#N` is still one deliverable, it just has something in front of it. The three-way distinction, the `route:tier-a` filing command and the filing ceiling are `SKILL.md` → §2d, which is the single source; what follows is this entry's branch. Typing `fullrun` approved implementing and merging **one** Issue; a batch is a different authorization, so the stop stays. What the filing removes is every confirmation before it, leaving the person one command to type. Inside an `epicrun` the same discovery is handled differently — recorded as a dependency and **not** parked; see `epicrun.md` → "A prerequisite discovered mid-run". The procedure, in order:
+**A prerequisite Issue discovered mid-run stops this command too — but files everything first.** The
+three-way distinction, the `route:tier-a` filing command and the filing ceiling are `SKILL.md` → §2d,
+the single source; what follows is this entry's branch. Typing `fullrun` approved merging **one**
+Issue; a batch is a different authorization, so the stop stays. Inside a `backlogrun` the same discovery
+is recorded as a dependency and **not** parked (`backlogrun-park.md` → "A prerequisite discovered mid-run").
+The procedure, in order:
 
-1. **File the prerequisite `#<P>` without asking** (Tier A, first-party), tagging it `route:tier-a` (joshuafolkken/kit#1083). It goes first because the steps below name it.
-2. **Stash the work in progress** — `git stash push -u -m "fullrun: paused #<N> for prerequisite #<P>"` — then record it on the Issue: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<what was stashed, and that #<P> must land first>"`. **`-u` is not optional**: the work almost always includes a new `*.test.ts`, which is untracked, and a stash without it leaves exactly those files in the tree for the `epicrun` the person is about to run, whose every child starts with `git switch main && git pull`. **The Issue comment is what gets the stash popped**: the run that later picks `#N` up reads it and pops before implementing — a stash recorded only in a Telegram message is orphaned work. Say it in the Telegram too, but the comment is the record.
-3. **Find out whether `#N` already belongs to an epic, before creating one** — `pnpm josh epic:bundle <N>`, which names it (`#893 already tracks this issue`) rather than only reporting that one exists.
+1. **File the prerequisite `#<P>` without asking** (Tier A, first-party), tagging it `route:tier-a`.
+   It goes first because the steps below name it. Run `pnpm josh issue:scout "<title>"` in front of the
+   filing call (`SKILL.md` → §2e).
+2. **Stash the work in progress** — `git stash push -u -m "fullrun: paused #<N> for prerequisite #<P>"`
+   — then record it on the Issue: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<what was
+   stashed, and that #<P> must land first>"`. **`-u` is not optional** (the work almost always includes
+   a new untracked `*.test.ts`). The Issue comment is what gets the stash popped — by message,
+   `pnpm josh stash:pop "fullrun: paused #<N> for prerequisite #<P>"`, never a positional
+   `git stash pop` a shared stash stack lets another lane divert. Say it in the Telegram too, but the
+   comment is the record.
+3. **Find out whether `#N` already belongs to an epic, before creating one** — `pnpm josh epic:bundle
+   <N>`, which names it (`#893 already tracks this issue`).
 
    | Answer | What to do |
    | --- | --- |
-   | An epic `#<E>` already tracks `#N` | `pnpm josh epic --add <E> <P> --before <N>` — insert into **that** epic. **Do not create a second one**: two epics tracking `#N` give the auto-close two task lists to disagree about, and `epic:next` answers from two different graphs (joshuafolkken/kit#943) |
-   | No epic tracks it | `pnpm josh epic "<title>" <P> <N> --ordered` — `#N` is itself a deliverable, so it is kept as a child rather than promoted. **`--ordered` is required, not stylistic**: without it the epic is written as `None — the children are independent` and no `blocked-by` relation is recorded, so the follow-up `epicrun` can hand back `#N` before its prerequisite — the exact ordering this rule exists to preserve |
-   | **The command could not answer** — it exited non-zero, or printed a ⚠ warning about a truncated listing **above a `Nothing to bundle.` verdict**. The truncation warning is the one beginning `⚠ The epic listing …`, in either of two forms — `hit its …-epic cap` and `stopped at the …-issue page ceiling` — both saying the epic listing was not read to the end, so the epic tracking `#N` may simply have sat past the cap (joshuafolkken/kit#1067). A definitive answer (`Already in an epic`, `Add it to the epic …`) stands even beside a warning: `⚠ Could not read #N.` is one relation read that failed and says nothing about epic membership (joshuafolkken/kit#950) | Stop and report, naming what it said. **Do not fall through to creating an epic**: "could not tell" is not "no epic tracks it", and reading it as such recreates the duplicate this step exists to prevent |
+   | An epic `#<E>` already tracks `#N` | `pnpm josh epic --add <E> <P> --before <N>` — insert into **that** epic. **Do not create a second one** |
+   | No epic tracks it | `pnpm josh epic "<title>" <P> <N> --ordered` — `#N` is itself a deliverable, so it is kept as a child rather than promoted. **`--ordered` is required, not stylistic**: without it no `blocked-by` relation is recorded and the follow-up `backlogrun` can hand back `#N` before its prerequisite |
+   | **The command could not answer** — a non-zero exit, `Could not confirm which epic already tracks these …`, or a ⚠ truncation warning (`⚠ The epic listing …`) above a `Nothing to bundle.` verdict | Stop and report, naming what it said. **Do not fall through to creating an epic**: "could not tell" is not "no epic tracks it". A definitive answer stands even beside a `⚠ Could not read #N.` warning |
 
-   **`#N` needs no place in the declared order for this to work.** An epic that mixes ordered and unordered children leaves a child out of every chain legitimately, and the command declares a new chain `#<P> -> #N` beside the existing ones rather than refusing (joshuafolkken/kit#949). It still refuses a target the epic does not track at all — `#N is not a child of this epic, so it cannot position an insertion` — and there the refusal *is* the report: do not hand-edit the body and do not create a second epic. This branch already ends in a stop, so say what was refused in the `confirmation` Telegram and let the person decide.
+   The command declares a new chain `#<P> -> #N` beside any existing ones rather than refusing. It
+   still refuses a target the epic does not track at all — there the refusal *is* the report: do not
+   hand-edit the body and do not create a second epic.
 
-4. **Remove `in-progress` from `#N`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`. `epic:next` classifies a child carrying that label as waiting on time **before** it consults any blocker, so leaving it on ships an epic whose `#N` is never offered and which stalls the moment `#<P>` merges.
-5. Send the `confirmation` Telegram and **stop** with "Please run `epicrun #<E>` to execute this epic."
+4. **Remove `in-progress` from `#N`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`. `epic:next` classifies a child carrying it as waiting on time before it consults any blocker.
+5. Send the `confirmation` Telegram and **stop** with "Please run `backlogrun #<E> --only` to execute this epic."
 
-**Automatic filing is capped at 10 Issues per run**, the same guard `epicrun` carries: with the confirmation gone, a ceiling is the only thing left to stop a chain of false positives. On reaching it, stop and report.
+**Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.
 
-- `fullrun #<N>`: Read Issue #N → **normalize the title**: if the title is not in English or can be phrased more clearly/conventionally, derive a better English title and run `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` → **add `in-progress` label** (create if missing: `gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is actively in progress" --silent 2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`) → post the agreed plan only if the Issue body is blank (use `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the plan-posting step → implement → run the **verification gate** (refactor per `prompts/refactoring.md` → **start `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) and the review together, and join the gate before the commit** — neither writes to the working tree, which is why `josh eval` is already started this way (joshuafolkken/kit#1242) — and **started once per run, not once per edit**: while implementing, re-run the single check by name (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`, the two scoped checks, each falling back to the whole one it narrows — joshuafolkken/kit#1298 and joshuafolkken/kit#1257 / the project's own type check) rather than the whole gate (joshuafolkken/kit#1246) → `/code-review` with the brief `pnpm josh review:brief` prints (the level, what the gate has already proved or is still proving on this exact tree, and the target) on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total** (`prompts/review.md` → "Review round cap") → `pnpm josh eval:scope`, and `pnpm josh eval` when it answers `required` (`eval-gate.md`)) → **`pnpm josh bump minor` → `pnpm josh gate` → join, which puts the commit *between* the two review rounds so CI runs beside round 2** (joshuafolkken/kit#1261; **that second gate runs only where the tree was edited after the first one started** — a clean round 1 with a green gate has neither, and its order is exactly what it was) → `pnpm josh git -y` → **the follow-up filing and `pnpm josh epic:bundle`, run here so they sit inside the CI wait** → `pnpm josh followup --merge` → `pnpm josh ms` (full run from Step 3 onward in `prompts/collaboration-workflow/plan-comment.md`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`, default `ja`). Before implementing, run `git switch main && git pull`, then run `pnpm josh latest:scope` and update dependencies only when it answers `required` — the trigger is elapsed time since the last update in this checkout, never a judgement, and `latest-gate.md` is its single source. On `required`, `josh latest` runs (it includes `pnpm audit`; fix with an `overrides` entry in `pnpm-workspace.yaml` if vulnerabilities found) and **the `dependency-update` skill is loaded and followed afterwards — the overrides in both `pnpm-workspace.yaml` and `package.json`, and the `devEngines` check; never report the pins intact without having run it.** On `skip` neither happens, and `git switch main && git pull` runs either way. Run `pnpm josh review:brief` and run `/code-review <what it printed>` inline **before committing**; fix all high/medium-priority findings — **so the first commit already carries reviewed code** — then ask `pnpm josh review:round2 --round-1-closed` whether a second round is due, **before the bump and never after it**: `pnpm josh bump minor` writes `package.json`, which is not inert, so a delta taken afterwards answers `required` whatever round 1 did, while asked here it is exactly round 1's fixes (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not", joshuafolkken/kit#1433). Then `pnpm josh bump minor`, `pnpm josh gate` (that second gate exists because any edit after the first gate started — a red check's fix as much as a finding's — made its result stale; with nothing edited there is nothing to re-run, and **a `skip` never removes it**, because round 1's fixes are exactly such an edit), join it, and `pnpm josh git -y`; on `skip` there is no second round and the run records the skip on the Issue inside the CI wait, and on `required` re-run with `pnpm josh review:brief --round 2` — **at most two reviews in total** — so that verification pass runs beside the CI the commit started (joshuafolkken/kit#1261; `prompts/review.md` → "The pull request opens between the rounds, so CI runs beside round 2"). **A finding round 2 fixes in place is pushed before its gate** (joshuafolkken/kit#1326): the single check the fix reaches → `pnpm josh git -y "<title> #<N>"` again, a follow-up commit on the same branch with **no second `bump`** → `pnpm josh gate` started beside the CI that commit re-runs and **joined before `pnpm josh followup --merge`**, which is what then blocks on it; a red gate there is fixed, re-checked and pushed again, the superseded cycle cancelled by `ci.yml`'s concurrency group (`prompts/review.md` → "The round-2 fix commit is pushed before its gate"). **A clean second round is not a turn boundary either**: the turn that reads it issues `pnpm josh followup --merge`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a turn of its own (`prompts/review.md` → "A clean second round issues the merge in the same turn", joshuafolkken/kit#1333). After the second round, route each remaining non-High finding through the three-way disposition — fix it in place without starting a new review round, file it referencing this one, or drop it with a one-line PR note; **for a filed finding, run `pnpm josh epic:bundle <new>` on it before this Issue closes and act on its answer** — and **run both the filing and the bundle after `pnpm josh git -y`, before `pnpm josh followup --merge`, so they sit inside the CI wait**: neither changes a line of code, so the CI already running stays valid, and the Issue closes at the merge, which is `followup`'s to do (`prompts/review.md` → "Review round cap"; not joshuafolkken/kit#1216's rejected "review during CI", which would overlap work that *does* change code) — `add_to_epic` / `create_epic` are Tier A, executed with the matching `pnpm josh epic --add` / `pnpm josh epic` write command and never a hand edit of the epic body; `ask` is Tier A too — choose the epic you recommend, run its write command, and record the decision on both the new Issue and that epic's `## Decisions`; it neither stops a run nor parks a child (joshuafolkken/kit#1339); `none` is a no-op — because an Issue `epic:next` never offers is parked rather than dropped (`prompts/review.md` → "Review round cap"); a standing High blocks the merge rather than buying a third round. When running `pnpm josh followup --merge`, compose an implementation summary in the session language (`JOSH_SESSION_LANG`, default `ja`) and pass it via `--notify-message`. Format: `"Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` (lead with the three plain-language lines; one bullet per meaningful change under `Details:`). **`pnpm josh followup --merge` waits for CI, verifies AI review findings, sends the completion notification, then merges — all in one step. If AI review blockers are found, followup exits non-zero; fix the findings and re-run `pnpm josh followup --merge`.** **After the merge succeeds, run `pnpm josh ms` to return to the default branch and pull the merge commit — `fullrun` always ends on the default branch.** — see `followup.md` → `auto-merge`.
-- `fullrun new` or `fullrun new "<title>"`: Shortcut that combines `kickoff new` + `fullrun #<N>` into a single run. When no Issue exists yet (full run from Step 1 onward in `prompts/collaboration-workflow/issue-template.md`). Steps: (1) Derive an English title from the conversation, or use the provided title. **(1a) Run `pnpm josh issue:scout "<title>" [--body "<summary>"]` before creating the Issue** — it answers in one call whether the work is already filed and which epic it belongs to, and a candidate that covers the same work stops the run rather than filing a second Issue for it; `SKILL.md` → §2e is the single source. (2) Create Issue: `gh api repos/{owner}/{repo}/issues -f title="<title>" -f body="<body>"` — body follows the minimum template in `prompts/collaboration-workflow/issue-template.md`, filled from conversation context. Capture the new Issue number `<N>`. (3) Add `in-progress` label: `gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is actively in progress" --silent 2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Post the agreed plan in the session language (`JOSH_SESSION_LANG`, default `ja`): if the Issue body is blank, use `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"` to fill the body; otherwise use `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<plan>"`. (5) If the working tree already has staged or modified files (e.g., user pre-staged kit/config changes), stash them first: `git stash`. (6) Run `git switch main && git pull`. (7) Run `pnpm josh latest:scope`; on `required` run `josh latest` (includes `pnpm audit`; fix with an `overrides` entry in `pnpm-workspace.yaml` if vulnerabilities found) and then load the `dependency-update` skill and follow its procedure — the overrides in both `pnpm-workspace.yaml` and `package.json`, and the `devEngines` check; never report the pins intact without having run it. On `skip` neither runs. **The answer is the command's, never a judgement — even when the working tree had modifications**; `latest-gate.md` is the single source. If you stashed changes in step (5), restore them now: `git stash pop`. (8) Implement. (9) run the verification gate (refactor → **start `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) and the review together, and join the gate before the commit** (joshuafolkken/kit#1242) — and **started once per run, not once per edit**: while implementing, re-run the single check by name (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`, the two scoped checks, each falling back to the whole one it narrows — joshuafolkken/kit#1298 and joshuafolkken/kit#1257 / the project's own type check) rather than the whole gate (joshuafolkken/kit#1246) → `/code-review` with the brief `pnpm josh review:brief` prints (the level, what the gate has already proved or is still proving on this exact tree, and the target) on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total** (`prompts/review.md` → "Review round cap"), of which **only the first runs here**: the second runs at step (11a), after the pull request is open, so CI overlaps it (joshuafolkken/kit#1261) → `pnpm josh eval:scope`, and `pnpm josh eval` when it answers `required` (`eval-gate.md`)). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether a second round is due — here, before (10), and never after it.** `pnpm josh bump minor` writes `package.json`, which is not inert, so a delta taken after the bump carries that write and answers `required` whatever round 1 did; asked here the delta is exactly round 1's fixes. The flag is passable only where every round-1 High/Medium closed, and without it the answer is `required`; `prompts/review.md` → "When round 2 is skipped entirely, and when it is not" is the single source (joshuafolkken/kit#1433). **A `skip` changes only whether (11a) runs** — (10)'s gate re-run still happens, because round 1 edited the tree and that is what made the first gate's result stale. (10) `pnpm josh bump minor`; **where the tree was edited after the first gate started** — a red check's fix or a round-1 finding's fix, the two the table in `prompts/review.md` names — follow it with `pnpm josh gate` again on that exact tree and join it: that edit is what made the first result stale, and **the bump goes in front of the re-run** so the gate the commit rests on covers the version bump and round 2's brief still reads `Already verified`. **That gate's trigger is not the second round's**: the round is due only where round 1 found High/Medium, so a red-gate fix on an otherwise clean round 1 is re-gated here and then covered by CI with no round to read it — which is what happened before this change too. With nothing edited since the first gate, join that one and go straight to (11). (11) `pnpm josh git -y "<title> #<N>"` — **the pull request opens here, between the two review rounds** (joshuafolkken/kit#1261). (11a) Run the **second round** now, beside the CI that commit started, **where (9a) answered `required`**: `/code-review` with the brief `pnpm josh review:brief --round 2` prints. Where it answered `skip` there is no second round — skip straight to (12), which is where the skip is recorded. **A finding it fixes in place is pushed before its gate** (joshuafolkken/kit#1326): the single check the fix reaches → `pnpm josh git -y "<title> #<N>"` again, a follow-up commit on the same branch with **no second `bump`** → `pnpm josh gate` started beside the CI that commit re-runs and **joined before `pnpm josh followup --merge`** (`prompts/review.md` → "The round-2 fix commit is pushed before its gate"). Skip (11a) when round 1 found no High/Medium: there is no second round, and this step is where the old order already was. **A clean second round is not a turn boundary either**: the turn that reads it issues `pnpm josh followup --merge`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a turn of its own (`prompts/review.md` → "A clean second round issues the merge in the same turn", joshuafolkken/kit#1333). (12) **File whatever the review round cap routed to branch 2, run `pnpm josh epic:bundle <new>` on each, and — where (9a) answered `skip` — record the skip on the Issue with the `review-round2-skipped` label and a `## Round 2 skipped` comment quoting the reason line verbatim — here, not before the commit.** This is the CI wait, neither step changes a line of code, and the Issue closes at the merge, so the deadline the bundle needs is still met (`prompts/review.md` → "Review round cap"). Skip the step when the review filed nothing. (13) `pnpm josh followup "<title> #<N>" --merge --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` (lead with the three plain-language lines; one bullet per meaningful change under `Details:`). **`pnpm josh followup --merge` waits for CI, verifies AI review findings (CodeRabbit, Claude Review), sends the completion notification, then merges. If blockers are found, followup exits non-zero; fix and re-run `pnpm josh followup --merge`.** (SonarCloud findings are not scanned by `followup`; the `sonar-qube.yml` CI quality gate fails the required `SonarQube` check on a red gate, which `followup` waits on before merging.) (14) **After the merge succeeds, run `pnpm josh ms` to return to the default branch and pull the merge commit — `fullrun new` always ends on the default branch.** — see `followup.md` → `auto-merge`.
+- `fullrun #<N>`: **add `in-progress` label the moment `run:hold` answered `hold`** (create if missing:
+  `gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is
+  actively in progress" --silent 2>/dev/null || true`, then `gh api
+  repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`) → Read Issue #N → **normalize the
+  title** (if not in English or can be phrased more clearly, derive a better English title and `gh api -X
+  PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`) → post the agreed plan only if the Issue
+  body is blank (`gh api -X PATCH
+  repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
+  plan-posting step → implement → run the **verification gate** (the full procedure is `chain-rule.md`;
+  in outline: refactor → `pnpm josh main:merge` → start `pnpm josh gate` and a subagent `/code-review`
+  with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,
+  iterate to no high/medium findings, at most two reviews → open the PR between the rounds with `pnpm
+  josh git -y "<title> #<N>"` → the follow-up filing and `pnpm josh epic:bundle` inside the CI wait →
+  `pnpm josh followup`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`,
+  default `ja`). Before implementing, run `git switch main && git pull`, then `pnpm josh latest:scope`
+  and update dependencies only on `required` — `latest-gate.md` is its single source, and on `required`
+  load the `dependency-update` skill afterwards. When running `pnpm josh followup`, pass an
+  implementation summary via `--notify-message` in the session language, leading with the three
+  plain-language lines: `"Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n-
+  <change1>\n- <change2>"`. **`pnpm josh followup` waits for CI, verifies AI review findings, sends the
+  completion notification, then merges; if blockers are found it exits non-zero — fix and re-run.**
+  **After the merge succeeds, run `pnpm josh ms`** to return to the default branch and pull the merge
+  commit (`followup.md` → `auto-merge`).
+- `fullrun new` or `fullrun new "<title>"`: `kickoff new` + `fullrun #<N>` in one run. Steps: (1)
+  Derive an English title, or use the provided one. **(1a) Run `pnpm josh issue:scout "<title>" [--body
+  "<summary>"]` before creating the Issue** — a candidate that covers the same work stops the run
+  rather than filing a second Issue (`SKILL.md` → §2e). (2) Create Issue: `gh api
+  repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -f body="<body>"` (body per
+  `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3) Add `in-progress` (as above).
+  (4) Post the agreed plan in the session language: fill the body if blank, otherwise add a comment.
+  (5) If the working tree already has staged or modified files,
+  `git stash push -m "fullrun new: pre-existing changes"` first. (6) `git switch main
+  && git pull`. (7) `pnpm josh latest:scope`; on `required` run `josh latest` and load the
+  `dependency-update` skill; on `skip` neither runs (`latest-gate.md` is the single source). If you
+  stashed in (5), `pnpm josh stash:pop "fullrun new: pre-existing changes"` — by message, never a
+  positional `git stash pop`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`;
+  only the first review round runs here). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether
+  a second round is due, once round 1's fixes are in and before the commit.** (10) Where the tree was
+  edited after the first gate started, re-run `pnpm josh gate` and join it. (11) `pnpm josh git -y
+  "<title> #<N>"` — the pull request opens here, between the two rounds. (11a) Run the **second round**
+  now beside the CI, where (9a) answered `required` (brief `pnpm josh review:brief --round 2`); a
+  finding it fixes in place is pushed before its gate. (12) File whatever the review round cap routed to
+  branch 2, run `pnpm josh epic:bundle <new>` on each, and where (9a) answered `skip` record the skip on
+  the Issue. (13) `pnpm josh followup "<title> #<N>" --notify-message "..."`. (14) **After the merge,
+  run `pnpm josh ms`.** (15) **Ask `pnpm josh release:scope` and close the completion summary with what
+  it answered** (`followup-reference.md` → "When `pnpm josh release` runs").
 
+**The last step of either form is the release ask.** Once the merge is done, `pnpm josh release:scope`
+says whether a release is owed — `required`, `skip` or `unknown`, and `unknown` is never read as
+`skip`. On `required` the completion summary closes with the request and the exact command; the run
+never types `pnpm josh release` itself, because publishing is Tier C (`followup-reference.md` → "When
+`pnpm josh release` runs", the single source). A `fullrun` invoked as one child of a
+`backlogrun` does not ask it — that batch asks once at its own end.

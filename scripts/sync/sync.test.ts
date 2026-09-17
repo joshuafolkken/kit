@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 import { workflow_pin_logic } from './workflow-pin-logic'
 
-const TEST_DIR = path.join(tmpdir(), 'sync-test')
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
+const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-test-'))
 const SRC_PATH = path.join(TEST_DIR, 'src', 'gitignore')
 const GITIGNORE_DEST_NAME = '.gitignore'
 const DEST_PATH = path.join(TEST_DIR, 'dest', GITIGNORE_DEST_NAME)
@@ -282,6 +283,44 @@ describe('sync_playwright_config', () => {
 })
 
 const NO_REFERENCES_CONTENT = 'no references here\n'
+
+const CLAUDE_MD_DEST = path.join(TEST_DIR, 'dest', 'CLAUDE.md')
+const CLAUDE_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
+
+// CLAUDE.md is distributed by import, not byte-copied (joshuafolkken/kit#1878): `josh sync` ensures
+// the one-line import is present while never disturbing a consumer's own additions below it.
+describe('sync_claude_md', () => {
+	it('writes the one-line import when the consumer has no CLAUDE.md', () => {
+		sync.sync_claude_md(CLAUDE_MD_DEST)
+
+		expect(readFileSync(CLAUDE_MD_DEST, 'utf8')).toBe(`${CLAUDE_IMPORT_LINE}\n`)
+	})
+
+	it('prepends the import while preserving project-specific additions', () => {
+		const additions = '## Project rules\n- do the thing\n'
+
+		writeFileSync(CLAUDE_MD_DEST, additions)
+		sync.sync_claude_md(CLAUDE_MD_DEST)
+
+		const result = readFileSync(CLAUDE_MD_DEST, 'utf8')
+
+		expect(result).toBe(`${CLAUDE_IMPORT_LINE}\n\n${additions}`)
+	})
+
+	it('leaves a file already carrying the import unchanged', () => {
+		const content = `${CLAUDE_IMPORT_LINE}\n\n## Project rules\n`
+
+		writeFileSync(CLAUDE_MD_DEST, content)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+
+		sync.sync_claude_md(CLAUDE_MD_DEST)
+
+		expect(readFileSync(CLAUDE_MD_DEST, 'utf8')).toBe(content)
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('unchanged'))
+	})
+})
 
 describe('sync_ai_file', () => {
 	it('writes file content to destination', () => {

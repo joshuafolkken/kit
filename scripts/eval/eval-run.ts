@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
-import { bounded_pool } from '#scripts/bounded-pool'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
-import { poll } from '#scripts/poll'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { poll } from '#scripts/lib/poll'
 import { eval_judge, type Verdict } from './eval-judge'
 import { eval_report } from './eval-report'
 import { eval_runner, type RunnerDependencies } from './eval-runner'
@@ -10,6 +10,7 @@ import { eval_sandbox } from './eval-sandbox'
 import { eval_scenario, type Scenario } from './eval-scenario'
 import { eval_session } from './eval-session'
 import { eval_stamp } from './eval-stamp'
+import { eval_streak } from './eval-streak'
 import { eval_transcript } from './eval-transcript'
 
 // `pnpm josh eval [name...]`. Deliberately not wired into CI: every scenario is a real Claude
@@ -97,8 +98,8 @@ function report_startup_problem(message: string): boolean {
 // started the run, and the lint rule that says so is right.
 // Recorded before the first session starts, so a `/code-review` running alongside can afterwards be
 // checked against exactly the tree the suite read (joshuafolkken/kit#1152). Best-effort on
-// purpose: a record that could not be written leaves `josh eval:scope --since-eval` with nothing,
-// which answers `required` — measure again rather than trust a result nothing vouches for. Failing
+// purpose: a record that could not be written leaves a reader of the per-checkout record with
+// nothing, so it must measure again rather than trust a result nothing vouches for. Failing
 // the run instead would turn a temp-directory problem into a lost measurement.
 function record_measured_tree(): void {
 	try {
@@ -108,9 +109,23 @@ function record_measured_tree(): void {
 	}
 }
 
+// The other half of the record, written once the run has returned a verdict (joshuafolkken/kit#1164).
+// A run interrupted at the keyboard, or one whose scenarios threw, never reaches this line, and the
+// record it leaves says only that a run started — an incomplete record a reader must treat as
+// `required`, the same answer no record at all gets. Best-effort for the same reason the write is: an
+// unrecorded completion costs a re-measurement, and re-measuring is the safe direction.
+function complete_measured_tree(): void {
+	try {
+		eval_stamp.complete_stamp()
+	} catch (error) {
+		console.error(`Could not record that this run finished: ${String(error)}`)
+	}
+}
+
 async function run_selection(
 	chosen: ReadonlyArray<Scenario>,
 	concurrency: number,
+	is_whole_suite: boolean,
 ): Promise<boolean> {
 	const model = process.env[MODEL_ENV_KEY] ?? DEFAULT_MODEL
 	const width = bounded_pool.pool_width(concurrency, chosen.length)
@@ -120,11 +135,37 @@ async function run_selection(
 	)
 
 	const verdicts = await eval_runner.run_all(chosen, runner_dependencies(model, concurrency))
-	// The count first, then what it means for a merge: the verdict line is what `josh eval:scope`
-	// sent the run here for, so it is the last thing printed rather than something to scroll back to.
+	// The count first, then what it means for a merge: the verdict line is what a reader reads, so it
+	// is the last thing printed rather than something to scroll back to.
 	const is_held = eval_report.report_summary(verdicts)
 
-	eval_report.report_merge_verdict(verdicts)
+	const verdict = eval_report.merge_verdict(verdicts)
+
+	// **Above the verdict line.** Every documented procedure reads the run's *last* line as the
+	// one-token verdict, so a warning printed after it would send an agent following the gate to the
+	// wrong line. Whether it is written at all is `run_recorded`'s single whole-suite condition,
+	// carried down rather than re-tested (joshuafolkken/kit#1197).
+	if (is_whole_suite) eval_streak.report_streak(verdict)
+
+	eval_report.print_verdict(verdict)
+
+	return is_held
+}
+
+// Both halves of the record are written under one condition — the whole-suite run below — so it is
+// asked once rather than twice, and neither half can be written without the other's guard. The run
+// of verdicts is carried down rather than re-tested here for the same reason: it belongs to the same
+// condition, and it has to be *printed* from inside the selection, above the verdict line
+// (joshuafolkken/kit#1197).
+async function run_recorded(
+	chosen: ReadonlyArray<Scenario>,
+	concurrency: number,
+): Promise<boolean> {
+	record_measured_tree()
+
+	const is_held = await run_selection(chosen, concurrency, true)
+
+	complete_measured_tree()
 
 	return is_held
 }
@@ -140,14 +181,19 @@ async function main(): Promise<boolean> {
 
 	if (unknown !== undefined) return report_startup_problem(unknown)
 
+	const chosen = selected(scenarios, names)
+
 	// **Only a whole-suite run leaves a record.** A named re-run — what a `blocked` verdict asks for —
 	// would otherwise overwrite the record with a newer timestamp and the tree as it is now, and
-	// `--since-eval` would then compare that tree against itself and answer `skip`: a one-scenario
+	// a reader would then compare that tree against itself and see nothing changed: a one-scenario
 	// reading standing in for the suite's measurement. The record says what the suite measured, so it
-	// is written only where the suite is what ran.
-	if (names.length === 0) record_measured_tree()
+	// is written only where the suite is what ran — and, since joshuafolkken/kit#1164, the completion
+	// it later takes is written under the same condition rather than a second one. The run of verdicts
+	// joshuafolkken/kit#1197 counts is the third thing under that one condition, and for the same
+	// reason: a named re-run would otherwise clear the count with a single scenario.
+	if (names.length > 0) return await run_selection(chosen, choice.limit, false)
 
-	return await run_selection(selected(scenarios, names), choice.limit)
+	return await run_recorded(chosen, choice.limit)
 }
 
 const is_all_held = await main()

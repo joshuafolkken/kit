@@ -236,12 +236,13 @@ export const code_quality_rules = {
 	// default caseを最後に配置
 	'default-case-last': 'error',
 	// ドット記法を優先
-	'dot-notation': [
-		'error',
-		{
-			allowPattern: '^[A-Z0-9_]+$',
-		},
-	],
+	// joshuafolkken/kit#1783: コア版は構文だけを見るため、index signature 由来のプロパティにも
+	// `--fix` でドット記法を強制する。その出力を tsconfig/base.json の
+	// noPropertyAccessFromIndexSignature が TS4111 で拒否するので、自動修正と型チェックのあいだに
+	// 固定点が無くなる。TypeScript 版は noPropertyAccessFromIndexSignature を自分で検出して
+	// index signature を除外するため、そちらの出力は常に型チェックを通る。
+	'dot-notation': 'off', // TypeScript版を使用
+	'@typescript-eslint/dot-notation': ['error', { allowPattern: '^[A-Z0-9_]+$' }],
 	// 分割代入のデフォルト値を要求
 	'default-param-last': 'error',
 	// グループ化された変数宣言を要求

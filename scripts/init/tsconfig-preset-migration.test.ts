@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -10,7 +10,8 @@ const APP_KIT_LEGACY = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit
 const APP_KIT_CURRENT = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json'
 const SVELTE_KIT_GENERATED = './.svelte-kit/tsconfig.json'
 
-const TEST_DIR = path.join(tmpdir(), 'tsconfig-preset-migration-test')
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
+const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'tsconfig-preset-migration-test-'))
 
 // The migration only rewrites an entry whose renamed target is actually installed, so every
 // "rewrites" case needs the `.json` preset present on disk.

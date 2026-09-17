@@ -61,8 +61,8 @@ describe('transform_prompt_paths', () => {
 	})
 
 	// The glob case: `prompts/**` names a set of paths, not a file a consumer can open. Rewriting it
-	// would print a path a consumer's diff can never contain, while `josh eval:scope` matches the
-	// original (joshuafolkken/kit#907).
+	// would print a path a consumer's diff can never contain, while the eval trigger set
+	// (`eval-trigger.ts`) matches the original (joshuafolkken/kit#907).
 	it.each([
 		['no references here', 'content with no prompts/ reference'],
 		['the measured set is `CLAUDE.md`, `prompts/**`, `.claude/settings.json`', 'a glob'],
@@ -72,8 +72,103 @@ describe('transform_prompt_paths', () => {
 	})
 })
 
+describe('transform_distributed_paths bundled eslint/ references', () => {
+	it('rewrites a published eslint/ path to the package location', () => {
+		const result = init_logic.transform_distributed_paths('lint by `eslint/rules/test-filename.js`')
+
+		expect(result).toContain('`node_modules/@joshuafolkken/kit/eslint/rules/test-filename.js`')
+	})
+
+	it('rewrites an eslint/ directory reference', () => {
+		const result = init_logic.transform_distributed_paths('see `eslint/rules/`')
+
+		expect(result).toBe('see `node_modules/@joshuafolkken/kit/eslint/rules/`')
+	})
+
+	it('leaves an eslint glob alone', () => {
+		const input = 'enforced by `eslint/rules/*`'
+
+		expect(init_logic.transform_distributed_paths(input)).toBe(input)
+	})
+})
+
+describe('transform_distributed_paths unbundled references', () => {
+	it('rewrites a *.test.ts reference to its GitHub source', () => {
+		const result = init_logic.transform_distributed_paths(
+			'`scripts/document/ai-document-pointers.test.ts`',
+		)
+
+		expect(result).toBe(
+			'`https://github.com/joshuafolkken/kit/blob/main/scripts/document/ai-document-pointers.test.ts`',
+		)
+	})
+
+	it('rewrites a bare docs/ directory reference to the GitHub tree view', () => {
+		const result = init_logic.transform_distributed_paths('review `docs/`')
+
+		expect(result).toBe('review `https://github.com/joshuafolkken/kit/tree/main/docs/`')
+	})
+
+	it('rewrites a docs/ file reference to the GitHub blob view', () => {
+		const result = init_logic.transform_distributed_paths('read `docs/init.md`')
+
+		expect(result).toBe('read `https://github.com/joshuafolkken/kit/blob/main/docs/init.md`')
+	})
+
+	it('rewrites prompts/, eslint/, tests and docs together in one pass', () => {
+		const input = '`prompts/overview.md` `eslint/rules/test-filename.js` `foo.test.ts` `docs/x.md`'
+		const result = init_logic.transform_distributed_paths(input)
+
+		expect(result).toContain('node_modules/@joshuafolkken/kit/prompts/overview.md')
+		expect(result).toContain('node_modules/@joshuafolkken/kit/eslint/rules/test-filename.js')
+		expect(result).toContain('https://github.com/joshuafolkken/kit/blob/main/foo.test.ts')
+		expect(result).toContain('https://github.com/joshuafolkken/kit/blob/main/docs/x.md')
+	})
+})
+
+describe('ensure_claude_md_import', () => {
+	const IMPORT_LINE = init_logic.CLAUDE_MD_IMPORT_LINE
+
+	it('writes the one-line import when the consumer has no file', () => {
+		expect(init_logic.ensure_claude_md_import(undefined)).toBe(`${IMPORT_LINE}\n`)
+	})
+
+	it('leaves a file that already carries the import untouched', () => {
+		const existing = `${IMPORT_LINE}\n\n## Project rules\n- do the thing\n`
+
+		expect(init_logic.ensure_claude_md_import(existing)).toBe(existing)
+	})
+
+	it('prepends the import while preserving project-specific additions', () => {
+		const additions = '## Project rules\n- do the thing\n'
+		const result = init_logic.ensure_claude_md_import(additions)
+
+		expect(result).toBe(`${IMPORT_LINE}\n\n${additions}`)
+		expect(result).toContain(additions)
+	})
+
+	it('is idempotent across repeated syncs', () => {
+		const once = init_logic.ensure_claude_md_import('## Project rules\n')
+
+		expect(init_logic.ensure_claude_md_import(once)).toBe(once)
+	})
+})
+
+describe('get_ai_copy_files CLAUDE.md distribution (joshuafolkken/kit#1878)', () => {
+	it('no longer byte-copies CLAUDE.md — it is distributed by import', () => {
+		expect(init_logic.get_ai_copy_files()).not.toContain('CLAUDE.md')
+	})
+
+	it('still copies the pointer files other tools read', () => {
+		const files = init_logic.get_ai_copy_files()
+
+		expect(files).toContain('AGENTS.md')
+		expect(files).toContain('GEMINI.md')
+		expect(files).toContain('.cursorrules')
+	})
+})
+
 describe('merge_package_scripts jf-* migration', () => {
-	/* eslint-disable dot-notation -- index signature requires bracket notation */
 	it('removes jf-git script since git is a retired alias', () => {
 		const content = '{"scripts":{"git":"jf-git"}}'
 		const parsed = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
@@ -114,13 +209,10 @@ describe('merge_package_scripts jf-* migration', () => {
 		expect(result.scripts['telegram:test']).toBeUndefined()
 		expect(result.scripts['test:unit']).toBeUndefined()
 	})
-
-	/* eslint-enable dot-notation */
 })
 
 describe('merge_package_scripts preinstall ordering', () => {
 	it('inserts preinstall as the first script key when merging into existing scripts', () => {
-		/* eslint-disable dot-notation -- index signature requires bracket notation */
 		const content = '{"scripts":{"build":"tsc","postinstall":"lefthook install"}}'
 		const result = JSON.parse(
 			init_logic.merge_package_scripts(content, { preinstall: SAFE_CHAIN_SCRIPT_VALUE }),
@@ -128,7 +220,6 @@ describe('merge_package_scripts preinstall ordering', () => {
 
 		expect(Object.keys(result.scripts)[0]).toBe('preinstall')
 		expect(result.scripts['preinstall']).toBe(SAFE_CHAIN_SCRIPT_VALUE)
-		/* eslint-enable dot-notation */
 	})
 })
 

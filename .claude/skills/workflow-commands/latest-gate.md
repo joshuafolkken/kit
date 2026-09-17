@@ -18,8 +18,7 @@ pnpm josh latest:scope   # → required | skip ; the reason on stderr
 **The input is when `josh latest` last finished in this checkout, and nothing else.** "The
 dependencies are probably still fresh" is a judgement made under time pressure, and time pressure
 resolves it toward `skip` exactly when a stale dependency is most likely to matter — the same reason
-`pnpm josh review:level` took the review level out of an agent's hands and `pnpm josh eval:scope`
-took the measurement trigger out of them.
+`pnpm josh review:brief --level-only` took the review level out of an agent's hands.
 
 - **No record answers `required`.** A fresh checkout, a cleared temp directory, a run that fell over
   halfway — every one of them lands there, and none of them is evidence that anything is current.
@@ -33,11 +32,15 @@ took the measurement trigger out of them.
 ## What runs when the answer is `required`
 
 ```bash
-git stash push -u    # only if the working tree has staged or modified files
+git stash push -u -m "josh latest"    # only if the working tree has staged or modified files
 git switch main && git pull
 pnpm josh latest     # on `required` only
-git stash pop        # only if you stashed above
+pnpm josh stash:pop "josh latest"     # only if you stashed above — by message, never a positional pop
 ```
+
+**The pop is by message, never a bare `git stash pop`.** The stash is a repository-wide stack every
+work tree shares, so a positional pop would take whichever lane last pushed rather than the one this
+step saved (joshuafolkken/kit#2050).
 
 Then **load the `dependency-update` skill and follow its procedure** — the overrides in **both**
 `pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines` pnpm bump. That condition
@@ -57,16 +60,16 @@ this command answered — so it is conditional on the **tree**, never on the ans
 
 `pnpm audit` runs inside `josh latest`, so a `skip` skips that reading too. **What still covers every
 merge is CI**: the `Security Audit` job runs on every pull request and is one of the required checks
-`pnpm josh followup --merge` waits on, so nothing reaches the default branch without a fresh audit —
+`pnpm josh followup` waits on, so nothing reaches the default branch without a fresh audit —
 whatever this gate answered locally. The local reading is a head start on a failure CI would catch
 anyway; it was never the only net.
 
 ## Why an elapsed-time window rather than "once per batch"
 
-`queue` and `epicrun` had already hoisted the update to the head of a batch, and that hoist is
+The batch entry points had already hoisted the update to the head of a batch, and that hoist is
 correct — but it says nothing about a standalone `fullrun`, which **is** the head of its own
 one-issue batch and therefore updated on every invocation. A session that runs six issues one at a
-time paid the full cost six times while a `queue` of the same six paid it once, for no difference
+time paid the full cost six times while a batch of the same six paid it once, for no difference
 anybody chose. An elapsed-time window is the one condition that reads the same at every entry point,
 so no entry needs a rule of its own — and the batch hoists survive it unchanged, because a batch's
 second child asks the same command and is told `skip`.
@@ -77,6 +80,6 @@ window removes is the other runs carrying the same bumps; it does not make that 
 Should the issue then fail CI on a bump rather than on its own change, that is a dependency problem
 found once — fix it forward before parking the issue for it.
 
-This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `queue.md` and `epicrun.md`
+This file is the single source of the rule. `fullrun.md`, `halfrun.md`, `backlogrun.md` and `backlogrun.md`
 each name `pnpm josh latest:scope` at the point their procedure reaches it and route here for
 everything else; `docs/josh-commands.md` documents the command itself.

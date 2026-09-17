@@ -1,5 +1,6 @@
 import { json_format } from '#scripts/config-merge/json-format'
-import { vscode_settings_schema } from '#scripts/schemas'
+import { vscode_settings_schema } from '#scripts/lib/schemas'
+import { distributed_paths } from './distributed-paths'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
 import { init_logic_secretlint } from './init-logic-secretlint'
@@ -33,7 +34,7 @@ const CSPELL_IMPORT = '@joshuafolkken/kit/cspell'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
 const SAFE_CHAIN_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
-const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
+const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts'
 // Marker identifying a consumer script that already runs the fix-gh-packages command.
 const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
 const PREPARE_KEY = 'prepare'
@@ -44,7 +45,28 @@ const LEGACY_POSTINSTALL_KEY = 'postinstall'
 // global installs outside a git repo) does not abort `pnpm install`. These are
 // developer-only hooks, so they live in `prepare` (local install + pack/publish)
 // rather than `postinstall`, which also runs when the package is a consumer dependency.
-const GUARDED_LEFTHOOK_CMD = `command -v lefthook >/dev/null 2>&1 && ${LEFTHOOK_INSTALL_CMD}`
+// A failing `lefthook install` used to be indistinguishable from a missing binary: `|| true` swallowed
+// both, so an install that left **zero** hooks in place still exited 0 and said nothing. The way it
+// happens in practice is `core.hooksPath` — lefthook refuses to install while any custom hooks path is
+// set — and the developer then commits and pushes for weeks with no pre-commit or pre-push check
+// running at all, believing they are (joshuafolkken/kit#1503).
+//
+// **The `|| true` stays**: a consumer's `pnpm install` must not die over a developer-only hook, which
+// is what it was added for. What changes is that the failure is named on standard error. The warning
+// sits **inside the branch the binary check already gates**, which is what separates the two cases —
+// the ordinary production or CI install, where lefthook is simply absent, stays exactly as silent as
+// it was, and only "lefthook is here and could not install" speaks up.
+// **It names a likely cause rather than asserting one, and links a URL rather than a path.** A set
+// `core.hooksPath` is much the commonest reason, but not the only one — a dev-dependency install in a
+// container with no `.git` fails here too — so a message that diagnosed would misdiagnose that build
+// on every run. And `docs/` is not among the files `josh init` copies, so a consumer told to read
+// `docs/init.md` is told to open a file their repository does not contain.
+const HOOK_INSTALL_WARNING =
+	'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything'
+const LEFTHOOK_BINARY_GUARD = 'command -v lefthook >/dev/null 2>&1'
+const GUARDED_LEFTHOOK_CMD = `${LEFTHOOK_BINARY_GUARD} && { ${LEFTHOOK_INSTALL_CMD} || echo '${HOOK_INSTALL_WARNING}' >&2; }`
+// What every already-initialized consumer has in `prepare` today, and what the upgrade below rewrites.
+const LEGACY_GUARDED_LEFTHOOK_CMD = `${LEFTHOOK_BINARY_GUARD} && ${LEFTHOOK_INSTALL_CMD}`
 const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}`
 // Tolerate each optional hook individually with `|| true` and chain them with `&&`,
 // rather than a blanket trailing `; true`. A blanket `; true` is reached
@@ -54,8 +76,11 @@ const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_
 // exits zero.
 const PREPARE_CMD = `(${GUARDED_LEFTHOOK_CMD} || true) && (${GUARDED_FIX_GH_PACKAGES_CMD} || true)`
 
+// CLAUDE.md is deliberately absent: it is no longer byte-copied. A consumer's CLAUDE.md is a single
+// @import of kit's published, path-transformed rules (ensure_claude_md_import), so a package update
+// alone keeps it current (joshuafolkken/kit#1878). AGENTS.md / GEMINI.md / .cursorrules stay copies
+// here — they are for other tools that do not read CLAUDE.md's import.
 const AI_COPY_FILES: ReadonlyArray<string> = [
-	'CLAUDE.md',
 	'AGENTS.md',
 	'GEMINI.md',
 	'CODE_OF_CONDUCT.md',
@@ -97,29 +122,13 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	},
 ]
 
-// Copied whole rather than file by file: a skill is a directory by definition, and one that grows a
-// supporting file would otherwise ship without it. `cpSync` copies bytes, so the walk is followed by
-// a transform pass over the copied markdown (directory-copy-guard.ts → transform_copied_tree) — the
-// same rewrite the file copies get, which is what lets a skill cite a `prompts/…` path and have it
-// resolve inside a consumer. Only markdown is rewritten, so a `.github/workflows` path still may not
-// live under one of these directories: it would arrive unpinned and unstamped.
-const AI_COPY_DIRECTORIES: ReadonlyArray<string> = [
-	'.claude/skills/verify-ui',
-	// joshuafolkken/kit#854: the workflow procedures and the post-dependency-update checks left the
-	// always-loaded AI documents for these two skills, so a consumer that does not receive them is
-	// left with the trigger and none of the procedure it points at.
-	'.claude/skills/workflow-commands',
-	'.claude/skills/dependency-update',
-	// joshuafolkken/kit#873: the `josh epic:*` procedures left the always-loaded documents for the
-	// same reason, and the documents now route to this skill instead of carrying them.
-	'.claude/skills/epic-commands',
-	// joshuafolkken/kit#1270: reading `josh time`'s output and deciding what to cut was pasted in as
-	// a prompt every time, so the wording drifted and with it the analysis. The procedure is a skill
-	// the shorthand table routes to, like every other one here.
-	'.claude/skills/diag',
-]
-
-const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
+// Empty since joshuafolkken/kit#1879: the five skill directories kit used to copy whole
+// (`workflow-commands`, `epic-commands`, `dependency-update`, `verify-ui`, `diag`) now ship as the
+// `kit` Claude Code plugin and load from the package, so nothing is copied into a consumer's tree.
+// The copy-and-transform machinery (directory-copy-guard.ts → transform_copied_tree) is kept intact
+// for any future distributed directory; the migration that removes a consumer's stale skill copies
+// lives in `scripts/sync/skill-migration.ts`.
+const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
 
 const LEFTHOOK_EXTENDS = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
 
@@ -378,6 +387,22 @@ function get_suggested_scripts_for_content(content: string): Record<string, stri
 	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== PREPARE_KEY))
 }
 
+// **The upgrade path for projects `josh init` has already run in.** Their `prepare` carries the
+// fix-gh-packages marker, and that marker is exactly what makes both merges here return early — so
+// the population joshuafolkken/kit#1503 is actually about, the consumers already installing with zero
+// hooks and no warning, would never receive the fix however often they re-ran `josh init`; only new
+// projects would. This rewrites the lefthook clause kit itself wrote and nothing else, because the
+// rest of that script is the consumer's. It is idempotent by construction: the new clause does not
+// contain the old one as a substring, since `{ ` sits between them.
+function upgrade_prepare_lefthook_warning(content: string): string {
+	return init_logic_json_merge.replace_in_package_script(
+		content,
+		PREPARE_KEY,
+		LEGACY_GUARDED_LEFTHOOK_CMD,
+		GUARDED_LEFTHOOK_CMD,
+	)
+}
+
 // Append the guarded lifecycle commands to an existing `prepare` when no script yet runs
 // fix-gh-packages, so the dev-only hooks land in `prepare` instead of being lost when the
 // suggested-scripts merge skips the already-present `prepare` key.
@@ -400,17 +425,6 @@ function strip_managed_postinstall(content: string): string {
 	)
 }
 
-// A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
-// open. `josh eval:scope`'s trigger set is written `prompts/**` in the distributed documents, and
-// rewriting it to `node_modules/@joshuafolkken/kit/prompts/**` would print a path that can never
-// appear in a consumer's diff and is not what the command matches (joshuafolkken/kit#907).
-function transform_prompt_paths(content: string): string {
-	return content.replaceAll(
-		/`prompts\/([^`*]+)`/gu,
-		(_match, prompt_path: string) => `\`${PROMPTS_PACKAGE_PREFIX}${prompt_path}\``,
-	)
-}
-
 function merge_prettier_plugin_development_deps(content: string): string {
 	return init_logic_json_merge.merge_development_dependencies(content, PRETTIER_PLUGIN_DEV_DEPS)
 }
@@ -423,6 +437,7 @@ const init_logic = {
 	...init_logic_secretlint,
 	...init_logic_yaml_merge,
 	...init_logic_deploy_vps,
+	...distributed_paths,
 	generate_tsconfig,
 	merge_tsconfig_exclude,
 	get_tsconfig_exclude_entries,
@@ -440,6 +455,8 @@ const init_logic = {
 	strip_kit_only_vscode_settings,
 	strip_kit_only_vscode_settings_content,
 	VSCODE_EXTENSIONS_FILENAME,
+	GUARDED_LEFTHOOK_CMD,
+	upgrade_prepare_lefthook_warning,
 	get_npmrc_lines,
 	get_development_engines_value,
 	get_ai_copy_files,
@@ -449,7 +466,6 @@ const init_logic = {
 	get_suggested_scripts_for_content,
 	merge_prepare_lifecycle_cmd,
 	strip_managed_postinstall,
-	transform_prompt_paths,
 }
 
 export { init_logic }

@@ -1,0 +1,129 @@
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { z } from 'zod'
+import { fix_gh_packages_logic, type LockfilePackage } from './fix-gh-packages-logic'
+import { gh_cli_token } from './gh-cli-token'
+
+const LOCKFILE = 'pnpm-lock.yaml'
+const NPMRC = '.npmrc'
+const GH_PACKAGES_HOST = 'npm.pkg.github.com'
+const FETCH_TIMEOUT_MS = 10_000
+
+const npm_distribution_schema = z.looseObject({ tarball: z.string().optional() })
+const npm_version_schema = z.looseObject({ dist: npm_distribution_schema.optional() })
+const npm_packument_schema = z.looseObject({
+	versions: z.record(z.string(), npm_version_schema).optional(),
+})
+
+type ParsedPackages = Record<string, LockfilePackage>
+
+function read_file(file_path: string): string {
+	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
+}
+
+// Resolution order: NODE_AUTH_TOKEN → a literal token in the project .npmrc → `gh auth token`.
+// The kit does not distribute the `_authToken=${NODE_AUTH_TOKEN}` line, and a consumer that
+// keeps one (see docs/authentication.md §4(d)) is unaffected: parse_npmrc_auth_token skips the
+// placeholder form, and the env var it expands to is already first in the order above. The
+// user-level ~/.npmrc is deliberately NOT read: no kit script resolves the home directory
+// (see no-global-shim-write.test.ts), and the gh CLI fallback covers the same setups.
+function get_effective_auth_token(npmrc: string): string | undefined {
+	const environment_token = process.env['NODE_AUTH_TOKEN']?.trim()
+	const npmrc_token = fix_gh_packages_logic.parse_npmrc_auth_token(npmrc)
+
+	return fix_gh_packages_logic.resolve_token(environment_token, npmrc_token, gh_cli_token.get)
+}
+
+async function fetch_tarball_url(
+	package_path: string,
+	version: string,
+	token: string,
+): Promise<string | undefined> {
+	const url = `https://${GH_PACKAGES_HOST}/${package_path}`
+	const response = await fetch(url, {
+		headers: { Authorization: `Bearer ${token}` },
+		signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+	})
+
+	if (!response.ok) {
+		console.warn(`fix-gh-packages: fetch failed for ${package_path} (${String(response.status)})`)
+
+		return undefined
+	}
+
+	const packument = npm_packument_schema.parse(await response.json())
+
+	return packument.versions?.[version]?.dist?.tarball
+}
+
+async function process_package_entry(
+	key: string,
+	entry: LockfilePackage,
+	scopes: Set<string>,
+	token: string,
+): Promise<[string, string] | undefined> {
+	if (!fix_gh_packages_logic.needs_tarball_fix(key, entry, scopes)) return undefined
+	const tarball = await fetch_tarball_url(
+		fix_gh_packages_logic.package_path_from_key(key),
+		fix_gh_packages_logic.package_version_from_key(key),
+		token,
+	)
+
+	return tarball === undefined ? undefined : [key, tarball]
+}
+
+async function collect_fixes(
+	packages: ParsedPackages,
+	scopes: Set<string>,
+	token: string,
+): Promise<Map<string, string>> {
+	const fixes = new Map<string, string>()
+
+	for (const [key, entry] of Object.entries(packages)) {
+		const pair = await process_package_entry(key, entry, scopes, token)
+		if (pair !== undefined) fixes.set(pair[0], pair[1])
+	}
+
+	return fixes
+}
+
+async function apply_fixes(cwd: string, scopes: Set<string>, token: string): Promise<void> {
+	const lockfile_path = path.join(cwd, LOCKFILE)
+	if (!existsSync(lockfile_path)) return
+	const raw = readFileSync(lockfile_path, 'utf8')
+	const packages = fix_gh_packages_logic.parse_lockfile_packages(raw)
+	if (Object.keys(packages).length === 0) return
+	const fixes = await collect_fixes(packages, scopes, token)
+	if (fixes.size === 0) return
+	writeFileSync(lockfile_path, fix_gh_packages_logic.patch_lockfile(raw, fixes))
+	console.info('fix-gh-packages: restored GitHub Packages tarball URLs in pnpm-lock.yaml')
+}
+
+async function run_main(cwd: string): Promise<void> {
+	const npmrc = read_file(path.join(cwd, NPMRC))
+	const scopes = fix_gh_packages_logic.parse_gh_scopes(npmrc)
+	if (scopes.size === 0) return
+	const token = get_effective_auth_token(npmrc)
+
+	if (token === undefined) {
+		console.warn(
+			'fix-gh-packages: no auth token found — run `gh auth login` or set NODE_AUTH_TOKEN',
+		)
+
+		return
+	}
+
+	await apply_fixes(cwd, scopes, token)
+}
+
+async function main(): Promise<void> {
+	try {
+		await run_main(process.cwd())
+	} catch (error) {
+		console.warn(`fix-gh-packages: skipped due to error: ${String(error)}`)
+	}
+}
+
+const [, argv1] = process.argv
+if (argv1 !== undefined && realpathSync(argv1) === fileURLToPath(import.meta.url)) await main()

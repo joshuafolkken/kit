@@ -1,9 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { verification_gate, type GateStepResult } from '#scripts/gate/verification-gate'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
-import { test_unit_guard } from '#scripts/test-unit-guard'
-import { verification_gate, type GateStepResult } from '#scripts/verification-gate'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { review_stamps } from './review-stamps'
 
@@ -94,7 +95,7 @@ describe('review_stamps — the three records are kept apart', () => {
 	})
 
 	it.each(RECORDS)('puts the %s record in the temp directory', (_label, access) => {
-		expect(access.stamp_path()).toContain(tmpdir())
+		expect(access.stamp_path()).toContain(PLATFORM_TEMP_ROOT)
 	})
 })
 
@@ -140,6 +141,26 @@ describe('the record round trip', () => {
 		expect(() => {
 			review_stamps.in_flight_stamp.remove(path.join(directory(), ABSENT_FILE))
 		}).not.toThrow()
+	})
+})
+
+// `josh eval`'s completion travels in the same payload these three records use
+// (joshuafolkken/kit#1164), so the parser they all share has to carry it back out again.
+describe('the record round trip — the completion field', () => {
+	it('reads back a completion it was given', () => {
+		const raw = '{"taken_at":"now","files":{},"completed_at":"later"}'
+
+		expect(file_map_stamp.parse_stamp(raw)?.completed_at).toBe('later')
+	})
+
+	// An optional field of the wrong type is dropped rather than rejected, and dropping is the safe
+	// direction here: a record with no completion is one whose run nothing vouches for.
+	it('drops a completion that is not a string rather than rejecting the record', () => {
+		const raw = '{"taken_at":"now","files":{},"completed_at":5}'
+		const stamp = file_map_stamp.parse_stamp(raw)
+
+		expect(stamp?.completed_at).toBeUndefined()
+		expect(stamp?.taken_at).toBe('now')
 	})
 })
 

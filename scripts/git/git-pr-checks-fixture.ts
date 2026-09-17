@@ -29,4 +29,46 @@ function make_pr_snapshot(overrides: Partial<PrStateSnapshot> = {}): PrStateSnap
 	}
 }
 
-export { make_pr_snapshot, PASSING_ROLLUP, CODE_RABBIT, SONAR_QUBE }
+const NO_SNAPSHOT_ERROR = 'No snapshot available for test.'
+
+// A snapshot GitHub has not settled yet: the aggregate is UNKNOWN and no checks have reported. The
+// poll loop reads it as `pending` — neither success nor failure — so a test can script a run that is
+// still in flight before it lands.
+function pending_rollup_snapshot(): PrStateSnapshot {
+	return make_pr_snapshot({ merge_state_status: 'UNKNOWN', rollup: [] })
+}
+
+// Steps through the given snapshots one per poll and reports how many reads were taken, so a test can
+// drive `wait_for_pr_success` through a scripted sequence of poll results. Shared rather than
+// re-declared per suite: a second copy is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#2029).
+function make_sequence_fetcher(snapshots: ReadonlyArray<PrStateSnapshot>): {
+	count: () => number
+	fetch: () => Promise<PrStateSnapshot>
+} {
+	let index = 0
+
+	async function fetch(): Promise<PrStateSnapshot> {
+		const snapshot = snapshots[index] ?? snapshots.at(-1)
+
+		index += 1
+
+		if (snapshot === undefined) throw new Error(NO_SNAPSHOT_ERROR)
+
+		return snapshot
+	}
+
+	function count(): number {
+		return index
+	}
+
+	return { count, fetch }
+}
+
+export {
+	make_pr_snapshot,
+	make_sequence_fetcher,
+	pending_rollup_snapshot,
+	PASSING_ROLLUP,
+	CODE_RABBIT,
+	SONAR_QUBE,
+}

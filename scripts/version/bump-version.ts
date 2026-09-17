@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { json_object_schema, package_with_version_schema } from '#scripts/schemas'
+import { json_object_schema, package_with_version_schema } from '#scripts/lib/schemas'
 import semver from 'semver'
 
 const VALID_BUMP_TYPES = ['major', 'minor', 'patch'] as const

@@ -29,6 +29,12 @@ const MILLISECONDS_PER_HOUR = 3_600_000
 const HOLD_MAX_AGE_MS = HOLD_MAX_AGE_HOURS * MILLISECONDS_PER_HOUR
 
 const RELEASE_COMMAND = 'pnpm josh run:release'
+// The spelling that removes a record this run did not write (joshuafolkken/kit#1799). **It is a
+// separate spelling rather than the same one** because a stop message has to name something a person
+// can type when a record really has been abandoned — and the one it named until now removed a *live*
+// run's record just as readily, which is the incident this guard was written after, reached through
+// the guard's own recovery instruction.
+const FORCE_RELEASE_COMMAND = `${RELEASE_COMMAND} --force`
 // The sentence `epic-busy.ts` prints for the same reason: a guard that cannot read its record has not
 // established that the tree is free, and reporting it as free is the one failure that matters here.
 const NOT_IDLE = 'that is not "nothing is running here"'
@@ -58,6 +64,17 @@ async function worktree_directory(): Promise<string | undefined> {
 	const directories = await git_command.git_directories()
 
 	return directories[0]
+}
+
+// A linked work tree — a lane — reports its own git directory as the first path and the common
+// directory every work tree of the repository shares as the second; the primary checkout reports one
+// path for both. Comparing the two detects a lane without assuming the git directory is named `.git`:
+// a `--separate-git-dir` clone or a bare repository defeats any `.git`-segment match
+// (joshuafolkken/kit#1106).
+async function is_linked_worktree(): Promise<boolean> {
+	const directories = await git_command.git_directories()
+
+	return directories[0] !== undefined && directories[0] !== directories[1]
 }
 
 const run_hold_schema = z.object({
@@ -149,19 +166,45 @@ function release_hold(target: string): void {
 
 // The pid is recorded for the person reading the stop message, never as the liveness test: the process
 // that claims the tree is a short-lived `josh run:hold`, so it has exited by the time anything reads
-// the record back. Age is what expires a record; `pnpm josh run:release` is what clears one early.
+// the record back. Age is what expires a record; `pnpm josh run:release --force` is what clears
+// somebody else's early, and `pnpm josh run:release <N>` what the run that wrote it types.
 function describe_holder(hold: RunHold): string {
 	const holder = hold.issue === UNNUMBERED_ISSUE ? 'an unnumbered run' : `#${hold.issue}`
 
 	return `${holder}, recorded ${hold.taken_at} (pid ${String(hold.pid)})`
 }
 
+// The command the run that *wrote* a record types to remove it — the claim's own spelling, mirrored,
+// so that releasing names the run exactly as claiming did.
+function own_release_command(issue: string): string {
+	return issue === UNNUMBERED_ISSUE ? RELEASE_COMMAND : `${RELEASE_COMMAND} ${issue}`
+}
+
+// The whole of the ownership test, and it is the issue rather than the pid: the process that claims a
+// tree is a short-lived `josh run:hold` that has exited before anything reads the record back, while
+// the issue is what identifies a run across every command it issues. `run-carry.ts` compares a
+// recorded owner against a declared one for the same reason; what differs is only who the owner is.
+function is_own_hold(hold: RunHold, claimant: string): boolean {
+	return hold.issue === claimant
+}
+
 function held_message(hold: RunHold): string {
-	return `This working tree is already held by ${describe_holder(hold)}. One run at a time per working tree: a second run here commits its files onto the other run's branch. If that record is stale, run \`${RELEASE_COMMAND}\` in this working tree and ask again.`
+	return `This working tree is already held by ${describe_holder(hold)}. One run at a time per working tree: a second run here commits its files onto the other run's branch. If that record is stale, run \`${FORCE_RELEASE_COMMAND}\` in this working tree — it removes a record this run did not write, so be sure the run that did has ended — and ask again.`
+}
+
+// **A release asked by anything but the record's own run removes nothing.** "Stale" is a judgement
+// made from outside the run that wrote the record, and the one place it is made is a person reading a
+// `busy` stop — so the refusal names both ways forward rather than only refusing.
+function foreign_release_message(hold: RunHold): string {
+	return `This working tree is held by ${describe_holder(hold)}, and this release did not claim it — nothing was removed. Release it as that run with \`${own_release_command(hold.issue)}\`, or, once you are sure it has ended, remove the record with \`${FORCE_RELEASE_COMMAND}\`.`
+}
+
+function forced_release_message(hold: RunHold): string {
+	return `Forced: removed the run record held by ${describe_holder(hold)}.`
 }
 
 function unreadable_message(): string {
-	return `This working tree's run record could not be read — ${NOT_IDLE}. Run \`${RELEASE_COMMAND}\` in this working tree to clear it, then ask again.`
+	return `This working tree's run record could not be read — ${NOT_IDLE}. Run \`${FORCE_RELEASE_COMMAND}\` in this working tree to clear it, then ask again.`
 }
 
 function stale_message(hold: RunHold): string {
@@ -169,7 +212,7 @@ function stale_message(hold: RunHold): string {
 }
 
 function uncommitted_message(hold: RunHold): string {
-	return `This working tree still has uncommitted changes, and its run record — held by ${describe_holder(hold)} — has expired. That is a run which stopped for a person rather than one that finished, so the tree is not free: commit or stash the work, or run \`${RELEASE_COMMAND}\` once you are done with it, then ask again.`
+	return `This working tree still has uncommitted changes, and its run record — held by ${describe_holder(hold)} — has expired. That is a run which stopped for a person rather than one that finished, so the tree is not free: commit or stash the work, or run \`${own_release_command(hold.issue)}\` once you are done with it, then ask again.`
 }
 
 // The exclusive claim lost: another process wrote the record between this one's read and its write.
@@ -181,7 +224,7 @@ function uncommitted_message(hold: RunHold): string {
 function race_message(read: HoldRead, target: string): string {
 	if (read.kind === 'held') return held_message(read.hold)
 
-	return `A record already exists at ${target} and this run did not write it — ${NOT_IDLE}. Either another run claimed the tree at the same moment, or the record belongs to another account. Run \`${RELEASE_COMMAND}\`, and remove that file by hand if it is still there.`
+	return `A record already exists at ${target} and this run did not write it — ${NOT_IDLE}. Either another run claimed the tree at the same moment, or the record belongs to another account. Run \`${FORCE_RELEASE_COMMAND}\`, and remove that file by hand if it is still there.`
 }
 
 function unknown_message(): string {
@@ -189,6 +232,7 @@ function unknown_message(): string {
 }
 
 const run_hold = {
+	FORCE_RELEASE_COMMAND,
 	HOLD_MAX_AGE_HOURS,
 	HOLD_MAX_AGE_MS,
 	RELEASE_COMMAND,
@@ -196,9 +240,14 @@ const run_hold = {
 	classify,
 	create_hold,
 	describe_holder,
+	foreign_release_message,
+	forced_release_message,
 	held_message,
 	hold_path,
+	is_linked_worktree,
+	is_own_hold,
 	is_tree_dirty,
+	own_release_command,
 	parse_hold,
 	race_message,
 	read_hold,

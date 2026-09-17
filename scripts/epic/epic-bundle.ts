@@ -53,13 +53,18 @@ interface BundleDecision {
 	reason: string
 }
 
+// Whether `from`'s body names `to`. One direction of the citation test, because which direction it
+// was is what `epic-bundle-evidence.ts` reports — and the read is single-sourced here rather than
+// written a second time there, so the candidate search and the evidence beside it cannot drift apart
+// (joshuafolkken/kit#1737).
+function names_in_body(from: BacklogIssue, to: BacklogIssue): boolean {
+	return epic_audit_logic.parse_references(from.body, from.repo).includes(to.number)
+}
+
 // Whether two issues cite each other, in either direction. A one-way citation is enough: the point
 // is that somebody wrote one issue while thinking about the other.
 function has_mutual_reference(subject: BacklogIssue, other: BacklogIssue): boolean {
-	const from_subject = epic_audit_logic.parse_references(subject.body, subject.repo)
-	const from_other = epic_audit_logic.parse_references(other.body, other.repo)
-
-	return from_subject.includes(other.number) || from_other.includes(subject.number)
+	return names_in_body(subject, other) || names_in_body(other, subject)
 }
 
 // Whether `blocked` names `blocker` in its recorded relations. Compared by identity — repository and
@@ -131,19 +136,95 @@ function create_decision(subject: BacklogIssue, numbers: ReadonlyArray<number>):
 	return { action: 'create_epic', epics: [], candidates: numbers, reason }
 }
 
+// Which epic each issue is itself tracked by. An epic is a row of the backlog like any other, so a
+// nested one carries its own parent here and no second read is needed (joshuafolkken/kit#1079).
+// The repository filter is defensive: every caller stamps one repository onto the whole listing
+// today, and the filter is what keeps a bare epic number naming the subject's repository if one ever
+// assembles two.
+function epic_parents(
+	backlog: ReadonlyArray<BacklogIssue>,
+	repo: string,
+): ReadonlyMap<number, number> {
+	const parents = new Map<number, number>()
+
+	for (const issue of backlog) {
+		if (issue.repo === repo && issue.epic !== undefined) parents.set(issue.number, issue.epic)
+	}
+
+	return parents
+}
+
+// Every epic above this one. `seen` bounds the walk, so a body declaring a cycle cannot loop here —
+// and an epic that lies on one ends up in its own set, which is how `is_cyclic` finds it.
+function ancestors_of(epic: number, parents: ReadonlyMap<number, number>): Set<number> {
+	const seen = new Set<number>()
+	let current = parents.get(epic)
+
+	while (current !== undefined && !seen.has(current)) {
+		seen.add(current)
+		current = parents.get(current)
+	}
+
+	return seen
+}
+
+// An epic reachable from itself sits on a cycle, and a cycle has no innermost member. Narrowing one
+// would drop whichever epic the walk happened to cover: two epics naming each other cover each
+// other, so a third unrelated epic beside them would be left as the sole survivor and the issue
+// placed there with nothing asked.
+function is_cyclic(
+	epics: ReadonlyArray<number>,
+	above: ReadonlyArray<ReadonlySet<number>>,
+): boolean {
+	return epics.some((epic, index) => above[index]?.has(epic) === true)
+}
+
+// Nested epics are not two peers to choose between: the parent already contains the child, so an
+// issue related to both belongs in the child and no merge is on the table. Asking anyway is the
+// false positive joshuafolkken/kit#1079 recorded three times, one of which stopped a whole batch.
+function narrow_to_innermost(
+	epics: ReadonlyArray<number>,
+	parents: ReadonlyMap<number, number>,
+): Array<number> {
+	const above = epics.map((epic) => ancestors_of(epic, parents))
+	// Report the spread unchanged and let a person decide, rather than pick one arbitrarily.
+	if (is_cyclic(epics, above)) return [...epics]
+	const covered = new Set(above.flatMap((ancestors) => [...ancestors]))
+
+	return epics.filter((epic) => !covered.has(epic))
+}
+
+// Says which epics were dropped as parents, so a placement that skipped an epic the candidates name
+// is legible without re-deriving the nesting. The count is enough to decide the wording: a cycle is
+// reported without narrowing above, so a lone survivor of two or more means the graph was acyclic,
+// and there every dropped epic is a transitive parent of the one left.
+function tracks_reason(epic: number, involved: ReadonlyArray<number>): string {
+	const tracks = `#${String(epic)} already tracks a related issue`
+	if (involved.length === 1) return tracks
+
+	return `${tracks}; the other epics the candidates sit in are its own parents`
+}
+
 // Which of the three the candidates call for, once there is at least one.
 function decide_with_candidates(
 	subject: BacklogIssue,
 	candidates: ReadonlyArray<BacklogIssue>,
+	parents: ReadonlyMap<number, number>,
 ): BundleDecision {
 	const numbers = to_numbers(candidates)
-	const epics = candidate_epics(candidates)
+	const involved = candidate_epics(candidates)
+	const epics = narrow_to_innermost(involved, parents)
 	if (epics.length > 1) return { action: 'ask', epics, candidates: numbers, reason: SPREAD_REASON }
 	const [epic] = epics
 	if (epic === undefined) return create_decision(subject, numbers)
-	const reason = `#${String(epic)} already tracks a related issue`
 
-	return { action: 'add_to_epic', epic, epics: [epic], candidates: numbers, reason }
+	return {
+		action: 'add_to_epic',
+		epic,
+		epics: [epic],
+		candidates: numbers,
+		reason: tracks_reason(epic, involved),
+	}
 }
 
 // What to do about the candidates. An epic is created only when the subject plus at least one
@@ -169,7 +250,7 @@ function decide_bundle(
 		return { action: 'none', epics: [], candidates: [], reason: NO_SIGNAL_REASON }
 	}
 
-	return decide_with_candidates(subject, candidates)
+	return decide_with_candidates(subject, candidates, epic_parents(backlog, subject.repo))
 }
 
 // The dependency links a bundle should record, from what the candidates already declare. Bundling
@@ -209,6 +290,7 @@ function bundle_children(
 
 const epic_bundle = {
 	names_as_blocker,
+	names_in_body,
 	NO_SIGNAL_REASON,
 	already_tracked_reason,
 	SPREAD_REASON,

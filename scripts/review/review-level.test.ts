@@ -1,7 +1,5 @@
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { review_level } from './review-level'
-import { review_level_cli } from './review-level-cli'
 
 const CODE = 'scripts/review/review-level.ts'
 const EDITOR_SETTING = '.editorconfig'
@@ -78,37 +76,5 @@ describe('review_level.deciding_paths', () => {
 
 	it('names nothing when every path is inert', () => {
 		expect(review_level.deciding_paths([EDITOR_SETTING])).toStrictEqual([])
-	})
-})
-
-describe('josh review:level registration', () => {
-	it('is registered as a josh command', () => {
-		const entry = COMMAND_MAP['review:level']
-
-		expect(entry?.script).toBe('scripts/review/review-level-cli.ts')
-	})
-
-	it('has a short alias', () => {
-		const { rl } = ALIASES
-
-		expect(rl).toBe('review:level')
-	})
-})
-
-describe('review_level_cli.format_reason', () => {
-	it('says why a change was reduced', () => {
-		expect(review_level_cli.format_reason([EDITOR_SETTING], review_level.REDUCED_LEVEL)).toContain(
-			'inert',
-		)
-	})
-
-	it('names the path that forced the default level', () => {
-		expect(review_level_cli.format_reason([CODE], review_level.DEFAULT_LEVEL)).toContain(CODE)
-	})
-
-	it('explains an empty diff rather than naming nothing', () => {
-		expect(review_level_cli.format_reason([], review_level.DEFAULT_LEVEL)).toContain(
-			'no changed paths',
-		)
 	})
 })

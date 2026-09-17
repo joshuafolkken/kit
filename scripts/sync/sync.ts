@@ -2,21 +2,27 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { auto_merge_setting } from '#scripts/auto-merge-setting'
-import { copy_directory_failure, directory_copy_blocker } from '#scripts/directory-copy-guard'
-import { gh_spawn } from '#scripts/gh-spawn'
+import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
-import { security_updates } from '#scripts/security-updates'
+import { plugin_install_hint_module } from '#scripts/init/plugin-install-hint'
+import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import { security_updates } from '#scripts/security/security-updates'
+import { sonar_file } from '#scripts/security/sonar-file'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
-import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
+import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
+import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
+import { skill_migration, type MigrationResult } from './skill-migration'
 import { sync_configs } from './sync-configs'
+import { sync_hook_safety } from './sync-hook-safety'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const PACKAGE_JSON = 'package.json'
 const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
+const CLAUDE_MD_FILENAME = 'CLAUDE.md'
+const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -25,7 +31,23 @@ function sync_ai_file(source_path: string, destination_path: string): void {
 	writeFileSync(destination_path, transform_copied_content(destination_path, content))
 }
 
+// The hook file is the one AI-copied file whose commands the consumer's *installed* bundle has to be
+// able to run. When sync is run from a newer source than that install, writing it would leave hooks
+// that fail every prompt (joshuafolkken/kit#1930); skip it and print how to update instead.
+function should_skip_hook_file(filename: string): boolean {
+	if (filename !== CLAUDE_SETTINGS_FILE) return false
+	const warning = sync_hook_safety.hook_write_warning(
+		PROJECT_ROOT,
+		sync_hook_safety.read_version_at(path.join(PACKAGE_DIR, PACKAGE_JSON)),
+	)
+	if (warning === undefined) return false
+	console.warn(warning)
+
+	return true
+}
+
 function sync_file(filename: string): void {
+	if (should_skip_hook_file(filename)) return
 	sync_ai_file(path.join(PACKAGE_DIR, filename), path.join(PROJECT_ROOT, filename))
 	console.info(`  ✔ synced    ${filename}`)
 }
@@ -184,8 +206,54 @@ function sync_sonar_with_template(name_with_owner: string | undefined, is_force 
 	console.info(`  ✔ synced    ${destination}`)
 }
 
+// A consumer's stale copy of a distributed skill is removed once it still matches the shipment and
+// kept with a warning once it does not (joshuafolkken/kit#1879). Plugin skills compare against the
+// package source; a retired skill compares against the frozen manifest (joshuafolkken/kit#1990). The
+// note distinguishes the two, and `absent` — the consumer never had the copy — prints nothing.
+function report_migration_result(result: MigrationResult): void {
+	if (result.action === 'absent') return
+
+	if (result.action === 'removed') {
+		console.info(
+			`  ✔ removed   ${result.directory}/ (${skill_migration.removed_note(result.source)})`,
+		)
+
+		return
+	}
+
+	console.warn(`  ⚠ kept      ${result.directory}/ (${skill_migration.kept_note(result.source)})`)
+}
+
+function migrate_removed_skills(): void {
+	const plugin = skill_migration.migrate_removed_skill_directories(PACKAGE_DIR, PROJECT_ROOT)
+	const retired = skill_migration.migrate_manifest_skills(PROJECT_ROOT, REMOVED_SKILL_MANIFEST)
+
+	for (const result of [...plugin, ...retired]) report_migration_result(result)
+}
+
+// CLAUDE.md is not byte-copied (joshuafolkken/kit#1878): a consumer's file is one @import of kit's
+// published rules plus the project's own additions below it. Ensure the import line is present
+// without ever disturbing those additions — so this ignores --force, which would otherwise mean
+// discarding a consumer's content.
+function sync_claude_md(destination_path: string): void {
+	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : undefined
+	const ensured = init_logic.ensure_claude_md_import(existing)
+
+	if (ensured === existing) {
+		console.info(`  ✔ unchanged ${CLAUDE_MD_FILENAME}`)
+
+		return
+	}
+
+	mkdirSync(path.dirname(destination_path), { recursive: true })
+	writeFileSync(destination_path, ensured)
+	console.info(`  ✔ synced    ${CLAUDE_MD_FILENAME}`)
+}
+
 function sync_ai_copy_all(is_force: boolean): void {
 	console.info('AI files:')
+
+	sync_claude_md(path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME))
 
 	for (const filename of init_logic.get_ai_copy_files()) {
 		sync_ai_copy_file(filename, is_force)
@@ -198,6 +266,8 @@ function sync_ai_copy_all(is_force: boolean): void {
 	for (const directory_name of init_logic.get_ai_copy_directories()) {
 		sync_directory(directory_name)
 	}
+
+	migrate_removed_skills()
 }
 
 function sync_config_files(): void {
@@ -254,6 +324,25 @@ function sync_secretlint_development_deps(destination_path: string): void {
 	)
 }
 
+// `lefthook install` fails silently when `core.hooksPath` is set, leaving a consumer with no hooks
+// and no message (joshuafolkken/kit#1503). `josh init` rewrites the clause it wrote so the failure
+// is reported; this covers everyone already initialized, who never re-runs `josh init`.
+function sync_prepare_lefthook_warning(destination_path: string): void {
+	sync_package_json_with(
+		destination_path,
+		(existing) => init_logic.upgrade_prepare_lefthook_warning(existing),
+		'  ✔ synced    prepare lefthook install warning (run `pnpm install`)',
+	)
+}
+
+// Every migration an already-initialized consumer needs applied to its own manifest, run as one
+// group so the next one is added here rather than at the call site.
+function sync_package_json_migrations(destination_path: string): void {
+	sync_package_manager_version(destination_path)
+	sync_secretlint_development_deps(destination_path)
+	sync_prepare_lefthook_warning(destination_path)
+}
+
 // Two distributed artifacts each depend on a repository setting kit cannot write, and both reports
 // are tied to the moment the artifact reaches the consumer. `.github/dependabot.yml` disables npm
 // version updates (joshuafolkken/kit#803), so a synced consumer only receives npm Dependabot pull
@@ -279,8 +368,7 @@ function sync_project_artifacts(is_force: boolean): void {
 
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
-	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
-	sync_secretlint_development_deps(path.join(PROJECT_ROOT, PACKAGE_JSON))
+	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)
 }
 
@@ -294,6 +382,7 @@ function main(): void {
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	sync_project_artifacts(is_force)
+	plugin_install_hint_module.report_plugin_install_hint()
 	console.info('\n✅ Done.\n')
 }
 
@@ -303,11 +392,13 @@ const sync = {
 	sync_file_mapping,
 	sync_ai_file,
 	sync_workspace_yaml,
+	sync_claude_md,
 	sync_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,
 	sync_package_manager_version,
 	sync_secretlint_development_deps,
+	sync_prepare_lefthook_warning,
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 

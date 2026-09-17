@@ -7,8 +7,16 @@ import { investigation_reads } from './investigation-reads'
 // is that the count is taken from the transcript rather than remembered — a delegation clears it, an
 // edit takes its file back out of it, and the same accumulation reached twice refuses twice.
 
-const { BRANCH, edit_call_line, josh_call_line, call_line, result_line, ms, target_turn_lines } =
-	time_transcript_fixture
+const {
+	BRANCH,
+	edit_call_line,
+	josh_call_line,
+	call_line,
+	result_line,
+	ms,
+	target_turn_lines,
+	tool_call_line,
+} = time_transcript_fixture
 
 const THRESHOLD = delegation_policy.INVESTIGATION_FILE_THRESHOLD
 const BELOW_THRESHOLD = THRESHOLD - 1
@@ -25,6 +33,32 @@ const SECOND_FILE = 'scripts/two.ts'
 const NEXT_FILE = 'scripts/next.ts'
 const SUBJECT_FILES = [FIRST_FILE, SECOND_FILE]
 const WORKFLOW_COMMAND = 'pnpm josh gate'
+
+// joshuafolkken/kit#1771: the four shapes a run's own session files take. Every one of them lives
+// outside the checkout by construction — that is what the exclusion is anchored on — and none can be
+// handed to a unit to read, because each belongs to this session's harness alone.
+//
+// **The temp root itself is not what is matched**, which is why this fixture uses the `/var/folders`
+// spelling `os.tmpdir()` returns on macOS rather than the `/private/tmp` one the observed path had: the
+// rule keys on the `claude-<uid>` segment, so both spellings answer alike and neither is load-bearing.
+const SESSION_TEMP = '/var/folders/q7/claude-501/-Users-me-kit/9f2'
+const CLAUDE_STATE = '/Users/me/.claude/projects/-Users-me-kit'
+const TASK_OUTPUT = `${SESSION_TEMP}/tasks/bg.output`
+const SCRATCHPAD_FILE = `${SESSION_TEMP}/scratchpad/probe.ts`
+// `tasks/` is a common repository directory, so an unpacked one must not inherit the exemption.
+const NESTED_TASKS_FILE = `${SESSION_TEMP}/scratchpad/cloned-repo/tasks/runner.ts`
+const TOOL_RESULT = `${CLAUDE_STATE}/tool-results/big.txt`
+const TRANSCRIPT = `${CLAUDE_STATE}/9f2.jsonl`
+const SESSION_FILES = [TASK_OUTPUT, TOOL_RESULT, TRANSCRIPT]
+// What `SKILL.md` → §1 specifies a `queue` entry to read. Obeying the procedure must not trip the guard.
+const WORKFLOW_SKILL = '.claude/skills/workflow-commands'
+const ENTRY_SET = [
+	...['SKILL', 'fullrun', 'chain-rule', 'followup', 'split-assessment'].map(
+		(name) => `${WORKFLOW_SKILL}/${name}.md`,
+	),
+	'prompts/review.md',
+]
+const NOT_COUNTED = 'does not count %s'
 
 interface ToolCall {
 	name: string
@@ -116,6 +150,64 @@ describe('investigation_reads.tally_of — reads and edits', () => {
 	})
 })
 
+// joshuafolkken/kit#1472: a span keeps no tool input, so two kinds of write could not be subtracted
+// at all and the count of unedited files was too large — one false refusal per accumulation.
+describe('investigation_reads.tally_of — a write the transcript could not describe', () => {
+	// Symptom 1. `sed` is in the read set because `sed -n` is how this repository reads, and a span
+	// cannot tell that spelling from `sed -i` — so a file written in place was counted as read and
+	// never taken back out. `CLAUDE.md` allows a small `sed -i` explicitly, so this is daily.
+	//
+	// **Asserted as an empty set since joshuafolkken/kit#1611.** It had to be written as an absence
+	// while the *read* half of the same span still tokenized the whole line: the quoted substitution
+	// left the path-shaped fragment `s/old/new` pending, so the set was not empty even once the real
+	// file came out of it. `bash_facts` now strips the quoted spans first, and the whole-set assertion
+	// is what would catch that third over-count coming back.
+	it('does not leave a file written in place by sed pending', () => {
+		const text = bash_text(`sed -i '' 's/old/new/' ${FIRST_FILE}`)
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([])
+	})
+
+	// The other half of the same case: subtracting the write must not swallow the read that shares the
+	// command name, or the guard stops counting the reading it exists to count.
+	it('still counts a file read with sed -n', () => {
+		const text = bash_text(`sed -n '1,40p' ${FIRST_FILE}`)
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([resolve(FIRST_FILE)])
+	})
+
+	// The over-claim that direction risks: a later segment's `-i` must not make the first segment's
+	// read look like a write, because subtracting deletes a file the run really did read.
+	it('counts the read when a later pipeline segment carries the -i', () => {
+		const text = bash_text(`sed -n '1,40p' ${FIRST_FILE} | grep -i thing`)
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([resolve(FIRST_FILE)])
+	})
+
+	// Symptom 2. Both tools carry `EDIT_MARKER` and neither is in `BUNDLEABLE_TOOLS`, so their spans
+	// used to arrive naming nothing at all and the subtraction had nothing to subtract. Measured on
+	// PR #1468: `Edit` and `Write` emptied `pending`, these two left the file in it.
+	//
+	// Each tool is given the field it really names — `NotebookEdit` sends `notebook_path` — so the case
+	// would fail if that field stopped being read, rather than passing on the other tool's field.
+	it.each([
+		['MultiEdit', 'file_path'],
+		['NotebookEdit', 'notebook_path'],
+	])('takes a file back out once %s has written it', (name, field) => {
+		const text = [
+			...target_turn_lines(0, SUBJECT_FILES),
+			tool_call_line(READ_MINUTE, BRANCH, {
+				name,
+				input: { [field]: resolve(FIRST_FILE) },
+				id: EDIT_ID,
+			}),
+			result_line(READ_MINUTE + 1, BRANCH, EDIT_ID),
+		].join('\n')
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([resolve(SECOND_FILE)])
+	})
+})
+
 describe('investigation_reads.tally_of — what a delegation does to the count', () => {
 	// The defect the Issue measured: after the unit returned the run kept reading and nothing was
 	// counted again. Clearing here makes the second accumulation indistinguishable from the first.
@@ -137,10 +229,12 @@ describe('investigation_reads.tally_of — what a delegation does to the count',
 describe('investigation_reads — the run’s own instructions are not the subject', () => {
 	it.each([
 		'prompts/refactoring.md',
-		'prompts/collaboration-workflow/delegation.md',
+		// A surviving collaboration-workflow topic file — joshuafolkken/kit#1925 deletes the pointer
+		// stubs (delegation.md among them), so the case exercises one that stays.
+		'prompts/collaboration-workflow/residency.md',
 		'.claude/skills/workflow-commands/SKILL.md',
 		'CLAUDE.md',
-	])('does not count %s', (target) => {
+	])(NOT_COUNTED, (target) => {
 		expect(investigation_reads.is_instruction_document(target)).toBe(true)
 		expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([])
 	})
@@ -159,6 +253,70 @@ describe('investigation_reads — the run’s own instructions are not the subje
 	it('never refuses a call that names only instructions', () => {
 		expect(investigation_reads.is_refusable_call(read_call('CLAUDE.md'))).toBe(false)
 		expect(investigation_reads.is_refusable_call(bash_call('cat prompts/review.md'))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#1771. A backgrounded call's result reaches its run only as the harness's output
+// file, and a tool result too large for the transcript only as a file the harness wrote — so refusing
+// either refuses a run the answer to an instruction it issued itself, and the remedy the refusal names
+// does not exist for a file no unit can be sent to.
+describe('investigation_reads — the harness’s own session files are not the subject', () => {
+	it.each(SESSION_FILES)(NOT_COUNTED, (target) => {
+		expect(investigation_reads.is_session_artifact(target)).toBe(true)
+		expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([])
+	})
+
+	it('never refuses a call that names only session files', () => {
+		expect(investigation_reads.is_refusable_call(read_call(TASK_OUTPUT))).toBe(false)
+		expect(investigation_reads.is_refusable_call(bash_call(`cat ${TOOL_RESULT}`))).toBe(false)
+	})
+
+	// The anchor is inverted rather than borrowed: leaving the checkout is a precondition, so no
+	// repository file can be exempted here however its directories happen to be named.
+	it.each(['scripts/tasks/one.ts', '.claude/settings.json'])(
+		'still counts %s, which is inside the checkout',
+		(target) => {
+			expect(investigation_reads.is_session_artifact(target)).toBe(false)
+			expect(investigation_reads.is_subject_file(target)).toBe(true)
+		},
+	)
+
+	// **The exemption is the harness's own files, not the session tree.** Exempting the tree would
+	// silently uncount anything a run unpacks or clones into its scratchpad to investigate — real
+	// subject material — and a false negative here produces no output at all, so nothing would show it.
+	it.each([SCRATCHPAD_FILE, NESTED_TASKS_FILE])(
+		'still counts %s, which the run put there itself',
+		(target) => {
+			expect(investigation_reads.is_session_artifact(target)).toBe(false)
+			expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([
+				resolve(target),
+			])
+		},
+	)
+})
+
+// The second false-positive class of joshuafolkken/kit#1771, decided as **excluded**. It already was,
+// through the instruction-document paths above; what was missing is a case pinning the whole set, so a
+// run that obeys `SKILL.md` → §1 cannot be refused for obeying it.
+describe('investigation_reads — the entry set a queue is specified to read', () => {
+	it.each(ENTRY_SET)(NOT_COUNTED, (target) => {
+		expect(investigation_reads.is_subject_file(target)).toBe(false)
+		expect(investigation_reads.is_refusable_call(read_call(target))).toBe(false)
+	})
+})
+
+// The acceptance criterion that keeps the two exclusions from becoming a loosening.
+describe('investigation_reads.should_block — the threshold itself is unchanged', () => {
+	it('refuses a call that mixes exempt files with one subject file', () => {
+		const call = bash_call(`cat ${TASK_OUTPUT} CLAUDE.md ${NEXT_FILE}`)
+
+		expect(investigation_reads.should_block(AT_THRESHOLD_TEXT, call, NEVER_REFUSED_MS)).toBe(true)
+	})
+
+	it('allows that same call once its only subject file is gone', () => {
+		const call = bash_call(`cat ${TASK_OUTPUT} CLAUDE.md`)
+
+		expect(investigation_reads.should_block(AT_THRESHOLD_TEXT, call, NEVER_REFUSED_MS)).toBe(false)
 	})
 })
 
@@ -261,11 +419,20 @@ describe('investigation_reads.should_block — and its second firing', () => {
 	// scrolled out of the window there is no reset instant left to beat, and one stale stamp disarmed
 	// the rest of the session — on exactly the run lengths the Issue was filed about.
 	it('refuses again once the recorded refusal is older than the window', () => {
-		const tally = investigation_reads.tally_of(AT_THRESHOLD_TEXT)
-		const before_window = tally.window_start_ms - 1
+		const before = investigation_reads.tally_of(AT_THRESHOLD_TEXT).window_start_ms - 1
+		const tally = investigation_reads.tally_of(AT_THRESHOLD_TEXT, before)
 
-		expect(investigation_reads.is_rearmed(tally, before_window)).toBe(true)
-		expect(investigation_reads.is_rearmed(tally, tally.window_start_ms + 1)).toBe(false)
+		expect(investigation_reads.is_rearmed(tally, before)).toBe(true)
+	})
+
+	// joshuafolkken/kit#1764: the disarm is per *accumulation*, and a run that ignores its one refusal
+	// goes on accumulating. Until this arm existed only a delegation could clear the disarm, so the one
+	// run the threshold exists for — one that reads on and never delegates — was the one run the guard
+	// never spoke to twice. The case above is its other half: nothing read since, and still disarmed.
+	it('refuses again once another accumulation has piled up without a delegation', () => {
+		const text = [AT_THRESHOLD_TEXT, reads_text(BELOW_THRESHOLD, LATE_TURN, 'late')].join('\n')
+
+		expect(investigation_reads.should_block(text, NEXT_READ, ms(READ_MINUTE))).toBe(true)
 	})
 
 	it('names the count, the command and the return shape in the reason', () => {

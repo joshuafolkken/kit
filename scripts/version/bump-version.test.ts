@@ -1,4 +1,4 @@
-import { package_version_schema } from '#scripts/schemas'
+import { package_version_schema } from '#scripts/lib/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ZodError } from 'zod'
 

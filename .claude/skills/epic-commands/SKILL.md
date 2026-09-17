@@ -1,74 +1,50 @@
 ---
 name: epic-commands
-description: The procedures for the `josh epic:*` commands that make an epic runnable without a person watching — `epic:plan` (front-load every decision into one batch), `epic:audit` (find contradictions across the children), `epic:next` (what is runnable, per repository), and `epic:bundle` (does a newly filed issue belong with one already in the backlog). Also how an epic spans repositories and why a cross-repository dependency waits for a publish. Read this before running any of those commands, before writing an epic that tracks a child in another repository, and right after filing an issue.
+description: The procedures for the `josh epic:*` commands that make an epic runnable without a person watching — `epic:audit` (find contradictions across the children), `epic:next` (what is runnable, per repository), and `epic:bundle` (does a newly filed issue belong with one already in the backlog). Also how an epic spans repositories and why a cross-repository dependency waits for a publish. Read this before running any of those commands, before writing an epic that tracks a child in another repository, and right after filing an issue.
 ---
 
 # The `josh epic:*` commands
 
-These four commands are what turn an epic from a list of issue numbers into something a run can
+These three commands are what turn an epic from a list of issue numbers into something a run can
 execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
-skill is the operational procedure, and the two must agree. **`epic:plan` is no longer among them**:
-its body is single-sourced here (joshuafolkken/kit#1189, the joshuafolkken/kit#1174 rollout), and
-`prompts/collaboration-workflow/epic-plan.md` is a pointer to this file rather than a second copy.
+skill is the operational procedure, and the two must agree.
 
-The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` — live in the
+The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `backlogrun` — live in the
 `workflow-commands` skill.
 
 ## The order they run in
 
 ```
-epic:plan  phase 0 → epic:audit, and fix what it finds (Tier A)
-           phase 1 → read the plan, triage every decision: auto / ask / defer
-           phase 2 → put every `ask` as ONE question for the whole epic
-           phase 3 → epicrun, which calls epic:next each round
+epic:audit → find contradictions across the children, and fix what it finds (Tier A)
+backlogrun → which calls epic:next each round
 ```
 
-## `josh epic:plan <E>` — one batch of decisions
+Front-loading every `needs-decision` in one pass is `backlogrun`'s job, not a command of this skill:
+`backlogrun.md` → "Resolve what the plan can resolve, before starting". A `backlogrun #E --only`'s
+pre-check is `epic:audit`.
 
-Prints every child's number, title, body, labels, `blockedBy` and state as one JSON document. The
-alias is `pnpm josh el <E>`.
+## Front-loading the decisions — now `backlogrun`'s
 
-Most of the stops an implementation makes could have been answered before it started. Arriving
-scattered is what forces a person to wait through the run; asking per child asks the same question
-several times; and the answers end up only in a conversation nobody can read back.
+`epic:plan` once printed every child as one JSON document so a person could answer every
+`needs-decision` in one batch before the run started. That front-loading is retired as a command of
+its own (joshuafolkken/kit#1965): **`backlogrun` does it at the start of every run**, and
+`backlogrun.md` → "Resolve what the plan can resolve, before starting" is its single source. A
+`backlogrun #E --only`'s only pre-check is `epic:audit` below, run without being asked.
 
-- **Phase 0 is not optional.** A batch decision made on a plan that contradicts itself has to be made
-  again once the contradiction surfaces. Run `pnpm josh epic:audit <E>` before phase 1 and let it
-  surface the four things a hand read misses — a dependency cycle, an ordering contradiction, an
-  implicit dependency, and a child no task list tracks. **Fix what it finds as Tier A, without asking,
-  and record the reasoning on the Issue**; only a contradiction that needs a person's judgement joins
-  phase 2's `ask`.
-- **Phase 0 is a step of the procedure, not a confirmation that may be skipped.** An epic whose
-  contradictions surface only once a person says "go find the bugs" has no unattended execution to
-  speak of — the run stalls at the first one, and nobody is watching. That is what phase 0 is for.
-- **Triage** — every decision the plan surfaces goes into one of three classes. **What separates the
-  first two is the margin, not the difficulty**: a class read off how hard a decision feels is what
-  sends an `auto` into phase 2 and doubles the question a person is asked.
+**A decision is still recorded in two places, and one without the other loses half of it.** The epic's
+`## Decisions` log carries the decision; a comment on each child it applies to carries the reasoning
+for that child's reader. **Recording a decision removes that child's `needs-decision` label** (Tier A);
+the label-clearing rule itself is `backlogrun-park.md` → "park and continue".
 
-  | Class | What it is | What happens to it |
-  | --- | --- | --- |
-  | `auto` | Tier A — one option is clearly better on the merits | Decide it, and record it when the child is implemented |
-  | `ask` | Tier B/C — the top options are close, or the action is irreversible | Collect it for phase 2 |
-  | `defer` | Out of scope for this epic | File it as a follow-up Issue |
-- **Phase 2 is one question for the whole epic**, never one per child.
-- Record each answer in **both** the epic's `## Decisions` and a comment on each child it applies to.
-  One without the other leaves either the child's reader without the reasoning or the epic without
-  the decision.
-- **Which command writes them depends on whether the child is being inserted.** A decision taken *as* a
-  child joins the epic goes through `pnpm josh epic --add … --decision-file` — the `epic:bundle` section
-  below is that flag's single source. Phase 2's answers are about children the epic **already tracks**,
-  which that flag cannot serve: an insertion with nothing to add is refused outright. Until
-  joshuafolkken/kit#1162 adds an entry point for already-tracked children, write the child comments with
-  `gh issue comment` on each child the answer applies to, and **say in the report that the epic's
-  `## Decisions` entry is still pending** — the entry going unwritten is exactly how two of the four most
-  recent placements in joshuafolkken/kit#1262 ended up with a child comment and nothing on the epic.
-  **Do not carry it on the next unrelated `--add --decision-file`**: that call posts the record as a
-  comment on the child it is *inserting*, so a decision about `#A` and `#B` would arrive on `#C`, which
-  has nothing to do with it — and `#A` and `#B` would still get nothing from that call.
-- **Recording a decision removes that child's `needs-decision` label** (Tier A). Without it the child
-  stays parked after the answer arrived. The label-clearing rule itself is defined by
-  `.claude/skills/workflow-commands/epicrun.md` → "park and continue"; what this section adds is the
-  moment it fires — the answer being written down.
+- **A decision taken *as* a child joins the epic** goes through `pnpm josh epic --add … --decision-file`
+  — the `epic:bundle` section below is that flag's single source, and it writes both halves at once.
+- **A decision about a child the epic already tracks** cannot use that flag: an insertion with nothing
+  to add is refused outright. Until joshuafolkken/kit#1162 adds an entry point for already-tracked
+  children, write the child comments with
+  `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` on each child the answer
+  applies to, and **say in the report that the epic's `## Decisions` entry is still pending** — the
+  entry going unwritten is how two of the four most recent placements in joshuafolkken/kit#1262 ended
+  up with a child comment and nothing on the epic.
 
 ```md
 ## Decisions
@@ -82,16 +58,13 @@ several times; and the answers end up only in a conversation nobody can read bac
 - 決定日: <YYYY-MM-DD>
 ```
 
-An epic whose task list tracks nothing is an empty plan, not a failure. An epic whose *body could not
-be read* is a failure — an empty plan there is indistinguishable from a finished one.
-
 ## `josh epic:audit <E>` — contradictions across the children
 
 `epic:check` verifies one epic's *format*. Nothing verified that the children agree, and a hand audit
 of a real epic found two contradictions that would have stalled the implementation while
 `epic:check` reported every requirement as passing.
 
-Run it **without being asked**: at the start of an `epicrun`, as `epic:plan`'s phase 0, and right
+Run it **without being asked**: when a `backlogrun` starts a named epic's children, and right
 after a child is added or a dependency changed.
 
 The cycle and declaration-mismatch checks are `epic:next`'s, reused rather than re-derived. What this
@@ -102,6 +75,7 @@ adds is reading *inside* the children:
 | A child's body names another child, nothing orders the two | warning |
 | A child's **acceptance criteria** name another child, nothing orders the two | **error**; a warning once both children are closed, and a warning when the pair is in two repositories (joshuafolkken/kit#1128 — such an order only became recordable with joshuafolkken/kit#1126, so an error would stop every epic written before it). A warning there does **not** mean the pair is safe: the child is still offered as runnable, and recording the relation is what clears it |
 | A body cites a missing or already-closed issue | warning |
+| A task-list row points at another **epic** | warning — `epic:next` withholds the row, so the batch is already safe; what is left is a thing a person has to look at (joshuafolkken/kit#1476) |
 | An issue names this epic as parent that the task list does not track | warning |
 | The search for those issues could not read the open backlog | **error** |
 | That search stopped before the end of the backlog | warning |
@@ -110,13 +84,15 @@ adds is reading *inside* the children:
 real missing dependency; failing on both would make design notes unwritable. A forward reference the
 other child *already depends on* is not reported at all.
 
-**A pair whose children are both closed is a warning, not an error.** What makes an undeclared order
-a contradiction is that the criteria's child *can run first*, and neither child has any execution
-left — so an epic that once forgot to declare an order would otherwise fail its audit forever, which
-stops every future `epicrun` on it at the first step. It is demoted rather than dropped because
-dropping it hands the same pair to the first check, which reports it as an implicit dependency
-instead: the same one line, minus the detail that the name is in the acceptance criteria
-(joshuafolkken/kit#1010).
+**A pair with either child closed is a warning, not an error.** What makes an undeclared order a
+contradiction is that the criteria's child *can run first*, and one end closing is enough to make
+that false: a closed naming child has already run, and a closed named child has already delivered
+what the criteria ask for — so an epic that once forgot to declare an order would otherwise fail its
+audit forever, which stops every future run of that epic at the first step. It is demoted rather than
+dropped because dropping it hands the same pair to the first check, which reports it as an implicit
+dependency instead: the same one line, minus the detail that the name is in the acceptance criteria
+(joshuafolkken/kit#1010, widened from both-closed to either-closed by joshuafolkken/kit#1597 after a
+closed child citing an open sibling **as evidence** held an epic red at step one).
 
 **Fixing what it finds is Tier A** — re-pointing a dependency or correcting prose is reversible and
 will otherwise stall the work. Park with `needs-decision` only when the contradiction is a design
@@ -126,7 +102,7 @@ choice nobody has made.
 about the search itself rather than about anything the children say (joshuafolkken/kit#1033):
 
 - `✖ orphan search: Could not list the open issues…` — the search never ran, so "no orphans" would
-  be a claim about a listing that never arrived. It fails the audit, which stops an `epicrun` at its
+  be a claim about a listing that never arrived. It fails the audit, which stops the epic's run at its
   step 0. **Re-run the audit**; that is the whole response. There is nothing to fix and nothing to
   decide, so neither Tier A nor a `needs-decision` park applies. If it keeps failing, check
   `gh auth status` and whether the rate limit has reset.
@@ -138,10 +114,60 @@ about the search itself rather than about anything the children say (joshuafolkk
 state or artifact, list the existing code referencing that concept and confirm some child owns
 updating it. Label names are single-sourced in `scripts/git/issue-labels.ts`.
 
-## `josh epic:next <E>` — what is runnable
+## `josh epic:next <E…>` — what is runnable
 
 Returns **every** runnable child, bundled per repository with the local checkout to run it in.
 `--repo <owner/repo>` narrows to one and prints a single token: the issue number, or the verdict.
+`--lanes` beside it prints one issue number per line instead, **up to the number of free lanes in
+that repository** — so a caller that reads one token keeps reading one token
+(joshuafolkken/kit#1491).
+
+**It takes more than one epic, and they answer as one** (joshuafolkken/kit#1493). Every leading
+argument is an epic reference — the split is on the first flag, so `epic:next 858 909 --repo X
+--lanes` reads two — and their runnable children merge into one candidate pool per repository, so six
+free lanes fill from every named epic rather than from whichever was typed first.
+**The priority order is the order the epics were named**: dependency
+depth does not compare across graphs, since depth is measured inside one epic and there is no
+relation between two epics to normalize against, while argument order is the one ranking a person
+typed and can change. **Inside one epic the order is that epic's own task list**
+(joshuafolkken/kit#1583): its declared chain still decides which children are *runnable*, and among
+those, the order the task list names them is the order they are offered — so an epic says "do this
+one first" by moving the row, not by declaring a chain, which would stop every child behind a stuck
+one. It was the lowest issue number until then, on the premise that number order is split order —
+false for any epic that gains children as work is found.
+**`pnpm josh epic --add <E> <N> --order-before <M>` is what moves that row**
+(joshuafolkken/kit#1738): the row goes where the flag names, and the declaration and the `blocked-by`
+relations are left exactly as they stood — so "moving the row" is a command rather than the hand edit
+`epic --add` exists to prevent. `--order-after <M>` is its other direction, and both work on a child
+the epic already tracks, which is a pure reorder. **A child a chain still holds is not freed by
+moving its row**: `epic:next` filters by `blocked-by` before it applies task-list order, so the
+command prints a ⚠️ line naming that child rather than reporting a reordering nothing can observe. **A child two epics both track enters once**, keyed by
+`owner/repo#number` and kept by the epic named earlier; withheld there, it stays withheld, because a
+`blocked-by` relation belongs to the issue rather than to the epic listing it. **One unusable graph
+refuses the whole answer**, and **one reference that does not parse fails the read** rather than
+being dropped. `docs/josh-commands.md` → "`josh epic:next`" carries the worked form.
+
+**An `in-progress` issue occupies a lane rather than the whole repository.** The occupancy is counted
+from that repository's own `in-progress` listing — never from anything the session remembers, since
+two sessions counting to the limit in their own memory would double it — and what is left of
+`JOSH_LANE_LIMIT` (**default 6**) is what gets offered. At zero the answer is `wait` and the holders
+are named on standard error. A parked child releases its lane; one stopped by `needs-human-review`
+goes on holding one, because its uncommitted work is still in that checkout. It is an advisory guard
+rather than a mutex: the label is applied after the read, so what it closes is the window that
+actually occurs — a lane holding the label for minutes.
+
+**A child that is itself an epic is never offered** (joshuafolkken/kit#1476). An epic is not a unit of
+work, so a run handed one has nothing to implement — before this the row fell through to the
+dependency reading, which makes anything unblocked runnable, and `backlogrun` passed the epic to
+`fullrun` as an ordinary issue. It waits on a *person*, because no amount of waiting turns an epic
+into work. **The test is the child's `epic` label, never how its task-list row is written**: a row
+naming `owner/repo#N` is a different property and a legitimate one — it disables the epic auto-close
+by design, which is why a cross-repository backlink is prose rather than a row — so a
+cross-repository child that is not an epic stays runnable, and one that is an epic is withheld
+exactly like a local one. **A parent epic over another epic never auto-closes**: the auto-close
+evaluates only the epics whose own task list holds the issue a merge just closed, and a grandchild
+merging never reaches the grandparent. `epic:audit` reports the same row, with that consequence in
+the finding.
 
 Children that are not runnable are sorted by **whether waiting helps**, never by label:
 
@@ -155,10 +181,141 @@ Reading labels instead fails in an ordinary state: when one repository's child h
 another's is waiting for a release to publish, nothing carries `in-progress` or `needs-decision` —
 and a label-based reading calls that "done" in the one moment it must wait.
 
+**A blocker outside every named epic is weighed, not ignored** (joshuafolkken/kit#1943). Closed, it
+resolves (a cross-repository one still waits for its release); open and tracked by any epic named in
+the same call, the child waits on time unless that blocker itself waits on a person, which the child
+inherits; open and tracked by none, the child waits on a person and the
+blocker is named on standard error; a state the relation did not carry reads as waiting. **So an order
+between two epics is recorded with a native `blocked-by` relation and honoured by naming both epics**
+— `epic:next 1936 1931`, or `backlog:next`, whose set is the whole opted-in backlog. The table is
+`docs/josh-commands.md` → "`josh epic:next`".
+
 Two things stop the command rather than being worked around: a **circular dependency**, and a
 **disagreement between the epic body and the `blocked-by` relations** (an epic written before `josh`
 recorded them, a recording that failed, or a relation hand-added since). Only a line that is
 *nothing but* a chain counts as a declaration — a prose line recommending an execution order is a suggestion, not a dependency.
+
+## Execution waves — parallel, then one alone, then the rest
+
+**A wave is not a mechanism, and there is nothing to add for one.** "Run #A, #B and #C together, then
+#D by itself, then the rest together" is already expressible with the dependency declaration this
+skill has described above, and wanting it only became common once parallel lanes
+(joshuafolkken/kit#1170) let several children run at once. What was missing was never the mechanism —
+it was that nobody had written down how to build one, or when not to (joshuafolkken/kit#1584).
+
+### The shape
+
+**A wave boundary is drawn by chaining every child of the later wave to every child of the earlier
+one.** Wave 1 `{#A, #B, #C}` → wave 2 `{#D}` → wave 3 `{#X, #Y, #Z}` is written in the epic's
+`## Dependencies` as three chain lines:
+
+```
+#A -> #D -> #X
+#B -> #D -> #Y
+#C -> #D -> #Z
+```
+
+- **#A #B #C are blocked by nobody, so they start together** — as many at once as there are free lanes.
+- **#D is `time` until all three have closed**, and becomes runnable the moment the last one does.
+- **#X #Y #Z are blocked by #D, so #D necessarily runs alone.**
+- **#D closing releases wave 3**, which again runs as wide as the lanes allow.
+
+**The block above is an illustration, not something to paste.** `parse_dependency_chains` strips
+fenced blocks before it matches, so a `## Dependencies` section whose chains sit inside a fence reads
+as **no declaration at all** rather than as an error — and `#A` / `#B` are not issue numbers anyway.
+The lines go into the epic body unfenced, with real numbers.
+
+**Deleting a declared order is `pnpm josh epic --remove <E> <M> <N> [<N2> …]`, and never a hand edit
+either** (joshuafolkken/kit#1712). The arguments are a path, so each consecutive pair is one order and
+a whole chain goes in one call; the body's declaration and the `blocked-by` relations are written from
+that one input, exactly as `--add` writes them. **The ends are never reconnected** — `#A -> #B -> #C`
+minus `#B -> #C` leaves `#A -> #B`, and taking out a middle child's two links leaves `#A` and `#C`
+unordered rather than declaring `#A -> #C`. Deleting the last link writes the unordered sentence, so
+the section never ends up with no machine-readable declaration. Pass `--decision-file` to record why;
+the record lands on the epic's `## Decisions` and on both ends of every deleted order. Doing either
+half by hand is the `declaration_mismatch` below, arrived at from the other direction.
+
+**Write the boundary with `pnpm josh epic --add`, not by hand.** A declared link with no recorded
+`blocked-by` relation is the `declaration_mismatch` that `find_anomalies` reports, and it stops
+`epic:next` and the run that consumes it outright; the rule further down — record the order in `blocked-by` **and**
+in `Dependencies` — is what a wave has to satisfy, and editing the body alone satisfies half of it.
+**`--before <hub>` and `--after <hub>` are both refused while the hub sits in more than one chain
+with nothing after it** — which is exactly what a hub is the moment the earlier wave has been chained
+into it. `chains_containing` finds several indices; `is_branching_after` does not hold, because it
+requires a successor in **every** chain naming the target and a hub has none in any of them; so
+`ambiguous_position_error` is raised (`scripts/git/git-epic-chains.ts`). **The first child of the
+next wave therefore goes into the declaration by hand**, with its `blocked-by` recorded to match.
+Once the hub has a successor, `--after <hub>` branches a new line and the rest of that wave goes in
+with it.
+
+**Nothing in the parsing or the consistency check forbids this.** `DECLARED_CHAIN_LINE` in `scripts/git/git-epic-parse.ts`
+asks only that a line be *nothing but* a chain, so there may be any number of chain lines and **one
+child may be an endpoint of several of them** — `parse_dependency_links` expands each line
+independently and flattens the result, dropping only self-loops. `find_anomalies` in
+`scripts/epic/epic-graph.ts` rejects exactly two things, a **cycle** and a **disagreement between the
+declaration and the recorded `blocked-by`**; a fan-in and a fan-out are neither.
+
+**The number of lines is the size of the widest wave**, because a one-child wave is a hub and the
+chains through it collapse into one line each. Where both sides of a boundary hold several children
+the count grows — and that is the moment to ask whether the boundary is real, rather than to go
+looking for a shorter notation.
+
+### Running one child alone is a wave of one
+
+**There is no `solo` mechanism, and none is needed.** "This one must not run beside anything" is the
+shape above with a wave of size one: chain into it every child that must not overlap it, and out of
+it every child that must not precede it. Adding a third axis — an exclusivity label, an
+`## Exclusive` section — would put a second way to say what the dependency declaration already says,
+and a second consistency check to keep the two agreeing.
+
+### When a wave may be declared
+
+**Declare a boundary only where the later wave needs the earlier wave's artifact.** That is the whole
+condition, and it is narrower than it sounds:
+
+- **A mere preference of order is not a dependency.** Wanting one child to go first — to see its
+  result early, to get the risky one out of the way — is presentation order, and joshuafolkken/kit#1583
+  is where that belongs. Substituting a dependency for it buys the order and pays with the stall below.
+  **Write it with `--order-before <M>` / `--order-after <M>`** (joshuafolkken/kit#1738), which move the
+  task-list row and declare nothing; `--before` / `--after` are for an order that really is a
+  dependency. Neither of the order-only flags helps at a **wave boundary**, which is a dependency by
+  definition — the hub case below stays what it is.
+- **Two children that would edit the same file** are the case with no better answer today: separating
+  them into different waves is how it is done, and the price — a fixed order, plus the stall — is
+  accepted knowingly rather than by default.
+- **No reason to wait means no declaration.** An epic whose children are mostly independent says so in
+  prose and leaves the graph empty.
+
+### What a jam does, and how it is cleared
+
+**Declare a boundary and one stuck child in the earlier wave stops every wave behind it.**
+`from_blockers` in `scripts/epic/epic-classify.ts` propagates `human`: a wave-1 child labelled
+`needs-decision` makes every child behind it "waiting on a person" rather than "waiting on time".
+
+**The park itself is not the halt, and reading it as one hides how the cost arrives.** `backlogrun` parks
+that child and goes on running the rest of wave 1 exactly as it always does; the session stops once
+those close and nothing is runnable, because every later wave has been classified `human`. So a
+boundary is paid for at the *end* of the wave rather than at the moment one child parks — which is
+what makes one easy to declare and expensive to have declared. **Clearing it is removing that child's
+`needs-decision`** once the decision has been recorded — the removal recording a decision already
+requires — after which the waves behind it become runnable on the next round.
+
+This is why the answer to "how do I build waves" is a paragraph rather than a feature. **A wave is
+declared for a real wait and removed when the wait ends; it is not the standing shape of an epic.**
+
+### The worked example — joshuafolkken/kit#1474
+
+That epic has grown to **46 children while its declared chains have stayed at three**, and its body
+says why:
+
+> **鎖として宣言していない。** 19 件はほぼ独立しており、順序を依存として宣言すると 1 件詰まっただけ
+> で残り全部が止まる。以下は推奨であって制約ではない。
+
+The nineteen that paragraph was written about are ordered in **prose — a group, not a graph** — so a
+reader gets the intent and no run is stopped by it, and none of the children added since has needed a
+chain either. joshuafolkken/kit#1262 is the same lesson from the other
+side: **24 false dependencies invented by `epic --add` have been removed from it**, each one an order
+nobody needed that could have stopped everything behind it.
 
 ## Epics that span repositories
 
@@ -170,8 +327,8 @@ to implement.
   target, by any route.
 - **The epic auto-closes only when every cross-repository child's state could actually be read.** One
   unreadable child leaves it open, exactly as before.
-- **An epic in another repository must be referenced as `owner/repo#N`** — `epicrun
-  joshuafolkken/kit#858`. A bare `#N` resolves to *this* repository's issue of that number.
+- **An epic in another repository must be referenced as `owner/repo#N`** — `backlogrun
+  joshuafolkken/kit#858 --only`. A bare `#N` resolves to *this* repository's issue of that number.
 
 **A dependency that crosses a repository is not satisfied by the blocking issue closing.** Merging
 does not publish: the merge, the auto-tag and the publish run one after another, so a consumer told
@@ -194,7 +351,7 @@ a publish that predates the change.
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
 Run it right after an issue is filed: by `kickoff` / `fullrun` / `halfrun`, or by any Tier A filing
-mid-implementation, including inside an `epicrun`. **It recommends; it writes nothing.**
+mid-implementation, including inside a `backlogrun`. **It recommends; it writes nothing.**
 
 "Two or more always means an epic" only fires when one request is split on the spot. Two issues filed
 days apart that turn out to be the front and back of one job are executed separately, in whatever
@@ -228,19 +385,49 @@ hundred of them, never pay it.
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
 | Already a child of an epic | Add to **that** epic; do not create a second | A |
+| Spread across an epic and its **own parent** | Add to the inner epic — the parent already contains it | A |
 | Spread across **different** epics | **Choose the one you recommend, add to it, and record why** | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
+| **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |
+
+**Every row that *places* the issue asserts a negative, so a cut epic listing withholds all of them**
+(joshuafolkken/kit#1697). "No epic already tracks this issue" — which `create_epic` asserts about the
+candidates too — is only as good as the listing it was read from, and an epic past the cut tracks its
+children invisibly. **`add_to_epic` rests on it as much as `create_epic` does**: adding the issue to
+the epic a *candidate* sits in, while an unseen epic already tracks the issue itself, is the same
+duplicate by another route. The cut was already on standard error
+(`⚠ The epic listing …`) while standard output went on printing an executable
+instruction such as `Create an epic for these (Tier A — do it).` — and the rule below that reads a warning as "could not answer" is written for one above
+`Nothing to bundle.`, so it never reached this verdict. Acted on as Tier A, that is a **second epic
+over an already-tracked issue**, which the auto-close and `epic:next` cannot both be right about
+(joshuafolkken/kit#943). The verdict now says so itself:
+
+```text
+Could not confirm which epic already tracks these — do not place this issue in one.
+  the epics were not read in full, so an epic already tracking one of these may never have been seen
+  Related: #1662
+```
+
+**The children and the order are deliberately absent** — they are the recipe for the placement that
+line says not to make. The exit code stays `0`, as it does for every other "do nothing" answer. **What
+survives the cut is a membership that *was* found**: the first row above names the epic it read
+tracking the issue, and epics past the cut cannot unseat it.
 
 **Placing an issue is not merging epics, and reading it as one is what used to stop runs.** Bundling
 is reversible — one `epic --add` moves an issue to a different epic — so choosing between two
 candidate epics is Tier A: take the one you recommend, and write the decision (what was taken, what
 was rejected, why, and the date) on **both** the issue and the epic's `## Decisions`. **Merging two
-epics is a different action, and nothing here proposes it**: this verdict fires whenever related
-issues sit in different epics, which includes an epic and its own parent — joshuafolkken/kit#1079
-records three such false positives, one of which stopped a whole batch over an issue whose
-implementation was finished and whose pull request was mergeable. Stop only where the two epics are
-genuinely too close to separate, which is the toss-up Tier B is for and is rare.
+epics is a different action, and nothing here proposes it.**
+
+**An epic and its own parent no longer produce the spread verdict at all** (joshuafolkken/kit#1079).
+They were never two peers to choose between — the parent already contains the child — so the pair is
+narrowed to the inner epic and the issue is added there. The verdict had recorded three such false
+positives, one of which stopped a whole batch over an issue whose implementation was finished and
+whose pull request was mergeable. **The narrowing drops parents, never peers**: one unrelated epic
+beside a nested chain still asks, and so does a cyclic declaration, where there is no inner epic to
+pick. Stop only where the epics left are genuinely too close to separate, which is the toss-up
+Tier B is for and is rare.
 
 **The decision record is what pays for the autonomy.** Skipping it is not a shortcut past a
 formality — it is the half that makes an unattended choice auditable, and without it the run has
@@ -260,8 +447,8 @@ skipped. Two constraints on the record's own text, both refused before anything 
   `--decision-file` with no usable path — otherwise the insertion lands, no record is written anywhere,
   and the command still exits 0.
 
-`epic:plan` phase 2's answers are about children the epic already tracks and cannot use this flag; that
-section says what to do instead.
+Answers about children the epic already tracks cannot use this flag; the "Front-loading the
+decisions" section above says what to do instead.
 
 **Its sibling runs before the filing, not after it: `pnpm josh issue:scout "<title>"`.** That command
 answers the same epic question for an issue that does not exist yet — this decision, called rather

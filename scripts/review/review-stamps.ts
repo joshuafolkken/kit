@@ -15,6 +15,24 @@ import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-
 // is already running — the exact cost joshuafolkken/kit#1241 removed. **It asserts nothing about the
 // result**, only that a gate was started on this tree and the run joins it before committing.
 //
+// **The marker names its writer by pid *and* start time** (joshuafolkken/kit#1245). A pid on its own
+// is not a process: an interrupted gate leaves its marker behind, and once the operating system
+// reissues that pid the liveness probe passes again and the marker resumes asserting a gate that
+// ended. The pair closes that, because a reissued pid necessarily started after the record was
+// written. **The marker was not made weaker to fix it** — dropping it, or having the brief ignore it,
+// would put the re-run joshuafolkken/kit#1242 removed straight back.
+//
+// **A marker whose gate is gone is left where it is, and that is the decision rather than an
+// oversight** (joshuafolkken/kit#1245's second question). Three things make leaving it correct here.
+// The record is keyed per checkout, so exactly one file exists and nothing accumulates; the next
+// `josh gate` overwrites it, since `write_stamp` unlinks before it creates; and the identity check
+// makes a leftover inert for as long as it sits there. Removing it from the reader would buy none of
+// that and would cost the one thing that matters: the reader deletes on "not running", which is also
+// the answer a platform that cannot report a start time gives for a gate that **is** running — so the
+// sweep would delete live markers there, and the next brief of that same run would lose the in-flight
+// sentence. `unit-worker-share.ts` sweeps and is not inconsistent with this: its markers are keyed per
+// pid, so they accumulate without bound, and that is what a sweep is for.
+//
 // **The round-1 snapshot** is written by the brief itself, so that `--round 2` can name the fix
 // delta by comparison rather than by an agent recalling which files it edited.
 //
@@ -29,6 +47,15 @@ import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-
 // to "every file absent" on both sides and compares equal, so `review-tree.ts` asks git for the
 // repository root instead.
 
+// **The two scoped records** answer "were `josh lint:related` and `josh test:related` green on this
+// exact tree" (joshuafolkken/kit#1511). They are separate from the gate stamp because they claim
+// something narrower — the changed files rather than the whole project, and two checks rather than
+// four — and folding them into one record would let a green from either half stand for the other.
+// They are read by `scoped-green.ts`, which is where what they mean is written down; they live here
+// because a stamp prefix declared anywhere else is a second place to look for the same kind of file.
+const LINT_RELATED_PREFIX = 'josh-lint-related-stamp-'
+const TEST_RELATED_PREFIX = 'josh-test-related-stamp-'
+
 const GATE_PREFIX = 'josh-gate-stamp-'
 const IN_FLIGHT_PREFIX = 'josh-gate-running-'
 const ROUND_ONE_PREFIX = 'josh-review-round1-'
@@ -36,6 +63,14 @@ const ROUND_ONE_PREFIX = 'josh-review-round1-'
 const gate_stamp: FileMapStampAccess = file_map_stamp.create(GATE_PREFIX, PROJECT_ROOT)
 const in_flight_stamp: FileMapStampAccess = file_map_stamp.create(IN_FLIGHT_PREFIX, PROJECT_ROOT)
 const round_one_stamp: FileMapStampAccess = file_map_stamp.create(ROUND_ONE_PREFIX, PROJECT_ROOT)
+const lint_related_stamp: FileMapStampAccess = file_map_stamp.create(
+	LINT_RELATED_PREFIX,
+	PROJECT_ROOT,
+)
+const test_related_stamp: FileMapStampAccess = file_map_stamp.create(
+	TEST_RELATED_PREFIX,
+	PROJECT_ROOT,
+)
 
 // **The round-1 snapshot's lifetime is one run, and something has to end it**
 // (joshuafolkken/kit#1441). Since the record is written once and never retaken, one left on disk
@@ -67,8 +102,12 @@ const review_stamps = {
 	gate_stamp,
 	IN_FLIGHT_PREFIX,
 	in_flight_stamp,
+	LINT_RELATED_PREFIX,
+	lint_related_stamp,
 	ROUND_ONE_PREFIX,
 	round_one_stamp,
+	TEST_RELATED_PREFIX,
+	test_related_stamp,
 }
 
 export { review_stamps }

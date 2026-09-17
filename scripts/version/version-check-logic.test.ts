@@ -111,8 +111,8 @@ describe('version_check_logic parameterization by package name', () => {
 			OTHER_CONFIG,
 		)
 
-		expect(result).toContain(`node_modules/${PACKAGE_NAME}/scripts/fix-gh-packages.ts`)
-		expect(result).not.toContain(`node_modules/${OTHER_PACKAGE}/scripts/fix-gh-packages.ts`)
+		expect(result).toContain(`node_modules/${PACKAGE_NAME}/scripts/gh/fix-gh-packages.ts`)
+		expect(result).not.toContain(`node_modules/${OTHER_PACKAGE}/scripts/gh/fix-gh-packages.ts`)
 	})
 })
 

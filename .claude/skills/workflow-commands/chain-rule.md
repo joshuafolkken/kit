@@ -1,62 +1,79 @@
-# `/code-review` → `followup --merge` chain rule (MANDATORY)
+# `/code-review` → `followup` chain rule (MANDATORY)
 
-Within `fullrun` / `fullrun new` / `queue`, the `/code-review` skill output is **not** a turn boundary. The skill returns a polished Markdown review with sections, severity-tagged findings, and a final recommendation — this is an intermediate step, not a finished deliverable.
+## Run the review-to-merge chain
 
-**`fullrun` STOPPING CONDITIONS** (the chain ends only here):
+This is the execution contract for `fullrun` and `backlogrun`; the record below is reference only.
+Review results and successful pushes are never turn boundaries.
 
-1. **PR is merged, the `completion` Telegram notification has been sent, AND `pnpm josh ms` has returned the working tree to the default branch** — normal end state, report the PR URL and stop.
-2. **A genuine blocker requires user judgment** — exactly three count:
-   - A CodeRabbit / Claude Review substantive finding that cannot be auto-verified as a false positive.
-   - The managed config-file confirmation gate (`josh sync`-distributed files in the diff).
-   - A CI failure that requires user input to resolve.
+1. Run `pnpm josh main:merge`, then the final scoped lint/test pair. Start `pnpm josh gate` in the
+   background beside a `/code-review` subagent using the provider, model, effort, checkout and nonce
+   from `pnpm josh review:brief`. Never load the review skill in the main line.
+2. Join and read the gate before committing. Fix any red check, then rerun the affected scoped check
+   and gate. Do not version-bump a child;
+   `pnpm josh release` decides the version from main's history.
+3. Before acting on any review round, run `pnpm josh review:attest --check`. `missing` or `mismatch`
+   discards it without counting; rerun against the brief's checkout. A review error receives a
+   `confirmation` Telegram and stops.
+4. Route the attested verdict mechanically:
+   - Clean or Low-only round 1: no second round. Fix, file, or drop each Low with a one-line reason.
+   - High/Medium round 1: fix it, then ask `pnpm josh review:round2 --round-1-closed`. On `skip`, record
+     the skip on the Issue. On `required`, open the PR first and run the verification pass from
+     `pnpm josh review:brief --round 2` beside CI.
+   - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
+     of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
+   Any round-1 fix runs its affected scoped check and the gate before `git -y`.
+5. After a green joined gate, background `pnpm josh git -y "<title> #<N>"`. Its completion resumes the
+   same turn through branch-2 filing, `epic:bundle`, and `pnpm josh followup`. A clean round 2 merges;
+   a round-2 fix is pushed before its gate, which is joined before `followup`.
 
-   When a blocker fires, send a `confirmation` Telegram **before** stopping.
+A dispatched lane child may end once at the pre-gate cut in `pre-gate-cut.md`; it never ends at the
+push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
+`pnpm josh ms` returned to the default branch, or when user judgment is required by an unverifiable
+CodeRabbit/Claude Review finding or a CI failure. In a lane, `josh ms` refusing is expected and the
+parent closes the lane. Managed config claims are reported by `followup` and do not stop the merge.
 
-**Everything else — including `/code-review` producing a polished "Approve for merge" recommendation — is NOT a stopping condition.** Continue straight through `pnpm josh bump minor` → `pnpm josh gate` (**only where the tree was edited after the first gate started** — a red check's fix or a round-1 finding's fix, either of which made its result stale; with nothing edited, join that one gate and go straight on) → `pnpm josh git -y` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup --merge` in the same turn. **The filing sits after the pull request is open on purpose**, so it runs inside the CI wait rather than in front of it (`prompts/review.md` → "Review round cap"). **Since joshuafolkken/kit#1261 the second review round sits in that same window** — after `pnpm josh git -y`, before `pnpm josh followup --merge` — which is why the commit now comes before it (`prompts/review.md` → "The pull request opens between the rounds, so CI runs beside round 2"). A clean first round has no second one, and that case's order is exactly what it was. **A clean second round is not a turn boundary either**: the turn that reads it issues `pnpm josh followup --merge`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a turn of its own (`prompts/review.md` → "A clean second round issues the merge in the same turn", the single source, joshuafolkken/kit#1333).
+Recommendations are informational; severity decides. A CodeRabbit rate-limit warning is not a finding.
 
-**Join the gate before `pnpm josh bump minor` — every row of the table below runs after that, not instead of it.** `pnpm josh gate` is started alongside the review rather than in front of it (`SKILL.md` → the verification gate, joshuafolkken/kit#1242), so when the review settles the checks may still be running: read what the gate printed before continuing. **A red gate is fixed and re-run whatever the review concluded** — a clean review is not a result about lint, the type check, the spell check or the unit tests, and the brief says as much while the checks are in flight. The fix is uncommitted like every other, so it lands in the round-2 fix delta and is reviewed with the rest. **There is no row here that reaches a commit on a gate nobody read.** Where anything was edited after that gate started — its own red check's fix as much as a round-1 finding's — the join is followed by `pnpm josh bump minor` and **a second `pnpm josh gate` over the bumped tree**, joined before `pnpm josh git -y`: the bump goes first so the gate covers the exact tree the commit carries and round 2's brief still reads `Already verified` (joshuafolkken/kit#1261). **That order is unconditional, and the gate enforces it** (joshuafolkken/kit#1437): `bump` always rewrites `package.json`, so a gate run in front of it is certain to run again after it — `pnpm josh gate` refuses and prints what to run instead rather than being paid for twice (`prompts/review.md` → "The bump goes in front of that gate, and it is unconditional").
+## Orchestration facts single-sourced here
 
-**Decision table** (map `/code-review` result → next action mechanically):
+These are the gate → review → PR → merge facts other documents cite. This file is their single source
+(joshuafolkken/kit#1927 moved them out of `prompts/review.md`, which now carries only the review
+_policy_ — level, round cap, disposition — and `prompts/review-rubric.md` the rubric). Each is stated
+once here; the measurements that motivated each one live in the linked Issues.
 
-| `/code-review` result                        | Findings severity  | Next action (same turn, no user input)                                                                                                                                                |
-| --------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Clean — every category says `No issues`, **and this was the first round** | None               | Immediately continue: `pnpm josh bump minor` → `pnpm josh git -y "<title> #<N>"` → `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`. **No second round is due**, and with nothing edited since the gate started, no second gate either — this row's order is exactly what it was |
-| Nothing to fix in place — **and this was the second round** | Any, so long as no finding took branch 1 | **Issue the merge in this same turn.** The pull request is already open, so `bump minor` and `git -y` are behind you: run any branch-2 filing and `pnpm josh epic:bundle` first, then `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` — never a turn of its own between reading the round and issuing the merge. **A Low-only second round is this row, not the one below**: a Low takes branch 2 or branch 3, and neither writes a line of code (`prompts/review.md` → "A clean second round issues the merge in the same turn") |
-| Low findings only, **and this was the first round** | Low                | Immediately continue: `bump minor` → `git -y` → the follow-up filing and `epic:bundle` for any Low routed to branch 2 → `followup --merge` (a Low that does not reach the user may be skipped with a one-line reason per Pre-commit Self-Review; one that does goes to a fix-in-place or an Issue, and a filed one goes here so it runs inside the CI wait) |
-| A finding routed to branch 1 — **and this was the second round** | Any                | Fix it in place — **there is no third round** — then the push-first order: the single check the fix reaches → `pnpm josh git -y "<title> #<N>"` again, a follow-up commit on the same branch with no second `bump` → `pnpm josh gate` beside the CI it starts, **joined before `pnpm josh followup --merge`** (`prompts/review.md` → "The round-2 fix commit is pushed before its gate"). The remaining findings take branch 2 or branch 3 as usual |
-| One or more High / Medium findings, **and this was the first round** | High and/or Medium | Fix in place, then **ask `pnpm josh review:round2 --round-1-closed` whether a second round is due at all — _before_ `pnpm josh bump minor`**, because that bump writes `package.json` into the fix delta and `package.json` is not inert, so an answer taken after it is `required` whatever round 1 did (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not", the single source; joshuafolkken/kit#1433). On `skip` there is no second round: continue `pnpm josh bump minor` → `pnpm josh gate` → join → `pnpm josh git -y "<title> #<N>"` → record the skip on the Issue beside any branch-2 filing and `pnpm josh epic:bundle` → `pnpm josh followup --merge`. **That gate re-run is not optional here** — round 1 edited the tree, so the first gate's result is stale, and this row is therefore *not* the clean-first-round row, which has nothing edited to re-run for. On `required`, run the **second-round verification pass** — `/code-review` with the brief `pnpm josh review:brief --round 2` prints, which hands over the **fix delta** as the target and asking whether each first-round finding closed, **not** a second adversarial read of `git diff main` (`prompts/review.md` → "The second round is a verification pass, not a second full review") — **at most two reviews in total** (`prompts/review.md` → "Review round cap"). **Open the pull request first**: `pnpm josh bump minor` → `pnpm josh gate` → join → `pnpm josh git -y "<title> #<N>"`, and run that pass beside the CI it starts (joshuafolkken/kit#1261). **A finding the pass then fixes in place is pushed before its gate** (joshuafolkken/kit#1326): the single check the fix reaches → `pnpm josh git -y "<title> #<N>"` again, a follow-up commit on the same branch with no second `bump` → `pnpm josh gate` beside the CI it starts, joined before `pnpm josh followup --merge` (`prompts/review.md` → "The round-2 fix commit is pushed before its gate"). Do NOT report narratively and wait. |
-| `/code-review` itself errors / can't run     | n/a                | Report the error and stop with a `confirmation` Telegram (CI-level blocker)                                                                                                           |
+- **The gate runs beside this review, not in front of it** — `pnpm josh gate` is started when the review
+  starts and joined before the commit; the two read the same tree and neither writes to it, so running
+  them serially is pure waiting. A red gate is fixed and re-run whatever the review concluded, and there
+  is no path to a commit on a gate nobody read (joshuafolkken/kit#1242).
+- **origin/main is merged in before the gate** — `pnpm josh main:merge` merges `origin/<default>` into
+  the branch before the gate and the review start, so the gate verifies the tree that will actually
+  merge rather than one that never existed (joshuafolkken/kit#1837). It is the last edit, so the scoped
+  pair and the gate run once over it. A conflict here fires `backlogrun-lanes.md` → "Conflicts are not predicted"
+  early.
+- **A single check answers once per tree** — while implementing, re-run a single check by name
+  (`pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's type
+  check) after every edit; a repeat of the same command with the same arguments over a tree nothing has
+  touched since buys only a copy of the answer already in hand (joshuafolkken/kit#1383).
+- **The pull request opens between the rounds, so CI runs beside round 2** — `pnpm josh git -y` sits
+  between the two review rounds. Round 1 runs on the uncommitted tree and its High/Medium findings are
+  fixed before anything is committed; the verification pass over those fixes then runs against the open
+  pull request, beside the CI the commit started (joshuafolkken/kit#1261).
+- **The round-2 fix commit is pushed before its gate** — a fix the second round makes in place is
+  pushed (`pnpm josh git -y` again, a follow-up commit) before its `pnpm josh gate`, so the gate runs
+  inside the CI wait and is joined before `pnpm josh followup` rather than in front of it
+  (joshuafolkken/kit#1326). The commit and pre-push hooks and CI's `Checks` job mean pushing first is
+  not pushing unverified code.
+- **A clean second round issues the merge in the same turn** — the turn that reads a clean second round
+  issues `pnpm josh followup`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a turn
+  of its own. Clean has two halves: no confirmed High is standing, and nothing was routed to branch 1 of
+  the disposition (joshuafolkken/kit#1333).
+- **The review runs in a subagent, never a main-line skill load** — `/code-review` is spawned through
+  the `Agent` tool in its own context; a mid-run `Skill` load rewrites the whole cached prompt prefix,
+  which is what makes it expensive (joshuafolkken/kit#1855).
+- **The brief names the checkout, and a review that read another one is refused** — `pnpm josh
+  review:brief` prints the checkout root, branch and HEAD and a nonce; the review runs `pnpm josh
+  review:attest <nonce>` from the tree it read, and `pnpm josh review:attest --check` must answer `ok`
+  before the run or `pnpm josh followup` acts on the verdict, or it is discarded (joshuafolkken/kit#1522).
 
-The recommendation line at the bottom of `/code-review` ("Approve for merge", "Request changes", etc.) is informational, not authoritative. **Severity of findings drives the decision, not the recommendation sentence.**
-
-**Anti-pattern catalog** — if you are about to emit text that resembles any of the following, you are violating the chain rule. Cancel the message; continue through `pnpm josh bump minor` → `pnpm josh gate` where round 1 produced fixes → `pnpm josh git -y` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup --merge` instead, running the second review round beside the CI that commit started where one is due.
-
-- "The `/code-review` is clean — ready to merge. Shall I proceed with `followup --merge`?"
-- "`/code-review` found no high/medium findings. Approve for merge after you confirm."
-- "Recommendation: Approve for merge. Let me know if you'd like me to continue."
-- "All green. Awaiting your go-ahead to merge."
-- "The review is complete. Should I run `pnpm josh followup --merge` now?"
-- Posting the `/code-review` Markdown output and then stopping the turn without a tool call.
-- Listing low-severity findings narratively and asking whether they should block merge (Low findings are auto-skipped with a one-line reason; do not escalate).
-- Treating CodeRabbit rate-limit warnings as findings (they are not — proceed).
-
-All of these share one shape: presenting `/code-review` output to the user and waiting. **The user invoked `fullrun`; merging is part of that invocation. The chain ends at a stopping condition above, never at `/code-review` output.**
-
-This rule applies regardless of model (Claude / Gemini / Cursor) or account; the workflow is portable and the chain must hold across environments.
-
-**Turn-end self-check (fullrun-conditional) — run BEFORE sending any response that contains `/code-review` output**
-
-This check exists because the chain rule has been violated repeatedly even with the decision table and anti-pattern catalog above (PR #387 on 2026-05-15, PR #398 on 2026-05-20). The rule needs to be visible at the exact moment of violation — when the response is about to be sent. Run this check, in order, before sending:
-
-1. **Mode check** — Is this `/code-review` part of a `fullrun` / `fullrun new` / `queue` invocation? Decide by both signals: (a) the user's recent prompt contained one of those commands, AND (b) the implementation is finished and the verification gate has reached its review step. **A `halfrun` invocation never satisfies (a)** — halfrun runs this same review inside its gate, but it ends at the confirmation stop without committing: send the `confirmation` Telegram and stop with the work uncommitted. If either signal is false → you are in **standalone mode**, not fullrun mode: stop after the review markdown and do NOT call `followup --merge`. **The conditional is why this step is first**: `/code-review <PR>` typed on its own is a review and nothing else, and a check that skipped it would auto-merge on a review the user asked for by itself.
-2. **Severity check** — Count high/medium findings, **using the two tests in `prompts/review.md` → "Severity"** rather than your own reading: a finding is `medium` or higher only when it reaches a runtime code path, a distributed artifact a consumer reads, or the verification that guards either **and** you can write its concrete failure scenario; failing either, it is `low`. **A `low` is not automatically droppable** — only one that fails the reach test is, so a `low` rated for want of a scenario still goes to a fix-in-place or an Issue. If ≥1 → fix in place, then ask **`pnpm josh review:round2 --round-1-closed`** whether the round is due, **before `pnpm josh bump minor`** — the bump writes `package.json`, which is not inert, so an answer taken after it is `required` whatever round 1 did (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not", joshuafolkken/kit#1433). `skip` means the round is not due, and the run continues to the merge through `bump minor` → `pnpm josh gate` → join → `git -y`, **the gate re-running because round 1 edited the tree**, and records the skip on the Issue inside the CI wait; **the flag is passable only where every High/Medium of round 1 closed, and without it the answer is `required`**. On `required`, run the **second-round verification pass**: `/code-review` with the brief `pnpm josh review:brief --round 2` prints, which hands over the **fix delta** as the target and asking whether each first-round finding closed and whether the fix itself introduced a defect — **not** the whole diff read adversarially again (`prompts/review.md` → "The second round is a verification pass, not a second full review"). The question narrows; the standard does not — an unresolved finding keeps its original severity. **That pass runs after `pnpm josh git -y`, beside the CI the commit started** (joshuafolkken/kit#1261), so a finding it fixes in place costs one follow-up commit and one CI re-run — which is the trade the change recorded, not an accident. **That follow-up commit is pushed before its own gate** (joshuafolkken/kit#1326): the single check the fix reaches, then `pnpm josh git -y` again, then `pnpm josh gate` joined before `pnpm josh followup --merge`, so the re-run has the gate beside it. Do NOT call `followup --merge` yet. **Stop at two rounds:** after the second, route each remaining non-High finding through the three-way disposition — fix it in place without starting a new review round, file it referencing this one, or drop it with a one-line PR note; **for a filed finding, run `pnpm josh epic:bundle <new>` on it before this Issue closes and act on its answer** — `add_to_epic` / `create_epic` are Tier A, executed with the matching `pnpm josh epic --add` / `pnpm josh epic` write command and never a hand edit of the epic body; `ask` is Tier A too — choose the epic you recommend, run its write command, and record the decision on both the new Issue and that epic's `## Decisions`; it neither stops a run nor parks a child (joshuafolkken/kit#1339); `none` is a no-op. **Do the filing and the bundle after `pnpm josh git -y` and before `pnpm josh followup --merge`, inside the CI wait** — neither changes a line of code, so the CI already running stays valid (`prompts/review.md` → "Review round cap"). Then continue the pipeline. Filing without the bundle step leaves an Issue `epic:next` never offers, so the finding is not dropped, it is parked forever (`prompts/review.md` → "Review round cap"). A confirmed High is the only thing that blocks past the cap, and one still standing after the second round means the change is not ready — send a `confirmation` Telegram and put the scope back to the user instead of starting a third round.
-3. **Append check** — If you are in fullrun mode AND there are 0 high/medium findings (Low-only or fully clean), the same response that contains the `/code-review` markdown MUST also continue the pipeline in tool calls, **from wherever the run already is**: where the pull request is not open yet (this was round 1) `pnpm josh bump minor`, then `pnpm josh gate` joined, then `pnpm josh git -y`; where it is already open (this was round 2, run beside its CI) that half is done and any fix-in-place is a follow-up commit instead — its single check, then `pnpm josh git -y`, then `pnpm josh gate` joined before the merge (joshuafolkken/kit#1326). Then, either way, the follow-up filing and `pnpm josh epic:bundle` if the cap routed anything to branch 2, then `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`. **Where this was round 2 and it came back clean, that merge is the whole of the continuation** — the turn that reads it issues `pnpm josh followup --merge` after any branch-2 filing and `pnpm josh epic:bundle`, and never in a turn of its own (`prompts/review.md` → "A clean second round issues the merge in the same turn"). **A response whose final assistant text is `/code-review` Markdown with no follow-on tool call is a violation.** Cancel and append the tool call.
-
-The check fires at the moment your response would end with review markdown and no follow-on tool call. That is the violation point. Treat the `/code-review` skill's output as an intermediate tool result, not a deliverable.
-
-**The self-check is mirrored at the end of the `/code-review` skill prompt (`prompts/review.md`)**, so it is visible inside the skill's own execution context rather than only in the always-loaded documents. The violation happens at the moment that skill finishes producing markdown, which is where the reminder has to be.
-
-**Tooling enforcement (investigated, not implemented).** A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part of this rule and **is not feasible at the tooling layer**: `/code-review` is an interactive AI skill that returns Markdown for the agent to interpret, so a shell command cannot host the skill, parse its severity verdicts, or decide "no high/medium" on the agent's behalf. The strongest available enforcement is the decision table, the anti-pattern catalog and the turn-end self-check above, sitting in this skill plus the skill prompt (`prompts/review.md`). Recorded so the next reader proposes something else rather than re-deriving the same dead end.
-
-This file is the single source of the rule; `prompts/collaboration-workflow/chain-rule.md` is a pointer to it (joshuafolkken/kit#1186 rollout of the joshuafolkken/kit#1174 pattern). The canonical section it replaced lived inside `prompts/collaboration-workflow/plan-comment.md`, which keeps Step 3 and is still cited for it.
-
+This file is the single source of the gate → review → PR → merge chain rule; other documents reference
+it rather than restating it. `prompts/collaboration-workflow/plan-comment.md` keeps Step 3.

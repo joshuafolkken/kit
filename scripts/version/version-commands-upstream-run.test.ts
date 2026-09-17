@@ -80,7 +80,7 @@ describe('version_commands.run_upgrade with upstreams', () => {
 			'sh',
 			[
 				'-c',
-				`${UPSTREAM_UPGRADE_COMMAND} && node_modules/.bin/tsx node_modules/${UPSTREAM_PACKAGE}/scripts/fix-gh-packages.ts`,
+				`${UPSTREAM_UPGRADE_COMMAND} && node_modules/.bin/tsx node_modules/${UPSTREAM_PACKAGE}/scripts/gh/fix-gh-packages.ts`,
 			],
 			{ stdio: 'inherit', reject: false },
 		)

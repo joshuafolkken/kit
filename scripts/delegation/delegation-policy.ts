@@ -43,12 +43,26 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 	},
 	{
 		name: 'epic-child',
-		// One row, two entry points: an epic's child under `epicrun` and one issue of a `queue` are
-		// the same unit — same brief, same summary, same verifier (joshuafolkken/kit#1149). A second
-		// row for the queue would be the clone `CLAUDE.md` prohibits.
-		does: "run one child of a batch end to end in an isolated unit — an epic's child under `epicrun` or one issue of a `queue` alike — plan, verification gate, PR, merge — and return only its summary to the parent loop",
+		// One row, two entry points: an epic's child under `epicrun` and one named issue of a
+		// `backlogrun` are the same unit — same brief, same summary, same verifier
+		// (joshuafolkken/kit#1149, folded from `queue` into `backlogrun` by joshuafolkken/kit#1984). A
+		// second row for the batch would be the clone `CLAUDE.md` prohibits.
+		does: "run one child of a batch end to end in an isolated unit — an epic's child or one named issue of a `backlogrun` alike — plan, verification gate, PR, merge — and return only its summary to the parent loop",
 		verifier:
-			"the parent reads the child's state from GitHub with `pnpm josh issue:state`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup --merge` would touch the PR",
+			"the parent reads the child's state from GitHub with `pnpm josh issue:state`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup` would touch the PR",
+	},
+	{
+		name: 'followup-filing',
+		// The late-run follow-up filing chain — issue:scout → file the Issue → epic:bundle → epic --add
+		// — is a dependency chain `batch:guard` correctly keeps one call per step, and what makes it
+		// expensive is the ~340k context it runs in at the tail of a run, not the step count
+		// (joshuafolkken/kit#1892). A fresh unit runs the same chain at a small context, and the review
+		// round cap already composed the finding text, so what the unit is handed is mechanical: run the
+		// four commands and act on their deterministic answers. This is not `batch:guard`'s business —
+		// the chain stays one call per step; delegation only moves it to a cheaper context.
+		does: 'run the late-run follow-up filing chain in an isolated unit — issue:scout, file the Issue, epic:bundle, epic --add — given the finding text the parent already composed, and return the new Issue number and the epic:bundle answer',
+		verifier:
+			"the parent reads the filed Issue from GitHub with `pnpm josh issue:state <new>`, not the unit's summary; a follow-up reported filed but not created is still absent, the way `epic-child`'s reported-done-but-not-merged child is still open. The finding text came from the parent and `issue:scout` / `epic:bundle` are deterministic, so the unit's work is the mechanical execution `issue:state` confirms",
 	},
 	{
 		name: 'survey',

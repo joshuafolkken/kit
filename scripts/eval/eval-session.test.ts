@@ -55,6 +55,21 @@ describe('eval_session.session_environment', () => {
 		},
 	)
 
+	// The regression joshuafolkken/kit#1197 was filed for. execa inherits this process's environment
+	// wholesale, so a session spawned from inside a Claude session used to be handed the parent's own
+	// messaging socket, dial it, be refused, and die as `ConnectionRefused` — every scenario reported
+	// `unmeasured` at five sessions' cost. `undefined` rather than `''` is the assertion that matters:
+	// Node omits an environment key whose value is `undefined`, and an empty socket path is still a
+	// socket path to whatever reads it.
+	it.each([...eval_session.PARENT_SESSION_KEYS])('removes the inherited %s', (key) => {
+		expect(environment[key]).toBeUndefined()
+		expect(Object.hasOwn(environment, key)).toBe(true)
+	})
+
+	it('removes the parent session messaging socket by name', () => {
+		expect(eval_session.PARENT_SESSION_KEYS).toContain('CLAUDE_CODE_MESSAGING_SOCKET')
+	})
+
 	// `gh` reads its login from a config directory, not only from the token variables; pointing it at
 	// one inside the sandbox leaves it unauthenticated whatever the developer's own login is.
 	it('points gh at a config directory inside the sandbox', () => {

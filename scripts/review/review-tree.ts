@@ -7,9 +7,9 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 // The tree `josh review:brief` records: every path the change touches, and the digest of its content
 // (joshuafolkken/kit#1241).
 //
-// The path list is `#scripts/git/changed-paths`', the same reading `josh review:level` and
-// `josh eval:scope` decide from — a second definition of "changed" would let the brief describe a
-// different change from the level printed beside it.
+// The path list is `#scripts/git/changed-paths`', the same reading `josh review:level` decides from
+// — a second definition of "changed" would let the brief describe a different change from the level
+// printed beside it.
 //
 // **The digests are what a `git diff` cannot give.** The implementation and a review's fixes are
 // uncommitted in the same tree, so a diff cannot say which side of the review a change fell on; a

@@ -1,5 +1,4 @@
 import {
-	CSPELL_CACHE_FLAGS,
 	ESLINT_CACHE_FLAGS,
 	GATE_COMMAND,
 	PE,
@@ -10,33 +9,23 @@ import {
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
 	[GATE_COMMAND]: {
-		script: 'scripts/verification-gate.ts',
+		script: 'scripts/gate/verification-gate.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
 	},
 	lint: {
-		script: 'scripts/lint-parallel.ts',
+		script: 'scripts/lint/lint-parallel.ts',
 		description: 'Check code with prettier and eslint',
 		category: 'Development',
 	},
 	'lint:related': {
-		script: 'scripts/lint-related.ts',
+		script: 'scripts/lint/lint-related.ts',
 		description: 'Check only the changed files with prettier and eslint (whole tree on fallback)',
 		category: 'Development',
 	},
 	lines: {
 		script: 'scripts/lines/lines-command.ts',
 		description: "Print a file's code lines against the max-lines limit and the headroom left",
-		category: 'Development',
-	},
-	'lint:prettier': {
-		shell: [...PE, 'prettier', '--check', '.'],
-		description: 'Check formatting with prettier',
-		category: 'Development',
-	},
-	'lint:eslint': {
-		shell: [...PE, 'eslint', '.', ...ESLINT_CACHE_FLAGS],
-		description: 'Check code with eslint',
 		category: 'Development',
 	},
 	format: {
@@ -50,25 +39,14 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		],
 		description: 'Format code with prettier and eslint',
 		category: 'Development',
-		argument_targets: ['format:prettier', 'format:eslint'],
-	},
-	'format:prettier': {
-		shell: [...PE, 'prettier', '--write', '.'],
-		description: 'Format code with prettier',
-		category: 'Development',
-	},
-	'format:eslint': {
-		shell: [...PE, 'eslint', '.', '--fix', ...ESLINT_CACHE_FLAGS],
-		description: 'Fix eslint issues',
-		category: 'Development',
 	},
 	'format:edited': {
-		script: 'scripts/format-edited-file.ts',
+		script: 'scripts/hooks/format-edited-file.ts',
 		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',
 		category: 'Development',
 	},
 	'batch:guard': {
-		script: 'scripts/batch-guard.ts',
+		script: 'scripts/hooks/batch-guard.ts',
 		description:
 			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
 		category: 'Development',
@@ -79,50 +57,48 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// second ~0.16 s tsx start off. The script calls `process.loadEnvFile` itself instead, which is
 		// node's own `--env-file` parser with node's own precedence.
 	},
-	cspell: {
-		shell: [
-			...PE,
-			'cspell',
-			'lint',
-			'--no-must-find-files',
-			'--no-progress',
-			'**/*.{ts,js,md,yaml,yml,json}',
-		],
-		description: 'Run spell check',
+	'pretool:guard': {
+		script: 'scripts/hooks/pretool-guard.ts',
+		description:
+			'Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin)',
 		category: 'Development',
+		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this is the one
+		// PreToolUse hook consumers run before every guarded call, so it must stay eligible for
+		// in-process dispatch rather than pay a second tsx start. Each guard it composes loads `.env`
+		// through the shared loader.
+	},
+	'session:lang': {
+		script: 'scripts/josh/session-language-cli.ts',
+		description:
+			'Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the session context',
+		category: 'Development',
+		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this runs on every
+		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
+		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
 	},
 	'cspell:dot': {
-		shell: [...PE, 'cspell', '.', '--dot', ...CSPELL_CACHE_FLAGS],
+		script: 'scripts/lint/cspell-cached.ts',
 		description: 'Run spell check including dotfiles',
 		category: 'Development',
 	},
 	'test:unit': {
-		script: 'scripts/test-unit-guard.ts',
-		description: 'Run unit tests with Vitest (skips when absent or no test files)',
+		script: 'scripts/test/test-unit-guard.ts',
+		description:
+			'Run unit tests with Vitest (skips when Vitest is absent; fails when it has no tests)',
 		category: 'Development',
 	},
 	'test:related': {
-		script: 'scripts/test-related.ts',
+		script: 'scripts/test/test-related.ts',
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 	},
-	'test:watch': {
-		shell: [...PE, 'vitest', 'watch'],
-		description: 'Run unit tests in watch mode',
-		category: 'Development',
-	},
-	'test:ui': {
-		shell: [...PE, 'vitest', '--ui'],
-		description: 'Run unit tests with browser UI',
-		category: 'Development',
-	},
 	'e2e:retry-check': {
-		script: 'scripts/e2e-retry-check.ts',
+		script: 'scripts/test/e2e-retry-check.ts',
 		description: 'Report whether the preview server crashed during a failed E2E attempt (CI)',
 		category: 'Development',
 	},
 	'test:e2e': {
-		script: 'scripts/test-e2e-guard.ts',
+		script: 'scripts/test/test-e2e-guard.ts',
 		description: 'Run E2E tests with Playwright (skips when absent or no e2e files)',
 		category: 'Development',
 	},
@@ -140,11 +116,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	port: {
 		script: 'scripts/ports/port-command.ts',
 		description: 'Print the PORT_SEED-resolved dev or preview port',
-		category: 'Development',
-	},
-	health: {
-		script: 'scripts/health-check.ts',
-		description: 'Show project health status',
 		category: 'Development',
 	},
 }

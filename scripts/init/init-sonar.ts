@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { sonar_file } from '#scripts/sonar-file'
+import { sonar_file } from '#scripts/security/sonar-file'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 

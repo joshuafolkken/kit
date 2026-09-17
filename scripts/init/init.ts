@@ -2,11 +2,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { auto_merge_setting } from '#scripts/auto-merge-setting'
+import { resolve_local_bin } from '#scripts/build/local-bin'
 import { doctor_io } from '#scripts/doctor/doctor-io'
-import { resolve_local_bin } from '#scripts/local-bin'
-import { package_version_schema, with_package_manager_schema } from '#scripts/schemas'
-import { security_updates } from '#scripts/security-updates'
+import { package_version_schema, with_package_manager_schema } from '#scripts/lib/schemas'
+import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import { security_updates } from '#scripts/security/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
@@ -15,6 +15,7 @@ import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-action
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
+import { plugin_install_hint_module } from './plugin-install-hint'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -105,7 +106,8 @@ function apply_dependency_merges(content: string): string {
 
 function apply_package_json_merges(content: string): string {
 	const with_kit = apply_dependency_merges(content)
-	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(with_kit)
+	const upgraded = init_logic.upgrade_prepare_lefthook_warning(with_kit)
+	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(upgraded)
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
 		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
@@ -176,15 +178,7 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 // rather than through `sync`'s own `main()`, so the guard there never ran for it — and on top of the
 // 14 files #868 reproduced, `init` also rewrites `package.json` scripts and devDependencies
 // (joshuafolkken/kit#879). Checked before the first write, for the reason the sync guard is.
-function main(): void {
-	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
-
-	console.info('\n🚀 Initializing @joshuafolkken/kit\n')
-	run_config_file_actions()
-
-	console.info('\nPackage scripts:')
-	merge_project_package_json()
-
+function run_ai_file_actions(): void {
 	console.info('\nAI files:')
 	// `init` writes the same npm-disabling `.github/dependabot.yml` that `sync` distributes, so a
 	// freshly scaffolded repository is exposed from its first commit — and a new private repository
@@ -196,6 +190,19 @@ function main(): void {
 
 	report_repository_settings(name_with_owner)
 
+	plugin_install_hint_module.report_plugin_install_hint()
+}
+
+function main(): void {
+	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
+
+	console.info('\n🚀 Initializing @joshuafolkken/kit\n')
+	run_config_file_actions()
+
+	console.info('\nPackage scripts:')
+	merge_project_package_json()
+
+	run_ai_file_actions()
 	console.info('\n✅ Done.\n')
 }
 

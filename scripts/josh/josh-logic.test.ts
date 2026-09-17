@@ -16,46 +16,31 @@ const PACKAGE_VERSION = (
 	JSON.parse(readFileSync(path.join(PACKAGE_DIR, 'package.json'), 'utf8')) as { version: string }
 ).version
 
-const ENV_FILE_FLAG = '--env-file=.env'
+const ENV_FILE_FLAG = '--env-file-if-exists=.env'
+const MANDATORY_ENV_FILE_FLAG = '--env-file=.env'
 const ALIAS_PAD_WIDTH = 2
 const CHECK_COMMIT_MESSAGE_CMD = 'check-commit-message'
 const UNKNOWN_CMD = 'not-a-command'
 const USAGE_LINE = 'Usage: josh <command>'
+const ALL_HINT = "Run 'josh --all'"
 
+// The default help lists the day-to-day commands; the maintenance ones show only under `--all`
+// (joshuafolkken/kit#1928). These entries are the ones expected in the DEFAULT listing, so no
+// maintenance command and no removed command appears here.
 const EXPECTED_COMMAND_ENTRIES: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
-	[
-		'Development',
-		[
-			'lint',
-			'lint:prettier',
-			'lint:eslint',
-			'format',
-			'format:prettier',
-			'format:eslint',
-			'cspell',
-			'cspell:dot',
-			'test:unit',
-			'test:e2e',
-			'test',
-			'check',
-		],
-	],
+	['Development', ['gate', 'lint', 'lines', 'format', 'cspell:dot', 'test:unit', 'test', 'check']],
 	['Project', ['init', 'sync']],
 	['Workflow', ['git', 'pr', 'followup', 'notify', 'main:sync', 'main:merge']],
 	['Versioning', ['bump', 'version']],
 	['Maintenance', ['overrides', 'audit', 'latest', 'latest:corepack', 'latest:update']],
-	[
-		'Git hooks',
-		[
-			'prevent-main-commit',
-			CHECK_COMMIT_MESSAGE_CMD,
-			'hook:install',
-			'hook:uninstall',
-			'hook:commit',
-			'hook:push',
-		],
-	],
-	['AI tools', ['prep', 'issue', 'epic', 'epic:check']],
+	['AI tools', ['epic', 'epic:check']],
+]
+
+// Commands the default help hides and `--all` reveals, one per audience-split category.
+const MAINTENANCE_ONLY_COMMANDS: ReadonlyArray<string> = [
+	'prevent-main-commit',
+	CHECK_COMMIT_MESSAGE_CMD,
+	'eval',
 ]
 
 const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>(
@@ -91,10 +76,14 @@ describe('COMMAND_MAP', () => {
 	})
 })
 
+// Every category, including `Git hooks`, whose commands are all maintenance-only and so absent from
+// the default help's category order (joshuafolkken/kit#1928).
+const VALID_CATEGORIES: ReadonlyArray<string> = [...EXPECTED_CATEGORY_ORDER, 'Git hooks']
+
 describe('COMMAND_MAP category', () => {
 	it('each entry has a valid category', () => {
 		for (const entry of Object.values(COMMAND_MAP)) {
-			expect(EXPECTED_CATEGORY_ORDER).toContain(entry.category)
+			expect(VALID_CATEGORIES).toContain(entry.category)
 		}
 	})
 })
@@ -125,7 +114,28 @@ describe('josh_logic.format_help', () => {
 
 		expect(help).toContain('l,  lint')
 		expect(help).toContain('tu, test:unit')
-		expect(help).toContain(`cm, ${CHECK_COMMIT_MESSAGE_CMD}`)
+		expect(help).toContain('ga, gate')
+	})
+})
+
+describe('josh_logic.format_help audience split', () => {
+	it('hides maintenance commands and points at --all by default', () => {
+		const help = josh_logic.format_help()
+
+		for (const cmd of MAINTENANCE_ONLY_COMMANDS) expect(help).not.toContain(cmd)
+		expect(help).toContain(ALL_HINT)
+	})
+
+	it('lists maintenance commands and drops the --all hint under --all', () => {
+		const help = josh_logic.format_help(true)
+
+		for (const cmd of MAINTENANCE_ONLY_COMMANDS) expect(help).toContain(cmd)
+		expect(help).not.toContain(ALL_HINT)
+	})
+
+	it('drops a category left empty once its maintenance commands are hidden', () => {
+		expect(josh_logic.format_help()).not.toContain('Git hooks')
+		expect(josh_logic.format_help(true)).toContain('Git hooks')
 	})
 })
 
@@ -136,14 +146,22 @@ describe('josh_logic.format_unknown_command', () => {
 		)
 	})
 
-	// #825: the two halves used to be printed separately, which is how the listing ended up on
-	// stdout while the error line went to stderr. Composing them here is what lets the caller send
-	// both to stderr in one write and keep stdout empty on a path that resolved no answer.
-	it('carries the help listing in the same string as the error line', () => {
+	// #1928 cut the full listing to one line: the #825 stdout contract still holds (the caller sends
+	// this to stderr), but a name a kit cannot resolve no longer dumps the whole toolkit index.
+	it('answers in one line without the full help listing', () => {
 		const reported = josh_logic.format_unknown_command(UNKNOWN_CMD)
 
-		expect(reported).toContain(josh_logic.format_help())
-		expect(reported.indexOf(UNKNOWN_CMD)).toBeLessThan(reported.indexOf(USAGE_LINE))
+		expect(reported).not.toContain(josh_logic.format_help())
+		expect(reported).toContain("Run 'josh --help'")
+		expect(reported.split('\n')).toHaveLength(1)
+	})
+
+	it('suggests the closest command when the typo is near one', () => {
+		expect(josh_logic.format_unknown_command('gat')).toContain("Did you mean 'gate'?")
+	})
+
+	it('offers no suggestion when nothing is close', () => {
+		expect(josh_logic.format_unknown_command('zzzzzzzz')).not.toContain('Did you mean')
 	})
 })
 
@@ -220,16 +238,19 @@ describe('resolve_alias', () => {
 	})
 })
 
+// joshuafolkken/kit#1564: the mandatory form is asserted absent as well as the optional one present.
+// A regression back to `--env-file=.env` is not a missing flag — it is a flag that kills both
+// commands before node starts on any machine with no `.env`, credentials in the environment or not.
 describe('COMMAND_MAP env-file commands', () => {
-	/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
-	it('followup includes --env-file=.env tsx argument', () => {
+	it('followup reads .env only when it exists', () => {
 		expect(COMMAND_MAP['followup']?.tsx_arguments).toContain(ENV_FILE_FLAG)
+		expect(COMMAND_MAP['followup']?.tsx_arguments).not.toContain(MANDATORY_ENV_FILE_FLAG)
 	})
 
-	it('notify includes --env-file=.env tsx argument', () => {
+	it('notify reads .env only when it exists', () => {
 		expect(COMMAND_MAP['notify']?.tsx_arguments).toContain(ENV_FILE_FLAG)
+		expect(COMMAND_MAP['notify']?.tsx_arguments).not.toContain(MANDATORY_ENV_FILE_FLAG)
 	})
-	/* eslint-enable dot-notation */
 })
 
 const SKIP_COMMIT_FLAG = '--skip-commit'
@@ -237,7 +258,6 @@ const SKIP_PUSH_FLAG = '--skip-push'
 const YES_FLAG = '-y'
 
 describe('COMMAND_MAP pr command', () => {
-	/* eslint-disable dot-notation */
 	it('pr command has default_script_arguments with -y --skip-commit --skip-push', () => {
 		const default_arguments = COMMAND_MAP['pr']?.default_script_arguments ?? []
 
@@ -249,7 +269,6 @@ describe('COMMAND_MAP pr command', () => {
 	it('pr command shares the git workflow script', () => {
 		expect(COMMAND_MAP['pr']?.script).toBe(COMMAND_MAP['git']?.script)
 	})
-	/* eslint-enable dot-notation */
 })
 
 describe('josh_logic.spawn_script — default_script_arguments injection', () => {
@@ -291,24 +310,9 @@ describe('josh_logic.run_command', () => {
 })
 
 describe('COMMAND_MAP shell commands', () => {
-	/* eslint-disable dot-notation */
 	it('lint uses a script for parallel execution', () => {
 		expect(COMMAND_MAP['lint']?.script).toBeDefined()
 		expect(COMMAND_MAP['lint']?.shell).toBeUndefined()
-	})
-
-	it('lint:prettier delegates to pnpm exec prettier', () => {
-		const shell = COMMAND_MAP['lint:prettier']?.shell ?? []
-
-		expect(shell).toContain('prettier')
-		expect(shell).toContain('pnpm')
-	})
-
-	it('hook:install delegates to lefthook install', () => {
-		const shell = COMMAND_MAP['hook:install']?.shell ?? []
-
-		expect(shell).toContain('lefthook')
-		expect(shell).toContain('install')
 	})
 
 	it('latest uses sh -c for chaining', () => {
@@ -317,12 +321,12 @@ describe('COMMAND_MAP shell commands', () => {
 
 	it('test:e2e delegates to the guard script so it can skip when playwright is absent', () => {
 		expect(COMMAND_MAP['test:e2e']?.shell).toBeUndefined()
-		expect(COMMAND_MAP['test:e2e']?.script).toBe('scripts/test-e2e-guard.ts')
+		expect(COMMAND_MAP['test:e2e']?.script).toBe('scripts/test/test-e2e-guard.ts')
 	})
 
 	it('test:unit delegates to the guard script so it can skip when vitest is absent', () => {
 		expect(COMMAND_MAP['test:unit']?.shell).toBeUndefined()
-		expect(COMMAND_MAP['test:unit']?.script).toBe('scripts/test-unit-guard.ts')
+		expect(COMMAND_MAP['test:unit']?.script).toBe('scripts/test/test-unit-guard.ts')
 	})
 
 	it('test uses sh -c for chaining test:unit and test:e2e', () => {
@@ -332,7 +336,6 @@ describe('COMMAND_MAP shell commands', () => {
 		expect(shell[2]).toContain('test:unit')
 		expect(shell[2]).toContain('test:e2e')
 	})
-	/* eslint-enable dot-notation */
 })
 
 describe('resolve_tsx_executable', () => {

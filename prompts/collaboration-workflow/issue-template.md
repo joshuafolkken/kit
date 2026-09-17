@@ -55,11 +55,11 @@ Issue には次の要素を必ず含める。
 
 `kickoff new` が 1 つの要望を **2 件以上**の Issue に分割したとき、**常に**それらを束ねる epic Issue を作成する。件数や実行順序の有無で分岐しない。
 
-なぜ必要か: 分割の根拠を「最初の Issue のコメント」に置くと、その Issue は `queue` が最初にマージしてクローズする対象でもあるため、残りの作業の設計図がクローズ済み Issue の中に埋もれる。epic の役割は、その情報の**閉じない置き場**を用意することにある。実行順序は epic が載せられる情報の一つであって、epic が存在する理由ではない。埋没は順序の有無と無関係に、複数分割のたびに起きる。
+なぜ必要か: 分割の根拠を「最初の Issue のコメント」に置くと、その Issue はバッチが最初にマージしてクローズする対象でもあるため、残りの作業の設計図がクローズ済み Issue の中に埋もれる。epic の役割は、その情報の**閉じない置き場**を用意することにある。実行順序は epic が載せられる情報の一つであって、epic が存在する理由ではない。埋没は順序の有無と無関係に、複数分割のたびに起きる。
 
 - **条件分岐を置かない。** 「件数が少ないうちは epic の管理コストが情報整理の利益を上回る」という以前の但し書きは、`scripts/git/git-epic-close.ts`（`pnpm josh followup` から駆動）が子 Issue の全クローズを検知して epic を自動クローズするようになった時点で根拠を失った。放置される epic という管理コストがもう存在しない以上、避けるべきは分岐の誤判定だけである。2 件・順序不問の分割に epic が付く冗長さは軽微で、分岐の見落としによる情報消失より常に安い
 - epic には `epic` ラベルを付ける（未作成なら `gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent 2>/dev/null || true`）。放置された open epic を `gh api "repos/{owner}/{repo}/issues?labels=epic&state=open"` で棚卸しできるようにするため
-- **epic を `queue` に渡してはならない。** `queue` には子 Issue のみを渡す。epic には成果物がなく、実装ランを走らせる対象ではない
+- **epic 自体を実装ランに渡してはならない。** epic には成果物がなく、`backlogrun #<E> --only` がその子 Issue を回す
 - epic は最後の子 Issue がクローズされた時点で `pnpm josh followup` が自動クローズする。マージ後に `epic` ラベルの open な Issue を探し、タスクリストの子が全てクローズ済みなら子を列挙したコメント付きで閉じる。1 件でも open なら放置し、この処理の失敗は警告のみでランを止めない。最終 PR に `closes #<epic>` を書く方法は、バッチが途中で失敗したときにも発火して未完了を完了扱いにするため採用しない
 - 自動クローズは `epic` ラベルとタスクリスト記法の両方に依存する。どちらかを欠くと epic は open のまま残るので、手動でクローズする
 - タスクリストが**他リポジトリの子 Issue**（`owner/repo#N` や URL 形式）を含む場合、自動クローズは行われない。その子の状態は別リポジトリを指定しないと読めず、無視すると open のまま epic を閉じてしまうため。この場合も手動でクローズする
@@ -82,7 +82,7 @@ pnpm josh epic "<epic-title>" <N1> <N2> --rationale-file <path|->
 pnpm josh epic "<epic-title>" <N1> <N2> --origin <owner/repo#N>
 ```
 
-このコマンドは上記 4 要件を**構成上**満たす。ラベルを用意してから付与し、子をタスクリスト記法で描画し、`Dependencies` を `--ordered` の有無で矢印連鎖／`None — ...` 固定文に振り分け、`queue` 行を子だけで組み立てる。`--ordered` のときは同じ入力から native な依存関係も付与するので、**本文の宣言と native な依存関係が食い違うことがない**（手順 4 の付け忘れが構造的に起きなくなる）。付与は REST の依存関係エンドポイント（`gh api`）を通るため、**`gh` CLI のバージョンには依存しない**（joshuafolkken/kit#1026）。このエンドポイントはブロッカーを Issue 番号ではなく **database id** で受け取り、しかもその id が自リポジトリの Issue かを検証しないため、コマンドは書き込み前に番号から id を解決する。付与は Issue の作成後に独立して行うので、失敗しても件数を報告して続行する（失われるのは関係だけで、Issue とタスクリストは既に正しい）。
+このコマンドは上記 4 要件を**構成上**満たす。ラベルを用意してから付与し、子をタスクリスト記法で描画し、`Dependencies` を `--ordered` の有無で矢印連鎖／`None — ...` 固定文に振り分け、`Execution` の実行コマンド（`backlogrun #<E> --only`）を組み立てる。`--ordered` のときは同じ入力から native な依存関係も付与するので、**本文の宣言と native な依存関係が食い違うことがない**（手順 4 の付け忘れが構造的に起きなくなる）。付与は REST の依存関係エンドポイント（`gh api`）を通るため、**`gh` CLI のバージョンには依存しない**（joshuafolkken/kit#1026）。このエンドポイントはブロッカーを Issue 番号ではなく **database id** で受け取り、しかもその id が自リポジトリの Issue かを検証しないため、コマンドは書き込み前に番号から id を解決する。付与は Issue の作成後に独立して行うので、失敗しても件数を報告して続行する（失われるのは関係だけで、Issue とタスクリストは既に正しい）。
 
 作成済みの epic は `pnpm josh epic:check <E>` で 4 要件を点検できる。手書きした epic、コマンド導入以前の epic、本文を手で編集した後の確認に使う。全要件を満たせば exit 0、満たさなければ exit 1 なのでゲートとしても使える。判定は自動クローズが読むのと**同じパーサ**（`scripts/git/git-epic-parse.ts`）を使うため、「自動クローズが読める形式」と「点検が通る形式」は定義上一致する。
 
@@ -119,7 +119,7 @@ epic 本文のテンプレート:
 
 ## Execution
 
-epicrun #<E>
+backlogrun #<E> --only
 
 ## Progress
 
@@ -145,6 +145,6 @@ epicrun #<E>
 | 依存関係 | `gh issue edit <N> --add-blocked-by <M>` / `--add-blocking` / `--remove-*` | `gh issue view <N> --json blockedBy,blocking`                |
 | 親子関係 | `gh issue edit <N> --parent <M>` / `--add-sub-issue`                       | `gh issue view <N> --json parent,subIssues,subIssuesSummary` |
 
-**依存関係は採用する**（上記の作成手順 4）。子 Issue 単体を見たときに何を待っているかが GitHub の UI と API の両方から分かるようになり、epic 本文の `Dependencies` 行が人間向けの散文でしかなかった問題が解消する。ただし依存関係は**表示するだけで着手を防がない**ため、順序を守る責任は引き続き `queue` の呼び出し順にある。epic 本文の `Dependencies` 行は、関係が付かなかった場合でも読める冗長な記録として残す。
+**依存関係は採用する**（上記の作成手順 4）。子 Issue 単体を見たときに何を待っているかが GitHub の UI と API の両方から分かるようになり、epic 本文の `Dependencies` 行が人間向けの散文でしかなかった問題が解消する。ただし依存関係は**表示するだけで着手を防がない**ため、順序を守る責任は引き続き依存関係の宣言（`--ordered`）と、それを読む `backlogrun` にある。epic 本文の `Dependencies` 行は、関係が付かなかった場合でも読める冗長な記録として残す。
 
 **sub-issues（親子関係）は採用しない。** 理由は 2 点 — 親子関係は「包含」を表すだけで実行順序を表現できない、および親子関係は同一リポジトリオーナー内に限られる。いずれも CLI の対応状況とは無関係で、2.94.0 以降でも変わらない。

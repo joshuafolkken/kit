@@ -40,8 +40,17 @@ const EMPTY_DELTA_REASON_PREFIX =
 	'the fix delta is empty: round 1 wrote no fix code, so there is no unreviewed fix for a verification pass to read'
 const INERT_DELTA_REASON_PREFIX =
 	'every path round 1 fixed is inert — it neither executes, nor instructs, nor ships'
+const BASE_MOVED_REASON =
+	'the change base moved since round 1 was recorded, so the two file maps do not cover the same set of paths and their difference is not the fix delta — the round runs rather than reading that difference as one'
 
 interface RoundTwoInput {
+	// **The commit the tree above is a diff against** (joshuafolkken/kit#1537). This decision reads the
+	// same digest comparison the brief's round-2 target does, so it inherits the same failure: taken
+	// against two different bases, the two maps do not cover the same set of paths, and an empty or
+	// inert-looking delta is then no evidence at all about what round 1 fixed. Here that evidence buys
+	// a `skip`, which is worse than a mistargeted read — nothing gets read at all.
+	// `undefined` where it could not be resolved to a commit, which is refused exactly like a mismatch.
+	base: string | undefined
 	// Asserted by the caller from round 1's own output, because no command can read a review's
 	// findings. It is a report of a fact already written down, not a judgement made under cost
 	// pressure — and its absence is the safe answer, so a caller that forgets it pays a round.
@@ -98,14 +107,14 @@ function verdict_for_delta(
 	return { verdict: REQUIRED_VERDICT, reason: live_reason(deciding) }
 }
 
-function decide(input: RoundTwoInput): RoundTwoDecision {
-	if (!input.is_round_one_closed) {
-		return { verdict: REQUIRED_VERDICT, reason: OPEN_FINDING_REASON, delta: [] }
-	}
+function required(reason: string): RoundTwoDecision {
+	return { verdict: REQUIRED_VERDICT, reason, delta: [] }
+}
 
-	if (input.snapshot === undefined) {
-		return { verdict: REQUIRED_VERDICT, reason: NO_SNAPSHOT_REASON, delta: [] }
-	}
+function decide(input: RoundTwoInput): RoundTwoDecision {
+	if (!input.is_round_one_closed) return required(OPEN_FINDING_REASON)
+	if (input.snapshot === undefined) return required(NO_SNAPSHOT_REASON)
+	if (!file_map_stamp.describes_base(input.snapshot, input.base)) return required(BASE_MOVED_REASON)
 
 	const delta = file_map_stamp.changed_since(input.snapshot, input.tree)
 
@@ -113,6 +122,7 @@ function decide(input: RoundTwoInput): RoundTwoDecision {
 }
 
 const review_round2 = {
+	BASE_MOVED_REASON,
 	decide,
 	EMPTY_DELTA_REASON_PREFIX,
 	empty_reason,

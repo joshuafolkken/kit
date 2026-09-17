@@ -17,13 +17,17 @@ const BEFORE = 'aaa'
 const AFTER = 'bbb'
 // What `review-tree.ts` records for a path the change lists but the working tree no longer holds.
 const ABSENT = 'absent'
+// One change base throughout: the ordinary run does not move it between the two rounds. The moved
+// base is its own arm, asserted below and end to end against real git in
+// `review-round2-target-scope.test.ts` (joshuafolkken/kit#1537).
+const BASE = '0123456789abcdef0123456789abcdef01234567'
 
 function tree_of(...entries: ReadonlyArray<readonly [string, string]>): Record<string, string> {
 	return Object.fromEntries(entries)
 }
 
 function snapshot_of(files: Record<string, string>): FileMapStamp {
-	return { taken_at: TAKEN_AT, files }
+	return { taken_at: TAKEN_AT, files, base: BASE }
 }
 
 const IMPLEMENTATION = tree_of([SOURCE, BEFORE], [CHANGELOG, BEFORE])
@@ -32,6 +36,7 @@ const SNAPSHOT = snapshot_of(IMPLEMENTATION)
 describe('review_round2.decide — the round is required unless something says otherwise', () => {
 	it('requires the round when the caller did not assert round 1 closed', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: false,
 			snapshot: SNAPSHOT,
 			tree: IMPLEMENTATION,
@@ -45,6 +50,7 @@ describe('review_round2.decide — the round is required unless something says o
 
 	it('requires the round when no round-1 snapshot was recorded', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: undefined,
 			tree: IMPLEMENTATION,
@@ -55,11 +61,59 @@ describe('review_round2.decide — the round is required unless something says o
 	})
 })
 
+// joshuafolkken/kit#1537: the base guard, which is read before the digests are.
+describe('review_round2.decide — a record measured against another base', () => {
+	// A record measured against another commit describes a different set of
+	// paths, so an empty delta is not evidence that round 1 wrote no fix code — and here that evidence
+	// would buy a `skip`, which leaves the fixes unread entirely.
+	it('requires the round when the change base moved since the record was taken', () => {
+		const decision = review_round2.decide({
+			base: 'fedcba9876543210fedcba9876543210fedcba98',
+			is_round_one_closed: true,
+			snapshot: SNAPSHOT,
+			tree: IMPLEMENTATION,
+		})
+
+		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
+		expect(decision.reason).toBe(review_round2.BASE_MOVED_REASON)
+	})
+
+	// `resolved_change_base` answers `undefined` where `merge-base` could not be resolved to a commit.
+	// Knowing less than the record does is not a match.
+	it('requires the round when the base could not be resolved to a commit', () => {
+		const decision = review_round2.decide({
+			base: undefined,
+			is_round_one_closed: true,
+			snapshot: SNAPSHOT,
+			tree: IMPLEMENTATION,
+		})
+
+		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
+		expect(decision.reason).toBe(review_round2.BASE_MOVED_REASON)
+	})
+
+	// A record written before the field existed cannot be shown to be comparable, so it falls on the
+	// same side as a mismatch. The alternative — treating an absent base as a match — is the state the
+	// defect shipped in.
+	it('requires the round when the record carries no base at all', () => {
+		const decision = review_round2.decide({
+			base: BASE,
+			is_round_one_closed: true,
+			snapshot: { files: IMPLEMENTATION, taken_at: TAKEN_AT },
+			tree: IMPLEMENTATION,
+		})
+
+		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
+		expect(decision.reason).toBe(review_round2.BASE_MOVED_REASON)
+	})
+})
+
 describe('review_round2.decide — the two skip arms', () => {
 	// Arm A. joshuafolkken/kit#1222's reason for the round is that round 1's fix code is unreviewed;
 	// here there is none, so the premise is absent rather than overridden.
 	it('skips the round when round 1 wrote no fix code', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: SNAPSHOT,
 			tree: IMPLEMENTATION,
@@ -77,6 +131,7 @@ describe('review_round2.decide — the two skip arms', () => {
 	// definition of "inert" would let the level printed beside this answer describe a different set.
 	it('skips the round when every path round 1 fixed is inert', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: SNAPSHOT,
 			tree: tree_of([SOURCE, BEFORE], [CHANGELOG, AFTER]),
@@ -118,6 +173,7 @@ describe('review_round2.inert_reason', () => {
 describe('review_round2.decide — a fix outside runtime code still gets the round', () => {
 	it('requires the round when a fix touched a distributed prompt', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: snapshot_of(tree_of([PROMPT, BEFORE])),
 			tree: tree_of([PROMPT, AFTER]),
@@ -129,6 +185,7 @@ describe('review_round2.decide — a fix outside runtime code still gets the rou
 
 	it('requires the round when a fix touched a test file', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: snapshot_of(tree_of([TEST_FILE, BEFORE])),
 			tree: tree_of([TEST_FILE, AFTER]),
@@ -142,6 +199,7 @@ describe('review_round2.decide — a fix outside runtime code still gets the rou
 	// review level: a per-file verdict would mean verifying part of a fix.
 	it('requires the round when one path of a mostly-inert fix delta executes', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: SNAPSHOT,
 			tree: tree_of([SOURCE, AFTER], [CHANGELOG, AFTER]),
@@ -158,6 +216,7 @@ describe('review_round2.decide — what the fix delta counts', () => {
 	// delete is part of the delta and is not mistaken for "unchanged".
 	it('counts a file a fix deleted', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: SNAPSHOT,
 			tree: tree_of([SOURCE, ABSENT], [CHANGELOG, BEFORE]),
@@ -171,6 +230,7 @@ describe('review_round2.decide — what the fix delta counts', () => {
 	// other side. Without it a fix that wrote a whole new module would read as an empty delta.
 	it('counts a file a fix added', () => {
 		const decision = review_round2.decide({
+			base: BASE,
 			is_round_one_closed: true,
 			snapshot: SNAPSHOT,
 			tree: tree_of([SOURCE, BEFORE], [CHANGELOG, BEFORE], [ADDED, AFTER]),

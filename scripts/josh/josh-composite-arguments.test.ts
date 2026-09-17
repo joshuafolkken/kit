@@ -26,7 +26,7 @@ const DIRECT_ENTRY: CommandEntry = {
 }
 
 const SCRIPT_ENTRY: CommandEntry = {
-	script: 'scripts/test-e2e-guard.ts',
+	script: 'scripts/test/test-e2e-guard.ts',
 	description: 'Run E2E tests with Playwright',
 	category: 'Development',
 }
@@ -104,13 +104,12 @@ describe('composite_arguments.reject_extra_arguments', () => {
 	})
 })
 
-const EXPECTED_COMPOSITES: ReadonlyArray<string> = [
-	'format',
-	'latest',
-	'main:merge',
-	'main:sync',
-	TEST_CMD,
-]
+// `main:sync` left this list when it became a script that enforces a precondition of its own; it
+// still refuses extra arguments, with the same message, from inside `scripts/git/main-sync.ts`
+// (joshuafolkken/kit#1535). `main:merge` left it the same way and for the same kind of reason — it
+// has to name a merge strategy `git pull` could not decide on its own (joshuafolkken/kit#1659) — and
+// refuses extra arguments from inside `scripts/git/main-merge.ts`.
+const EXPECTED_COMPOSITES: ReadonlyArray<string> = ['format', 'latest', TEST_CMD]
 
 function collect_composite_entries(): Array<[string, CommandEntry]> {
 	return Object.entries(COMMAND_MAP).filter(([, entry]) =>

@@ -13,6 +13,11 @@ const copy_sonar_mock = vi.hoisted(() => vi.fn())
 const OWNER_REPO = vi.hoisted(() => 'owner/repo')
 const get_repo_name_mock = vi.hoisted(() => vi.fn())
 const get_ai_copy_files_mock = vi.hoisted(() => vi.fn().mockReturnValue([PROMPT_FILE_NAME]))
+const CLAUDE_MD_DEST = vi.hoisted(() => '/project/CLAUDE.md')
+const CLAUDE_IMPORT_CONTENT = vi.hoisted(() => '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md\n')
+const ensure_claude_md_import_mock = vi.hoisted(() =>
+	vi.fn().mockReturnValue(CLAUDE_IMPORT_CONTENT),
+)
 const merge_workspace_mock = vi.hoisted(() =>
 	vi.fn().mockImplementation((existing: string) => existing),
 )
@@ -20,7 +25,7 @@ const transform_copied_content_mock = vi.hoisted(() =>
 	vi.fn().mockImplementation((_destination: string, content: string) => content),
 )
 
-vi.mock('#scripts/gh-spawn', () => ({
+vi.mock('#scripts/gh/gh-spawn', () => ({
 	gh_spawn: { get_repo_name_with_owner: get_repo_name_mock },
 }))
 vi.mock('node:fs', () => ({
@@ -50,6 +55,7 @@ vi.mock('./init-copy-content', () => ({
 vi.mock('./init-logic', () => ({
 	init_logic: {
 		transform_prompt_paths: vi.fn().mockImplementation((content: string) => content),
+		ensure_claude_md_import: ensure_claude_md_import_mock,
 		get_ai_copy_files: get_ai_copy_files_mock,
 		get_ai_copy_file_mappings: vi
 			.fn()
@@ -330,6 +336,31 @@ describe('init_ai_copy.run_ai_copies — closing hint', () => {
 		const lines = info.mock.calls.map((call) => String(call[0])).join('\n')
 
 		expect(lines).not.toContain('Run `josh sync`')
+	})
+})
+
+// CLAUDE.md is no longer byte-copied (joshuafolkken/kit#1878): `josh init` writes the one-line import
+// when the consumer has none, and leaves an existing file alone so its additions are never disturbed.
+describe('init_ai_copy.run_ai_copies — CLAUDE.md import', () => {
+	it('writes the one-line import when the consumer has no CLAUDE.md', () => {
+		exists_sync_mock.mockReturnValue(false)
+		silence_console()
+		write_file_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(write_file_mock).toHaveBeenCalledWith(CLAUDE_MD_DEST, CLAUDE_IMPORT_CONTENT)
+	})
+
+	it('leaves an existing CLAUDE.md untouched', () => {
+		exists_sync_mock.mockImplementation((candidate: string) => candidate === CLAUDE_MD_DEST)
+		lstat_sync_mock.mockReturnValue({ isDirectory: () => true })
+		silence_console()
+		write_file_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(write_file_mock).not.toHaveBeenCalledWith(CLAUDE_MD_DEST, expect.anything())
 	})
 })
 

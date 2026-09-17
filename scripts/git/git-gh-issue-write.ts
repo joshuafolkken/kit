@@ -192,6 +192,24 @@ async function issue_add_label(issue_number: string, label: string): Promise<boo
 	)
 }
 
+// The counterpart to the addition above, for a run taking its own marker back off
+// (joshuafolkken/kit#1794). **The name travels in the path, so it is encoded**: a label is free to
+// contain a `/` or a `#`, and an unencoded one would address a path that is not this label's.
+//
+// **It throws rather than answering `boolean`**, which is the one place it departs from
+// `issue_add_label`. Its caller is a post-merge cleanup step, and the guard there
+// (`git-followup-cleanup.ts`) reports a failure by name with the command that finishes it by hand —
+// a `false` swallowed here would reach that guard as a success and the step would be reported as
+// done.
+async function issue_remove_label(issue_number: string, label: string): Promise<void> {
+	const labels_path = `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`
+
+	await git_gh_exec.exec_gh_api({
+		path: `${labels_path}/${encodeURIComponent(label)}`,
+		method: DELETE_METHOD,
+	})
+}
+
 // The blocker's **database id**, which is the only thing the dependencies endpoint accepts — and the
 // reason this resolution exists rather than the issue number being sent straight through.
 //
@@ -259,6 +277,7 @@ const git_gh_issue_write = {
 	issue_create_request,
 	issue_create_with_label,
 	issue_add_label,
+	issue_remove_label,
 	issue_add_blocked_by,
 	issue_remove_blocked_by,
 }

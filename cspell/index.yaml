@@ -41,17 +41,33 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  # The POSIX call named in the shell error a lane close leaves behind when it removes the directory
+  # the shell is sitting in (joshuafolkken/kit#1587). Distributed, because `epicrun.md` quotes that
+  # message so the failure can be searched for, and `josh sync` copies that skill.
+  - getcwd
   # The process-listing command `epicrun.md` names among the traces a stopped delegated unit leaves
   # (joshuafolkken/kit#1212). Distributed, because the skill that names it is copied by `josh sync`.
   - pgrep
+  # The shell variable naming the parent process, which `josh run:carry --owner "$PPID"` passes so the
+  # record can name the long-lived session spending the budget (joshuafolkken/kit#1722). Distributed,
+  # because `backlogrun.md` types that command and `josh sync` copies that skill.
+  - PPID
   # The phase `josh time` reports for everything a run does once its pull request is open
-  # (joshuafolkken/kit#1299). Distributed, because the `diag` skill `josh sync` copies names it.
+  # (joshuafolkken/kit#1299). Distributed, because `docs/josh-commands.md` names it in the phase list.
   - wrapup
-  # What `josh run:preflight` is and `josh run:hold` is not (joshuafolkken/kit#926): a question that
-  # may be put again once the tree it read has been reclaimed. Distributed, because `epicrun.md`
-  # names it and `josh sync` copies that skill. cspell derives neither this nor "re-askable" from
-  # "ask".
+  # What `josh time`'s bundling block calls a call that could have gone out beside another
+  # (joshuafolkken/kit#1607). Distributed, because `docs/josh-commands.md` and `turn-batching.md` name it.
+  - bundleable
+  # What a re-runnable tree-state check is and `josh run:hold` is not (joshuafolkken/kit#926): a
+  # question that may be put again once the tree it read has been reclaimed. Distributed, because
+  # `epicrun.md` names it and `josh sync` copies that skill. cspell derives neither this nor
+  # "re-askable" from "ask".
   - askable
+  # The single-process guard command wired to the distributed `.claude/settings.json` PreToolUse hook
+  # (`josh pretool:guard`), and the matching Codex adapter phase. Distributed, because `josh sync`
+  # copies that settings file and the package carries the provider adapter.
+  - pretool
+  - posttool
   - delegatable
   - backgrounding
   - unretried
@@ -74,6 +90,7 @@ words:
   - arrowdown
   - autoincrement
   - autorestart
+  - backlogrun
   - betterauth
   - coderabbit
   - coderabbitai
@@ -114,6 +131,10 @@ words:
   - sonarqube
   - sonarcloud
   - sonarqubecloud
+  # SonarCloud's own rule-key prefixes for the taint-analysis engine, cited by the S8707
+  # suppression in `sonar-project.properties`. Distributed, because `josh init` copies that file.
+  - tssecurity
+  - jssecurity
   - qualitygate
   - Dsonar
   - Stylesheet
@@ -135,7 +156,15 @@ words:
   - unreviewed
   # Words the skills `josh sync` copies into a consumer use. They belong here rather than in kit's
   # own `cspell.config.yaml`, because a consumer spell-checks the copies and resolves them only
-  # through this dictionary (joshuafolkken/kit#1092). `scripts/cspell-distributed-words.test.ts` is
+  # through this dictionary (joshuafolkken/kit#1092). `scripts/gate/cspell-distributed-words.test.ts` is
   # what keeps the two in step.
   - worktrees
+  # The singular joined it once `epicrun.md` had to name the git subcommand itself — `git worktree
+  # add <dir> <existing-branch>`, the restore no `josh lane:*` command reaches (joshuafolkken/kit#1587).
+  - worktree
   - evals
+  # How `background-commands.md` (the §2h body since joshuafolkken/kit#1873) names a command already
+  # sent to the background (joshuafolkken/kit#1510), and the gate as the first command a run can send
+  # there. It is a skill `josh sync` copies, so the words have to resolve here.
+  - backgrounded
+  - backgroundable

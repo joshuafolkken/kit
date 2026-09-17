@@ -1,4 +1,9 @@
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	ALREADY_DONE_LABEL,
+	EPIC_LABEL,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/git/issue-labels'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_classify, type DependencyVerdict } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -188,11 +193,100 @@ describe('epic_classify.classify_children — every open child is accounted for'
 	})
 })
 
+// joshuafolkken/kit#1583. **Priority is not dependency**, and this is the pair that says so. Since
+// the epic's task-list order became the offer order, a child the epic lists *first* can be one that
+// is waiting on a person — and it simply does not reach `runnable`, so the one after it is offered.
+// A declared `blocked-by` chain, which was the only way to order two children before, would instead
+// have stopped everything behind the stuck one.
+describe('epic_classify.classify_children — a parked child ahead of a runnable one', () => {
+	it('skips it rather than holding back the child listed after it', () => {
+		const children = [child(1, { labels: [NEEDS_DECISION_LABEL] }), child(2)]
+		const result = epic_classify.classify_children(children)
+
+		expect(numbers(result.runnable)).toEqual([2])
+		expect(numbers(result.human)).toEqual([1])
+	})
+})
+
+// joshuafolkken/kit#1476: an epic's task list can hold a row pointing at another epic, and nothing
+// read it — the row fell through to `from_blockers`, which minted `runnable`, so `epicrun` handed an
+// epic to `fullrun` as an ordinary issue. The cases below vary one property at a time, because the
+// refusal must key on the `epic` label and never on a row naming another repository — that one is
+// legitimate, and disables the epic auto-close by design.
+describe('epic_classify.classify_children — a child that is itself an epic', () => {
+	it('withholds it instead of offering it', () => {
+		const result = epic_classify.classify_children([child(1, { labels: [EPIC_LABEL] })])
+
+		expect(result.runnable).toEqual([])
+		expect(numbers(result.human)).toEqual([1])
+	})
+
+	it('still offers a child in another repository that is not an epic', () => {
+		const result = epic_classify.classify_children([child(1, { repo: CONSUMER })])
+
+		expect(numbers(result.runnable)).toEqual([1])
+	})
+
+	it('withholds one in another repository that is an epic', () => {
+		const nested = child(1, { repo: CONSUMER, labels: [EPIC_LABEL] })
+		const result = epic_classify.classify_children([nested])
+
+		expect(result.runnable).toEqual([])
+		expect(numbers(result.human)).toEqual([1])
+	})
+
+	it('names it on standard error, since the report prints a bare number', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		epic_classify.reset_reported()
+		epic_classify.classify_children([child(7, { labels: [EPIC_LABEL] })])
+
+		expect(warn.mock.calls.join('\n')).toContain('#7')
+		expect(warn.mock.calls.join('\n')).toContain('is itself an epic')
+		warn.mockRestore()
+	})
+
+	it('says nothing about a closed one, which nobody has to act on', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		epic_classify.reset_reported()
+		epic_classify.classify_children([child(8, { labels: [EPIC_LABEL], state: 'CLOSED' })])
+
+		expect(warn).not.toHaveBeenCalled()
+		warn.mockRestore()
+	})
+})
+
 describe('epic_classify.local_category', () => {
+	it('matches a label whatever casing the repository created it with', () => {
+		expect(epic_classify.local_category(child(1, { labels: ['Epic'] }))).toBe('human')
+	})
+
+	it('prefers the epic label over the running one', () => {
+		const nested = child(1, { labels: [IN_PROGRESS_LABEL, EPIC_LABEL] })
+
+		expect(epic_classify.local_category(nested)).toBe('human')
+	})
+
 	it('prefers the parked label over the running one', () => {
 		const parked = child(1, { labels: [IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL] })
 
 		expect(epic_classify.local_category(parked)).toBe('human')
+	})
+
+	// joshuafolkken/kit#1679: the work is already merged, so nothing is waiting to be run and nothing
+	// is waiting on time either — what is left is the close, which is Tier C and so a person's. Read
+	// as `time`, an epic would report it as something that resolves itself and wait on it forever.
+	it('calls an already-done child a person problem', () => {
+		const done = child(1, { labels: [ALREADY_DONE_LABEL] })
+
+		expect(epic_classify.local_category(done)).toBe('human')
+	})
+
+	it('prefers the already-done label over the running one', () => {
+		const done = child(1, { labels: [IN_PROGRESS_LABEL, ALREADY_DONE_LABEL] })
+
+		expect(epic_classify.local_category(done)).toBe('human')
 	})
 
 	it('reports a closed child as done', () => {
@@ -248,17 +342,68 @@ describe('epic_classify.classify_children — the cross-repository resolver', ()
 	})
 })
 
-// The last acceptance criterion of joshuafolkken/kit#1126: a relation the graph cannot place is
-// reported rather than dropped in silence. Whether it should hold the child back is a separate
-// question, and it belongs to joshuafolkken/kit#1123.
+const OUTSIDE = 999
+
+function outside_child(state?: 'OPEN' | 'CLOSED', repo = REPO): EpicChild {
+	const blocker = state === undefined ? { repo, number: OUTSIDE } : { repo, number: OUTSIDE, state }
+
+	return child(2, { blockers: [blocker] })
+}
+
+function outside_key(repo = REPO): string {
+	return `${repo}#${String(OUTSIDE)}`
+}
+
+// joshuafolkken/kit#1943: a blocker no graph in this invocation tracks is weighed rather than ignored.
+// Ignored, a child waiting on another epic's open issue was offered as runnable.
 describe('epic_classify.classify_children — a blocker the epic does not track', () => {
-	it('names the relation it could not weigh', () => {
+	it('waits when the open blocker is something this run also runs', () => {
+		const running = new Set([outside_key(), `${REPO}#2`])
+		const result = epic_classify.classify_children([outside_child('OPEN')], undefined, running)
+
+		expect(numbers(result.time)).toEqual([2])
+		expect(result.runnable).toEqual([])
+	})
+
+	it('goes to a person, naming the blocker, when this run does not run it', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		epic_classify.classify_children([child(2, { blocked_by: [999] })])
+		epic_classify.reset_reported()
 
-		expect(warn.mock.calls.join('\n')).toContain('#999')
-		expect(warn.mock.calls.join('\n')).toContain('does not track')
+		const result = epic_classify.classify_children([outside_child('OPEN')])
+
+		expect(numbers(result.human)).toEqual([2])
+		expect(warn.mock.calls.join('\n')).toContain(`#${String(OUTSIDE)}`)
+		expect(warn.mock.calls.join('\n')).toContain('this run will not finish')
+		warn.mockRestore()
+	})
+})
+
+describe('epic_classify.classify_children — a closed or unread blocker the epic does not track', () => {
+	it('runs the child once the outside blocker is closed', () => {
+		const result = epic_classify.classify_children([outside_child('CLOSED')])
+
+		expect(numbers(result.runnable)).toEqual([2])
+	})
+
+	it('still waits for the release of a closed outside blocker in another repository', () => {
+		const result = epic_classify.classify_children(
+			[outside_child('CLOSED', CONSUMER)],
+			() => 'time',
+		)
+
+		expect(numbers(result.time)).toEqual([2])
+	})
+
+	it('waits rather than runs when the blocker state was never read', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		epic_classify.reset_reported()
+
+		const result = epic_classify.classify_children([outside_child()])
+
+		expect(numbers(result.time)).toEqual([2])
+		expect(warn.mock.calls.join('\n')).toContain('could not be read')
 		warn.mockRestore()
 	})
 

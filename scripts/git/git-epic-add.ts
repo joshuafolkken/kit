@@ -1,16 +1,22 @@
-import { epic_fetch } from '#scripts/epic/epic-fetch'
-import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
-import { git_epic_parse } from './git-epic-parse'
-import { format_issue_references } from './git-epic-reference'
+import { git_epic_read } from './git-epic-read'
+import {
+	format_issue_references,
+	format_replaced_relations,
+	to_issue_reference,
+} from './git-epic-reference'
 import { git_epic_relations } from './git-epic-relations'
-import { git_epic_validate, type EpicSubject } from './git-epic-validate'
 import { git_gh_command } from './git-gh-command'
 
-// `josh epic --add <E> <N...> [--before <M> | --after <M>] [--decision-file <path|->]` — insert
-// children into an existing epic.
+// `josh epic --add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]
+// [--decision-file <path|->]` — insert children into an existing epic.
+//
+// **`--order-*` moves the row and writes nothing else** (joshuafolkken/kit#1738). `epic:next` offers
+// children in task-list order, so putting one first meant `--before`, which records a `blocked-by`:
+// "no dependency, but run this one first" had no spelling, and an order written that way stops every
+// child behind the one that stalls.
 //
 // Adding a child by editing the body is what the procedure told an agent to do, and it is what stops
 // an unattended run: the body then declares an order the native `blocked-by` relations do not record,
@@ -26,18 +32,14 @@ import { git_gh_command } from './git-gh-command'
 
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
-// Refused rather than stood in for, and this path *writes*. Since joshuafolkken/kit#1126 the plan
-// filters recorded relations by the declared repository, so a placeholder drops every one of them:
-// the "reconcile them before inserting" guard never fires, the superseded link is never dropped, and
-// relations that already exist are re-POSTed — leaving the epic in exactly the mismatched state
-// `epic:audit` refuses to run on.
-const UNKNOWN_REPO =
-	"Could not read this repository from `git remote`, so the epic's relations cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote."
 
 interface AddChildrenInput {
 	epic_number: number
 	children: ReadonlyArray<number>
 	position?: InsertPosition | undefined
+	// `--order-before` / `--order-after`: place the row at `position` and write nothing else — no
+	// declaration, no `blocked-by` (joshuafolkken/kit#1738).
+	is_order_only?: boolean | undefined
 	// The decision record to write, from `--decision-file`. It goes to two places, and both used to be
 	// separate calls a run made afterwards: the epic's `## Decisions` section — folded into the body
 	// edit below, so it costs no round trip — and a comment on each child added
@@ -45,39 +47,11 @@ interface AddChildrenInput {
 	decision?: string | undefined
 }
 
-async function read_subject(epic_number: number): Promise<EpicSubject | undefined> {
-	return git_epic_validate.parse_epic_subject(
-		await git_gh_command.issue_get_labels_and_body(String(epic_number)),
-	)
-}
-
-// The current children with their native relations. A child that cannot be read stops the command
-// for the reason it stops `epic:next`: a missing node makes whatever it blocks look unblocked, and
-// an insertion computed against that graph would record the wrong order.
-async function read_recorded(
-	body: string | undefined,
-): Promise<{ children: ReadonlyArray<EpicChild>; repo: string } | { error: string }> {
-	const repo = await git_gh_command.repo_get_name_with_owner()
-	if (repo === undefined) return { error: UNKNOWN_REPO }
-	const tracked = git_epic_parse.parse_task_list_issue_numbers(body)
-	if (tracked.length === 0) return { children: [], repo }
-
-	const fetched = await epic_fetch.fetch_children(tracked, repo)
-
-	if (fetched.unreadable.length > 0) {
-		const list = epic_graph.format_references(fetched.unreadable, repo)
-
-		return { error: `Could not read ${list}; the epic's dependency graph is incomplete.` }
-	}
-
-	return { children: fetched.children, repo }
-}
-
 function report_relations(plan: AddPlan, failures: { added: number; removed: number }): void {
 	if (plan.removed.length > 0) {
 		console.info(
 			git_epic_relations.format_relation_report({
-				total: plan.removed.length,
+				links: plan.removed,
 				failures: failures.removed,
 				action: 'drop',
 			}),
@@ -88,7 +62,7 @@ function report_relations(plan: AddPlan, failures: { added: number; removed: num
 
 	console.info(
 		git_epic_relations.format_relation_report({
-			total: plan.added.length,
+			links: plan.added,
 			failures: failures.added,
 			action: 'record',
 		}),
@@ -104,62 +78,106 @@ async function apply_plan(plan: AddPlan): Promise<void> {
 	report_relations(plan, { added, removed })
 }
 
-function report_success(epic_number: number, plan: AddPlan): void {
-	const list = format_issue_references(plan.additions)
+// The two things one insertion can do, reported separately because they are different edits: an
+// addition gains a task-list row, a relocation moves the row it already had. Either list can be empty
+// — `--before` / `--after` on children the epic already tracks adds nothing at all
+// (joshuafolkken/kit#1701) — so neither line is printed unconditionally.
+// A row moved onto the wrong side of an order the declaration already states. `epic:next` filters by
+// `blocked_by` before it applies task-list order, so the move cannot change when that child is offered
+// until the declaration itself changes — and the placement line above, read alone, says the opposite.
+// It is a warning rather than a refusal for the reason `contradicted` gives (joshuafolkken/kit#1738).
+function report_contradiction(plan: AddPlan): void {
+	if (plan.contradicted.length === 0) return
 
-	console.info(`📋 Added ${list} to epic #${String(epic_number)}.`)
+	console.info(
+		`⚠️ ${format_issue_references(plan.contradicted)} is still held by a declared order, so \`epic:next\` will not offer it any earlier until that order is changed — \`--remove\` deletes one.`,
+	)
+}
 
-	if (plan.removed.length > 0) {
-		console.info(`↪ Re-pointed: ${git_epic_add_plan.format_links(plan.removed)} was replaced.`)
+// **An order-only move reports the place, because nothing else will** (joshuafolkken/kit#1738). An
+// ordinary insertion is followed by the replaced-relation line and the relation report, which between
+// them say where the child landed; `--order-*` writes neither, so without this line the console says a
+// row moved and never says where to. The position is read from the input rather than the plan: the
+// plan deliberately carries no record of it, the declaration being what it did not change.
+function report_order(input: AddChildrenInput, plan: AddPlan): void {
+	const { position } = input
+	if (position === undefined) return
+
+	const placed = format_issue_references([...plan.additions, ...plan.relocations])
+	const target = to_issue_reference(position.target)
+
+	console.info(
+		`📋 Placed ${placed} ${position.kind} ${target} in epic #${String(input.epic_number)} — order only, no dependency written.`,
+	)
+	report_contradiction(plan)
+}
+
+function report_placements(input: AddChildrenInput, plan: AddPlan): void {
+	if (input.is_order_only === true) {
+		report_order(input, plan)
+
+		return
+	}
+
+	const epic = `epic #${String(input.epic_number)}`
+
+	if (plan.additions.length > 0) {
+		console.info(`📋 Added ${format_issue_references(plan.additions)} to ${epic}.`)
+	}
+
+	if (plan.relocations.length > 0) {
+		console.info(`📋 Moved ${format_issue_references(plan.relocations)} within ${epic}.`)
 	}
 }
 
-// The epic and its current graph, or the reason neither could be read.
-async function read_epic(
-	epic_number: number,
-): Promise<
-	{ subject: EpicSubject; recorded: ReadonlyArray<EpicChild>; repo: string } | { error: string }
-> {
-	const subject = await read_subject(epic_number)
-	if (subject === undefined) return { error: `Could not read issue #${String(epic_number)}.` }
+// **What the insertion discarded, printed from `plan.replaced` rather than `plan.removed`**
+// (joshuafolkken/kit#1711). The two differ by the filter `removed` carries for `gh`'s sake: a link the
+// body declared but nobody ever recorded natively is dropped from the declaration all the same, and
+// reporting from the work list let exactly those go by without a word. A positioned `--add` is the
+// only invocation that can replace anything, so an addition that re-points nothing prints nothing.
+function report_success(input: AddChildrenInput, plan: AddPlan): void {
+	report_placements(input, plan)
 
-	const recorded = await read_recorded(subject.body)
-	if ('error' in recorded) return { error: recorded.error }
-
-	return { subject, recorded: recorded.children, repo: recorded.repo }
+	if (plan.replaced.length > 0) {
+		console.info(`↪ ${format_replaced_relations(plan.replaced)}`)
+	}
 }
 
 // The child half of the decision record, posted after the epic's body carries its own half. A failure
 // is counted rather than thrown for the reason a relation failure is: the insertion itself has landed,
 // and an exception here would leave the caller unable to tell that from a refusal that wrote nothing.
-async function comment_decision(additions: ReadonlyArray<number>, decision: string): Promise<void> {
+async function comment_decision(children: ReadonlyArray<number>, decision: string): Promise<void> {
 	const posted = await Promise.all(
-		additions.map(async (child) => await git_gh_command.issue_try_comment(String(child), decision)),
+		children.map(async (child) => await git_gh_command.issue_try_comment(String(child), decision)),
 	)
 
 	console.info(
 		git_epic_decision.format_decision_report({
-			total: additions.length,
+			total: children.length,
 			failures: posted.filter((is_posted) => !is_posted).length,
 		}),
 	)
 }
 
-async function write_plan(
-	epic_number: number,
-	plan: AddPlan,
-	decision: string | undefined,
-): Promise<void> {
-	await git_gh_command.issue_edit_body(String(epic_number), plan.body)
-	report_success(epic_number, plan)
+// The record posted to the children is `plan.decision`, not the caller's file: the plan is what folded
+// the replaced relations into it, and reading the raw input here would leave the epic's `## Decisions`
+// carrying a line the child comments do not (joshuafolkken/kit#1711).
+async function write_plan(input: AddChildrenInput, plan: AddPlan): Promise<void> {
+	await git_gh_command.issue_edit_body(String(input.epic_number), plan.body)
+	report_success(input, plan)
 	await apply_plan(plan)
-	if (decision !== undefined) await comment_decision(plan.additions, decision)
+
+	// A relocation is a placement decision as much as an addition is, so the record reaches the child
+	// that was moved too (joshuafolkken/kit#1701).
+	if (plan.decision !== undefined) {
+		await comment_decision([...plan.additions, ...plan.relocations], plan.decision)
+	}
 }
 
 // Insert children into an existing epic, or refuse without writing anything. Every refusal happens
 // before the body edit, so a rejected invocation leaves the epic exactly as it was.
 async function add_children(input: AddChildrenInput): Promise<number> {
-	const epic = await read_epic(input.epic_number)
+	const epic = await git_epic_read.read_epic(input.epic_number)
 
 	if ('error' in epic) {
 		console.error(`✖ ${epic.error}`)
@@ -173,6 +191,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		labels: epic.subject.labels,
 		children: input.children,
 		position: input.position,
+		is_order_only: input.is_order_only,
 		recorded: epic.recorded,
 		repo: epic.repo,
 		decision: input.decision,
@@ -184,7 +203,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	await write_plan(input.epic_number, outcome.plan, input.decision)
+	await write_plan(input, outcome.plan)
 
 	return SUCCESS_EXIT_CODE
 }

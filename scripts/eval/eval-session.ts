@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { execa } from 'execa'
 import type { Scenario } from './eval-scenario'
 
@@ -18,6 +19,12 @@ const SCRUBBED_ENV: Readonly<Record<string, string>> = {
 	GH_ENTERPRISE_TOKEN: '',
 	GITHUB_ENTERPRISE_TOKEN: '',
 }
+
+// Cleared to empty is not the same as absent, and the parent-session variables need to be *absent*:
+// execa runs with `extendEnv: true` by default, so the child inherits this process's whole
+// environment. The list and the reasoning are `agent-session-environment.ts`, shared with `run:wake` since
+// joshuafolkken/kit#1719 — a second launcher of a headless session, and a second copy of the list
+// would be the clone that fails silently.
 
 const GH_CONFIG_KEY = 'GH_CONFIG_DIR'
 const SPAWN_FAILURE_EXIT_CODE = -1
@@ -87,8 +94,12 @@ function session_arguments(scenario: Scenario, model: string): ReadonlyArray<str
 	]
 }
 
-function session_environment(sandbox_path: string): Record<string, string> {
-	return { ...SCRUBBED_ENV, [GH_CONFIG_KEY]: `${sandbox_path}/.gh-config` }
+function session_environment(sandbox_path: string): Record<string, string | undefined> {
+	return {
+		...agent_session_environment.removed_environment(),
+		...SCRUBBED_ENV,
+		[GH_CONFIG_KEY]: `${sandbox_path}/.gh-config`,
+	}
 }
 
 // The exit code and stderr are carried out rather than dropped. A session that never ran — a missing
@@ -125,7 +136,15 @@ async function run_session(
 	}
 }
 
-const eval_session = { run_session, session_arguments, session_environment, spawn_failure_note }
+const eval_session = {
+	// Re-exported from its new home rather than dropped, so the tests that pin this suite's environment
+	// hygiene keep asserting against the list both launchers now share.
+	PARENT_SESSION_KEYS: agent_session_environment.PARENT_SESSION_KEYS,
+	run_session,
+	session_arguments,
+	session_environment,
+	spawn_failure_note,
+}
 
 export { eval_session }
 export type { SessionResult }

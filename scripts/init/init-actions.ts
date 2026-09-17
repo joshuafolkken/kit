@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
+import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 
@@ -30,7 +30,6 @@ function build_vscode_actions(): ReadonlyArray<FileAction> {
 	const extensions_path = path.join('.vscode', init_logic.VSCODE_EXTENSIONS_FILENAME)
 	const settings_path = path.join('.vscode', init_logic.get_vscode_settings_filename())
 	const extensions_raw = vscode_settings_schema.parse(read_package_json(extensions_path))
-	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 	const raw_recommendations = extensions_raw['recommendations']
 	const recommendations = string_array_schema.parse(raw_recommendations)
 	const settings_data = init_logic.strip_kit_only_vscode_settings(
