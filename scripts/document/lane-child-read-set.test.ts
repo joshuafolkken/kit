@@ -14,7 +14,10 @@ const FULLRUN = 'fullrun'
 const BYTES_PER_KB = 1024
 const REQUIRED_SAVING_BYTES = 35 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
-const MAX_TOTAL_TOKENS = 30_000
+// Raised from 30k when joshuafolkken/kit#2119 added two delivered-rule rows (the scout and the
+// per-run filing cap) to `rule-delivery.md`, which the child reads whole. The #2021 acceptance
+// criterion the trim exists for is the 35KB saving vs `fullrun`, which is pinned above and unaffected.
+const MAX_TOTAL_TOKENS = 31_000
 const NOTHING = 0
 
 function total_read_bytes(report: ReturnType<typeof entry_read_set.costed>): number {
@@ -87,7 +90,7 @@ describe('lane_child_read_set.costed — the whole reduction', () => {
 		expect(lane_child_read_set.costed(ROOT).scoped.tokens).toBeLessThanOrEqual(MAX_INITIAL_TOKENS)
 	})
 
-	it('keeps the total read at or below 30k tokens', () => {
+	it('keeps the total read at or below 31k tokens', () => {
 		const tokens = total_read_tokens(lane_child_read_set.costed(ROOT))
 
 		expect(tokens).toBeLessThanOrEqual(MAX_TOTAL_TOKENS)

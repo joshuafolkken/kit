@@ -14,6 +14,9 @@ const LATER_TIMESTAMP = '2026-09-09T00:00:02.000Z'
 const FILED_TIMESTAMP = '2026-09-09T00:00:09.000Z'
 const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
+// The filing cap declares no `keeps` — staying under a cap is not a call — so it reads unmeasured
+// (joshuafolkken/kit#2119).
+const FILING_CAP_ID = 'filing-cap'
 
 const FILING = 'gh api repos/o/r/issues -f title=x'
 const COUNT = 'gh api repos/o/r/issues?state=open --jq length'
@@ -231,11 +234,12 @@ describe('rule_value.measure — rules nothing can score', () => {
 		expect(rule_value.unaided_rate(unmeasured)).toBeUndefined()
 	})
 
-	// **Every rule but the two that cannot have a compliance test** (joshuafolkken/kit#1764,
-	// joshuafolkken/kit#2118). The investigation row declares none because no call-shaped test can tell
-	// a delegation of the reading from any other dispatch; the test-declared row declares none because
-	// its verdict is a working-tree read the transcript never records, so no recorded call reveals
-	// whether the commit carried a test. The module's doctrine is that such a rule reads unmeasured
+	// **Every rule but the three that cannot have a compliance test** (joshuafolkken/kit#1764,
+	// joshuafolkken/kit#2118, joshuafolkken/kit#2119). The investigation row declares none because no
+	// call-shaped test can tell a delegation of the reading from any other dispatch; the test-declared
+	// row declares none because its verdict is a working-tree read the transcript never records, so no
+	// recorded call reveals whether the commit carried a test; the filing-cap row declares none because
+	// staying under a cap is not a call. The module's doctrine is that such a rule reads unmeasured
 	// rather than as compliant. Naming them exactly keeps the guard over every other row, the batching
 	// one included, rather than exempting a whole registry to make room for the exceptions.
 	it('declares a compliance test on every rule but the ones that cannot have one', () => {
@@ -244,7 +248,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			.filter((reading) => !reading.is_measurable)
 			.map((reading) => reading.id)
 
-		expect(unmeasured).toStrictEqual(['test-declared', INVESTIGATION])
+		expect(unmeasured).toStrictEqual([FILING_CAP_ID, 'test-declared', INVESTIGATION])
 	})
 })
 
