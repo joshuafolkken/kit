@@ -58,8 +58,11 @@ const SLACK_BYTES = 512
 // mark, the branch's merge with `main` layering the section on top of a document `main` had already
 // filled. joshuafolkken/kit#2122 raised it two slack units (90,240 → 91,264) for the mandated `josh
 // repo:party` section — its command reference and the three verdicts (`first-party` / `third-party` /
-// `unknown`) — landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 91_264
+// `unknown`) — landing against a document already at its mark. joshuafolkken/kit#2123 raised it five
+// slack units (91,264 → 93,824) for the mandated `josh issue:lint`, `josh issue:backlinks` and `josh
+// report:lint` sections — the three new fixed-shape-artifact linters, their command references and
+// their verdicts — landing against a document already at its mark.
+const JOSH_COMMANDS_CEILING_BYTES = 93_824
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -87,7 +90,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 19_208 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 90_744 },
+	{ path: 'docs/josh-commands.md', bytes: 93_043 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -108,7 +111,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4518 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 16_801 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 488 },
-	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 18_438 },
+	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 19_530 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 17_830 },
 	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 36_055 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8133 },

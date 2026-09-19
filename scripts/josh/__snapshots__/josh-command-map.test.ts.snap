@@ -32,7 +32,9 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ga": "gate",
     "gp": "pr",
     "i": "init",
+    "ibl": "issue:backlinks",
     "ig": "investigation:guard",
+    "iln": "issue:lint",
     "ird": "issue:read",
     "isc": "issue:scout",
     "ist": "issue:state",
@@ -73,6 +75,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "res": "release:scope",
     "rg": "run:progress",
     "rh": "run:hold",
+    "rl": "report:lint",
     "rmg": "run:merge",
     "rp": "run:prep",
     "rpy": "repo:party",
@@ -320,6 +323,20 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "issue:backlinks": [
+      "<issue>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "issue:lint": [
+      "<path>",
+      "automation",
+      [
+        "files",
       ],
     ],
     "issue:read": [
@@ -589,6 +606,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "repo:party": [
       "[<owner/repo>]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "report:lint": [
+      "(reads stdin)",
       "automation",
       [
         "none",

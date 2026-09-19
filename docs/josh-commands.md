@@ -793,6 +793,36 @@ pnpm josh issue:scout "<title>" --body "follows on from #1246"
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
 
+### `josh issue:lint`
+
+Check an issue body written to a file against the template's four required headings — `## 背景`, `## 現象`, `## 期待結果`, `## 受け入れ条件` (the single source is `prompts/collaboration-workflow/issue-template.md`). It reads a path rather than stdin so a body can be linted before the `gh api … issues` call that files it.
+
+```bash
+pnpm josh issue:lint /tmp/issue-body.md
+```
+
+Prints `ok` (exit 0) when every heading is present, or each missing heading name (exit 1). A heading has to be a line of its own — one mentioned inside a sentence is not the section heading. The judgement half (is the prose specific enough?) is out of scope; this is the mechanical half alone (joshuafolkken/kit#2123).
+
+### `josh issue:backlinks`
+
+Classify an origin issue's upstream backlinks into one fixed word. The backlink headings (`## Origin` / `## Upstream issues` / `## Upstream candidate`, single-sourced in `prompts/collaboration-workflow/issue-template.md`) were fixed so a grep could find them; this is that grep. It reads issue N, then the bodies of every upstream it lists, and checks the pair points both ways.
+
+```bash
+pnpm josh issue:backlinks 2123
+```
+
+**Verdicts:** `ok` (exit 0) when `## Upstream issues` lists repository-qualified references and each listed upstream cites `## Origin` back — a body with only `## Upstream candidate` (nothing filed yet) also reads `ok`; `missing-upstream` when no backlink heading is present; `missing-origin` when a listed upstream does not point back; `wrong-heading` for a near-miss heading (`## Upstream`), a bare `#N` reference, or a checkbox reference. Anything but `ok` exits 1.
+
+### `josh report:lint`
+
+Check a two-layer work summary (`CLAUDE.md` Step 0, single-sourced in `prompts/collaboration-workflow/report-format.md`) on stdin against the half a machine can enforce: the labels are present, no overview line runs over its character ceiling, nothing wraps the summary in a code fence, and no file path or CLI flag leaks into the overview.
+
+```bash
+pnpm josh report:lint < summary.md
+```
+
+Prints `ok` (exit 0), or the violations one per line (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it (joshuafolkken/kit#2123).
+
 ### `josh stash:pop`
 
 Pop the stash whose message matches, and no other. The stash is a repository-wide stack every work tree shares, so a bare `git stash pop` — or a positional `stash@{n}` read before another lane pushed — takes whichever entry now sits on top; that is how one lane's parked work reached another's tree (joshuafolkken/kit#2050). This resolves the selector from the message immediately before the pop, targeting the entry itself rather than a position that moves.
