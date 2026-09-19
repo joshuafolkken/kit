@@ -24,7 +24,7 @@
 
 上の「起票は確認なし」は **first-party の集合**（kit / app-kit / game-kit / jgame）を前提に書かれている。トラッカーが自分たちのもので、重複起票のコストがバックログ 1 行で済むからである。**自分たちが所有しないリポジトリへの書き込みは、これとは別物**として扱う。
 
-- **判定は機械的に行い、判断に委ねない**: 対象リポジトリの owner が、いまセッションが動いているリポジトリの owner と一致すれば **first-party**（`gh api repos/{owner}/{repo} --jq .owner.login`）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る
+- **判定は機械的に行い、判断に委ねない**: `pnpm josh repo:party [<owner/repo>]` が `first-party` / `third-party` / `unknown` の 1 語で答える（対象リポジトリの owner がセッションのリポジトリの owner と一致すれば **first-party**、owner を読めなければ **unknown** で third-party 扱いはしない）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る。この判定は `delivered-rules.ts` の `third-party-write` ルールが同じ計算を使って third-party への `gh api` 書き込みを拒否する（読み取りは素通し）
 - **first-party は従来どおり**: Tier A。確認なしで起票し、双方向バックリンクを書き、停止する。kit / app-kit / game-kit のフローに新しい摩擦は加わらない
 - **third-party は書き込みの種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビューのいずれも、**その turn におけるユーザーの明示指示**なしに行ってはならない。公開は外向きかつ実質不可逆で、Issue はユーザーの GitHub アカウント名義で公開され、watcher へ通知され、検索に載る。後からクローズしてもそのいずれも取り消せない。加えて、誰も差し出すと約束していないメンテナの時間を消費する
 - **third-party だと判明したときの手順**: (1) **自分たちの側の Issue** に証拠込みで所見を記録する。見出しは `## Upstream candidate` を使い、`## Upstream issues` は使わない（後者は「起票済み」を主張する見出しであるため）。(2) 報告本文の下書きをその Issue 内に用意し、ユーザーが 1 メッセージで承認できる状態にする。(3) 対象プロジェクト名と報告しようとしている内容を書いた `confirmation` Telegram を送って**停止する**

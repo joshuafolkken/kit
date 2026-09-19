@@ -775,6 +775,16 @@ Print what an entry point reads before it starts, and what that read costs
 
 ---
 
+### `josh repo:party` · `josh rpy`
+
+> **Audience:** automation · **Side effects:** none
+
+`[<owner/repo>]`
+
+Say whether a repository is first-party or third-party by owner equality (computed, not judged)
+
+---
+
 ### `josh review:attest` · `josh ra`
 
 > **Audience:** automation · **Side effects:** files
