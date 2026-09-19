@@ -289,6 +289,9 @@ describe('closing one of two open lanes', () => {
 			expect(existsSync(second.directory)).toBe(true)
 			expect(remaining.map((lane) => lane.issue)).toEqual([SECOND_ISSUE])
 			expect(remaining.map((lane) => lane.seat)).toEqual([second.seat])
+			// Closing a lane deletes its own branch, so a defect deleting both would leave the issue
+			// and seat readings above unchanged and only this one red.
+			expect(remaining.map((lane) => lane.branch)).toEqual([second.branch])
 		},
 		TIMEOUT_MS,
 	)
