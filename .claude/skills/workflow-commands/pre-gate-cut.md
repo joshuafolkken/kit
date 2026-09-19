@@ -268,7 +268,7 @@ at each boundary itself, and whether the run held to it is read from the run-tim
 pre-gate cut's own measurement uses.
 
 **The aggregate is not the only feedback: an individual child that ended mid-implementation without
-cutting is detected per-child, after the fact, by `pnpm josh run:ending <N> --output <path>**
+cutting is detected per-child, after the fact, by `pnpm josh run:ending <N> --output <path>`**
 (joshuafolkken/kit#2139) — it classifies the child's ending as `merged` / `cut` / `abandoned` /
 `unreadable` from the exit record, the cut record and the Issue state, so the `abandoned` case (a
 child that stopped in the middle without handing off) is visible without opening the log, and its
