@@ -53,6 +53,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ms": "main:sync",
     "nf": "notify",
     "obf": "observations:flush",
+    "ol": "oracle:list",
     "ov": "overrides",
     "pg": "propagate",
     "pm": "prevent-main-commit",
@@ -471,6 +472,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "git",
         "network",
+      ],
+    ],
+    "oracle:list": [
+      "",
+      "automation",
+      [
+        "none",
       ],
     ],
     "overrides": [

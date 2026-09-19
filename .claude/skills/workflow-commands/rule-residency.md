@@ -1,9 +1,7 @@
 # How much of a resident rule is resident — `SKILL.md` §3's body
 
 **This is `SKILL.md` → §3's procedure, and it is read when a rule is being placed, moved or
-retired — not at the entry** (joshuafolkken/kit#1797). §3 keeps the two questions that decide
-*whether* a rule is resident; what follows decides *how much of it* is, and carries the enumeration
-of every resident rule that has an on-demand counterpart and the retirement route and its three tests.
+retired — not at the entry** (joshuafolkken/kit#1797). §3 now opens with question 0 — `prompts/collaboration-workflow/residency.md` → question 0 — which asks whether the rule's answer is computable; a yes means a decision oracle (`pnpm josh oracle:list`), and the two residency questions below only apply on a no. What follows decides *how much of it* is resident, and carries the enumeration of every resident rule that has an on-demand counterpart and the retirement route and its three tests.
 The `rule:value` readings it used to carry no longer gate reduction — that gating was
 retracted on 2026-09-13 (joshuafolkken/kit#1931 → `## Decisions`) and they are retained below only as
 history.

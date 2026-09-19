@@ -725,6 +725,16 @@ Close every lane an interruption left without its work tree
 
 ---
 
+### `josh oracle:list` · `josh ol`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Print the decision oracles — commands that answer a rule question mechanically
+
+---
+
 ### `josh read:set` · `josh rs`
 
 > **Audience:** automation · **Side effects:** none
