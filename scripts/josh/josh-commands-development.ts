@@ -107,6 +107,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
 	},
+	'test:declared': {
+		script: 'scripts/test/test-declared.ts',
+		description: 'Report whether the working-tree change needs a test (required/exempt/satisfied)',
+		category: 'Development',
+		reference: ['', 'developer', ['processes']],
+	},
 	'e2e:retry-check': {
 		script: 'scripts/test/e2e-retry-check.ts',
 		description: 'Report whether the preview server crashed during a failed E2E attempt (CI)',

@@ -145,6 +145,16 @@ Run unit and E2E tests
 
 ---
 
+### `josh test:declared` · `josh td`
+
+> **Audience:** developer · **Side effects:** processes
+
+_No arguments._
+
+Report whether the working-tree change needs a test (required/exempt/satisfied)
+
+---
+
 ### `josh test:e2e` · `josh te`
 
 > **Audience:** developer · **Side effects:** processes

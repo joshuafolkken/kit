@@ -231,18 +231,20 @@ describe('rule_value.measure — rules nothing can score', () => {
 		expect(rule_value.unaided_rate(unmeasured)).toBeUndefined()
 	})
 
-	// **Every rule but the one that cannot have a compliance test** (joshuafolkken/kit#1764). The
-	// investigation row declares none on purpose — no call-shaped test can tell a delegation of the
-	// reading from any other dispatch — and the module's doctrine is that such a rule reads unmeasured
-	// rather than as compliant. Naming it exactly keeps the guard over every other row, the batching
-	// one included, rather than exempting a whole registry to make room for one exception.
-	it('declares a compliance test on every rule but the one that cannot have one', () => {
+	// **Every rule but the two that cannot have a compliance test** (joshuafolkken/kit#1764,
+	// joshuafolkken/kit#2118). The investigation row declares none because no call-shaped test can tell
+	// a delegation of the reading from any other dispatch; the test-declared row declares none because
+	// its verdict is a working-tree read the transcript never records, so no recorded call reveals
+	// whether the commit carried a test. The module's doctrine is that such a rule reads unmeasured
+	// rather than as compliant. Naming them exactly keeps the guard over every other row, the batching
+	// one included, rather than exempting a whole registry to make room for the exceptions.
+	it('declares a compliance test on every rule but the ones that cannot have one', () => {
 		const unmeasured = rule_value
 			.measure([[session(FILING)]])
 			.filter((reading) => !reading.is_measurable)
 			.map((reading) => reading.id)
 
-		expect(unmeasured).toStrictEqual([INVESTIGATION])
+		expect(unmeasured).toStrictEqual(['test-declared', INVESTIGATION])
 	})
 })
 

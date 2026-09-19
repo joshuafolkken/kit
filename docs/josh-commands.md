@@ -198,6 +198,14 @@ pnpm josh test:related --silent            # flags are forwarded to vitest
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when no changed file is importable; a narrowed run matching nothing prints `No test files found` and exits 0.
 
+### `josh test:declared`
+
+Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`).
+
+```bash
+pnpm josh test:declared   # alias: josh td
+```
+
 ### `josh test:e2e`
 
 Run E2E tests with Playwright. **Skips gracefully (exit 0)** when `@playwright/test` is not installed or no `*.e2e.{ts,js}` files exist. Once both are present, runs `playwright test`.

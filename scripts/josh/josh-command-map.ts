@@ -39,6 +39,7 @@ const ALIASES: Record<string, string> = {
 	t: 'test',
 	tu: 'test:unit',
 	tr: 'test:related',
+	td: 'test:declared',
 	te: 'test:e2e',
 	er: 'e2e:retry-check',
 	sl: 'session:lang',
