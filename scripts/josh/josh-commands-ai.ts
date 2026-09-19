@@ -252,6 +252,14 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<issue> <prompt>', 'automation', ['processes']],
 		default_script_arguments: ['dispatch'],
 	},
+	'lane:await': {
+		...LANE_ARGUMENTS,
+		description:
+			'Block until any of the named in-flight lane children completes; prints which one finished',
+		category: 'AI tools',
+		reference: ['<issue> [<issue>...]', 'automation', ['processes']],
+		default_script_arguments: ['await'],
+	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
 		description:
@@ -272,6 +280,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// **No `tsx_arguments`, for the reason the other two guards declare none**
 		// (joshuafolkken/kit#1342): declaring any disqualifies a command from in-process dispatch, and
 		// this one runs in front of every shell call.
+	},
+	'run:watcher:guard': {
+		script: 'scripts/run/run-watcher-guard-cli.ts',
+		description:
+			'Guard: exits non-zero when lane children are in-flight but the watcher has not pinged recently',
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
 	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',

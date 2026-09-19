@@ -111,6 +111,8 @@ const ALIASES: Record<string, string> = {
 	lnp: 'lane:prune',
 	lnv: 'lane:output',
 	lnd: 'lane:dispatch',
+	lna: 'lane:await',
+	rwg: 'run:watcher:guard',
 	ig: 'investigation:guard',
 	rug: 'rule:guard',
 	ptg: 'pretool:guard',

@@ -1200,6 +1200,16 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 
 **Output / exit codes:** stdout carries only the five labelled progress lines; notices go to stderr. `--once` with no run recorded prints nothing and exits 0; an unreadable listing exits 1. It sends no Telegram; `JOSH_PROGRESS=0` reports nothing (`--mark` still records).
 
+### `josh run:watcher:guard`
+
+Guard hook: exits non-zero when lane children are in-flight but `run:progress` has not pinged its life record recently (within three watcher ticks, roughly 90 s). Wired as a `PreToolUse` hook so the agent cannot issue the next Bash call while the watcher is stale. Alias `josh rwg`.
+
+```bash
+pnpm josh run:watcher:guard   # alias: josh rwg
+```
+
+**Output / exit codes:** exits 0 when no lane children are in-flight or the watcher is fresh. Exits 1 and writes a note to stderr telling the user to restart `run:progress --wait` before proceeding.
+
 ### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
 
 Open and close a lane: one linked git work tree with its own branch and its own port seat. `lane:open` cuts from `refs/remotes/origin/<default>` (falling back to the local branch), attaches to an existing `<N>-lane` branch, installs dependencies (`pnpm install --frozen-lockfile`), and warms the gate caches from the main checkout.
@@ -1264,6 +1274,16 @@ defaults to `gpt-5.6-sol` with scheduler/worker/reviewer efforts `high`/`medium`
 evaluation procedure](./backlogrun-worker-evaluation.md).
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
+
+#### `josh lane:await`
+
+Block until any of the named in-flight lane children confirms it has completed, then print which issue finished. Alias `josh lna`.
+
+```bash
+pnpm josh lane:await 1749 1750   # block until either lane completes; alias: josh lna
+```
+
+Polls each child's process every 5 s with a 15 s re-confirm window, so a process that briefly disappears (the pre-gate cut handoff) is not mistakenly declared done. Prints the issue number of the first child that confirms completion and exits 0; does not exit until one confirms.
 
 ### `josh cost`
 

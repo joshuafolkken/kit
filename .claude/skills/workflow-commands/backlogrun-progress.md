@@ -25,6 +25,11 @@ moves and no fourth:**
    next report time itself.
 3. **In that same turn, start the next one.** The interval is measured from the last report.
 
+**`pnpm josh run:watcher:guard` detects a missed restart** (joshuafolkken/kit#2113): it exits
+non-zero when lane children are in-flight but the watcher's life record has not been refreshed
+within the staleness threshold. Wire it as a PreToolUse hook or call it before step 1 of each
+loop iteration.
+
 **`run:progress` prints the five labelled lines itself now (joshuafolkken/kit#2026); present them
 as-is.** It emits the observation instant (`at`, local first and UTC beside it), the elapsed figures
 (`quiet` and `unchanged`), the children in flight, the run state (`lanes`, `load`, `record`), and the
@@ -170,11 +175,13 @@ single non-numeric line as the verdict.
    that lane's `lane:open`.
 
    **Start the unit without blocking on it — `pnpm josh lane:dispatch <N>` when the child runs in a
-   lane — and poll.** Blocking on the return leaves the parent with no turn in which to notice the return
-   is never coming. **Start no wait of your own** — the next turn is the one the progress watcher's exit
-   delivers ("The parent keeps no clock of its own" below) — and on that wake ask `pnpm josh run:liveness
-   <N> --output <path> --process <what `pgrep -laf "fullrun #<N>$"` found>` where that file has been
-   unchanged for the silent-unit window. **The flag is what you saw, never what kind of child it is.**
+   lane — and in the same turn start `pnpm josh lane:await <N...>` in the background** (joshuafolkken/kit#2113).
+   `lane:await` watches local process presence and exits when any named child confirms-complete,
+   waking the parent at the actual completion rather than at the next heartbeat interval. **The
+   re-confirm delay and poll interval are the command's, not the agent's** — pass only the issue
+   numbers. On that wake ask `pnpm josh run:liveness <N> --output <path> --process <what
+   `pgrep -laf "fullrun #<N>$"` found>` where that file has been unchanged for the silent-unit
+   window. **The flag is what you saw, never what kind of child it is.**
 
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
