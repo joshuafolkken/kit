@@ -188,3 +188,11 @@ words:
   # park on the Issue (joshuafolkken/kit#2034) — the state the delivered rule refuses. It reaches no
   # distributed file: the word appears only in that module, its two suites and the enumeration.
   - unparked
+  # Python identifiers named in `scripts/rules/file-body.ts`'s detection patterns (joshuafolkken/kit#2120):
+  # the file-body guard refuses shell forms that write a file's body — `f.writelines(...)`,
+  # `shutil.copy`/`shutil.move` into an existing path. They appear only in that module's patterns and tests.
+  - writelines
+  - shutil
+  # English word in `scripts/rules/worktree-guard.ts` — a message-tagged stash is "findable and poppable"
+  # by `pnpm josh stash:pop` (joshuafolkken/kit#2120). Appears only in that module's comment.
+  - poppable

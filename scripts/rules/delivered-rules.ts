@@ -4,7 +4,9 @@ import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
 import { early_heartbeat } from './early-heartbeat'
+import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
+import { git_force } from './git-force'
 import { issue_scout } from './issue-scout'
 import { lane_park } from './lane-park'
 import { piped_verification } from './piped-verification'
@@ -14,6 +16,7 @@ import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
 import { test_declared_commit } from './test-declared-commit'
+import { worktree_guard } from './worktree-guard'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
@@ -429,6 +432,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: lane_park.LANE_PARK_REASON,
 		keeps: on_bash_command(lane_park.records_the_park),
 	},
+	// **The three Bash-string gaps the deny glob cannot express** (joshuafolkken/kit#2120), each reading
+	// the command's argv rather than a literal a glob keys on. They share no trigger with any row above —
+	// force/delete is `git push` / `git branch`, the worktree change is `git checkout` / `restore` /
+	// `stash`, and the file body is a heredoc / `node -e` / `perl -i` — so no two rows claim one command,
+	// which `delivered-rules-bash.test.ts` pins. Each declares `decide` returning true: a destructive or
+	// billed act is refused on every occurrence, never once per run (`git-force.ts`).
+	git_force.ROW,
+	worktree_guard.ROW,
+	file_body.ROW,
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that
@@ -657,7 +669,9 @@ function is_enabled(): boolean {
 const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
+	FILE_BODY_REASON: file_body.FILE_BODY_REASON,
 	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
+	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON,
 	ISSUE_SCOUT_REASON: issue_scout.ISSUE_SCOUT_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
@@ -668,6 +682,7 @@ const delivered_rules = {
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,
+	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,
 	delivery_path,
 	is_body_only_issue_read,
