@@ -5,6 +5,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { run_liveness } from '#scripts/run/run-liveness'
@@ -76,6 +77,7 @@ function mock_supervisor(): void {
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 	vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'session')
 	vi.stubEnv('CODEX_THREAD_ID', '')
 	launch.mockReturnValue({ kind: 'launched', pid: PID })
@@ -162,7 +164,7 @@ describe('lane_dispatch.default_log_path — the log the dispatch owns', () => {
 
 describe('lane_dispatch.dispatch_child — provider selection', () => {
 	it('uses the OpenAI worker adapter when the provider is selected', async () => {
-		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 		vi.stubEnv('CODEX_THREAD_ID', 'thread')
 		check_diagnostics.mockReturnValue({ kind: 'ready' })
 		wait_for_supervisor.mockResolvedValue({ issue: ISSUE, nonce: 'owner', pid: PID })
@@ -178,7 +180,7 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 	})
 
 	it('does not reuse a live OpenAI owner recorded for another issue', async () => {
-		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 		vi.stubEnv('CODEX_THREAD_ID', 'thread')
 		check_diagnostics.mockReturnValue({ kind: 'ready' })
 		active_supervisor.mockReturnValue({ issue: '9999', nonce: 'other', pid: PID })
@@ -192,7 +194,7 @@ describe('lane_dispatch.dispatch_child — provider selection', () => {
 	})
 
 	it('reports failure when the spawned OpenAI supervisor never claims the lane', async () => {
-		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 		vi.stubEnv('CODEX_THREAD_ID', 'thread')
 		check_diagnostics.mockReturnValue({ kind: 'ready' })
 
