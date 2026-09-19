@@ -39,6 +39,8 @@ const SPLIT_MARKERS: ReadonlyArray<string> = [
 	'**The default is not to split.**',
 	'Two questions have to answer yes **together**',
 	SPLIT_GUIDE,
+	// Test files are excluded so that adding tests does not push a change past the split threshold.
+	'(test files excluded)',
 	// The reason, without which the next reader restores the old test as an obvious simplification.
 	'**Separability is not scarce, which is why a test made only of it splits nearly everything.**',
 	'`route:split` accounted for **28 of the 119 open Issues (24%)**',
@@ -172,7 +174,7 @@ describe(`${WIP_TOPIC} — the WIP cap and all three sides of its procedure`, ()
 // command included, so the one place it is written stays the one place it has to be kept correct.
 const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	'**its default is not to split**',
-	'about 10 changed files, about 400 changed lines',
+	'about 10 changed files, about 400 changed lines (test files excluded)',
 	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
 ]
 

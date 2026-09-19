@@ -10,8 +10,8 @@ leaves the work as one Issue:
 
 1. **Does the request contain two or more deliverables that could each be merged separately?**
 2. **Does the whole of it clearly exceed what one verification gate can confirm in one pass?** The
-   guide is **about 10 changed files and about 400 changed lines**. Under that, it is one Issue however
-   many separable pieces a reader can name inside it.
+   guide is **about 10 changed files and about 400 changed lines** (test files excluded).
+   Under that, it is one Issue however many separable pieces a reader can name inside it.
 
 Separately mergeable is still the first test, and it is unchanged: a change that must land in one
 commit to be correct is one deliverable however big it is. What changed is that **separability alone
