@@ -395,6 +395,16 @@ Update pnpm via corepack to the latest release on the current major
 
 ---
 
+### `josh latest:guard` · `josh lg`
+
+> **Audience:** automation · **Side effects:** files
+
+_No arguments._
+
+Refuse josh latest inside a lane (the update stamp is keyed to the project root)
+
+---
+
 ### `josh latest:scope` · `josh ls`
 
 > **Audience:** automation · **Side effects:** files

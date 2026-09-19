@@ -67,6 +67,7 @@ const ALIASES: Record<string, string> = {
 	ap: 'audit:provision',
 	rt: 'reconcile-templates',
 	u: 'latest',
+	lg: 'latest:guard',
 	lc: 'latest:corepack',
 	lu: 'latest:update',
 	ls: 'latest:scope',

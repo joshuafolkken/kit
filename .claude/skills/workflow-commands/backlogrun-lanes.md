@@ -122,10 +122,9 @@ In the **primary checkout**, in this order, and never again per lane:
 2. `pnpm josh latest:scope`, and the update on `required` — "`josh latest` runs once per session" above.
 3. `pnpm josh lane:prune` — closes the lanes an interruption left registered without a work tree.
 
-**`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there.** The
-elapsed-time window is keyed to the project root, and a lane's project root is its own directory, so a
-fresh lane has no stamp, is told `required`, and every lane runs a dependency update. **Ask it in the
-primary checkout; in a lane, do not ask at all.**
+**`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there** — the command
+enforces it: `latest:scope` answers `skip` in a lane and `pnpm josh latest` refuses outright, fronted
+by `pnpm josh latest:guard`. Ask it in the primary checkout, per step 2 above.
 
 **The rewritten lock file still has to reach a pull request**, and with lanes no child runs in the
 primary checkout to carry it. `git stash` is a repository-level ref shared by every work tree:
