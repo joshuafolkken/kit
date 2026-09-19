@@ -1275,13 +1275,13 @@ put. The printed PID is the supervisor's.
 
 **Options:**
 
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `opus`, `sonnet`, and `opus`. Codex keeps its provider-specific model.
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `high`, `medium`, and `high`.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `opus`, `opus`, and `opus`. Codex keeps its provider-specific model.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.
 
 Blank means unset. The inherited agent session identifier selects the provider; a missing or
 conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
 refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
-defaults to `gpt-5.6-sol` with scheduler/worker/reviewer efforts `high`/`medium`/`high`. Legacy
+defaults to `gpt-5.6-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
 evaluation procedure](./backlogrun-worker-evaluation.md).
 
