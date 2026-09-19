@@ -7,9 +7,11 @@ import { document_byte_budget } from './document-byte-budget'
 const {
 	DOCUMENT_BYTE_BUDGET,
 	JOSH_COMMANDS_CEILING_BYTES,
+	SLACK_BYTES,
 	ceiling_for,
 	over_budget_message,
 	recorded_bytes_for,
+	stale_budget_message,
 } = document_byte_budget
 
 const JOSH_COMMANDS = 'docs/josh-commands.md'
@@ -29,6 +31,19 @@ describe('agent-read document byte budget', () => {
 
 		expect(current, message).toBeLessThanOrEqual(ceiling_for(bytes))
 	})
+
+	// The growth guard alone lets a recorded size sit far above the shrunk document forever — the
+	// stale-loose ratchet joshuafolkken/kit#2125 found on chain-rule.md. This pins the other direction:
+	// a record more than a slack above the actual size must be lowered, so a reduction is held.
+	it.each(DOCUMENT_BYTE_BUDGET)(
+		'$path keeps its ratchet tight, not stale above actual',
+		({ path, bytes }) => {
+			const current = byte_size(path)
+			const message = stale_budget_message(path, bytes, current)
+
+			expect(bytes, message).toBeLessThanOrEqual(current + SLACK_BYTES)
+		},
+	)
 
 	it('budgets exactly the documents in scope — no stale entry, no un-budgeted file', () => {
 		const budgeted = sorted(DOCUMENT_BYTE_BUDGET.map((entry) => entry.path))
