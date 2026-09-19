@@ -1,7 +1,8 @@
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
@@ -29,6 +30,11 @@ const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'rule-guard-'))
 // process.cwd() to decide whether a checkout is a lane, so a run started inside a lane worktree would
 // otherwise see the gate cases fire that rule and the silence assertions break (joshuafolkken/kit#1884).
 const ENTRY_DIRECTORY = process.cwd()
+// A lane checkout under WORK_DIRECTORY, for the one block that runs as a dispatched lane child
+// (joshuafolkken/kit#2138). Every other block stays in the non-lane WORK_DIRECTORY.
+const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
+const LANE_ISSUE = '2138'
+const LANE_DIRECTORY = path.join(LANE_ROOT, LANE_ISSUE)
 const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const NOW_MS = 1_700_000_000_000
@@ -124,6 +130,9 @@ const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PR
 // the disabled list recognizes, so the guard reads as on exactly as it does on a fresh machine.
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
+	// The lane-child block sets `JOSH_LANE_CHILD`; clearing it here, beside the cwd reset, keeps it from
+	// leaking into any case that runs after — the same reset-before-every-case discipline as the cwd.
+	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
 })
 
@@ -457,5 +466,38 @@ describe('DELIVERED_RULES — the enumeration', () => {
 
 	it('is on by default', () => {
 		expect(delivered_rules.is_enabled()).toBe(true)
+	})
+})
+
+describe('rule_delivery — a dispatched lane child keeps the rule guard', () => {
+	// joshuafolkken/kit#2138: the rule guard fires in a lane child — it carries the lane-only rules a
+	// child depends on and the safety rules it must still obey — so this block sets the mark and stays in
+	// a lane checkout, unlike every other block here, which runs from the non-lane WORK_DIRECTORY.
+	// The outer `beforeEach` chdirs back to the non-lane WORK_DIRECTORY and clears the mark before every
+	// case, so this block needs no teardown of its own; `afterAll` restores the entry directory.
+	beforeEach(() => {
+		mkdirSync(LANE_DIRECTORY, { recursive: true })
+		process.chdir(LANE_DIRECTORY)
+		process.env[lane_child_marker.KEY] = LANE_ISSUE
+	})
+
+	// The rule guard fires in a child (the enumeration's `rule: true`, pinned in
+	// `lane-guard-policy.test.ts`) — a safety rule still delivers here.
+	it('still delivers a rule in a lane child', () => {
+		expect(rule_delivery(payload_of('lane-shell-body', EVALUATED_BODY_COMMAND), NOW_MS)).toBe(
+			delivered_rules.SHELL_BODY_REASON,
+		)
+	})
+
+	// **The batching stand-aside is disabled in a lane child.** The batching guard is suppressed there
+	// (joshuafolkken/kit#2138), so on the very history it would otherwise refuse, a lone rule trigger is
+	// delivered at once rather than stood aside for a refusal that can no longer come — the non-lane
+	// version of this transcript stands aside first (see "stands aside while the batching guard may
+	// speak").
+	it('delivers a body read without standing aside on a batched history', () => {
+		const transcript = transcript_for('lane-body-collision', unbatched_text())
+		const call = payload_for(transcript, BODY_READ_COMMAND)
+
+		expect(rule_delivery(call, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 })

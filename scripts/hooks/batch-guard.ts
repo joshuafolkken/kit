@@ -2,6 +2,7 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 
 // The disk half of the batching guard (joshuafolkken/kit#1390): find the transcript, read enough of
@@ -41,10 +42,19 @@ function is_batch_candidate(call: GuardedCall): boolean {
 	return time_batch_guard.is_guarded_call(call) || time_batch_guard.is_notice_call(call)
 }
 
+// **A dispatched lane child is exempt, decided from the one-place enumeration**
+// (joshuafolkken/kit#2138): the reissue-in-one-turn correction presumes a main line that reshapes its
+// next turn, and a headless child ends its turn on the refusal instead. The call-shape test runs first,
+// so `is_child_of` — the dispatch mark against this checkout's own issue — is read only for a call this
+// guard could otherwise act on, and a person working in a lane sees the guard unchanged.
+function is_candidate(call: GuardedCall): boolean {
+	return is_batch_candidate(call) && !lane_guard_policy.is_suppressed_here('batching')
+}
+
 const GUARD = hook_decision.create_transcript_guard({
 	prefix: time_batch_guard.STAMP_PREFIX,
 	switch_key: SWITCH_ENV_KEY,
-	is_candidate: is_batch_candidate,
+	is_candidate,
 	should_block: time_batch_guard.should_block,
 	reason: time_batch_guard.REASON,
 	// The whole-file write is notified rather than refused, on a record of its own so it never spends
