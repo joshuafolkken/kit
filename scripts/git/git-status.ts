@@ -31,11 +31,7 @@ function has_unstaged_files(status_output: string): boolean {
 }
 
 function is_staged_file(line: string): boolean {
-	if (line.length < REQUIRED_STATUS_LENGTH) {
-		return false
-	}
-
-	if (is_untracked_file(line)) {
+	if (line.length < REQUIRED_STATUS_LENGTH || is_untracked_file(line)) {
 		return false
 	}
 

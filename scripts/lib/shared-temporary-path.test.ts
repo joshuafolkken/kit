@@ -53,8 +53,7 @@ const FS_IMPORT = /from '(?:node:)?fs(?:\/promises)?'/u
 const SCANNED_SUFFIXES: ReadonlyArray<string> = ['.test.ts', '-fixture.ts']
 
 function is_scanned(entry: string): boolean {
-	if (path.basename(entry) === SELF_NAME) return false
-	if (entry.includes('node_modules')) return false
+	if (path.basename(entry) === SELF_NAME || entry.includes('node_modules')) return false
 
 	return SCANNED_SUFFIXES.some((suffix) => entry.endsWith(suffix))
 }

@@ -44,9 +44,9 @@ function copy_ai_file(source_path: string, destination_path: string): void {
 // The destination is checked before the file is opened, and a read failure is stepped over, so
 // nothing here can turn a skipped file into a failed `init` the way it never was before.
 function did_warn_unstamped_workflow(destination_path: string, label: string): boolean {
-	if (!is_workflow_destination(destination_path)) return false
-
-	if (!did_read_unstamped(destination_path)) return false
+	if (!is_workflow_destination(destination_path) || !did_read_unstamped(destination_path)) {
+		return false
+	}
 
 	console.warn(`  ⚠ ${label} has no managed-workflow header — run josh sync before merging bumps`)
 

@@ -200,7 +200,7 @@ function classify(raw: string | undefined, now: Date): CarryRead {
 
 	if (carry === undefined) return UNREADABLE_READ
 
-	return is_expired(carry, now) ? { kind: 'expired', carry } : { kind: 'carried', carry }
+	return { kind: is_expired(carry, now) ? 'expired' : 'carried', carry }
 }
 
 function read_carry(target: string, now: Date = new Date()): CarryRead {

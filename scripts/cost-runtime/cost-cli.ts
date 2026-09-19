@@ -147,8 +147,13 @@ function same_openai_project(target: string, cwd: string): boolean {
 }
 
 function reject_openai_cross_project(context: RunContext, target: string, cwd: string): boolean {
-	if (context.provider !== 'openai' || context.path === undefined) return false
-	if (same_openai_project(target, cwd)) return false
+	if (
+		context.provider !== 'openai' ||
+		context.path === undefined ||
+		same_openai_project(target, cwd)
+	) {
+		return false
+	}
 
 	console.error(
 		'OpenAI --path cannot select a thread from another project; run josh cost in that project.',

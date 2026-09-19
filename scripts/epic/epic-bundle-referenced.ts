@@ -86,11 +86,10 @@ function to_backlog_issue(issue: EpicIssue, context: ReferencedContext): Backlog
 // build an epic whose other child is already finished — nothing for a run to execute, and an epic
 // that reads as half-done from the moment it is created.
 function is_usable_candidate(issue: BacklogIssue, read: EpicIssue): boolean {
-	if (issue.is_epic === true) return false
 	// The issue endpoint answers for a pull request too, and a body citing "the fix landed in #952"
 	// is ordinary prose. Without this, a merged PR reads as an open issue in no epic and the command
 	// proposes creating an epic with a pull request among its children (joshuafolkken/kit#947).
-	if (epic_issue.is_pull_request(read)) return false
+	if (issue.is_epic === true || epic_issue.is_pull_request(read)) return false
 
 	return epic_issue.is_open(read.state) || issue.epic !== undefined
 }

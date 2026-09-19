@@ -17,8 +17,7 @@ function get_exit_code(error: unknown): number | undefined {
 // timeout, and a second copy of the same three lines is the duplication `CLAUDE.md` prohibits
 // (joshuafolkken/kit#1251).
 function has_timed_out(error: unknown): boolean {
-	if (typeof error !== 'object' || error === null) return false
-	if (!('timedOut' in error)) return false
+	if (typeof error !== 'object' || error === null || !('timedOut' in error)) return false
 
 	return error.timedOut === true
 }
