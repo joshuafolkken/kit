@@ -89,6 +89,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "sy": "sync",
     "sys": "sync:scope",
     "t": "test",
+    "td": "test:declared",
     "te": "test:e2e",
     "tm": "time",
     "tr": "test:related",
@@ -727,6 +728,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "test": [
+      "",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "test:declared": [
       "",
       "developer",
       [

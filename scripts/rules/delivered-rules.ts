@@ -12,6 +12,7 @@ import { prior_comment_read } from './prior-comment-read'
 import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
+import { test_declared_commit } from './test-declared-commit'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
@@ -365,6 +366,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(early_heartbeat.is_progress_watch),
 		reaches: on_bash_command(early_heartbeat.waits_for_progress),
 	},
+	// **Listed before `run-tail`, the one row it deliberately overlaps** (joshuafolkken/kit#2118). A
+	// foreground `pnpm josh git -y` with no test beside the change is claimed by both: `test-declared`
+	// decides whether the commit should happen at all, so it is listed first, exactly as `wip-cap`
+	// precedes `shell-body` for deciding whether an Issue should exist. Nothing is lost by `run-tail`
+	// losing the race — the stamps are keyed per `id`, so the reissued push is delivered `run-tail`,
+	// which is asserted rather than assumed. The overlap only arises in a real checkout where the
+	// verdict is `required`; in the hermetic non-repo suite the git read fails to `exempt`, so
+	// `test-declared` claims nothing and the "exactly one rule" invariant over `run-tail`'s fixture holds.
+	test_declared_commit.ROW,
 	// **The one row whose trigger reads a field of the input beside the command**, so it supplies its
 	// own tool-name check rather than going through `on_bash_command`: a push step already issued with
 	// `run_in_background` is the rule obeyed, and refusing it would charge a run for doing the right

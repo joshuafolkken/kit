@@ -52,8 +52,12 @@ const SLACK_BYTES = 512
 // merged tree needs a unit the branch alone did not. joshuafolkken/kit#2139 raised it four slack
 // units (87,680 → 89,728) for the mandated `josh run:ending` section — its command reference, the four
 // ending verdicts (`merged` / `cut` / `abandoned` / `unreadable`) and its `--output` / `--repo`
-// options — landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 89_728
+// options — landing against a document already at its mark. joshuafolkken/kit#2118 raised it one slack
+// unit (89,728 → 90,240) for the mandated `josh test:declared` section — its command reference and the
+// three verdicts (`required` / `exempt` / `satisfied`) — landing against a document already at its
+// mark, the branch's merge with `main` layering the section on top of a document `main` had already
+// filled.
+const JOSH_COMMANDS_CEILING_BYTES = 90_240
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -77,11 +81,11 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 7528 },
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_931 },
-	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 26_628 },
+	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 26_629 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 19_208 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
-	{ path: 'CLAUDE.md', bytes: 26_355 },
-	{ path: 'docs/josh-commands.md', bytes: 88_950 },
+	{ path: 'CLAUDE.md', bytes: 26_907 },
+	{ path: 'docs/josh-commands.md', bytes: 89_267 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -104,7 +108,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 488 },
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 18_438 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 17_830 },
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 24_393 },
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 27_166 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8133 },
 	{ path: 'prompts/collaboration-workflow/single-source-rules.md', bytes: 1764 },
 	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 18_726 },
