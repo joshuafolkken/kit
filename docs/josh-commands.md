@@ -1174,8 +1174,8 @@ or `already-done`) is left alone; a **failed** child has its stale `in-progress`
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
 `over` (the merge crossed the shared 150,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
-before its commit — stop), `stop` (the consecutive-failure guard tripped), and `retry` (the child's
-state could not be read).
+before its commit — stop), `stop` (failure guard), `retry` (state unreadable), and `busy` (refused
+count; exit 1).
 
 **Options:**
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { run_carry } from '#scripts/run/run-carry'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_open, type OpenOutcome } from './lane-open'
@@ -40,6 +41,23 @@ function report_usage(): number {
 	console.error(USAGE)
 
 	return FAILURE_EXIT_CODE
+}
+
+// Read the carry record and refuse if this session has already handed off its budget via `--cut`.
+// A cut session must not open new lanes or dispatch new children — the successor owns the budget
+// (joshuafolkken/kit#2114).
+async function guard_cut_session(): Promise<string | undefined> {
+	const directory = await run_carry.repository_directory()
+
+	if (directory === undefined) return undefined
+
+	const read = run_carry.read_carry(run_carry.carry_path(directory))
+
+	if ((read.kind !== 'carried' && read.kind !== 'expired') || read.carry.is_handed_off !== true) {
+		return undefined
+	}
+
+	return run_carry.count_refused_message(read.carry)
 }
 
 function parse_lane_issue(value: string | undefined): string | undefined {
@@ -132,6 +150,14 @@ async function open_command(rest: ReadonlyArray<string>): Promise<number> {
 	const issue = parse_issue(rest)
 
 	if (issue === undefined) return report_usage()
+
+	const refused = await guard_cut_session()
+
+	if (refused !== undefined) {
+		console.error(refused)
+
+		return FAILURE_EXIT_CODE
+	}
 
 	return report_open(await lane_open.open_lane(issue))
 }
@@ -234,6 +260,14 @@ async function dispatch_command(rest: ReadonlyArray<string>): Promise<number> {
 	const issue = parse_issue(rest)
 
 	if (issue === undefined) return report_usage()
+
+	const refused = await guard_cut_session()
+
+	if (refused !== undefined) {
+		console.error(refused)
+
+		return FAILURE_EXIT_CODE
+	}
 
 	return await report_dispatch(await lane_dispatch.dispatch_child(issue), issue)
 }
