@@ -37,9 +37,10 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // **What is stubbed, and why it is not the subject.** Three calls, the same three
 // `lane-open-start-point.test.ts` stubs and for the same reasons:
 //
-// - `lane_install.install_dependencies` runs a real `pnpm install --frozen-lockfile` with no skip
-//   seam of any kind. The fixture repository has no manifest and no lockfile, so the install could
-//   only fail — on a manifest that was never what this test is about.
+// - `lane_install.install_dependencies` is stubbed so no real `pnpm install --frozen-lockfile` runs.
+//   The manifest-absent skip (joshuafolkken/kit#2148) would in fact skip it on its own here — the
+//   fixture repository has no manifest — but the stub is kept so this suite stays about the seat race
+//   rather than about the skip, which `lane-install.test.ts` pins.
 // - `git_worktree.ls_remote_branch` and `git_command.fetch_branch` reach the network, which the unit
 //   network guard refuses by design, and the fixture has no remote to ask. `fetch_branch` carries no
 //   timeout of its own, so leaving it live would hang the gate on a machine whose global git config
@@ -47,9 +48,10 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 //
 // **What this file does NOT cover, stated rather than implied.** It does not run two lanes in two
 // operating-system processes: production dispatches a lane child as its own process, and this suite
-// interleaves two `open_lane` calls inside one. A cross-process test cannot be written against the
-// code as it stands, because the only seam that lets a lane open without a real `pnpm install` is a
-// `vi.spyOn` inside the test process. It also does not start an agent CLI, does not run a
+// interleaves two `open_lane` calls inside one. The manifest-absent skip (joshuafolkken/kit#2148) is
+// what now lets a lane open without a real `pnpm install` from another process; writing that
+// cross-process test is a separate issue and is not done here. It also does not start an agent CLI,
+// does not run a
 // verification gate inside a lane, and does not cover cache seeding beyond the fact that opening a
 // lane did not throw.
 
