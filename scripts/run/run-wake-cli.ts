@@ -243,6 +243,9 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 		progress_line(context),
 		run_liveness.describe_agent_state(context.log_target),
 		`output: ${context.log_target}`,
+		// The ambient surface a person keeps open across the cut: `--list` relays the last line on
+		// demand, and this names the file that streams every one (joshuafolkken/kit#2156).
+		`ambient: tail -F ${run_progress_clock.log_path_of(context.progress_target)}`,
 		`stop it with \`${STOP_COMMAND}\``,
 	]
 		.filter((line) => line !== undefined)

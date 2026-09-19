@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -146,5 +146,107 @@ describe('the report clock also carries the last heartbeat line', () => {
 
 		run_progress_clock.mark(target, WHEN)
 		expect(run_progress_clock.read_last_line(target)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#2156: the report clock also mirrors every heartbeat line into a plain-text log
+// beside it — the *ambient* surface a person keeps open with `tail -F` to watch the run stream on
+// across a session cut, without typing for `--list` each time.
+const AMBIENT_LINE = '⏳ at 2026-09-13 15:30+09:00 / 06:30Z · quiet 3m · lanes none · next later'
+const AMBIENT_NEXT = '⏳ at 2026-09-13 15:50+09:00 / 06:50Z · quiet 20m · lanes none · next later'
+const AMBIENT_WHEN = Date.parse('2026-09-20T06:30:00.000Z')
+const MINUTE_MS = 60_000
+// One blank line between blocks means at most two consecutive newlines; a third marks a wider gap.
+const MAX_CONSECUTIVE_NEWLINES = 2
+const TOO_WIDE_GAP = '\n'.repeat(MAX_CONSECUTIVE_NEWLINES + 1)
+
+function ambient_blocks(target: string): ReadonlyArray<string> {
+	const log = run_progress_clock.log_path_of(target)
+
+	if (!existsSync(log)) return []
+
+	return readFileSync(log, 'utf8')
+		.split('\n\n')
+		.map((block) => block.trimEnd())
+		.filter((block) => block.length > 0)
+}
+
+describe('the report clock mirrors heartbeats into the ambient log', () => {
+	it('names the ambient log as a sibling of the report clock', () => {
+		expect(run_progress_clock.log_path_of('/scratch/clock.json')).toBe('/scratch/clock.json.log')
+	})
+
+	it('writes the heartbeat line into the ambient log', () => {
+		const target = path.join(TEMPORARY, 'ambient-one.json')
+
+		run_progress_clock.mark(target, AMBIENT_WHEN, AMBIENT_LINE)
+
+		expect(ambient_blocks(target)).toStrictEqual([
+			`${new Date(AMBIENT_WHEN).toISOString()}\n${AMBIENT_LINE}`,
+		])
+	})
+
+	it('appends a second heartbeat that lands within the run', () => {
+		const target = path.join(TEMPORARY, 'ambient-two.json')
+
+		run_progress_clock.mark(target, AMBIENT_WHEN, AMBIENT_LINE)
+		run_progress_clock.mark(target, AMBIENT_WHEN + MINUTE_MS, AMBIENT_NEXT)
+
+		expect(ambient_blocks(target)).toHaveLength(2)
+	})
+
+	// The raw file, not the trimmed blocks: a re-read that kept the trailing newline would grow a blank
+	// line between every pair of blocks, so the reader's `tail -F` surface must separate them by exactly
+	// one blank line.
+	it('separates blocks by a single blank line on disk', () => {
+		const target = path.join(TEMPORARY, 'ambient-format.json')
+
+		run_progress_clock.mark(target, AMBIENT_WHEN, AMBIENT_LINE)
+		run_progress_clock.mark(target, AMBIENT_WHEN + MINUTE_MS, AMBIENT_NEXT)
+
+		const raw = readFileSync(run_progress_clock.log_path_of(target), 'utf8')
+
+		expect(raw).not.toContain(TOO_WIDE_GAP)
+	})
+})
+
+describe('the ambient log resets on a stale run and is bounded', () => {
+	// A gap longer than any interval belongs to a previous run, so the log opens fresh rather than on
+	// stale lines.
+	it('resets the log when the newest block predates this run', () => {
+		const target = path.join(TEMPORARY, 'ambient-stale.json')
+		const later = AMBIENT_WHEN + run_progress_clock.LOG_STALE_MS + MINUTE_MS
+
+		run_progress_clock.mark(target, AMBIENT_WHEN, AMBIENT_LINE)
+		run_progress_clock.mark(target, later, AMBIENT_NEXT)
+
+		expect(ambient_blocks(target)).toStrictEqual([
+			`${new Date(later).toISOString()}\n${AMBIENT_NEXT}`,
+		])
+	})
+
+	it('keeps only the most recent LOG_KEEP heartbeats', () => {
+		const target = path.join(TEMPORARY, 'ambient-cap.json')
+		const count = run_progress_clock.LOG_KEEP + 3
+
+		for (let index = 0; index < count; index += 1) {
+			run_progress_clock.mark(
+				target,
+				AMBIENT_WHEN + index * MINUTE_MS,
+				`${AMBIENT_LINE} ${String(index)}`,
+			)
+		}
+
+		expect(ambient_blocks(target)).toHaveLength(run_progress_clock.LOG_KEEP)
+	})
+
+	// A bare `--mark` moves the clock on a real report without a heartbeat line, so it writes nothing to
+	// the ambient log — the tier is for observed heartbeats, not for the run's own reports.
+	it('writes nothing to the ambient log for a bare mark', () => {
+		const target = path.join(TEMPORARY, 'ambient-bare.json')
+
+		run_progress_clock.mark(target, AMBIENT_WHEN)
+
+		expect(ambient_blocks(target)).toStrictEqual([])
 	})
 })
