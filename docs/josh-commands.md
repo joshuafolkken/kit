@@ -1075,6 +1075,16 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
+### `josh oracle:list` · `josh ol`
+
+Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → question 0). Each row carries the command, its answer vocabulary and its single-source document. Adding a new oracle means adding a row here and nowhere else.
+
+```bash
+pnpm josh oracle:list   # alias: josh ol
+```
+
+Single source: `scripts/rules/decision-oracle.ts`.
+
 ### `josh run:hold` / `josh run:release`
 
 Guard a working tree so only one run holds it at a time — `run:hold` claims it, `run:release` clears the claim. The unit is the working tree, so two lanes of one repository key differently.

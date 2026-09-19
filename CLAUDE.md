@@ -152,6 +152,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 ## Collaboration Workflow
 
 - For the issue-driven proposal/plan/execution/notification flow, follow `prompts/collaboration-workflow/` (indexed by `prompts/collaboration-workflow.md`; each topic is its own file).
+- **Before writing a rule as prose, ask whether its answer can be computed from mechanically readable inputs alone.** If yes, the rule is a decision oracle — add it to `pnpm josh oracle:list` (`scripts/rules/decision-oracle.ts`) rather than writing it in `CLAUDE.md` or a prompt file. `prompts/collaboration-workflow/residency.md` → question 0 is the criterion.
 - **Count the target repository's open Issues before filing; with more than 30 open, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository; both exemptions proceed, stating the overage. Meeting none of the three, a finding stays discretionary. `pnpm josh rule:guard` states it again at the call that files. The count command and both procedures: `prompts/collaboration-workflow/wip-cap.md`.
 
 ### Shorthand Commands

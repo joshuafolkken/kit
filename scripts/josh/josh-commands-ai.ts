@@ -288,6 +288,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	'oracle:list': {
+		script: 'scripts/rules/oracle-list-cli.ts',
+		description: 'Print the decision oracles — commands that answer a rule question mechanically',
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',

@@ -117,6 +117,7 @@ const ALIASES: Record<string, string> = {
 	rug: 'rule:guard',
 	ptg: 'pretool:guard',
 	ev: 'eval',
+	ol: 'oracle:list',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

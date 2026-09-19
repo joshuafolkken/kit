@@ -821,6 +821,8 @@ single source of every one of them.
 
 ## 3. What stays resident, and what is read from here
 
+**Before either question below, ask question 0:** `prompts/collaboration-workflow/residency.md` → question 0 — can the rule's answer be computed from mechanically readable inputs alone? If yes, it is a decision oracle and neither question below applies; `pnpm josh oracle:list` shows the existing ones. Only a no reaches the first question.
+
 **The first question is whether the rule's trigger can be named:**
 
 > **Can the moment the rule begins to bind be named as one tool call?**
