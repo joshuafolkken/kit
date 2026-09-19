@@ -426,7 +426,7 @@ function write_decision(raw_payload: string, refusal: (raw: string) => string | 
 // Run from a terminal there is no payload coming, and waiting for one looks like a hang.
 function report_no_payload(command: string): void {
 	process.stderr.write(
-		`${command} reads a Claude Code PreToolUse payload on stdin; it is not run by hand.\n`,
+		`${command} reads a Claude Code hook payload on stdin; it is not run by hand.\n`,
 	)
 }
 

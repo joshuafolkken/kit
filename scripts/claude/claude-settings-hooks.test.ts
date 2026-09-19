@@ -30,6 +30,10 @@ const PRETOOL_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command(
 	'pretool-guard.js',
 	'pretool:guard',
 )
+// The Stop hook (joshuafolkken/kit#2121): one process delivering the three stop-time rules — the two
+// hold-based refusals and the issue-citation notice. It is the stop-time counterpart of the PreToolUse
+// guard, launched from its own bundle with a `pnpm josh` fallback.
+const STOP_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command('stop-guard.js', 'stop:guard')
 // Derived from the script's own per-spawn bound rather than written as a number: raising that bound
 // has to raise the declared budget with it, or the harness kills a run the script still considers
 // healthy — and it lands at a moment the script did not choose, possibly inside `prettier --write`.
@@ -45,6 +49,10 @@ const MINIMUM_HOOK_TIMEOUT_SECONDS =
 // quarter-megabyte read. Declared all the same: a `PreToolUse` hook holds the call it guards, and a
 // kill at an undeclared default would land on a decision the script had not finished making.
 const MINIMUM_GUARD_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
+// The stop guard reads the transcript tail and a `git status`, but starts no formatter, so one script
+// start and a quarter-megabyte read is its whole budget — declared for the reason the PreToolUse
+// guard's is: a kill at an undeclared default would land on a decision the script had not finished.
+const MINIMUM_STOP_GUARD_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 
 // The separators the exact-list form admits — `|` and `,`, with any surrounding space trimmed off.
 // Splitting on `|` alone would read the equally valid `"Edit, Write, Bash"` as one tool named
@@ -213,6 +221,20 @@ function describe_session_hook(title: string, wiring: HookWiring): void {
 	})
 }
 
+// `Stop` carries no tool matcher — it fires on every turn end, so the empty matcher is what says "every
+// stop" (joshuafolkken/kit#2121). It shares the three properties every hook holds and adds the same
+// empty-matcher assertion the session hooks make, for the same reason: a named matcher would leave some
+// stops unguarded.
+function describe_stop_hook(title: string, wiring: HookWiring): void {
+	describe(title, () => {
+		describe_shared_hook_properties(wiring)
+
+		it('matches every stop rather than a matcher variant', () => {
+			expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual([''])
+		})
+	})
+}
+
 describe_session_hook('.claude/settings.json — session-start audit provisioning', {
 	event: 'SessionStart',
 	command: PROVISION_HOOK_COMMAND,
@@ -251,6 +273,12 @@ describe_tool_hook('.claude/settings.json — consolidated pre-call guard', {
 	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
 })
 
+describe_stop_hook('.claude/settings.json — stop-time rule delivery', {
+	event: 'Stop',
+	command: STOP_GUARD_HOOK_COMMAND,
+	minimum_timeout_seconds: MINIMUM_STOP_GUARD_TIMEOUT_SECONDS,
+})
+
 // The consolidation's own guarantee (joshuafolkken/kit#1930): PreToolUse is one entry running one
 // hook, so the three-launch cost is gone rather than merely relabelled.
 function pretool_entries(): ReadonlyArray<HookMatcher> {
@@ -273,7 +301,13 @@ describe('.claude/settings.json — PreToolUse is one consolidated entry', () =>
 
 function all_hooks(): ReadonlyArray<HookHandler> {
 	const { hooks } = claude_settings_fixture.load_settings()
-	const events = [hooks.SessionStart, hooks.UserPromptSubmit, hooks.PreToolUse, hooks.PostToolUse]
+	const events = [
+		hooks.SessionStart,
+		hooks.UserPromptSubmit,
+		hooks.PreToolUse,
+		hooks.PostToolUse,
+		hooks.Stop,
+	]
 
 	return events.flatMap((matchers) => matchers ?? []).flatMap((entry) => entry.hooks)
 }

@@ -119,6 +119,7 @@ const ALIASES: Record<string, string> = {
 	ig: 'investigation:guard',
 	rug: 'rule:guard',
 	ptg: 'pretool:guard',
+	sg: 'stop:guard',
 	ev: 'eval',
 	ol: 'oracle:list',
 }

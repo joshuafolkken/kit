@@ -135,6 +135,16 @@ Claude Code hook: print the resolved JOSH_SESSION_LANG (defaults to ja) for the 
 
 ---
 
+### `josh stop:guard` · `josh sg`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Claude Code Stop hook: deliver the three stop-time rules — hold notify/release and issue citation (reads the Stop payload on stdin)
+
+---
+
 ### `josh test` · `josh t`
 
 > **Audience:** developer · **Side effects:** processes

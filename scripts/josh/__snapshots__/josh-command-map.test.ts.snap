@@ -83,6 +83,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rw": "run:wake",
     "rwg": "run:watcher:guard",
     "sd": "cspell:dot",
+    "sg": "stop:guard",
     "sl": "session:lang",
     "sp": "stash:pop",
     "ss": "secretlint-scan",
@@ -711,6 +712,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "git",
+      ],
+    ],
+    "stop:guard": [
+      "",
+      "automation",
+      [
+        "none",
       ],
     ],
     "sync": [
