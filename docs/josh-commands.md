@@ -1173,6 +1173,22 @@ pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 
 
 **Output / exit codes:** stdout is one token; stderr explains. `alive`, `stopped`, `settled` exit 0; `undetermined` exits 1. Growth in the transcript answers `alive` on its own. Two `undetermined` answers in a row is a check fault; the caller stops polling rather than escalating to `stopped`.
 
+### `josh run:ending`
+
+Classify how a dispatched lane child _ended_ — a different question from `run:liveness`'s "is it still going". `run:liveness` cannot see a child that stopped mid-implementation: its output freezes exactly as a completed child's does, and a `subtype: success` exit reads as a clean finish. This reads three traces the child leaves behind — a carried cut record (it handed off), a CLOSED Issue (it merged), or an OPEN Issue with no cut (it ended in the middle) — and, for the last, prints the exit-record basis a park comment should carry.
+
+```bash
+pnpm josh run:ending 2118 --output <path>                       # alias: josh red
+pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
+```
+
+**Options:**
+
+- `--output <path>` — the child's transcript, absolute and under the home or temp directory (validated the same way `run:liveness --output` is).
+- `--repo <owner/name>` — a child in another repository.
+
+**Output / exit codes:** stdout is one token; stderr carries the reason and the basis. `merged`, `cut`, `abandoned` exit 0; `unreadable` exits 1. The verdict never reads `is_error: false` as a completion — completion is the CLOSED Issue — so a normal exit that abandoned the run is told apart from one that finished it. For `abandoned` the basis names which exit-record fields were read (`subtype`, `num_turns`, `permission_denials` count) and whether uncommitted work remains, ready to paste into the park comment. The four words are deliberately disjoint from `run:liveness`'s `alive` / `stopped` / `settled` / `undetermined`.
+
 ### `josh run:prep`
 
 Bundles the reads a run makes before its first edit into one call; alias `rp`.

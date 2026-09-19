@@ -815,6 +815,16 @@ Cut a lane child before the gate and resume a fresh process from the persisted s
 
 ---
 
+### `josh run:ending` · `josh red`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue> --output <path> [--repo <owner/repo>]`
+
+Classify how a dispatched lane child ended: merged, cut, abandoned mid-implementation, or unreadable
+
+---
+
 ### `josh run:hold` · `josh rh`
 
 > **Audience:** automation · **Side effects:** files

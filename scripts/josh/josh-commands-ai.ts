@@ -190,6 +190,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> --output <path> [options]', 'automation', ['processes']],
 	},
+	'run:ending': {
+		script: 'scripts/run/run-ending-cli.ts',
+		description:
+			'Classify how a dispatched lane child ended: merged, cut, abandoned mid-implementation, or unreadable',
+		category: 'AI tools',
+		reference: ['<issue> --output <path> [--repo <owner/repo>]', 'automation', ['network']],
+	},
 	'run:progress': {
 		script: 'scripts/run/run-progress-cli.ts',
 		description: 'Report an unattended run’s progress once it has gone quiet for an interval',

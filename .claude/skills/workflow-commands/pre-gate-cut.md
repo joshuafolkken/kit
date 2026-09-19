@@ -267,6 +267,14 @@ at each boundary itself, and whether the run held to it is read from the run-tim
 `pnpm josh cost` on a real dispatched run (see "Measurement" below) — the same feedback loop the
 pre-gate cut's own measurement uses.
 
+**The aggregate is not the only feedback: an individual child that ended mid-implementation without
+cutting is detected per-child, after the fact, by `pnpm josh run:ending <N> --output <path>**
+(joshuafolkken/kit#2139) — it classifies the child's ending as `merged` / `cut` / `abandoned` /
+`unreadable` from the exit record, the cut record and the Issue state, so the `abandoned` case (a
+child that stopped in the middle without handing off) is visible without opening the log, and its
+exit-record basis goes into the park comment. It is post-hoc detection, not the synchronous guard this
+trigger cannot be — the same reason stated above.
+
 ### Edit in bulk, then check once
 
 **A single check (`lint:related` / `test:related`) is run after a batch of edits, not after each
