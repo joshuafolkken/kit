@@ -41,7 +41,9 @@ const SLACK_BYTES = 512
 // needed the second unit that the branch tree alone did not. joshuafolkken/kit#2050 raised it four
 // slack units (82,048 → 84,096) for the mandated `josh stash:pop` section — its command reference and
 // the `conflicted` verdict — landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 84_096
+// joshuafolkken/kit#2113 raised it three slack units (84,096 → 85,632) for the mandated
+// `josh run:watcher:guard` and `josh lane:await` sections.
+const JOSH_COMMANDS_CEILING_BYTES = 85_632
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -69,7 +71,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_355 },
-	{ path: 'docs/josh-commands.md', bytes: 83_584 },
+	{ path: 'docs/josh-commands.md', bytes: 84_965 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

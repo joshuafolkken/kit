@@ -655,6 +655,16 @@ Print each issue's state and labels, in the spelling the documents compare again
 
 ---
 
+### `josh lane:await` · `josh lna`
+
+> **Audience:** automation · **Side effects:** processes
+
+`<issue> [<issue>...]`
+
+Block until any of the named in-flight lane children completes; prints which one finished
+
+---
+
 ### `josh lane:close` · `josh lnc`
 
 > **Audience:** automation · **Side effects:** files, git
@@ -852,6 +862,16 @@ Release this working tree's run record
 `[options]`
 
 Continue a cut backlogrun by waking the next session from outside the conversation
+
+---
+
+### `josh run:watcher:guard` · `josh rwg`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Guard: exits non-zero when lane children are in-flight but the watcher has not pinged recently
 
 ---
 

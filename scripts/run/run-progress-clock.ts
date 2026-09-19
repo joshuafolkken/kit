@@ -123,11 +123,51 @@ function life_target_of(git_directory: string | undefined): string {
 	return stamp_file.stamp_path(LIFE_PREFIX, git_directory)
 }
 
+// **`pinged_at` is written by every tick and checked by `is_life_fresh`.** Without it the life record
+// is presence-only — existence is the only signal, and a record from a watcher that stopped an hour
+// ago is indistinguishable from one whose watcher is live. Adding `pinged_at` to the payload lets a
+// guard detect "children in-flight but watcher stale" without a second file (joshuafolkken/kit#2113).
+// Old records carrying only `{ alive: true }` parse successfully; `pinged_at` is optional on read,
+// which is what makes this backward-compatible.
+const life_schema = z.object({ alive: z.literal(true), pinged_at: z.string().optional() })
+
 // The watcher declares itself alive. `write_stamp` unlinks first, so a fresh `--wait` cleanly replaces
-// a record an earlier one left behind. The payload is presence only — nothing reads its contents; the
-// existence of the file is the whole signal.
+// a record an earlier one left behind.
 function begin_life(target: string): void {
-	stamp_file.write_stamp(target, { alive: true })
+	stamp_file.write_stamp(target, { alive: true, pinged_at: new Date().toISOString() })
+}
+
+// Refreshes the `pinged_at` timestamp without disturbing the liveness semantics. Called on every
+// watch tick so the record's age is a proxy for "watcher is running".
+function ping_life(target: string): void {
+	begin_life(target)
+}
+
+function parse_pinged_at(raw: string): number | undefined {
+	const parsed = life_schema.safeParse(JSON.parse(raw))
+
+	if (!parsed.success || parsed.data.pinged_at === undefined) return undefined
+
+	const pinged_ms = Date.parse(parsed.data.pinged_at)
+
+	return Number.isNaN(pinged_ms) ? undefined : pinged_ms
+}
+
+// Returns `false` for any absent, unreadable or un-timestamped record — both "no watcher" and "old
+// watcher that predates joshuafolkken/kit#2113" produce `false`, which is the safe direction for a
+// guard: it speaks up rather than staying silent.
+function is_life_fresh(target: string, threshold_ms: number): boolean {
+	const raw = stamp_file.read_stamp_text(target)
+
+	if (raw === undefined) return false
+
+	try {
+		const pinged_ms = parse_pinged_at(raw)
+
+		return pinged_ms !== undefined && Date.now() - pinged_ms < threshold_ms
+	} catch {
+		return false
+	}
 }
 
 // **Gone means ended.** `read_stamp_text` answers `undefined` for an absent or unowned record, and the
@@ -186,9 +226,11 @@ const run_progress_clock = {
 	begin_life,
 	end_life,
 	is_life_ended,
+	is_life_fresh,
 	life_target_of,
 	mark,
 	parse_stamp,
+	ping_life,
 	read_last_line,
 	read_last_report,
 	read_last_report_sync,

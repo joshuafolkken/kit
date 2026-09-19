@@ -39,6 +39,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "l": "lint",
     "lc": "latest:corepack",
     "ln": "lines",
+    "lna": "lane:await",
     "lnc": "lane:close",
     "lnd": "lane:dispatch",
     "lnl": "lane:list",
@@ -77,6 +78,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rug": "rule:guard",
     "rv": "run:liveness",
     "rw": "run:wake",
+    "rwg": "run:watcher:guard",
     "sd": "cspell:dot",
     "sl": "session:lang",
     "sp": "stash:pop",
@@ -333,6 +335,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "network",
+      ],
+    ],
+    "lane:await": [
+      "<issue> [<issue>...]",
+      "automation",
+      [
+        "processes",
       ],
     ],
     "lane:close": [
@@ -649,6 +658,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "processes",
         "notifications",
+      ],
+    ],
+    "run:watcher:guard": [
+      "",
+      "automation",
+      [
+        "none",
       ],
     ],
     "secretlint-scan": [
