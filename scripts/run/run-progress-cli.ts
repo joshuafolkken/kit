@@ -330,6 +330,7 @@ async function run_ticks(
 
 	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
 		await sleep(options.tick_ms)
+		run_progress_clock.ping_life(life)
 		loop = await step(options, target, loop)
 
 		if (has_reported(loop, should_stop_on_report)) return 'reported'

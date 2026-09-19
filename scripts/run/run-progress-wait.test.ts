@@ -29,6 +29,7 @@ vi.mock('./run-progress-clock', () => ({
 	run_progress_clock: {
 		begin_life: vi.fn(),
 		is_life_ended: vi.fn(),
+		ping_life: vi.fn(),
 	},
 }))
 

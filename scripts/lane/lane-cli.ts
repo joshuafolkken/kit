@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { lane_await } from './lane-await'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_open, type OpenOutcome } from './lane-open'
@@ -32,6 +33,7 @@ const USAGE = [
 	'       josh lane:prune',
 	'       josh lane:output <issue-number> [<path>]',
 	'       josh lane:dispatch <issue-number>',
+	'       josh lane:await <issue-number> ...',
 ].join('\n')
 
 type Handler = (rest: ReadonlyArray<string>) => Promise<number>
@@ -238,6 +240,28 @@ async function dispatch_command(rest: ReadonlyArray<string>): Promise<number> {
 	return await report_dispatch(await lane_dispatch.dispatch_child(issue), issue)
 }
 
+// Each valid argument is an issue number; any non-number stops parsing and triggers usage.
+function parse_issues(rest: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
+	if (rest.length === 0) return undefined
+	const issues = rest.filter((value) => lane_await.ISSUE_PATTERN.test(value))
+
+	return issues.length === rest.length ? issues : undefined
+}
+
+// The completed issue number goes to standard output so `N=$(pnpm josh lane:await ...)` captures
+// which child finished without parsing stderr.
+async function await_command(rest: ReadonlyArray<string>): Promise<number> {
+	const issues = parse_issues(rest)
+
+	if (issues === undefined) return report_usage()
+
+	const completed = await lane_await.wait_for_any(issues)
+
+	console.info(completed)
+
+	return SUCCESS_EXIT_CODE
+}
+
 const HANDLERS: Record<string, Handler> = {
 	open: open_command,
 	close: close_command,
@@ -245,6 +269,7 @@ const HANDLERS: Record<string, Handler> = {
 	prune: prune_command,
 	output: output_command,
 	dispatch: dispatch_command,
+	await: await_command,
 }
 
 async function dispatch(argv: ReadonlyArray<string>): Promise<number> {

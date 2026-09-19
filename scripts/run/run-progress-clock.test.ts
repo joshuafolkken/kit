@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -49,6 +49,48 @@ describe('the watcher liveness record', () => {
 		expect(() => {
 			run_progress_clock.end_life(target)
 		}).not.toThrow()
+	})
+})
+
+describe('ping_life and is_life_fresh — staleness detection (joshuafolkken/kit#2113)', () => {
+	it('is_life_fresh returns false for an absent record', () => {
+		const target = path.join(TEMPORARY, 'fresh-absent.json')
+
+		expect(run_progress_clock.is_life_fresh(target, 60_000)).toBe(false)
+	})
+
+	it('is_life_fresh returns false for an old-format record without pinged_at', () => {
+		const target = path.join(TEMPORARY, 'fresh-old.json')
+
+		writeFileSync(target, JSON.stringify({ alive: true }))
+
+		expect(run_progress_clock.is_life_fresh(target, 60_000)).toBe(false)
+	})
+
+	it('is_life_fresh returns true right after ping_life', () => {
+		const target = path.join(TEMPORARY, 'fresh-pinged.json')
+
+		run_progress_clock.ping_life(target)
+
+		expect(run_progress_clock.is_life_fresh(target, 60_000)).toBe(true)
+	})
+
+	it('is_life_fresh returns false after the threshold has elapsed', () => {
+		const target = path.join(TEMPORARY, 'fresh-stale.json')
+
+		run_progress_clock.ping_life(target)
+
+		// is_life_fresh with a threshold of 0 ms always returns false
+		expect(run_progress_clock.is_life_fresh(target, 0)).toBe(false)
+	})
+
+	// begin_life now also sets pinged_at, so the liveness record is fresh from the first write.
+	it('begin_life writes a fresh pinged_at timestamp', () => {
+		const target = path.join(TEMPORARY, 'fresh-begin.json')
+
+		run_progress_clock.begin_life(target)
+
+		expect(run_progress_clock.is_life_fresh(target, 60_000)).toBe(true)
 	})
 })
 
