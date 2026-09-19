@@ -30,9 +30,9 @@ describe('Claude argv construction', () => {
 
 		expect(result).toMatchObject({
 			kind: 'argv',
-			profile: { provider: 'anthropic', role: 'worker', model: 'sonnet', effort: 'medium' },
+			profile: { provider: 'anthropic', role: 'worker', model: 'opus', effort: 'medium' },
 		})
-		if (result.kind === 'argv') expect(result.argv.args).toContain('sonnet')
+		if (result.kind === 'argv') expect(result.argv.args).toContain('opus')
 	})
 
 	it('passes no permission-bypass flag', () => {

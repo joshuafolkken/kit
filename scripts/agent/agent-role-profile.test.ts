@@ -23,11 +23,11 @@ describe('the role policy defaults', () => {
 			provider: 'anthropic',
 			role: SCHEDULER,
 			model: 'opus',
-			effort: 'high',
+			effort: 'medium',
 		})
 		expect(profile(WORKER, ANTHROPIC_ENV)).toMatchObject({
 			provider: 'anthropic',
-			model: 'sonnet',
+			model: 'opus',
 			effort: 'medium',
 		})
 		expect(profile(REVIEWER, ANTHROPIC_ENV)).toMatchObject({
@@ -42,7 +42,7 @@ describe('the role policy defaults', () => {
 			provider: 'openai',
 			role: SCHEDULER,
 			model: OPENAI_MODEL,
-			effort: 'high',
+			effort: 'medium',
 		})
 		expect(profile(WORKER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
 		expect(profile(REVIEWER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'high' })
