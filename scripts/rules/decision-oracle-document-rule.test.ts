@@ -13,7 +13,7 @@ const RULE_RESIDENCY = '.claude/skills/workflow-commands/rule-residency.md'
 const CLAUDE = 'CLAUDE.md'
 
 // The unique marker for question 0 in residency.md. The phrase appears only in the question 0
-// criterion — the previous criterion used 第 1 問 / 第 2 問 numbering.
+// criterion — the previous criterion used a "question 1 / question 2" numbering.
 const QUESTION_0_JP_MARKER = '機械的に読める入力だけから計算できるか'
 // The oracle listing command that documents must name as the pointer.
 const ORACLE_COMMAND = 'oracle:list'

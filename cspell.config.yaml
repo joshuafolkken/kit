@@ -196,3 +196,7 @@ words:
   # English word in `scripts/rules/worktree-guard.ts` — a message-tagged stash is "findable and poppable"
   # by `pnpm josh stash:pop` (joshuafolkken/kit#2120). Appears only in that module's comment.
   - poppable
+  # The ESTree property name for a template literal's static string chunks (`node.quasis`), read by
+  # `eslint/rules/english-only-prose.js` when it inspects a no-substitution template title
+  # (joshuafolkken/kit#2124). It is the AST spelling, not a coined word.
+  - quasis

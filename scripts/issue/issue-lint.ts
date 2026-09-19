@@ -13,8 +13,8 @@ function heading_lines(body: string): ReadonlyArray<string> {
 	return body.split('\n').map((line) => line.trim())
 }
 
-// A heading is present when a line is exactly it — a `## 背景` mentioned inside a sentence is not the
-// section heading, and matching a substring would accept it.
+// A heading is present when a line is exactly it — a required heading (see REQUIRED_HEADINGS) mentioned
+// inside a sentence is not the section heading, and matching a substring would accept it.
 function has_heading(body: string, heading: string): boolean {
 	return heading_lines(body).includes(heading)
 }

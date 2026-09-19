@@ -129,7 +129,7 @@ describe('the canonical workflow document is split by topic', () => {
 	})
 })
 
-// A citation may name a section as well as a file: `` `…/backlogrun.md` → "EPIC でない Issue も受け取る" ``.
+// A citation may name a section as well as a file: `` `…/backlogrun.md` → "When #N is not an epic" ``.
 // Checking only that the file exists is what let three pointers name the wrong file and stay green —
 // the files existed, the sections were in other ones (joshuafolkken/kit#965).
 // Both quote styles: the documents use `"…"` and `「…」` interchangeably, and matching only the
