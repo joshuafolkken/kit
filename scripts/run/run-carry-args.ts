@@ -22,7 +22,7 @@ const MIN_PID = 1
 // cannot advance a budget that is no longer its own. `--end` alone accepts it and ignores it, and a
 // usage line that offered it there would be promising an ownership check nothing performs.
 const USAGE =
-	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue>) [--owner <pid>] | --end'
+	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue>) [--owner <pid>] | --end [--stopped <reason>]'
 
 const OPTIONS = {
 	begin: { type: 'string' },
@@ -34,6 +34,11 @@ const OPTIONS = {
 	merged: { type: 'string' },
 	owner: { type: 'string' },
 	resume: { type: 'string' },
+	// **`--stopped <reason>` rides on `--end`, so it is a modifier rather than a fifth group.** A run
+	// that halts needing a person ends its record exactly as a clean one does; the reason is what turns
+	// that end into the ⏸️ confirmation the person gets after a session cut (joshuafolkken/kit#2136).
+	// Named without `--end` it is ignored, the way a read ignores every counting flag.
+	stopped: { type: 'string' },
 } as const
 
 type OptionName = keyof typeof OPTIONS
@@ -50,10 +55,12 @@ interface CountRequest {
 }
 
 type Request =
-	CountRequest | { kind: 'read' } | { kind: 'claim'; claim: CarryClaimRequest } | { kind: 'end' }
+	| CountRequest
+	| { kind: 'read' }
+	| { kind: 'claim'; claim: CarryClaimRequest }
+	| { kind: 'end'; stopped: string | undefined }
 
 const READ_REQUEST: Request = { kind: 'read' }
-const END_REQUEST: Request = { kind: 'end' }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
 	try {
@@ -173,7 +180,7 @@ function to_claim_request(
 }
 
 function to_other_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
-	if (values.end === true) return END_REQUEST
+	if (values.end === true) return { kind: 'end', stopped: text_of(values.stopped) }
 
 	return has_count(values) ? to_count_request(values, owner) : READ_REQUEST
 }
