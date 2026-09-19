@@ -1,15 +1,12 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
+import { read_script } from './josh-script-reader'
 
 // The argument synopsis is the half of the reference metadata nothing else can check. A description
 // is prose nobody can contradict, but a synopsis is a claim about a parser, and the parser is in the
 // repository — so the claim is checked against it (joshuafolkken/kit#2106). Without this the
 // metadata is authored from each command's description, which is how `latest:update` came to
 // advertise a per-package argument it discards and `overrides` a positional it throws on.
-const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const FLAG_PATTERN = /--[a-z\d][a-z\d-]*/gu
 const FLAG_VALUE_PATTERN = /--[a-z\d][a-z\d-]*(?:[ =]<[^>]*>)?/gu
 // A positional opens with `<` or `[` followed by a letter. `[--fix]` opens with `[-`, and a flag's
@@ -25,10 +22,6 @@ const POSITIONAL_MARKERS: ReadonlyArray<string> = [
 	'positionals',
 	'process.argv.includes',
 ]
-
-function source_of(script: string): string {
-	return readFileSync(path.join(REPOSITORY_ROOT, script), 'utf8')
-}
 
 // A flag reaches its script under one of two spellings: written out in a usage string or compared
 // literally, or as a bare `parseArgs` option key, which carries no dashes. Both count — checking
@@ -64,7 +57,7 @@ function does_read_positional(source: string): boolean {
 describe('command reference — the synopsis matches the script it describes', () => {
 	it('never advertises a flag the script does not mention', () => {
 		for (const [name, script, synopsis] of script_commands()) {
-			const source = source_of(script)
+			const source = read_script(script)
 
 			for (const flag of flags_of(synopsis)) {
 				const is_mentioned = mentions_flag(source, flag)
@@ -78,7 +71,7 @@ describe('command reference — the synopsis matches the script it describes', (
 		for (const [name, script, synopsis] of script_commands()) {
 			if (!POSITIONAL_PATTERN.test(positional_part(synopsis))) continue
 
-			const is_read = does_read_positional(source_of(script))
+			const is_read = does_read_positional(read_script(script))
 
 			expect(is_read, `${name} advertises a positional ${script} discards`).toBe(true)
 		}

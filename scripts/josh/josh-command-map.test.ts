@@ -234,6 +234,18 @@ describe('COMMAND_MAP — latest command authentication', () => {
 	})
 })
 
+describe('COMMAND_MAP — side effects vocabulary', () => {
+	it("'none' is exclusive — not combined with other side effects", () => {
+		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
+			if (!entry.reference[2].includes('none')) continue
+			expect(
+				entry.reference[2],
+				`command ${name} mixes 'none' with other side effects`,
+			).toHaveLength(1)
+		}
+	})
+})
+
 describe('CATEGORY_ORDER — covers all command categories', () => {
 	it('includes every category used in COMMAND_MAP', () => {
 		const used_categories = new Set(Object.values(COMMAND_MAP).map((entry) => entry.category))
