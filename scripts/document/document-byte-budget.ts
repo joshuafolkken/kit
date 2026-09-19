@@ -49,8 +49,15 @@ const SLACK_BYTES = 512
 // batch:guard`, `josh investigation:guard` and `josh pretool:guard` notes recording that the
 // interactive-line guards stand down for a dispatched lane child, per the one-place enumeration in
 // `scripts/lane/lane-guard-policy.ts`; the merge with `main` layered #2136's addition on top, so the
-// merged tree needs a unit the branch alone did not.
-const JOSH_COMMANDS_CEILING_BYTES = 87_680
+// merged tree needs a unit the branch alone did not. joshuafolkken/kit#2139 raised it four slack
+// units (87,680 → 89,728) for the mandated `josh run:ending` section — its command reference, the four
+// ending verdicts (`merged` / `cut` / `abandoned` / `unreadable`) and its `--output` / `--repo`
+// options — landing against a document already at its mark. joshuafolkken/kit#2118 raised it one slack
+// unit (89,728 → 90,240) for the mandated `josh test:declared` section — its command reference and the
+// three verdicts (`required` / `exempt` / `satisfied`) — landing against a document already at its
+// mark, the branch's merge with `main` layering the section on top of a document `main` had already
+// filled.
+const JOSH_COMMANDS_CEILING_BYTES = 90_240
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -61,7 +68,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 5320 },
 	{ path: '.claude/skills/workflow-commands/SKILL.md', bytes: 63_392 },
 	{ path: '.claude/skills/workflow-commands/background-commands.md', bytes: 8180 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', bytes: 24_829 },
+	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', bytes: 25_925 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', bytes: 25_746 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', bytes: 11_889 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 40_607 },
@@ -74,11 +81,11 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 7528 },
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_931 },
-	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 25_508 },
+	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 26_629 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 19_208 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 87_168 },
+	{ path: 'docs/josh-commands.md', bytes: 89_267 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

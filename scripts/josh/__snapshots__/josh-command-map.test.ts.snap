@@ -69,6 +69,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rc": "run:carry",
     "rct": "run:cut",
     "re": "release",
+    "red": "run:ending",
     "res": "release:scope",
     "rg": "run:progress",
     "rh": "run:hold",
@@ -624,6 +625,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "files",
+      ],
+    ],
+    "run:ending": [
+      "<issue> --output <path> [--repo <owner/repo>]",
+      "automation",
+      [
+        "network",
       ],
     ],
     "run:hold": [
