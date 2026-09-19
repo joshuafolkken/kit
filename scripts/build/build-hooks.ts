@@ -34,6 +34,7 @@ interface HookBundle {
 const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/hooks/codex-hook-adapter.ts', out: 'codex-hook-adapter' },
 	{ source: 'scripts/hooks/pretool-guard.ts', out: 'pretool-guard' },
+	{ source: 'scripts/hooks/stop-guard.ts', out: 'stop-guard' },
 	{ source: 'scripts/hooks/format-edited-file.ts', out: 'format-edited' },
 	{ source: 'scripts/josh/session-language-cli.ts', out: 'session-lang' },
 	{ source: 'scripts/hooks/batch-guard.ts', out: 'batch-guard' },

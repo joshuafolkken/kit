@@ -93,6 +93,18 @@
 					}
 				]
 			}
+		],
+		"Stop": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "if [ -f dist/hooks/stop-guard.js ]; then node dist/hooks/stop-guard.js; else pnpm josh stop:guard; fi",
+						"timeout": 20
+					}
+				]
+			}
 		]
 	}
 }

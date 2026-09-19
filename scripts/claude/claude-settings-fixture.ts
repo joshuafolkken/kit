@@ -35,6 +35,8 @@ interface HooksBlock {
 	PreToolUse?: ReadonlyArray<HookMatcher>
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	PostToolUse?: ReadonlyArray<HookMatcher>
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
+	Stop?: ReadonlyArray<HookMatcher>
 }
 
 // The harness environment the settings file declares. Values are strings because Claude Code reads

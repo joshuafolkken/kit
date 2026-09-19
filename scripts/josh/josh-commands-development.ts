@@ -78,6 +78,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		// in-process dispatch rather than pay a second tsx start. Each guard it composes loads `.env`
 		// through the shared loader.
 	},
+	'stop:guard': {
+		script: 'scripts/hooks/stop-guard.ts',
+		description:
+			'Claude Code Stop hook: deliver the three stop-time rules — hold notify/release and issue citation (reads the Stop payload on stdin)',
+		category: 'Development',
+		reference: ['', 'automation', ['none']],
+		// **No `tsx_arguments`, deliberately**, the same as `pretool:guard` above: this runs at every
+		// turn end, so it must stay eligible for in-process dispatch rather than pay a second tsx start.
+		// It loads `.env` through the shared `hook-decision.ts` loader.
+	},
 	'session:lang': {
 		script: 'scripts/josh/session-language-cli.ts',
 		description:

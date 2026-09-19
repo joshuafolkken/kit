@@ -157,6 +157,10 @@ The `PreToolUse` dispatcher that routes each pending tool call to the delivered-
 
 **Which of the three fire in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, whether each guard fires for a lane child (`JOSH_LANE_CHILD`): `investigation` and `batching` stand down, while `rule` stays on — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
+### `josh stop:guard`
+
+The `Stop` hook (joshuafolkken/kit#2121): one process delivering the three stop-time rules — stop-notification and hold-release **block** the stop, issue-citation **notices** a bare `#N`. Built on `hook-decision.ts`, `lane-park.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+
 ### `josh session:lang`
 
 Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit` so the value is injected every turn.
