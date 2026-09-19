@@ -282,8 +282,41 @@ async function warn(input: WarningInput): Promise<boolean> {
 	)
 }
 
+interface ConfirmInput {
+	issue_title: string
+	body: string
+	recovery: string
+}
+
+/**
+ * Push the ⏸️ confirmation type — a state change an unattended run made that a person now has to act
+ * on, a `backlogrun` that stopped needing a decision being the one this was written for
+ * (joshuafolkken/kit#2136).
+ *
+ * **One function rather than one per caller, for `warn`'s reason exactly**: the repository lookup
+ * under a timeout is the field a second caller composing the four itself would drift on, and a lookup
+ * with no bound hangs the confirmation behind the very stop it is announcing. The tolerant `send_or_report`
+ * is used, not the strict `send`: the run is ending either way, so a gateway timeout at Telegram must
+ * not turn a stop into a crash — the pull path (`pnpm josh run:wake --list`) is the fallback the
+ * `recovery` line names.
+ */
+async function confirm(input: ConfirmInput): Promise<boolean> {
+	return await send_or_report(
+		{
+			task_type: 'confirmation',
+			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
+			issue_title: input.issue_title,
+			body: input.body,
+			issue_url: undefined,
+			pr_url: undefined,
+		},
+		input.recovery,
+	)
+}
+
 const telegram_notify = {
 	REPO_LOOKUP_TIMEOUT_MS,
+	confirm,
 	send,
 	send_or_report,
 	warn,
