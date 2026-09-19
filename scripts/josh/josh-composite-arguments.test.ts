@@ -10,6 +10,7 @@ const COMPOSITE_ENTRY: CommandEntry = {
 	shell: ['sh', '-c', 'pnpm josh test:unit && pnpm josh test:e2e'],
 	description: 'Run unit and E2E tests',
 	category: 'Development',
+	reference: ['', 'developer', ['processes']],
 	argument_targets: ['test:unit', 'test:e2e'],
 }
 
@@ -17,18 +18,21 @@ const NO_TARGET_ENTRY: CommandEntry = {
 	shell: ['sh', '-c', 'git checkout main && git pull'],
 	description: 'Checkout default branch and pull latest',
 	category: 'Workflow',
+	reference: ['', 'developer', ['git', 'network']],
 }
 
 const DIRECT_ENTRY: CommandEntry = {
 	shell: ['pnpm', 'exec', 'prettier', '--check', '.'],
 	description: 'Check formatting with prettier',
 	category: 'Development',
+	reference: ['', 'developer', ['processes']],
 }
 
 const SCRIPT_ENTRY: CommandEntry = {
 	script: 'scripts/test/test-e2e-guard.ts',
 	description: 'Run E2E tests with Playwright',
 	category: 'Development',
+	reference: ['', 'developer', ['processes']],
 }
 
 describe('composite_arguments.is_composite_shell', () => {

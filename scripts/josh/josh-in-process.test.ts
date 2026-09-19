@@ -21,6 +21,7 @@ const SCRIPT_ENTRY: CommandEntry = {
 	script: 'scripts/lint/lint-related.ts',
 	description: 'Lint the changed files',
 	category: 'Development',
+	reference: ['', 'developer', ['processes']],
 }
 
 const ORIGINAL_ARGV = process.argv
@@ -55,6 +56,7 @@ describe('josh_in_process.can_run_in_process', () => {
 			shell: ['pnpm', 'exec', 'prettier', '--check', '.'],
 			description: 'Check formatting',
 			category: 'Development',
+			reference: ['', 'developer', ['processes']],
 		}
 
 		expect(josh_in_process.can_run_in_process(entry, TYPESCRIPT_DISPATCHER_URL)).toBe(false)
