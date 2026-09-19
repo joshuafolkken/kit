@@ -249,7 +249,17 @@ else is: "The cost check is not asked during a watch" below.
 run reporting only what it merged would hide that it had spanned four sessions to do it.
 
 **End the record when the run ends** — `pnpm josh run:carry --end`, in the same turn as the final
-report — so the next `backlogrun` begins a budget of its own rather than resuming a spent one.
+report — so the next `backlogrun` begins a budget of its own rather than resuming a spent one. **Where
+the run ends by _stopping_ rather than finishing its work** — `backlog:budget` or `epic:next` answered
+`stop` (a parked backlog, an unreadable listing, the maximum, the whole-run bound), or the
+consecutive-failure guard tripped — **end it with `pnpm josh run:carry --end --stopped "<one-line
+reason>"` instead**. That pushes one ⏸️ confirmation as it clears the record, so a person learns the run
+halted even when the session was cut and this parent is headless (joshuafolkken/kit#2136); the reason is
+what the stop verdict printed, in the session language. A clean completion takes the bare `--end` and
+stays silent, because it has its own report, and a parked _child_ is already pushed by the child that
+parked it (`backlogrun-park.md`). Because `--end` removes the record, a re-run's second `--end` finds
+nothing and never sends the confirmation twice — `backlogrun-progress.md` → "Progress while the run is
+quiet" is the single source of the pull-versus-push split.
 
 **The record widens nothing.** It carries a budget and nothing else: `auto-ok` is still applied only
 by a person, so a cut adds no rule about which issues may be offered. **The pool itself may have

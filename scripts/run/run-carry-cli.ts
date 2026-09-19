@@ -8,6 +8,7 @@ import {
 	type RunCarry,
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
+import { run_stop_notify } from './run-stop-notify'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts
 // (joshuafolkken/kit#1714). A `backlogrun` begins it, counts a merge and a filing into it, marks each
@@ -257,10 +258,22 @@ function count(target: string, read: CarryRead, request: CountRequest, is_json: 
 		: report_carry(COUNTED_VERDICT, carry, is_json)
 }
 
-function finish(target: string, is_json: boolean): number {
+// **A stop over a record that is still there pushes one ⏸️ confirmation before the record goes**
+// (joshuafolkken/kit#2136). `plan` is read from the record `--end` is about to remove, so the second
+// `--end` reads `none` and plans nothing — one stop never notifies twice. A clean `--end` passes no
+// reason and stays silent, because a completed run has its own notification.
+async function finish(
+	target: string,
+	stopped: string | undefined,
+	is_json: boolean,
+): Promise<number> {
 	const read = run_carry.read_carry(target)
 
 	run_carry.end_carry(target)
+
+	const notice = run_stop_notify.plan(read, stopped)
+
+	if (notice !== undefined) await run_stop_notify.announce(notice)
 
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, SUCCESS_EXIT_CODE)
 
@@ -271,10 +284,10 @@ function finish(target: string, is_json: boolean): number {
 	return report_carry(ENDED_VERDICT, read.carry, is_json)
 }
 
-function act(target: string, request: Request, is_json: boolean): number {
+async function act(target: string, request: Request, is_json: boolean): Promise<number> {
 	if (request.kind === 'claim') return claim_record(target, request.claim, is_json)
 
-	if (request.kind === 'end') return finish(target, is_json)
+	if (request.kind === 'end') return await finish(target, request.stopped, is_json)
 
 	const read = run_carry.read_carry(target)
 
@@ -294,7 +307,7 @@ async function answer(request: Request, is_json: boolean): Promise<number> {
 
 	if (directory === undefined) return report_unknown(is_json)
 
-	return act(run_carry.carry_path(directory), request, is_json)
+	return await act(run_carry.carry_path(directory), request, is_json)
 }
 
 function refuse(): number {

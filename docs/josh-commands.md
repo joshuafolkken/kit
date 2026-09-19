@@ -1116,12 +1116,14 @@ pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"   # alias: josh
 pnpm josh run:carry --json                          # read the record back in a resumed session
 pnpm josh run:carry --cut --owner "$PPID"           # hand the record off before a cut
 pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"  # adopt a record no cut handed off
+pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind parked #2118"  # end + push
 ```
 
 **Options:**
 
 - `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
 - `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
+- `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not (joshuafolkken/kit#2136). A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
