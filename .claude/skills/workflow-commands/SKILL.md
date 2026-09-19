@@ -549,8 +549,9 @@ most likely to duplicate something.
   a repository-wide stack every lane shares and a positional pop takes whichever lane last pushed. Say
   it in the Telegram too — the comment is the record.
 
-**Automatic filing is capped at 10 Issues per run** at every entry point. On reaching it, stop and
-report. `kickoff` is exempt — it never implements, so it never discovers one.
+**Automatic filing is capped at 10 Issues per run** at every entry point; `pnpm josh rule:guard`
+refuses the eleventh filing (`prompts/collaboration-workflow/rule-delivery.md`). On reaching it, stop
+and report. `kickoff` is exempt — it never implements, so it never discovers one.
 
 ## 2e. Before filing a new Issue — `pnpm josh issue:scout`
 
@@ -583,9 +584,10 @@ pnpm josh issue:scout "<title>" --body "<one-line summary, citing #N where the w
 - **It does not replace `epic:bundle`, which still runs after the filing.** This one answers about an
   Issue that does not exist yet, from a title; that one answers about an Issue that does. Both calls
   happen — the scout before the `issues` call, `epic:bundle` after it.
-- **Every filing route runs it, not only a `new` entry point.** The trigger is the `gh api … issues`
-  call, never which keyword started the run — §2d's prerequisite, §2i's observation and the review
-  round cap's branch-2 filing all go through it.
+- **Every filing route runs it, not only a `new` entry point, and `pnpm josh rule:guard` refuses a
+  filing the run has not scouted** (`prompts/collaboration-workflow/rule-delivery.md`) — the trigger is
+  the `gh api … issues` call, never which keyword started the run, so §2d's prerequisite, §2i's
+  observation and the review round cap's branch-2 filing all go through it.
 - **A `#N` entry point does not run it *for the Issue it was handed*.** `fullrun #N` / `halfrun #N` /
   `kickoff #N` are given an Issue that already exists. That says nothing about an Issue such a run goes
   on to file later, which the bullet above covers.

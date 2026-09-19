@@ -1,7 +1,7 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
-import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
+import { tail_commands } from './tail-commands'
 
 // The stand-down that keeps the `issue-comments` rule from refusing a body read the run has already
 // earned (joshuafolkken/kit#1905). The rule exists so a run reads an Issue's comments before building
@@ -75,25 +75,6 @@ function reads_target_comments(command: string, target: Set<number>): boolean {
 	return false
 }
 
-function is_bash_call(block: Block): boolean {
-	return block.type === cost_blocks.TOOL_USE_TYPE && block.name === cost_blocks.BASH_TOOL
-}
-
-// The Bash commands one transcript line issued, empty for a line that parses to none.
-function bash_commands_of(line: string): ReadonlyArray<string> {
-	const parsed = time_transcript_line.parse_line(line)
-
-	if (parsed === undefined) return []
-
-	return parsed.blocks
-		.filter((block) => is_bash_call(block))
-		.map((block) => time_shell.bash_command(block.input))
-}
-
-function prior_commands(tail: string): ReadonlyArray<string> {
-	return tail.split('\n').flatMap((line) => bash_commands_of(line))
-}
-
 // **Whether the run has already read the comments of the Issue this body read targets.** The tail is
 // scanned for a prior read of the same number, so a body read that names no Issue — and a run with no
 // earlier comment read — both answer false and are refused exactly as before.
@@ -102,7 +83,9 @@ function already_read_comments_for(tail: string, command: string): boolean {
 
 	if (target.size === 0) return false
 
-	return prior_commands(tail).some((prior) => reads_target_comments(prior, target))
+	return tail_commands
+		.prior_bash_commands(tail)
+		.some((prior) => reads_target_comments(prior, target))
 }
 
 // The `already_satisfied` predicate wired onto the issue-comments row of `delivered-rules.ts`: this

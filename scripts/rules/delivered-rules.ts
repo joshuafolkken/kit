@@ -1,10 +1,11 @@
-import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_shell } from '#scripts/time-runtime/time-shell'
+import { bash_triggers } from './bash-triggers'
 import { early_heartbeat } from './early-heartbeat'
+import { filing_cap } from './filing-cap'
+import { issue_scout } from './issue-scout'
 import { lane_park } from './lane-park'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
@@ -112,36 +113,11 @@ type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 
 const STAMP_PREFIX = 'josh-rule-guard-'
 
-// `gh issue create`, in any of the spellings a run reaches for.
-const ISSUE_CREATE_COMMAND = /\bgh\s+(?:\S+\s+)*?issue\s+create\b/u
-// `gh api …/issues` — the path segment has to *end* there, so a comment endpoint
-// (`…/issues/1524/comments`) and a listing under it are both left alone.
-const ISSUES_ENDPOINT = /repos\/[^\s'"]*\/issues(?=$|["'\s])/u
-// A title field is what separates the POST that files from the GET that lists: `gh api …/issues`
-// with no field is a listing, and a listing files nothing. **All four spellings**, `-F` included —
-// it is `--field`'s short form and reads as a different flag to a pattern that only knows `-f`.
-// A body passed with `--input <file>` carries the title inside the file and is not visible here;
-// that limit is recorded beside the non-`gh` one in `prompts/collaboration-workflow/rule-delivery.md`.
-const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
-
-function is_issue_filing(command: string): boolean {
-	if (ISSUE_CREATE_COMMAND.test(command)) return true
-
-	return ISSUES_ENDPOINT.test(command) && TITLE_FIELD.test(command)
-}
-
-// **Only `Bash`, and the omission is deliberate** (joshuafolkken/kit#1390): Claude Code denies one
-// call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself
-// not. Every rule enumerated here is therefore one whose binding moment is a shell call — so the
-// tool-name guard belongs to the enumeration rather than to each row, and a row states only what it
-// looks for in the command.
-function on_bash_command(is_match: (command: string) => boolean): (call: GuardedCall) => boolean {
-	return function is_trigger(call: GuardedCall): boolean {
-		if (call.name !== cost_blocks.BASH_TOOL) return false
-
-		return is_match(time_shell.bash_command(call.input))
-	}
-}
+// **`is_issue_filing` and `on_bash_command` moved to `bash-triggers.ts`** (joshuafolkken/kit#2119):
+// three rows now share the filing trigger — the WIP cap, the scout gate and the per-run filing cap —
+// and the last two live in their own modules, which could not import the enumeration back to reach a
+// private function of it. `on_bash_command` went with it because those modules build their own rows.
+const { is_issue_filing, on_bash_command } = bash_triggers
 
 // The whole of the WIP cap, in the shape a refusal can carry: the count, the refusal, the two
 // exemptions and the three tests that decide the second one. The three tests are spelled out rather
@@ -337,6 +313,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: WIP_CAP_REASON,
 		keeps: on_bash_command(counts_open_issues),
 	},
+	// **Three rows share the filing trigger** (joshuafolkken/kit#2119), listed after `wip-cap` so the
+	// backlog count still speaks first: `issue-scout` refuses a filing the run has not scouted (once per
+	// run, stood down once the scout is on the tail), and `filing-cap` refuses every filing past the
+	// per-run ceiling. Each is a real instance of the admissible overlap the comment on `delivery`
+	// describes — the losing rule's delivery is still correct one reissue later — so a scout-less,
+	// over-cap filing is delivered `wip-cap`, then `issue-scout`, then `filing-cap` across its reissues.
+	issue_scout.ROW,
+	filing_cap.ROW,
 	{
 		id: 'issue-comments',
 		is_trigger: on_bash_command(is_body_only_issue_read),
@@ -644,17 +628,18 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 
 // **The first entry whose delivery actually fires wins — not the first whose trigger matches.** Only
 // one refusal can leave a `PreToolUse` hook, so a rule that matched but has already been delivered
-// this run falls through and a later rule may speak on the same call. **A rule added here therefore
-// has to be one whose trigger no other row also matches**, and the enumeration's own suite asserts
-// that over every row's fixtures.
+// this run falls through and a later rule may speak on the same call. **A rule added here whose
+// trigger another row also matches is admissible only when the overlap is safe** — the losing rule's
+// delivery still correct one reissue later — and the enumeration's own suite asserts, per fixture,
+// that every command is claimed by exactly the rows meant to overlap on it.
 //
-// **`shell-body` carries the one deliberate exception, and the order is what makes it safe**
-// (joshuafolkken/kit#1198). A filing whose body happens to contain a backtick —
-// `gh api …/issues -f title="…" -f body="… \`x\` …"` — is claimed by `wip-cap` as well. It is listed
-// first because it decides whether the Issue should exist at all, and rewriting a body into a file
-// for an Issue that must not be filed is wasted work. Nothing is lost by losing the race: the stamps
-// are keyed per `id`, so the reissued call is delivered the second rule. An overlap is admissible
-// only when that reading holds — that the losing rule's delivery is still correct one call later.
+// **The filing trigger is shared by three rows, and the order is what makes the overlap safe**
+// (joshuafolkken/kit#2119). `wip-cap`, `issue-scout` and `filing-cap` all match a filing; a
+// scout-less, over-cap filing is delivered `wip-cap`, then `issue-scout`, then `filing-cap` across its
+// reissues, each still the right thing to say when it is reached. `wip-cap` is listed first because it
+// decides whether the backlog has room at all — the same reason it precedes `shell-body`, which claims
+// a filing whose body carries a backtick (joshuafolkken/kit#1198). Nothing is lost by losing a race:
+// the stamps are keyed per `id`, so the reissued call is delivered the next rule.
 function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
 	for (const guard of GUARDS.values()) {
 		const reason = guard.refusal(raw_payload, now_ms)
@@ -672,7 +657,9 @@ function is_enabled(): boolean {
 const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
+	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	ISSUE_COMMENTS_REASON,
+	ISSUE_SCOUT_REASON: issue_scout.ISSUE_SCOUT_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
