@@ -82,10 +82,10 @@ describe('cost_verdict.report_over', () => {
 // child cuts, at or below it it keeps implementing, and the shared threshold is single-sourced so
 // the scheduler and worker cannot drift.
 describe("cost_verdict.report_over at the lane child's implementation threshold", () => {
-	const EXPECTED_CONTEXT_CUT_THRESHOLD = 150_000
+	const EXPECTED_CONTEXT_CUT_THRESHOLD = 200_000
 	const threshold = CONTEXT_CUT_THRESHOLD
 
-	it('uses the shared 150k threshold', () => {
+	it('uses the shared 200k threshold', () => {
 		expect(CONTEXT_CUT_THRESHOLD).toBe(EXPECTED_CONTEXT_CUT_THRESHOLD)
 		expect(run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD).toBe(CONTEXT_CUT_THRESHOLD)
 	})
