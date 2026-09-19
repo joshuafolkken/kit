@@ -55,7 +55,7 @@ carrying the figure printed on standard error and the resume command (the invoca
 in a fresh session — `fullrun #<N>` for a `#N` entry, `fullrun new` for a `new` one), run
 `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run was dispatched
 by `backlogrun`** — that batch owns the same question at its own seam.
-`backlogrun-progress.md` → "The hand-off" is the single source of the check and of the shared 150,000 threshold — **a dispatched lane child does not perform this check and never reads that document** (its trimmed set is `pnpm josh read:set lane-child`).
+`backlogrun-progress.md` → "The hand-off" is the single source of the check and of the shared 200,000 threshold — **a dispatched lane child does not perform this check and never reads that document** (its trimmed set is `pnpm josh read:set lane-child`).
 
 **Start the progress step once the hold is claimed, and start it without being asked** —
 `pnpm josh run:progress --wait` in the background, what it printed presented as-is when it

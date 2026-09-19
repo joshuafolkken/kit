@@ -198,7 +198,7 @@ resumes the same lane **back into implementation** carrying none of the thinking
 The child decides whether to cut with the same measurement the parent uses between children —
 `pnpm josh cost --cut` (`cost_verdict.per_request_cost`, billed input tokens per request), whose single
 source is `backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
-`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` both use the shared 150_000 constant. No separate
+`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` both use the shared 200_000 constant. No separate
 measurement or threshold is built for the lane child.
 
 ```bash
@@ -303,7 +303,7 @@ tells whether the average fell.
 **The implementation-phase cut's drop is measured the same way, and is likewise unmeasured until
 then** (joshuafolkken/kit#1933): one changed `backlogrun` compares the average and maximum context
 per request of each lane against the 2026-09-13 run recorded in the issue, and until that run exists
-the effect of the 150_000 threshold is reported as unmeasured.
+the effect of the 200_000 threshold is reported as unmeasured.
 
 ## A lane child records its park before it stops
 

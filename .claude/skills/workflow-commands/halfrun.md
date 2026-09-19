@@ -34,7 +34,7 @@ send a `confirmation` Telegram carrying the figure printed on standard error and
 invocation as it was typed, in a fresh session — `halfrun #<N>` for a `#N` entry, `halfrun new` for a
 `new` one), run `pnpm josh run:release <N>` (bare for a `new` entry) and stop. **Skip it when this run
 was dispatched by a batch entry point.** `backlogrun-progress.md` → "The hand-off" is the single source of the check
-and of the shared 150,000 threshold.
+and of the shared 200,000 threshold.
 
 **Start the progress step once the hold is claimed, and start it without being asked**, exactly as
 `fullrun` does — `pnpm josh run:progress --wait` in the background, presented as-is when it
