@@ -1,6 +1,7 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
+import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { early_heartbeat } from './early-heartbeat'
@@ -555,6 +556,11 @@ const BATCH_REFUSAL_WINDOW_MS = 10_000
 // lost for the run with nothing recorded to say so. That is the silent deletion the stand-aside
 // exists to prevent, arrived at from the other side.
 function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
+	// In a dispatched lane child the batching guard is suppressed (joshuafolkken/kit#2138), so it will
+	// refuse nothing — and the stand-aside must agree, or a lone rule trigger (`shell-body`) would be
+	// stepped aside from for a batching refusal that can no longer come and lost for the run.
+	if (lane_guard_policy.is_suppressed_here('batching')) return false
+
 	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
 
 	if (run.now_ms - refused_at_ms < BATCH_REFUSAL_WINDOW_MS) return true

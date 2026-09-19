@@ -106,6 +106,7 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 ```
 
 - `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
+- **Suppressed in a dispatched lane child** (`JOSH_LANE_CHILD`), because the reissue-in-one-turn correction ends a headless child's turn instead of guiding it — decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`, not per guard (joshuafolkken/kit#2138).
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable. One refusal per run.
 
 ### `josh investigation:guard`
@@ -122,6 +123,7 @@ Refuse a file read once the run has read the threshold's worth of un-edited file
 ```
 
 - On the `Bash` side only read-only lines are refused (`bat`, `cat`, `head`, `less`, `more`, `nl`, `sed`, `tail`); a delegation clears the pending set. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
+- **Suppressed in a dispatched lane child** (`JOSH_LANE_CHILD`), because the child is itself the delegated unit the refusal asks for and cannot dispatch a sub-unit to read its own edit targets — decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` (joshuafolkken/kit#2138).
 - Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
 ### `josh rule:guard`
@@ -152,6 +154,8 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery p
 ### `josh pretool:guard`
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
+
+**Which of the three fire in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, whether each guard fires for a lane child (`JOSH_LANE_CHILD`): `investigation` and `batching` stand down, while `rule` stays on — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh session:lang`
 

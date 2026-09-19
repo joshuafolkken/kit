@@ -2,6 +2,14 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Verb coined from Node's working-directory-change call — "the lane case chdirs into a lane checkout".
+  # The guard suites
+  # for joshuafolkken/kit#2138 change directory into a lane checkout to exercise the dispatched-child
+  # path, and the teardown comments name that act.
+  - chdirs
+  # "An unenumerated guard fires" — a guard not listed in the `lane-guard-policy.ts` enumeration
+  # (joshuafolkken/kit#2138). Names the fail-safe default in the code comment and its test.
+  - unenumerated
   # Coined for the retirement of `josh cost` reports no rule or decision read (#2016): a column,
   # scope or module is "readerless" when nothing consumes its value. Used in the CLI comments, the
   # tests and `docs/josh-commands.md` to name what was removed and why the `--over` verdict stays.

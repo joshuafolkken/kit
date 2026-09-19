@@ -42,8 +42,11 @@ const SLACK_BYTES = 512
 // slack units (82,048 → 84,096) for the mandated `josh stash:pop` section — its command reference and
 // the `conflicted` verdict — landing against a document already at its mark.
 // joshuafolkken/kit#2113 raised it three slack units (84,096 → 85,632) for the mandated
-// `josh run:watcher:guard` and `josh lane:await` sections.
-const JOSH_COMMANDS_CEILING_BYTES = 85_632
+// `josh run:watcher:guard` and `josh lane:await` sections. joshuafolkken/kit#2138 raised it three
+// slack units (85,632 → 87,168) for the mandated `josh batch:guard`, `josh investigation:guard` and
+// `josh pretool:guard` notes recording that the interactive-line guards stand down for a dispatched
+// lane child, per the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
+const JOSH_COMMANDS_CEILING_BYTES = 87_168
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -71,7 +74,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 19_208 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_355 },
-	{ path: 'docs/josh-commands.md', bytes: 85_120 },
+	{ path: 'docs/josh-commands.md', bytes: 86_656 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
