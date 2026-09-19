@@ -78,7 +78,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', bytes: 11_889 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 40_607 },
 	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 50_577 },
-	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 18_031 },
+	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6240 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
 	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 16_702 },
@@ -87,7 +87,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_931 },
 	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 26_629 },
-	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 19_208 },
+	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 21_674 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
 	{ path: 'docs/josh-commands.md', bytes: 93_043 },
@@ -151,6 +151,24 @@ function over_budget_message(
 	return `${relative_path} is ${current} bytes, over its ${ceiling}-byte ceiling (recorded ${recorded}). Shrink the document, or ${raise_hint}.`
 }
 
+// The failure message the staleness test raises. A recorded size sitting more than `SLACK_BYTES`
+// above the document's actual size is a stale-loose ratchet: the document shrank and its record was
+// never lowered, so the ceiling no longer holds the reduction — the drift joshuafolkken/kit#2125 swept
+// (chain-rule.md was cut in joshuafolkken/kit#2078 but its record stayed at 18,031). It names the
+// file, its recorded size, its actual size, the gap, and where to lower the record.
+function stale_budget_message(
+	relative_path: string,
+	recorded_bytes: number,
+	current_bytes: number,
+): string {
+	const recorded = recorded_bytes.toString()
+	const current = current_bytes.toString()
+	const gap = (recorded_bytes - current_bytes).toString()
+	const lower_hint = `lower its recorded size in scripts/document/document-byte-budget.ts so the ratchet holds the reduction`
+
+	return `${relative_path} records ${recorded} bytes but is ${current} (stale by ${gap}, over ${SLACK_BYTES.toString()} slack). ${lower_hint}.`
+}
+
 const document_byte_budget = {
 	DOCUMENT_BYTE_BUDGET,
 	JOSH_COMMANDS_CEILING_BYTES,
@@ -158,6 +176,7 @@ const document_byte_budget = {
 	ceiling_for,
 	over_budget_message,
 	recorded_bytes_for,
+	stale_budget_message,
 }
 
 export type { DocumentBudget }
