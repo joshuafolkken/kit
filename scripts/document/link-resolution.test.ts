@@ -17,7 +17,7 @@ import { document_section } from './document-section'
 const DOCUMENTS = all_documents()
 
 // A few references cite the reference form itself rather than a real anchor — the doc-section
-// explanation writes `"節名"` (Japanese for "section name") as a stand-in.
+// explanation writes a Japanese "section name" placeholder (see EXAMPLE_HEADINGS) as a stand-in.
 const EXAMPLE_HEADINGS: ReadonlySet<string> = new Set(['節名', 'Heading', '見出し'])
 
 // Any bold span is a citable anchor: the documents point at `- **Cross-package problems → …**` at a

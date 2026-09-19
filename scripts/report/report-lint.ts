@@ -54,8 +54,8 @@ function line_index_of(lines: ReadonlyArray<string>, label: string): number {
 	return lines.findIndex((line) => line.includes(label))
 }
 
-// The overview region is the lines between `■ 概要` and `技術詳細`; the length and intrusion checks
-// apply there alone, since `変更とテスト` legitimately carries file paths.
+// The overview region is the lines between OVERVIEW_LABEL and DETAILS_LABEL; the length and intrusion
+// checks apply there alone, since the CHANGES_LABEL region legitimately carries file paths.
 function overview_lines(summary: string): ReadonlyArray<string> {
 	const lines = summary.split('\n')
 	const start = line_index_of(lines, OVERVIEW_LABEL)

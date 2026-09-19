@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest'
 //
 // The decision: a citation names the file the body is in. A topic file that has become a pointer is
 // reached from the index, never from a citation elsewhere — naming it restores the two-hop read the
-// index's own "参照の書き方" prohibits, through a file that holds no body at all.
+// index's own "how to cite" rule prohibits, through a file that holds no body at all.
 
 // The declaration a canonical topic file opens with once its body lives in a skill. Detection is by
 // this sentence rather than by a hard-coded list, so the rollout's remaining topics are covered the

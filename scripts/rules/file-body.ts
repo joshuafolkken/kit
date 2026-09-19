@@ -10,7 +10,7 @@ import { shell_segments } from './shell-segments'
 //
 // **The detector existed for measurement and refused nothing.** `time-writes.ts` already knew a
 // redirection and a heredoc write a file; nothing turned that knowledge into a refusal. This row does,
-// and it keeps `file-edits.md`'s 可否表 exactly: the one branch is whether the redirect target is an
+// and it keeps `file-edits.md`'s allow/deny table exactly: the one branch is whether the redirect target is an
 // existing file, and a synchronous `stat` decides it — a new-file creation and a read-only heredoc stay
 // silent, an existing-file rewrite is refused.
 //

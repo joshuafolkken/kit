@@ -1,14 +1,13 @@
 // The bare-`#N` predicate behind the `issue-citation` row of the stop guard (joshuafolkken/kit#2121).
 //
 // **Session-facing output cites an Issue as a number-link, never a bare `#N`.** `CLAUDE.md` and
-// `prompts/collaboration-workflow/issue-citation.md` require `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <短い要約>`
+// `prompts/collaboration-workflow/issue-citation.md` require `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <short summary>`
 // in what the person reads: a bare `#123` is not clickable and does not say which repository's Issue
 // it is. The stop guard reads `last_assistant_message` — the turn's session-facing text — and this
 // predicate answers whether a bare number slipped into it.
 //
 // **It is a notice, never a refusal.** A citation-format slip is not worth blocking a stop over, and
-// the cost of a false positive is high — so the row emits `systemMessage` and lets the stop proceed
-// (停止を妨げるほどのものではなく、誤発火が高くつく).
+// the cost of a false positive is high — so the row emits `systemMessage` and lets the stop proceed.
 
 // An Issue number: `#` and its digits. `\d+` is greedy, so an optional `owner/repo` prefix would add
 // nothing to whether the mention is bare — the `#N` alone locates it, and its enclosure decides the
@@ -41,7 +40,7 @@ function is_linked_at(message: string, index: number): boolean {
 
 // **The message text alone, never a GitHub-bound artifact.** An Issue body or comment is passed to
 // `gh` as a `Bash` argument, not spoken in `last_assistant_message`, so those never reach this
-// predicate — which is exactly the "GitHub 向け成果物では無言" the issue asks for, obtained by what
+// predicate — which is exactly the "silent on GitHub-bound artifacts" behavior the issue asks for, obtained by what
 // the stop guard reads rather than by a second exclusion here.
 function has_bare_reference(message: string): boolean {
 	for (const match of message.matchAll(ISSUE_REFERENCE)) {
