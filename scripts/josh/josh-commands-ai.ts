@@ -210,6 +210,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['network']],
 	},
+	'repo:party': {
+		script: 'scripts/discovery/repo-party-cli.ts',
+		description:
+			'Say whether a repository is first-party or third-party by owner equality (computed, not judged)',
+		category: 'AI tools',
+		reference: ['[<owner/repo>]', 'automation', ['none']],
+	},
 	'run:merge': {
 		script: 'scripts/run/run-merge-cli.ts',
 		description:

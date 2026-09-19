@@ -459,8 +459,8 @@ backlogrun joshuafolkken/kit#858 --only
 
 - **One definition, every entry point.** The prefix goes where `#N` goes, so no new keyword is added,
   and `owner/repo#new` stands in the same slot as `owner/repo#N`.
-- **A short name expands by prefixing the session repository's owner** — `gh api repos/{owner}/{repo}
-  --jq .owner.login` — and **never by searching kit#869's map**, which answers where a checkout is
+- **A short name expands by prefixing the session repository's owner** — `pnpm josh repo:party`
+  computes the party — and **never by searching kit#869's map**, which answers where a checkout is
   rather than which repository is meant. A short name therefore satisfies the first-party test (owner
   equality) by construction, so **there is structurally no path by which a short name resolves to a
   third-party target**, and a repository that is not checked out here is still a valid `kickoff`
@@ -471,8 +471,8 @@ backlogrun joshuafolkken/kit#858 --only
   whose owner is determined has no such failure mode.
 - **An explicit owner that is not the session's is a third-party target, and it stops the run.**
   `fullrun <other-owner>/repo#12` names a tracker we do not own, and every write there is Tier C
-  (`CLAUDE.md` → "Third-party repositories are Tier C"). **Decide it mechanically**: whether the owner
-  equals what `gh api repos/{owner}/{repo} --jq .owner.login` returns. Typing the prefix is not the
+  (`CLAUDE.md` → "Third-party repositories are Tier C"). **Decide it mechanically** with
+  `pnpm josh repo:party <owner/repo>` — a `third-party` verdict stops the run. Typing the prefix is not the
   explicit instruction that rule requires. **Send a `confirmation` Telegram and stop** — nothing has
   been produced yet, so there is no finding to record and no draft to prepare.
 - **No prefix leaves the behavior exactly as it was** — the target is the session's repository.
@@ -792,8 +792,8 @@ twice: filing into a first-party repository is **Tier A** and already settled, a
 answer under `backlogrun` parks the run without saying so.
 
 - **File it, without asking, the moment you judge it worth filing.** A **first-party** target — its
-  owner equal to this session's repository owner, decided by `gh api repos/{owner}/{repo} --jq
-  .owner.login` rather than by judgement — is Tier A. **A third-party target is Tier C and is never
+  owner equal to this session's repository owner, decided by `pnpm josh repo:party` rather than by
+  judgement — is Tier A. **A third-party target is Tier C and is never
   filed** (`CLAUDE.md` → "Third-party repositories are Tier C").
 - **It carries no `route:` label of its own.** `route:tier-a` means a filing the run is *blocked by*,
   and an observation blocks nothing. Where one of the interrupt tests is met the filing takes

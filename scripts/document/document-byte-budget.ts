@@ -56,8 +56,10 @@ const SLACK_BYTES = 512
 // unit (89,728 → 90,240) for the mandated `josh test:declared` section — its command reference and the
 // three verdicts (`required` / `exempt` / `satisfied`) — landing against a document already at its
 // mark, the branch's merge with `main` layering the section on top of a document `main` had already
-// filled.
-const JOSH_COMMANDS_CEILING_BYTES = 90_240
+// filled. joshuafolkken/kit#2122 raised it two slack units (90,240 → 91,264) for the mandated `josh
+// repo:party` section — its command reference and the three verdicts (`first-party` / `third-party` /
+// `unknown`) — landing against a document already at its mark.
+const JOSH_COMMANDS_CEILING_BYTES = 91_264
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -85,7 +87,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 19_208 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 89_664 },
+	{ path: 'docs/josh-commands.md', bytes: 90_744 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -112,7 +114,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8133 },
 	{ path: 'prompts/collaboration-workflow/single-source-rules.md', bytes: 1764 },
 	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 18_726 },
-	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 11_252 },
+	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 11_920 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 17_057 },
 	{ path: 'prompts/refactoring.md', bytes: 8372 },
 	{ path: 'prompts/review-rubric.md', bytes: 18_268 },

@@ -1205,6 +1205,25 @@ pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 
 Bundles the reads a run makes before its first edit into one call; alias `rp`.
 
+### `josh repo:party`
+
+Says whether a repository is **first-party** or **third-party** — computed by owner equality, not
+judged (joshuafolkken/kit#2122); alias `rpy`. Prints one of `first-party` / `third-party` / `unknown`
+on stdout, and the two owners it compared on stderr.
+
+```bash
+pnpm josh repo:party joshuafolkken/kit     # → first-party (in the kit session)
+pnpm josh repo:party sveltejs/kit          # → third-party
+pnpm josh repo:party                        # no argument: the session's own repository
+```
+
+The target's owner equals the session repository's owner → `first-party`; it differs → `third-party`;
+either owner cannot be read (no `origin`, an unreadable config, a malformed argument) → `unknown`,
+which is never read as `third-party`. This is the mechanical test `CLAUDE.md` → "Third-party
+repositories are Tier C" and `prompts/collaboration-workflow/upstream-interrupt.md` describe; the
+`third-party-write` row of `delivered-rules.ts` computes the same thing to refuse a `gh api` write to a
+repository we do not own (a read passes untouched).
+
 ### `josh run:merge`
 
 Collapses a `backlogrun` merge event into one call (joshuafolkken/kit#2024); alias `rmg`. The parent

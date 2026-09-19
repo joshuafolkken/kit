@@ -239,10 +239,12 @@ describe('rule_value.measure — rules nothing can score', () => {
 	// declares none because no call-shaped test can tell a delegation of the reading from any other
 	// dispatch; the test-declared row declares none because its verdict is a working-tree read the
 	// transcript never records, so no recorded call reveals whether the commit carried a test; the
-	// filing-cap row declares none because staying under a cap is not a call; and the three Bash-string
+	// filing-cap row declares none because staying under a cap is not a call; the three Bash-string
 	// gaps (`git-force`, `worktree-mutation`, `file-body`) declare none because the act each guards
 	// against is destructive or billed and the safe alternative is the *absence* of a call — a push
-	// never made, a stash never raw, an Edit that is not a Bash call at all. The module's doctrine is
+	// never made, a stash never raw, an Edit that is not a Bash call at all; and `third-party-write`
+	// declares none for the same reason (joshuafolkken/kit#2122) — not writing to another owner's
+	// tracker is the absence of a call, not a call. The module's doctrine is
 	// that such a rule reads unmeasured rather than as compliant. Naming them exactly keeps the guard
 	// over every other row, the batching one included, rather than exempting a whole registry to make
 	// room for the exceptions.
@@ -253,6 +255,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			.map((reading) => reading.id)
 
 		expect(unmeasured).toStrictEqual([
+			'third-party-write',
 			FILING_CAP_ID,
 			'test-declared',
 			'git-force',

@@ -6,6 +6,7 @@ import { bash_triggers } from './bash-triggers'
 import { early_heartbeat } from './early-heartbeat'
 import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
+import { gh_api } from './gh-api'
 import { git_force } from './git-force'
 import { issue_scout } from './issue-scout'
 import { lane_park } from './lane-park'
@@ -16,6 +17,7 @@ import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
 import { test_declared_commit } from './test-declared-commit'
+import { third_party_write } from './third-party-write'
 import { worktree_guard } from './worktree-guard'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
@@ -140,33 +142,22 @@ const WIP_CAP_REASON =
 // Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
 // view <N> …"` is read as the write it is rather than as the read it quotes. The cut itself is
 // `shell-segments.ts`, shared with the triggers that need the same one.
-// Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped.
-const GH_FLAGS = String.raw`(?:-{1,2}[\w-]+(?:[= ][^\s]+)?\s+)*`
-const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}issue\s+view\s`, 'u')
-const GH_API_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}api\s`, 'u')
+// Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped —
+// the same optional-flag prefix `gh-api.ts` skips in front of `api`, shared from there.
+const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${gh_api.GH_FLAGS}issue\s+view\s`, 'u')
 // `…/issues/<N>` — **one** Issue's body. The number has to end the path, so the listing
 // (`…/issues`) and every sub-resource under it (`…/issues/1319/comments`) are left alone.
 const ISSUE_BODY_PATH = /repos\/[^\s'"]*\/issues\/\d+(?=$|["'\s])/u
-// **A write to that path is not a read of it.** `gh api` sends POST as soon as any field flag
-// appears, and `kickoff` PATCHes `…/issues/<N>` to normalize a title and to fill a blank body — so
-// without this the delivery would be spent refusing a write, and the genuine body read later in the
-// same run would never be guarded.
-const API_METHOD = /(?:^|\s)(?:--method|-X)[= ]([A-Za-z]+)/u
-const API_FIELD = /(?:^|\s)(?:--raw-field|--field|--input|-F|-f)(?:[= ]|$)/u
+// **A write to that path is not a read of it**, which is why the body read below asks `gh_api.is_read`:
+// `gh api` sends POST as soon as any field flag appears, and `kickoff` PATCHes `…/issues/<N>` to
+// normalize a title and to fill a blank body — so without the read check the delivery would be spent
+// refusing a write, and the genuine body read later in the same run would never be guarded.
 // A segment that fetches comments: the flag, a `comments` field in a `--json` projection, or the
 // comments endpoint. The short `-c` is deliberately absent — it belongs to `wc`, `grep` and `sort`
 // far more often than to `gh`, and reading it as "comments included" silenced the rule on any line
 // that ended in a pipe. A run that types it pays one round trip instead.
 const FETCHES_COMMENTS = /--comments\b|--json\s[\w,]*\bcomments\b|\/comments\b/u
 const ISSUES_PATH = /repos\/[^\s'"]*\/issues\//u
-
-function is_api_read(segment: string): boolean {
-	const method = API_METHOD.exec(segment)?.[1]
-
-	if (method !== undefined) return method.toUpperCase() === 'GET'
-
-	return !API_FIELD.test(segment)
-}
 
 // A field projection — `--jq` for `gh api`, `--json` for `gh issue view` — whose value never names the
 // body. `gh api …/issues/<N> --jq '{state, labels}'` fetches the Issue only to read its state or its
@@ -189,7 +180,7 @@ function is_body_read_segment(segment: string): boolean {
 
 	if (ISSUE_VIEW_COMMAND.test(segment)) return true
 
-	return GH_API_COMMAND.test(segment) && ISSUE_BODY_PATH.test(segment) && is_api_read(segment)
+	return gh_api.is_gh_api(segment) && ISSUE_BODY_PATH.test(segment) && gh_api.is_read(segment)
 }
 
 // **An Issue's comments, not just any comments.** Batching pushes a run to fetch the body and the
@@ -200,7 +191,7 @@ function fetches_issue_comments(segment: string): boolean {
 	if (!FETCHES_COMMENTS.test(segment)) return false
 
 	return (
-		ISSUE_VIEW_COMMAND.test(segment) || (GH_API_COMMAND.test(segment) && ISSUES_PATH.test(segment))
+		ISSUE_VIEW_COMMAND.test(segment) || (gh_api.is_gh_api(segment) && ISSUES_PATH.test(segment))
 	)
 }
 
@@ -310,6 +301,14 @@ function reaches_the_pre_gate_boundary(
 }
 
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
+	// **Listed first, ahead of the filing trigger it overlaps** (joshuafolkken/kit#2122). A `gh api`
+	// that files an Issue into a repository we do not own trips both this row and `wip-cap` /
+	// `issue-scout` / `filing-cap` — but the backlog count, the scout and the per-run cap are all about
+	// filing into *our own* backlog, so on a third-party target the right answer is to stop the write
+	// entirely rather than to count anything. Placing it first means a third-party write is refused
+	// before any of those speak; on a first-party filing it is silent (the owners match), so `wip-cap`
+	// still speaks first, exactly as before. It fires on every occurrence (`git-force.ts`).
+	third_party_write.ROW,
 	{
 		id: 'wip-cap',
 		is_trigger: on_bash_command(is_issue_filing),
@@ -681,6 +680,7 @@ const delivered_rules = {
 	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
+	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,
 	WIP_CAP_REASON,
 	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,

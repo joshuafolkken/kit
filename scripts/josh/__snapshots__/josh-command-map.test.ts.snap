@@ -75,6 +75,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rh": "run:hold",
     "rmg": "run:merge",
     "rp": "run:prep",
+    "rpy": "repo:party",
     "rr": "run:release",
     "rs": "read:set",
     "rt": "reconcile-templates",
@@ -581,6 +582,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "release:scope": [
       "[--json]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "repo:party": [
+      "[<owner/repo>]",
       "automation",
       [
         "none",
