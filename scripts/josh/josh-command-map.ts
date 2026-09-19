@@ -102,6 +102,7 @@ const ALIASES: Record<string, string> = {
 	rw: 'run:wake',
 	rct: 'run:cut',
 	rv: 'run:liveness',
+	red: 'run:ending',
 	rg: 'run:progress',
 	rp: 'run:prep',
 	rmg: 'run:merge',

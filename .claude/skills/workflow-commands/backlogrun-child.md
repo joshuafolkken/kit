@@ -215,9 +215,15 @@ guard, and go back to step 1.
    message, `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`, never a positional
    `git stash pop` that a shared stack lets another lane divert.
 2. **Remove `in-progress`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
-3. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
-   naming what `run:liveness` answered and what it read.
-4. **Go back to step 1 of the loop.**
+3. **Classify how the child ended** — `pnpm josh run:ending <N> --output <path>`
+   (joshuafolkken/kit#2139). `run:liveness` said it stopped; this says *how* — `abandoned` for a child
+   that ended mid-implementation without a cut, told apart from a `merged` one even when it exited
+   `is_error: false`. The basis it prints (the exit-record fields it read and the `permission_denials`
+   count) is what a person needs to see without opening the log.
+4. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
+   naming what `run:liveness` answered and what it read, **and the basis `run:ending` printed** — for
+   an `abandoned` ending, its exit-record fields and denial count go into the comment verbatim.
+5. **Go back to step 1 of the loop.**
 
 **It is booked as a failure rather than restarted.** A silent retry re-runs a child whose tree may be
 half-written, and the consecutive-failure guard is the only thing that notices the environment rather
