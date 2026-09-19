@@ -6,11 +6,13 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/version/bump-version.ts',
 		description: 'Bump package version',
 		category: 'Versioning',
+		reference: ['[major|minor|patch]', 'maintainer', ['files']],
 	},
 	version: {
 		script: 'scripts/version/version-check.ts',
 		description: 'Show kit versions; --upgrade updates the global and project install',
 		category: 'Versioning',
+		reference: ['[--upgrade]', 'developer', ['files', 'network', 'processes']],
 	},
 	// A `script` entry, not a shell one: script paths resolve against the kit package root, so this
 	// keeps working from a consumer repo where the file lives under node_modules. The registry
@@ -20,6 +22,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/version/publishable-range-check.ts',
 		description: 'Check that every published dependency range still resolves for a consumer',
 		category: 'Versioning',
+		reference: ['', 'developer', ['network']],
 	},
 	// The one place that decides a version (joshuafolkken/kit#1169). A `script` entry for the same
 	// reason `ranges` is one: script paths resolve against the kit package root, so it keeps working
@@ -28,6 +31,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/release/release-cli.ts',
 		description: 'Release the merges main has taken since the version last changed',
 		category: 'Versioning',
+		reference: ['[version]', 'maintainer', ['git', 'network', 'release']],
 	},
 	// The read-only half of the one above (joshuafolkken/kit#1582). `release --dry-run` cannot
 	// answer this question: it refuses off the default branch and on a dirty tree, which is every
@@ -36,6 +40,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/release/release-scope-cli.ts',
 		description: 'Say whether a release is owed, from the unreleased merges on main',
 		category: 'Versioning',
+		reference: ['[--json]', 'automation', ['none']],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

@@ -1,0 +1,751 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`COMMAND_MAP — reference metadata > keeps every canonical command and alias stable 1`] = `
+{
+  "aliases": {
+    "a": "audit",
+    "ad": "adopt",
+    "ao": "auto-ok:next",
+    "ap": "audit:provision",
+    "bb": "backlog:budget",
+    "bg": "batch:guard",
+    "bl": "backlog:next",
+    "blp": "backlog:plan",
+    "bp": "bump",
+    "c": "check",
+    "cm": "check-commit-message",
+    "co": "cost",
+    "dg": "delegate",
+    "dr": "doctor",
+    "ds": "doc:section",
+    "ea": "epic:audit",
+    "eb": "epic:bundle",
+    "ec": "epic:check",
+    "en": "epic:next",
+    "ep": "epic",
+    "er": "e2e:retry-check",
+    "ev": "eval",
+    "f": "format",
+    "fd": "format:edited",
+    "fu": "followup",
+    "g": "git",
+    "ga": "gate",
+    "gp": "pr",
+    "i": "init",
+    "ig": "investigation:guard",
+    "ird": "issue:read",
+    "isc": "issue:scout",
+    "ist": "issue:state",
+    "l": "lint",
+    "lc": "latest:corepack",
+    "ln": "lines",
+    "lna": "lane:await",
+    "lnc": "lane:close",
+    "lnd": "lane:dispatch",
+    "lnl": "lane:list",
+    "lno": "lane:open",
+    "lnp": "lane:prune",
+    "lnv": "lane:output",
+    "lr": "lint:related",
+    "ls": "latest:scope",
+    "lu": "latest:update",
+    "mm": "main:merge",
+    "ms": "main:sync",
+    "nf": "notify",
+    "obf": "observations:flush",
+    "ov": "overrides",
+    "pg": "propagate",
+    "pm": "prevent-main-commit",
+    "ppu": "pre-push-unit",
+    "pt": "port",
+    "ptc": "pre-commit-type-check",
+    "ptg": "pretool:guard",
+    "r": "ranges",
+    "r2": "review:round2",
+    "ra": "review:attest",
+    "rb": "review:brief",
+    "rc": "run:carry",
+    "rct": "run:cut",
+    "re": "release",
+    "res": "release:scope",
+    "rg": "run:progress",
+    "rh": "run:hold",
+    "rmg": "run:merge",
+    "rp": "run:prep",
+    "rr": "run:release",
+    "rs": "read:set",
+    "rt": "reconcile-templates",
+    "rug": "rule:guard",
+    "rv": "run:liveness",
+    "rw": "run:wake",
+    "rwg": "run:watcher:guard",
+    "sd": "cspell:dot",
+    "sl": "session:lang",
+    "sp": "stash:pop",
+    "ss": "secretlint-scan",
+    "sy": "sync",
+    "sys": "sync:scope",
+    "t": "test",
+    "te": "test:e2e",
+    "tm": "time",
+    "tr": "test:related",
+    "tu": "test:unit",
+    "u": "latest",
+    "v": "version",
+  },
+  "references": {
+    "adopt": [
+      "[--dry-run]",
+      "developer",
+      [
+        "files",
+        "git",
+        "network",
+        "processes",
+      ],
+    ],
+    "audit": [
+      "",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "audit:provision": [
+      "",
+      "automation",
+      [
+        "files",
+        "network",
+      ],
+    ],
+    "auto-ok:next": [
+      "[--exclude <n>[,<n>...]] [--label <name>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "backlog:budget": [
+      "[options]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "backlog:next": [
+      "[--exclude <n>[,<n>...]] [--repo <owner/repo>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "backlog:plan": [
+      "[issue...] [--only]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "batch:guard": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "bump": [
+      "[major|minor|patch]",
+      "maintainer",
+      [
+        "files",
+      ],
+    ],
+    "check": [
+      "[arguments...]",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "check-commit-message": [
+      "[<message-file>]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "cost": [
+      "[--cut|--over]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "cspell:dot": [
+      "",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "delegate": [
+      "<step> | --list",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "doc:section": [
+      "<file> <heading>",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "doctor": [
+      "[--fix]",
+      "developer",
+      [
+        "files",
+      ],
+    ],
+    "e2e:retry-check": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "epic": [
+      "<title> <issue...> [--ordered]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "epic:audit": [
+      "<epic>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "epic:bundle": [
+      "<issue>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "epic:check": [
+      "<epic>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "epic:next": [
+      "<epic>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "eval": [
+      "[scenario...]",
+      "maintainer",
+      [
+        "processes",
+        "network",
+      ],
+    ],
+    "followup": [
+      "<title> [--notify-message <text>]",
+      "automation",
+      [
+        "git",
+        "network",
+        "notifications",
+      ],
+    ],
+    "format": [
+      "",
+      "developer",
+      [
+        "files",
+        "processes",
+      ],
+    ],
+    "format:edited": [
+      "",
+      "automation",
+      [
+        "files",
+        "processes",
+      ],
+    ],
+    "gate": [
+      "[--verbose|--force|--no-unit]",
+      "developer",
+      [
+        "files",
+        "processes",
+      ],
+    ],
+    "git": [
+      "[-y] <message>",
+      "developer",
+      [
+        "git",
+        "network",
+      ],
+    ],
+    "init": [
+      "",
+      "developer",
+      [
+        "files",
+        "processes",
+      ],
+    ],
+    "investigation:guard": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "issue:read": [
+      "<issue...>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "issue:scout": [
+      "<title> [--body <summary>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "issue:state": [
+      "<issue...> [--repo <owner/repo>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "lane:await": [
+      "<issue> [<issue>...]",
+      "automation",
+      [
+        "processes",
+      ],
+    ],
+    "lane:close": [
+      "<issue>",
+      "automation",
+      [
+        "files",
+        "git",
+      ],
+    ],
+    "lane:dispatch": [
+      "<issue> <prompt>",
+      "automation",
+      [
+        "processes",
+      ],
+    ],
+    "lane:list": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "lane:open": [
+      "<issue> [options]",
+      "automation",
+      [
+        "files",
+        "git",
+      ],
+    ],
+    "lane:output": [
+      "<issue> [path]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "lane:prune": [
+      "",
+      "automation",
+      [
+        "files",
+        "git",
+      ],
+    ],
+    "latest": [
+      "",
+      "maintainer",
+      [
+        "files",
+        "network",
+        "processes",
+      ],
+    ],
+    "latest:corepack": [
+      "",
+      "maintainer",
+      [
+        "files",
+        "network",
+      ],
+    ],
+    "latest:scope": [
+      "[--record] [--json]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "latest:update": [
+      "",
+      "maintainer",
+      [
+        "files",
+        "network",
+      ],
+    ],
+    "lines": [
+      "<files...>",
+      "developer",
+      [
+        "none",
+      ],
+    ],
+    "lint": [
+      "",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "lint:related": [
+      "[files...]",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "main:merge": [
+      "",
+      "developer",
+      [
+        "git",
+        "network",
+      ],
+    ],
+    "main:sync": [
+      "",
+      "developer",
+      [
+        "git",
+        "network",
+      ],
+    ],
+    "notify": [
+      "--task-type <type> --body <text>",
+      "automation",
+      [
+        "notifications",
+      ],
+    ],
+    "observations:flush": [
+      "",
+      "automation",
+      [
+        "git",
+        "network",
+      ],
+    ],
+    "overrides": [
+      "[--save]",
+      "maintainer",
+      [
+        "files",
+      ],
+    ],
+    "port": [
+      "<dev|preview>",
+      "developer",
+      [
+        "none",
+      ],
+    ],
+    "pr": [
+      "<message>",
+      "developer",
+      [
+        "network",
+      ],
+    ],
+    "pre-commit-type-check": [
+      "",
+      "automation",
+      [
+        "processes",
+      ],
+    ],
+    "pre-push-unit": [
+      "",
+      "automation",
+      [
+        "processes",
+      ],
+    ],
+    "pretool:guard": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "prevent-main-commit": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "propagate": [
+      "[--dry-run] [--skip-publish-wait]",
+      "maintainer",
+      [
+        "files",
+        "network",
+      ],
+    ],
+    "ranges": [
+      "",
+      "developer",
+      [
+        "network",
+      ],
+    ],
+    "read:set": [
+      "[<entry>] [--json]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "reconcile-templates": [
+      "",
+      "maintainer",
+      [
+        "files",
+      ],
+    ],
+    "release": [
+      "[version]",
+      "maintainer",
+      [
+        "git",
+        "network",
+        "release",
+      ],
+    ],
+    "release:scope": [
+      "[--json]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "review:attest": [
+      "<nonce> | --check",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "review:brief": [
+      "[--round <1|2>] | --level-only [--staged] [--json]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "review:round2": [
+      "[--round-1-closed] [--json]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "rule:guard": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "run:carry": [
+      "<operation> [arguments...]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "run:cut": [
+      "[--resume] <issue>",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "run:hold": [
+      "[issue]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "run:liveness": [
+      "<issue> --output <path> [options]",
+      "automation",
+      [
+        "processes",
+      ],
+    ],
+    "run:merge": [
+      "<issue> [options]",
+      "automation",
+      [
+        "git",
+        "network",
+      ],
+    ],
+    "run:prep": [
+      "<issue>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "run:progress": [
+      "[--wait|--mark]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "run:release": [
+      "[issue|--force]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "run:wake": [
+      "[options]",
+      "automation",
+      [
+        "processes",
+        "notifications",
+      ],
+    ],
+    "run:watcher:guard": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "secretlint-scan": [
+      "[paths...]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "session:lang": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "stash:pop": [
+      "<message>",
+      "automation",
+      [
+        "git",
+      ],
+    ],
+    "sync": [
+      "",
+      "developer",
+      [
+        "files",
+      ],
+    ],
+    "sync:scope": [
+      "[--staged] [--json]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "test": [
+      "",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "test:e2e": [
+      "[filters...]",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "test:related": [
+      "[files...]",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "test:unit": [
+      "[filters...]",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
+    "time": [
+      "[options]",
+      "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "version": [
+      "[--upgrade]",
+      "developer",
+      [
+        "files",
+        "network",
+        "processes",
+      ],
+    ],
+  },
+}
+`;

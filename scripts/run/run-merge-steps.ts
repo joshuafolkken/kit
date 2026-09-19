@@ -4,6 +4,12 @@ import { execa } from 'execa'
 import { run_carry, type CarryChange, type CarryOwner, type RunCarry } from './run-carry'
 import { run_merge } from './run-merge'
 
+// The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
+// callers surface the refusal as a hard failure rather than silently continuing on a carry that was
+// not advanced (joshuafolkken/kit#2114).
+type ApplyCarryResult =
+	{ kind: 'applied'; carry: RunCarry } | { kind: 'refused'; carry: RunCarry } | { kind: 'none' }
+
 // The side-effect half of `run:merge` (joshuafolkken/kit#2024). The pure decisions are `run-merge.ts`'s;
 // this file is what those decisions drive — the same actions the parent used to spend two turns on,
 // collapsed into one command.
@@ -39,6 +45,9 @@ interface JoshResult {
 interface FailedResult {
 	carry: RunCarry | undefined
 	is_parked: boolean
+	// Set when the carry record refused the count because this session is not its owner
+	// (joshuafolkken/kit#2114). The caller surfaces this as a hard failure rather than continuing.
+	is_refused: boolean
 }
 
 // A captured `pnpm josh` subprocess: its output is read back rather than inherited, and a non-zero
@@ -64,21 +73,24 @@ async function read_record(): Promise<{ target: string; carry: RunCarry } | unde
 }
 
 // Count the outcome into the carry record, respecting the ownership guard so a session whose record
-// was handed off cannot advance a budget that is no longer its own. Returns the record as it now
-// stands — updated, or left as read when nothing was counted.
+// was handed off cannot advance a budget that is no longer its own. Returns `refused` when the
+// ownership check fails — callers treat this as a hard failure so the operation is not silently
+// skipped (joshuafolkken/kit#2114).
 async function apply_carry(
 	ctx: MergeContext,
 	change: CarryChange | undefined,
-): Promise<RunCarry | undefined> {
+): Promise<ApplyCarryResult> {
 	const record = await read_record()
 
-	if (record === undefined) return undefined
+	if (record === undefined) return { kind: 'none' }
 
-	if (change === undefined) return record.carry
+	if (change === undefined) return { kind: 'applied', carry: record.carry }
 
-	if (run_carry.is_count_refused(record.carry, ctx.owner)) return record.carry
+	if (run_carry.is_count_refused(record.carry, ctx.owner)) {
+		return { kind: 'refused', carry: record.carry }
+	}
 
-	return run_carry.apply_change(record.target, record.carry, change)
+	return { kind: 'applied', carry: run_carry.apply_change(record.target, record.carry, change) }
 }
 
 async function sync_main(): Promise<void> {
@@ -98,13 +110,19 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 }
 
 // A merged child: count the merge (which resets the failure streak), return to the default branch,
-// close the lane, and mirror the counters onto the epic.
-async function do_merged(ctx: MergeContext): Promise<void> {
-	const carry = await apply_carry(ctx, run_merge.change_of('merged'))
+// close the lane, and mirror the counters onto the epic. Returns the carry when the ownership check
+// fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child
+// (joshuafolkken/kit#2114). Returns `undefined` on success.
+async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
+	const result = await apply_carry(ctx, run_merge.change_of('merged'))
+
+	if (result.kind === 'refused') return result.carry
 
 	await sync_main()
 	await close_lane(ctx.child)
-	await post_counters(ctx, carry)
+	await post_counters(ctx, result.kind === 'applied' ? result.carry : undefined)
+
+	return undefined
 }
 
 // A stale label removal must not fail the run, so a failed removal is swallowed exactly as the
@@ -119,14 +137,19 @@ async function remove_in_progress(child: string): Promise<void> {
 
 // A failed child: count the failure, drop the stale `in-progress`, and park it with `needs-decision`
 // so the next offer does not hand the same child straight back. Returns the record so the caller can
-// read the streak against the guard.
+// read the streak against the guard. Returns `is_refused: true` without touching labels when the
+// carry record rejected the count (joshuafolkken/kit#2114).
 async function do_failed(ctx: MergeContext): Promise<FailedResult> {
-	const carry = await apply_carry(ctx, run_merge.change_of('failed'))
+	const result = await apply_carry(ctx, run_merge.change_of('failed'))
+
+	if (result.kind === 'refused') return { carry: result.carry, is_parked: false, is_refused: true }
+
+	const carry = result.kind === 'applied' ? result.carry : undefined
 
 	await remove_in_progress(ctx.child)
 	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
 
-	return { carry, is_parked }
+	return { carry, is_parked, is_refused: false }
 }
 
 // The hand-off check, asked at a merge alone. A subprocess that cannot measure exits non-zero, which
@@ -159,5 +182,5 @@ const run_merge_steps = {
 	is_over_budget,
 }
 
-export type { MergeContext }
+export type { ApplyCarryResult, FailedResult, MergeContext }
 export { run_merge_steps }
