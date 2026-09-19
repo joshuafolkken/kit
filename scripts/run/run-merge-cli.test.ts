@@ -78,7 +78,7 @@ describe('run_merge_cli.run — a merged child', () => {
 	})
 })
 
-describe('run_merge_cli.run — a child that did not merge', () => {
+describe('run_merge_cli.run — a parked child', () => {
 	it('leaves a needs-decision child parked without merging it', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [NEEDS_DECISION]))
 
@@ -86,10 +86,16 @@ describe('run_merge_cli.run — a child that did not merge', () => {
 		expect(do_merged_mock).not.toHaveBeenCalled()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 	})
+})
 
+describe('run_merge_cli.run — a failed child', () => {
 	it('parks a failed or budget-exhausted worker once without retrying it', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({ carry: { failures: BELOW_GUARD }, is_parked: true })
+		do_failed_mock.mockResolvedValue({
+			carry: { failures: BELOW_GUARD },
+			is_parked: true,
+			is_refused: false,
+		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
@@ -99,24 +105,56 @@ describe('run_merge_cli.run — a child that did not merge', () => {
 
 	it('stops when the failure guard trips', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({ carry: { failures: AT_GUARD }, is_parked: true })
+		do_failed_mock.mockResolvedValue({
+			carry: { failures: AT_GUARD },
+			is_parked: true,
+			is_refused: false,
+		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.STOP_TOKEN)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
+})
 
-	it('stops with an error when the failed child could not be parked', async () => {
-		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({ carry: { failures: BELOW_GUARD }, is_parked: false })
+describe('run_merge_cli.run — a carry ownership refusal', () => {
+	it('emits busy and exits 1 when the merged carry count is refused', async () => {
+		read_issue_mock.mockResolvedValue(state_read(CLOSED, []))
+		do_merged_mock.mockResolvedValue({ failures: 0, owner_pid: 99_999 })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.STOP_TOKEN)
+		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
+		expect(ask_next_mock).not.toHaveBeenCalled()
+	})
+
+	it('emits busy and exits 1 when the failed carry count is refused', async () => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
+		do_failed_mock.mockResolvedValue({
+			carry: { failures: BELOW_GUARD },
+			is_parked: false,
+			is_refused: true,
+		})
+
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
+		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
 })
 
 describe('run_merge_cli.run — a stop and a refusal', () => {
+	it('stops with an error when the failed child could not be parked', async () => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
+		do_failed_mock.mockResolvedValue({
+			carry: { failures: BELOW_GUARD },
+			is_parked: false,
+			is_refused: false,
+		})
+
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
+		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.STOP_TOKEN)
+		expect(ask_next_mock).not.toHaveBeenCalled()
+	})
+
 	it('stops for a human-review child without offering more', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [NEEDS_HUMAN_REVIEW], true))
 

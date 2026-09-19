@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
-import { run_carry, type CarryOwner } from './run-carry'
+import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
 import { run_issue_number } from './run-issue-number'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
@@ -26,6 +26,8 @@ const FIRST = 0
 const MIN_PID = 1
 const OVER_TOKEN = 'over'
 const HUMAN_REVIEW_TOKEN = 'human-review'
+// Matches the `busy` verdict `run:carry` emits for a refused count, so callers see one vocabulary.
+const BUSY_TOKEN = 'busy'
 const STOP_TOKEN = 'stop'
 const RETRY_TOKEN = 'retry'
 const PARK_FAILURE_NOTE = 'The failed child could not be parked with needs-decision; stopping.'
@@ -168,10 +170,20 @@ function outcome_of(read: Awaited<ReturnType<typeof issue_state_cli.read_issue>>
 	return read.kind === 'state' ? run_merge.classify_child(read.state) : 'unresolved'
 }
 
+// A refused count means this session is not the carry record's owner, so the whole operation is
+// rejected — the lane is not closed and no next child is offered (joshuafolkken/kit#2114).
+function report_count_refused(carry: RunCarry | undefined): number {
+	if (carry !== undefined) console.error(run_carry.count_refused_message(carry))
+
+	return emit(BUSY_TOKEN, FAILURE_EXIT_CODE)
+}
+
 // A merge is the only outcome that asks the hand-off check, because it is the only one that returned
 // the tree to a clean default branch. `over` stops the offer; `under` asks for the next child.
 async function on_merged(ctx: MergeContext): Promise<number> {
-	await run_merge_steps.do_merged(ctx)
+	const refused = await run_merge_steps.do_merged(ctx)
+
+	if (refused !== undefined) return report_count_refused(refused)
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) return emit(OVER_TOKEN, SUCCESS_EXIT_CODE)
 
@@ -180,6 +192,8 @@ async function on_merged(ctx: MergeContext): Promise<number> {
 
 async function on_failed(ctx: MergeContext): Promise<number> {
 	const result = await run_merge_steps.do_failed(ctx)
+
+	if (result.is_refused) return report_count_refused(result.carry)
 
 	if (!result.is_parked) {
 		console.error(PARK_FAILURE_NOTE)
@@ -236,6 +250,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_merge_cli = {
+	BUSY_TOKEN,
 	HUMAN_REVIEW_TOKEN,
 	OVER_TOKEN,
 	RETRY_TOKEN,
