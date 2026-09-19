@@ -655,6 +655,26 @@ Claude Code hook: refuse a read once the unedited-read threshold is reached agai
 
 ---
 
+### `josh issue:backlinks` · `josh ibl`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue>`
+
+Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading
+
+---
+
+### `josh issue:lint` · `josh iln`
+
+> **Audience:** automation · **Side effects:** files
+
+`<path>`
+
+Check an issue body file for the template's required headings
+
+---
+
 ### `josh issue:read` · `josh ird`
 
 > **Audience:** automation · **Side effects:** network
@@ -782,6 +802,16 @@ Print what an entry point reads before it starts, and what that read costs
 `[<owner/repo>]`
 
 Say whether a repository is first-party or third-party by owner equality (computed, not judged)
+
+---
+
+### `josh report:lint` · `josh rl`
+
+> **Audience:** automation · **Side effects:** none
+
+`(reads stdin)`
+
+Check a two-layer work summary on stdin against its mechanical format rules
 
 ---
 

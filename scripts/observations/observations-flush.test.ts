@@ -17,6 +17,20 @@ import {
 // work in progress gets committed, or whether a person is told to walk away from the only copy of an
 // appended line.
 
+const SLUG_REASON = 'the slug must be lowercase'
+
+describe('observations_flush.broken_lines_message', () => {
+	it('names the broken line and why it broke, so a malformed append is refused before the commit', () => {
+		const message = observations_flush.broken_lines_message([
+			{ line: '- k:Bad | d1 | 2026-09-10 | where | what', reason: SLUG_REASON },
+		])
+
+		expect(message).toContain(OBSERVATION_LEDGER_PATH)
+		expect(message).toContain('- k:Bad')
+		expect(message).toContain(SLUG_REASON)
+	})
+})
+
 const SOURCE_PATH = 'scripts/git/git-staging.ts'
 const TEST_PATH = 'scripts/new.test.ts'
 const MODIFIED_SOURCE = ` M ${SOURCE_PATH}`

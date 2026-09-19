@@ -2,6 +2,7 @@ import type { CommandCategory, CommandEntry } from './josh-command-types'
 import { AI_COMMANDS } from './josh-commands-ai'
 import { DEV_COMMANDS } from './josh-commands-development'
 import { HOOKS_COMMANDS } from './josh-commands-hooks'
+import { LINT_COMMANDS } from './josh-commands-lint'
 import { MAINTENANCE_COMMANDS } from './josh-commands-maintenance'
 import { PROJECT_COMMANDS } from './josh-commands-project'
 import { VERSIONING_COMMANDS } from './josh-commands-versioning'
@@ -25,6 +26,7 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 	...MAINTENANCE_COMMANDS,
 	...HOOKS_COMMANDS,
 	...AI_COMMANDS,
+	...LINT_COMMANDS,
 }
 
 const ALIASES: Record<string, string> = {
@@ -80,6 +82,9 @@ const ALIASES: Record<string, string> = {
 	ird: 'issue:read',
 	ist: 'issue:state',
 	isc: 'issue:scout',
+	iln: 'issue:lint',
+	ibl: 'issue:backlinks',
+	rl: 'report:lint',
 	ep: 'epic',
 	ec: 'epic:check',
 	en: 'epic:next',
