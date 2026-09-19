@@ -1294,6 +1294,7 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 **Options:**
 
 - `--mark` — record that a real report happened without printing a line (keeps the last line for `run:wake --list`).
+- `--path` — print the ambient heartbeat log's path and exit. Every heartbeat line is mirrored there beside the report clock, so a person keeps it open with `tail -F "$(pnpm josh run:progress --path)"` to watch the run stream on across a `backlogrun` session cut without typing for `--list` (joshuafolkken/kit#2156). Reads no run state, so it answers in a lane child too.
 - `--interval <min>` — silence interval (default 20; also `JOSH_PROGRESS_INTERVAL_MINUTES`, then `josh.progress_interval_minutes`).
 - `--hours <n>` — how long the watcher lives (default 1); `--repo <owner/name>` scopes the read.
 

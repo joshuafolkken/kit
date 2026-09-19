@@ -76,7 +76,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', bytes: 25_925 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', bytes: 25_746 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', bytes: 11_889 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 40_607 },
+	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 41_667 },
 	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 50_577 },
 	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6240 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
