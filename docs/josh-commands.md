@@ -1,5 +1,7 @@
 # josh CLI — Command Reference
 
+See also: [Command Catalog](josh-command-catalog.md) — auto-generated from the command map (command name, aliases, synopsis, audience, side effects).
+
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal.
 
 ## How a command runs
