@@ -38,7 +38,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		shell: [
 			'sh',
 			'-c',
-			'export NODE_AUTH_TOKEN=$(gh auth token) && pnpm josh latest:corepack && pnpm josh latest:update && pnpm josh ranges && pnpm josh audit && pnpm josh latest:scope --record',
+			'export NODE_AUTH_TOKEN=$(gh auth token) && pnpm josh latest:guard && pnpm josh latest:corepack && pnpm josh latest:update && pnpm josh ranges && pnpm josh audit && pnpm josh latest:scope --record',
 		],
 		description: 'Update pnpm, dependencies, and run security audit',
 		category: 'Maintenance',
@@ -55,6 +55,12 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		// where the project keeps its settings — a variable that only works when exported from the
 		// shell is one a user follows the documentation for and gets the default from, silently.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+	},
+	'latest:guard': {
+		script: 'scripts/version/latest-lane-guard.ts',
+		description: 'Refuse josh latest inside a lane (the update stamp is keyed to the project root)',
+		category: 'Maintenance',
+		reference: ['', 'automation', ['files']],
 	},
 	'latest:corepack': {
 		script: 'scripts/version/latest-corepack.ts',

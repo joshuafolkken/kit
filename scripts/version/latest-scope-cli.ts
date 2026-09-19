@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { latest_lane_guard } from './latest-lane-guard'
 import { latest_stamp, type LatestStamp } from './latest-stamp'
 
 // `josh latest:scope` — say whether this run has to update dependencies (joshuafolkken/kit#1215).
@@ -64,6 +65,18 @@ function decide(): Decision {
 	}
 }
 
+// A lane is answered `skip` before the stamp is even read (joshuafolkken/kit#2135): the stamp is
+// keyed to the project root, so a lane always reads as stale, and every lane would otherwise run its
+// own dependency update. `latest_lane_guard` is the single source of the reason and of the refusal
+// `josh latest` prints.
+function scope_decision(): Decision {
+	if (latest_lane_guard.is_lane()) {
+		return { scope: SKIPPED_SCOPE, reason: latest_lane_guard.LANE_SCOPE_REASON }
+	}
+
+	return decide()
+}
+
 // The answer alone on stdout so `$(pnpm josh latest:scope)` reads it, and the reason on stderr so a
 // person sees why without a shell having to parse around it — the same split `josh review:level`
 // prints in.
@@ -106,7 +119,7 @@ function run(argv: ReadonlyArray<string>): number {
 
 	if (argv.includes(RECORD_FLAG)) return record()
 
-	print_decision(decide(), argv.includes(JSON_FLAG))
+	print_decision(scope_decision(), argv.includes(JSON_FLAG))
 
 	return 0
 }
@@ -124,6 +137,7 @@ const latest_scope_cli = {
 	RECORD_FLAG,
 	REQUIRED_SCOPE,
 	run,
+	scope_decision,
 	SKIPPED_SCOPE,
 	USAGE,
 }

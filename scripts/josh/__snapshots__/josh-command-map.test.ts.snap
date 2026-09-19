@@ -38,6 +38,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ist": "issue:state",
     "l": "lint",
     "lc": "latest:corepack",
+    "lg": "latest:guard",
     "ln": "lines",
     "lna": "lane:await",
     "lnc": "lane:close",
@@ -405,6 +406,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "network",
+      ],
+    ],
+    "latest:guard": [
+      "",
+      "automation",
+      [
+        "files",
       ],
     ],
     "latest:scope": [

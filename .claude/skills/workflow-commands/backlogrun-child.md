@@ -268,9 +268,9 @@ before parking it.
 **`git switch main && git pull` stays per child** — it brings the previous child's merge into the tree,
 and a child that skips it implements on a stale main. Only the dependency update moves to the run. **In
 lanes it changes hands**: no lane can switch to the default branch, so the parent runs it in the primary
-checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — its
-`latest:scope` always answers `required`; the reason and the stash that carries the lock file into the
-first lane are in "Once per repository, before the first lane opens" above.
+checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — `latest:scope`
+skips and `latest:guard` refuses. The stash that carries the lock file into the first lane is in "Once
+per repository, before the first lane opens" above.
 
 This is the same rule `latest-gate.md` is the single source of.
 

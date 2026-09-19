@@ -677,6 +677,10 @@ pnpm josh latest:scope      # → required | skip — does this run have to upda
 
 Prints `required` or `skip` on stdout (reason on stderr) — whether this checkout must update. Read the answer with `$(pnpm josh latest:scope)`; workflow commands ask it instead of updating unconditionally. No completion record answers `required` (fresh checkout, cleared temp dir, or a half-finished chain). The freshness window is **12 hours**, overridable via `JOSH_LATEST_MAX_AGE_HOURS`. The record is per-checkout, and `--record` is the write half used by the chain (prints nothing on stdout).
 
+#### `josh latest:guard`
+
+Fronts the `josh latest` chain and refuses inside a lane; a lane's per-root stamp always reads stale.
+
 #### `josh latest:corepack`
 
 Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`), staying within `devEngines`. It temporarily widens the exact `devEngines` pin so corepack's `devEngines` validation accepts a newer patch, then realigns `devEngines.packageManager.version` byte-for-byte (integrity suffix included) with the `packageManager` pin. If the registry can't answer, the pnpm bump is skipped with a notice and nothing is widened.
