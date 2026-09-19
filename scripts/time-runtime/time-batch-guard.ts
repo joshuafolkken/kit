@@ -247,8 +247,7 @@ function is_sequence_at_limit(
 	facts: BundleFacts,
 	refused_at_ms: number,
 ): boolean {
-	if (sequence.length < SEQUENCE_BEFORE_LIMIT) return false
-	if (depends_on_sequence(sequence, facts)) return false
+	if (sequence.length < SEQUENCE_BEFORE_LIMIT || depends_on_sequence(sequence, facts)) return false
 
 	return sequence_started_ms(sequence) > refused_at_ms
 }

@@ -137,8 +137,14 @@ function continues_turn(spans: ReadonlyArray<Span>, index: number, message_id: s
 function opens_round_trip(spans: ReadonlyArray<Span>, index: number): boolean {
 	const span = spans[index]
 
-	if (span === undefined || !is_tool(span) || span.is_continuation) return false
-	if (is_tool_at(spans, index - 1)) return false
+	if (
+		span === undefined ||
+		!is_tool(span) ||
+		span.is_continuation ||
+		is_tool_at(spans, index - 1)
+	) {
+		return false
+	}
 
 	return !continues_turn(spans, index, span.message_id)
 }

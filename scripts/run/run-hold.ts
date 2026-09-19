@@ -118,7 +118,7 @@ function classify(raw: string | undefined, now: Date): HoldRead {
 
 	if (hold === undefined) return UNREADABLE_READ
 
-	return is_stale(hold, now) ? { kind: 'stale', hold } : { kind: 'held', hold }
+	return { kind: is_stale(hold, now) ? 'stale' : 'held', hold }
 }
 
 function read_hold(target: string, now: Date = new Date()): HoldRead {

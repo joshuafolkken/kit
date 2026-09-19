@@ -125,8 +125,10 @@ async function warn_if_missing_closes(branch_name: string): Promise<string | und
 function reads_as_empty_rollup(raw_json: string): boolean {
 	const parsed = git_pr_checks_parse.parse_json_safe(raw_json)
 
-	if (typeof parsed !== 'object' || parsed === null) return false
-	if (!('statusCheckRollup' in parsed)) return false
+	if (typeof parsed !== 'object' || parsed === null || !('statusCheckRollup' in parsed)) {
+		return false
+	}
+
 	const { statusCheckRollup: rollup } = parsed
 
 	return Array.isArray(rollup) && rollup.length === 0

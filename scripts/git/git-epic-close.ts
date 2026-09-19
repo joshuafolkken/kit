@@ -134,9 +134,13 @@ async function inspect_siblings(
 // absence of relations is reported — checking each dependent pair would mean inferring the chain
 // from task-list order, which need not match.
 function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<SiblingState>): void {
-	if (states.length === 0) return
-	if (!epic.has_declared_order) return
-	if (states.some((state) => state.has_blocked_by)) return
+	if (
+		states.length === 0 ||
+		!epic.has_declared_order ||
+		states.some((state) => state.has_blocked_by)
+	) {
+		return
+	}
 
 	console.info(
 		`ℹ️  Epic #${String(epic.number)} has no blocked-by relation on any child; ` +

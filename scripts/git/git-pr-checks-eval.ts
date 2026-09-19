@@ -98,9 +98,13 @@ function evaluate_failure_state(input: {
 	failed_checks: ReadonlyArray<string>
 	merge_state_status: string | undefined
 }): PrEvaluation | undefined {
-	if (is_merge_conflict(input.merge_state_status)) return 'failure'
-	if (is_review_blocked(input.review_decision)) return 'failure'
-	if (input.failed_checks.length > 0) return 'failure'
+	if (
+		is_merge_conflict(input.merge_state_status) ||
+		is_review_blocked(input.review_decision) ||
+		input.failed_checks.length > 0
+	) {
+		return 'failure'
+	}
 
 	return undefined
 }

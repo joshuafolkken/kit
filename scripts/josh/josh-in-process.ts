@@ -25,8 +25,7 @@ function is_typescript_dispatcher(dispatcher_url: string): boolean {
 // process of their own; each runs at most a few times per run, so none of them is where the cost
 // this saves accumulates.
 function can_run_in_process(entry: CommandEntry, dispatcher_url: string): boolean {
-	if (entry.script === undefined) return false
-	if (entry.tsx_arguments !== undefined) return false
+	if (entry.script === undefined || entry.tsx_arguments !== undefined) return false
 
 	return is_typescript_dispatcher(dispatcher_url)
 }

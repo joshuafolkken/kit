@@ -92,9 +92,7 @@ async function close_lane(child: string): Promise<void> {
 // The progress comment is a human-readable mirror of the carry record, so it is best-effort and only
 // where a named epic has a body to carry it — a pure backlog run keeps the record alone.
 async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Promise<void> {
-	if (carry === undefined) return
-
-	if (ctx.epic === undefined) return
+	if (carry === undefined || ctx.epic === undefined) return
 
 	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge.counters_comment(carry))
 }

@@ -45,9 +45,8 @@ function shares_path_with_workflows(directory: string): boolean {
 		.replace(/^\.\//u, '')
 		.replace(/\/$/u, '')
 
-	if (normalized === '') return true
 	// An entry that climbs out of the repository can reach `.github/workflows` from anywhere above it.
-	if (normalized.split('/').includes('..')) return true
+	if (normalized === '' || normalized.split('/').includes('..')) return true
 
 	return (
 		normalized === WORKFLOWS_ROOT ||

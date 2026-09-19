@@ -171,7 +171,7 @@ function parse_listing(raw: string, is_capped: boolean): BusyRead {
 	const holders = read.rows.filter((row) => !is_parked(row))
 	if (holders.length > 0) return { kind: 'busy', issues: holders }
 
-	return is_capped ? { kind: 'truncated' } : { kind: 'idle' }
+	return { kind: is_capped ? 'truncated' : 'idle' }
 }
 
 // The label filter is the query's job — membership is what makes the listing the running set, so
