@@ -18,6 +18,9 @@ export default defineConfig({
 			'prettier/**/*.test.ts',
 			'templates/**/*.test.ts',
 		],
+		// Smoke test packs and installs the real tarball — too slow (~60 s setup) for the unit
+		// gate. Run before release with: pnpm vitest run scripts/build/packed-consumer.test.ts
+		exclude: ['scripts/build/packed-consumer.test.ts'],
 		testTimeout: TEST_TIMEOUT_MS,
 		// A unit test that reaches GitHub fails on someone else's latency rather than on the code under
 		// test. The guard puts a recording `gh` in front of the real one and fails the run if anything
