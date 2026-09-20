@@ -585,6 +585,16 @@ Say whether a run step may go to a cheaper execution tier
 
 ---
 
+### `josh doc:read` · `josh dcr`
+
+> **Audience:** automation · **Side effects:** none
+
+`<file>`
+
+Read a whole document safely: print it, or point at the Read tool when over the Bash cap
+
+---
+
 ### `josh doc:section` · `josh ds`
 
 > **Audience:** automation · **Side effects:** none
@@ -932,6 +942,16 @@ Say whether a delegated unit is still working, or stopped without reporting
 `<issue> [options]`
 
 Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child
+
+---
+
+### `josh run:next` · `josh rn`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue>`
+
+Print the next step a fullrun takes, computed from the run’s state
 
 ---
 

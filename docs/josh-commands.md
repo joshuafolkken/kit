@@ -1251,6 +1251,16 @@ Bundles the reads a run makes before its first edit into one call; alias `rp`.
 Bundles a run's read-only status — issue state, `cost --cut` verdict, and carry counters — in one
 call; alias `rst`, `--repo` for a cross-repo child. Writes nothing (joshuafolkken/kit#2165).
 
+### `josh run:next`
+
+Prints the next step a `fullrun` takes, computed from the run's state rather than read out of prose;
+alias `rn` (joshuafolkken/kit#2188). It reads exactly what `run:prep` reads — the issue state, the
+`human_review` line and the dependency scope — by calling `run:prep`'s own gather, and maps the four
+facts to one step: a `CLOSED` issue is already done, a `required` dependency scope is updated first, a
+`needs-human-review` issue stops before its commit, and everything else is the ordinary implement step.
+It is the consumer #2165's `run:prep` was built to have and the foundation the entry-read trim of epic
+#2166 rests on.
+
 ### `josh repo:party`
 
 Says whether a repository is **first-party** or **third-party** — computed by owner equality, not
@@ -1471,6 +1481,21 @@ Two figures under one definition, which is what makes a before and an after comp
 - **`lane-child` is a synthetic entry**, not a table keyword: `pnpm josh read:set lane-child` prints the trimmed set a dispatched lane child (`JOSH_LANE_CHILD`) reads — it drops the point-of-use documents the parent owns (child dispatch, lane opening, the progress watcher and the hand-off) and reads the entry-only `SKILL.md` sections (§2a/§2c/§2e/§2i/§3) at the section level, so its `total read` falls well below a normal `fullrun`'s (joshuafolkken/kit#2021).
 
 **Output / exit codes:** an unrecognized keyword is refused with the known ones listed, rather than reporting a saving of zero.
+
+### `josh doc:read`
+
+A Bash-cap-safe read path for a whole document; alias `dcr` (joshuafolkken/kit#2188).
+
+```bash
+pnpm josh doc:read CLAUDE.md          # under the cap: prints the document
+pnpm josh doc:read backlogrun.md      # over the cap: prints a directive, no content
+```
+
+- Resolves the file exactly as `doc:section` does — a bare name inside `.claude/skills/workflow-commands/`, anything that resolves as a path taken as one.
+- **Under the Bash output cap it prints the document; over it, it prints one line and no content.** A `cat` of a document larger than `BASH_MAX_OUTPUT_LENGTH` hands back a middle-truncated preview and the file is then read a second time (joshuafolkken/kit#1797); this never emits the over-cap document through the shell, so no truncated preview is produced. The directive names both byte figures and the path, so the `Read` tool reads it once.
+- The cap is read from `.claude/settings.json`, the same figure `read:set` marks its rows against; `doc:section` remains the way to fetch a single heading when the whole file is not wanted.
+
+**Output / exit codes:** an unreadable file exits non-zero; an over-cap document prints its directive and exits zero.
 
 ### `josh time`
 

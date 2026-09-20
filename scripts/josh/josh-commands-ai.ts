@@ -114,6 +114,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[<entry>] [--json]', 'automation', ['none']],
 	},
+	'doc:read': {
+		script: 'scripts/document/document-read-cli.ts',
+		description:
+			'Read a whole document safely: print it, or point at the Read tool when over the Bash cap',
+		category: 'AI tools',
+		reference: ['<file>', 'automation', ['none']],
+	},
 	time: {
 		script: 'scripts/time/time-cli.ts',
 		description: "Report where a run's wall clock went: model wait, tool execution, human wait",
@@ -214,6 +221,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Bundle a run’s read-only status: issue state, cost verdict, carry counters',
 		category: 'AI tools',
 		reference: ['<issue> [--repo <owner/repo>]', 'automation', ['network']],
+	},
+	'run:next': {
+		script: 'scripts/run/run-next-cli.ts',
+		description: 'Print the next step a fullrun takes, computed from the run’s state',
+		category: 'AI tools',
+		reference: ['<issue>', 'automation', ['network']],
 	},
 	'repo:party': {
 		script: 'scripts/discovery/repo-party-cli.ts',
