@@ -248,6 +248,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: [ISSUE_WITH_OPTIONS, 'automation', ['git', 'network']],
 	},
+	'run:review': {
+		script: 'scripts/run/run-review-cli.ts',
+		description:
+			'Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
+		category: 'AI tools',
+		reference: ['[--join]', 'automation', ['processes', 'files']],
+	},
 	...LANE_COMMANDS,
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',

@@ -86,6 +86,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rp": "run:prep",
     "rpy": "repo:party",
     "rr": "run:release",
+    "rrv": "run:review",
     "rs": "read:set",
     "rst": "run:status",
     "rt": "reconcile-templates",
@@ -758,6 +759,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "[issue|--force]",
       "automation",
       [
+        "files",
+      ],
+    ],
+    "run:review": [
+      "[--join]",
+      "automation",
+      [
+        "processes",
         "files",
       ],
     ],

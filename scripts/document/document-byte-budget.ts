@@ -80,8 +80,11 @@ const SLACK_BYTES = 512
 // document already at its mark. joshuafolkken/kit#2202 raised it three slack units (100,992 →
 // 102,528) for the mandated `josh read:files` section — the mid-implementation counterpart of
 // `run:prep`, its command reference and its cap/fallback behavior — landing against a document
-// already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 102_528
+// already at its mark. joshuafolkken/kit#2179 raised it two slack units (102,528 → 103,552) for the
+// mandated `josh run:review` section — the composite that starts the gate beside the review, its
+// command reference and its `--join` verdict — landing against a document already at its mark, the
+// branch's merge with `main` layering the section on top of a document `main` had already filled.
+const JOSH_COMMANDS_CEILING_BYTES = 103_552
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -128,7 +131,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 101_914 },
+	{ path: 'docs/josh-commands.md', bytes: 102_833 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
