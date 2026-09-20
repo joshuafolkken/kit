@@ -13,6 +13,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "blo": "backlog:offer",
     "blp": "backlog:plan",
     "bp": "bump",
+    "by": "bytes",
     "c": "check",
     "cm": "check-commit-message",
     "co": "cost",
@@ -180,6 +181,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "maintainer",
       [
         "files",
+      ],
+    ],
+    "bytes": [
+      "<files...>",
+      "developer",
+      [
+        "none",
       ],
     ],
     "check": [

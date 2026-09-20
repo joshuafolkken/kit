@@ -7,6 +7,7 @@ import {
 } from './josh-command-types'
 
 const FILE_ARGUMENTS = '[files...]'
+const REQUIRED_FILE_ARGUMENTS = '<files...>'
 const FILTER_ARGUMENTS = '[filters...]'
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -33,7 +34,14 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/lines/lines-command.ts',
 		description: "Print a file's code lines against the max-lines limit and the headroom left",
 		category: 'Development',
-		reference: ['<files...>', 'developer', ['none']],
+		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
+	},
+	bytes: {
+		script: 'scripts/bytes/bytes-command.ts',
+		description:
+			"Print an agent-read document's byte size against its ceiling and the headroom left",
+		category: 'Development',
+		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
 	},
 	format: {
 		// prettier first here, unlike `format:edited`, and deliberately: `eslint --fix` exits 1
