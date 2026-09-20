@@ -84,11 +84,25 @@ const HOLD_RELEASE_REASON =
 	'row is silent there. Release it, then stop again.'
 
 // **A citation slip, not a refusal.** The stop proceeds; the notice reaches the person watching.
+//
+// **It corrects rather than advises.** The bare `#N` is already on screen and the hook cannot unsay
+// it, so the notice does the one thing that helps the *next* reply: it names the numbers it detected
+// and hands over the exact `issue:cite` call that prints the paste-ready lines. The rule itself is not
+// restated — it is resident in `CLAUDE.md` — only pointed at.
 const ISSUE_CITATION_NOTICE =
-	'ℹ issue citation: your reply names an Issue as a bare `#N`. Session-facing output cites it as a ' +
-	'number-link — `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <短い要約>` (`CLAUDE.md`, ' +
-	'`prompts/collaboration-workflow/issue-citation.md`), so the reader can click through and see which ' +
-	'repository it is. This is a notice only; the stop proceeds.'
+	'Session-facing output cites an Issue as a number-link so the reader can click through and see ' +
+	'which repository it is (`CLAUDE.md`, `prompts/collaboration-workflow/issue-citation.md`). This is ' +
+	'a notice only; the stop proceeds.'
+
+function build_citation_notice(references: ReadonlyArray<string>): string {
+	const numbers = references.join(', ')
+	const command = `pnpm josh issue:cite ${issue_citation.cite_arguments(references).join(' ')}`
+
+	return (
+		`ℹ issue citation: your reply names an Issue as a bare \`#N\` (${numbers}). Run \`${command}\` ` +
+		`to print the paste-ready citation lines, then use those in your next reply. ${ISSUE_CITATION_NOTICE}`
+	)
+}
 
 function needs_notify(context: StopContext): boolean {
 	return context.hold_present && !context.notified
@@ -110,7 +124,10 @@ function block_reason(context: StopContext): string | undefined {
 }
 
 function notice_text(context: StopContext): string | undefined {
-	return issue_citation.has_bare_reference(context.message) ? ISSUE_CITATION_NOTICE : undefined
+	const references = issue_citation.bare_references(context.message)
+	if (references.length === 0) return undefined
+
+	return build_citation_notice(references)
 }
 
 // The block path decides first; the notice is asked only when nothing blocks, so a refused stop never

@@ -115,8 +115,11 @@ const SLACK_BYTES = 512
 // disposition` section — the runtime-path oracle sharing the review-level inert set, its command
 // reference and its `runtime` / `non-runtime` verdict — and the `josh test:declared --match` note,
 // landing against a document already at its mark, the branch's merge with `main` layering #2180's,
-// #2182's and #2207's sections on top.
-const JOSH_COMMANDS_CEILING_BYTES = 110_720
+// #2182's and #2207's sections on top. joshuafolkken/kit#2220 raised it two further slack units
+// (110,720 → 111,744) for the mandated `josh issue:cite` section — the paste-ready citation command,
+// its command reference and its `--repo` / `owner/repo#N` behavior — landing against a document already
+// at its mark, the branch's merge with `main` layering #2182's, #2207's and #2181's sections on top.
+const JOSH_COMMANDS_CEILING_BYTES = 111_744
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -163,7 +166,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 27_477 },
-	{ path: 'docs/josh-commands.md', bytes: 110_178 },
+	{ path: 'docs/josh-commands.md', bytes: 111_198 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -175,7 +178,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/epic-bundle.md', bytes: 23_605 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_147 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4494 },
-	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 3103 },
+	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 3876 },
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 22_054 },
 	{ path: 'prompts/collaboration-workflow/latest-first.md', bytes: 2625 },
 	{ path: 'prompts/collaboration-workflow/no-clones.md', bytes: 1614 },

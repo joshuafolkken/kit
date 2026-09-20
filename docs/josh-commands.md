@@ -852,6 +852,23 @@ pnpm josh issue:scout "<title>" --body "follows on from #1246"
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
 
+### `josh issue:cite`
+
+Print the paste-ready number-link citation line for each issue in one call, so the correct session-facing form — `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <summary>` — costs one command rather than a title read per issue. The summary is the issue's own title, fetched; adapt it to the session language when it matters.
+
+```bash
+pnpm josh issue:cite 2220                                  # alias: josh ici
+pnpm josh issue:cite 2220 1758 1252                        # several numbers, read concurrently
+pnpm josh issue:cite 45 --repo joshuafolkken/app-kit       # bare numbers in another repository
+pnpm josh issue:cite joshuafolkken/app-kit#45 2220         # per-token owner/repo#N notation
+```
+
+**Options:**
+
+- `--repo <owner/repo>` — the repository for every bare number; a token written `owner/repo#N` overrides it for itself.
+
+Citation lines go to stdout so the block stays paste-ready; a number that resolves to nothing or a read that failed is named on stderr rather than dropped, and any failure sets a non-zero exit. Any non-numeric token refuses the whole call. The [`Stop` hook's citation notice](../prompts/collaboration-workflow/issue-citation.md) points at this command with the numbers it detected already filled in.
+
 ### `josh pkg:scout`
 
 Before the Package-First tier decision, rank candidate packages by measured metrics so Tier A ("clearly best") and Tier B ("genuine toss-up") are read off the output rather than judged (joshuafolkken/kit#2216). It queries the npm registry and prints one line per candidate: npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
