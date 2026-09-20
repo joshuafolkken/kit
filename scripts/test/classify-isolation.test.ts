@@ -61,6 +61,12 @@ describe('classify_pilot_files — the generated candidate list', () => {
 	it('classifies every returned file as a pilot candidate', () => {
 		for (const file of candidates) expect(is_pilot_candidate(file), file).toBe(true)
 	})
+
+	it('returns only git-tracked files (hermetic against transient fixtures)', () => {
+		const tracked = classify_isolation.tracked_files()
+
+		for (const file of candidates) expect(tracked.has(file), file).toBe(true)
+	})
 })
 
 describe('render_pilot_files — the regenerated artifact', () => {
