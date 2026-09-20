@@ -71,7 +71,7 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 		id: 'rule',
 		mode_in_lane_child: 'refuse',
 		because:
-			'it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules a child must still obey (`shell-body`, `piped-verification`); a blanket suppression would disarm exactly the guards written for the child',
+			"it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules a child must still obey (`shell-body`, `piped-verification`); a blanket suppression would disarm exactly the guards written for the child. The pre-gate-cut refusal does collateral a sibling call batched in the same turn — a `PreToolUse` deny cancels the turn's other parallel calls, which is the harness behavior kit#2177 measured on #2160 (gate refused, its batched `review:brief` cancelled) — and that collateral is not avoidable at the guard level. `notice` was considered for the pre-gate-cut point and rejected: kit#1864 measured the cut taken 0 times while it was carried as prose, and a notice is prose in front of the run (kit#2178 measured a lane-child notice not moving the number), so a notice would drop enforcement without a procedural replacement. kit#2177 supplies that replacement in the procedure instead — the chain orders the cut before the gate, so the cut is issued on its own (its `cut` verdict ends the turn, batching with nothing) and the gate runs in the fresh process where the carried cut keeps this guard silent; the refusal therefore stays `refuse` as insurance and the collateral is gone from the default path rather than from the guard",
 	},
 ]
 
