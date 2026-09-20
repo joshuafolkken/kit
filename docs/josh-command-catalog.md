@@ -135,6 +135,16 @@ Claude Code hook: the batch, investigation and rule guards in one process (reads
 
 ---
 
+### `josh refactor:scan` · `josh rfs`
+
+> **Audience:** automation · **Side effects:** processes
+
+_No arguments._
+
+List refactoring candidates in the changed scope by category and answer clear/candidates
+
+---
+
 ### `josh session:lang` · `josh sl`
 
 > **Audience:** automation · **Side effects:** none
