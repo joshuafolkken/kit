@@ -76,6 +76,19 @@ describe('cost_verdict.report_over', () => {
 	})
 })
 
+describe('cost_verdict.classify', () => {
+	const one = over_of([record(100)])
+
+	it('answers over when the marginal cost exceeds the limit, printing nothing', () => {
+		expect(cost_verdict.classify(one, 0)).toBe(cost_verdict.OVER_VERDICT)
+		expect(stdout()).toBe('')
+	})
+
+	it('answers under at exactly the limit', () => {
+		expect(cost_verdict.classify(one, 100)).toBe(cost_verdict.UNDER_VERDICT)
+	})
+})
+
 // joshuafolkken/kit#1933: the implementation-phase cut of a lane child is decided by this same
 // `report_over` measurement — `pnpm josh cost --cut` — not by a
 // second decision function. This pins the boundary against the real path: over the threshold a lane

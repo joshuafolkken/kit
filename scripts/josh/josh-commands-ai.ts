@@ -172,15 +172,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// the failure warning needs the Telegram credentials, the same
 		// reasons `notify` and `followup` carry these flags.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		description:
-			'Continue a cut backlogrun by waking the next session from outside the conversation',
+		description: 'Wake the next session of a cut backlogrun from outside the conversation',
 		category: 'AI tools',
 		reference: ['[options]', 'automation', ['processes', 'notifications']],
 	},
 	'run:cut': {
 		script: 'scripts/run/run-cut-cli.ts',
-		description:
-			'Cut a lane child before the gate and resume a fresh process from the persisted state',
+		description: 'Cut a lane child before the gate and resume a fresh process',
 		category: 'AI tools',
 		reference: ['[--resume] <issue>', 'automation', ['files']],
 	},
@@ -192,8 +190,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:ending': {
 		script: 'scripts/run/run-ending-cli.ts',
-		description:
-			'Classify how a dispatched lane child ended: merged, cut, abandoned mid-implementation, or unreadable',
+		description: 'Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)',
 		category: 'AI tools',
 		reference: ['<issue> --output <path> [--repo <owner/repo>]', 'automation', ['network']],
 	},
@@ -205,10 +202,15 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:prep': {
 		script: 'scripts/run/run-prep-cli.ts',
-		description:
-			'Bundle the reads a run makes before its first edit: issue body and comments, state, dependency-update scope',
+		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['network']],
+	},
+	'run:status': {
+		script: 'scripts/run/run-status-cli.ts',
+		description: 'Bundle a run’s read-only status: issue state, cost verdict, carry counters',
+		category: 'AI tools',
+		reference: ['<issue> [--repo <owner/repo>]', 'automation', ['network']],
 	},
 	'repo:party': {
 		script: 'scripts/discovery/repo-party-cli.ts',

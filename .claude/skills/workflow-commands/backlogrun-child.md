@@ -181,7 +181,7 @@ pnpm josh run:liveness <N> --output <path> --process none --window 45 --repo <ow
 | --- | --- | --- |
 | `alive` | The output moved, or a process of the child is running | Keep polling; touch nothing |
 | `stopped` | The output has been frozen past the window and no process of the child is alive | The recovery below |
-| `settled` | The child closed, or the unit parked it with `needs-decision` | Re-read it with `pnpm josh issue:state <N>` and take the branch its state says |
+| `settled` | The child closed, or the unit parked it with `needs-decision` | Re-read it with `pnpm josh run:status <N>` — one read-only call whose state section says which branch and whose carry counters beside it feed the failure-streak decision — and take the branch its state section says |
 | `undetermined` | A trace could not be read | Read the trace that failed and ask again — and see the two-in-a-row rule below |
 
 **Two `undetermined` answers in a row is a fault in the check, not a slow unit.** The second
@@ -209,7 +209,9 @@ the child is parked; **"nothing was ever opened for the child" is `pnpm josh run
 at the start of the next child, not this one's.**
 
 **What follows is what a failed child already gets.** Re-read the child first with
-`pnpm josh issue:state <N>`; then, while it is still `state: OPEN` and not carrying `needs-decision`.
+`pnpm josh run:status <N>` — its state section carries the same `state:` / `labels:` /
+`human_review:` lines `issue:state` prints, and folds in the carry counters this recovery reads
+anyway; then, while it is still `state: OPEN` and not carrying `needs-decision`.
 **A re-read carrying `needs-decision`** means the unit parked the child and then stopped, so fall
 through to the loop's park branch: leave the label on, count nothing against the consecutive-failure
 guard, and go back to step 1.
