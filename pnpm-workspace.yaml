@@ -32,3 +32,10 @@ minimumReleaseAgeExclude:
 overrides:
   svelte: ^5.55.7
   devalue: ^5.8.1
+  # Indirect deps a within-range re-resolution could not lift past their parents' pins, floored at the
+  # smallest release clearing each OSV advisory (joshuafolkken/kit#2200; user-approved 2026-09-21 to
+  # override indirect packages). Carets so `josh latest`'s re-resolution keeps them current within the
+  # major without reintroducing the advisory.
+  vite: ^8.0.16 # OSV — vite 8.0.8 → 8.0.16
+  postcss: ^8.5.23 # OSV — postcss 8.5.16 → 8.5.23
+  nanoid: ^3.3.18 # OSV — nanoid 3.3.15 → 3.3.18

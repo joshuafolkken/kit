@@ -33,13 +33,24 @@ const ALREADY_PRESENT = 'already available'
 const WRONG_CHECKSUM = 'deadbeef'
 const EXECUTABLE_MODE = 0o755
 const TEST_TIMEOUT_MS = 5000
+const FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.6.0'
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'kit-audit-provision-'))
 
-function fake_sync_result(exit_code: number | undefined): ExecaSyncResult {
-	const result = { exitCode: exit_code }
+function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSyncResult {
+	const result = { exitCode: exit_code, stdout }
 
 	return result as unknown as ExecaSyncResult
+}
+
+// The PATH probe and the managed-copy probe now read `--version`, so a floor decision depends on
+// which binary was spawned; a flat mock can no longer answer both (joshuafolkken/kit#2200).
+function mock_scanner_version(managed_output: string): void {
+	mocked_execa_sync.mockImplementation((target) =>
+		String(target) === security_audit_logic.BINARY_NAME
+			? fake_sync_result(undefined)
+			: fake_sync_result(0, managed_output),
+	)
 }
 
 function sha256_of(content: string): string {
@@ -197,7 +208,7 @@ describe('security_audit_provision.provision — a download that does not', () =
 
 describe('security_audit_provision.report', () => {
 	it('does nothing when the scanner is already on PATH', async () => {
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, FLOOR_VERSION_OUTPUT))
 		const fetch_spy = vi.fn()
 
 		vi.stubGlobal('fetch', fetch_spy)
@@ -210,7 +221,7 @@ describe('security_audit_provision.report', () => {
 	it('does nothing when a previous session already provisioned one', async () => {
 		const project_root = path.join(scratch, 'already-provisioned')
 
-		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
+		mock_scanner_version(FLOOR_VERSION_OUTPUT)
 		write_executable(managed_path_in(project_root), PAYLOAD)
 		const fetch_spy = vi.fn()
 

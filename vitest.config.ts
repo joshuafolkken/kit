@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config'
-import { VITEST_INCLUDE_GLOBS } from './scripts/test/vitest-include-globs'
+import { VITEST_INCLUDE_GLOBS } from './scripts/test/vitest-include-globs.ts'
 
 const TEST_TIMEOUT_MS = 10_000
 

@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config'
-import { PILOT_FILES } from './scripts/test/pilot-files'
+import { PILOT_FILES } from './scripts/test/pilot-files.ts'
 
 const TEST_TIMEOUT_MS = 10_000
 
