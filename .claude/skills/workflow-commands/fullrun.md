@@ -42,7 +42,10 @@ are `fullrun-steps.md`, read when a step needs its detail.
   background, presented as-is when it exits, and `pnpm josh run:progress --mark` in the same turn as
   every real report (`backlogrun-progress.md` → "Progress while the run is quiet"). A `fullrun`
   dispatched as a lane child starts none and never reads that document (`pnpm josh read:set
-  lane-child`).
+  lane-child`). **The watcher is a per-session heartbeat; the run's report surface is not it** — the
+  ambient surface is the run's event stream, followed identically before and after a cut, so nothing
+  about the reporter moves when execution hands off (`backlogrun-progress.md` → "The invariant is a
+  tier, not a mechanism").
 - **A dispatched lane child asks whether it is a resume first — `pnpm josh run:cut --resume <N>`**; on
   `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
   boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with

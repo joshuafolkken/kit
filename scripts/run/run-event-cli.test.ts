@@ -86,6 +86,19 @@ describe('run_event_cli.run — read', () => {
 		expect(read.next_position).toBe(2)
 	})
 
+	it('follows from a position, relaying new events on stdout and the next position on stderr', async () => {
+		fresh_target()
+		await run_event_cli.run(['--append', 'plan', 'planned'])
+		await run_event_cli.run(['--append', 'merge', 'merged'])
+		stdout.length = 0
+		stderr.length = 0
+
+		expect(await run_event_cli.run(['--follow', '1'])).toBe(SUCCESS)
+		expect(stdout.join('')).toContain('merged')
+		expect(stdout.join('')).not.toContain('planned')
+		expect(stderr.join('')).toContain('next_position: 2')
+	})
+
 	it('reads the newest event with --last', async () => {
 		fresh_target()
 		await run_event_cli.run(['--append', 'plan', 'planned'])

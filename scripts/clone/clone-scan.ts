@@ -102,8 +102,13 @@ function repo_identity(repo_path: string): string {
 // The absolute roots to scan: the current repository plus every first-party repository discovered
 // beside it, de-duplicated by identity — the current tree wins, so a worktree of it is dropped — so
 // each repository is scanned exactly once.
+//
+// **Discovery is asked from the main work tree, never from `root` directly.** A `backlogrun` child
+// runs in a lane, whose only neighbors are that repository's other lanes; asked there, discovery
+// returns nothing and the cross-repository half of this command's answer silently becomes `clean`.
+// The current tree is still scanned as `root`, so a lane reports its own working state.
 function scan_roots(root: string): Array<string> {
-	const map = repo_discovery.discover_repositories(root)
+	const map = repo_discovery.discover_repositories(repo_discovery.main_worktree(root))
 	const seen = new Set<string>()
 	const roots: Array<string> = []
 
@@ -126,8 +131,12 @@ function scan(root: string): Array<CloneGroup> {
 }
 
 // One site as `<repo>/<file>:<line>`; the repository basename disambiguates a cross-repository clone.
+// **The main work tree's basename, not the scanned tree's.** A lane's directory is named after its
+// issue, so a site found in one would otherwise print as `2217/…` — a repository nobody has.
 function format_site(site: CloneSite): string {
-	return `${path.basename(site.repo)}/${site.file}:${String(site.line)}`
+	const label = path.basename(repo_discovery.main_worktree(site.repo))
+
+	return `${label}/${site.file}:${String(site.line)}`
 }
 
 // One clone group: its category and every site it occurs at.

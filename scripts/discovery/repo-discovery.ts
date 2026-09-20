@@ -113,6 +113,24 @@ function resolve_current_owner(repository_path: string): string | undefined {
 	return repo_origin.parse_origin_url(origin_url)?.owner
 }
 
+// The work tree a repository's siblings sit beside: the given path for an ordinary checkout, and the
+// **main** work tree for a linked one. A linked work tree is parked wherever it was created — a lane
+// lives under `.kit-lanes/`, whose only neighbors are that repository's other lanes — so taking the
+// given path's parent as the place to look for siblings finds none of them. The common directory
+// `resolve_git_directory` already follows is `<main>/.git`, so its parent is that main work tree.
+//
+// **Only when the resolved directory is itself a `.git`.** A submodule resolves to
+// `<super>/.git/modules/<path>`, and a bare main repository to `<somewhere>/<name>.git`; neither has
+// a work tree for a parent, so taking one would hand discovery a directory that is not a checkout at
+// all — the very failure this function exists to close, moved somewhere else.
+function main_worktree(repository_path: string): string {
+	const git_directory = resolve_git_directory(repository_path)
+	if (git_directory === undefined) return repository_path
+	if (path.basename(git_directory) !== GIT_DIRECTORY) return repository_path
+
+	return path.dirname(git_directory)
+}
+
 // The map for the repository at `repository_path`. Empty when that repository's own owner cannot be
 // determined: without it there is nothing to compare siblings against, and a map built without the
 // owner restriction is exactly what must never be produced.
@@ -129,6 +147,7 @@ function discover_repositories(repository_path: string, environment = process.en
 
 const repo_discovery = {
 	OVERRIDE_ENV_KEY,
+	main_worktree,
 	read_origin_url,
 	resolve_current_owner,
 	scan_siblings,
