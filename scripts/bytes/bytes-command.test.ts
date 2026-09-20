@@ -13,11 +13,12 @@ describe('status_row — one budgeted document', () => {
 		expect(row).toContain('612 left')
 	})
 
-	it('names the value to record when over the ceiling', () => {
-		const row = status_row({ path: 'docs/x.md', current: 1600, recorded: 1000, remaining: -88 })
+	it('names the next block to record when over the ceiling', () => {
+		const row = status_row({ path: 'docs/x.md', current: 5000, recorded: 4096, remaining: -904 })
 
-		expect(row).toContain('over by 88')
-		expect(row).toContain('raise recorded to 1600')
+		expect(row).toContain('over by 904')
+		// The value to record is the next block multiple (block_ceiling(5000)), not the raw current size.
+		expect(row).toContain('raise recorded to 8192')
 	})
 })
 
@@ -51,7 +52,7 @@ describe('argument_row — a path handed on the command line', () => {
 })
 
 describe('near_ceiling_statuses — the no-argument scan', () => {
-	it('reports only documents within a slack of their ceiling, least headroom first', () => {
+	it('reports only documents near their ceiling, least headroom first', () => {
 		const statuses = near_ceiling_statuses()
 		const headrooms = statuses.map((status) => status.remaining)
 

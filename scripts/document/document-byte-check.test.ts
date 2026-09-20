@@ -15,20 +15,19 @@ describe('ceiling_message — the pure over-budget decision', () => {
 	})
 
 	it('is undefined when the size is within the ceiling', () => {
-		const recorded = 1000
+		const recorded = document_byte_budget.block_ceiling(1000)
 
-		expect(
-			ceiling_message('docs/x.md', document_byte_budget.ceiling_for(recorded), recorded),
-		).toBeUndefined()
+		expect(ceiling_message('docs/x.md', recorded, recorded)).toBeUndefined()
 	})
 
 	it('names the file and the value to record when over the ceiling', () => {
-		const recorded = 1000
-		const current = document_byte_budget.ceiling_for(recorded) + 1
+		const recorded = document_byte_budget.block_ceiling(1000)
+		const current = recorded + 1
 		const message = ceiling_message('docs/x.md', current, recorded)
+		const next = document_byte_budget.block_ceiling(current).toString()
 
 		expect(message).toContain('docs/x.md')
-		expect(message).toContain(`raise its recorded size to ${current.toString()}`)
+		expect(message).toContain(`raise its recorded size to ${next}`)
 	})
 })
 
