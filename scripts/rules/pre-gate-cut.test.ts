@@ -381,6 +381,24 @@ describe('rule_value.measure — the pre-gate cut row', () => {
 	})
 })
 
+// **kit#2177: the ordered cut removes the collateral cancel from the default path.** The wasted round
+// trip #2160 measured came from reaching an uncut gate, being refused, and losing the `review:brief`
+// batched with it. Ordering the cut first avoids that in two structural ways this suite pins: the cut
+// is issued on its own (so nothing is batched with the refused call), and the gate then runs in the
+// fresh process where the carried cut keeps the guard silent (so a batched gate survives).
+describe('the ordered cut avoids the collateral cancel', () => {
+	// The near-side process issues the cut on its own and is not refused for it, so it batches nothing a
+	// refusal could collateral; the fresh process then runs the gate with the cut carried, where the
+	// guard is silent — so a gate batched there with `review:brief` is not refused and neither call is
+	// cancelled. Both halves are what the ordered step relies on to keep the #2160 collateral off the path.
+	it('refuses neither the lone cut nor the resumed gate, so no batched sibling is cancelled', () => {
+		const resumed = state_of(LANE_DIRECTORY, cut_of(ISSUE))
+
+		expect(pre_gate_cut.is_uncut_gate(TAKE_THE_CUT, state_of(LANE_DIRECTORY))).toBe(false)
+		expect(pre_gate_cut.is_uncut_gate(GATE, resumed)).toBe(false)
+	})
+})
+
 describe('PRE_GATE_CUT_REASON', () => {
 	it.each([
 		// The command that fixes it — the only thing that makes a refusal actionable.

@@ -115,7 +115,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// on both sides by the ratchet, exactly as #2189 did for `fullrun.md` / `fullrun-steps.md`.
 	{ path: '.claude/skills/workflow-commands/backlogrun-steps.md', bytes: 46_674 },
 	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 7491 },
-	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6240 },
+	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6948 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 5355 },
@@ -127,7 +127,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 4370 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_956 },
-	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 28_364 },
+	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 29_452 },
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 5420 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 23_282 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
