@@ -211,6 +211,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: BACKLOGRUN_MD,
 	},
 	{
+		name: 'refactor:scan',
+		decision: 'Whether the refactoring scope still holds high- or medium-priority candidates',
+		args: '',
+		vocabulary: ['clear', 'candidates', 'error'],
+		single_source: 'prompts/refactoring.md',
+	},
+	{
 		name: 'split:assess',
 		decision: 'Whether a change size clears the split guide (the split assessment size question)',
 		args: '[--json]',

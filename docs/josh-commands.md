@@ -69,6 +69,14 @@ scripts/hooks/format-edited-file.ts  230/300 code lines (76%), 70 to spare
 
 - Count is lint's own (`skipBlankLines` / `skipComments`); `near from` marks 85%. Never fails on a large file — a non-zero exit means the argument list was unusable.
 
+### `josh refactor:scan`
+
+Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 describes, run as a command: it picks the target files (branch diff plus untracked, or `scripts/`; excluding `demo`, `src/routes/stories`, `/* @refactor-ignore */`), expands the scope along the import graph, asks the project's own eslint for the §4.2 categories, and answers `verdict: clear` / `verdict: candidates`. Reports and never fails.
+
+```bash
+pnpm josh refactor:scan
+```
+
 ### `josh bytes`
 
 Print how many bytes an agent-read document has against its recorded byte ceiling and how many remain — the byte counterpart of `josh lines`, so a mandated documentation update that would cross the ceiling is seen right after the edit rather than at the gate.

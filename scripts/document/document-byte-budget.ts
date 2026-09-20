@@ -98,13 +98,16 @@ const SLACK_BYTES = 512
 // split:assess` section — the split-assessment size command, its command reference and its
 // `split` / `single` verdict — landing against a document already at its mark, the branch's merge with
 // `main` layering the section on top of #2205's and #2216's, so the merged tree needs two units the
-// branch tree alone did not.
-// joshuafolkken/kit#2182 raised it two further slack units (108,160 → 109,184) for the mandated
+// branch tree alone did not. joshuafolkken/kit#2180 raised it one slack unit (108,160 → 108,672) for
+// the mandated `josh refactor:scan` section — the refactoring-candidate scan, its command reference and
+// its `verdict: clear` / `verdict: candidates` answer — landing against a document already at its mark,
+// the branch's merge with `main` layering the section on top.
+// joshuafolkken/kit#2182 raised it two further slack units (108,672 → 109,696) for the mandated
 // `josh sonar:hotspots` and `josh ui:routes` sections — the two prose procedures turned into commands,
 // their command references and branch/output contracts — landing against a document already at its
 // mark, the branch's merge with `main` layering the sections on top of the `josh run:event`,
-// `josh pkg:scout` and `josh split:assess` sections `main` had already added.
-const JOSH_COMMANDS_CEILING_BYTES = 109_184
+// `josh pkg:scout`, `josh split:assess` and `josh refactor:scan` sections `main` had already added.
+const JOSH_COMMANDS_CEILING_BYTES = 109_696
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -151,7 +154,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 108_201 },
+	{ path: 'docs/josh-commands.md', bytes: 108_682 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -180,7 +183,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 21_128 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 11_920 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 17_057 },
-	{ path: 'prompts/refactoring.md', bytes: 8372 },
+	{ path: 'prompts/refactoring.md', bytes: 8002 },
 	{ path: 'prompts/review-rubric.md', bytes: 18_268 },
 	{ path: 'prompts/review.md', bytes: 17_103 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 4660 },
