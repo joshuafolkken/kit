@@ -33,27 +33,30 @@ When triaging a red gate, confirm via the PR analysis whether the failing condit
 Code** condition (caused by this PR — fix it) or an **Overall** condition (pre-existing — handle
 per the table below, and do not let it silently block an unrelated change).
 
-## Step A: fetch hotspot details via public API (no auth)
+## Step A / Step B: fetch the hotspots and read each one's disposition
 
 ```bash
-curl -sS "https://sonarcloud.io/api/hotspots/search?projectKey=joshuafolkken_joshuafolkken-com&pullRequest=<PR-number>" \
-  | python3 -m json.tool
+pnpm josh sonar:hotspots <PR>   # alias: josh shs
 ```
 
-Check each entry for:
+The command fetches the hotspots on the pull request from SonarCloud's public API (no auth), reading
+the project key from `sonar-project.properties`, and prints per hotspot its `status`, `component`,
+`line`, `ruleKey` and the Step B branch it falls into. The one branch key that used to be walked by
+eye — "is this path upstream-synced?" — is answered by calling `josh sync:scope`'s own detection, so
+no distribution path list is duplicated. The four branches:
 
-- `status`: `TO_REVIEW` (action needed) vs `REVIEWED` (already resolved)
-- `component`, `line`: where the hotspot is
-- `message`, `ruleKey`: what rule fired
+| Branch     | Meaning                                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------------------------- |
+| `excluded` | A `TO_REVIEW` hotspot on an upstream-synced file — add the path to `sonar.exclusions`, never edit the file |
+| `local`    | A `TO_REVIEW` hotspot on project-local code — a targeted `sonar.issue.ignore.*` rule or NOSONAR comment    |
+| `fix`      | A reviewed-and-fixed hotspot — the real issue was fixed                                                    |
+| `defer`    | A reviewed hotspot set aside — out of scope for this PR                                                    |
 
-## Step B: decide how to respond
-
-| Situation                                                                        | Action                                                                                                         |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| False positive on an upstream-synced file (`.claude/**`, `scripts/git/**`, etc.) | Add the path to `sonar.exclusions` in `sonar-project.properties`. Do **not** edit the upstream-synced file     |
-| False positive on project-local code                                             | Document rationale; if suppression is warranted, add a targeted `sonar.issue.ignore.*` rule or NOSONAR comment |
-| Real issue                                                                       | Fix the code and add a regression test                                                                         |
-| Issue out of scope for the current PR                                            | Mention explicitly in the completion comment and open a follow-up Issue                                        |
+A read that failed (rate-limit, network) prints `unreadable: <reason>`, told apart from a success
+that found no hotspots. `pnpm josh oracle:list` carries the same vocabulary. **The only judgement
+left to you is whether a `TO_REVIEW` hotspot is really a false positive** — if it is, apply its
+`excluded` / `local` branch; if it is instead a real issue fix the code and add a regression test,
+and if it is out of scope mention it in the completion comment and open a follow-up Issue.
 
 ## Step C: optional — mark SAFE via API if a token is available
 

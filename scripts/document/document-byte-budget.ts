@@ -101,11 +101,25 @@ const SLACK_BYTES = 512
 // branch tree alone did not. joshuafolkken/kit#2180 raised it one slack unit (108,160 → 108,672) for
 // the mandated `josh refactor:scan` section — the refactoring-candidate scan, its command reference and
 // its `verdict: clear` / `verdict: candidates` answer — landing against a document already at its mark,
-// the branch's merge with `main` layering the section on top. joshuafolkken/kit#2220 raised it two
-// slack units (108,672 → 109,696) for the mandated `josh issue:cite` section — the paste-ready
-// citation command, its command reference and its `--repo` / `owner/repo#N` behavior — landing against
-// a document already at its mark, the branch's merge with `main` layering the section on top of #2180's.
-const JOSH_COMMANDS_CEILING_BYTES = 109_696
+// the branch's merge with `main` layering the section on top.
+// joshuafolkken/kit#2182 raised it two further slack units (108,672 → 109,696) for the mandated
+// `josh sonar:hotspots` and `josh ui:routes` sections — the two prose procedures turned into commands,
+// their command references and branch/output contracts — landing against a document already at its
+// mark, the branch's merge with `main` layering the sections on top of the `josh run:event`,
+// `josh pkg:scout`, `josh split:assess` and `josh refactor:scan` sections `main` had already added.
+// joshuafolkken/kit#2207 raised it one slack unit (109,696 → 110,208) for the mandated `--follow` reader
+// on the `josh run:event` section — the waiting positioned read an attached session relays with, its
+// command reference and its stdout/stderr contract — landing against a document already at its mark, the
+// branch's merge with `main` layering #2216's, #2218's, #2180's and #2182's sections on top.
+// joshuafolkken/kit#2181 raised it one slack unit (110,208 → 110,720) for the mandated `josh
+// disposition` section — the runtime-path oracle sharing the review-level inert set, its command
+// reference and its `runtime` / `non-runtime` verdict — and the `josh test:declared --match` note,
+// landing against a document already at its mark, the branch's merge with `main` layering #2180's,
+// #2182's and #2207's sections on top. joshuafolkken/kit#2220 raised it two further slack units
+// (110,720 → 111,744) for the mandated `josh issue:cite` section — the paste-ready citation command,
+// its command reference and its `--repo` / `owner/repo#N` behavior — landing against a document already
+// at its mark, the branch's merge with `main` layering #2182's, #2207's and #2181's sections on top.
+const JOSH_COMMANDS_CEILING_BYTES = 111_744
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -127,7 +141,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', bytes: 26_291 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', bytes: 26_442 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', bytes: 11_889 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 41_667 },
+	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 42_358 },
 	// joshuafolkken/kit#2190 cut `backlogrun.md` to a manifest and moved its detailed procedure into
 	// `backlogrun-steps.md`, so the entry read carries the manifest, not the prose — a relocation held
 	// on both sides by the ratchet, exactly as #2189 did for `fullrun.md` / `fullrun-steps.md`.
@@ -137,7 +151,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 5355 },
-	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 4680 },
+	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 5175 },
 	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 5578 },
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 3156 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 6980 },
@@ -151,8 +165,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 7108 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
-	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 109_020 },
+	{ path: 'CLAUDE.md', bytes: 27_477 },
+	{ path: 'docs/josh-commands.md', bytes: 111_198 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

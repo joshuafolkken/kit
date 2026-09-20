@@ -19,6 +19,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "co": "cost",
     "dcr": "doc:read",
     "dg": "delegate",
+    "dp": "disposition",
     "dr": "doctor",
     "ds": "doc:section",
     "ea": "epic:audit",
@@ -102,6 +103,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "sa": "split:assess",
     "sd": "cspell:dot",
     "sg": "stop:guard",
+    "shs": "sonar:hotspots",
     "sl": "session:lang",
     "sp": "stash:pop",
     "ss": "secretlint-scan",
@@ -114,6 +116,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "tr": "test:related",
     "tu": "test:unit",
     "u": "latest",
+    "uir": "ui:routes",
     "v": "version",
   },
   "references": {
@@ -228,6 +231,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "delegate": [
       "<step> | --list",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "disposition": [
+      "<path...>",
       "automation",
       [
         "none",
@@ -748,7 +758,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:event": [
-      "--append <kind> <text> | --from <position> | --last",
+      "--append <kind> <text> | --from|--follow <n> | --last",
       "automation",
       [
         "files",
@@ -848,6 +858,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "sonar:hotspots": [
+      "<PR>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "split:assess": [
       "[--json]",
       "automation",
@@ -891,7 +908,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "test:declared": [
-      "",
+      "[--match]",
       "developer",
       [
         "processes",
@@ -921,6 +938,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "time": [
       "[options]",
       "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "ui:routes": [
+      "[--staged]",
+      "automation",
       [
         "none",
       ],

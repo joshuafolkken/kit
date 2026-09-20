@@ -5,7 +5,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { run_carry } from './run-carry'
-import { run_progress_clock } from './run-progress-clock'
+import { run_event_stream } from './run-event-stream'
 import { run_wake } from './run-wake'
 import { run_wake_cli } from './run-wake-cli'
 import { run_wake_session } from './run-wake-session'
@@ -52,10 +52,10 @@ function log_target(): string {
 	return run_wake.wake_log_path(REPOSITORY)
 }
 
-// The woken session's progress record, keyed on the same directory `resolve_context` resolves — the
-// primary checkout, whose own git directory is this common one (joshuafolkken/kit#1910).
-function progress_target(): string {
-	return run_progress_clock.stamp_target_of(REPOSITORY)
+// The run's event stream, keyed on the same directory `resolve_context` resolves — the primary
+// checkout, whose own git directory is this common one (joshuafolkken/kit#2207).
+function event_target(): string {
+	return run_event_stream.target_of(REPOSITORY)
 }
 
 // Written as a stamp rather than through `begin_carry`, because what these cases turn on is a record
@@ -85,13 +85,13 @@ beforeEach(() => {
 	run_wake.remove_wake(wake_target())
 	run_carry.end_carry(carry_target())
 	rmSync(log_target(), { force: true })
-	stamp_file.remove_stamp(progress_target())
+	rmSync(event_target(), { force: true })
 })
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
 	rmSync(log_target(), { force: true })
-	stamp_file.remove_stamp(progress_target())
+	rmSync(event_target(), { force: true })
 })
 
 describe('josh run:wake — the stdout contract', () => {
@@ -213,16 +213,16 @@ describe('josh run:wake --list — a person can see what is running', () => {
 	})
 })
 
-// joshuafolkken/kit#2156: after a cut `--list` relays the last heartbeat on demand and names the
-// ambient log that streams every one, so a person can keep it open with `tail -F` rather than typing
-// `--list` again.
+// joshuafolkken/kit#2207: after a cut the ambient surface is the run's event stream, followed from
+// `--list`, with `tail -F` on the raw stream named as a recovery path rather than the ambient one.
 describe('josh run:wake --list — the ambient surface across the cut', () => {
-	it('names the ambient log a person keeps open across the cut', async () => {
+	it('names the follow reader and the stream to recover from across the cut', async () => {
 		write_carry(false)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
 
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
-		expect(errors.join('\n')).toContain(run_progress_clock.log_path_of(progress_target()))
+		expect(errors.join('\n')).toContain('pnpm josh run:event --follow')
+		expect(errors.join('\n')).toContain(`tail -F ${event_target()}`)
 	})
 })
 
@@ -238,37 +238,29 @@ describe('josh run:wake --list — the scheduler profile', () => {
 	})
 })
 
-// joshuafolkken/kit#1910. A headless parent woken after a cut prints its progress only to its own
-// transcript, so `--list` relays the last heartbeat it persisted — a person's one window onto the run
-// once they are no longer the parent session. The heartbeat is five labelled lines now
-// (joshuafolkken/kit#2026), so the `progress:` label heads its own line and the block is indented
-// under it — every line, not just the first.
+// joshuafolkken/kit#2207. A headless parent woken after a cut appends its progress to the run's event
+// stream, so `--list` relays the newest event it holds — a person's one window onto the run once they
+// are no longer the parent session, and the degenerate last-event read of the stream the attached
+// session follows.
 describe('josh run:wake --list — the woken session’s progress', () => {
-	const LINE = [
-		'⏳ at 2026-09-10 12:00+00:00 / 2026-09-10T12:00Z',
-		'quiet 3m · unchanged 3m',
-		'children #1904 in-progress PR:open',
-		'lanes none · load 1.0 · record unread',
-		'next later',
-	].join('\n')
+	const AT = NOW.toISOString()
+	const TEXT = '#1904 merged'
+	const KIND = run_event_stream.EVENT_KIND.MERGE
 
-	it('relays the five-line heartbeat as an indented block and keeps standard output one token', async () => {
+	it('relays the newest event and keeps standard output one token', async () => {
 		write_carry(false)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
-		run_progress_clock.mark(progress_target(), NOW.getTime(), LINE)
-
-		// The label heads its own line and every one of the five lines is indented under it — so a
-		// continuation line (`next later`) is indented, not left flush the way prefixing only line 1 left it.
-		const relayed = `progress:\n  ${LINE.replaceAll('\n', '\n  ')}`
+		run_event_stream.append(event_target(), KIND, TEXT, AT)
+		const line = run_event_stream.format_event({ pos: 1, at: AT, kind: KIND, text: TEXT })
 
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
 		expect(out).toStrictEqual([run_wake_cli.SUPERVISING_VERDICT])
-		expect(errors.join('\n')).toContain(relayed)
+		expect(errors.join('\n')).toContain(`progress: ${line}`)
 	})
 
-	// Before the first heartbeat there is no line, and "progress: (none)" on every pre-heartbeat listing
-	// is one a reader stops seeing — so it is omitted, the way a count of zero outstanding launches is.
-	it('says nothing about progress before the first heartbeat', async () => {
+	// Before the first event there is no line, and "progress: (none)" on every pre-event listing is one
+	// a reader stops seeing — so it is omitted, the way a count of zero outstanding launches is.
+	it('says nothing about progress before the first event', async () => {
 		write_carry(false)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
 

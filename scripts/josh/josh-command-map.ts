@@ -109,6 +109,7 @@ const ALIASES: Record<string, string> = {
 	rb: 'review:brief',
 	r2: 'review:round2',
 	ra: 'review:attest',
+	dp: 'disposition',
 	dg: 'delegate',
 	rh: 'run:hold',
 	rr: 'run:release',
@@ -142,6 +143,8 @@ const ALIASES: Record<string, string> = {
 	ev: 'eval',
 	ol: 'oracle:list',
 	sa: 'split:assess',
+	shs: 'sonar:hotspots',
+	uir: 'ui:routes',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

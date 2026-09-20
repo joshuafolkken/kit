@@ -230,11 +230,14 @@ pnpm josh test:related --silent            # flags are forwarded to vitest
 
 ### `josh test:declared`
 
-Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`).
+Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`). On `required` the detail names each untested file's type — `E2E` under `src/routes/`, `Unit` elsewhere (`prompts/testing-guide.md` §1).
 
 ```bash
-pnpm josh test:declared   # alias: josh td
+pnpm josh test:declared           # alias: josh td
+pnpm josh test:declared --match   # check Step 0 declarations on stdin
 ```
+
+`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
 
 ### `josh test:e2e`
 
@@ -369,6 +372,23 @@ pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 - `--json` — emit `{"scope","reason"}` as JSON.
 
 **Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
+
+### `josh sonar:hotspots` · `josh shs`
+
+Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.
+
+```bash
+pnpm josh sonar:hotspots 42   # alias: josh shs
+```
+
+### `josh ui:routes` · `josh uir`
+
+List the screenshot-target routes the change touches: a changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived" rather than guessing; the `verify-ui` skill's §1 narrows the list.
+
+```bash
+pnpm josh ui:routes            # the branch diff; alias: josh uir
+pnpm josh ui:routes --staged   # the staged diff instead
+```
 
 ### `josh propagate`
 
@@ -1153,6 +1173,14 @@ pnpm josh review:round2 --json              # the verdict and the reason, machin
 
 `skip` on **Arm A** (the fix delta is empty) or **Arm B** (every path in the fix delta is inert by [`josh review:brief --level-only`](#josh-reviewbrief)'s classification); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one non-inert path. Full reasoning: `prompts/review.md`.
 
+### `josh disposition`
+
+Say whether a review finding **reaches a runtime path** (`runtime`, any non-inert path) or is inert (`non-runtime`) — the machine half of the three-way disposition, sharing `review-level.ts`'s inert set, so only "is the defect confirmed" is left to a person. Verdict on stdout, reason on stderr. Full reasoning: `prompts/review.md` → "Three-way disposition after the cap".
+
+```bash
+pnpm josh disposition <path...>   # → runtime | non-runtime ; alias: josh dp
+```
+
 ### `josh review:attest`
 
 Record, or verify, which checkout a `/code-review` actually read — it is forked into the session's working directory, so a lane run can be reviewed from the wrong tree. `josh review:brief` prints a nonce; `attest <nonce>` reads the checkout it is run in and exits non-zero when that is not the briefed one.
@@ -1407,13 +1435,20 @@ joshuafolkken/kit#2179 and `chain-rule.md`.
 Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205); alias
 `rev`. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
 lane child append to one stream that survives a session cut; `--from` reads everything after a position,
-`--last` the newest event alone.
+`--last` the newest event alone, and `--follow` the reader an attached session relays with
+(joshuafolkken/kit#2207).
 
 ```bash
 pnpm josh run:event --append <kind> <text>   # append one event; prints its position
-pnpm josh run:event --from <position>         # every event after <position>, in order
+pnpm josh run:event --from <position>         # every event after <position>, in order (JSON)
+pnpm josh run:event --follow <position>       # relay new events, waiting for one; position on stderr
 pnpm josh run:event --last                    # the newest event alone
 ```
+
+`--follow` is `--from` that waits: it returns the moment an event is past `<position>` and otherwise at
+the interval, so an attached session sees a new event at once and the run's aliveness while quiet. Events
+go to standard output to relay verbatim and the next position to standard error — the same before and
+after a cut, the stream the run's, the position the caller's.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `cut`, `stop`,
 `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge` and `park`

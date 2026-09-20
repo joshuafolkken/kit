@@ -74,6 +74,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: CHAIN_RULE_MD,
 	},
 	{
+		name: 'disposition',
+		decision: 'Whether a review finding reaches a runtime path, so it may be filed',
+		args: '<path...>',
+		vocabulary: ['runtime', 'non-runtime'],
+		single_source: 'prompts/review.md → Three-way disposition after the cap',
+	},
+	{
 		name: 'review:attest',
 		decision: 'Whether a /code-review attested the briefed checkout',
 		args: '--check',
@@ -223,6 +230,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		args: '[--json]',
 		vocabulary: ['split', 'single'],
 		single_source: '.claude/skills/workflow-commands/split-assessment.md → The question',
+	},
+	{
+		name: 'sonar:hotspots',
+		decision: 'The Step B disposition for each SonarCloud hotspot on a pull request',
+		args: '<PR>',
+		vocabulary: ['excluded', 'local', 'fix', 'defer', 'unreadable'],
+		single_source: 'prompts/sonar-hotspot-handling.md',
 	},
 ]
 

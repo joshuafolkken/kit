@@ -23,6 +23,19 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Project',
 		reference: ['[--staged] [--json]', 'automation', ['none']],
 	},
+	'sonar:hotspots': {
+		script: 'scripts/sonar/sonar-hotspots-cli.ts',
+		description:
+			"Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition",
+		category: 'Project',
+		reference: ['<PR>', 'automation', ['network']],
+	},
+	'ui:routes': {
+		script: 'scripts/ui/ui-routes-cli.ts',
+		description: 'List the screenshot-target routes the current change touches',
+		category: 'Project',
+		reference: ['[--staged]', 'automation', ['none']],
+	},
 	propagate: {
 		script: 'scripts/propagate/propagate.ts',
 		description: 'Carry the published release into every consumer repository next to this one',
