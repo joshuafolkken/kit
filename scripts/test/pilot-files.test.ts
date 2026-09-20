@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { classify_isolation } from './classify-isolation'
 import { PILOT_FILES } from './pilot-files'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
@@ -51,6 +52,22 @@ describe('PILOT_FILES — partitioning does not lose test targets', () => {
 	it('all files are covered by a main-suite include pattern', () => {
 		for (const file of PILOT_FILES) {
 			expect(matches_main_include(file), `${file} is not covered by vitest.config.ts`).toBe(true)
+		}
+	})
+})
+
+describe('PILOT_FILES — the list is a generated artifact, not a hand-kept one', () => {
+	it('matches the classifier output exactly (regenerate on drift)', () => {
+		const regenerate = 'pnpm exec tsx scripts/test/classify-isolation.ts --write'
+
+		expect([...PILOT_FILES], `stale — run: ${regenerate}`).toEqual(
+			classify_isolation.classify_pilot_files(),
+		)
+	})
+
+	it('holds no file that requires isolation (misclassification guard)', () => {
+		for (const file of PILOT_FILES) {
+			expect(classify_isolation.is_pilot_candidate(file), `${file} requires isolation`).toBe(true)
 		}
 	})
 })
