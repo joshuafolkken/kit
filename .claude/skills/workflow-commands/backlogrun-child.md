@@ -1,10 +1,14 @@
 # `backlogrun` — running a child (shared mechanics, delegation, liveness, session setup)
 
-**Read this file in full before the first child is dispatched** — in the turn that reaches
-`pnpm josh delegate epic-child` (or `pnpm josh lane:dispatch`), and again for each child. It is a
-point-of-use document, never an entry read: the entry procedure is `backlogrun.md`, which points here
-at that step (joshuafolkken/kit#2010). This file is the single source of how one `backlogrun` child —
-of a named epic, a named issue, or the opted-in pool — is run.
+**Read this file in full once per session — before the first child is dispatched**, in the turn that
+reaches `pnpm josh delegate epic-child` (or `pnpm josh lane:dispatch`). **A later child does not re-read
+the whole file; it fetches only the section that child needs** — `pnpm josh doc:section backlogrun-child.md
+"<heading>"` — because a full re-read per child stacks this file's whole length onto the parent's
+conversation for every remaining request, which is exactly the n²/2 growth the hand-off exists to
+avoid (`backlogrun-progress.md`). It is a point-of-use document, never an entry read: the entry
+procedure is `backlogrun.md`, which points here at that step (joshuafolkken/kit#2010). This file is the
+single source of how one `backlogrun` child — of a named epic, a named issue, or the opted-in pool — is
+run.
 
 ## Running a child — the shared mechanics
 
@@ -91,7 +95,7 @@ takes. `pnpm josh lane:dispatch` is where a lane's child is started; "Handing th
 carries the command.
 
 **The lane child uses the invoking CLI's `worker` profile.** Claude Code defaults to Anthropic
-`sonnet` / `medium`; Codex uses `codex exec`, OpenAI `gpt-5.6-sol` / `medium`, workspace-write and
+`opus` / `medium`; Codex uses `codex exec`, OpenAI `gpt-5.6-sol` / `medium`, workspace-write and
 JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
 and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
 refuse or park without fallback or retry.
@@ -177,7 +181,7 @@ pnpm josh run:liveness <N> --output <path> --process none --window 45 --repo <ow
 | --- | --- | --- |
 | `alive` | The output moved, or a process of the child is running | Keep polling; touch nothing |
 | `stopped` | The output has been frozen past the window and no process of the child is alive | The recovery below |
-| `settled` | The child closed, or the unit parked it with `needs-decision` | Re-read it with `pnpm josh issue:state <N>` and take the branch its state says |
+| `settled` | The child closed, or the unit parked it with `needs-decision` | Re-read it with `pnpm josh run:status <N>` — one read-only call whose state section says which branch and whose carry counters beside it feed the failure-streak decision — and take the branch its state section says |
 | `undetermined` | A trace could not be read | Read the trace that failed and ask again — and see the two-in-a-row rule below |
 
 **Two `undetermined` answers in a row is a fault in the check, not a slow unit.** The second
@@ -205,7 +209,9 @@ the child is parked; **"nothing was ever opened for the child" is `pnpm josh run
 at the start of the next child, not this one's.**
 
 **What follows is what a failed child already gets.** Re-read the child first with
-`pnpm josh issue:state <N>`; then, while it is still `state: OPEN` and not carrying `needs-decision`.
+`pnpm josh run:status <N>` — its state section carries the same `state:` / `labels:` /
+`human_review:` lines `issue:state` prints, and folds in the carry counters this recovery reads
+anyway; then, while it is still `state: OPEN` and not carrying `needs-decision`.
 **A re-read carrying `needs-decision`** means the unit parked the child and then stopped, so fall
 through to the loop's park branch: leave the label on, count nothing against the consecutive-failure
 guard, and go back to step 1.
@@ -215,9 +221,15 @@ guard, and go back to step 1.
    message, `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`, never a positional
    `git stash pop` that a shared stack lets another lane divert.
 2. **Remove `in-progress`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
-3. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
-   naming what `run:liveness` answered and what it read.
-4. **Go back to step 1 of the loop.**
+3. **Classify how the child ended** — `pnpm josh run:ending <N> --output <path>`
+   (joshuafolkken/kit#2139). `run:liveness` said it stopped; this says *how* — `abandoned` for a child
+   that ended mid-implementation without a cut, told apart from a `merged` one even when it exited
+   `is_error: false`. The basis it prints (the exit-record fields it read and the `permission_denials`
+   count) is what a person needs to see without opening the log.
+4. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
+   naming what `run:liveness` answered and what it read, **and the basis `run:ending` printed** — for
+   an `abandoned` ending, its exit-record fields and denial count go into the comment verbatim.
+5. **Go back to step 1 of the loop.**
 
 **It is booked as a failure rather than restarted.** A silent retry re-runs a child whose tree may be
 half-written, and the consecutive-failure guard is the only thing that notices the environment rather
@@ -268,9 +280,9 @@ before parking it.
 **`git switch main && git pull` stays per child** — it brings the previous child's merge into the tree,
 and a child that skips it implements on a stale main. Only the dependency update moves to the run. **In
 lanes it changes hands**: no lane can switch to the default branch, so the parent runs it in the primary
-checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — its
-`latest:scope` always answers `required`; the reason and the stash that carries the lock file into the
-first lane are in "Once per repository, before the first lane opens" above.
+checkout **before each `lane:open`**. **And in a lane `josh latest` is not even asked** — `latest:scope`
+skips and `latest:guard` refuses. The stash that carries the lock file into the first lane is in "Once
+per repository, before the first lane opens" above.
 
 This is the same rule `latest-gate.md` is the single source of.
 

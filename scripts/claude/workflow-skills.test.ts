@@ -32,7 +32,8 @@ const DEPENDENCY_SKILL = '.claude/skills/dependency-update'
 const RESIDENCY_TOPIC = 'prompts/collaboration-workflow/residency.md'
 // §3's body left the entry file in joshuafolkken/kit#1797: how much of a resident rule is resident
 // binds on a turn spent moving a sentence, never on one spent executing an Issue, so a workflow
-// entry no longer pays for it. The two questions that decide *whether* stay in `SKILL.md` §3.
+// entry no longer pays for it. joshuafolkken/kit#2161 finished the move — the two residency questions
+// went here too, leaving only the pointer heading in `SKILL.md` §3.
 const RESIDENCY_SKILL = `${WORKFLOW_SKILL}/rule-residency.md`
 
 // Long enough that it says when to read the skill rather than merely naming it — the description is
@@ -86,6 +87,10 @@ const THREE_BYTE_CHAR_BYTES = 3
 
 const KICKOFF_FILE = 'kickoff.md'
 const FULLRUN_FILE = 'fullrun.md'
+// joshuafolkken/kit#2189 turned `fullrun.md` into a manifest and moved its step lists — the stash of a
+// `fullrun new`'s pre-existing changes among them — to `fullrun-steps.md`, so the stash-safety check
+// below reads that companion for the `fullrun` side.
+const FULLRUN_STEPS_FILE = 'fullrun-steps.md'
 const HALFRUN_FILE = 'halfrun.md'
 const CHAIN_RULE_FILE = 'chain-rule.md'
 const FOLLOWUP_FILE = 'followup.md'
@@ -178,7 +183,7 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 	// the stash list with the run reporting success. The pop is `pnpm josh stash:pop`, targeted by
 	// message, because the stash is a repository-wide stack every lane shares — a positional
 	// `git stash pop` takes whichever lane last pushed (joshuafolkken/kit#2050).
-	it.each([FULLRUN_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
+	it.each([FULLRUN_STEPS_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
 		const content = read_skill_file(WORKFLOW_SKILL, filename)
 
 		expect(content).toContain('git stash push')
@@ -216,17 +221,15 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 // started — and every rule that passes it is named, because a criterion with no worked examples is
 // re-derived differently every time it is applied.
 describe('the residency criterion — which rules may stay in the always-loaded documents', () => {
-	// Enumerated, because a criterion with no worked examples is re-derived differently each time, and
-	// the set has to match what the suite below asserts resident.
-	// Only the two questions that decide *whether* a rule is resident stay in the entry file: a run
-	// about to move a sentence reads them before anything else (joshuafolkken/kit#1797). The worked
-	// examples went with the rest of §3's body to `rule-residency.md`, and are asserted in the suite
-	// below — moved, not dropped.
-	it.each([
-		'## 3. What stays resident, and what is read from here',
-		'**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**',
-	])('is documented in the workflow skill: %j', (marker) => {
-		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).toContain(marker)
+	// §3's heading stays in the entry file as a pointer (pinned in `document-markers.test.ts`), but its
+	// whole body — the residency questions included — moved to `rule-residency.md`
+	// (joshuafolkken/kit#2161), read only when a rule is placed, moved or retired and never at an entry.
+	// Earlier (joshuafolkken/kit#1797) the two questions stayed resident; #2161 finished the move, since
+	// no run reaches them. Moved, not dropped: the criterion is asserted at its new home here.
+	it('states the residency criterion at its new home in rule-residency.md', () => {
+		expect(read_unwrapped(RESIDENCY_SKILL)).toContain(
+			'**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**',
+		)
 	})
 })
 

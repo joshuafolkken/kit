@@ -213,6 +213,19 @@ describe('josh run:wake --list — a person can see what is running', () => {
 	})
 })
 
+// joshuafolkken/kit#2156: after a cut `--list` relays the last heartbeat on demand and names the
+// ambient log that streams every one, so a person can keep it open with `tail -F` rather than typing
+// `--list` again.
+describe('josh run:wake --list — the ambient surface across the cut', () => {
+	it('names the ambient log a person keeps open across the cut', async () => {
+		write_carry(false)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
+
+		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
+		expect(errors.join('\n')).toContain(run_progress_clock.log_path_of(progress_target()))
+	})
+})
+
 describe('josh run:wake --list — the scheduler profile', () => {
 	it('reports the profile recorded when the supervisor claimed the run', async () => {
 		write_carry(false)

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ALIASES, CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-map'
+import { COMMAND_AUDIENCES, COMMAND_SIDE_EFFECTS } from './josh-command-types'
+import { composite_arguments } from './josh-composite-arguments'
 
 const ALL_COMMAND_NAMES = Object.keys(COMMAND_MAP)
 const TEST_E2E_COMMAND = 'test:e2e'
@@ -44,6 +46,51 @@ describe('COMMAND_MAP — required fields', () => {
 
 			expect(has_both, `command ${name} has both script and shell`).toBe(false)
 		}
+	})
+})
+
+// The reference triple is what the generated command catalog reads (joshuafolkken/kit#2064), so the
+// vocabulary it is checked against is the one the type is derived from rather than a second copy.
+describe('COMMAND_MAP — reference metadata', () => {
+	it('every command has complete reference metadata', () => {
+		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
+			const [arguments_synopsis, audience, side_effects] = entry.reference
+
+			// Not `toBeTypeOf('string')`: the tuple types position 0 as a string, so that assertion
+			// cannot fail. What can is a synopsis carrying padding, which the generated catalog would
+			// render verbatim.
+			expect(arguments_synopsis, `command ${name} has a padded synopsis`).toBe(
+				arguments_synopsis.trim(),
+			)
+			expect(COMMAND_AUDIENCES, `command ${name} has invalid audience`).toContain(audience)
+			expect(side_effects, `command ${name} missing side effects`).not.toHaveLength(0)
+
+			for (const side_effect of side_effects) {
+				expect(COMMAND_SIDE_EFFECTS, `command ${name} has invalid side effect`).toContain(
+					side_effect,
+				)
+			}
+		}
+	})
+
+	it('composite commands do not advertise arguments they reject', () => {
+		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
+			if (!composite_arguments.is_composite_shell(entry.shell)) continue
+
+			expect(entry.reference[0], `composite command ${name} advertises rejected arguments`).toBe('')
+		}
+	})
+
+	// The per-command values are pinned by the snapshot below rather than by hand-picked examples:
+	// three `toEqual` assertions duplicating snapshot entries meant every metadata edit had to be
+	// made twice, and `josh-command-reference.test.ts` now checks each synopsis against its own
+	// parser, which is what those examples were reaching for.
+	it('keeps every canonical command and alias stable', () => {
+		const references = Object.fromEntries(
+			Object.entries(COMMAND_MAP).map(([name, entry]) => [name, entry.reference]),
+		)
+
+		expect({ aliases: ALIASES, references }).toMatchSnapshot()
 	})
 })
 
@@ -184,6 +231,18 @@ describe('COMMAND_MAP — latest command authentication', () => {
 		const shell_string = entry?.shell?.join(' ') ?? ''
 
 		expect(shell_string).toContain('export NODE_AUTH_TOKEN=$(gh auth token)')
+	})
+})
+
+describe('COMMAND_MAP — side effects vocabulary', () => {
+	it("'none' is exclusive — not combined with other side effects", () => {
+		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
+			if (!entry.reference[2].includes('none')) continue
+			expect(
+				entry.reference[2],
+				`command ${name} mixes 'none' with other side effects`,
+			).toHaveLength(1)
+		}
 	})
 })
 

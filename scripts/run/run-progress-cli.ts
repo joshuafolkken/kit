@@ -60,7 +60,7 @@ const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
 const DISABLED_VALUE = '0'
 
 const USAGE =
-	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark'
+	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark | josh run:progress --path'
 const DISABLED_NOTICE = `\`${ENVIRONMENT_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
 const MARKED_NOTICE =
 	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
@@ -330,6 +330,7 @@ async function run_ticks(
 
 	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
 		await sleep(options.tick_ms)
+		run_progress_clock.ping_life(life)
 		loop = await step(options, target, loop)
 
 		if (has_reported(loop, should_stop_on_report)) return 'reported'
@@ -404,12 +405,22 @@ async function mark_now(): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
+// The ambient log's path on standard output, so a person can `tail -F` the surface the heartbeat keeps
+// across a session cut (joshuafolkken/kit#2156). It reads no run state, so it answers even before one
+// has started and in a lane child alike — the path is a function of the checkout, not of a live run.
+async function report_path(): Promise<number> {
+	console.info(await run_progress_read.log_target())
+
+	return SUCCESS_EXIT_CODE
+}
+
 const OPTIONS = {
 	hours: { type: 'string' },
 	interval: { type: 'string' },
 	mark: { type: 'boolean' },
 	once: { type: 'boolean' },
 	output: { type: 'string', multiple: true },
+	path: { type: 'boolean' },
 	repo: { type: 'string' },
 	wait: { type: 'boolean' },
 } as const
@@ -420,6 +431,7 @@ interface ParsedValues {
 	mark?: boolean
 	once?: boolean
 	output?: Array<string>
+	path?: boolean
 	repo?: string
 	wait?: boolean
 }
@@ -471,13 +483,24 @@ async function run_watch(values: ParsedValues): Promise<number> {
 	return await watch(options)
 }
 
+// The verbs that read no run state and start no watcher, so they answer before the lane-child and
+// disabled checks. `--mark` records a real report for the parent's clock even in a lane child, and
+// `--path` names the ambient surface in any checkout; `undefined` means neither was asked.
+async function query_verb(values: ParsedValues): Promise<number | undefined> {
+	if (values.mark === true) return await mark_now()
+	if (values.path === true) return await report_path()
+
+	return undefined
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const values = read_arguments(argv)
 
 	if (values === undefined) return report_usage()
-	// `--mark` comes first, so a lane child still records its own real reports for the parent's clock;
-	// what it must not do is run a watcher, which every reporting form below would.
-	if (values.mark === true) return await mark_now()
+
+	const queried = await query_verb(values)
+
+	if (queried !== undefined) return queried
 	if (lane_child_marker.is_child_of(process.cwd())) return report_lane_child()
 	if (is_disabled()) return report_disabled()
 

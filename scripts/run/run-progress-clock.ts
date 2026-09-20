@@ -35,6 +35,26 @@ const PROGRESS_PREFIX = 'josh-run-progress-'
 // it — never by another run deciding whether a resource is free — so a fresh watcher always overwrites
 // a stale one and there is no cross-run read to fall open.
 const LIFE_PREFIX = 'josh-run-progress-life-'
+// **The ambient surface the heartbeat keeps across a session cut** (joshuafolkken/kit#2156). The report
+// clock holds only the *last* line, which `josh run:wake --list` relays on demand — a person has to
+// type for it, so after a cut the heartbeat sits at the *requested* tier. This log mirrors every
+// heartbeat line into a plain-text file beside the clock, so a person who keeps `tail -F` open on it
+// sees the run's progress without asking again: the *ambient* tier the terminal held before the cut,
+// kept across it. It is a sibling of the clock (`<clock>.log`) so both name one file per work tree, and
+// `.log` rather than `.json` because it holds the lines verbatim for a reader — the `stamp_path`
+// distinction the wake log already draws.
+const LOG_SUFFIX = '.log'
+// A few hours of heartbeats at the twenty-minute interval — enough to read the run's recent shape, and
+// bounded so an unattended run cannot grow the file without limit.
+const LOG_KEEP = 12
+const MS_PER_MINUTE = 60_000
+// Longer than any heartbeat interval and shorter than any gap between two runs. Heartbeats land at most
+// one interval apart while a run is live (twenty minutes by default, well under this), so a newest block
+// older than this belongs to a previous run: past it the log is reset rather than extended, and a fresh
+// run never opens on stale lines.
+const LOG_STALE_MINUTES = 90
+const LOG_STALE_MS = LOG_STALE_MINUTES * MS_PER_MINUTE
+const BLOCK_SEPARATOR = '\n\n'
 // The lookup only ever decides whether a rule speaks, so a git call that hangs must not hold the hook
 // that is holding the user's call. A timeout answers `undefined`, which reads as "no clock here" and
 // lets the call through — the direction every other failure in this path already takes.
@@ -98,13 +118,68 @@ function read_last_report(target: string): number | undefined {
 	}
 }
 
+// The ambient log's path, a sibling of the report clock so one directory names both and the CLI can
+// derive it from the clock target alone (joshuafolkken/kit#2156).
+function log_path_of(target: string): string {
+	return `${target}${LOG_SUFFIX}`
+}
+
+// **Staleness is read from the report clock's own last timestamp, not the log file's mtime**
+// (joshuafolkken/kit#2156). The clock's `reported_at` is the run's own clock — a copy or a backup can
+// move a file's mtime, and a fresh run whose first heartbeat found a previous run's log would then
+// append to it. It is read before `mark` overwrites the clock, so it sees the *previous* report.
+function is_log_stale(target: string, now_ms: number): boolean {
+	const previous_ms = read_last_report(target)
+
+	return previous_ms === undefined || now_ms - previous_ms > LOG_STALE_MS
+}
+
+// The blocks already in the log, or none when it is absent or a previous run's. `read_stamp_text` is
+// the symlink-safe read the clock itself uses, so a planted file reads as no record rather than being
+// trusted.
+function recent_blocks(log_target: string, is_fresh: boolean): ReadonlyArray<string> {
+	if (is_fresh) return []
+
+	const raw = stamp_file.read_stamp_text(log_target)
+
+	if (raw === undefined) return []
+
+	// `trimEnd` per block so the file's trailing newline, glued to the last block by the split, does not
+	// re-join into a `\n\n\n` gap that grows the reader's ambient surface a blank line at a time.
+	return raw
+		.split(BLOCK_SEPARATOR)
+		.map((block) => block.trimEnd())
+		.filter((block) => block.length > 0)
+}
+
+// One heartbeat mirrored into the ambient log, newest last, the oldest rolled off past `LOG_KEEP`. A
+// fresh run — or a stale log — starts the file over. `write_text_stamp` unlinks then creates
+// exclusively, so the write is symlink-safe and `tail -F` re-reads it cleanly after each replacement.
+function append_line(
+	log_target: string,
+	reported_at: string,
+	line: string,
+	is_fresh: boolean,
+): void {
+	const block = `${reported_at}\n${line}`
+	const blocks = [...recent_blocks(log_target, is_fresh), block].slice(-LOG_KEEP)
+
+	stamp_file.write_text_stamp(log_target, `${blocks.join(BLOCK_SEPARATOR)}\n`)
+}
+
 // A heartbeat carries its line; a bare `--mark` (a real report resetting the clock) carries none and
 // **preserves the line already there** rather than blanking it — so `josh run:wake --list` keeps
 // showing the most recent heartbeat between a run's real reports rather than going empty on every one
-// (joshuafolkken/kit#1910).
+// (joshuafolkken/kit#1910). A carried line is also mirrored into the ambient log — the surface a person
+// keeps open across a cut — before the clock is overwritten, so staleness sees the previous report
+// (joshuafolkken/kit#2156).
 function mark(target: string, now_ms: number, line?: string): void {
 	const reported_at = new Date(now_ms).toISOString()
 	const kept = line ?? read_last_line(target)
+
+	if (line !== undefined) {
+		append_line(log_path_of(target), reported_at, line, is_log_stale(target, now_ms))
+	}
 
 	stamp_file.write_stamp(target, kept === undefined ? { reported_at } : { reported_at, line: kept })
 }
@@ -123,11 +198,51 @@ function life_target_of(git_directory: string | undefined): string {
 	return stamp_file.stamp_path(LIFE_PREFIX, git_directory)
 }
 
+// **`pinged_at` is written by every tick and checked by `is_life_fresh`.** Without it the life record
+// is presence-only — existence is the only signal, and a record from a watcher that stopped an hour
+// ago is indistinguishable from one whose watcher is live. Adding `pinged_at` to the payload lets a
+// guard detect "children in-flight but watcher stale" without a second file (joshuafolkken/kit#2113).
+// Old records carrying only `{ alive: true }` parse successfully; `pinged_at` is optional on read,
+// which is what makes this backward-compatible.
+const life_schema = z.object({ alive: z.literal(true), pinged_at: z.string().optional() })
+
 // The watcher declares itself alive. `write_stamp` unlinks first, so a fresh `--wait` cleanly replaces
-// a record an earlier one left behind. The payload is presence only — nothing reads its contents; the
-// existence of the file is the whole signal.
+// a record an earlier one left behind.
 function begin_life(target: string): void {
-	stamp_file.write_stamp(target, { alive: true })
+	stamp_file.write_stamp(target, { alive: true, pinged_at: new Date().toISOString() })
+}
+
+// Refreshes the `pinged_at` timestamp without disturbing the liveness semantics. Called on every
+// watch tick so the record's age is a proxy for "watcher is running".
+function ping_life(target: string): void {
+	begin_life(target)
+}
+
+function parse_pinged_at(raw: string): number | undefined {
+	const parsed = life_schema.safeParse(JSON.parse(raw))
+
+	if (!parsed.success || parsed.data.pinged_at === undefined) return undefined
+
+	const pinged_ms = Date.parse(parsed.data.pinged_at)
+
+	return Number.isNaN(pinged_ms) ? undefined : pinged_ms
+}
+
+// Returns `false` for any absent, unreadable or un-timestamped record — both "no watcher" and "old
+// watcher that predates joshuafolkken/kit#2113" produce `false`, which is the safe direction for a
+// guard: it speaks up rather than staying silent.
+function is_life_fresh(target: string, threshold_ms: number): boolean {
+	const raw = stamp_file.read_stamp_text(target)
+
+	if (raw === undefined) return false
+
+	try {
+		const pinged_ms = parse_pinged_at(raw)
+
+		return pinged_ms !== undefined && Date.now() - pinged_ms < threshold_ms
+	} catch {
+		return false
+	}
 }
 
 // **Gone means ended.** `read_stamp_text` answers `undefined` for an absent or unowned record, and the
@@ -182,13 +297,19 @@ function read_last_report_sync(): number | undefined {
 
 const run_progress_clock = {
 	LIFE_PREFIX,
+	LOG_KEEP,
+	LOG_STALE_MS,
 	PROGRESS_PREFIX,
+	append_line,
 	begin_life,
 	end_life,
 	is_life_ended,
+	is_life_fresh,
 	life_target_of,
+	log_path_of,
 	mark,
 	parse_stamp,
+	ping_life,
 	read_last_line,
 	read_last_report,
 	read_last_report_sync,

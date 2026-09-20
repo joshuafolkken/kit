@@ -2,6 +2,7 @@ import type { CommandCategory, CommandEntry } from './josh-command-types'
 import { AI_COMMANDS } from './josh-commands-ai'
 import { DEV_COMMANDS } from './josh-commands-development'
 import { HOOKS_COMMANDS } from './josh-commands-hooks'
+import { LINT_COMMANDS } from './josh-commands-lint'
 import { MAINTENANCE_COMMANDS } from './josh-commands-maintenance'
 import { PROJECT_COMMANDS } from './josh-commands-project'
 import { VERSIONING_COMMANDS } from './josh-commands-versioning'
@@ -25,6 +26,7 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 	...MAINTENANCE_COMMANDS,
 	...HOOKS_COMMANDS,
 	...AI_COMMANDS,
+	...LINT_COMMANDS,
 }
 
 const ALIASES: Record<string, string> = {
@@ -39,6 +41,7 @@ const ALIASES: Record<string, string> = {
 	t: 'test',
 	tu: 'test:unit',
 	tr: 'test:related',
+	td: 'test:declared',
 	te: 'test:e2e',
 	er: 'e2e:retry-check',
 	sl: 'session:lang',
@@ -67,6 +70,7 @@ const ALIASES: Record<string, string> = {
 	ap: 'audit:provision',
 	rt: 'reconcile-templates',
 	u: 'latest',
+	lg: 'latest:guard',
 	lc: 'latest:corepack',
 	lu: 'latest:update',
 	ls: 'latest:scope',
@@ -78,6 +82,9 @@ const ALIASES: Record<string, string> = {
 	ird: 'issue:read',
 	ist: 'issue:state',
 	isc: 'issue:scout',
+	iln: 'issue:lint',
+	ibl: 'issue:backlinks',
+	rl: 'report:lint',
 	ep: 'epic',
 	ec: 'epic:check',
 	en: 'epic:next',
@@ -85,11 +92,13 @@ const ALIASES: Record<string, string> = {
 	eb: 'epic:bundle',
 	ao: 'auto-ok:next',
 	bl: 'backlog:next',
+	blo: 'backlog:offer',
 	blp: 'backlog:plan',
 	bb: 'backlog:budget',
 	co: 'cost',
 	ds: 'doc:section',
 	rs: 'read:set',
+	dcr: 'doc:read',
 	tm: 'time',
 	rb: 'review:brief',
 	r2: 'review:round2',
@@ -101,8 +110,12 @@ const ALIASES: Record<string, string> = {
 	rw: 'run:wake',
 	rct: 'run:cut',
 	rv: 'run:liveness',
+	red: 'run:ending',
 	rg: 'run:progress',
 	rp: 'run:prep',
+	rst: 'run:status',
+	rn: 'run:next',
+	rpy: 'repo:party',
 	rmg: 'run:merge',
 	sp: 'stash:pop',
 	lno: 'lane:open',
@@ -111,10 +124,15 @@ const ALIASES: Record<string, string> = {
 	lnp: 'lane:prune',
 	lnv: 'lane:output',
 	lnd: 'lane:dispatch',
+	lna: 'lane:await',
+	lnla: 'lane:launch',
+	rwg: 'run:watcher:guard',
 	ig: 'investigation:guard',
 	rug: 'rule:guard',
 	ptg: 'pretool:guard',
+	sg: 'stop:guard',
 	ev: 'eval',
+	ol: 'oracle:list',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

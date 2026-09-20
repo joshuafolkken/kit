@@ -35,8 +35,7 @@ async function sync_and_flush(): Promise<void> {
 // anyway. Guarded like its sibling tail steps (joshuafolkken/kit#1539): past the merge a flush
 // failure is reported, never allowed to take the merge, the epic close and the hold release with it.
 async function flush_ledger_step(should_merge: boolean): Promise<void> {
-	if (!should_merge) return
-	if (!observation_ledger.has_pending_append(await git_command.status())) return
+	if (!should_merge || !observation_ledger.has_pending_append(await git_command.status())) return
 
 	// `should_merge` is always true past the early return; it is passed on as `run_guarded_step`'s
 	// guard flag rather than a literal `true` so this step stays identical to its sibling tail steps —

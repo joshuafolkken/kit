@@ -25,6 +25,11 @@ moves and no fourth:**
    next report time itself.
 3. **In that same turn, start the next one.** The interval is measured from the last report.
 
+**`pnpm josh run:watcher:guard` detects a missed restart** (joshuafolkken/kit#2113): it exits
+non-zero when lane children are in-flight but the watcher's life record has not been refreshed
+within the staleness threshold. Wire it as a PreToolUse hook or call it before step 1 of each
+loop iteration.
+
 **`run:progress` prints the five labelled lines itself now (joshuafolkken/kit#2026); present them
 as-is.** It emits the observation instant (`at`, local first and UTC beside it), the elapsed figures
 (`quiet` and `unchanged`), the children in flight, the run state (`lanes`, `load`, `record`), and the
@@ -78,12 +83,37 @@ sessions). **It is added, never substituted for the elapsed figure**, and **the 
 stamp computed for it** — the command prints the `at` stamp and the `next` field.
 
 **The line carries observations, never "still running", and nothing in it is a verification result** —
-no gate, no CI, no check rollup, because the command reads none of them. **It goes to the session only**:
-no Telegram, because `confirmation` and `completion` are what interrupt a person. **Across a `backlogrun`
-session cut it is still session-only, but the session is no longer the person's** — after a cut the
-parent is a headless `claude -p backlogrun` the `run:wake` supervisor started, so the watcher persists
-each line into the report record and `pnpm josh run:wake --list` relays the last one verbatim; it stays
-a pull, which is why `--mark` keeps rather than blanks it.
+no gate, no CI, no check rollup, because the command reads none of them.
+
+**The invariant is a tier, not a mechanism** (joshuafolkken/kit#2156). Three tiers say how much of a
+person's attention a signal takes: **interrupt** reaches for it now (a Telegram — `confirmation`,
+`completion`, `warning`), **ambient** is seen without being asked for (a line that is simply there), and
+**requested** is read only once a person thinks to type for it. **The heartbeat sits at the ambient
+tier, and stays there across a `backlogrun` session cut — never promoted to interrupt, never demoted to
+requested.** Writing this as a *mechanism* ("a pull, not a push") is what let the ambient surface vanish
+at the cut with the words still reading as kept: a pull is still a pull once the terminal it was seen on
+is gone.
+
+**Interrupt is withheld on purpose**: no Telegram, because `confirmation` and `completion` are what
+interrupt a person, and a line every fifteen minutes on a phone is the fatigue that stops them being
+read. **Ambient is realized differently either side of the cut, and both are the same tier.** Before the
+cut the session is the person's, so the terminal is the ambient surface. After it the parent is a
+headless `claude -p backlogrun` the `run:wake` supervisor started, so the watcher mirrors every line
+into a plain-text log beside the report record — `pnpm josh run:progress --path` names it — and a person
+keeps it open with `tail -F` to watch the run stream on without asking. The record still holds the last
+line, which `pnpm josh run:wake --list` relays and names the ambient log beside; that relay is the
+requested tier, the floor the ambient surface is not allowed to fall to, which is why `--mark` keeps
+rather than blanks the line.
+
+**A stop is an interrupt, and only a stop** (joshuafolkken/kit#2136). The heartbeat says a run is still
+going; a run that has _stopped_ — every remaining child blocked behind a parked one, the backlog drained
+of anything runnable, the failure streak tripped — is the event the ambient tier was hiding, because
+after a cut "quiet" and "stopped" look identical until a person reads for it. So the terminal stop is
+pushed to the interrupt tier: `pnpm josh run:carry --end --stopped "<reason>"` sends one ⏸️ confirmation
+as it ends the record, and because the record is gone by the second `--end` the same stop never notifies
+twice. A parked child is pushed by the child itself, which records the park and sends its own
+`confirmation` before it stops (`backlogrun-park.md`). **Nothing new carries either one** — both ride the
+existing notification types and the record the watcher already keeps.
 
 **A heartbeat is emitted from the moment a run has started, even before any child carries
 `in-progress`** — "a run has started" is read from a mechanical record (a registered lane, a held work
@@ -170,11 +200,13 @@ single non-numeric line as the verdict.
    that lane's `lane:open`.
 
    **Start the unit without blocking on it — `pnpm josh lane:dispatch <N>` when the child runs in a
-   lane — and poll.** Blocking on the return leaves the parent with no turn in which to notice the return
-   is never coming. **Start no wait of your own** — the next turn is the one the progress watcher's exit
-   delivers ("The parent keeps no clock of its own" below) — and on that wake ask `pnpm josh run:liveness
-   <N> --output <path> --process <what `pgrep -laf "fullrun #<N>$"` found>` where that file has been
-   unchanged for the silent-unit window. **The flag is what you saw, never what kind of child it is.**
+   lane — and in the same turn start `pnpm josh lane:await <N...>` in the background** (joshuafolkken/kit#2113).
+   `lane:await` watches local process presence and exits when any named child confirms-complete,
+   waking the parent at the actual completion rather than at the next heartbeat interval. **The
+   re-confirm delay and poll interval are the command's, not the agent's** — pass only the issue
+   numbers. On that wake ask `pnpm josh run:liveness <N> --output <path> --process <what
+   `pgrep -laf "fullrun #<N>$"` found>` where that file has been unchanged for the silent-unit
+   window. **The flag is what you saw, never what kind of child it is.**
 
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
@@ -272,7 +304,7 @@ in the repository that owns it ("Who sends the summary, and who propagates" belo
 **A session pays for every child it has already run, on every later turn**, because every turn re-reads
 the accumulated preamble. **So the run reads the marginal cost off a line rather than feeling for it** —
 at **every** child's merge, and crossing it **hands the session off to a fresh one, carrying the budget
-with it** (`backlogrun.md` → "The session cut is inside the invocation"). The cut is where a `backlogrun` spans several
+with it** (`backlogrun-steps.md` → "The session cut is inside the invocation"). The cut is where a `backlogrun` spans several
 sessions; it is not a stop.
 
 ```bash
@@ -283,7 +315,7 @@ It prints `over` or `under` on standard output and the measured figure on standa
 the next turn of this session costs more than the threshold in billed input, and the number is passed
 explicitly so a run cannot drift it by remembering it wrong.
 
-**150,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
+**200,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
 The value is `CONTEXT_CUT_THRESHOLD` in `scripts/cost-runtime/context-cut-threshold.ts`; `cost --cut`,
 `run:merge` and `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` all read it rather than carrying separate
 numbers. The 150,000 output ceiling and the 150,000 entry-read character figure are separate systems.
@@ -313,7 +345,7 @@ on the default branch, and the epic's state on GitHub is complete.
 **The same `pnpm josh cost --over` measurement bounds a lane child's context _during_ implementation, not
 only the parent's between children** — the pre-gate cut fires only once implementation is done, so it
 never caps the thinking a child accumulates while implementing. The child measures its own per-request
-context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 150_000, and cuts with
+context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 200_000, and cuts with
 `pnpm josh run:cut --impl <N>`. **The measurement and threshold are single-sourced**:
 `cost_verdict.per_request_cost` is what both seams compare, and `cost --cut` selects the same constant
 for the parent and child. The boundary and the resume are `pre-gate-cut.md` → "The
@@ -361,7 +393,7 @@ ever.
   `pnpm josh run:carry --cut --owner "$PPID"`, and `pnpm josh run:wake` starts the next session from
   outside the conversation with nobody retyping the keyword. The lanes keep running and the resumed
   session polls them from `lane:list`. Post the progress comment naming **every lane still in flight and
-  the path each one records** so the resumed session can find them. `backlogrun.md` → "The session cut is inside the
+  the path each one records** so the resumed session can find them. `backlogrun-steps.md` → "The session cut is inside the
   invocation" is the single source of the carry; this reading is only where the cut is *taken*.
 
 **The hand-over is what makes the cut reachable, and the drain it replaced cost the pool.** `epic:next

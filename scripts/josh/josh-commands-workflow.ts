@@ -1,6 +1,7 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 const GIT_WORKFLOW_SCRIPT = 'scripts-ai/git-workflow.ts'
+const GIT_MESSAGE_ARGUMENTS = '[-y] <message>'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
@@ -8,11 +9,15 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: GIT_WORKFLOW_SCRIPT,
 		description: 'Git workflow helper',
 		category: 'Workflow',
+		reference: [GIT_MESSAGE_ARGUMENTS, 'developer', ['git', 'network']],
 	},
 	pr: {
 		script: GIT_WORKFLOW_SCRIPT,
 		description: 'Create PR only (skip commit and push)',
 		category: 'Workflow',
+		// Not `GIT_MESSAGE_ARGUMENTS`: `-y` is already in the default arguments below, so advertising
+		// it would document a flag that cannot change what this command does.
+		reference: ['<message>', 'developer', ['network']],
 		default_script_arguments: ['-y', '--skip-commit', '--skip-push'],
 	},
 	// **The optional form, on both** (joshuafolkken/kit#1564). These two were the last commands
@@ -33,12 +38,18 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts-ai/git-followup-workflow.ts',
 		description: 'Follow-up git workflow',
 		category: 'Workflow',
+		reference: [
+			'<title> [--notify-message <text>]',
+			'automation',
+			['git', 'network', 'notifications'],
+		],
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	notify: {
 		script: 'scripts-ai/telegram-test.ts',
 		description: 'Send Telegram notification',
 		category: 'Workflow',
+		reference: ['--task-type <type> --body <text>', 'automation', ['notifications']],
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	// The observation ledger's only commit path (joshuafolkken/kit#1756). `pnpm josh git` excludes the
@@ -48,6 +59,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/observations/observations-flush-cli.ts',
 		description: 'Commit the observation ledger as a pull request of its own, and merge it',
 		category: 'Workflow',
+		reference: ['', 'automation', ['git', 'network']],
 	},
 	// A script rather than an `sh -c` chain, because it has a precondition to enforce: run inside a
 	// linked work tree it would hijack the default branch from every other one (joshuafolkken/kit#1535).
@@ -55,6 +67,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/git/main-sync.ts',
 		description: 'Checkout default branch and pull latest (refuses inside a lane)',
 		category: 'Workflow',
+		reference: ['', 'developer', ['git', 'network']],
 	},
 	// A script rather than an `sh -c` chain, because the strategy has to be named rather than left to
 	// the caller's git configuration: the `git pull` this replaced aborted with `Need to specify how
@@ -64,6 +77,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/git/main-merge.ts',
 		description: 'Merge origin default branch into the current branch',
 		category: 'Workflow',
+		reference: ['', 'developer', ['git', 'network']],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

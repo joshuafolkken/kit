@@ -40,22 +40,25 @@ import { time_transcript_line } from './time-transcript-line'
 // had checked. That is the first call of the very behavior this exists to produce, punished with a
 // verdict nobody could see was empty.
 //
-// ## The refusal cannot repeat while the sequence is in view
+// ## The refusal cannot repeat on the call in hand, but it does repeat as the run keeps single-calling
 //
-// A refusal repeating on the call in hand would wedge a run, and that is made structurally impossible:
-// the caller records when it last refused, and a sequence qualifies only if it *began* after that
-// instant. A refused call extends the sequence rather than restarting it, and a sequence's start does
-// not move between two calls seconds apart — so the immediate re-refusal cannot happen, and a turn can
-// have at most one of its calls refused. The run has to batch (or issue a dependent or non-bundleable
-// call) before a new sequence starts and the guard has anything to say again.
+// A refusal repeating on the *same call* would wedge a run, and that is made structurally impossible in
+// two ways. The caller records when it last fired, and the immediate re-look never re-fires: a call the
+// run answered by re-issuing it unchanged is found on a refused span in the tail (`is_reissued_refusal`)
+// and let through, so a turn can have at most one of its calls refused.
 //
-// **What that argument does not cover is a sequence outliving the window the caller reads.** The start
-// compared here is the first span *in that window*, so an unbroken run of single-call turns longer than
-// it — 23–34 round trips, measured on these transcripts — presents a start that has moved forward, and
-// is refused a second time. **That is bounded rather than a loop**: one extra round trip per window of
-// unbroken single-calling, which is behavior worth having. Closing it exactly would cost the mechanism
-// its life — the only test that does so (refuse only where the recorded instant is itself inside the
-// window) silences the guard permanently once the window passes the last refusal.
+// **What used to follow from the record was silence for the rest of the run, and kit#2164 is what ends
+// that.** The old rule fired only where the open sequence *began* after the last firing — and a run that
+// ignored the refusal and kept single-calling never started a new sequence, so it was never spoken to
+// again. Measured across every run, that came to one refusal per run against thousands of turns. The
+// rule now fires the first time a run of single-call turns reaches the limit, and then **again every
+// `REFIRE_EVERY` further single-call turns** it keeps issuing: `is_sequence_at_limit` counts the closed
+// single-call turns since the last firing and re-fires once that count reaches the interval. A new
+// sequence — the run batched, then lapsed again — is a first firing of its own, exactly as before.
+//
+// **The re-fire cannot wedge**, for the same reason the first firing cannot: each re-fire refuses a
+// *different* call than the one already on a refused span, and a call the run re-issues unchanged after a
+// re-fire is let through by `is_reissued_refusal` just as the first refusal's re-issue is.
 //
 // **And the caller must fail toward allowing.** With no instant on record every sequence looks new, so
 // a caller that cannot record the refusal must not make it. `scripts/hooks/batch-guard.ts` states that half.
@@ -66,6 +69,17 @@ import { time_transcript_line } from './time-transcript-line'
 // turns left to save. Four or more gives most of them back; two would refuse the ordinary pair a
 // person would never call a defect.
 const CONSECUTIVE_LIMIT = 3
+
+// **How many further single-call turns pass between one firing and the next, once a run keeps
+// single-calling after being spoken to** (joshuafolkken/kit#2164). This is the `N` the acceptance
+// criteria name, and it lives here as a single constant. Before this the guard fired once per unbroken
+// run of single-call turns and then went silent — a run that ignored the first refusal and kept issuing
+// single calls was never spoken to again, so over thousands of turns the guard delivered one notice. The
+// re-fire turns that back into steady pressure: the same `CONSECUTIVE_LIMIT` cadence the first firing
+// used, applied again from the last firing, so the reminder recurs every three continued single-call
+// turns rather than once. It is deliberately not more frequent than the initial limit — a shorter
+// interval would refuse a run that is only two single calls past a reminder it just answered.
+const REFIRE_EVERY = CONSECUTIVE_LIMIT
 const ONE_TURN = 1
 const NONE = 0
 
@@ -160,6 +174,23 @@ const NOTICE =
 	`\`prompts/collaboration-workflow/turn-batching.md\`. If this run was already batching, or the write ` +
 	`genuinely has nothing to go beside it, carry on: this fires once per run of single-call turns.`
 
+// The notice a *refusable* call earns instead of its refusal when the run is a dispatched lane child
+// (joshuafolkken/kit#2164). A headless `claude -p` child ends its turn on a denial, so the batching
+// guard cannot refuse there — but the guidance is exactly as useful, so it is delivered as a notice: the
+// call proceeds, and the model is told to batch what follows. It carries no ⛔, so a person watching
+// reads it as advice rather than a stop, and it says the reminder recurs so a child that keeps
+// single-calling knows the pressure is steady rather than spent.
+const LANE_NOTICE =
+	`💡 batching: the last ${String(SEQUENCE_BEFORE_LIMIT)} turns each issued a single tool call, so ` +
+	`this one makes ${String(CONSECUTIVE_LIMIT)} in a row. This is a notice, not a refusal — the call ` +
+	`proceeds, because a dispatched lane child ends its turn on a denial. Where the calls meant to follow ` +
+	`it do not need its result, issue them in one turn together. **The criterion is whether a call's ` +
+	`input needs another call's result, not what kind of call it is** — it never authorizes weakening a ` +
+	`verification gate or a review: fewer turns, never less work. The measured cost and the rejected ` +
+	`mechanisms are in \`prompts/collaboration-workflow/turn-batching.md\`. If this run was already ` +
+	`batching, or the call genuinely has nothing to go beside it, carry on: this recurs every ` +
+	`${String(REFIRE_EVERY)} further single-call turns.`
+
 // The one write that is never refused, because it is the one whose reissue is **unconditional**. Every
 // other refusable write is content-addressed and so fails loudly when its turn's siblings moved the
 // text under it; a `Write` carries the whole file, so reissuing it re-applies content composed before
@@ -231,26 +262,40 @@ function depends_on_sequence(sequence: ReadonlyArray<Span>, facts: BundleFacts):
 }
 
 // The instant the open sequence began, as far as the window shows. An empty sequence answers `NONE`,
-// and `NONE` is never greater than a recorded refusal — so the length test below is what actually
-// admits a run, and this can only ever withhold.
+// and `NONE` is never greater than a recorded refusal — so the length test in `is_sequence_at_limit` is
+// what admits a run's first firing, and this decides only whether that firing is the sequence's first.
 //
 // **Both sides of that comparison are the same machine's wall clock**: the transcript's timestamps and
 // the instant the caller recorded. A clock that jumped backwards makes a record read as later than
-// every sequence, which withholds the refusal — the safe direction, and the one every other failure
-// here takes too.
+// every sequence, which withholds the firing — the safe direction, and the one every other failure here
+// takes too.
 function sequence_started_ms(sequence: ReadonlyArray<Span>): number {
 	return sequence[0]?.ended_ms ?? NONE
 }
 
+// How many of the open sequence's closed single-call turns ended after the last firing. For a run whose
+// last firing predates this sequence every turn counts; for one already spoken to inside this sequence
+// only the turns issued since count — which is what the re-fire interval is measured against.
+function turns_since(sequence: ReadonlyArray<Span>, last_fired_ms: number): number {
+	return sequence.filter((span) => span.ended_ms > last_fired_ms).length
+}
+
+// **The firing test, first-time and re-fire in one** (joshuafolkken/kit#2164). The length and dependency
+// gates are unchanged. What changed is the instant comparison: where a firing predates the open
+// sequence it is that sequence's first, so the length gate alone decides it; where the run has already
+// been spoken to inside this sequence, it re-fires only once `REFIRE_EVERY` further single-call turns
+// have closed since. The old rule kept only the first branch, which is why it fell silent for the rest
+// of a run that kept single-calling.
 function is_sequence_at_limit(
 	sequence: ReadonlyArray<Span>,
 	facts: BundleFacts,
-	refused_at_ms: number,
+	last_fired_ms: number,
 ): boolean {
-	if (sequence.length < SEQUENCE_BEFORE_LIMIT) return false
-	if (depends_on_sequence(sequence, facts)) return false
+	if (sequence.length < SEQUENCE_BEFORE_LIMIT || depends_on_sequence(sequence, facts)) return false
 
-	return sequence_started_ms(sequence) > refused_at_ms
+	if (last_fired_ms < sequence_started_ms(sequence)) return true
+
+	return turns_since(sequence, last_fired_ms) >= REFIRE_EVERY
 }
 
 // **Nothing here reads the turn the call belongs to**, because nothing can: see "What it cannot know"
@@ -338,9 +383,11 @@ const NOTICE_STAMP_PREFIX = 'josh-batch-guard-notice-'
 const time_batch_guard = {
 	CONSECUTIVE_LIMIT,
 	GUARD_LABEL,
+	LANE_NOTICE,
 	NOTICE,
 	NOTICE_STAMP_PREFIX,
 	REASON,
+	REFIRE_EVERY,
 	SEQUENCE_BEFORE_LIMIT,
 	STAMP_PREFIX,
 	is_guarded_call,

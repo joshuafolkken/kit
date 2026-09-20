@@ -43,7 +43,7 @@ const FENCE_LINE_PATTERN = /^[ \t]*(?:`{3,}|~{3,})/u
 //
 // Only a line that is *nothing but* a chain counts, optionally behind a list marker. Measured
 // against joshuafolkken/kit#858, whose Dependencies section is followed by a prose line recommending
-// an execution order — `推奨実行順: #869 -> #863 -> …`. Those arrows are a suggestion, not a
+// an execution order — e.g. `recommended order: #869 -> #863 -> …`. Those arrows are a suggestion, not a
 // declaration, and reading them as one reported four disagreements that did not exist.
 const DECLARED_CHAIN_LINE = /^(?:[-*+][ \t]+)?#\d+(?:[ \t]*(?:->|→)[ \t]*#\d+)+$/u
 const CHAIN_REFERENCE_PATTERN = /#(\d+)/gu

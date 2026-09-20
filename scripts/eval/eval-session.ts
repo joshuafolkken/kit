@@ -59,8 +59,13 @@ function spawn_failure_note(result: {
 	timedOut?: boolean | undefined
 	signal?: string | undefined
 }): string {
-	if (is_timeout_result(result) || result.exitCode !== undefined) return ''
-	if (read_signal(result) !== undefined) return ''
+	if (
+		is_timeout_result(result) ||
+		result.exitCode !== undefined ||
+		read_signal(result) !== undefined
+	) {
+		return ''
+	}
 
 	return result.message ?? `could not start ${CLAUDE_BIN}`
 }

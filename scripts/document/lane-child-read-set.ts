@@ -39,13 +39,16 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 
 // **The point-of-use documents a leaf child never reaches**: child dispatch, lane opening and the
 // progress watcher / hand-off are the parent's, so their single-source documents are dropped from
-// the child's read. The gate documents (`chain-rule.md`, `background-commands.md`), `followup.md`,
-// `latest-gate.md` and `backlogrun-park.md` stay — a child runs the gate, opens its PR, and may park
-// on a decision, so it does reach every one of those.
+// the child's read. **`latest-gate.md` is the parent's too** (joshuafolkken/kit#2189): the dependency
+// update runs once per session in the outermost run, never in a dispatched lane child (`latest:scope`
+// answers `skip` in a lane via the lane guard), so the child never opens `latest-gate.md`. The gate documents
+// (`chain-rule.md`, `background-commands.md`), `followup.md` and `backlogrun-park.md` stay — a child
+// runs the gate, opens its PR, and may park on a decision, so it does reach every one of those.
 const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'backlogrun-child.md',
 	'backlogrun-lanes.md',
 	'backlogrun-progress.md',
+	'latest-gate.md',
 ])
 
 function subtract(left: Cost, right: Cost): Cost {

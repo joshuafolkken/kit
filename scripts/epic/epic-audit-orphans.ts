@@ -35,11 +35,11 @@ function has_parent_marker(line: string): boolean {
 // this one elsewhere in its body, and matching the marker and the number independently reported
 // every such issue as an orphan.
 //
-// The number is read through the same reference parse the checks use, so `親: owner/other#858` names
-// that repository's epic and not this one's (joshuafolkken/kit#1014).
+// The number is read through the same reference parse the checks use, so a parent line (a PARENT_MARKERS
+// prefix) such as `owner/other#858` names that repository's epic and not this one's (joshuafolkken/kit#1014).
 // The known set is this repository alone — a parent line names this epic or it names nothing here —
 // and it is passed rather than omitted so a repository whose own name contains a dot still recognizes
-// `親: joshuafolkken/site.com#858` (joshuafolkken/kit#1016).
+// `joshuafolkken/site.com#858` (joshuafolkken/kit#1016).
 function names_this_epic(line: string, epic_number: number, repo: string): boolean {
 	return epic_audit_logic
 		.parse_issue_references(line, repo, epic_audit_logic.known_repos([], repo))

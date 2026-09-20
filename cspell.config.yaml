@@ -2,6 +2,14 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Verb coined from Node's working-directory-change call — "the lane case chdirs into a lane checkout".
+  # The guard suites
+  # for joshuafolkken/kit#2138 change directory into a lane checkout to exercise the dispatched-child
+  # path, and the teardown comments name that act.
+  - chdirs
+  # "An unenumerated guard fires" — a guard not listed in the `lane-guard-policy.ts` enumeration
+  # (joshuafolkken/kit#2138). Names the fail-safe default in the code comment and its test.
+  - unenumerated
   # Coined for the retirement of `josh cost` reports no rule or decision read (#2016): a column,
   # scope or module is "readerless" when nothing consumes its value. Used in the CLI comments, the
   # tests and `docs/josh-commands.md` to name what was removed and why the `--over` verdict stays.
@@ -180,3 +188,15 @@ words:
   # park on the Issue (joshuafolkken/kit#2034) — the state the delivered rule refuses. It reaches no
   # distributed file: the word appears only in that module, its two suites and the enumeration.
   - unparked
+  # Python identifiers named in `scripts/rules/file-body.ts`'s detection patterns (joshuafolkken/kit#2120):
+  # the file-body guard refuses shell forms that write a file's body — `f.writelines(...)`,
+  # `shutil.copy`/`shutil.move` into an existing path. They appear only in that module's patterns and tests.
+  - writelines
+  - shutil
+  # English word in `scripts/rules/worktree-guard.ts` — a message-tagged stash is "findable and poppable"
+  # by `pnpm josh stash:pop` (joshuafolkken/kit#2120). Appears only in that module's comment.
+  - poppable
+  # The ESTree property name for a template literal's static string chunks (`node.quasis`), read by
+  # `eslint/rules/english-only-prose.js` when it inspects a no-substitution template title
+  # (joshuafolkken/kit#2124). It is the AST spelling, not a coined word.
+  - quasis

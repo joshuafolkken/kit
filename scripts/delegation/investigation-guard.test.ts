@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delegation_policy } from './delegation-policy'
 import {
 	deny_envelope,
@@ -20,6 +22,13 @@ import { investigation_reads } from './investigation-reads'
 // that make the threshold fire more than once in a run.
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigation-guard-'))
+// The directory vitest was launched from, restored in teardown. `should_block` now reads the live
+// process.cwd() and `JOSH_LANE_CHILD` to decide whether the session is a dispatched lane child
+// (joshuafolkken/kit#2138), so the lane case chdirs into a lane checkout and this puts it back.
+const ENTRY_DIRECTORY = process.cwd()
+const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
+const LANE_ISSUE = '2138'
+const LANE_DIRECTORY = path.join(LANE_ROOT, LANE_ISSUE)
 const WRITTEN_TRANSCRIPTS: Array<string> = []
 const { BRANCH, call_line, edit_call_line, error_result_line, result_line, ms, target_turn_lines } =
 	time_transcript_fixture
@@ -109,12 +118,17 @@ function refusal_for(transcript: string, file_path: string): string | undefined 
 }
 
 // The switch is assigned rather than deleted, so a value left in the real environment cannot decide
-// what these cases see.
+// what these cases see. The lane-child mark is deleted so the ambient `JOSH_LANE_CHILD` of a lane
+// checkout — where these very tests run — cannot suppress the guard and turn the suite green on a guard
+// that never fired (joshuafolkken/kit#2138); the lane case sets it back for itself.
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = UNSET
+	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 })
 
 afterAll(() => {
+	process.chdir(ENTRY_DIRECTORY)
+
 	for (const transcript of WRITTEN_TRANSCRIPTS) rmSync(refusal_path(transcript), { force: true })
 
 	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
@@ -261,6 +275,40 @@ describe('investigation_refusal — a file the run has edited is not re-counted'
 
 	it('refuses a re-read of a file whose edit failed', () => {
 		expect(refusal_for(threshold_then_edit('edited-failed', false), EDITED_FILE)).toBeDefined()
+	})
+})
+
+describe('investigation_refusal — a dispatched lane child is exempt', () => {
+	// joshuafolkken/kit#2138: a dispatched lane child is itself the delegated unit this guard's refusal
+	// asks for, and a refusal ends its headless turn rather than guiding it — so the guard stands down,
+	// decided from the one-place enumeration. The mark and the checkout are set up here exactly as
+	// `lane-park.test.ts` sets up its own lane case.
+	beforeEach(() => {
+		mkdirSync(LANE_DIRECTORY, { recursive: true })
+		process.chdir(LANE_DIRECTORY)
+		process.env[lane_child_marker.KEY] = LANE_ISSUE
+	})
+
+	afterEach(() => {
+		process.chdir(ENTRY_DIRECTORY)
+	})
+
+	// The enumeration says so, and the guard obeys it — asserted together so the two cannot drift apart.
+	it('refuses nothing at the threshold while marked as a lane child', () => {
+		const transcript = write_transcript('lane-child', at_threshold_lines())
+
+		expect(lane_guard_policy.mode_in_lane_child('investigation')).toBe('off')
+		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+	})
+
+	// A person working in a lane carries no mark, so the guard refuses exactly as it always did — the
+	// "fires as before when not a lane child" half of the acceptance criterion.
+	it('refuses again once the lane-child mark is gone', () => {
+		const transcript = write_transcript('lane-unmarked', at_threshold_lines())
+
+		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
+
+		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBe(investigation_reads.REASON)
 	})
 })
 

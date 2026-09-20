@@ -36,13 +36,13 @@ const OPENAI_MODEL = 'gpt-5.6-sol'
 const CODEX_SESSION_KEY = 'CODEX_THREAD_ID'
 
 const DEFAULT_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
-	scheduler: { provider: ANTHROPIC_PROVIDER, role: SCHEDULER, model: 'opus', effort: 'high' },
-	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: 'sonnet', effort: 'medium' },
+	scheduler: { provider: ANTHROPIC_PROVIDER, role: SCHEDULER, model: 'opus', effort: 'medium' },
+	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: 'opus', effort: 'medium' },
 	reviewer: { provider: ANTHROPIC_PROVIDER, role: REVIEWER, model: 'opus', effort: 'high' },
 }
 
 const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
-	scheduler: { provider: OPENAI_PROVIDER, role: SCHEDULER, model: OPENAI_MODEL, effort: 'high' },
+	scheduler: { provider: OPENAI_PROVIDER, role: SCHEDULER, model: OPENAI_MODEL, effort: 'medium' },
 	worker: { provider: OPENAI_PROVIDER, role: WORKER, model: OPENAI_MODEL, effort: 'medium' },
 	reviewer: { provider: OPENAI_PROVIDER, role: REVIEWER, model: OPENAI_MODEL, effort: 'high' },
 }

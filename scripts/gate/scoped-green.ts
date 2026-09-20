@@ -194,8 +194,13 @@ interface GreenRecord {
 async function record_if_green(stamp: FileMapStampAccess, record: GreenRecord): Promise<void> {
 	const { before, exit_code, target } = record
 
-	if (before === undefined || exit_code !== SUCCESS_EXIT_CODE) return
-	if (!is_unmoved(before, await gate_tree.read_gate_tree())) return
+	if (
+		before === undefined ||
+		exit_code !== SUCCESS_EXIT_CODE ||
+		!is_unmoved(before, await gate_tree.read_gate_tree())
+	) {
+		return
+	}
 
 	record_green(stamp, before, target)
 }

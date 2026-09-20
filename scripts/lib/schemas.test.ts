@@ -126,10 +126,12 @@ describe('with_scripts_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (result.success) {
-			expect(result.data.scripts).toStrictEqual({ build: 'tsc', test: 'vitest' })
-			expect(result.data).toMatchObject({ name: PKG_NAME })
+		if (!result.success) {
+			return
 		}
+
+		expect(result.data.scripts).toStrictEqual({ build: 'tsc', test: 'vitest' })
+		expect(result.data).toMatchObject({ name: PKG_NAME })
 	})
 
 	it('parses without scripts (optional)', () => {
@@ -146,10 +148,12 @@ describe('with_development_deps_schema', () => {
 
 		expect(result.success).toBe(true)
 
-		if (result.success) {
-			expect(result.data.devDependencies).toStrictEqual({ vitest: VITEST_VERSION })
-			expect(result.data).toMatchObject({ name: PKG_NAME })
+		if (!result.success) {
+			return
 		}
+
+		expect(result.data.devDependencies).toStrictEqual({ vitest: VITEST_VERSION })
+		expect(result.data).toMatchObject({ name: PKG_NAME })
 	})
 
 	it('parses without devDependencies (optional)', () => {

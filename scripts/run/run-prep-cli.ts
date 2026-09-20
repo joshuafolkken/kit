@@ -122,7 +122,10 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_prep_cli = { USAGE, main, parse_number, run }
+// `gather` and `to_parts` are exported so `run:next` reads the same state from the same three reads
+// rather than growing a second copy of the gather (joshuafolkken/kit#2188) — `run:next` is the
+// consumer of `run:prep` the epic #2166 wanted.
+const run_prep_cli = { USAGE, gather, main, parse_number, run, to_parts }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

@@ -76,16 +76,29 @@ describe('cost_verdict.report_over', () => {
 	})
 })
 
+describe('cost_verdict.classify', () => {
+	const one = over_of([record(100)])
+
+	it('answers over when the marginal cost exceeds the limit, printing nothing', () => {
+		expect(cost_verdict.classify(one, 0)).toBe(cost_verdict.OVER_VERDICT)
+		expect(stdout()).toBe('')
+	})
+
+	it('answers under at exactly the limit', () => {
+		expect(cost_verdict.classify(one, 100)).toBe(cost_verdict.UNDER_VERDICT)
+	})
+})
+
 // joshuafolkken/kit#1933: the implementation-phase cut of a lane child is decided by this same
 // `report_over` measurement — `pnpm josh cost --cut` — not by a
 // second decision function. This pins the boundary against the real path: over the threshold a lane
 // child cuts, at or below it it keeps implementing, and the shared threshold is single-sourced so
 // the scheduler and worker cannot drift.
 describe("cost_verdict.report_over at the lane child's implementation threshold", () => {
-	const EXPECTED_CONTEXT_CUT_THRESHOLD = 150_000
+	const EXPECTED_CONTEXT_CUT_THRESHOLD = 200_000
 	const threshold = CONTEXT_CUT_THRESHOLD
 
-	it('uses the shared 150k threshold', () => {
+	it('uses the shared 200k threshold', () => {
 		expect(CONTEXT_CUT_THRESHOLD).toBe(EXPECTED_CONTEXT_CUT_THRESHOLD)
 		expect(run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD).toBe(CONTEXT_CUT_THRESHOLD)
 	})

@@ -34,12 +34,19 @@ const REST_READ = 'gh api repos/{owner}/{repo}/issues/<N>/comments'
 const STOP_ANSWER = 'no longer has a reason to exist'
 
 // joshuafolkken/kit#1959: §2g's story and rationale moved out (joshuafolkken/kit#1925 trims the
-// section to its rule). The section's existence is held by the heading anchor in
-// `document-markers.test.ts`; here the doc half is the one command the read cannot lose, and the
-// entry points still point at the single source rather than restating it.
-describe('SKILL.md §2g — the procedure every `#N` entry point owes', () => {
-	it('names the portable comment read', () => {
-		expect(read_unwrapped(WORKFLOW_SKILL)).toContain(REST_READ)
+// section to its rule). joshuafolkken/kit#2189 relocated the §2g body to `issue-comments.md`, leaving
+// the `SKILL.md` §2g stub as a trigger and pointer; the portable comment read the rule cannot lose now
+// lives in that companion, and the entry points still point at the single source rather than restating
+// it.
+const ISSUE_COMMENTS_DOC = '.claude/skills/workflow-commands/issue-comments.md'
+
+describe('§2g — the procedure every `#N` entry point owes', () => {
+	it('names the portable comment read in its single source', () => {
+		expect(read_unwrapped(ISSUE_COMMENTS_DOC)).toContain(REST_READ)
+	})
+
+	it('leaves the SKILL.md stub pointing at the companion', () => {
+		expect(read_unwrapped(WORKFLOW_SKILL)).toContain('issue-comments.md')
 	})
 })
 

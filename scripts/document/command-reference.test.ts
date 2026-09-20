@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { all_documents, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
+import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 
 // Every `pnpm josh <x>` a document names in a code span has to be a real command. A per-rule marker
 // suite used to pin a handful of command names by hand; this checks all of them at once, and a
@@ -78,5 +80,21 @@ describe('the command reference covers exactly the command map', () => {
 		for (const name of documented_commands()) if (!KNOWN_COMMANDS.has(name)) unknown.push(name)
 
 		expect(unknown).toStrictEqual([])
+	})
+})
+
+describe('the command catalog is up to date', () => {
+	const catalog = generate_catalog()
+
+	it('matches the command map', () => {
+		const on_disk = readFileSync(CATALOG_FILE, 'utf8')
+
+		expect(on_disk).toBe(catalog)
+	})
+
+	it('covers every command in the map', () => {
+		const missing = Object.keys(COMMAND_MAP).filter((name) => !catalog.includes(`\`josh ${name}\``))
+
+		expect(missing).toStrictEqual([])
 	})
 })

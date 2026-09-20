@@ -27,18 +27,19 @@ that run is holding. It claims nothing, so it must not release anything either. 
 single source.
 
 **The target repository is named in front of the Issue reference** — `kickoff kit#new`,
-`kickoff joshuafolkken/kit#412`. The definition is `SKILL.md` → §2c. `kickoff` is the entry that needs
+`kickoff joshuafolkken/kit#412`. The definition is `SKILL.md` → §2c, whose body is `target-repository.md`. `kickoff` is the entry that needs
 no checkout: name the target repository in the path of every `gh api` call — reads included — and never
 clone. The one exception is the split path's epic, since `pnpm josh epic` writes only the repository it
 runs in — and the promote arm has no remote fallback at all, so it stops when that repository is not
 checked out here. A target whose owner is not this session's is third-party: Tier C, so it stops rather
 than filing.
 
-**Read `split-assessment.md` first.** It carries the one definition of the scope assessment that every
-entry point applies, including this one — `kickoff #N` assesses scope exactly as `kickoff new` does.
-Its default is not to split: separability and a scope that clearly exceeds what one verification gate
-can confirm in one pass (the guide is about 10 changed files and about 400 changed lines) have to hold
-**together**.
+**Read `split-assessment.md` → "The question" first.** It is the split decision every entry point
+applies, including this one — `kickoff #N` assesses scope exactly as `kickoff new` does. Its default is
+not to split: separability and a scope that clearly exceeds what one verification gate can confirm in
+one pass (the guide is about 10 changed files and about 400 changed lines) have to hold **together**.
+The rest of `split-assessment.md` — what each entry does with the answer — is read on demand when a
+split is found.
 
 - `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (0) **Scope assessment** per
   `split-assessment.md`. If multiple → the **multi-issue split path**; if single → the **single-issue

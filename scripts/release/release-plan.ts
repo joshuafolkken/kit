@@ -96,7 +96,7 @@ function short_sha(sha: string): string {
 
 // **The count is the line a person reads**, which is why it is built here rather than at each caller:
 // the release command prints it, and so does anything else that wants to say how much is waiting to
-// ship (joshuafolkken/kit#1169 → "未リリースのマージ件数が、目に見える場所に出る").
+// ship (joshuafolkken/kit#1169 → "the count of unreleased merges shows somewhere visible").
 function format_pending_line(pending: number): string {
 	return `${PENDING_ICON} unreleased merges on main: ${String(pending)}`
 }

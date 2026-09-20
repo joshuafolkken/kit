@@ -198,7 +198,7 @@ resumes the same lane **back into implementation** carrying none of the thinking
 The child decides whether to cut with the same measurement the parent uses between children —
 `pnpm josh cost --cut` (`cost_verdict.per_request_cost`, billed input tokens per request), whose single
 source is `backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
-`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` both use the shared 150_000 constant. No separate
+`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` both use the shared 200_000 constant. No separate
 measurement or threshold is built for the lane child.
 
 ```bash
@@ -267,6 +267,14 @@ at each boundary itself, and whether the run held to it is read from the run-tim
 `pnpm josh cost` on a real dispatched run (see "Measurement" below) — the same feedback loop the
 pre-gate cut's own measurement uses.
 
+**The aggregate is not the only feedback: an individual child that ended mid-implementation without
+cutting is detected per-child, after the fact, by `pnpm josh run:ending <N> --output <path>`**
+(joshuafolkken/kit#2139) — it classifies the child's ending as `merged` / `cut` / `abandoned` /
+`unreadable` from the exit record, the cut record and the Issue state, so the `abandoned` case (a
+child that stopped in the middle without handing off) is visible without opening the log, and its
+exit-record basis goes into the park comment. It is post-hoc detection, not the synchronous guard this
+trigger cannot be — the same reason stated above.
+
 ### Edit in bulk, then check once
 
 **A single check (`lint:related` / `test:related`) is run after a batch of edits, not after each
@@ -303,7 +311,7 @@ tells whether the average fell.
 **The implementation-phase cut's drop is measured the same way, and is likewise unmeasured until
 then** (joshuafolkken/kit#1933): one changed `backlogrun` compares the average and maximum context
 per request of each lane against the 2026-09-13 run recorded in the issue, and until that run exists
-the effect of the 150_000 threshold is reported as unmeasured.
+the effect of the 200_000 threshold is reported as unmeasured.
 
 ## A lane child records its park before it stops
 

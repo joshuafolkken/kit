@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
 	batch_outcome,
 	batch_refusal,
@@ -17,6 +19,13 @@ import {
 } from './batch-guard'
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'batch-guard-'))
+// The directory vitest was launched from, restored in teardown. The candidate test now reads the live
+// process.cwd() and `JOSH_LANE_CHILD` to decide whether the session is a dispatched lane child
+// (joshuafolkken/kit#2138), so the lane case chdirs into a lane checkout and this puts it back.
+const ENTRY_DIRECTORY = process.cwd()
+const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
+const LANE_ISSUE = '2138'
+const LANE_DIRECTORY = path.join(LANE_ROOT, LANE_ISSUE)
 const { open_turn_lines, target_turn_lines, ms } = time_transcript_fixture
 // A minute of the fixture day that is past every turn below. The recorded instant is compared against
 // the transcript's own timestamps, so a `Date.now()`-shaped constant taken from a different year would
@@ -107,9 +116,14 @@ function fork_payload_of(name: string, agent_id: string = AGENT_ID): string {
 // that has never heard of the variable.
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
+	// Deleted so the ambient `JOSH_LANE_CHILD` of a lane checkout — where these tests run — cannot
+	// suppress the guard and turn the suite green on a guard that never fired (joshuafolkken/kit#2138).
+	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 })
 
 afterAll(() => {
+	process.chdir(ENTRY_DIRECTORY)
+
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(refusal_path(transcript), { force: true })
 		rmSync(notice_refusal_path(transcript), { force: true })
@@ -267,6 +281,50 @@ describe('batch_refusal — a forked agent is judged on its own transcript', () 
 		const payload = time_transcript_fixture.with_null_agent(payload_of('null-agent'))
 
 		expect(batch_refusal(payload, NOW_MS)).toContain('batching')
+	})
+})
+
+describe('batch_outcome — a dispatched lane child is notified, not refused', () => {
+	// joshuafolkken/kit#2138, joshuafolkken/kit#2164: a *refusal* ends a headless child's turn rather than
+	// guiding it, so the batching guard is downgraded to a notice for a dispatched lane child — decided
+	// from the one-place enumeration, set up here as `lane-park.test.ts` sets up its own lane case.
+	beforeEach(() => {
+		mkdirSync(LANE_DIRECTORY, { recursive: true })
+		process.chdir(LANE_DIRECTORY)
+		process.env[lane_child_marker.KEY] = LANE_ISSUE
+	})
+
+	afterEach(() => {
+		process.chdir(ENTRY_DIRECTORY)
+	})
+
+	// The enumeration says `notice`, and the guard obeys it — asserted together so the two cannot drift
+	// apart, which is the "enumeration and live behavior cannot disagree" half of the acceptance criteria.
+	it('reads its lane-child mode as notice', () => {
+		expect(lane_guard_policy.mode_in_lane_child('batching')).toBe('notice')
+	})
+
+	// **The turn is not ended.** A notice carries no `permissionDecision` — only `reason` becomes a deny —
+	// so a refusable call at the limit comes back with the notice set and the reason unset, and the call
+	// proceeds. This is what keeps a headless `claude -p` child alive (joshuafolkken/kit#2164).
+	it('delivers a notice, not a refusal, on the third single-call turn in a lane child', () => {
+		const { reason, notice } = batch_outcome(payload_of('lane-notice'), NOW_MS)
+
+		expect(reason).toBeUndefined()
+		expect(notice).toContain('batching')
+	})
+
+	// The refusal path stays silent there — read through `batch_refusal`, which returns only the deny
+	// reason, the guard says nothing that could end the turn.
+	it('refuses nothing on the third single-call turn while marked as a lane child', () => {
+		expect(batch_refusal(payload_of('lane-child'), NOW_MS)).toBeUndefined()
+	})
+
+	// A person working in a lane carries no mark and is refused exactly as before.
+	it('refuses again once the lane-child mark is gone', () => {
+		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
+
+		expect(batch_refusal(payload_of('lane-unmarked'), NOW_MS)).toContain('batching')
 	})
 })
 

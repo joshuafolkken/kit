@@ -1,16 +1,44 @@
-# How much of a resident rule is resident — `SKILL.md` §3's body
+# What stays resident, and how much — `SKILL.md` §3's body
 
-**This is `SKILL.md` → §3's procedure, and it is read when a rule is being placed, moved or
-retired — not at the entry** (joshuafolkken/kit#1797). §3 keeps the two questions that decide
-*whether* a rule is resident; what follows decides *how much of it* is, and carries the enumeration
-of every resident rule that has an on-demand counterpart and the retirement route and its three tests.
-The `rule:value` readings it used to carry no longer gate reduction — that gating was
-retracted on 2026-09-13 (joshuafolkken/kit#1931 → `## Decisions`) and they are retained below only as
-history.
+**This is `SKILL.md` → §3's body, and it is read when a rule is being placed, moved or retired — not
+at any entry** (joshuafolkken/kit#1797, joshuafolkken/kit#2161). **Nothing in a run reaches it.** The
+moment it binds is a turn spent editing `CLAUDE.md` or one of these documents, which is why it costs a
+workflow entry nothing to leave it here. `SKILL.md` → §3 keeps the heading and points here; the
+questions that decide *whether* a rule stays now live below, alongside the procedure that decides *how
+much* of it does. The `rule:value` readings this file used to carry no longer gate reduction — that
+gating was retracted on 2026-09-13 (joshuafolkken/kit#1931 → `## Decisions`) and they are retained
+below only as history.
 
-**Nothing in a run reaches it.** The moment it binds is a turn spent editing `CLAUDE.md` or one of
-these documents, which is why it costs a workflow entry nothing to leave it here — and why the two
-questions themselves stay in §3, where a run that is about to move a sentence still reads them first.
+## Whether a rule stays
+
+**Before either question below, ask question 0:** `prompts/collaboration-workflow/residency.md` → question 0 — can the rule's answer be computed from mechanically readable inputs alone? If yes, it is a decision oracle and neither question below applies; `pnpm josh oracle:list` shows the existing ones. Only a no reaches the first question.
+
+**The first question is whether the rule's trigger can be named:**
+
+> **Can the moment the rule begins to bind be named as one tool call?**
+
+**A rule whose trigger can be named moves its body out of `CLAUDE.md`.** It goes on the enumeration in
+`prompts/collaboration-workflow/rule-delivery.md`, and a hook refuses that call and states the rule —
+cheaper than resident prose, because it costs nothing on every other turn, and **stronger, because a
+refusal cannot be skimmed past**. **Relocating is not deleting** — the rule's text survives, on a
+stronger channel.
+
+**What stays behind is the trigger and the criterion, one line, because the channel reaches one
+harness.** `CLAUDE.md` is agent-agnostic by construction — `AGENTS.md`, `GEMINI.md` and `.cursorrules`
+are pointers to it, and a Codex, Gemini or Cursor session runs no `.claude/settings.json` hook at all;
+so does a Claude Code session with the guard's own off-switch set. **The gain is the body, not the
+line.** A rule may leave residency entirely only where the agent that has to obey it is always this
+harness.
+
+Only a rule whose trigger cannot be named reaches the second question:
+
+**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.** That
+test has exactly one input: when does the rule first bind — before a command has started, or after.
+Everything a run reaches only *after* it has read this skill is routed to from `CLAUDE.md`, never
+restated there.
+
+`CLAUDE.md` is the only document this section is about. `AGENTS.md` and `GEMINI.md` hold no rules at
+all — they are pointers to it.
 
 ### The second question: how much of a resident rule is resident
 
@@ -233,3 +261,5 @@ finds nothing retirable records the candidates with their evidence and stops the
 lowering the bar until a deletion appears. A rule
 scoring `-` has declared no compliance test and is **unmeasured, never zero** — it is not thereby a
 candidate.
+
+**The fourth reading swept the eight mechanization PRs of the reduction epic (joshuafolkken/kit#2117–#2124) and retired nothing, which is again the route working** (joshuafolkken/kit#2125). Each PR that moved a judgement into a command trimmed its own resident prose to trigger-plus-pointer as it landed, so the sweep found no procedure restated in full: the mechanized triggers — the computable-answer question 0 (`oracle:list`), `test:declared`, `issue:scout` and the filing cap, the shell-body guard, `repo:party`, and the fixed-shape linters (`issue:lint` / `report:lint`) — each already resolve to their declared single source (`prompts/collaboration-workflow/residency.md`, `rule-delivery.md`, `wip-cap.md`, `shell-body.md`, `upstream-interrupt.md`, `report-format.md`) rather than carrying the procedure resident. **The one candidate the sweep raised was the `Stop` hook's arrival** (joshuafolkken/kit#2121): the resident `CLAUDE.md` → "Mid-workflow stop notification" section looked like a delivered rule whose copy could shrink to a one-liner, but it fails test 3 — `scripts/document/document-markers.test.ts` pins its heading and `scripts/claude/workflow-skills.test.ts` pins its `notify` command and its `parseArgs` line — and it fails test 2, because `stop-rules.ts`'s `STOP_NOTIFY_REASON` names this very section as the single source the delivered text points at, so trimming it would strand the pointer. The hold-release and issue-citation stop rules introduced no resident duplication at all: their single sources are `SKILL.md` → §2f and `issue-citation.md`, which the hook points to, and the resident issue-citation text was already a one-line trigger. **What the sweep reclaimed was a stale byte-budget record, not prose**: `chain-rule.md` was reduced in joshuafolkken/kit#2078 but its recorded size was never lowered, so the ratchet in `scripts/document/document-byte-budget.ts` was tightened 18,031 → 6,240 to hold that reduction. **The reclamation was only possible because nothing enforced it** — the ratchet's growth guard catches a document that swells past its ceiling but is blind to one that shrinks and leaves its record standing, which is how chain-rule.md's stale-loose entry survived two reduction epics unseen. So a staleness guard was added beside it (`recorded ≤ actual + slack`): an unrecorded shrink now fails `pnpm josh gate` rather than drifting, so the next reduction epic finds nothing stale to reclaim.

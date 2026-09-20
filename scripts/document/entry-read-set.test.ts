@@ -10,12 +10,15 @@ import { entry_read_set } from './entry-read-set'
 // these against itself and say nothing about the documents.
 
 const ROOT = process.cwd()
-// `fullrun` reads its own file, `split-assessment.md` and the skill; it cites `followup-reference.md`
-// at one out-of-set section ("When `pnpm josh release` runs"), so it exercises the section-saving
-// measurement — reading that section rather than the whole file it sits in. (Before
-// joshuafolkken/kit#2010 it cited `backlogrun.md`'s "The hand-off" and "Progress while the run is
-// quiet"; that content moved to `backlogrun`'s point-of-use phase documents, which are not counted.)
+// `fullrun` reads its own manifest and the skill; it cites `split-assessment.md` at one out-of-set
+// section ("The question"), so it exercises the section-saving measurement — reading that section
+// rather than the whole file it sits in. (joshuafolkken/kit#2189 turned the command files into
+// manifests: `split-assessment.md` left the entry table and became a section-cite of the split
+// decision, and the release-ask pointer at `followup-reference.md` moved into `fullrun-steps.md`,
+// read on demand rather than at the entry.)
 const SECTION_CITER = 'fullrun'
+const SPLIT_QUESTION_HEADING = 'The question'
+const SPLIT_FILE = 'split-assessment.md'
 const BACKLOGRUN = 'backlogrun.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
@@ -46,6 +49,12 @@ const UNKNOWN_ENTRY = 'no-such-entry'
 // files they were cut from. Loose on purpose — it asserts the shape, not today's figure.
 const HALF_AGAIN = 1.5
 const MAX_BACKLOGRUN_TOKENS = 90_000
+// The ceiling joshuafolkken/kit#2190 set on the `backlogrun` parent's own entry read — `SKILL.md` plus
+// the `backlogrun.md` manifest, the referenced sections included. Cutting the detailed procedure into
+// the point-of-use `backlogrun-steps.md` is what brought the entry read under it (measured ~13,800
+// after the cut, from ~29,800 before), and this pins it so a manifest that grew the prose back would
+// fail the gate.
+const MAX_BACKLOGRUN_ENTRY_TOKENS = 20_000
 const NOTHING = 0
 
 const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'backlogrun']
@@ -132,6 +141,54 @@ describe('entry_read_set.read_set — which files', () => {
 	})
 })
 
+describe('entry_read_set — backlogrun reads its child files at the point of use (joshuafolkken/kit#2161)', () => {
+	const ENTRY = 'backlogrun'
+	const SPLIT = SPLIT_FILE
+	const FULLRUN_FILE = 'fullrun.md'
+	const PER_ENTRY: ReadonlyArray<string> = [FULLRUN_FILE, SPLIT]
+	const IMPLEMENTING_AND_PLAN: ReadonlyArray<string> = [SECTION_CITER, 'halfrun', PLAN_ONLY]
+
+	// The parent orchestrates and never implements: a dispatched child reads both inside its own
+	// delegated fullrun unit, so neither is a backlogrun entry read.
+	it.each(PER_ENTRY)('keeps %s out of the backlogrun entry read', (file) => {
+		expect(entry_read_set.read_set(ROOT, ENTRY).files).not.toContain(file)
+	})
+
+	// `fullrun.md` stays the entry file of a `fullrun`; `split-assessment.md` left the entry table in
+	// joshuafolkken/kit#2189 and is now section-cited ("The question") by every command manifest, so it
+	// is no longer read whole at the entry of `fullrun` / `halfrun` / `kickoff`.
+	it('keeps fullrun.md the entry file of a fullrun, split-assessment.md out of its whole-file read', () => {
+		const { files } = entry_read_set.read_set(ROOT, SECTION_CITER)
+
+		expect(files).toContain(FULLRUN_FILE)
+		expect(files).not.toContain(SPLIT)
+	})
+
+	it.each(IMPLEMENTING_AND_PLAN)(
+		'section-cites split-assessment.md from the %s manifest',
+		(entry) => {
+			const cited = entry_read_set.read_set(ROOT, entry).sections
+			const split = cited.find((reference) => reference.file === SPLIT)
+
+			expect(split?.heading).toBe(SPLIT_QUESTION_HEADING)
+		},
+	)
+
+	it('classifies the child files as point-of-use for backlogrun and no other entry', () => {
+		const classified = [...(entry_read_set.POINT_OF_USE_BY_ENTRY.get(ENTRY) ?? [])]
+
+		expect(classified.toSorted(alphabetical)).toStrictEqual([...PER_ENTRY].toSorted(alphabetical))
+		expect(entry_read_set.POINT_OF_USE_BY_ENTRY.has(SECTION_CITER)).toBe(false)
+	})
+
+	// The saving is not a disappearance: the cost report still accounts for what the child reads later.
+	it('reports the child files under the backlogrun point-of-use', () => {
+		const files = entry_read_set.costed(ROOT, ENTRY).point_of_use.map((one) => one.file)
+
+		for (const file of PER_ENTRY) expect(files).toContain(file)
+	})
+})
+
 describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#1856)', () => {
 	// chain-rule.md governs the /code-review → followup chain, which binds after the first edit, so it
 	// left the entry read of the four entries that used to list it and joined the point-of-use set. A
@@ -203,6 +260,41 @@ describe('entry_read_set — point-of-use reachability', () => {
 
 		expect(total.tokens).toBeLessThan(MAX_BACKLOGRUN_TOKENS)
 	})
+
+	// joshuafolkken/kit#2190: the manifest cut is about the *entry* read, not the total — the total is
+	// unchanged because the prose only moved to a point-of-use file. `scoped` is what the parent pays
+	// up front, and it is what has to stay under 20k.
+	it('keeps the backlogrun entry read below 20k tokens', () => {
+		expect(entry_read_set.costed(ROOT, 'backlogrun').scoped.tokens).toBeLessThan(
+			MAX_BACKLOGRUN_ENTRY_TOKENS,
+		)
+	})
+})
+
+describe('entry_read_set — backlogrun-steps.md is point-of-use (joshuafolkken/kit#2190)', () => {
+	// `backlogrun.md` was cut to a manifest and its detailed procedure moved into `backlogrun-steps.md`,
+	// read on demand rather than at the entry. It must be classified point-of-use so the manifest's
+	// pointers into it are not charged to the entry read, exactly as the four `backlogrun-*.md` phase
+	// documents are.
+	const STEPS = 'backlogrun-steps.md'
+
+	it('classifies backlogrun-steps.md as a point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(STEPS)
+	})
+
+	it('keeps backlogrun-steps.md out of the entry read of every entry', () => {
+		for (const entry of EXPECTED_ENTRIES) {
+			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(STEPS)
+		}
+	})
+
+	// The saving is not a disappearance: the manifest's pointers reach it, and the cost report still
+	// accounts for what the run reads later under the backlogrun point-of-use.
+	it('reports backlogrun-steps.md under the backlogrun point-of-use', () => {
+		const files = entry_read_set.costed(ROOT, 'backlogrun').point_of_use.map((one) => one.file)
+
+		expect(files).toContain(STEPS)
+	})
 })
 
 describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkken/kit#1922)', () => {
@@ -226,9 +318,7 @@ describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkk
 describe('entry_read_set.read_set — which sections', () => {
 	it('collects the sections its own documents point at, out of the set', () => {
 		expect(entry_read_set.read_set(ROOT, SECTION_CITER).sections).toEqual(
-			expect.arrayContaining([
-				{ file: 'followup-reference.md', heading: 'When `pnpm josh release` runs' },
-			]),
+			expect.arrayContaining([{ file: SPLIT_FILE, heading: SPLIT_QUESTION_HEADING }]),
 		)
 	})
 

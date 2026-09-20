@@ -177,7 +177,7 @@ function classify(raw: string | undefined, now: Date): CutRead {
 
 	if (cut === undefined) return UNREADABLE_READ
 
-	return is_expired(cut, now) ? { kind: 'expired', cut } : { kind: 'carried', cut }
+	return { kind: is_expired(cut, now) ? 'expired' : 'carried', cut }
 }
 
 function read_cut(target: string, now: Date = new Date()): CutRead {
