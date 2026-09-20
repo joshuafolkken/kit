@@ -54,6 +54,15 @@ a lane it cuts.
 
 ## Taking the cut
 
+**The order is fixed in the chain, not left to the refusal to enforce** (joshuafolkken/kit#2177).
+`chain-rule.md` step 1 issues `pnpm josh run:cut <N>` after `pnpm josh main:merge`, before the scoped
+pair and the gate, so the default path takes the cut before anything reads the tree for the gate and
+the guard refusal below never fires on the happy path. Because the `cut` verdict ends the turn the
+command is issued on its own, batching with nothing a refusal could collateral; the gate then runs in
+the fresh process, where the carried cut keeps the guard silent. This removes the wasted round trip
+joshuafolkken/kit#2160 measured — an uncut gate refused, its batched `review:brief` cancelled, then
+cut and resume back to the same place.
+
 At the pre-gate boundary, issue:
 
 ```bash
@@ -86,6 +95,11 @@ is carried, and hands back the command above with what each verdict obliges. It 
 conclusion joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each reached after measuring prose that
 moved the number not at all: a step a run is free to skip is the step that gets skipped under time
 pressure, and `run:hold` — the one boundary step that never gets missed — is the one that refuses.
+
+**With the ordered step above (joshuafolkken/kit#2177) the refusal is insurance, not the primary
+trigger.** The chain now issues the cut before the gate, so a child on the happy path never reaches an
+uncut gate; the refusal remains for the child that still does, but its wasted round trip and collateral
+cancel are gone from the default path.
 
 - **It fires for a marked child and nowhere else** (joshuafolkken/kit#1904). The `PreToolUse` hook
   answers synchronously, so it reads two facts off the world: the working directory is a lane —

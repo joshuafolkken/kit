@@ -84,6 +84,7 @@ const ALIASES: Record<string, string> = {
 	ird: 'issue:read',
 	ist: 'issue:state',
 	isc: 'issue:scout',
+	pks: 'pkg:scout',
 	iln: 'issue:lint',
 	ibl: 'issue:backlinks',
 	rl: 'report:lint',
@@ -102,6 +103,7 @@ const ALIASES: Record<string, string> = {
 	rs: 'read:set',
 	dcr: 'doc:read',
 	rf: 'read:files',
+	rfs: 'refactor:scan',
 	tm: 'time',
 	rb: 'review:brief',
 	r2: 'review:round2',
@@ -121,6 +123,7 @@ const ALIASES: Record<string, string> = {
 	rpy: 'repo:party',
 	rmg: 'run:merge',
 	rrv: 'run:review',
+	rev: 'run:event',
 	sp: 'stash:pop',
 	lno: 'lane:open',
 	lnc: 'lane:close',
@@ -137,6 +140,9 @@ const ALIASES: Record<string, string> = {
 	sg: 'stop:guard',
 	ev: 'eval',
 	ol: 'oracle:list',
+	sa: 'split:assess',
+	shs: 'sonar:hotspots',
+	uir: 'ui:routes',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

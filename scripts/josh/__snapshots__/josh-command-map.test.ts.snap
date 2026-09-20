@@ -64,6 +64,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ol": "oracle:list",
     "ov": "overrides",
     "pg": "propagate",
+    "pks": "pkg:scout",
     "pm": "prevent-main-commit",
     "ppu": "pre-push-unit",
     "pt": "port",
@@ -78,7 +79,9 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "re": "release",
     "red": "run:ending",
     "res": "release:scope",
+    "rev": "run:event",
     "rf": "read:files",
+    "rfs": "refactor:scan",
     "rg": "run:progress",
     "rh": "run:hold",
     "rl": "report:lint",
@@ -95,8 +98,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rv": "run:liveness",
     "rw": "run:wake",
     "rwg": "run:watcher:guard",
+    "sa": "split:assess",
     "sd": "cspell:dot",
     "sg": "stop:guard",
+    "shs": "sonar:hotspots",
     "sl": "session:lang",
     "sp": "stash:pop",
     "ss": "secretlint-scan",
@@ -109,6 +114,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "tr": "test:related",
     "tu": "test:unit",
     "u": "latest",
+    "uir": "ui:routes",
     "v": "version",
   },
   "references": {
@@ -564,6 +570,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "pkg:scout": [
+      "<keywords> [--size <n>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "port": [
       "<dev|preview>",
       "developer",
@@ -640,6 +653,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "maintainer",
       [
         "files",
+      ],
+    ],
+    "refactor:scan": [
+      "",
+      "automation",
+      [
+        "processes",
       ],
     ],
     "release": [
@@ -719,6 +739,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "network",
+      ],
+    ],
+    "run:event": [
+      "--append <kind> <text> | --from <position> | --last",
+      "automation",
+      [
+        "files",
       ],
     ],
     "run:hold": [
@@ -815,6 +842,20 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "sonar:hotspots": [
+      "<PR>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "split:assess": [
+      "[--json]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "stash:pop": [
       "<message>",
       "automation",
@@ -881,6 +922,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "time": [
       "[options]",
       "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "ui:routes": [
+      "[--staged]",
+      "automation",
       [
         "none",
       ],

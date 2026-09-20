@@ -69,6 +69,14 @@ scripts/hooks/format-edited-file.ts  230/300 code lines (76%), 70 to spare
 
 - Count is lint's own (`skipBlankLines` / `skipComments`); `near from` marks 85%. Never fails on a large file — a non-zero exit means the argument list was unusable.
 
+### `josh refactor:scan`
+
+Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 describes, run as a command: it picks the target files (branch diff plus untracked, or `scripts/`; excluding `demo`, `src/routes/stories`, `/* @refactor-ignore */`), expands the scope along the import graph, asks the project's own eslint for the §4.2 categories, and answers `verdict: clear` / `verdict: candidates`. Reports and never fails.
+
+```bash
+pnpm josh refactor:scan
+```
+
 ### `josh bytes`
 
 Print how many bytes an agent-read document has against its recorded byte ceiling and how many remain — the byte counterpart of `josh lines`, so a mandated documentation update that would cross the ceiling is seen right after the edit rather than at the gate.
@@ -361,6 +369,23 @@ pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 - `--json` — emit `{"scope","reason"}` as JSON.
 
 **Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
+
+### `josh sonar:hotspots` · `josh shs`
+
+Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.
+
+```bash
+pnpm josh sonar:hotspots 42   # alias: josh shs
+```
+
+### `josh ui:routes` · `josh uir`
+
+List the screenshot-target routes the change touches: a changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived" rather than guessing; the `verify-ui` skill's §1 narrows the list.
+
+```bash
+pnpm josh ui:routes            # the branch diff; alias: josh uir
+pnpm josh ui:routes --staged   # the staged diff instead
+```
 
 ### `josh propagate`
 
@@ -824,6 +849,16 @@ pnpm josh issue:scout "<title>" --body "follows on from #1246"
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
 
+### `josh pkg:scout`
+
+Before the Package-First tier decision, rank candidate packages by measured metrics so Tier A ("clearly best") and Tier B ("genuine toss-up") are read off the output rather than judged (joshuafolkken/kit#2216). It queries the npm registry and prints one line per candidate: npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
+
+```bash
+pnpm josh pkg:scout "date formatting" --size 5   # alias: josh pks
+```
+
+`--size <n>` sets how many candidates to fetch and rank (default 10). The verdict reads the top two's relative lead `(top − second) / top`: `clear` when the leader is ahead by at least 15% (select it, Tier A), `close` when within it (ask the user, Tier B). A failed per-candidate read leaves that metric blank (`—`).
+
 ### `josh issue:lint`
 
 Check an issue body written to a file against the template's four required headings — `## 背景`, `## 現象`, `## 期待結果`, `## 受け入れ条件` (the single source is `prompts/collaboration-workflow/issue-template.md`). It reads a path rather than stdin so a body can be linted before the `gh api … issues` call that files it.
@@ -1168,6 +1203,17 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
+### `josh split:assess` · `josh sa`
+
+Measure a branch's change size and answer the split assessment's size question. It counts changed files and changed lines against `main`, **excluding test files** (`*.test.ts` / `*.e2e.ts`), and answers `split` only when both guides are exceeded together, `single` otherwise.
+
+```bash
+pnpm josh split:assess          # → single ; alias: josh sa
+pnpm josh split:assess --json   # the verdict and the reason, machine-readable
+```
+
+`split` needs **both** the file guide (10) and the line guide (400) exceeded; either alone, or an empty diff, is `single` — the conservative default of `.claude/skills/workflow-commands/split-assessment.md` → "The question". It answers the **size** question only: separability stays a judgement, so `split` is the size condition met, not a decision to divide the Issue. Untracked files have no diff base — commit before measuring for an exact count.
+
 ### `josh oracle:list` · `josh ol`
 
 Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → question 0). Each row carries the command, its answer vocabulary and its single-source document. Adding a new oracle means adding a row here and nowhere else.
@@ -1355,6 +1401,24 @@ The default waits only for the gate to _start_ (never for the checks to pass) an
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
 the mechanical form of "a review verdict is not adopted over a red gate". The overlap's reader is
 joshuafolkken/kit#2179 and `chain-rule.md`.
+
+### `josh run:event`
+
+Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205); alias
+`rev`. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
+lane child append to one stream that survives a session cut; `--from` reads everything after a position,
+`--last` the newest event alone.
+
+```bash
+pnpm josh run:event --append <kind> <text>   # append one event; prints its position
+pnpm josh run:event --from <position>         # every event after <position>, in order
+pnpm josh run:event --last                    # the newest event alone
+```
+
+`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `cut`, `stop`,
+`pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge` and `park`
+in-process; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
+without limit.
 
 ### `josh run:progress`
 

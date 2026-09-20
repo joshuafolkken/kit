@@ -1,5 +1,6 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 import { LANE_COMMANDS } from './josh-commands-lane'
+import { SPLIT_COMMANDS } from './josh-commands-split'
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
@@ -26,6 +27,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Before filing: say whether an issue like this exists and which epic it belongs to',
 		category: 'AI tools',
 		reference: ['<title> [--body <summary>]', 'automation', ['network']],
+	},
+	'pkg:scout': {
+		script: 'scripts/package/package-scout-cli.ts',
+		description:
+			'Rank package candidates by measured metrics so the Package-First tier decision is read, not judged',
+		category: 'AI tools',
+		reference: ['<keywords> [--size <n>]', 'automation', ['network']],
 	},
 	'stash:pop': {
 		script: 'scripts/git/stash-pop-cli.ts',
@@ -255,6 +263,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--join]', 'automation', ['processes', 'files']],
 	},
+	'run:event': {
+		script: 'scripts/run/run-event-cli.ts',
+		description:
+			'Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)',
+		category: 'AI tools',
+		reference: ['--append <kind> <text> | --from <position> | --last', 'automation', ['files']],
+	},
 	...LANE_COMMANDS,
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
@@ -284,6 +299,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	...SPLIT_COMMANDS,
 	'oracle:list': {
 		script: 'scripts/rules/oracle-list-cli.ts',
 		description: 'Print the decision oracles — commands that answer a rule question mechanically',

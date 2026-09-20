@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { execFileSync } from 'node:child_process'
 import { globSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -70,7 +69,6 @@ const ISOLATION_PATTERNS: ReadonlyArray<RegExp> = [MODULE_MOCKS, ENV_WRITES, SUB
 // never reach the pilot either.
 const MAIN_EXCLUDE = new Set(['scripts/build/packed-consumer.test.ts'])
 const NODE_MODULES = 'node_modules'
-const MAX_GIT_OUTPUT = 20_971_520 // 20 MiB — well above any plausible tracked-file listing
 const PILOT_FILES_PATH = 'scripts/test/pilot-files.ts'
 const WRITE_FLAG = '--write'
 const INDENT = '\t'
@@ -103,26 +101,10 @@ function by_code_point(left: string, right: string): number {
 	return left > right ? 1 : 0
 }
 
-// Git-tracked test files only. The classifier runs inside the unit suite, and other tests write
-// transient `*.test.ts` fixtures into scanned directories while it runs; a live `globSync` picks
-// those up, so the committed list and a fresh scan disagree in CI (joshuafolkken/kit#2170). The
-// tracked set is the hermetic source — untracked fixtures never enter it.
-function tracked_files(): Set<string> {
-	const output = execFileSync('git', ['ls-files', '-z', '--', '*.test.ts'], {
-		encoding: 'utf8',
-		maxBuffer: MAX_GIT_OUTPUT,
-	})
-
-	return new Set(output.split('\0').filter(Boolean))
-}
-
 function all_test_files(): Array<string> {
-	const tracked = tracked_files()
 	const files = VITEST_INCLUDE_GLOBS.flatMap((glob) => collect_glob(glob))
 
-	return [...new Set(files)]
-		.filter((file) => tracked.has(file) && !MAIN_EXCLUDE.has(file))
-		.toSorted(by_code_point)
+	return [...new Set(files)].filter((file) => !MAIN_EXCLUDE.has(file)).toSorted(by_code_point)
 }
 
 function requires_isolation(source: string): boolean {
@@ -161,7 +143,6 @@ const classify_isolation = {
 	is_pilot_candidate,
 	render_pilot_files,
 	requires_isolation,
-	tracked_files,
 	write_pilot_files,
 }
 
