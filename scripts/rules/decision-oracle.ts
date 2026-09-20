@@ -211,6 +211,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: BACKLOGRUN_MD,
 	},
 	{
+		name: 'split:assess',
+		decision: 'Whether a change size clears the split guide (the split assessment size question)',
+		args: '[--json]',
+		vocabulary: ['split', 'single'],
+		single_source: '.claude/skills/workflow-commands/split-assessment.md → The question',
+	},
+	{
 		name: 'sonar:hotspots',
 		decision: 'The Step B disposition for each SonarCloud hotspot on a pull request',
 		args: '<PR>',

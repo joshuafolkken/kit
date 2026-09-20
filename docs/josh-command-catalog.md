@@ -1095,6 +1095,16 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 ---
 
+### `josh split:assess` · `josh sa`
+
+> **Audience:** automation · **Side effects:** none
+
+`[--json]`
+
+Measure the branch change size (tests excluded) and answer the split assessment size question: split | single
+
+---
+
 ### `josh stash:pop` · `josh sp`
 
 > **Audience:** automation · **Side effects:** git

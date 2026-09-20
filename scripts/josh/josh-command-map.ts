@@ -139,6 +139,7 @@ const ALIASES: Record<string, string> = {
 	sg: 'stop:guard',
 	ev: 'eval',
 	ol: 'oracle:list',
+	sa: 'split:assess',
 	shs: 'sonar:hotspots',
 	uir: 'ui:routes',
 }

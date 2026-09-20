@@ -48,6 +48,9 @@ words:
   # left behind, and `test-repository-guard.ts` cites it three times as the reason the guard has to
   # name what it caught.
   - reflog
+  # git's own name for the `--numstat` diff format — added/deleted line counts per file, tab-delimited.
+  # `josh split:assess` reads it to size a change (joshuafolkken/kit#2218).
+  - numstat
   # What `josh review:attest` calls a review that read a checkout other than the one it was briefed
   # on (joshuafolkken/kit#1522). cspell derives "targeted" but not the "mis-" compound.
   - mistargeted

@@ -1,5 +1,6 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 import { LANE_COMMANDS } from './josh-commands-lane'
+import { SPLIT_COMMANDS } from './josh-commands-split'
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
@@ -298,6 +299,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	...SPLIT_COMMANDS,
 	'oracle:list': {
 		script: 'scripts/rules/oracle-list-cli.ts',
 		description: 'Print the decision oracles — commands that answer a rule question mechanically',
