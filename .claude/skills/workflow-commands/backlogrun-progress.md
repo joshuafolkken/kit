@@ -304,7 +304,7 @@ in the repository that owns it ("Who sends the summary, and who propagates" belo
 **A session pays for every child it has already run, on every later turn**, because every turn re-reads
 the accumulated preamble. **So the run reads the marginal cost off a line rather than feeling for it** —
 at **every** child's merge, and crossing it **hands the session off to a fresh one, carrying the budget
-with it** (`backlogrun.md` → "The session cut is inside the invocation"). The cut is where a `backlogrun` spans several
+with it** (`backlogrun-steps.md` → "The session cut is inside the invocation"). The cut is where a `backlogrun` spans several
 sessions; it is not a stop.
 
 ```bash
@@ -393,7 +393,7 @@ ever.
   `pnpm josh run:carry --cut --owner "$PPID"`, and `pnpm josh run:wake` starts the next session from
   outside the conversation with nobody retyping the keyword. The lanes keep running and the resumed
   session polls them from `lane:list`. Post the progress comment naming **every lane still in flight and
-  the path each one records** so the resumed session can find them. `backlogrun.md` → "The session cut is inside the
+  the path each one records** so the resumed session can find them. `backlogrun-steps.md` → "The session cut is inside the
   invocation" is the single source of the carry; this reading is only where the cut is *taken*.
 
 **The hand-over is what makes the cut reachable, and the drain it replaced cost the pool.** `epic:next

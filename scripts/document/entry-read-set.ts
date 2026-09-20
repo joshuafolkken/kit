@@ -45,6 +45,10 @@ const ONE_LINE = 1
 // four phase documents below are read from it at the step each names — dispatching a child, opening a
 // lane, the progress watcher and the hand-off, a child that cannot finish — never at the entry. Kept
 // out of the count here, exactly as the four above are. `SKILL.md` → §1 is the human source.
+// **`backlogrun-steps.md` joins them** (joshuafolkken/kit#2190): `backlogrun.md` was cut to a manifest
+// and its detailed procedure moved into `backlogrun-steps.md`, read on demand rather than at the
+// entry. Counting the manifest's pointers into it would put that prose straight back into the entry
+// figure under another name, which is exactly what this reduction removes.
 const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'latest-gate.md',
 	'followup.md',
@@ -54,6 +58,7 @@ const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'backlogrun-lanes.md',
 	'backlogrun-progress.md',
 	'backlogrun-park.md',
+	'backlogrun-steps.md',
 ])
 
 // **A file an entry names but reads only later — point-of-use for that entry, an entry read for

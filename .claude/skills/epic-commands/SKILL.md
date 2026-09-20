@@ -20,7 +20,7 @@ backlogrun → which calls epic:next each round
 ```
 
 Front-loading every `needs-decision` in one pass is `backlogrun`'s job, not a command of this skill:
-`backlogrun.md` → "Resolve what the plan can resolve, before starting". A `backlogrun #E --only`'s
+`backlogrun-steps.md` → "Resolve what the plan can resolve, before starting". A `backlogrun #E --only`'s
 pre-check is `epic:audit`.
 
 ## Front-loading the decisions — now `backlogrun`'s
@@ -28,7 +28,7 @@ pre-check is `epic:audit`.
 `epic:plan` once printed every child as one JSON document so a person could answer every
 `needs-decision` in one batch before the run started. That front-loading is retired as a command of
 its own (joshuafolkken/kit#1965): **`backlogrun` does it at the start of every run**, and
-`backlogrun.md` → "Resolve what the plan can resolve, before starting" is its single source. A
+`backlogrun-steps.md` → "Resolve what the plan can resolve, before starting" is its single source. A
 `backlogrun #E --only`'s only pre-check is `epic:audit` below, run without being asked.
 
 **A decision is still recorded in two places, and one without the other loses half of it.** The epic's

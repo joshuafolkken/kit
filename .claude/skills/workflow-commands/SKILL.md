@@ -34,7 +34,7 @@ the cut is an execution detail of spending it. What this rule forbids is _inferr
 request's shape. **The reading covers `backlogrun` and it alone** — a `fullrun` cut still waits for
 the keyword, because a `fullrun` ends at one issue and has nothing to carry.
 
-**`backlogrun.md` → "The session cut is inside the invocation" is the single source of the
+**`backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
 mechanism** — the record, the two commands, and what each answer means, and how a named-issue
 `backlogrun #N1 #N2 …` pins its list to what was typed while the issues it has finished live in the
 record's `done` field rather than shrinking the string.
@@ -199,7 +199,7 @@ an epic's child and a named issue of a `backlogrun` alike. **They share one
 mechanism** — one enumeration, one command, one verifier requirement; building a second is the clone
 `CLAUDE.md` prohibits, so **no second row like `backlogrun-child` is added**. **A batch entry point
 that does not delegate is the defect**: the per-issue procedure is `backlogrun-child.md` → "Each child runs in a
-delegated unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue.
+delegated unit", which `backlogrun-steps.md` → "Named issues run first, in order" applies to a named issue.
 
 **`followup-filing` is a third unit — one whole sub-procedure of a run.** The late-run follow-up
 filing chain — `issue:scout` → file the Issue → `epic:bundle` → `epic --add` — is expensive because of
@@ -220,7 +220,7 @@ own ending rather than an unfinished child**. A child stopped by `needs-human-re
 consecutive-failure guard. Read as a failure there, the parent strips that label, releases the
 repository, and hands the next child a `git switch main && git pull` on top of that uncommitted work.
 The classification belongs to the per-entry procedure: `backlogrun-child.md` → "Each child runs in a delegated
-unit", which `backlogrun.md` → "Named issues run first, in order" applies to a named issue. The
+unit", which `backlogrun-steps.md` → "Named issues run first, in order" applies to a named issue. The
 enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in readable form by
 `docs/josh-commands.md` → "`josh delegate`".
 
@@ -398,7 +398,7 @@ answer under `backlogrun` parks the run without saying so.
   filing (§2e).
 - **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
   tracks is one `epic:next` never offers. **Where that epic's root carries `auto-ok` the filing joins
-  the backlog's pool** (`backlogrun.md` → "What one invocation approves").
+  the backlog's pool** (`backlogrun-steps.md` → "What one invocation approves").
 - **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent, and the Issue in
   hand is implemented as it was. Name what was filed in the completion report.
 

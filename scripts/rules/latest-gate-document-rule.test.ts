@@ -18,11 +18,14 @@ const OLD_RULE = 'mandatory, never skip'
 // Every file that tells a run whether to update. A rule written in the gate document while every
 // procedure a run actually follows still ran `josh latest` unconditionally would read as shipped and
 // change nothing.
+// joshuafolkken/kit#2190 cut `backlogrun.md` to a manifest and moved its once-per-session steps —
+// including `git switch main && git pull` then the dependency scope — into `backlogrun-steps.md`, so
+// that is where the `backlogrun` flow now names the command.
 const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/SKILL.md',
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/backlogrun.md',
+	'.claude/skills/workflow-commands/backlogrun-steps.md',
 	GATE,
 ]
 

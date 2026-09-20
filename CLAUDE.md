@@ -186,7 +186,7 @@ Never start a `kickoff` / `halfrun` / `fullrun` / `backlogrun` workflow (includi
 - Instead, **prompt the user to type the command themselves**, with the exact phrasing: "Please run \`<command>\` to start this task." (e.g. "Please run \`halfrun new\` to start this task.").
 - This applies even when the user authorized a related workflow in an earlier turn — each invocation must be re-typed in the current turn.
 
-**A session cut inside a declared budget is not a new invocation** — a `backlogrun` cut and resumed is the one invocation a person typed, and it continues rather than waiting to be retyped; **`backlogrun` alone**, though — a `fullrun` cut still waits for the keyword. Single source: `backlogrun.md` → "The session cut is inside the invocation".
+**A session cut inside a declared budget is not a new invocation** — a `backlogrun` cut and resumed is the one invocation a person typed, and it continues rather than waiting to be retyped; **`backlogrun` alone**, though — a `fullrun` cut still waits for the keyword. Single source: `backlogrun-steps.md` → "The session cut is inside the invocation".
 
 **A `backlogrun` parks a child instead of stopping the run**, and its procedure is read from `backlogrun-park.md` → "park and continue", which is that rule's single source.
 

@@ -90,7 +90,7 @@ describe('the candidate table', () => {
 
 	// joshuafolkken/kit#1675: an issue a run files carries no `auto-ok` of its own, and on the
 	// prerequisite route it carries a `route:` label as well. Bundled into an opted-in epic it is
-	// offered all the same — the behavior `backlogrun.md` → "What one invocation approves" now states
+	// offered all the same — the behavior `backlogrun-steps.md` → "What one invocation approves" now states
 	// rather than denies. **The label is inert today, and that is what this case is for**: nothing
 	// under `scripts/backlog/` reads a `route:` label, so this passes for the same reason
 	// 'offers a runnable child of an epic whose root carries auto-ok' does — and it is the two repairs

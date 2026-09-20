@@ -1013,7 +1013,7 @@ stdout is the verdict word (reason to stderr): `run` (start what was offered), `
 
 ### `josh backlog:offer`
 
-Collapse a `backlogrun` loop-head event into one call (alias `josh blo`): run `backlog:next`, map its answer to the budget word `backlogrun.md` → "The loop" fixes, run `backlog:budget`, return the verdict — two turns folded into one where the parent's context is largest, as `run:merge` did for a merge event.
+Collapse a `backlogrun` loop-head event into one call (alias `josh blo`): run `backlog:next`, map its answer to the budget word `backlogrun-steps.md` → "The loop" fixes, run `backlog:budget`, return the verdict — two turns folded into one where the parent's context is largest, as `run:merge` did for a merge event.
 
 ```bash
 pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --retries 1

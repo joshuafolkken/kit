@@ -57,7 +57,7 @@ const STOP_VERDICT = 'stop'
 type BudgetVerdict = typeof RUN_VERDICT | typeof WATCH_VERDICT | typeof STOP_VERDICT
 
 // What `backlog:next` answered, in the words this decision needs. The mapping is mechanical and is
-// written once, in `backlogrun.md` → "The loop": numbers are `candidates`, `wait` is `blocked` while
+// written once, in `backlogrun-steps.md` → "The loop": numbers are `candidates`, `wait` is `blocked` while
 // this run has children in flight and `exhausted` when it does not, `none` is `exhausted`, `stop` is
 // `parked`, and `error` or a failed listing is `unreadable`.
 const ANSWERS = ['blocked', 'candidates', 'exhausted', 'parked', 'unreadable'] as const

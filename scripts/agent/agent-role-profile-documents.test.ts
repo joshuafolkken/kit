@@ -4,14 +4,15 @@ import { describe, expect, it } from 'vitest'
 import { agent_role_profile } from './agent-role-profile'
 
 // The default agent profiles are the single source of the model and effort each unattended role runs
-// with (joshuafolkken/kit#2095). The two workflow documents that quote them — `backlogrun.md` and
-// `backlogrun-child.md` — had drifted to the pre-#2095 `sonnet` worker, so a cost argument was read
-// against a model the run never used (joshuafolkken/kit#2161). Derived from `DEFAULT_PROFILES` so a
-// later profile change fails here until the prose is updated with it.
+// with (joshuafolkken/kit#2095). The two workflow documents that quote them — `backlogrun-steps.md`
+// and `backlogrun-child.md` — had drifted to the pre-#2095 `sonnet` worker, so a cost argument was
+// read against a model the run never used (joshuafolkken/kit#2161). Derived from `DEFAULT_PROFILES` so
+// a later profile change fails here until the prose is updated with it. joshuafolkken/kit#2190 moved
+// the provider prose out of `backlogrun.md`'s session-cut section into `backlogrun-steps.md`.
 
 const ROOT = process.cwd()
 const PROFILES = agent_role_profile.DEFAULT_PROFILES
-const BACKLOGRUN = 'backlogrun.md'
+const BACKLOGRUN = 'backlogrun-steps.md'
 const BACKLOGRUN_CHILD = 'backlogrun-child.md'
 
 function unwrapped(file: string): string {
@@ -24,7 +25,7 @@ describe('the workflow documents quote the default agent profiles', () => {
 	const backlogrun = unwrapped(BACKLOGRUN)
 	const child = unwrapped(BACKLOGRUN_CHILD)
 
-	it('names every Anthropic role model that backlogrun.md quotes', () => {
+	it('names every Anthropic role model that backlogrun-steps.md quotes', () => {
 		expect(backlogrun).toContain(
 			`scheduler \`${PROFILES.scheduler.model}\`, worker \`${PROFILES.worker.model}\` and reviewer \`${PROFILES.reviewer.model}\``,
 		)

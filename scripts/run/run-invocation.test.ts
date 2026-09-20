@@ -87,7 +87,7 @@ describe('a backlogrun invocation with a named issue list', () => {
 	)
 
 	// The repository prefix is `SKILL.md` → §2c's, and this grammar does not carry it: the record's
-	// `done` holds numbers. `backlogrun.md` → "The session cut is inside the invocation" is why such a
+	// `done` holds numbers. `backlogrun-steps.md` → "The session cut is inside the invocation" is why such a
 	// run begins no carry record at all, rather than beginning one the supervisor then refuses.
 	it('refuses a repository-qualified reference', () => {
 		expect(run_invocation.rebuild(QUALIFIED)).toBeUndefined()
