@@ -1178,6 +1178,23 @@ pnpm josh oracle:list   # alias: josh ol
 
 Single source: `scripts/rules/decision-oracle.ts`.
 
+### `josh sonar:hotspots` · `josh shs`
+
+Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.
+
+```bash
+pnpm josh sonar:hotspots 42   # alias: josh shs
+```
+
+### `josh ui:routes` · `josh uir`
+
+List the screenshot-target routes the change touches: a changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived" rather than guessing; the `verify-ui` skill's §1 narrows the list.
+
+```bash
+pnpm josh ui:routes            # the branch diff; alias: josh uir
+pnpm josh ui:routes --staged   # the staged diff instead
+```
+
 ### `josh run:hold` / `josh run:release`
 
 Guard a working tree so only one run holds it at a time — `run:hold` claims it, `run:release` clears the claim. The unit is the working tree, so two lanes of one repository key differently.

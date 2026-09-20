@@ -290,6 +290,19 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	'sonar:hotspots': {
+		script: 'scripts/sonar/sonar-hotspots-cli.ts',
+		description:
+			"Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition",
+		category: 'AI tools',
+		reference: ['<PR>', 'automation', ['network']],
+	},
+	'ui:routes': {
+		script: 'scripts/ui/ui-routes-cli.ts',
+		description: 'List the screenshot-target routes the current change touches',
+		category: 'AI tools',
+		reference: ['[--staged]', 'automation', ['none']],
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',

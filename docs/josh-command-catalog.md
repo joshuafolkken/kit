@@ -1055,6 +1055,16 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 ---
 
+### `josh sonar:hotspots` · `josh shs`
+
+> **Audience:** automation · **Side effects:** network
+
+`<PR>`
+
+Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
+
+---
+
 ### `josh stash:pop` · `josh sp`
 
 > **Audience:** automation · **Side effects:** git
@@ -1072,3 +1082,13 @@ Pop the stash matching this message, not whichever a shared stack has on top
 `[options]`
 
 Report where a run's wall clock went: model wait, tool execution, human wait
+
+---
+
+### `josh ui:routes` · `josh uir`
+
+> **Audience:** automation · **Side effects:** none
+
+`[--staged]`
+
+List the screenshot-target routes the current change touches

@@ -97,6 +97,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rwg": "run:watcher:guard",
     "sd": "cspell:dot",
     "sg": "stop:guard",
+    "shs": "sonar:hotspots",
     "sl": "session:lang",
     "sp": "stash:pop",
     "ss": "secretlint-scan",
@@ -109,6 +110,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "tr": "test:related",
     "tu": "test:unit",
     "u": "latest",
+    "uir": "ui:routes",
     "v": "version",
   },
   "references": {
@@ -815,6 +817,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "sonar:hotspots": [
+      "<PR>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "stash:pop": [
       "<message>",
       "automation",
@@ -881,6 +890,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "time": [
       "[options]",
       "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "ui:routes": [
+      "[--staged]",
+      "automation",
       [
         "none",
       ],

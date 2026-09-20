@@ -203,6 +203,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: [OVER, 'human-review', STOP, RETRY, BUSY],
 		single_source: BACKLOGRUN_MD,
 	},
+	{
+		name: 'sonar:hotspots',
+		decision: 'The Step B disposition for each SonarCloud hotspot on a pull request',
+		args: '<PR>',
+		vocabulary: ['excluded', 'local', 'fix', 'defer', 'unreadable'],
+		single_source: 'prompts/sonar-hotspot-handling.md',
+	},
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
