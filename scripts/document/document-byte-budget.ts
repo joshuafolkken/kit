@@ -101,12 +101,17 @@ const SLACK_BYTES = 512
 // branch tree alone did not. joshuafolkken/kit#2180 raised it one slack unit (108,160 → 108,672) for
 // the mandated `josh refactor:scan` section — the refactoring-candidate scan, its command reference and
 // its `verdict: clear` / `verdict: candidates` answer — landing against a document already at its mark,
-// the branch's merge with `main` layering the section on top. joshuafolkken/kit#2207 raised it one slack
-// unit (108,672 → 109,184) for the mandated `--follow` reader on the `josh run:event` section — the
-// waiting positioned read an attached session relays with, its command reference and its stdout/stderr
-// contract — landing against a document already at its mark, the branch's merge with `main` layering
-// #2216's, #2218's and #2180's sections on top.
-const JOSH_COMMANDS_CEILING_BYTES = 109_184
+// the branch's merge with `main` layering the section on top.
+// joshuafolkken/kit#2182 raised it two further slack units (108,672 → 109,696) for the mandated
+// `josh sonar:hotspots` and `josh ui:routes` sections — the two prose procedures turned into commands,
+// their command references and branch/output contracts — landing against a document already at its
+// mark, the branch's merge with `main` layering the sections on top of the `josh run:event`,
+// `josh pkg:scout`, `josh split:assess` and `josh refactor:scan` sections `main` had already added.
+// joshuafolkken/kit#2207 raised it one slack unit (109,696 → 110,208) for the mandated `--follow` reader
+// on the `josh run:event` section — the waiting positioned read an attached session relays with, its
+// command reference and its stdout/stderr contract — landing against a document already at its mark, the
+// branch's merge with `main` layering #2216's, #2218's, #2180's and #2182's sections on top.
+const JOSH_COMMANDS_CEILING_BYTES = 110_208
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -153,7 +158,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 108_314 },
+	{ path: 'docs/josh-commands.md', bytes: 109_252 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

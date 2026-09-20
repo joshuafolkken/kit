@@ -224,6 +224,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: ['split', 'single'],
 		single_source: '.claude/skills/workflow-commands/split-assessment.md → The question',
 	},
+	{
+		name: 'sonar:hotspots',
+		decision: 'The Step B disposition for each SonarCloud hotspot on a pull request',
+		args: '<PR>',
+		vocabulary: ['excluded', 'local', 'fix', 'defer', 'unreadable'],
+		single_source: 'prompts/sonar-hotspot-handling.md',
+	},
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
