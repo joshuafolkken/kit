@@ -79,6 +79,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "re": "release",
     "red": "run:ending",
     "res": "release:scope",
+    "rev": "run:event",
     "rf": "read:files",
     "rg": "run:progress",
     "rh": "run:hold",
@@ -727,6 +728,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "network",
+      ],
+    ],
+    "run:event": [
+      "--append <kind> <text> | --from <position> | --last",
+      "automation",
+      [
+        "files",
       ],
     ],
     "run:hold": [
