@@ -825,6 +825,16 @@ Print the decision oracles — commands that answer a rule question mechanically
 
 ---
 
+### `josh read:files` · `josh rf`
+
+> **Audience:** automation · **Side effects:** none
+
+`<path> [<path> ...]`
+
+Read several files in one call so edit targets fold into one turn
+
+---
+
 ### `josh read:set` · `josh rs`
 
 > **Audience:** automation · **Side effects:** none

@@ -100,6 +100,7 @@ const ALIASES: Record<string, string> = {
 	ds: 'doc:section',
 	rs: 'read:set',
 	dcr: 'doc:read',
+	rf: 'read:files',
 	tm: 'time',
 	rb: 'review:brief',
 	r2: 'review:round2',

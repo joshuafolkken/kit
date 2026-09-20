@@ -121,6 +121,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<file>', 'automation', ['none']],
 	},
+	'read:files': {
+		script: 'scripts/document/read-files-cli.ts',
+		description: 'Read several files in one call so edit targets fold into one turn',
+		category: 'AI tools',
+		reference: ['<path> [<path> ...]', 'automation', ['none']],
+	},
 	time: {
 		script: 'scripts/time/time-cli.ts',
 		description: "Report where a run's wall clock went: model wait, tool execution, human wait",

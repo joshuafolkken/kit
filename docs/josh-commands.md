@@ -1531,6 +1531,20 @@ pnpm josh doc:read backlogrun.md      # over the cap: prints a directive, no con
 
 **Output / exit codes:** an unreadable file exits non-zero; an over-cap document prints its directive and exits zero.
 
+### `josh read:files`
+
+Read several files in one call, so the reads that precede a run's edits fold into one turn; alias `rf` (joshuafolkken/kit#2202).
+
+```bash
+pnpm josh read:files a.ts b.ts c.ts   # under the cap: prints each file under its own header
+pnpm josh read:files a.ts big.ts      # over the cap: prints a directive to Read them in one turn, no content
+```
+
+- **The mid-implementation counterpart of `run:prep`.** `run:prep` folds a run's pre-edit reads at a pre-determined point; this folds the reads of the files Step 0 enumerated as edit targets, routed at the Step 0 seam by `report-format.md` beside the `josh lines` step. The interleaved read-then-edit sequence the batching guard could not reach in a lane child (`turn-batching.md` → "実装中の独立編集に効く合成コマンド") collapses: the reads go out in one turn, and the edits no longer wait on an interleaved read.
+- Each present file is printed under a `===== <path> =====` header. **Under the Bash cap it prints every file; over it, a directive and no content** — the `doc:read` invariant — naming every path and telling the run to Read them **in one turn**, so the reads stay folded on the fallback too. A missing path is named on stderr and makes the call non-zero.
+
+**Output / exit codes:** any missing path exits non-zero; an over-cap batch prints its directive and exits zero.
+
 ### `josh time`
 
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `scripts/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.

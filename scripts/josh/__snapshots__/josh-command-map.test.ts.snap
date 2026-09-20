@@ -77,6 +77,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "re": "release",
     "red": "run:ending",
     "res": "release:scope",
+    "rf": "read:files",
     "rg": "run:progress",
     "rh": "run:hold",
     "rl": "report:lint",
@@ -609,6 +610,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "network",
+      ],
+    ],
+    "read:files": [
+      "<path> [<path> ...]",
+      "automation",
+      [
+        "none",
       ],
     ],
     "read:set": [

@@ -77,10 +77,14 @@ const SLACK_BYTES = 512
 // document already at its mark. joshuafolkken/kit#2176 raised it two slack units (99,968 → 100,992)
 // for the mandated `josh bytes` section — the byte counterpart of `josh lines`, its command reference
 // and the note that `josh lint:related` now runs the fast byte-ceiling check — landing against a
-// document already at its mark. joshuafolkken/kit#2179 raised it two slack units (100,992 → 102,016)
-// for the mandated `josh run:review` section — the composite that starts the gate beside the review,
-// its command reference and its `--join` verdict — landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 102_016
+// document already at its mark. joshuafolkken/kit#2202 raised it three slack units (100,992 →
+// 102,528) for the mandated `josh read:files` section — the mid-implementation counterpart of
+// `run:prep`, its command reference and its cap/fallback behavior — landing against a document
+// already at its mark. joshuafolkken/kit#2179 raised it two slack units (102,528 → 103,552) for the
+// mandated `josh run:review` section — the composite that starts the gate beside the review, its
+// command reference and its `--join` verdict — landing against a document already at its mark, the
+// branch's merge with `main` layering the section on top of a document `main` had already filled.
+const JOSH_COMMANDS_CEILING_BYTES = 103_552
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -127,7 +131,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 101_456 },
+	{ path: 'docs/josh-commands.md', bytes: 102_833 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -148,12 +152,12 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4518 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 16_801 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 488 },
-	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 19_530 },
+	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 21_109 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 17_830 },
 	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 37_399 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8133 },
 	{ path: 'prompts/collaboration-workflow/single-source-rules.md', bytes: 1764 },
-	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 18_726 },
+	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 21_128 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 11_920 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 17_057 },
 	{ path: 'prompts/refactoring.md', bytes: 8372 },
