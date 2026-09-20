@@ -17,6 +17,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "c": "check",
     "cm": "check-commit-message",
     "co": "cost",
+    "cs": "clone:scan",
     "dcr": "doc:read",
     "dg": "delegate",
     "dp": "disposition",
@@ -213,6 +214,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "clone:scan": [
+      "",
+      "automation",
+      [
+        "files",
       ],
     ],
     "cost": [

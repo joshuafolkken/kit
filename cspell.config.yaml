@@ -7,6 +7,12 @@ words:
   # for joshuafolkken/kit#2138 change directory into a lane checkout to exercise the dispatched-child
   # path, and the teardown comments name that act.
   - chdirs
+  # "A copy still matches after reindentation" — `josh clone:scan` normalizes whitespace before it
+  # fingerprints a block, so a block copied and reindented (its leading whitespace changed) still
+  # hashes the same (joshuafolkken/kit#2217). Named in the clone-detection code and its tests.
+  - reindent
+  - reindented
+  - reindentation
   # "An unenumerated guard fires" — a guard not listed in the `lane-guard-policy.ts` enumeration
   # (joshuafolkken/kit#2138). Names the fail-safe default in the code comment and its test.
   - unenumerated

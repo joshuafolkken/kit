@@ -615,6 +615,16 @@ Print the whole backlog as a plan: ready now, waiting on what, waiting on a pers
 
 ---
 
+### `josh clone:scan` · `josh cs`
+
+> **Audience:** automation · **Side effects:** files
+
+_No arguments._
+
+Count code duplication across files and first-party repositories, printing each clone as file:line pairs
+
+---
+
 ### `josh cost` · `josh co`
 
 > **Audience:** automation · **Side effects:** none

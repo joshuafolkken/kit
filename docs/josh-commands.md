@@ -1252,6 +1252,10 @@ pnpm josh oracle:list   # alias: josh ol
 
 Single source: `scripts/rules/decision-oracle.ts`.
 
+### `josh clone:scan` · `josh cs`
+
+Count code duplication across files and first-party repos (`JOSH_REPO_PATHS` included) — the measurement `no-clones` lacked. Output: `clean`, or `clones: <N>` then each clone `[same-file|cross-file|cross-repo]` with `file:line` (exit 0). Single source: `scripts/clone/clone-scan.ts`.
+
 ### `josh run:hold` / `josh run:release`
 
 Guard a working tree so only one run holds it at a time — `run:hold` claims it, `run:release` clears the claim. The unit is the working tree, so two lanes of one repository key differently.

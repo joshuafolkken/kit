@@ -11,6 +11,7 @@ const KIT_KEY = 'joshuafolkken/kit'
 const GIT = '.git'
 const CONFIG = 'config'
 const SELF_HOSTED_REMOTE = 'git@git.example.com:joshuafolkken/kit.git'
+const KIT_WORKTREE = 'kit-worktree'
 const FAR_PATH = '/Users/example/elsewhere/far'
 
 const state = { workspace: '' }
@@ -67,7 +68,7 @@ describe('repo_discovery.read_origin_url', () => {
 	})
 
 	it('reads the shared config of a linked worktree, which holds none of its own', () => {
-		const linked = make_worktree(make_repository(KIT, KIT_REMOTE), 'kit-worktree')
+		const linked = make_worktree(make_repository(KIT, KIT_REMOTE), KIT_WORKTREE)
 
 		expect(repo_discovery.read_origin_url(linked)).toBe(KIT_REMOTE)
 	})
@@ -94,6 +95,44 @@ describe('repo_discovery.read_origin_url', () => {
 
 	it('returns nothing for a work tree that declares no origin', () => {
 		expect(repo_discovery.read_origin_url(make_repository('local-only'))).toBeUndefined()
+	})
+})
+
+// Where to look for a repository's siblings. A linked work tree is parked wherever it was created —
+// a lane lives among that repository's other lanes — so its own parent holds no sibling at all.
+describe('repo_discovery.main_worktree', () => {
+	it('is the given path for an ordinary checkout', () => {
+		const kit = make_repository(KIT, KIT_REMOTE)
+
+		expect(repo_discovery.main_worktree(kit)).toBe(kit)
+	})
+
+	it('is the main work tree for a linked one', () => {
+		const kit = make_repository(KIT, KIT_REMOTE)
+
+		expect(repo_discovery.main_worktree(make_worktree(kit, KIT_WORKTREE))).toBe(kit)
+	})
+
+	// A submodule resolves to `<super>/.git/modules/<path>`, whose parent is not a work tree, so the
+	// given path is the only honest answer.
+	it('is the given path for a submodule, whose git directory has no work tree for a parent', () => {
+		const embedded = path.join(state.workspace, GIT, 'modules', 'vendor', KIT)
+		const consumer = path.join(state.workspace, 'vendor', KIT)
+
+		mkdirSync(embedded, { recursive: true })
+		writeFileSync(path.join(embedded, CONFIG), `[remote "origin"]\n\turl = ${KIT_REMOTE}\n`)
+		mkdirSync(consumer, { recursive: true })
+		writeFileSync(path.join(consumer, GIT), `gitdir: ${embedded}\n`)
+
+		expect(repo_discovery.main_worktree(consumer)).toBe(consumer)
+	})
+
+	it('is the given path for a directory that is not a work tree', () => {
+		const plain = path.join(state.workspace, 'notes')
+
+		mkdirSync(plain, { recursive: true })
+
+		expect(repo_discovery.main_worktree(plain)).toBe(plain)
 	})
 })
 

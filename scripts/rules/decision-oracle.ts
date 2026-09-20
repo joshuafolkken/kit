@@ -238,6 +238,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: ['excluded', 'local', 'fix', 'defer', 'unreadable'],
 		single_source: 'prompts/sonar-hotspot-handling.md',
 	},
+	{
+		name: 'clone:scan',
+		decision: 'Whether cross-file or cross-repository code duplication exists',
+		args: '',
+		vocabulary: ['clean', 'clones:'],
+		single_source: 'prompts/collaboration-workflow/no-clones.md',
+	},
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
