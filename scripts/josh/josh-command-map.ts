@@ -140,6 +140,7 @@ const ALIASES: Record<string, string> = {
 	sg: 'stop:guard',
 	ev: 'eval',
 	ol: 'oracle:list',
+	sa: 'split:assess',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

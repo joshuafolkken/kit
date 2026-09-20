@@ -217,6 +217,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: ['clear', 'candidates', 'error'],
 		single_source: 'prompts/refactoring.md',
 	},
+	{
+		name: 'split:assess',
+		decision: 'Whether a change size clears the split guide (the split assessment size question)',
+		args: '[--json]',
+		vocabulary: ['split', 'single'],
+		single_source: '.claude/skills/workflow-commands/split-assessment.md → The question',
+	},
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
