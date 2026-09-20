@@ -5,8 +5,8 @@ import { parseArgs } from 'node:util'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
+import { run_event_stream } from './run-event-stream'
 import { run_liveness } from './run-liveness'
-import { run_progress_clock } from './run-progress-clock'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
@@ -110,11 +110,12 @@ interface WakeContext {
 	// Where everything this supervisor starts writes its output (joshuafolkken/kit#1746). It is named
 	// in `--list` and in every warning, because a path nobody is told is a file nobody reads.
 	log_target: string
-	// The woken session's progress record, keyed on the primary checkout's git directory — the one the
-	// resumed `backlogrun` parent runs in, so its own git directory is this common one. `--list` reads
-	// the last heartbeat from here and relays it, which is a headless parent's only window onto a person
-	// after a cut (joshuafolkken/kit#1910).
-	progress_target: string
+	// The run's event stream, keyed on the primary checkout's git directory — the one the resumed
+	// `backlogrun` parent runs in, so its own git directory is this common one, exactly the key the emit
+	// side uses. `--list` relays the newest event from here: the report surface belongs to the run, and
+	// `--list` is the degenerate last-event read of the same stream the attached session follows
+	// (joshuafolkken/kit#2207).
+	event_target: string
 	worktree: string
 }
 
@@ -178,7 +179,7 @@ async function resolve_context(): Promise<WakeContext | undefined> {
 		carry_target: run_carry.carry_path(directory),
 		wake_target: run_wake.wake_path(directory),
 		log_target,
-		progress_target: run_progress_clock.stamp_target_of(directory),
+		event_target: run_event_stream.target_of(directory),
 		worktree: path.dirname(directory),
 	}
 }
@@ -210,17 +211,19 @@ function outstanding_line(wake: RunWake): string | undefined {
 	return `${String(wake.attempts)} launch(es) outstanding for the current cut, none claimed yet`
 }
 
-// The last heartbeat the woken session persisted, relayed here because a headless parent's progress
-// reaches its own transcript alone — after a cut, `--list` is the person's one window onto it
-// (joshuafolkken/kit#1910). Absent until the first heartbeat, and omitted rather than shown empty, the
-// way `outstanding_line` omits a count of zero. The heartbeat is five labelled lines now
-// (joshuafolkken/kit#2026), so the label heads its own line and the block is indented under it rather
-// than prefixing only the first of five.
-function progress_line(context: WakeContext): string | undefined {
-	const line = run_progress_clock.read_last_line(context.progress_target)
-	if (line === undefined) return undefined
+// The run's stream, read here because a headless parent's progress reaches its own transcript alone —
+// after a cut, `--list` is the person's one window onto it (joshuafolkken/kit#1910). Two lines: the
+// newest event (the degenerate last-event read of the stream the attached session follows, so `--list`
+// and the follow read one stream rather than two paths), and how to follow on from here — the same
+// reader before and after the cut, with `tail -F` on the raw stream named as a recovery path rather
+// than the ambient one (joshuafolkken/kit#2207). The event line is omitted before the first event, the
+// way `outstanding_line` omits a count of zero; the follow line is always shown.
+function stream_lines(context: WakeContext): Array<string> {
+	const event = run_event_stream.read_last(context.event_target)
+	const progress = event === undefined ? [] : [`progress: ${run_event_stream.format_event(event)}`]
+	const follow = `follow: \`pnpm josh run:event --follow ${String(event?.pos ?? 0)}\` (recover with \`tail -F ${context.event_target}\`)`
 
-	return `progress:\n  ${line.replaceAll('\n', '\n  ')}`
+	return [...progress, follow]
 }
 
 // The wake count is printed beside the carry record's `cuts` rather than alone, because the two being
@@ -240,12 +243,11 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 		`supervisor: process ${String(wake.pid)} (${live}), watching since ${wake.started_at}`,
 		`woke ${String(wake.woke)} session(s) across ${cuts} cut(s)`,
 		outstanding_line(wake),
-		progress_line(context),
 		run_liveness.describe_agent_state(context.log_target),
 		`output: ${context.log_target}`,
-		// The ambient surface a person keeps open across the cut: `--list` relays the last line on
-		// demand, and this names the file that streams every one (joshuafolkken/kit#2156).
-		`ambient: tail -F ${run_progress_clock.log_path_of(context.progress_target)}`,
+		// How progress is seen without asking after the cut: the run's stream, followed from here
+		// (joshuafolkken/kit#2207). `--list` is that reader's one-shot last-event form.
+		...stream_lines(context),
 		`stop it with \`${STOP_COMMAND}\``,
 	]
 		.filter((line) => line !== undefined)

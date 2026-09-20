@@ -218,11 +218,25 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: BACKLOGRUN_MD,
 	},
 	{
+		name: 'refactor:scan',
+		decision: 'Whether the refactoring scope still holds high- or medium-priority candidates',
+		args: '',
+		vocabulary: ['clear', 'candidates', 'error'],
+		single_source: 'prompts/refactoring.md',
+	},
+	{
 		name: 'split:assess',
 		decision: 'Whether a change size clears the split guide (the split assessment size question)',
 		args: '[--json]',
 		vocabulary: ['split', 'single'],
 		single_source: '.claude/skills/workflow-commands/split-assessment.md → The question',
+	},
+	{
+		name: 'sonar:hotspots',
+		decision: 'The Step B disposition for each SonarCloud hotspot on a pull request',
+		args: '<PR>',
+		vocabulary: ['excluded', 'local', 'fix', 'defer', 'unreadable'],
+		single_source: 'prompts/sonar-hotspot-handling.md',
 	},
 ]
 

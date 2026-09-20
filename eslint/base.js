@@ -14,6 +14,7 @@ import { config_fingerprint } from './config-fingerprint.js'
 import { code_quality_rules } from './rules/code-quality.js'
 import { formatting_rules } from './rules/formatting.js'
 import { import_rules } from './rules/import.js'
+import { namespace_object_export_rule } from './rules/namespace-object-export.js'
 import { naming_convention_rules } from './rules/naming-convention.js'
 import { promise_rules } from './rules/promise.js'
 import { sonarjs_rules } from './rules/sonarjs.js'
@@ -122,10 +123,19 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			},
 		},
 		{
-			plugins: { '@stylistic': stylistic },
+			// joshuafolkken/kit#2180: `local` is kit's own rule plugin. `namespace-object-export` is the
+			// one §4.2 checklist item ESLint could not decide until now — a file that exports two or more
+			// functions individually instead of grouping them into one namespace object. It is wired here
+			// in the shared rules block so every consumer of `create_base_config` inherits it, the same
+			// way the test-filename bans are.
+			plugins: {
+				'@stylistic': stylistic,
+				local: { rules: { 'namespace-object-export': namespace_object_export_rule } },
+			},
 			languageOptions: { globals: { ...globals.browser, ...globals.node } },
 			rules: {
 				'no-undef': 'off',
+				'local/namespace-object-export': 'error',
 				...naming_convention_rules,
 				...typescript_rules,
 				...code_quality_rules,

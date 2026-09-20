@@ -135,6 +135,16 @@ Claude Code hook: the batch, investigation and rule guards in one process (reads
 
 ---
 
+### `josh refactor:scan` · `josh rfs`
+
+> **Audience:** automation · **Side effects:** processes
+
+_No arguments._
+
+List refactoring candidates in the changed scope by category and answer clear/candidates
+
+---
+
 ### `josh session:lang` · `josh sl`
 
 > **Audience:** automation · **Side effects:** none
@@ -235,6 +245,16 @@ Carry the published release into every consumer repository next to this one
 
 ---
 
+### `josh sonar:hotspots` · `josh shs`
+
+> **Audience:** automation · **Side effects:** network
+
+`<PR>`
+
+Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
+
+---
+
 ### `josh sync` · `josh sy`
 
 > **Audience:** developer · **Side effects:** files
@@ -252,6 +272,16 @@ Sync config files
 `[--staged] [--json]`
 
 Say whether this change touches a file josh sync distributes
+
+---
+
+### `josh ui:routes` · `josh uir`
+
+> **Audience:** automation · **Side effects:** none
+
+`[--staged]`
+
+List the screenshot-target routes the current change touches
 
 ## Workflow
 
@@ -969,9 +999,9 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 > **Audience:** automation · **Side effects:** files
 
-`--append <kind> <text> | --from <position> | --last`
+`--append <kind> <text> | --from|--follow <n> | --last`
 
-Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)
+Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)
 
 ---
 
