@@ -65,7 +65,11 @@ const SLACK_BYTES = 512
 // three slack units (93,824 → 95,360) for the mandated `josh batch:guard` / `josh pretool:guard`
 // rewrite recording the three-valued lane-child mode (`refuse` / `notice` / `off`) and the
 // re-fire-every-`REFIRE_EVERY` batching cadence, landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 95_360
+// joshuafolkken/kit#2160 raised it one slack unit (95,360 → 95,872) for the mandated `josh lane:open`
+// note recording that a lane also copies the pre-built `dist/hooks/` bundles from the main checkout —
+// why the copy is needed for kit's own lanes and not for a consumer repository — landing against a
+// document already at its mark.
+const JOSH_COMMANDS_CEILING_BYTES = 95_872
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -93,7 +97,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 21_674 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 94_432 },
+	{ path: 'docs/josh-commands.md', bytes: 95_137 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
