@@ -12,9 +12,14 @@ const do_failed_mock = vi.hoisted(() => vi.fn())
 const ask_next_mock = vi.hoisted(() => vi.fn())
 const is_over_budget_mock = vi.hoisted(() => vi.fn())
 const info_mock = vi.hoisted(() => vi.fn())
+const emit_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
+}))
+
+vi.mock('./run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit: emit_mock },
 }))
 
 vi.mock('./run-merge-steps', () => ({
@@ -57,6 +62,7 @@ beforeEach(() => {
 	ask_next_mock.mockReset().mockResolvedValue(NEXT)
 	is_over_budget_mock.mockReset().mockResolvedValue(false)
 	info_mock.mockReset()
+	emit_mock.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockImplementation(info_mock)
 })
 
@@ -67,6 +73,7 @@ describe('run_merge_cli.run — a merged child', () => {
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_merged_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
+		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`)
 	})
 
 	it('hands off when the merge crosses the budget', async () => {
@@ -101,6 +108,7 @@ describe('run_merge_cli.run — a failed child', () => {
 		expect(do_failed_mock).toHaveBeenCalledOnce()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
 	})
 
 	it('stops when the failure guard trips', async () => {

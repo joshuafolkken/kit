@@ -945,6 +945,16 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 ---
 
+### `josh run:event` · `josh rev`
+
+> **Audience:** automation · **Side effects:** files
+
+`--append <kind> <text> | --from <position> | --last`
+
+Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)
+
+---
+
 ### `josh run:hold` · `josh rh`
 
 > **Audience:** automation · **Side effects:** files
