@@ -209,3 +209,11 @@ words:
   # `eslint/rules/english-only-prose.js` when it inspects a no-substitution template title
   # (joshuafolkken/kit#2124). It is the AST spelling, not a coined word.
   - quasis
+  # OSV-Scanner's own package-extraction library, named in the `--version` banner the scanner floor
+  # parses (joshuafolkken/kit#2200). It appears only in `scripts/security/security-audit-provision-logic.ts`
+  # and its suite, both internal to this package.
+  - scalibr
+  # A binary that cannot be spawned at all (ENOENT), described in `scripts/security/security-audit.ts`'s
+  # comment on why a version that cannot be read is treated as below the floor (joshuafolkken/kit#2200).
+  # The negated form of "able to be spawned", which cspell does not derive from "spawn".
+  - unspawnable

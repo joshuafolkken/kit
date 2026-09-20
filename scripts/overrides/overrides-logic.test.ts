@@ -272,6 +272,29 @@ describe('overrides_check.build_update_command', () => {
 	})
 })
 
+// joshuafolkken/kit#2200: vite/postcss/nanoid are pinned as indirect overrides to clear OSV
+// advisories. An override on an indirect package must keep it out of the `--latest` targets
+// exactly as a direct one does, so its declared range is never rewritten past the pin.
+describe('overrides_check.build_update_command — indirect overrides', () => {
+	it('excludes bare indirect overrides even when they are not direct dependencies', () => {
+		const overrides = make_overrides([
+			['vite', '^8.0.16'],
+			['postcss', '^8.5.23'],
+			['nanoid', '^3.3.18'],
+		])
+		const content = make_package_json({ svelte: '^5' }, { vitest: '^3' })
+		const result = overrides_check.build_update_command(overrides, content)
+
+		expect(result).toEqual(['pnpm', 'update', '--latest', 'svelte', 'vitest'])
+		expect(overrides_check.list_excluded_package_names(overrides)).toEqual([
+			'typescript',
+			'vite',
+			'postcss',
+			'nanoid',
+		])
+	})
+})
+
 describe('overrides_check.build_update_command — held-back packages', () => {
 	it('excludes the held-back typescript package even without any overrides', () => {
 		const content = make_package_json({ svelte: '^5' }, { typescript: '^6', vitest: '^3' })

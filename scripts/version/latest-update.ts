@@ -31,14 +31,13 @@ function run(arguments_: Array<string>): number {
 	return result.exitCode ?? 1
 }
 
-function run_update(update_arguments: Array<string> | undefined): number {
-	if (update_arguments === undefined) {
-		console.info('\n⏭ No packages to update.')
-
-		return 0
+function run_update_stages(stages: Array<Array<string>>): number {
+	for (const stage of stages) {
+		const status = run(stage)
+		if (status !== 0) return status
 	}
 
-	return run(update_arguments)
+	return 0
 }
 
 function take_snapshot(): TreeSnapshot {
@@ -61,10 +60,23 @@ function report_kept_back(regressions: ReadonlyArray<VersionRegression>): void {
 	console.info(latest_regression.format_kept_back_notice(regressions))
 }
 
-function build_command(): Array<string> | undefined {
-	const content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+// The direct-dependency `--latest` bump lifts the package.json ranges; this second, argument-less
+// pass then re-resolves every tier the lockfile carries within those ranges, which is the only stage
+// that reaches the indirect packages a direct-only update leaves pinned at a stale resolution
+// (joshuafolkken/kit#2200). `pnpm update` defaults to depth Infinity, so no flag is needed to reach
+// the whole tree. The re-resolution stage always runs — even when every direct dependency is
+// overridden and the `--latest` stage is absent, the indirect tiers still need re-resolving.
+const PNPM_UPDATE_ALL_TIERS = ['pnpm', 'update']
 
-	return overrides_check.build_update_command(overrides_files.read_current_overrides(), content)
+function build_update_commands(): Array<Array<string>> {
+	const content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const latest = overrides_check.build_update_command(
+		overrides_files.read_current_overrides(),
+		content,
+	)
+	const stages: Array<Array<string>> = latest === undefined ? [] : [latest]
+
+	return [...stages, [...PNPM_UPDATE_ALL_TIERS]]
 }
 
 interface UpdateOutcome {
@@ -87,7 +99,7 @@ function find_regressions_after_update(snapshot: TreeSnapshot): Array<VersionReg
 // Exits zero: the tree is left exactly as it was found, nothing is broken, and every workflow that
 // runs `josh latest` in its preamble would otherwise stop for a situation that resolves itself.
 function update_without_downgrading(snapshot: TreeSnapshot): UpdateOutcome {
-	const status = run_update(build_command())
+	const status = run_update_stages(build_update_commands())
 	if (status !== 0) return { status, is_rolled_back: false }
 
 	const regressions = find_regressions_after_update(snapshot)
@@ -175,6 +187,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 const latest_update = {
 	run,
 	main,
+	build_update_commands,
+	run_update_stages,
 	update_without_downgrading,
 	take_snapshot,
 	restore_snapshot,
