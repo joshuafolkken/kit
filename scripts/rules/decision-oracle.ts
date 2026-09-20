@@ -28,6 +28,14 @@ const UNKNOWN = 'unknown'
 const NONE = 'none'
 const NOT_A_LANE = 'not-a-lane'
 const BUSY = 'busy'
+// Lane liveness verdicts shared by the lane:list oracle and asserted against `lane_occupancy` in its
+// test. `LIVE` is the silent norm; `STOPPED` and `UNKNOWN` lead the difference lines.
+const LIVE = 'live'
+const STOPPED = 'stopped'
+// The verdicts `epic --reconcile` prints; kept in step with the `git_epic_reconcile` constants in its
+// test.
+const RECONCILED = 'reconciled'
+const NOTHING_TO_RECONCILE = 'nothing to reconcile'
 
 // Arguments shared by more than one oracle entry.
 const ISSUE_N_ARG = '<N>'
@@ -43,8 +51,10 @@ interface DecisionOracle {
 	command?: string
 	// The arguments to pass, shown in the printed listing.
 	args: string
-	// The fixed-vocabulary tokens the command prints on stdout. An issue number is not a
-	// vocabulary token; only the named string verdicts appear here.
+	// The fixed-vocabulary tokens the command emits — on standard output for a pure decision command,
+	// or on the difference lines of a listing command (`lane:list`) whose standard output is reserved
+	// for its listing. An issue number is not a vocabulary token; only the named string verdicts appear
+	// here, and each is kept in step with the constant its emitting module exports.
 	vocabulary: ReadonlyArray<string>
 	// The single-source document for the decision procedure, in `file.md → section` form.
 	single_source: string
@@ -244,6 +254,23 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		args: '',
 		vocabulary: ['clean', 'clones:'],
 		single_source: 'prompts/collaboration-workflow/no-clones.md',
+	},
+	{
+		name: 'epic:reconcile',
+		command: 'epic',
+		decision:
+			"Whether an epic's declaration matches its recorded relations, and the repair when it does not",
+		args: '--reconcile <E>',
+		vocabulary: [RECONCILED, NOTHING_TO_RECONCILE],
+		single_source: 'docs/josh-commands.md → `josh epic --reconcile`',
+	},
+	{
+		name: 'lane:list',
+		decision:
+			'Whether each in-progress issue holds a live lane, and the two-directional difference',
+		args: '',
+		vocabulary: [LIVE, STOPPED, UNKNOWN],
+		single_source: 'docs/josh-commands.md → The `in-progress` / lane difference',
 	},
 ]
 

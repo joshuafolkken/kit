@@ -1,6 +1,8 @@
 import { clone_scan } from '#scripts/clone/clone-scan'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
+import { git_epic_reconcile } from '#scripts/git/git-epic-reconcile'
 import { COMMAND_MAP } from '#scripts/josh/josh-logic'
+import { lane_occupancy } from '#scripts/lane/lane-occupancy'
 import { disposition } from '#scripts/review/disposition-logic'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
 import { oracle_list_cli } from '#scripts/rules/oracle-list-cli'
@@ -123,6 +125,35 @@ describe('vocabulary matches the code for run:hold oracle', () => {
 
 	it('unknown verdict is in declared vocabulary', () => {
 		expect(HOLD_ORACLE?.vocabulary).toContain(run_hold_cli.UNKNOWN_VERDICT)
+	})
+})
+
+describe('the #2235 oracles are on the enumeration', () => {
+	const RECONCILE_ORACLE = 'epic:reconcile'
+
+	it('epic:reconcile exists and reuses the epic command', () => {
+		const oracle = decision_oracle.find_oracle(RECONCILE_ORACLE)
+
+		expect(oracle).toBeDefined()
+		expect(oracle?.command).toBe('epic')
+	})
+
+	it('epic:reconcile vocabulary stays in step with the emitted tokens', () => {
+		const oracle = decision_oracle.find_oracle(RECONCILE_ORACLE)
+
+		expect(oracle?.vocabulary).toContain(git_epic_reconcile.RECONCILED)
+		expect(oracle?.vocabulary).toContain(git_epic_reconcile.NOTHING_TO_RECONCILE)
+	})
+
+	it('lane:list vocabulary stays in step with the liveness verdicts', () => {
+		const oracle = decision_oracle.find_oracle('lane:list')
+
+		expect(oracle).toBeDefined()
+		expect(oracle?.vocabulary).toEqual([
+			lane_occupancy.LIVE,
+			lane_occupancy.STOPPED,
+			lane_occupancy.UNKNOWN,
+		])
 	})
 })
 

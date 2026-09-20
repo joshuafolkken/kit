@@ -12,6 +12,9 @@ const RATIONALE_FLAG = '--rationale-file'
 const ORIGIN_FLAG = '--origin'
 const PROMOTE_FLAG = '--promote'
 const ADD_FLAG = '--add'
+// `--reconcile <E>`: bring the epic's declaration and its recorded relations back into agreement
+// (joshuafolkken/kit#2235). It takes no value flags — the epic number is the whole subject.
+const RECONCILE_FLAG = '--reconcile'
 const BEFORE_FLAG = '--before'
 const AFTER_FLAG = '--after'
 // The same two places with the declaration withheld: move the task-list row and write neither the
@@ -101,6 +104,24 @@ function parse_create_arguments(argv: ReadonlyArray<string>): CreateArguments | 
 // Whether the invocation is a promotion rather than a creation.
 function is_promotion(argv: ReadonlyArray<string>): boolean {
 	return argv.includes(PROMOTE_FLAG)
+}
+
+// Whether the invocation reconciles an epic rather than creating, promoting or editing one.
+function is_reconciliation(argv: ReadonlyArray<string>): boolean {
+	return argv.includes(RECONCILE_FLAG)
+}
+
+interface ReconcileArguments {
+	epic_number: number
+}
+
+// The epic to reconcile. The number after `--reconcile` is the only subject; there are no children
+// and no position — the repair reads what the epic already records rather than being told an order.
+function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArguments | undefined {
+	const [raw_epic] = to_positional_arguments(argv)
+	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+
+	return { epic_number: Number(raw_epic) }
 }
 
 // The promoted issue and its children. The number after `--promote` is the epic; everything else
@@ -358,6 +379,7 @@ function read_decision(decision_path: string | undefined): string | undefined {
 const epic_cli = {
 	is_promotion,
 	is_addition,
+	is_reconciliation,
 	...epic_cli_remove,
 	find_cross_repo_add_target,
 	is_decision_path_unusable,
@@ -366,6 +388,7 @@ const epic_cli = {
 	parse_add_arguments,
 	parse_create_arguments,
 	parse_promote_arguments,
+	parse_reconcile_arguments,
 	parse_check_argument,
 	read_decision,
 	read_rationale,
@@ -383,6 +406,7 @@ export {
 	ORIGIN_FLAG,
 	PROMOTE_FLAG,
 	RATIONALE_FLAG,
+	RECONCILE_FLAG,
 }
 export { REMOVE_FLAG } from './epic-cli-remove'
 export type { AddArguments, CreateArguments, CrossRepoAddTarget, PromoteArguments }
