@@ -1,6 +1,6 @@
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
-import { execa } from 'execa'
+import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_carry, type CarryChange, type CarryOwner, type RunCarry } from './run-carry'
 import { run_merge } from './run-merge'
 
@@ -21,10 +21,7 @@ type ApplyCarryResult =
 // a failed child, and generating the progress comment from that record — is in-process, because it has
 // a reusable logic function and no stdout to keep clean.
 
-const PNPM = 'pnpm'
-const JOSH = 'josh'
 const OVER = 'over'
-const NONZERO_EXIT = 1
 const LANES = '--lanes'
 const REPO_FLAG = '--repo'
 
@@ -37,11 +34,6 @@ interface MergeContext {
 	owner: CarryOwner
 }
 
-interface JoshResult {
-	code: number
-	out: string
-}
-
 interface FailedResult {
 	carry: RunCarry | undefined
 	is_parked: boolean
@@ -51,11 +43,10 @@ interface FailedResult {
 }
 
 // A captured `pnpm josh` subprocess: its output is read back rather than inherited, and a non-zero
-// exit is a value to branch on rather than a throw (`reject: false`).
+// exit is a value to branch on rather than a throw. The step's stderr stays piped here — `run:merge`
+// composes its own report from the captured values — so this passes `josh_command.josh_run`'s default.
 async function josh(args: ReadonlyArray<string>): Promise<JoshResult> {
-	const result = await execa(PNPM, [JOSH, ...args], { reject: false })
-
-	return { code: result.exitCode ?? NONZERO_EXIT, out: result.stdout.trim() }
+	return await josh_command.josh_run(args)
 }
 
 // Read the single-source carry record, or `undefined` when there is none to advance.

@@ -131,28 +131,36 @@ primary checkout to carry it. `git stash` is a repository-level ref shared by ev
 
 ```bash
 git stash push -u -m "backlogrun: josh latest before lanes"   # primary checkout, only if the update rewrote anything
-pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # the first lane opened, after `lane:open`'s own install
 ```
 
 Record it on that first child's Issue — the comment is what gets it popped if the run dies in between.
-**Pop it by message with `--dir`, never `git -C "$dir" stash pop`**: the stash is a repository-wide
-stack every lane shares, so a positional pop would take whichever lane last pushed.
+**The first lane's `pnpm josh lane:launch "$n" --stash "backlogrun: josh latest before lanes"` pops it
+by message, after `lane:open`'s own install** — never a positional `git -C "$dir" stash pop`: the stash
+is a repository-wide stack every lane shares, so a positional pop would take whichever lane last pushed.
 
-### Opening one lane
+### Opening one lane and dispatching its child
+
+**One command opens the lane, prepares it, and dispatches the child — `pnpm josh lane:launch`**
+(joshuafolkken/kit#2162). It runs `lane:open`, then — only when `--stash` is given, which is the first
+lane alone — pops that stash into the lane and re-installs against the lock it brought in, then
+`lane:dispatch`. Four to six turns of the parent folded into one:
 
 ```bash
-dir=$(pnpm josh lane:open "$n") || exit 1   # the directory on stdout, nothing else; alias: josh lno
-pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir" || exit 1   # the first lane only, and only if `josh latest` stashed
-pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, which changed the lock
+pid=$(pnpm josh lane:launch "$n") || exit 1   # the child's pid on stdout, nothing else; alias: josh lnla
+pid=$(pnpm josh lane:launch "$n" --stash "backlogrun: josh latest before lanes") || exit 1   # the first lane only, and only if `josh latest` stashed
 ```
+
+`lane:launch` is a thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, so each of their
+guards, refusals and messages holds unchanged; the bullets below describe the steps it runs.
 
 - **A refusal is an empty capture beside a non-zero exit**, with the reason on standard error: `full`,
   `already-open`, and a **failed install** — which leaves a real work tree behind holding its seat, so
-  the next `lane:open` answers `already-open` and never retries. **Park that child and name
-  `pnpm josh lane:close <N>`** — a lock the lane cannot build is a state a person fixes. **The guard is
-  in the snippet** — without it the next two lines run `--dir ""`.
-- **`lane:open` installs; the third line is a *re*-install, and only the popping lane needs it.** A
-  failed install fails `lane:open`, so a directory on standard output is the guarantee the lane runs.
+  the next launch answers `already-open` and never retries. **Park that child and name
+  `pnpm josh lane:close <N>`** — a lock the lane cannot build is a state a person fixes. A refused
+  `lane:open`, a pop that refused, or a failed re-install each **stop the launch before the child is
+  dispatched**.
+- **`lane:open` installs; the `--stash` lane re-installs, and only that lane needs it.** A failed
+  install fails `lane:open`, so `lane:launch` reaching `lane:dispatch` is the guarantee the lane runs.
 - **What the pop changes is the lock, which is why that one lane installs twice.** The pop brings in
   the `pnpm-lock.yaml` that `josh latest` rewrote, which this child's gate must build against. **A pop
   that fails stops the lane** rather than re-installing anyway.
@@ -177,12 +185,9 @@ The child runs as `fullrun #<N>` in that lane, and neither `josh latest` nor a p
 started there. Everything else — the plan, the gate, `/code-review`, `pnpm josh git`,
 `pnpm josh followup` — is unchanged, and `pnpm josh followup` releases that lane's hold at the merge.
 
-**The child is started as a process of its own, not as a subagent of this session.** One command does
-it, in the lane that was just opened:
-
-```bash
-pid=$(pnpm josh lane:dispatch "$n") || exit 1   # the child's pid on stdout, nothing else; alias: josh lnd
-```
+**The child is started as a process of its own, not as a subagent of this session** — `lane:launch`'s
+final step, the `lane:dispatch` it runs after the lane is opened and prepared, whose pid it returns.
+The bullets below describe that dispatch:
 
 - **It records where the child writes as it starts it** — the dispatch's own
   `<temp>/josh-lane-dispatch-<N>.log` — so "this lane records no path" is no longer a state the hand-off

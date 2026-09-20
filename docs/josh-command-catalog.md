@@ -545,6 +545,16 @@ Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epi
 
 ---
 
+### `josh backlog:offer` · `josh blo`
+
+> **Audience:** automation · **Side effects:** network
+
+`[options]`
+
+Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start
+
+---
+
 ### `josh backlog:plan` · `josh blp`
 
 > **Audience:** automation · **Side effects:** network
@@ -732,6 +742,16 @@ Close a lane, leaving no work tree, branch or directory behind
 `<issue> <prompt>`
 
 Start a lane’s child as a detached process that outlives this session
+
+---
+
+### `josh lane:launch` · `josh lnla`
+
+> **Audience:** automation · **Side effects:** files, git, processes
+
+`<issue> [--stash <message>]`
+
+Collapse a backlogrun lane-start event into one call: open the lane, pop and re-install on the first, dispatch the child
 
 ---
 

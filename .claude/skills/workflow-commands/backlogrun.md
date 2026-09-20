@@ -384,17 +384,28 @@ finding rather than an authorization — which is why a run parks with it and a 
 
 ## The loop
 
-The answer comes from one command, and the command is the single source of what may start:
+**The loop's head is one command — `pnpm josh backlog:offer`** (joshuafolkken/kit#2162). It runs
+`backlog:next`, maps its answer to the budget word the table below fixes, runs `backlog:budget`, and
+returns the verdict with the issue numbers to start — the two turns the loop's head used to spend
+folded into one where the parent's context is largest, the same reasoning `run:merge` folded a merge
+event on. What follows is still the single source of both halves' contracts: `backlog:offer` is glue
+over them, so a change to what an answer *means* is a change here.
 
 ```bash
-answers=$(pnpm josh backlog:next)                      # alias: josh bl
-# one issue number per line, in the order they may be started; a verdict word when there is none
-answers=$(pnpm josh backlog:next --exclude 1630)             # after #1630 merged
-answers=$(pnpm josh backlog:next --exclude 1630,1631)        # after two
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active")   # alias: josh blo
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630)        # after #1630 merged
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after two
 ```
 
-**The output contract is `docs/josh-commands.md` → "`josh backlog:next`", and four parts of it decide
-how this loop is written:**
+**The first line of standard output is the budget verdict; on `run`, the issue numbers to start
+follow, one per line.** `backlog:offer` forwards `--exclude` and `--repo` to `backlog:next` and
+`--started` / `--active` / `--merged` / `--running` / `--max` / `--idle` to `backlog:budget`, computes
+`--answer` itself, and carries the consecutive-retry count on the last stderr line (`retries: <n>`) and
+in `--json`. **The verdict table is "The two budgets" below; the answer-to-word mapping it applies is
+this section's table.**
+
+**`backlog:next`'s output contract is `docs/josh-commands.md` → "`josh backlog:next`", and four parts
+of it decide how the mapping is written:**
 
 1. **Standard output is one token per line, and everything else is standard error** — so `answers`
    holds something a loop can branch on.
@@ -496,17 +507,20 @@ applies — except an issue this run filed and bundled under an already opted-in
 ("What one invocation approves") and bounded by the brake there, never the watch. No issue nobody
 opted in is ever picked up during a watch.
 
-**Ask `pnpm josh backlog:budget` on every iteration and act on what it answers** — after
-`backlog:next`, with the word the table above maps its answer to:
+**`backlog:offer` asks `backlog:budget` for you on every iteration** — it maps `backlog:next`'s answer
+to the word the table above fixes and hands it over, so the loop makes the one call and reads back the
+verdict:
 
 ```bash
-verdict=$(pnpm josh backlog:budget --answer <word> --started "$started" --active "$active" \
-  --merged <count> --running <count> [--idle <minutes>] [--max <count>])
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active" \
+  --merged <count> --running <count> --retries <count> [--idle <minutes>] [--max <count>])
 ```
 
 **`--active` is required of every ask, because the watch is on unless it was turned off** — an
-invocation whose watch is on and that carries no `--active` is **refused**, so an emptiness nobody
-watched cannot be reported as an ordinary `stop`. Only `--idle 0` excuses it.
+invocation whose watch is on and that carries no `--active` is **refused** by `backlog:budget`, so an
+emptiness nobody watched cannot be reported as an ordinary `stop`. Only `--idle 0` excuses it.
+**`--running` also decides `wait` and `--retries` decides `retry`** — the two context branches the
+table above carries, now applied inside the command from the counts the loop already tracks.
 
 | Verdict | What the loop does |
 | --- | --- |

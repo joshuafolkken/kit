@@ -1011,6 +1011,16 @@ pnpm josh backlog:budget --answer candidates --started "$started" --active "$act
 
 stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), or empty with exit 1 if the invocation is unreadable. The whole-run bound (8 hours) is decided here and outranks both budgets, but a `parked` or `unreadable` answer outranks the bound. A watch polls every 5 min.
 
+### `josh backlog:offer`
+
+Collapse a `backlogrun` loop-head event into one call (alias `josh blo`): run `backlog:next`, map its answer to the budget word `backlogrun.md` → "The loop" fixes, run `backlog:budget`, return the verdict — two turns folded into one where the parent's context is largest, as `run:merge` did for a merge event.
+
+```bash
+pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --retries 1
+```
+
+`--exclude` / `--repo` forward to `backlog:next`; `--started` / `--active` / `--merged` / `--running` / `--max` / `--idle` forward to `backlog:budget` (`--answer` is computed here). `--running` also decides `wait` (→ `blocked` with children in flight, else `exhausted`) and `--retries` decides `retry` (→ `blocked` below three, `unreadable` at the third). stdout is the verdict, then — on `run` — the issue numbers one per line; the new retry count is the last stderr line (`retries: <n>`) and in `--json`. Exit 1 from `backlog:next` maps to `unreadable`, never `none`.
+
 ### `needs-human-review` — the opposite label
 
 The inverse of `auto-ok`: implemented and taken through the verification gate as usual, then nothing is committed, pushed, opened as a PR or merged — the working tree is left uncommitted, a `confirmation` notification carries the resume command, and the run stops. For work no test can judge. Only a person applies or removes it.
@@ -1390,6 +1400,17 @@ pnpm josh lane:await 1749 1750   # block until either lane completes; alias: jos
 ```
 
 Polls each child's process every 5 s with a 15 s re-confirm window, so a process that briefly disappears (the pre-gate cut handoff) is not mistakenly declared done. Prints the issue number of the first child that confirms completion and exits 0; does not exit until one confirms.
+
+#### `josh lane:launch`
+
+Collapse a `backlogrun` lane-start event into one call (alias `josh lnla`): open the lane, then — only with `--stash`, which the caller passes for the first lane alone — pop that stash into it and re-install against the lock it brought in, then dispatch the child. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
+
+```bash
+pid=$(pnpm josh lane:launch 1749) || exit 1                                                  # every lane after the first
+pid=$(pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes") || exit 1   # the first lane only
+```
+
+The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A refused `lane:open` (`full` / `already-open` / failed install), a refused pop, or a failed re-install each stop the launch before the child is dispatched.
 
 ### `josh cost`
 
