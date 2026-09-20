@@ -263,9 +263,7 @@ describe('OpenAI supervisor inherited-child identity', () => {
 		const original = process_identity.is_same_process
 		const live = vi.spyOn(process_identity, 'is_same_process')
 
-		live.mockImplementation((pid, process_start) =>
-			pid === 8123 ? false : original(pid, process_start),
-		)
+		live.mockImplementation((pid, process_start) => pid !== 8123 && original(pid, process_start))
 
 		expect(await supervise('reused-pid')).toBe(0)
 		expect(launch).toHaveBeenCalledOnce()

@@ -10,15 +10,23 @@ import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 // them a read of a file the child was about to edit. So a guard whose correction is a denial cannot fire
 // as one in a child.
 //
-// **But a denial is not the only way a guard can speak, and that is what kit#2164 corrects.** A guard
-// can also raise a *notice* — a non-blocking `additionalContext` that carries the same guidance without
-// a `permissionDecision`, so the turn is never ended. The lane child holds the most expensive runs
-// (64% of measured cost), and taking the batching guard entirely off there is what let the run's tool
-// density fall to one call per turn. So the choice is three-valued, not two:
+// **But a denial is not the only way a guard can speak, and that is what kit#2164 tried.** A guard can
+// also raise a *notice* — a non-blocking `additionalContext` that carries the same guidance without a
+// `permissionDecision`, so the turn is never ended. kit#2164 downgraded the batching guard to a notice
+// in the child for exactly that reason. So the choice is three-valued, not two:
 //
 //   - `refuse` — deny the call (the main-line default; the child keeps this for the safety rules).
 //   - `notice` — let the call through but attach the guidance, so a headless child is nudged, not killed.
 //   - `off`    — say nothing at all, for a guard whose remedy the child cannot carry out.
+//
+// **The notice did not move the number, and that is what kit#2178 corrects.** The lane child that ran
+// right after kit#2164 merged came in at 1.00 calls per turn on both sides of the first notice
+// (transcript `f39efeb5`), and nine indisputably independent edits immediately after a notice still went
+// out one per turn. That is the third refutation of "advise and it will be obeyed": kit#1304 distributed
+// the norm as prose and kit#1329 / kit#1337 put the density in front of the running run, and neither
+// moved the number either. So the batching guard is `off` in the child now — advice measured not to work
+// is not worth the per-turn context cost of carrying it — while the `notice` mode stays a valid spelling
+// for a future guard whose guidance a child can actually act on.
 //
 // **It is an enumeration and not a judgement, for the reason `delegation-policy.ts` is one.** "This
 // guard's mode in a child" is a call made under the same pressure that produced the misfire. The list is
@@ -55,9 +63,9 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 	},
 	{
 		id: 'batching',
-		mode_in_lane_child: 'notice',
+		mode_in_lane_child: 'off',
 		because:
-			'the reissue-in-one-turn correction is guidance a child can act on — batch the next calls — but a *refusal* ends its turn instead of guiding it, so kit#2164 delivers it as a non-blocking notice: the child is nudged toward batching without being killed, and the lane child is where the cost this whole guard exists to cut is largest',
+			'a refusal ends a child turn so it cannot fire as one (kit#2138), and the notice kit#2164 replaced it with did not move the density: the lane child after kit#2164 merged ran at 1.00 calls per turn on both sides of the notice (transcript f39efeb5) and kept editing one file per turn even across nine independent edits — the third refutation of advice after kit#1304 (prose) and kit#1329 / kit#1337 (density in front of the run), so kit#2178 takes it off rather than pay the per-turn context cost of guidance measured not to work',
 	},
 	{
 		id: 'rule',

@@ -148,7 +148,7 @@ async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 async function is_over_budget(over: number): Promise<boolean> {
 	const result = await josh(['cost', '--over', String(over)])
 
-	return result.code === 0 ? result.out === OVER : true
+	return result.code !== 0 || result.out === OVER
 }
 
 // The next offer: one issue number per line up to the free lanes, or a verdict token, exactly as the
