@@ -46,12 +46,54 @@ function read_changed_paths_sync(): Array<string> {
 	}
 }
 
-// The verdict over the current working tree. `paths` is injectable so the wiring is testable without a
-// checkout; the default reads the tree.
-function current_verdict(paths: ReadonlyArray<string> = read_changed_paths_sync()): Verdict {
+// The working-tree read behind `current_verdict`, injectable so the delivery path can be exercised
+// without a checkout (joshuafolkken/kit#2169). Held on a `const` object rather than a reassigned
+// variable — production leaves `paths` unset and the real reader runs; a test fixes it for the span of
+// one call through `with_paths`, and it is cleared afterwards.
+const injected: { paths?: ReadonlyArray<string> } = {}
+
+// The paths `current_verdict` reads when none are passed: the injected set if a test has fixed one,
+// else the real working tree.
+function source_paths(): ReadonlyArray<string> {
+	return injected.paths ?? read_changed_paths_sync()
+}
+
+// The verdict over the current working tree. `paths` stays injectable for a direct caller; when it is
+// omitted the injected set is read if one is in force, else the real tree.
+function current_verdict(paths: ReadonlyArray<string> = source_paths()): Verdict {
 	return test_declared_logic.verdict_for(paths)
 }
 
-const test_declared_changed = { current_verdict, path_of, read_changed_paths_sync }
+// Put the injection back to what it was before a `with_paths` span — cleared to the live reader when
+// nothing was in force, else the outer span's set. Restoring rather than always clearing lets a nested
+// span prove the clear happened without reading the live tree (joshuafolkken/kit#2169).
+function restore_injection(previous: ReadonlyArray<string> | undefined): void {
+	if (previous === undefined) {
+		delete injected.paths
+
+		return
+	}
+
+	injected.paths = previous
+}
+
+// The seam the `rule_delivery` call path needs (joshuafolkken/kit#2169). `is_untested_commit` reads the
+// tree at trigger time rather than from an argument, so a unit test driving `rule_delivery` cannot reach
+// `current_verdict`'s `paths` port from the outside. Running `body` inside `with_paths` fixes the read
+// to `paths` for its duration and restores it afterwards — the `PreToolUse` production path, which never
+// calls this, still reads the live tree.
+function with_paths<T>(paths: ReadonlyArray<string>, body: () => T): T {
+	const previous = injected.paths
+
+	injected.paths = paths
+
+	try {
+		return body()
+	} finally {
+		restore_injection(previous)
+	}
+}
+
+const test_declared_changed = { current_verdict, path_of, read_changed_paths_sync, with_paths }
 
 export { test_declared_changed }
