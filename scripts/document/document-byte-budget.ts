@@ -111,7 +111,12 @@ const SLACK_BYTES = 512
 // on the `josh run:event` section — the waiting positioned read an attached session relays with, its
 // command reference and its stdout/stderr contract — landing against a document already at its mark, the
 // branch's merge with `main` layering #2216's, #2218's, #2180's and #2182's sections on top.
-const JOSH_COMMANDS_CEILING_BYTES = 110_208
+// joshuafolkken/kit#2181 raised it one slack unit (110,208 → 110,720) for the mandated `josh
+// disposition` section — the runtime-path oracle sharing the review-level inert set, its command
+// reference and its `runtime` / `non-runtime` verdict — and the `josh test:declared --match` note,
+// landing against a document already at its mark, the branch's merge with `main` layering #2180's,
+// #2182's and #2207's sections on top.
+const JOSH_COMMANDS_CEILING_BYTES = 110_720
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -157,8 +162,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 7108 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
-	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 109_252 },
+	{ path: 'CLAUDE.md', bytes: 27_477 },
+	{ path: 'docs/josh-commands.md', bytes: 110_178 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
