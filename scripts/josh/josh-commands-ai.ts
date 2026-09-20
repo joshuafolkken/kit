@@ -27,6 +27,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<title> [--body <summary>]', 'automation', ['network']],
 	},
+	'pkg:scout': {
+		script: 'scripts/package/package-scout-cli.ts',
+		description:
+			'Rank package candidates by measured metrics so the Package-First tier decision is read, not judged',
+		category: 'AI tools',
+		reference: ['<keywords> [--size <n>]', 'automation', ['network']],
+	},
 	'stash:pop': {
 		script: 'scripts/git/stash-pop-cli.ts',
 		description: 'Pop the stash matching this message, not whichever a shared stack has on top',

@@ -845,6 +845,16 @@ Print the decision oracles — commands that answer a rule question mechanically
 
 ---
 
+### `josh pkg:scout` · `josh pks`
+
+> **Audience:** automation · **Side effects:** network
+
+`<keywords> [--size <n>]`
+
+Rank package candidates by measured metrics so the Package-First tier decision is read, not judged
+
+---
+
 ### `josh read:files` · `josh rf`
 
 > **Audience:** automation · **Side effects:** none

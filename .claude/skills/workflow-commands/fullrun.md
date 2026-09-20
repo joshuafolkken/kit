@@ -45,8 +45,10 @@ are `fullrun-steps.md`, read when a step needs its detail.
   lane-child`).
 - **A dispatched lane child asks whether it is a resume first — `pnpm josh run:cut --resume <N>`**; on
   `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
-  boundary it takes the cut with `pnpm josh run:cut <N>`, and it records any park on the Issue before
-  the stop notify. `pre-gate-cut.md` is the single source of both.
+  boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
+  `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`, so the cut is taken before the gate
+  rather than after a refusal), and it records any park on the Issue before the stop notify.
+  `pre-gate-cut.md` is the single source of both.
 
 ## The stop branches
 

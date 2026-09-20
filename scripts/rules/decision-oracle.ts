@@ -124,6 +124,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: SKILL_2E,
 	},
 	{
+		name: 'pkg:scout',
+		decision: 'Whether the top package candidate is clearly best (Tier A) or a near-tie (Tier B)',
+		args: '<keywords>',
+		vocabulary: ['clear', 'close'],
+		single_source: 'CLAUDE.md → Package-First Development',
+	},
+	{
 		name: 'issue:lint',
 		decision:
 			'Whether a behavior-change issue declares a deliverable firing point and a re-runnable baseline',
