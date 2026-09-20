@@ -1,4 +1,5 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import { ISSUE_COMMANDS } from './josh-commands-issue'
 import { LANE_COMMANDS } from './josh-commands-lane'
 import { SPLIT_COMMANDS } from './josh-commands-split'
 
@@ -8,26 +9,7 @@ const ISSUE_WITH_OPTIONS = '<issue> [options]'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const AI_COMMANDS: Record<string, CommandEntry> = {
-	'issue:read': {
-		script: 'scripts/issue/issue-read-cli.ts',
-		description: "Print each issue's title, body and every comment on it, in one call",
-		category: 'AI tools',
-		reference: ['<issue...>', 'automation', ['network']],
-	},
-	'issue:state': {
-		script: 'scripts/issue/issue-state-cli.ts',
-		description:
-			"Print each issue's state and labels, in the spelling the documents compare against",
-		category: 'AI tools',
-		reference: ['<issue...> [--repo <owner/repo>]', 'automation', ['network']],
-	},
-	'issue:scout': {
-		script: 'scripts/issue/issue-scout-cli.ts',
-		description:
-			'Before filing: say whether an issue like this exists and which epic it belongs to',
-		category: 'AI tools',
-		reference: ['<title> [--body <summary>]', 'automation', ['network']],
-	},
+	...ISSUE_COMMANDS,
 	'pkg:scout': {
 		script: 'scripts/package/package-scout-cli.ts',
 		description:

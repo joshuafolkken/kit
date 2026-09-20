@@ -36,6 +36,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "gp": "pr",
     "i": "init",
     "ibl": "issue:backlinks",
+    "ici": "issue:cite",
     "ig": "investigation:guard",
     "iln": "issue:lint",
     "ird": "issue:read",
@@ -361,6 +362,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "issue:backlinks": [
       "<issue>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "issue:cite": [
+      "<issue...> [--repo <owner/repo>]",
       "automation",
       [
         "network",

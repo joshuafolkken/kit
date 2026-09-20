@@ -715,6 +715,16 @@ Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading
 
 ---
 
+### `josh issue:cite` · `josh ici`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue...> [--repo <owner/repo>]`
+
+Print the paste-ready number-link citation line for each issue, in one call
+
+---
+
 ### `josh issue:lint` · `josh iln`
 
 > **Audience:** automation · **Side effects:** files
