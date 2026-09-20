@@ -989,9 +989,9 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 > **Audience:** automation · **Side effects:** files
 
-`--append <kind> <text> | --from <position> | --last`
+`--append <kind> <text> | --from|--follow <n> | --last`
 
-Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)
+Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)
 
 ---
 

@@ -56,15 +56,14 @@ describe('PILOT_FILES — partitioning does not lose test targets', () => {
 	})
 })
 
-describe('PILOT_FILES — the list is a generated artifact, not a hand-kept one', () => {
-	it('matches the classifier output exactly (regenerate on drift)', () => {
-		const regenerate = 'pnpm exec tsx scripts/test/classify-isolation.ts --write'
-
-		expect([...PILOT_FILES], `stale — run: ${regenerate}`).toEqual(
-			classify_isolation.classify_pilot_files(),
-		)
-	})
-
+describe('PILOT_FILES — a generated list the classifier keeps valid', () => {
+	// The list is produced by `pnpm exec tsx scripts/test/classify-isolation.ts --write`; widen it by
+	// rerunning that. A full-equality check against a live scan is deliberately NOT enforced here: CI
+	// runs on the branch merged with main, so a concurrent PR adding any test file would fail an exact
+	// match on files that are not ours, and post-merge it would redden every test-adding PR
+	// (joshuafolkken/kit#2170). The per-file guard below is the churn-proof invariant — it reads each
+	// listed file directly and never scans the tree, so it catches a misclassified or stale entry
+	// regardless of what else exists.
 	it('holds no file that requires isolation (misclassification guard)', () => {
 		for (const file of PILOT_FILES) {
 			expect(classify_isolation.is_pilot_candidate(file), `${file} requires isolation`).toBe(true)

@@ -312,6 +312,7 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/rules/worktree-guard.test.ts',
 	'scripts/run/detached-launch.test.ts',
 	'scripts/run/run-ending.test.ts',
+	'scripts/run/run-event-follow.test.ts',
 	'scripts/run/run-invocation.test.ts',
 	'scripts/run/run-merge.test.ts',
 	'scripts/run/run-next.test.ts',

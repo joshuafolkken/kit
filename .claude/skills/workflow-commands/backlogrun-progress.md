@@ -85,25 +85,32 @@ stamp computed for it** — the command prints the `at` stamp and the `next` fie
 **The line carries observations, never "still running", and nothing in it is a verification result** —
 no gate, no CI, no check rollup, because the command reads none of them.
 
-**The invariant is a tier, not a mechanism** (joshuafolkken/kit#2156). Three tiers say how much of a
-person's attention a signal takes: **interrupt** reaches for it now (a Telegram — `confirmation`,
-`completion`, `warning`), **ambient** is seen without being asked for (a line that is simply there), and
-**requested** is read only once a person thinks to type for it. **The heartbeat sits at the ambient
-tier, and stays there across a `backlogrun` session cut — never promoted to interrupt, never demoted to
-requested.** Writing this as a *mechanism* ("a pull, not a push") is what let the ambient surface vanish
-at the cut with the words still reading as kept: a pull is still a pull once the terminal it was seen on
-is gone.
+**The invariant is a tier, not a mechanism** (joshuafolkken/kit#2156, joshuafolkken/kit#2207). Three
+tiers say how much of a person's attention a signal takes: **interrupt** reaches for it now (a Telegram —
+`confirmation`, `completion`, `warning`), **ambient** is seen without being asked for (a line that is
+simply there), and **requested** is read only once a person thinks to type for it. **The heartbeat sits
+at the ambient tier, and stays there across a `backlogrun` session cut — never promoted to interrupt,
+never demoted to requested.**
+
+**The report surface belongs to the run, not to the session** (joshuafolkken/kit#2207). The run's
+session-facing events — a plan posted, a child launched, a PR opened, a review round, a park, a cut, a
+stop, a merge — are appended to one ordered stream keyed to the run's identity (`pnpm josh run:event`),
+which survives the cut because it is the run's and not any one session's. **Every session is a writer;
+whichever session is attached to a terminal is the reader.** The reader follows the stream from its own
+last position — `pnpm josh run:event --follow <position>` returns the moment a new event lands and
+otherwise at the interval, so a person sees progress arrive at once and still sees the run is alive when
+it is quiet — and relays the events it prints. **This is the same reader before and after the cut**,
+because a cut moves who executes, never where the stream lives or where a reader stands in it. Writing
+ambient as a *mechanism* ("a pull, not a push") is what let the surface vanish at the cut with the words
+still reading as kept; anchoring it to the run's stream is what keeps it.
 
 **Interrupt is withheld on purpose**: no Telegram, because `confirmation` and `completion` are what
 interrupt a person, and a line every fifteen minutes on a phone is the fatigue that stops them being
-read. **Ambient is realized differently either side of the cut, and both are the same tier.** Before the
-cut the session is the person's, so the terminal is the ambient surface. After it the parent is a
-headless `claude -p backlogrun` the `run:wake` supervisor started, so the watcher mirrors every line
-into a plain-text log beside the report record — `pnpm josh run:progress --path` names it — and a person
-keeps it open with `tail -F` to watch the run stream on without asking. The record still holds the last
-line, which `pnpm josh run:wake --list` relays and names the ambient log beside; that relay is the
-requested tier, the floor the ambient surface is not allowed to fall to, which is why `--mark` keeps
-rather than blanks the line.
+read. **`pnpm josh run:wake --list` is the requested tier** — the degenerate last-event read of the same
+stream the follow reads, for a person who types for one line rather than following. **`tail -F` on the
+raw stream file is a recovery path, not the ambient surface** — the follow is how progress is seen
+without asking, and the raw `tail` is what a person falls back to when the relay has stopped. It is
+named for that role in `--list`'s own output, beside the follow it is the fallback for.
 
 **A stop is an interrupt, and only a stop** (joshuafolkken/kit#2136). The heartbeat says a run is still
 going; a run that has _stopped_ — every remaining child blocked behind a parked one, the backlog drained

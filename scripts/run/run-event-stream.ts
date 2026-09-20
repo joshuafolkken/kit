@@ -167,6 +167,16 @@ function read_last(target: string): RunEvent | undefined {
 	return events[events.length - POSITION_INCREMENT]
 }
 
+// One event as the line a reader relays (joshuafolkken/kit#2207). The follow reader and the degenerate
+// `run:wake --list` both present events to a person, so the "what an event reads as" lives here, beside
+// the enumeration it names, rather than being spelled twice at the two call sites. `at`, `kind` and
+// `text` are joined with a separator no field carries, so the three stay legible in one line.
+const FIELD_SEPARATOR = ' · '
+
+function format_event(event: RunEvent): string {
+	return [event.at, event.kind, event.text].join(FIELD_SEPARATOR)
+}
+
 const run_event_stream = {
 	EVENT_CAP,
 	EVENT_KIND,
@@ -174,6 +184,7 @@ const run_event_stream = {
 	EVENT_PREFIX,
 	EVENT_SUFFIX,
 	append,
+	format_event,
 	is_event_kind,
 	read_events,
 	read_from,
