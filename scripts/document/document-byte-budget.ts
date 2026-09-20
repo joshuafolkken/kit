@@ -102,7 +102,12 @@ const SLACK_BYTES = 512
 // the mandated `josh refactor:scan` section — the refactoring-candidate scan, its command reference and
 // its `verdict: clear` / `verdict: candidates` answer — landing against a document already at its mark,
 // the branch's merge with `main` layering the section on top.
-const JOSH_COMMANDS_CEILING_BYTES = 108_672
+// joshuafolkken/kit#2182 raised it two further slack units (108,672 → 109,696) for the mandated
+// `josh sonar:hotspots` and `josh ui:routes` sections — the two prose procedures turned into commands,
+// their command references and branch/output contracts — landing against a document already at its
+// mark, the branch's merge with `main` layering the sections on top of the `josh run:event`,
+// `josh pkg:scout`, `josh split:assess` and `josh refactor:scan` sections `main` had already added.
+const JOSH_COMMANDS_CEILING_BYTES = 109_696
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -149,7 +154,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 107_744 },
+	{ path: 'docs/josh-commands.md', bytes: 108_682 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

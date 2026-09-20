@@ -245,6 +245,16 @@ Carry the published release into every consumer repository next to this one
 
 ---
 
+### `josh sonar:hotspots` · `josh shs`
+
+> **Audience:** automation · **Side effects:** network
+
+`<PR>`
+
+Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
+
+---
+
 ### `josh sync` · `josh sy`
 
 > **Audience:** developer · **Side effects:** files
@@ -262,6 +272,16 @@ Sync config files
 `[--staged] [--json]`
 
 Say whether this change touches a file josh sync distributes
+
+---
+
+### `josh ui:routes` · `josh uir`
+
+> **Audience:** automation · **Side effects:** none
+
+`[--staged]`
+
+List the screenshot-target routes the current change touches
 
 ## Workflow
 

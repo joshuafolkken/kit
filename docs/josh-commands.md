@@ -370,6 +370,23 @@ pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 
 **Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
 
+### `josh sonar:hotspots` · `josh shs`
+
+Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.
+
+```bash
+pnpm josh sonar:hotspots 42   # alias: josh shs
+```
+
+### `josh ui:routes` · `josh uir`
+
+List the screenshot-target routes the change touches: a changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived" rather than guessing; the `verify-ui` skill's §1 narrows the list.
+
+```bash
+pnpm josh ui:routes            # the branch diff; alias: josh uir
+pnpm josh ui:routes --staged   # the staged diff instead
+```
+
 ### `josh propagate`
 
 Carry the release this repository just published into every consumer repository checked out next to it. Runs only from the supplier's own clean, up-to-date default branch; waits for the exact published version to appear in the registry before touching any consumer.
