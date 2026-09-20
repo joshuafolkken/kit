@@ -235,6 +235,16 @@ Carry the published release into every consumer repository next to this one
 
 ---
 
+### `josh sonar:hotspots` · `josh shs`
+
+> **Audience:** automation · **Side effects:** network
+
+`<PR>`
+
+Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
+
+---
+
 ### `josh sync` · `josh sy`
 
 > **Audience:** developer · **Side effects:** files
@@ -252,6 +262,16 @@ Sync config files
 `[--staged] [--json]`
 
 Say whether this change touches a file josh sync distributes
+
+---
+
+### `josh ui:routes` · `josh uir`
+
+> **Audience:** automation · **Side effects:** none
+
+`[--staged]`
+
+List the screenshot-target routes the current change touches
 
 ## Workflow
 
@@ -945,6 +965,16 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 ---
 
+### `josh run:event` · `josh rev`
+
+> **Audience:** automation · **Side effects:** files
+
+`--append <kind> <text> | --from <position> | --last`
+
+Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)
+
+---
+
 ### `josh run:hold` · `josh rh`
 
 > **Audience:** automation · **Side effects:** files
@@ -1055,16 +1085,6 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 ---
 
-### `josh sonar:hotspots` · `josh shs`
-
-> **Audience:** automation · **Side effects:** network
-
-`<PR>`
-
-Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
-
----
-
 ### `josh stash:pop` · `josh sp`
 
 > **Audience:** automation · **Side effects:** git
@@ -1082,13 +1102,3 @@ Pop the stash matching this message, not whichever a shared stack has on top
 `[options]`
 
 Report where a run's wall clock went: model wait, tool execution, human wait
-
----
-
-### `josh ui:routes` · `josh uir`
-
-> **Audience:** automation · **Side effects:** none
-
-`[--staged]`
-
-List the screenshot-target routes the current change touches

@@ -87,10 +87,15 @@ const SLACK_BYTES = 512
 // joshuafolkken/kit#2212 raised it four slack units (103,552 → 105,600) for the mandated `josh
 // measure:rerun` section and the `josh issue:lint` behavior-change note — the after-merge baseline
 // re-run and the firing-point/baseline checks it adds — landing against a document already at its mark.
-// joshuafolkken/kit#2182 raised it one slack unit (105,600 → 106,112) for the mandated
+// joshuafolkken/kit#2205 raised it one slack unit (105,600 → 106,112) for the mandated `josh run:event`
+// section — the run's append-only event stream, its command reference and its append/read forms —
+// landing against a document already at its mark.
+// joshuafolkken/kit#2182 raised it two slack units (106,112 → 107,136) for the mandated
 // `josh sonar:hotspots` and `josh ui:routes` sections — the two prose procedures turned into commands,
-// their command references and branch/output contracts — landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 106_112
+// their command references and branch/output contracts — landing against a document already at its
+// mark, the branch's merge with `main` layering the sections on top of the `josh run:event` section
+// `main` had already added.
+const JOSH_COMMANDS_CEILING_BYTES = 107_136
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -137,7 +142,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 105_537 },
+	{ path: 'docs/josh-commands.md', bytes: 106_478 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

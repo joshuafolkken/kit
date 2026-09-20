@@ -255,6 +255,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--join]', 'automation', ['processes', 'files']],
 	},
+	'run:event': {
+		script: 'scripts/run/run-event-cli.ts',
+		description:
+			'Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)',
+		category: 'AI tools',
+		reference: ['--append <kind> <text> | --from <position> | --last', 'automation', ['files']],
+	},
 	...LANE_COMMANDS,
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
@@ -289,19 +296,6 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print the decision oracles — commands that answer a rule question mechanically',
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
-	},
-	'sonar:hotspots': {
-		script: 'scripts/sonar/sonar-hotspots-cli.ts',
-		description:
-			"Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition",
-		category: 'AI tools',
-		reference: ['<PR>', 'automation', ['network']],
-	},
-	'ui:routes': {
-		script: 'scripts/ui/ui-routes-cli.ts',
-		description: 'List the screenshot-target routes the current change touches',
-		category: 'AI tools',
-		reference: ['[--staged]', 'automation', ['none']],
 	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
