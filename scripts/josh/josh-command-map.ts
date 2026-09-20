@@ -1,5 +1,6 @@
 import type { CommandCategory, CommandEntry } from './josh-command-types'
 import { AI_COMMANDS } from './josh-commands-ai'
+import { CLONE_COMMANDS } from './josh-commands-clone'
 import { DEV_COMMANDS } from './josh-commands-development'
 import { HOOKS_COMMANDS } from './josh-commands-hooks'
 import { LINT_COMMANDS } from './josh-commands-lint'
@@ -27,6 +28,7 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 	...HOOKS_COMMANDS,
 	...AI_COMMANDS,
 	...LINT_COMMANDS,
+	...CLONE_COMMANDS,
 }
 
 const ALIASES: Record<string, string> = {
@@ -139,6 +141,7 @@ const ALIASES: Record<string, string> = {
 	sg: 'stop:guard',
 	ev: 'eval',
 	ol: 'oracle:list',
+	sa: 'split:assess',
 	cs: 'clone:scan',
 }
 

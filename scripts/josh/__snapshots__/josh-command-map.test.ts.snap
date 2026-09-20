@@ -98,6 +98,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rv": "run:liveness",
     "rw": "run:wake",
     "rwg": "run:watcher:guard",
+    "sa": "split:assess",
     "sd": "cspell:dot",
     "sg": "stop:guard",
     "sl": "session:lang",
@@ -834,6 +835,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "session:lang": [
       "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "split:assess": [
+      "[--json]",
       "automation",
       [
         "none",
