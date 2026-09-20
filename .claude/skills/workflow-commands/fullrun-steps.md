@@ -16,7 +16,8 @@ derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<
 → post the agreed plan only if the Issue body is blank (`gh api -X PATCH
 repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
 plan-posting step → implement → run the **verification gate** (the full procedure is `chain-rule.md`;
-in outline: refactor → `pnpm josh main:merge` → start `pnpm josh gate` and a subagent `/code-review`
+in outline: refactor → `pnpm josh main:merge` → `pnpm josh run:cut <N>` (the pre-gate cut, before the
+gate; a no-op outside a lane) → start `pnpm josh gate` and a subagent `/code-review`
 with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,
 iterate to no high/medium findings, at most two reviews → open the PR between the rounds with `pnpm
 josh git -y "<title> #<N>"` → the follow-up filing and `pnpm josh epic:bundle` inside the CI wait →
