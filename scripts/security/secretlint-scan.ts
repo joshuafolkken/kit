@@ -83,5 +83,4 @@ const secretlint_scan = {
 	run_scan,
 }
 
-export type { ScanDecision }
 export { MISSING_NOTICE, secretlint_scan }

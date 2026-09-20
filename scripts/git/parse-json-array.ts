@@ -93,7 +93,6 @@ const parse_json = {
 	read_json_listing,
 }
 
-export type { ListingRead }
 export {
 	parse_json,
 	parse_json_array_or_undefined,

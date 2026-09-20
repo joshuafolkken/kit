@@ -160,5 +160,5 @@ const issue_backlinks = {
 	UPSTREAM_CANDIDATE_HEADING,
 }
 
-export type { BacklinkVerdict, UpstreamEntry }
+export type { UpstreamEntry }
 export { issue_backlinks }

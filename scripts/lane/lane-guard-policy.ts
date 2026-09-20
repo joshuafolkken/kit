@@ -124,5 +124,5 @@ const lane_guard_policy = {
 	is_suppressed_here,
 }
 
-export type { LaneGuardEntry, LaneGuardId, LaneGuardMode }
+export type { LaneGuardMode }
 export { lane_guard_policy }

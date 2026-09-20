@@ -129,7 +129,6 @@ const git_gh_pr_snapshot = {
 	pr_get_review_decision,
 }
 
-export type { PrChecksSnapshot }
 export {
 	git_gh_pr_snapshot,
 	pr_get_state_snapshot,

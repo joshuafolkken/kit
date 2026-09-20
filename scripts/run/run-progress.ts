@@ -362,12 +362,5 @@ const run_progress = {
 	observation_key,
 }
 
-export type {
-	ChildObservation,
-	LaneObservation,
-	LineTiming,
-	Observations,
-	ProgressState,
-	ReportFields,
-}
+export type { ChildObservation, LaneObservation, Observations, ProgressState }
 export { run_progress }

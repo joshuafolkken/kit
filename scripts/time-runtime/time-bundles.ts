@@ -533,5 +533,4 @@ const time_bundles = {
 	shares_target,
 }
 
-export type { BundleToolRow, BundleTotals, TargetFacts, TripPrice }
 export { time_bundles }

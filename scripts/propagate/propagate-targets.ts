@@ -156,5 +156,5 @@ const propagate_targets = {
 	resolve_targets,
 }
 
-export type { Manifest, PropagateTarget, TargetState }
+export type { Manifest, PropagateTarget }
 export { propagate_targets }

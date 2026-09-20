@@ -212,5 +212,5 @@ const propagate = {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export type { RunOptions, RunVersion }
+export type { RunOptions }
 export { propagate }

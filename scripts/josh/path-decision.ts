@@ -101,5 +101,4 @@ const path_decision = {
 	STAGED_FLAG,
 }
 
-export type { DecisionCommand, DecisionOptions }
 export { path_decision }

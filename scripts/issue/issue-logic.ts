@@ -47,5 +47,4 @@ function prepare(issue_number: number, title: string): IssuePrepResult {
 
 const issue_logic = { has_cjk, slugify, suggest_branch_name, prepare }
 
-export type { IssuePrepResult }
 export { issue_logic }

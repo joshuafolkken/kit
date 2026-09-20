@@ -198,14 +198,7 @@ const ESLINT_RELATED_CACHE_FLAGS = content_cache_flags(ESLINT_RELATED_CACHE_FILE
 const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
 const CSPELL_CACHE_FLAGS = content_cache_flags(CSPELL_CACHE_FILE)
 
-export type {
-	CommandAudience,
-	CommandCategory,
-	CommandEntry,
-	CommandReference,
-	CommandSideEffect,
-	GateCacheSpec,
-}
+export type { CommandCategory, CommandEntry, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
 // them per target (joshuafolkken/kit#1314): the lint step writes only the eslint one, so a target
 // that cleared the list would report a cold type check as the lint's own cost. The edit hook's cache

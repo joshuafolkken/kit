@@ -106,5 +106,5 @@ const repo_setting = {
 	print_section,
 }
 
-export type { RepoApiResult, RepoSettingStatus }
+export type { RepoSettingStatus }
 export { repo_setting }

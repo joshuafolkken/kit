@@ -400,14 +400,7 @@ const run_liveness = {
 	to_safe_path,
 }
 
-export type {
-	LivenessDecision,
-	LivenessRequest,
-	LivenessVerdict,
-	OutputSample,
-	ProcessTrace,
-	Traces,
-}
+export type { LivenessDecision, LivenessRequest, LivenessVerdict, ProcessTrace, Traces }
 export {
 	ALIVE_VERDICT,
 	DEFAULT_GAP_SECONDS,

@@ -197,5 +197,5 @@ const propagate_run = {
 	format_report,
 }
 
-export type { RunOutcome, RunStep, StepResult, TargetResult }
+export type { RunStep, StepResult, TargetResult }
 export { propagate_run }

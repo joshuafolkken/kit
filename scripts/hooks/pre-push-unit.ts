@@ -143,5 +143,4 @@ const pre_push_unit = {
 	run_pre_push_unit,
 }
 
-export type { PushTree }
 export { pre_push_unit }

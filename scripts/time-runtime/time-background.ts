@@ -297,5 +297,4 @@ const time_background = {
 	unread_phases,
 }
 
-export type { BackgroundRun }
 export { time_background }

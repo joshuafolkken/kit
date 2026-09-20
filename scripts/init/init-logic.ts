@@ -469,5 +469,4 @@ const init_logic = {
 }
 
 export { init_logic }
-export type { FileCopyMapping }
 export type { SonarIdentifiers } from './init-logic-sonar'

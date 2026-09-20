@@ -159,5 +159,5 @@ const stop_rules = {
 	stop_outcome,
 }
 
-export type { StopContext, StopOutcome, StopPayload }
+export type { StopContext, StopOutcome }
 export { stop_rules }

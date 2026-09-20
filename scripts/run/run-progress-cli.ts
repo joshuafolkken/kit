@@ -537,5 +537,5 @@ const run_progress_cli = {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export type { EmitContext, EmitResult, WatchLoop, WatchOptions }
+export type { WatchLoop, WatchOptions }
 export { run_progress_cli }

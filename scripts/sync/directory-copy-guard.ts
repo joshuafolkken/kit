@@ -132,4 +132,3 @@ export {
 	is_transformable,
 	transform_copied_tree,
 }
-export type { DestinationKind }

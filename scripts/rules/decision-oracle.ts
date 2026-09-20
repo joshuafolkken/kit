@@ -221,5 +221,4 @@ const decision_oracle = {
 	get_command,
 }
 
-export type { DecisionOracle }
 export { decision_oracle }
