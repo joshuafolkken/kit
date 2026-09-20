@@ -387,5 +387,5 @@ const run_cut = {
 	worktree_git_directory_sync,
 }
 
-export type { CutRead, CutResume, CutResumeRequest, CutSpec, CutState, RunCut }
+export type { CutResumeRequest, CutState, RunCut }
 export { run_cut }

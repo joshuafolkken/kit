@@ -169,7 +169,6 @@ function create_version_command_config(options: VersionCommandConfigOptions): Ve
 export type {
 	PackageVersionConfig,
 	UpstreamDescriptor,
-	UpstreamEffectiveHooks,
 	UpstreamHookContext,
 	UpstreamVersionConfig,
 	VersionCommandConfig,

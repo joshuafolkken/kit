@@ -140,4 +140,3 @@ const codex_hook_adapter = {
 }
 
 export { codex_hook_adapter }
-export type { PayloadFormatter }

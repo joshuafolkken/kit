@@ -102,4 +102,4 @@ function parse_pull(pull_url: string | undefined): PullUrlTarget | undefined {
 const github_issue_url = { parse, parse_pull }
 
 export { github_issue_url }
-export type { IssueUrlTarget, PullUrlTarget, RepoIdentity }
+export type { IssueUrlTarget, RepoIdentity }

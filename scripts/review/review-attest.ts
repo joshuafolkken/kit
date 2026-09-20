@@ -315,5 +315,5 @@ const review_attest = {
 	STALE_AFTER_MS,
 }
 
-export type { AttestStatus, AttestVerdict }
+export type { AttestVerdict }
 export { review_attest }

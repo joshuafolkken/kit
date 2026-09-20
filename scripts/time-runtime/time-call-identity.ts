@@ -34,5 +34,4 @@ function identity_of(call: IdentityCall): string {
 
 const time_call_identity = { identity_of }
 
-export type { IdentityCall }
 export { time_call_identity }

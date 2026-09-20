@@ -237,4 +237,4 @@ const workflow_pin_logic = {
 }
 
 export { workflow_pin_logic }
-export type { ActionPin, PinDrift, UnknownAction, WorkflowSource }
+export type { PinDrift }

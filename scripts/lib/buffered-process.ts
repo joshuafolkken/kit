@@ -78,5 +78,5 @@ function is_process_failed(result: Pick<BufferedProcessResult, 'exit_code'>): bo
 
 const buffered_process = { is_process_failed, run_buffered_process }
 
-export type { BufferedProcessOptions, BufferedProcessResult }
+export type { BufferedProcessResult }
 export { buffered_process, FAIL_EXIT_CODE, PROCESS_TIMEOUT_MS }

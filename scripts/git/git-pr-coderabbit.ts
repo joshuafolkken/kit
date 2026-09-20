@@ -126,5 +126,4 @@ const git_pr_coderabbit = {
 	handle_coderabbit_findings,
 }
 
-export type { PullComment }
 export { git_pr_coderabbit, UNREADABLE_CR_NOTE }

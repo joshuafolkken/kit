@@ -99,5 +99,5 @@ const release_scope_cli = {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export type { Decision, ReleaseScope }
+export type { Decision }
 export { release_scope_cli }

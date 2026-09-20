@@ -66,5 +66,4 @@ const lane_capacity = {
 	free_lanes,
 }
 
-export type { LimitChoice }
 export { lane_capacity }

@@ -49,5 +49,4 @@ const run_stop_notify = {
 	plan,
 }
 
-export type { StopNotice }
 export { run_stop_notify }

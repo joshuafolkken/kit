@@ -173,5 +173,5 @@ const run_merge_steps = {
 	is_over_budget,
 }
 
-export type { ApplyCarryResult, FailedResult, MergeContext }
+export type { MergeContext }
 export { run_merge_steps }

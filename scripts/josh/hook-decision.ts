@@ -451,13 +451,5 @@ const hook_decision = {
 	write_outcome,
 }
 
-export type {
-	GuardOutcome,
-	GuardRun,
-	HookPayload,
-	NotifySpec,
-	RefusalStamp,
-	TranscriptGuard,
-	TranscriptGuardSpec,
-}
+export type { GuardOutcome, GuardRun, TranscriptGuard, TranscriptGuardSpec }
 export { hook_decision }

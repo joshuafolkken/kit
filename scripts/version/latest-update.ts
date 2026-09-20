@@ -182,4 +182,3 @@ const latest_update = {
 }
 
 export { latest_update }
-export type { TreeSnapshot }

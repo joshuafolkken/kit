@@ -176,6 +176,5 @@ export {
 	UNREADABLE_COMMENTS_BODY,
 	UNREADABLE_COMMENTS_NOTE,
 }
-export type { AiReviewPullComment }
 
 export { has_ignore_reason, type TelegramContext } from './git-pr-confirmation'

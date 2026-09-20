@@ -144,5 +144,4 @@ const latest_scope_cli = {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
-export type { LatestScope }
 export { latest_scope_cli }
