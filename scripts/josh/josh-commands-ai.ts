@@ -290,6 +290,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	'clone:scan': {
+		script: 'scripts/clone/clone-scan-cli.ts',
+		description:
+			'Count code duplication across files and first-party repositories, printing each clone as file:line pairs',
+		category: 'AI tools',
+		reference: ['', 'automation', ['files']],
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',

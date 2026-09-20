@@ -1,3 +1,4 @@
+import { clone_scan } from '#scripts/clone/clone-scan'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { COMMAND_MAP } from '#scripts/josh/josh-logic'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
@@ -105,5 +106,21 @@ describe('vocabulary matches the code for run:hold oracle', () => {
 
 	it('unknown verdict is in declared vocabulary', () => {
 		expect(HOLD_ORACLE?.vocabulary).toContain(run_hold_cli.UNKNOWN_VERDICT)
+	})
+})
+
+describe('vocabulary matches the code for clone:scan oracle', () => {
+	const CLONE_ORACLE = decision_oracle.find_oracle('clone:scan')
+
+	it('clone:scan oracle exists', () => {
+		expect(CLONE_ORACLE).toBeDefined()
+	})
+
+	it('clean verdict is in declared vocabulary', () => {
+		expect(CLONE_ORACLE?.vocabulary).toContain(clone_scan.CLEAN_VERDICT)
+	})
+
+	it('clones prefix is in declared vocabulary', () => {
+		expect(CLONE_ORACLE?.vocabulary).toContain(clone_scan.CLONES_PREFIX)
 	})
 })

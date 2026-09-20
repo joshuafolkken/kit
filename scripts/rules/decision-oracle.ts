@@ -203,6 +203,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: [OVER, 'human-review', STOP, RETRY, BUSY],
 		single_source: BACKLOGRUN_MD,
 	},
+	{
+		name: 'clone:scan',
+		decision: 'Whether cross-file or cross-repository code duplication exists',
+		args: '',
+		vocabulary: ['clean', 'clones:'],
+		single_source: 'prompts/collaboration-workflow/no-clones.md',
+	},
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
