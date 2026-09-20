@@ -16,6 +16,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "c": "check",
     "cm": "check-commit-message",
     "co": "cost",
+    "dcr": "doc:read",
     "dg": "delegate",
     "dr": "doctor",
     "ds": "doc:section",
@@ -79,6 +80,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rh": "run:hold",
     "rl": "report:lint",
     "rmg": "run:merge",
+    "rn": "run:next",
     "rp": "run:prep",
     "rpy": "repo:party",
     "rr": "run:release",
@@ -210,6 +212,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "delegate": [
       "<step> | --list",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "doc:read": [
+      "<file>",
       "automation",
       [
         "none",
@@ -705,6 +714,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "git",
+        "network",
+      ],
+    ],
+    "run:next": [
+      "<issue>",
+      "automation",
+      [
         "network",
       ],
     ],
