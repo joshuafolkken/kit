@@ -284,10 +284,12 @@ describe('batch_refusal — a forked agent is judged on its own transcript', () 
 	})
 })
 
-describe('batch_outcome — a dispatched lane child is notified, not refused', () => {
-	// joshuafolkken/kit#2138, joshuafolkken/kit#2164: a *refusal* ends a headless child's turn rather than
-	// guiding it, so the batching guard is downgraded to a notice for a dispatched lane child — decided
-	// from the one-place enumeration, set up here as `lane-park.test.ts` sets up its own lane case.
+describe('batch_outcome — a dispatched lane child is silent, neither notified nor refused', () => {
+	// joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178: a *refusal* ends a headless
+	// child's turn rather than guiding it, so kit#2164 downgraded the guard to a notice — but the notice
+	// was measured not to move the density (the lane child after kit#2164 merged ran at 1.00 calls per turn
+	// on both sides of it), so kit#2178 takes the guard `off` in a lane child. Set up here as
+	// `lane-park.test.ts` sets up its own lane case.
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
@@ -298,24 +300,26 @@ describe('batch_outcome — a dispatched lane child is notified, not refused', (
 		process.chdir(ENTRY_DIRECTORY)
 	})
 
-	// The enumeration says `notice`, and the guard obeys it — asserted together so the two cannot drift
+	// The enumeration says `off`, and the guard obeys it — asserted together so the two cannot drift
 	// apart, which is the "enumeration and live behavior cannot disagree" half of the acceptance criteria.
-	it('reads its lane-child mode as notice', () => {
-		expect(lane_guard_policy.mode_in_lane_child('batching')).toBe('notice')
+	it('reads its lane-child mode as off', () => {
+		expect(lane_guard_policy.mode_in_lane_child('batching')).toBe('off')
 	})
 
-	// **The turn is not ended.** A notice carries no `permissionDecision` — only `reason` becomes a deny —
-	// so a refusable call at the limit comes back with the notice set and the reason unset, and the call
-	// proceeds. This is what keeps a headless `claude -p` child alive (joshuafolkken/kit#2164).
-	it('delivers a notice, not a refusal, on the third single-call turn in a lane child', () => {
-		const { reason, notice } = batch_outcome(payload_of('lane-notice'), NOW_MS)
+	// **The guard says nothing at all.** An `off`-mode guard is skipped before the transcript is read, so a
+	// refusable call at the limit comes back with neither a notice nor a reason and proceeds untouched —
+	// the per-turn context cost kit#2164's ineffective notice carried is gone (joshuafolkken/kit#2178).
+	it('delivers neither a notice nor a refusal on the third single-call turn in a lane child', () => {
+		const { reason, notice } = batch_outcome(payload_of('lane-silent'), NOW_MS)
 
 		expect(reason).toBeUndefined()
-		expect(notice).toContain('batching')
+		expect(notice).toBeUndefined()
 	})
 
-	// The refusal path stays silent there — read through `batch_refusal`, which returns only the deny
-	// reason, the guard says nothing that could end the turn.
+	// **The #2164 non-regression.** kit#2138 measured a child killed before its commit by three refusals;
+	// the guard must never refuse in a lane child. The refusal path stays silent even on the third
+	// single-call turn that would be refused on the main line, so a headless `claude -p` child is not
+	// killed by it (joshuafolkken/kit#2164).
 	it('refuses nothing on the third single-call turn while marked as a lane child', () => {
 		expect(batch_refusal(payload_of('lane-child'), NOW_MS)).toBeUndefined()
 	})

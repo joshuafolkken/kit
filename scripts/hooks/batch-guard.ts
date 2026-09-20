@@ -43,32 +43,36 @@ function is_batch_candidate(call: GuardedCall): boolean {
 }
 
 // **How the batching guard behaves for the session in hand, decided from the one-place enumeration**
-// (joshuafolkken/kit#2138, joshuafolkken/kit#2164). Outside a lane child the mode is `refuse` and the
-// guard is exactly what it always was; in a dispatched lane child it is `notice`, and the two wrappers
-// below turn that into "never refuse, notify instead". The enumeration reads `is_child_of` — the
+// (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178). Outside a lane child the
+// mode is `refuse` and the guard is exactly what it always was; in a dispatched lane child it is `off`
+// since kit#2178 — kit#2164's notice was measured not to move the density, so the guard says nothing
+// there rather than pay the per-turn context cost. The wrappers below stay three-valued so a future
+// `notice`-mode guard is honoured without a second edit. The enumeration reads `is_child_of` — the
 // dispatch mark against this checkout's own issue — only for a guard whose mode it would actually
 // change, so a person working in a lane sees the guard unchanged.
 function batching_mode(): LaneGuardMode {
 	return lane_guard_policy.mode_here('batching')
 }
 
-// A guard the enumeration turns fully `off` says nothing at all; batching is never `off`, but the check
-// is kept general so a future enumeration change is honoured here without a second edit.
+// A guard the enumeration turns fully `off` says nothing at all — this is the mode batching takes in a
+// lane child since kit#2178, so the whole guard (refusal and notice alike) is skipped there. On the main
+// line the mode is `refuse`, so the whole-file-write notice below still fires.
 function is_candidate(call: GuardedCall): boolean {
 	return is_batch_candidate(call) && batching_mode() !== 'off'
 }
 
-// A refusable call is refused only where the mode is `refuse`. In a lane child the mode is `notice`, so
-// the refusal is withheld here and the notice path below carries the same guidance without ending the
-// child's turn.
+// A refusable call is refused only where the mode is `refuse`. A lane child is `off` (kit#2178) and
+// never reaches here — `is_candidate` short-circuits first — but the guard against any non-`refuse` mode
+// is kept so a `notice`-mode guard would withhold the refusal rather than emit one.
 function should_block_here(tail: string, call: GuardedCall, refused_at_ms: number): boolean {
 	if (batching_mode() !== 'refuse') return false
 
 	return time_batch_guard.should_block(tail, call, refused_at_ms)
 }
 
-// The whole-file write earns a notice on every run (joshuafolkken/kit#1848); a refusable call earns one
-// only in a lane child, where its refusal was withheld above. Both read the notice's own record, so a
+// The whole-file write earns a notice on every run (joshuafolkken/kit#1848). The second branch turns a
+// refusable call into a notice under a `notice`-mode guard; no guard is `notice` now (kit#2178 took
+// batching to `off`), so it stays dormant against a future one. Both read the notice's own record, so a
 // notice never spends the refusal's stamp and re-fires on the same `REFIRE_EVERY` cadence.
 function should_notify_here(tail: string, call: GuardedCall, notified_at_ms: number): boolean {
 	if (time_batch_guard.should_notify(tail, call, notified_at_ms)) return true
@@ -77,8 +81,8 @@ function should_notify_here(tail: string, call: GuardedCall, notified_at_ms: num
 	return time_batch_guard.should_block(tail, call, notified_at_ms)
 }
 
-// The wording each notice carries. The whole-file write keeps its own text; a refusable call only
-// reaches the notice path in a lane child, so it earns the lane notice (joshuafolkken/kit#2164).
+// The wording each notice carries. The whole-file write keeps its own text; the lane notice is reached
+// only under a `notice`-mode guard, dormant since kit#2178 took batching to `off`.
 function notice_text(call: GuardedCall): string {
 	if (time_batch_guard.is_notice_call(call)) return time_batch_guard.NOTICE
 
@@ -92,8 +96,8 @@ const GUARD = hook_decision.create_transcript_guard({
 	should_block: should_block_here,
 	reason: time_batch_guard.REASON,
 	// The whole-file write is notified rather than refused, on a record of its own so it never spends
-	// the refusal's stamp (joshuafolkken/kit#1848); in a lane child a refusable call joins it there
-	// (joshuafolkken/kit#2164).
+	// the refusal's stamp (joshuafolkken/kit#1848); the lane-child refusable-call notice kit#2164 added
+	// here is dormant since kit#2178 took batching to `off`.
 	notify: {
 		prefix: time_batch_guard.NOTICE_STAMP_PREFIX,
 		should_notify: should_notify_here,
