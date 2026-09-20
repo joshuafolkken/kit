@@ -61,6 +61,14 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Workflow',
 		reference: ['', 'automation', ['git', 'network']],
 	},
+	// After a behavior-change Issue merges, re-run its declared baseline and print before/after; a value
+	// that did not move appends a refuted-premise line to the observation ledger (joshuafolkken/kit#2212).
+	'measure:rerun': {
+		script: 'scripts/issue/measure-rerun-cli.ts',
+		description: 'Re-run a merged issue’s baseline command and print the before/after pair',
+		category: 'Workflow',
+		reference: ['<path>', 'automation', ['processes', 'files']],
+	},
 	// A script rather than an `sh -c` chain, because it has a precondition to enforce: run inside a
 	// linked work tree it would hijack the default branch from every other one (joshuafolkken/kit#1535).
 	'main:sync': {

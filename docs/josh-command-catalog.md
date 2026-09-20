@@ -295,6 +295,16 @@ Checkout default branch and pull latest (refuses inside a lane)
 
 ---
 
+### `josh measure:rerun` · `josh mrr`
+
+> **Audience:** automation · **Side effects:** processes, files
+
+`<path>`
+
+Re-run a merged issue’s baseline command and print the before/after pair
+
+---
+
 ### `josh notify` · `josh nf`
 
 > **Audience:** automation · **Side effects:** notifications

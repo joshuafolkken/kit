@@ -56,6 +56,7 @@ const ALIASES: Record<string, string> = {
 	fu: 'followup',
 	nf: 'notify',
 	obf: 'observations:flush',
+	mrr: 'measure:rerun',
 	ms: 'main:sync',
 	mm: 'main:merge',
 	bp: 'bump',

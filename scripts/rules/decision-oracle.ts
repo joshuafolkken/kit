@@ -124,6 +124,14 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: SKILL_2E,
 	},
 	{
+		name: 'issue:lint',
+		decision:
+			'Whether a behavior-change issue declares a deliverable firing point and a re-runnable baseline',
+		args: '<path>',
+		vocabulary: ['ok', '✖ missing heading', '✖ firing point', '✖ baseline'],
+		single_source: 'prompts/collaboration-workflow/issue-template.md',
+	},
+	{
 		name: 'issue:state',
 		decision: "An issue's state, labels, and human-review flag",
 		args: ISSUE_N_ARG,

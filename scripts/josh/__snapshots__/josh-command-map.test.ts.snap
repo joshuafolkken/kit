@@ -57,6 +57,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ls": "latest:scope",
     "lu": "latest:update",
     "mm": "main:merge",
+    "mrr": "measure:rerun",
     "ms": "main:sync",
     "nf": "notify",
     "obf": "observations:flush",
@@ -524,6 +525,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "git",
         "network",
+      ],
+    ],
+    "measure:rerun": [
+      "<path>",
+      "automation",
+      [
+        "processes",
+        "files",
       ],
     ],
     "notify": [
