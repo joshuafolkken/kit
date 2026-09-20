@@ -284,10 +284,10 @@ describe('batch_refusal — a forked agent is judged on its own transcript', () 
 	})
 })
 
-describe('batch_refusal — a dispatched lane child is exempt', () => {
-	// joshuafolkken/kit#2138: the reissue-in-one-turn correction ends a headless child's turn rather than
-	// guiding it, so the batching guard stands down for a dispatched lane child — decided from the
-	// one-place enumeration, set up here as `lane-park.test.ts` sets up its own lane case.
+describe('batch_outcome — a dispatched lane child is notified, not refused', () => {
+	// joshuafolkken/kit#2138, joshuafolkken/kit#2164: a *refusal* ends a headless child's turn rather than
+	// guiding it, so the batching guard is downgraded to a notice for a dispatched lane child — decided
+	// from the one-place enumeration, set up here as `lane-park.test.ts` sets up its own lane case.
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
@@ -298,9 +298,25 @@ describe('batch_refusal — a dispatched lane child is exempt', () => {
 		process.chdir(ENTRY_DIRECTORY)
 	})
 
-	// The enumeration says so, and the guard obeys it — asserted together so the two cannot drift apart.
+	// The enumeration says `notice`, and the guard obeys it — asserted together so the two cannot drift
+	// apart, which is the "enumeration and live behavior cannot disagree" half of the acceptance criteria.
+	it('reads its lane-child mode as notice', () => {
+		expect(lane_guard_policy.mode_in_lane_child('batching')).toBe('notice')
+	})
+
+	// **The turn is not ended.** A notice carries no `permissionDecision` — only `reason` becomes a deny —
+	// so a refusable call at the limit comes back with the notice set and the reason unset, and the call
+	// proceeds. This is what keeps a headless `claude -p` child alive (joshuafolkken/kit#2164).
+	it('delivers a notice, not a refusal, on the third single-call turn in a lane child', () => {
+		const { reason, notice } = batch_outcome(payload_of('lane-notice'), NOW_MS)
+
+		expect(reason).toBeUndefined()
+		expect(notice).toContain('batching')
+	})
+
+	// The refusal path stays silent there — read through `batch_refusal`, which returns only the deny
+	// reason, the guard says nothing that could end the turn.
 	it('refuses nothing on the third single-call turn while marked as a lane child', () => {
-		expect(lane_guard_policy.fires_in_lane_child('batching')).toBe(false)
 		expect(batch_refusal(payload_of('lane-child'), NOW_MS)).toBeUndefined()
 	})
 

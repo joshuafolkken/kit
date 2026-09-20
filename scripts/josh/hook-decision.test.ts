@@ -239,7 +239,8 @@ function notify_guard(will_block: boolean, will_notify: boolean): TranscriptGuar
 			// not fired on this sequence, so the record the shell arms is what stops the second look.
 			should_notify: (_tail, _call, notified_at_ms) =>
 				will_notify && notified_at_ms === hook_decision.NEVER_MS,
-			text: NOTICE_TEXT,
+			// The text is chosen from the call (joshuafolkken/kit#2164); this guard's is constant.
+			text: () => NOTICE_TEXT,
 		},
 	})
 }
