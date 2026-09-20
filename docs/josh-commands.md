@@ -1324,6 +1324,23 @@ count; exit 1).
 - `--epic <E> --repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
 
+### `josh run:review`
+
+Starts the gate in the background and prints the whole `/code-review` brief in one call, so a lane
+child launches the two together and they overlap (joshuafolkken/kit#2179); alias `rrv`. It composes
+`josh gate` and `josh review:brief` and changes neither, so `review:attest --check`'s nonce/checkout
+contract is minted exactly as before.
+
+```bash
+pnpm josh run:review          # detach the gate, print the brief; then launch the /code-review subagent
+pnpm josh run:review --join   # after the review returns: join the gate, check its verdict
+```
+
+The default waits only for the gate to _start_ (never for the checks to pass) and prints the brief;
+`--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
+the mechanical form of "a review verdict is not adopted over a red gate". The overlap's reader is
+joshuafolkken/kit#2179 and `chain-rule.md`.
+
 ### `josh run:progress`
 
 Report an unattended run's progress once it has gone quiet — the one josh command meant to be started and left running in the background.

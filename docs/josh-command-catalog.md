@@ -995,6 +995,16 @@ Release this working tree's run record
 
 ---
 
+### `josh run:review` · `josh rrv`
+
+> **Audience:** automation · **Side effects:** processes, files
+
+`[--join]`
+
+Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)
+
+---
+
 ### `josh run:status` · `josh rst`
 
 > **Audience:** automation · **Side effects:** network
