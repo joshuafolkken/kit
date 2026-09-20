@@ -132,6 +132,44 @@ describe('entry_read_set.read_set — which files', () => {
 	})
 })
 
+describe('entry_read_set — backlogrun reads its child files at the point of use (joshuafolkken/kit#2161)', () => {
+	const ENTRY = 'backlogrun'
+	const SPLIT = 'split-assessment.md'
+	const PER_ENTRY: ReadonlyArray<string> = ['fullrun.md', SPLIT]
+
+	// The parent orchestrates and never implements: a dispatched child reads both inside its own
+	// delegated fullrun unit, so neither is a backlogrun entry read.
+	it.each(PER_ENTRY)('keeps %s out of the backlogrun entry read', (file) => {
+		expect(entry_read_set.read_set(ROOT, ENTRY).files).not.toContain(file)
+	})
+
+	// The same two files stay entry reads for an entry that implements one issue directly — the
+	// distinction the global point-of-use set cannot express.
+	it('keeps fullrun.md and split-assessment.md in the fullrun entry read', () => {
+		expect(entry_read_set.read_set(ROOT, 'fullrun').files).toEqual(
+			expect.arrayContaining([...PER_ENTRY]),
+		)
+	})
+
+	it.each(['halfrun', 'kickoff'])('keeps split-assessment.md in the %s entry read', (entry) => {
+		expect(entry_read_set.read_set(ROOT, entry).files).toContain(SPLIT)
+	})
+
+	it('classifies the child files as point-of-use for backlogrun and no other entry', () => {
+		const classified = [...(entry_read_set.POINT_OF_USE_BY_ENTRY.get(ENTRY) ?? [])]
+
+		expect(classified.toSorted(alphabetical)).toStrictEqual([...PER_ENTRY].toSorted(alphabetical))
+		expect(entry_read_set.POINT_OF_USE_BY_ENTRY.has(SECTION_CITER)).toBe(false)
+	})
+
+	// The saving is not a disappearance: the cost report still accounts for what the child reads later.
+	it('reports the child files under the backlogrun point-of-use', () => {
+		const files = entry_read_set.costed(ROOT, ENTRY).point_of_use.map((one) => one.file)
+
+		for (const file of PER_ENTRY) expect(files).toContain(file)
+	})
+})
+
 describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#1856)', () => {
 	// chain-rule.md governs the /code-review → followup chain, which binds after the first edit, so it
 	// left the entry read of the four entries that used to list it and joined the point-of-use set. A

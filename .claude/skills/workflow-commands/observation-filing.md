@@ -158,7 +158,7 @@ and it was filed anyway, because **discarding it was the only alternative on off
 
 - **The destination is `docs/observations.md` in the repository the observation is about** — the same
   repository the Issue would have been filed into. **The count and the append are both run in that
-  repository's checkout**, resolved the way §2c resolves any cross-repository target, and the file is
+  repository's checkout**, resolved the way §2c (`target-repository.md`) resolves any cross-repository target, and the file is
   created on the first append where that repository has none. **The subject decides, never the
   working directory**: an observation about this package's own orchestration, seen while a run is
   inside a repository that consumes it, is recorded here rather than there — the append follows the

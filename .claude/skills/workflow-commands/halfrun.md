@@ -48,7 +48,7 @@ that disagree the later text is the agreement in force. `pnpm josh rule:guard` r
 read once per run. `SKILL.md` → §2g is the single source, including the two answers that stop the run.
 
 **The target repository is named in front of the Issue reference** — `halfrun kit#412`,
-`halfrun joshuafolkken/app-kit#12`. The definition is `SKILL.md` → §2c. An implementing entry needs
+`halfrun joshuafolkken/app-kit#12`. The definition is `SKILL.md` → §2c, whose body is `target-repository.md`. An implementing entry needs
 that repository's checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than
 cloning** when there is none, or when the tree there is not clean. A target whose owner is not this
 session's is third-party: Tier C, so it stops rather than filing.

@@ -27,7 +27,7 @@ that run is holding. It claims nothing, so it must not release anything either. 
 single source.
 
 **The target repository is named in front of the Issue reference** — `kickoff kit#new`,
-`kickoff joshuafolkken/kit#412`. The definition is `SKILL.md` → §2c. `kickoff` is the entry that needs
+`kickoff joshuafolkken/kit#412`. The definition is `SKILL.md` → §2c, whose body is `target-repository.md`. `kickoff` is the entry that needs
 no checkout: name the target repository in the path of every `gh api` call — reads included — and never
 clone. The one exception is the split path's epic, since `pnpm josh epic` writes only the repository it
 runs in — and the promote arm has no remote fallback at all, so it stops when that repository is not

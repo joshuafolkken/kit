@@ -1,10 +1,14 @@
 # `backlogrun` — running a child (shared mechanics, delegation, liveness, session setup)
 
-**Read this file in full before the first child is dispatched** — in the turn that reaches
-`pnpm josh delegate epic-child` (or `pnpm josh lane:dispatch`), and again for each child. It is a
-point-of-use document, never an entry read: the entry procedure is `backlogrun.md`, which points here
-at that step (joshuafolkken/kit#2010). This file is the single source of how one `backlogrun` child —
-of a named epic, a named issue, or the opted-in pool — is run.
+**Read this file in full once per session — before the first child is dispatched**, in the turn that
+reaches `pnpm josh delegate epic-child` (or `pnpm josh lane:dispatch`). **A later child does not re-read
+the whole file; it fetches only the section that child needs** — `pnpm josh doc:section backlogrun-child.md
+"<heading>"` — because a full re-read per child stacks this file's whole length onto the parent's
+conversation for every remaining request, which is exactly the n²/2 growth the hand-off exists to
+avoid (`backlogrun-progress.md`). It is a point-of-use document, never an entry read: the entry
+procedure is `backlogrun.md`, which points here at that step (joshuafolkken/kit#2010). This file is the
+single source of how one `backlogrun` child — of a named epic, a named issue, or the opted-in pool — is
+run.
 
 ## Running a child — the shared mechanics
 
@@ -91,7 +95,7 @@ takes. `pnpm josh lane:dispatch` is where a lane's child is started; "Handing th
 carries the command.
 
 **The lane child uses the invoking CLI's `worker` profile.** Claude Code defaults to Anthropic
-`sonnet` / `medium`; Codex uses `codex exec`, OpenAI `gpt-5.6-sol` / `medium`, workspace-write and
+`opus` / `medium`; Codex uses `codex exec`, OpenAI `gpt-5.6-sol` / `medium`, workspace-write and
 JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
 and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
 refuse or park without fallback or retry.

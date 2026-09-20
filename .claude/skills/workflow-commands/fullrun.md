@@ -77,7 +77,7 @@ and `latest:scope`'s dependency scope in one report, run beside `pnpm josh run:h
 separate commands; no `--repo`.
 
 **The target repository is named in front of the Issue reference** — `fullrun joshuafolkken/app-kit#12`,
-`fullrun kit#new`. The definition is `SKILL.md` → §2c. An implementing entry needs that repository's
+`fullrun kit#new`. The definition is `SKILL.md` → §2c, whose body is `target-repository.md`. An implementing entry needs that repository's
 checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than cloning** when there
 is none, or when the tree there is not clean. A target whose owner is not this session's is
 third-party: Tier C, so it stops rather than filing.
