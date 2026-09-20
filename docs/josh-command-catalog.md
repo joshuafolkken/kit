@@ -169,9 +169,9 @@ Run unit and E2E tests
 
 > **Audience:** developer · **Side effects:** processes
 
-_No arguments._
+`[--match]`
 
-Report whether the working-tree change needs a test (required/exempt/satisfied)
+Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin
 
 ---
 
@@ -602,6 +602,16 @@ Report a run's token and credit cost from Claude Code's session transcripts
 `<step> | --list`
 
 Say whether a run step may go to a cheaper execution tier
+
+---
+
+### `josh disposition` · `josh dp`
+
+> **Audience:** automation · **Side effects:** none
+
+`<path...>`
+
+Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)
 
 ---
 

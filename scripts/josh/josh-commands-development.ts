@@ -9,6 +9,8 @@ import {
 const FILE_ARGUMENTS = '[files...]'
 const REQUIRED_FILE_ARGUMENTS = '<files...>'
 const FILTER_ARGUMENTS = '[filters...]'
+const MATCH_ARGUMENTS = '[--match]'
+const PATH_ARGUMENTS = '<path...>'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
@@ -127,9 +129,17 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'test:declared': {
 		script: 'scripts/test/test-declared.ts',
-		description: 'Report whether the working-tree change needs a test (required/exempt/satisfied)',
+		description:
+			'Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin',
 		category: 'Development',
-		reference: ['', 'developer', ['processes']],
+		reference: [MATCH_ARGUMENTS, 'developer', ['processes']],
+	},
+	disposition: {
+		script: 'scripts/review/disposition-cli.ts',
+		description:
+			'Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)',
+		category: 'AI tools',
+		reference: [PATH_ARGUMENTS, 'automation', ['none']],
 	},
 	'e2e:retry-check': {
 		script: 'scripts/test/e2e-retry-check.ts',

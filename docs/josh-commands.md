@@ -222,11 +222,14 @@ pnpm josh test:related --silent            # flags are forwarded to vitest
 
 ### `josh test:declared`
 
-Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`).
+Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`). On `required` the detail names each untested file's type — `E2E` under `src/routes/`, `Unit` elsewhere (`prompts/testing-guide.md` §1).
 
 ```bash
-pnpm josh test:declared   # alias: josh td
+pnpm josh test:declared           # alias: josh td
+pnpm josh test:declared --match   # check Step 0 declarations on stdin
 ```
+
+`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
 
 ### `josh test:e2e`
 
@@ -1127,6 +1130,14 @@ pnpm josh review:round2 --json              # the verdict and the reason, machin
 - `--json` — machine-readable verdict and reason.
 
 `skip` on **Arm A** (the fix delta is empty) or **Arm B** (every path in the fix delta is inert by [`josh review:brief --level-only`](#josh-reviewbrief)'s classification); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one non-inert path. Full reasoning: `prompts/review.md`.
+
+### `josh disposition`
+
+Say whether a review finding **reaches a runtime path** (`runtime`, any non-inert path) or is inert (`non-runtime`) — the machine half of the three-way disposition, sharing `review-level.ts`'s inert set, so only "is the defect confirmed" is left to a person. Verdict on stdout, reason on stderr. Full reasoning: `prompts/review.md` → "Three-way disposition after the cap".
+
+```bash
+pnpm josh disposition <path...>   # → runtime | non-runtime ; alias: josh dp
+```
 
 ### `josh review:attest`
 
