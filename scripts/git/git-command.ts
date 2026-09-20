@@ -224,6 +224,21 @@ async function diff_cached_names(): Promise<string> {
 	])
 }
 
+// The branch diff as `added\tdeleted\tpath` rows — the same base and flags as `diff_main_names`, so
+// the size read against and the name read agree on what "changed" is. A binary file prints `-` for
+// both counts; the parser above `josh split:assess` reads it treats those as zero changed lines.
+async function diff_main_numstat(): Promise<string> {
+	return await git_spawn.read([
+		...NO_PATH_QUOTING,
+		'diff',
+		'--numstat',
+		NO_RELATIVE_PATHS,
+		NO_RENAME_DETECTION,
+		await change_base(),
+		'--',
+	])
+}
+
 // Files git is not tracking yet. `git diff` never lists them, so a classifier built on the diff
 // alone sees a change that adds a whole new module as an empty one — which is how a run adding new
 // code could have been handed a reduced review level (joshuafolkken/kit#966).
@@ -530,6 +545,7 @@ const git_command = {
 	change_base,
 	change_base_commit,
 	diff_main_names,
+	diff_main_numstat,
 	untracked_names,
 	get_default_branch,
 	default_branch_reference,

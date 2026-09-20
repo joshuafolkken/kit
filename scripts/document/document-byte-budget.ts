@@ -94,11 +94,15 @@ const SLACK_BYTES = 512
 // that ranks candidate packages by measured metrics, its command reference and its `clear`/`close`
 // verdict — landing against a document already at its mark, the branch's merge with `main` layering
 // the section on top of #2205's own, so the merged tree needs two units the branch tree alone did not.
-// joshuafolkken/kit#2207 raised it one slack unit (107,136 → 107,648) for the mandated `--follow`
-// reader on the `josh run:event` section — the waiting positioned read an attached session relays with,
-// its command reference and its stdout/stderr contract — landing against a document already at its
-// mark, the branch's merge with `main` layering #2216's section on top so the merged tree carries both.
-const JOSH_COMMANDS_CEILING_BYTES = 107_648
+// joshuafolkken/kit#2218 raised it two further slack units (107,136 → 108,160) for the mandated `josh
+// split:assess` section — the split-assessment size command, its command reference and its
+// `split` / `single` verdict — landing against a document already at its mark, the branch's merge with
+// `main` layering the section on top of #2205's and #2216's, so the merged tree needs two units the
+// branch tree alone did not. joshuafolkken/kit#2207 raised it one slack unit (108,160 → 108,672) for the
+// mandated `--follow` reader on the `josh run:event` section — the waiting positioned read an attached
+// session relays with, its command reference and its stdout/stderr contract — landing against a document
+// already at its mark, the branch's merge with `main` layering #2216's and #2218's sections on top.
+const JOSH_COMMANDS_CEILING_BYTES = 108_672
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -141,11 +145,11 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 29_452 },
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 5420 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 23_282 },
-	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
+	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 7108 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 106_907 },
+	{ path: 'docs/josh-commands.md', bytes: 107_833 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
