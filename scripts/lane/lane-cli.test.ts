@@ -21,6 +21,15 @@ vi.mock('./lane-dispatch', () => ({
 	},
 }))
 vi.mock('./lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
+// `lane:list` reads the `in-progress` listing to name the lane/label difference (joshuafolkken/kit#2235);
+// mocked so the unit suite makes no live `gh` call. An idle repository plus a known owner lets the
+// occupancy path run deterministically over the listed lanes.
+vi.mock('#scripts/git/git-gh-command', () => ({
+	git_gh_command: { repo_get_name_with_owner: vi.fn().mockResolvedValue('joshuafolkken/kit') },
+}))
+vi.mock('#scripts/epic/epic-busy', () => ({
+	epic_busy: { read_repository: vi.fn().mockResolvedValue({ kind: 'idle' }) },
+}))
 vi.mock('./lane-output', () => ({
 	lane_output: {
 		NO_OUTPUT: 'no output path',

@@ -971,6 +971,19 @@ Writes all three places an epic's order lives — the task list, the `## Depende
 
 Nothing is written unless all three places will agree. `#M` must be a child of the epic; a position naming an issue being placed, or a hub the declaration cannot position within, is refused without writing. A cross-repository target is refused with the bare-number command to run instead.
 
+#### `josh epic --reconcile` — bring the declaration and the recorded relations back into agreement
+
+```bash
+pnpm josh epic --reconcile 2184   # rewrite the body to match the recorded blocked-by, and record any order the body declared
+```
+
+When the `## Dependencies` declaration and the native `blocked-by` relations disagree, `--add` and `--remove` both refuse and `backlog:next` reports the graph unusable — and the only other exit was to edit the epic body by hand. `--reconcile` is that repair. There is no judgement in it: a relation recorded but never declared is written into the declaration (the relation is the GitHub-side fact, the body its copy), and an order declared but never recorded is aligned by recording the relation. The result declares exactly what it records.
+
+- It **writes no `## Decisions`** — synchronizing a copy is not a decision, so nothing is recorded on the epic or its children.
+- When the two already agree it writes nothing and prints `nothing to reconcile`.
+- A circular union of declared and recorded orders is refused without writing; there is nothing to reconcile a cycle to.
+- On success it states that `epic:audit` and `backlog:next` now agree on the epic's order.
+
 ### `josh epic:next`
 
 List an epic's runnable children, bundled per repository. All state lives on GitHub, so asking again after any interruption gives the same answer.
@@ -1510,6 +1523,8 @@ pnpm josh lane:prune        # alias: josh lnp
 - `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 6); applied by `josh epic:next`.
 
 **Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
+
+**The `in-progress` / lane difference:** `epic:next` counts lane occupancy from the `in-progress` label list, while the lanes are the work trees actually open — and the two can disagree. `lane:list` names the difference on stderr, in both directions: an issue that carries `in-progress` but has no open lane (a stale label that silently shrinks the free-lane count), and a lane whose issue carries no `in-progress` label (which lets another session claim the same issue). The per-issue judgement is three-valued — `live`, `stopped`, or `unknown` when the lane listing could not be read — and `unknown` is never collapsed to `stopped`. It reads the two sets the way `epic:next` and `lane:list` already read them, and **it never changes a label** — clearing `in-progress` from a live run is a person's to do, since removing it is exactly what opens a second pull request.
 
 #### `josh lane:output`
 
