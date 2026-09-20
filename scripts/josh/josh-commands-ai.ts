@@ -1,4 +1,5 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import { CLONE_COMMANDS } from './josh-commands-clone'
 import { LANE_COMMANDS } from './josh-commands-lane'
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
@@ -26,6 +27,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Before filing: say whether an issue like this exists and which epic it belongs to',
 		category: 'AI tools',
 		reference: ['<title> [--body <summary>]', 'automation', ['network']],
+	},
+	'pkg:scout': {
+		script: 'scripts/package/package-scout-cli.ts',
+		description:
+			'Rank package candidates by measured metrics so the Package-First tier decision is read, not judged',
+		category: 'AI tools',
+		reference: ['<keywords> [--size <n>]', 'automation', ['network']],
 	},
 	'stash:pop': {
 		script: 'scripts/git/stash-pop-cli.ts',
@@ -255,6 +263,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--join]', 'automation', ['processes', 'files']],
 	},
+	'run:event': {
+		script: 'scripts/run/run-event-cli.ts',
+		description:
+			'Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)',
+		category: 'AI tools',
+		reference: ['--append <kind> <text> | --from <position> | --last', 'automation', ['files']],
+	},
 	...LANE_COMMANDS,
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
@@ -290,13 +305,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
-	'clone:scan': {
-		script: 'scripts/clone/clone-scan-cli.ts',
-		description:
-			'Count code duplication across files and first-party repositories, printing each clone as file:line pairs',
-		category: 'AI tools',
-		reference: ['', 'automation', ['files']],
-	},
+	...CLONE_COMMANDS,
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',

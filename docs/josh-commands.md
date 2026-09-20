@@ -824,6 +824,16 @@ pnpm josh issue:scout "<title>" --body "follows on from #1246"
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
 
+### `josh pkg:scout`
+
+Before the Package-First tier decision, rank candidate packages by measured metrics so Tier A ("clearly best") and Tier B ("genuine toss-up") are read off the output rather than judged (joshuafolkken/kit#2216). It queries the npm registry and prints one line per candidate: npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
+
+```bash
+pnpm josh pkg:scout "date formatting" --size 5   # alias: josh pks
+```
+
+`--size <n>` sets how many candidates to fetch and rank (default 10). The verdict reads the top two's relative lead `(top − second) / top`: `clear` when the leader is ahead by at least 15% (select it, Tier A), `close` when within it (ask the user, Tier B). A failed per-candidate read leaves that metric blank (`—`).
+
 ### `josh issue:lint`
 
 Check an issue body written to a file against the template's four required headings — `## 背景`, `## 現象`, `## 期待結果`, `## 受け入れ条件` (the single source is `prompts/collaboration-workflow/issue-template.md`). It reads a path rather than stdin so a body can be linted before the `gh api … issues` call that files it.
@@ -1180,9 +1190,7 @@ Single source: `scripts/rules/decision-oracle.ts`.
 
 ### `josh clone:scan` · `josh cs`
 
-Count code duplication across files and first-party repositories (including `JOSH_REPO_PATHS`), giving the `no-clones` rule its missing measurement. Detection is by non-overlapping blocks of normalized significant lines, so one copied region counts once. Output: `clean`, or `clones: <N>` then each clone as `[same-file|cross-file|cross-repo]` with `file:line` sites (exit 0).
-
-Single source: `scripts/clone/clone-scan.ts`.
+Count code duplication across files and first-party repos (`JOSH_REPO_PATHS` included) — the measurement `no-clones` lacked. Output: `clean`, or `clones: <N>` then each clone `[same-file|cross-file|cross-repo]` with `file:line` (exit 0). Single source: `scripts/clone/clone-scan.ts`.
 
 ### `josh run:hold` / `josh run:release`
 
@@ -1361,6 +1369,24 @@ The default waits only for the gate to _start_ (never for the checks to pass) an
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
 the mechanical form of "a review verdict is not adopted over a red gate". The overlap's reader is
 joshuafolkken/kit#2179 and `chain-rule.md`.
+
+### `josh run:event`
+
+Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205); alias
+`rev`. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
+lane child append to one stream that survives a session cut; `--from` reads everything after a position,
+`--last` the newest event alone.
+
+```bash
+pnpm josh run:event --append <kind> <text>   # append one event; prints its position
+pnpm josh run:event --from <position>         # every event after <position>, in order
+pnpm josh run:event --last                    # the newest event alone
+```
+
+`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `cut`, `stop`,
+`pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge` and `park`
+in-process; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
+without limit.
 
 ### `josh run:progress`
 
