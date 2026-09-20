@@ -206,9 +206,12 @@ function build_plan(
 // failure is recoverable by re-running the install alone.
 //
 // **The gate's verification caches are seeded from the main checkout before the install**
-// (joshuafolkken/kit#1849), so the lane's first `josh gate` is warm rather than cold. It is
-// best-effort and runs after the `.env` write for the same reason the install does: a lane whose
-// warming found nothing still carries its seat and is perfectly usable, cold first gate and all.
+// (joshuafolkken/kit#1849), so the lane's first `josh gate` is warm rather than cold. The pre-built
+// hook bundles are seeded the same way (joshuafolkken/kit#2160): `dist/hooks/` is git-ignored, so a
+// lane's work tree never carries it and every Claude Code hook drops to the slow `pnpm josh …`
+// fallback without this copy. Both are best-effort and run after the `.env` write for the same reason
+// the install does: a lane whose warming found nothing still carries its seat and is perfectly
+// usable, cold first gate and fallback hooks and all.
 async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 	// The seat lock is released the moment the `.env` is on disk — from then the lane is readable and
 	// its seat discoverable, so nothing more holds the seat. It must **not** ride the multi-minute
@@ -224,6 +227,7 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 		writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
 		release_seat_lock(plan.seat_lock)
 		lane_cache.seed_caches(source_root, plan.lane.directory)
+		lane_cache.seed_hook_bundles(source_root, plan.lane.directory)
 		guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
 	} finally {
 		release_seat_lock(plan.seat_lock)

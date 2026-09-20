@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { hook_launch } from '#scripts/init/hook-launch'
 import {
 	CSPELL_CACHE_FILE,
 	ESLINT_CACHE_FILE,
@@ -177,5 +178,57 @@ describe('best-effort lane cache seeding', () => {
 		expect(() => {
 			lane_cache.seed_caches(SOURCE, path.join(scratch, 'no-such-lane'))
 		}).not.toThrow()
+	})
+})
+
+// joshuafolkken/kit#2160: a fresh lane also copies the git-ignored `dist/hooks/` bundles from the
+// main checkout, so its child launches each hook off `node dist/hooks/<name>.js` instead of the slow
+// `pnpm josh …` fallback. Best-effort, exactly like the gate-cache warming above.
+const HOOK_BUNDLE_NAME = 'pretool-guard.js'
+
+function source_hook_bundle(content: string): void {
+	const bundle_directory = path.join(SOURCE, hook_launch.HOOK_DIST_DIR)
+
+	mkdirSync(bundle_directory, { recursive: true })
+	writeFileSync(path.join(bundle_directory, HOOK_BUNDLE_NAME), content)
+}
+
+function destination_hook_bundle(): string {
+	return path.join(DESTINATION, hook_launch.HOOK_DIST_DIR, HOOK_BUNDLE_NAME)
+}
+
+describe("seeding a lane's hook bundles", () => {
+	it('copies the pre-built hook bundles the main checkout has', () => {
+		const body = 'bundle body'
+
+		source_hook_bundle(body)
+
+		lane_cache.seed_hook_bundles(SOURCE, DESTINATION)
+
+		expect(readFileSync(destination_hook_bundle(), 'utf8')).toBe(body)
+	})
+
+	// A clone that never ran `pnpm build` has no bundles: the lane opens on the fallback path rather
+	// than failing, so nothing is copied and nothing throws.
+	it('copies nothing when the main checkout has no bundles', () => {
+		expect(() => {
+			lane_cache.seed_hook_bundles(SOURCE, DESTINATION)
+		}).not.toThrow()
+
+		expect(existsSync(path.join(DESTINATION, hook_launch.HOOK_DIST_DIR))).toBe(false)
+	})
+
+	// The copy is independent, so a lane rewriting a bundle cannot reach back into the main checkout's.
+	it('copies into files independent of the source', () => {
+		const original = 'source bundle'
+
+		source_hook_bundle(original)
+
+		lane_cache.seed_hook_bundles(SOURCE, DESTINATION)
+		writeFileSync(destination_hook_bundle(), 'lane rewrite')
+
+		expect(
+			readFileSync(path.join(SOURCE, hook_launch.HOOK_DIST_DIR, HOOK_BUNDLE_NAME), 'utf8'),
+		).toBe(original)
 	})
 })
