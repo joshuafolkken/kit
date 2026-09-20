@@ -5,10 +5,15 @@
 This is the execution contract for `fullrun` and `backlogrun`; the record below is reference only.
 Review results and successful pushes are never turn boundaries.
 
-1. Run `pnpm josh main:merge`, then the final scoped lint/test pair. Run `pnpm josh run:review`: it
-   starts `pnpm josh gate` in the background and prints the whole `/code-review` brief in one call, so
-   the gate and the review overlap rather than the review waiting on the gate (joshuafolkken/kit#2179).
-   Launch the `/code-review` subagent with that brief. Never load the review skill in the main line.
+1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` before the scoped pair and the
+   gate** — the pre-gate cut, ordered here so a lane child takes it before the gate rather than after a
+   refusal (joshuafolkken/kit#2177). It is a no-op outside a lane and cuts inside one; on `cut` the turn
+   ends and a fresh process resumes at the gate, and because the cut is issued on its own it never
+   batches with a call a refusal could collateral. The `pre-gate-cut.md` refusal stays as insurance.
+   Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts `pnpm josh gate` in
+   the background and prints the whole `/code-review` brief in one call, so the gate and the review
+   overlap rather than the review waiting on the gate (joshuafolkken/kit#2179). Launch the
+   `/code-review` subagent with that brief. Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
    and gate. Do not version-bump a child; `pnpm josh release` decides the version from main's history.

@@ -89,13 +89,17 @@ const SLACK_BYTES = 512
 // re-run and the firing-point/baseline checks it adds — landing against a document already at its mark.
 // joshuafolkken/kit#2205 raised it one slack unit (105,600 → 106,112) for the mandated `josh run:event`
 // section — the run's append-only event stream, its command reference and its append/read forms —
-// landing against a document already at its mark.
-// joshuafolkken/kit#2182 raised it two slack units (106,112 → 107,136) for the mandated
+// landing against a document already at its mark. joshuafolkken/kit#2216 raised it two further slack
+// units (106,112 → 107,136) for the mandated `josh pkg:scout` section — the Package-First tier oracle
+// that ranks candidate packages by measured metrics, its command reference and its `clear`/`close`
+// verdict — landing against a document already at its mark, the branch's merge with `main` layering
+// the section on top of #2205's own, so the merged tree needs two units the branch tree alone did not.
+// joshuafolkken/kit#2182 raised it two further slack units (107,136 → 108,160) for the mandated
 // `josh sonar:hotspots` and `josh ui:routes` sections — the two prose procedures turned into commands,
 // their command references and branch/output contracts — landing against a document already at its
-// mark, the branch's merge with `main` layering the sections on top of the `josh run:event` section
-// `main` had already added.
-const JOSH_COMMANDS_CEILING_BYTES = 107_136
+// mark, the branch's merge with `main` layering the sections on top of the `josh run:event` and
+// `josh pkg:scout` sections `main` had already added.
+const JOSH_COMMANDS_CEILING_BYTES = 108_160
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -123,7 +127,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// on both sides by the ratchet, exactly as #2189 did for `fullrun.md` / `fullrun-steps.md`.
 	{ path: '.claude/skills/workflow-commands/backlogrun-steps.md', bytes: 46_674 },
 	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 7491 },
-	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6240 },
+	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6948 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 5355 },
@@ -135,14 +139,14 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 4370 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_956 },
-	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 28_364 },
+	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 29_452 },
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 5420 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 23_282 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 106_478 },
+	{ path: 'docs/josh-commands.md', bytes: 107_275 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
