@@ -36,6 +36,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
 	},
+	'refactor:scan': {
+		script: 'scripts/refactor/refactor-scan-cli.ts',
+		description:
+			'List refactoring candidates in the changed scope by category and answer clear/candidates',
+		category: 'Development',
+		reference: ['', 'automation', ['processes']],
+	},
 	bytes: {
 		script: 'scripts/bytes/bytes-command.ts',
 		description:

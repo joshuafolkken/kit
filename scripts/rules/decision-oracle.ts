@@ -203,6 +203,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: [OVER, 'human-review', STOP, RETRY, BUSY],
 		single_source: BACKLOGRUN_MD,
 	},
+	{
+		name: 'refactor:scan',
+		decision: 'Whether the refactoring scope still holds high- or medium-priority candidates',
+		args: '',
+		vocabulary: ['clear', 'candidates', 'error'],
+		single_source: 'prompts/refactoring.md',
+	},
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
