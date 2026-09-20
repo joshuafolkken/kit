@@ -81,6 +81,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rpy": "repo:party",
     "rr": "run:release",
     "rs": "read:set",
+    "rst": "run:status",
     "rt": "reconcile-templates",
     "rug": "rule:guard",
     "rv": "run:liveness",
@@ -708,6 +709,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "files",
+      ],
+    ],
+    "run:status": [
+      "<issue> [--repo <owner/repo>]",
+      "automation",
+      [
+        "network",
       ],
     ],
     "run:wake": [

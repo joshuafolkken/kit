@@ -102,7 +102,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 95_137 },
+	{ path: 'docs/josh-commands.md', bytes: 95_356 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },

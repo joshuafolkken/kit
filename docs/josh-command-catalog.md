@@ -871,7 +871,7 @@ Carry one invocation’s budget across its own session cuts
 
 `[--resume] <issue>`
 
-Cut a lane child before the gate and resume a fresh process from the persisted state
+Cut a lane child before the gate and resume a fresh process
 
 ---
 
@@ -881,7 +881,7 @@ Cut a lane child before the gate and resume a fresh process from the persisted s
 
 `<issue> --output <path> [--repo <owner/repo>]`
 
-Classify how a dispatched lane child ended: merged, cut, abandoned mid-implementation, or unreadable
+Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 ---
 
@@ -921,7 +921,7 @@ Collapse a backlogrun merge event into one call: confirm the child, do the post-
 
 `<issue>`
 
-Bundle the reads a run makes before its first edit: issue body and comments, state, dependency-update scope
+Bundle a run’s pre-edit reads: body, comments, state, dependency scope
 
 ---
 
@@ -945,13 +945,23 @@ Release this working tree's run record
 
 ---
 
+### `josh run:status` · `josh rst`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue> [--repo <owner/repo>]`
+
+Bundle a run’s read-only status: issue state, cost verdict, carry counters
+
+---
+
 ### `josh run:wake` · `josh rw`
 
 > **Audience:** automation · **Side effects:** processes, notifications
 
 `[options]`
 
-Continue a cut backlogrun by waking the next session from outside the conversation
+Wake the next session of a cut backlogrun from outside the conversation
 
 ---
 

@@ -26,6 +26,16 @@ function per_request_cost(measurement: OverMeasurement): number {
 	return Math.round(measurement.billed_input_tokens / measurement.request_count)
 }
 
+// The bare over/under decision, without a report: `run:status` reads this same verdict read-only
+// (joshuafolkken/kit#2165), so the comparison lives here once rather than being copied there. A
+// threshold of exactly `cost` is under, matching the `>` the printed report used.
+function classify(
+	measurement: OverMeasurement,
+	limit: number,
+): typeof OVER_VERDICT | typeof UNDER_VERDICT {
+	return per_request_cost(measurement) > limit ? OVER_VERDICT : UNDER_VERDICT
+}
+
 // A verdict, not a table: the point of the flag is that the hand-off is decided by a number rather
 // than by whether the run feels long, which is a judgement made under exactly the pressure that
 // resolves it the wrong way.
@@ -36,11 +46,9 @@ function report_over(measurement: OverMeasurement | undefined, limit: number): n
 		return FAILURE_EXIT_CODE
 	}
 
-	const cost = per_request_cost(measurement)
-
-	console.info(cost > limit ? OVER_VERDICT : UNDER_VERDICT)
+	console.info(classify(measurement, limit))
 	console.error(
-		`${String(cost)} billed input tokens per request over ${String(measurement.request_count)} request(s); limit ${String(limit)}`,
+		`${String(per_request_cost(measurement))} billed input tokens per request over ${String(measurement.request_count)} request(s); limit ${String(limit)}`,
 	)
 
 	return 0
@@ -49,6 +57,7 @@ function report_over(measurement: OverMeasurement | undefined, limit: number): n
 const cost_verdict = {
 	OVER_VERDICT,
 	UNDER_VERDICT,
+	classify,
 	per_request_cost,
 	report_over,
 }

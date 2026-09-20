@@ -1236,6 +1236,11 @@ pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 
 Bundles the reads a run makes before its first edit into one call; alias `rp`.
 
+### `josh run:status`
+
+Bundles a run's read-only status — issue state, `cost --cut` verdict, and carry counters — in one
+call; alias `rst`, `--repo` for a cross-repo child. Writes nothing (joshuafolkken/kit#2165).
+
 ### `josh repo:party`
 
 Says whether a repository is **first-party** or **third-party** — computed by owner equality, not

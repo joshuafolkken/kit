@@ -111,6 +111,7 @@ const ALIASES: Record<string, string> = {
 	red: 'run:ending',
 	rg: 'run:progress',
 	rp: 'run:prep',
+	rst: 'run:status',
 	rpy: 'repo:party',
 	rmg: 'run:merge',
 	sp: 'stash:pop',
