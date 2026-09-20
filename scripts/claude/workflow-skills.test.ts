@@ -87,6 +87,10 @@ const THREE_BYTE_CHAR_BYTES = 3
 
 const KICKOFF_FILE = 'kickoff.md'
 const FULLRUN_FILE = 'fullrun.md'
+// joshuafolkken/kit#2189 turned `fullrun.md` into a manifest and moved its step lists — the stash of a
+// `fullrun new`'s pre-existing changes among them — to `fullrun-steps.md`, so the stash-safety check
+// below reads that companion for the `fullrun` side.
+const FULLRUN_STEPS_FILE = 'fullrun-steps.md'
 const HALFRUN_FILE = 'halfrun.md'
 const CHAIN_RULE_FILE = 'chain-rule.md'
 const FOLLOWUP_FILE = 'followup.md'
@@ -179,7 +183,7 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 	// the stash list with the run reporting success. The pop is `pnpm josh stash:pop`, targeted by
 	// message, because the stash is a repository-wide stack every lane shares — a positional
 	// `git stash pop` takes whichever lane last pushed (joshuafolkken/kit#2050).
-	it.each([FULLRUN_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
+	it.each([FULLRUN_STEPS_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
 		const content = read_skill_file(WORKFLOW_SKILL, filename)
 
 		expect(content).toContain('git stash push')

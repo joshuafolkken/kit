@@ -31,9 +31,9 @@ const SKILL_ROOT = '.claude/skills/workflow-commands'
 
 // Each filing route, the constant that names its label, and the document whose filing command must
 // carry it. Tier A files from two procedures — a prerequisite (same repo) and an upstream defect
-// (a first-party target) — so both are pinned. The prerequisite's command moved to the skill under
-// joshuafolkken/kit#1185, which single-sourced that rule body there and left the canonical topic
-// file a pointer holding no command of its own.
+// (a first-party target) — so both are pinned. joshuafolkken/kit#2189 relocated §2d's body out of
+// `SKILL.md` into `prerequisite.md`, so the prerequisite's raw `gh api` filing command now lives
+// there and the `SKILL.md` stub carries only the trigger and the pointer.
 const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: string }> = [
 	{
 		route: 'review round-cap carry-forward',
@@ -48,7 +48,7 @@ const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: 
 	{
 		route: 'Tier A prerequisite',
 		label: TIER_A_ROUTE_LABEL,
-		doc: `${SKILL_ROOT}/SKILL.md`,
+		doc: `${SKILL_ROOT}/prerequisite.md`,
 	},
 	{
 		route: 'Tier A upstream defect',
