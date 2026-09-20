@@ -10,6 +10,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bb": "backlog:budget",
     "bg": "batch:guard",
     "bl": "backlog:next",
+    "blo": "backlog:offer",
     "blp": "backlog:plan",
     "bp": "bump",
     "c": "check",
@@ -46,6 +47,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lnc": "lane:close",
     "lnd": "lane:dispatch",
     "lnl": "lane:list",
+    "lnla": "lane:launch",
     "lno": "lane:open",
     "lnp": "lane:prune",
     "lnv": "lane:output",
@@ -145,6 +147,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "backlog:next": [
       "[--exclude <n>[,<n>...]] [--repo <owner/repo>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "backlog:offer": [
+      "[options]",
       "automation",
       [
         "network",
@@ -380,6 +389,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "<issue> <prompt>",
       "automation",
       [
+        "processes",
+      ],
+    ],
+    "lane:launch": [
+      "<issue> [--stash <message>]",
+      "automation",
+      [
+        "files",
+        "git",
         "processes",
       ],
     ],

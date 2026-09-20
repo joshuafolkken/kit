@@ -58,6 +58,10 @@ words:
   # What `josh time`'s bundling block calls a call that could have gone out beside another
   # (joshuafolkken/kit#1607). Distributed, because `docs/josh-commands.md` and `turn-batching.md` name it.
   - bundleable
+  # The alias for `josh lane:launch`, the composite lane-start command (joshuafolkken/kit#2162).
+  # Distributed, because `docs/josh-commands.md` and `backlogrun-lanes.md` name it and `josh sync`
+  # copies that skill. The other lane aliases are three letters, below cspell's checked-word length.
+  - lnla
   # What a re-runnable tree-state check is and `josh run:hold` is not (joshuafolkken/kit#926): a
   # question that may be put again once the tree it read has been reclaimed. Distributed, because
   # `epicrun.md` names it and `josh sync` copies that skill. cspell derives neither this nor
