@@ -23,6 +23,8 @@ const CLAUDE_MD = 'CLAUDE.md'
 const SKILL_MD = '.claude/skills/workflow-commands/SKILL.md'
 const FULLRUN_MD = '.claude/skills/workflow-commands/fullrun.md'
 const BACKLOGRUN_MD = '.claude/skills/workflow-commands/backlogrun.md'
+// joshuafolkken/kit#2190 moved `backlogrun.md`'s detailed procedure into `backlogrun-steps.md`.
+const BACKLOGRUN_STEPS_MD = '.claude/skills/workflow-commands/backlogrun-steps.md'
 const BACKLOGRUN_CHILD_MD = '.claude/skills/workflow-commands/backlogrun-child.md'
 const BACKLOGRUN_LANES_MD = '.claude/skills/workflow-commands/backlogrun-lanes.md'
 const BACKLOGRUN_PROGRESS_MD = '.claude/skills/workflow-commands/backlogrun-progress.md'
@@ -57,7 +59,8 @@ const RESIDENT_ANCHORS: ReadonlyArray<Anchor> = [
 	{ file: SKILL_MD, heading: "2g. An Issue's comments are part of the Issue" },
 	{ file: SKILL_MD, heading: '3. What stays resident, and what is read from here' },
 	{ file: FULLRUN_MD, heading: '`fullrun`' },
-	{ file: BACKLOGRUN_MD, heading: 'The session cut is inside the invocation' },
+	{ file: BACKLOGRUN_MD, heading: '`backlogrun`' },
+	{ file: BACKLOGRUN_STEPS_MD, heading: 'The session cut is inside the invocation' },
 	{ file: BACKLOGRUN_PROGRESS_MD, heading: 'The hand-off' },
 	{ file: BACKLOGRUN_PARK_MD, heading: 'park and continue' },
 	{ file: BACKLOGRUN_CHILD_MD, heading: 'When `#N` is not an epic' },

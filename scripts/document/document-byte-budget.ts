@@ -98,7 +98,11 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', bytes: 26_442 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', bytes: 11_889 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 41_667 },
-	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 51_893 },
+	// joshuafolkken/kit#2190 cut `backlogrun.md` to a manifest and moved its detailed procedure into
+	// `backlogrun-steps.md`, so the entry read carries the manifest, not the prose — a relocation held
+	// on both sides by the ratchet, exactly as #2189 did for `fullrun.md` / `fullrun-steps.md`.
+	{ path: '.claude/skills/workflow-commands/backlogrun-steps.md', bytes: 46_674 },
+	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 7491 },
 	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6240 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },

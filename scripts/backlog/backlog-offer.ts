@@ -5,7 +5,7 @@ import { backlog_next } from './backlog-next'
 // answered — its stdout tokens and its exit code — into the one word `backlog:budget` is then asked
 // with, plus the issue numbers to start and the consecutive-retry count carried to the next ask.
 //
-// **The mapping is `backlogrun.md` → "The loop"'s table, held here so it cannot drift.** That table
+// **The mapping is `backlogrun-steps.md` → "The loop"'s table, held here so it cannot drift.** That table
 // fixed which `backlog:next` answer becomes which `backlog:budget` word, and it carried two context
 // branches an agent had to apply by hand every iteration: `wait` is `blocked` while this run has
 // children in flight and `exhausted` when it has none, and `retry` is `blocked` until the third
@@ -13,7 +13,7 @@ import { backlog_next } from './backlog-next'
 // judgement.
 
 // Three consecutive `retry` answers end the run: below that a transport hiccup is re-asked, at it the
-// outage is not a hiccup. `backlogrun.md` → "The loop" is the single source of the count.
+// outage is not a hiccup. `backlogrun-steps.md` → "The loop" is the single source of the count.
 const RETRY_LIMIT = 3
 const FAILURE_EXIT_CODE = 1
 const NO_RETRIES = 0

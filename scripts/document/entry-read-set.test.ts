@@ -49,6 +49,12 @@ const UNKNOWN_ENTRY = 'no-such-entry'
 // files they were cut from. Loose on purpose — it asserts the shape, not today's figure.
 const HALF_AGAIN = 1.5
 const MAX_BACKLOGRUN_TOKENS = 90_000
+// The ceiling joshuafolkken/kit#2190 set on the `backlogrun` parent's own entry read — `SKILL.md` plus
+// the `backlogrun.md` manifest, the referenced sections included. Cutting the detailed procedure into
+// the point-of-use `backlogrun-steps.md` is what brought the entry read under it (measured ~13,800
+// after the cut, from ~29,800 before), and this pins it so a manifest that grew the prose back would
+// fail the gate.
+const MAX_BACKLOGRUN_ENTRY_TOKENS = 20_000
 const NOTHING = 0
 
 const IMPLEMENTING: ReadonlyArray<string> = ['fullrun', 'halfrun', 'backlogrun']
@@ -253,6 +259,41 @@ describe('entry_read_set — point-of-use reachability', () => {
 		])
 
 		expect(total.tokens).toBeLessThan(MAX_BACKLOGRUN_TOKENS)
+	})
+
+	// joshuafolkken/kit#2190: the manifest cut is about the *entry* read, not the total — the total is
+	// unchanged because the prose only moved to a point-of-use file. `scoped` is what the parent pays
+	// up front, and it is what has to stay under 20k.
+	it('keeps the backlogrun entry read below 20k tokens', () => {
+		expect(entry_read_set.costed(ROOT, 'backlogrun').scoped.tokens).toBeLessThan(
+			MAX_BACKLOGRUN_ENTRY_TOKENS,
+		)
+	})
+})
+
+describe('entry_read_set — backlogrun-steps.md is point-of-use (joshuafolkken/kit#2190)', () => {
+	// `backlogrun.md` was cut to a manifest and its detailed procedure moved into `backlogrun-steps.md`,
+	// read on demand rather than at the entry. It must be classified point-of-use so the manifest's
+	// pointers into it are not charged to the entry read, exactly as the four `backlogrun-*.md` phase
+	// documents are.
+	const STEPS = 'backlogrun-steps.md'
+
+	it('classifies backlogrun-steps.md as a point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(STEPS)
+	})
+
+	it('keeps backlogrun-steps.md out of the entry read of every entry', () => {
+		for (const entry of EXPECTED_ENTRIES) {
+			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(STEPS)
+		}
+	})
+
+	// The saving is not a disappearance: the manifest's pointers reach it, and the cost report still
+	// accounts for what the run reads later under the backlogrun point-of-use.
+	it('reports backlogrun-steps.md under the backlogrun point-of-use', () => {
+		const files = entry_read_set.costed(ROOT, 'backlogrun').point_of_use.map((one) => one.file)
+
+		expect(files).toContain(STEPS)
 	})
 })
 
