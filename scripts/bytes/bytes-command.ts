@@ -49,14 +49,16 @@ function status_of(relative_path: string, recorded: number): DocumentStatus {
 	return { path: relative_path, current, recorded, remaining }
 }
 
-// An over-budget row names the number to record, the same value `over_budget_message` states; an
-// in-budget row names the headroom left, so a reader sees the margin before spending it.
+// An over-budget row names the number to record — the next block multiple, the same value
+// `over_budget_message` states; an in-budget row names the headroom left, so a reader sees the margin
+// before spending it.
 function status_body(status: DocumentStatus): string {
-	const ceiling = document_byte_budget.ceiling_for(status.recorded).toString()
+	const ceiling = status.recorded.toString()
 	const current = status.current.toString()
+	const next = document_byte_budget.block_ceiling(status.current).toString()
 
 	if (status.remaining < 0) {
-		return `${current}/${ceiling} bytes · over by ${(-status.remaining).toString()} — raise recorded to ${current}`
+		return `${current}/${ceiling} bytes · over by ${(-status.remaining).toString()} — raise recorded to ${next}`
 	}
 
 	return `${current}/${ceiling} bytes · ${status.remaining.toString()} left`
@@ -82,16 +84,21 @@ function argument_row(argument: string): string {
 	return status_row(status_of(relative_path, recorded))
 }
 
-// The scan reports the documents that have grown into their slack — less than a full slack unit of
-// headroom left, which the ratchet only allows once a document has grown past its recorded size —
-// least headroom first, so an over-budget document sorts ahead of one that merely has little room
-// left. A freshly recorded document sits at exactly one slack of headroom and is left out, so the
-// scan surfaces what is moving toward its ceiling rather than the whole budget.
+// A document is "near its ceiling" once less than this is left before its recorded block ceiling —
+// the point where the next addition tips it over and forces a deterministic bump. Display-only, so it
+// is this command's own dial rather than the ratchet's block size.
+const NEAR_CEILING_BYTES = 512
+
+// The scan reports the documents nearing their ceiling — less than `NEAR_CEILING_BYTES` of headroom
+// left before the next block bump — least headroom first, so an over-budget document sorts ahead of
+// one that merely has little room left. A document freshly recorded to its block sits with the whole
+// block of headroom and is left out, so the scan surfaces what is moving toward its ceiling rather
+// than the whole budget.
 function near_ceiling_statuses(): ReadonlyArray<DocumentStatus> {
 	return document_byte_budget.DOCUMENT_BYTE_BUDGET.map((entry) =>
 		status_of(entry.path, entry.bytes),
 	)
-		.filter((status) => status.remaining < document_byte_budget.SLACK_BYTES)
+		.filter((status) => status.remaining < NEAR_CEILING_BYTES)
 		.toSorted((left, right) => left.remaining - right.remaining)
 }
 

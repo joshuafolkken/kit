@@ -87,11 +87,11 @@ pnpm josh bytes                                 # scan: every budgeted document 
 ```
 
 ```
-docs/josh-commands.md  99968/100480 bytes · 512 left
+docs/josh-commands.md  111777/114688 bytes · 2911 left
 ```
 
 - Path is repository-root-relative (a leading `./` is stripped); a path with no budget entry reads `not counted`.
-- An over-budget row names the exact value to record in `document-byte-budget.ts`. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
+- The recorded ceiling is block-quantized — the next 4 KB multiple at or above the document's size (`document-byte-budget.ts`, joshuafolkken/kit#2231), so a document growing within its block needs no ceiling edit and parallel command-adding lanes stop conflicting on this record. An over-budget row names the value to record: the next block multiple, not the raw current size. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
 
 ### `josh format`
 

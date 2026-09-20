@@ -25,7 +25,7 @@ function ceiling_message(
 	recorded_bytes: number | undefined,
 ): string | undefined {
 	if (recorded_bytes === undefined) return undefined
-	if (current_bytes <= document_byte_budget.ceiling_for(recorded_bytes)) return undefined
+	if (current_bytes <= recorded_bytes) return undefined
 
 	return document_byte_budget.over_budget_message(relative_path, current_bytes, recorded_bytes)
 }
