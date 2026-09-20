@@ -51,7 +51,15 @@ stops before the commit, and `kickoff` never implements.
 | `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md` + `split-assessment.md`        |
 | `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md`        |
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
-| `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` + `split-assessment.md` + `fullrun.md` |
+| `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` — its dispatched child reads `fullrun.md` + `split-assessment.md` in its own unit, not the parent at entry |
+
+`backlogrun`'s row lists `backlogrun.md` alone at the entry: its parent orchestrates and never
+implements, so `fullrun.md` and `split-assessment.md` are read by a dispatched child inside its own
+delegated `fullrun` unit (`backlogrun-child.md`) — point-of-use for `backlogrun`, entry reads for
+`fullrun` / `halfrun` / `kickoff`. The relocated on-demand sections `into-target.md` (an `into`
+suffix) and `target-repository.md` (an `owner/repo#` prefix) are read only when their trigger is
+typed, and §3's residency procedure lives in `rule-residency.md`, reached only when a rule is placed,
+moved or retired.
 
 ### The fetch is one `Read` call per file
 
@@ -277,47 +285,11 @@ Each entry point's own branch stays in its own file — `fullrun.md`, `halfrun.m
 
 ## 2a. The `into <target>` suffix — where the new Issue lands
 
-`kickoff new` / `fullrun new` / `halfrun new` accept a suffix naming the epic the run's artifact
-belongs to. Without it the artifact belongs to no epic, and `epic:next` only ever offers an epic's
-children — so a forgotten instruction parks that Issue permanently rather than losing it visibly.
-
-```
-kickoff new into #909
-fullrun new into #909
-halfrun new into #909
-kickoff new "<title>" into #909
-kickoff new into joshuafolkken/kit#909
-```
-
-`into` is the spelling because the alternatives collide with forms that already mean something else:
-`kickoff new #909` reads as the existing `kickoff #N`, and `kickoff new epic #909` reads as "create a
-new epic" when what gets created is often a single Issue.
-
-- **One artifact goes in: the top-level one this run created.** No split, and it is the Issue; a
-  split, and it is the epic. The children belong to that epic, not to the target.
-- **Insert as soon as the artifact exists** — before implementation in `fullrun new`, before the plan
-  comment in `kickoff new`. Left until the end, a run that stops halfway leaves behind exactly the
-  orphaned Issue this suffix exists to prevent.
-- **The insertion always goes through `pnpm josh epic --add <E> <N> [--before <M> | --after <M>]`.**
-  Never hand-edit the epic body: the declaration and the `blocked-by` relations then disagree,
-  `epic:next` answers `error`, and an unattended run stops.
-- **Decide the position, then record why** — in the target epic's body or as an Issue comment. The
-  position follows whatever criteria the target epic has already been ordered by — work whose effect
-  compounds over the remaining children goes earlier, and a child already in progress is never jumped
-  ahead of.
-- **A target that is not an epic is refused, and the refusal names both ways out**:
-  `pnpm josh epic --promote <N> <N...>` when it is a request, a discussion or a container, or a new
-  epic over both when it is itself one of the deliverables. Never promote on your own — which arm
-  applies depends on what the target is, and promoting rewrites someone else's Issue into a container.
-- **A cross-repository target is written `owner/repo#N`** and inserted from that repository's
-  checkout; run there, since `epic --add` reads and writes only the repository it runs from
-  (`prompts/collaboration-workflow/cross-repo-epic.md`). A bare `#N` resolves to this repository's
-  issue of that number.
-- **No suffix leaves the behavior exactly as it was.**
-
-**It is not `epic:bundle`, and both still run.** `epic:bundle` *recommends* an epic for a newly filed
-Issue and does nothing when the signal is weak; `into` is a person naming one explicitly. They are
-separate routes, so the `epic:bundle` call that follows a filing happens exactly as before.
+**The suffix and its procedure are `into-target.md`, read at its point of use — the moment a `new`
+entry (`kickoff new` / `fullrun new` / `halfrun new`) is typed with an `into <target>` suffix.** It
+names the epic the run's artifact joins, inserts it with `pnpm josh epic --add <E> <N>` as soon as the
+artifact exists, and refuses a target that is not an epic. A run given a `#N` or a bare `new` never
+reaches it. `into-target.md` is the single source.
 
 ## 2b. Delegating a step to a cheaper tier
 
@@ -444,57 +416,13 @@ change is the main line's.
 
 ## 2c. The `owner/repo#` prefix — which repository the run acts on
 
-Every entry point takes the target repository in front of the Issue reference. Without it the target
-is the repository the session runs in.
-
-```
-kickoff joshuafolkken/kit#412
-kickoff kit#new
-kickoff kit#new "<title>"
-fullrun joshuafolkken/app-kit#12
-halfrun kit#412
-backlogrun kit#1 kit#2
-backlogrun joshuafolkken/kit#858 --only
-```
-
-- **One definition, every entry point.** The prefix goes where `#N` goes, so no new keyword is added,
-  and `owner/repo#new` stands in the same slot as `owner/repo#N`.
-- **A short name expands by prefixing the session repository's owner** — `pnpm josh repo:party`
-  computes the party — and **never by searching kit#869's map**, which answers where a checkout is
-  rather than which repository is meant. A short name therefore satisfies the first-party test (owner
-  equality) by construction, so **there is structurally no path by which a short name resolves to a
-  third-party target**, and a repository that is not checked out here is still a valid `kickoff`
-  target. A name that does not exist fails as `gh` not found: report it, never read it as a near-miss
-  for another name.
-- **It is not the standing prohibition on a bare `#N`.** What that forbids is a bare *Issue number*,
-  which resolves without complaint to a different issue of the same number; a bare *repository* name
-  whose owner is determined has no such failure mode.
-- **An explicit owner that is not the session's is a third-party target, and it stops the run.**
-  `fullrun <other-owner>/repo#12` names a tracker we do not own, and every write there is Tier C
-  (`CLAUDE.md` → "Third-party repositories are Tier C"). **Decide it mechanically** with
-  `pnpm josh repo:party <owner/repo>` — a `third-party` verdict stops the run. Typing the prefix is not the
-  explicit instruction that rule requires. **Send a `confirmation` Telegram and stop** — nothing has
-  been produced yet, so there is no finding to record and no draft to prepare.
-- **No prefix leaves the behavior exactly as it was** — the target is the session's repository.
-- **`kickoff` needs no checkout**: name the target repository in the path of every `gh api` call and
-  never clone. The one exception is the split path's epic, since `pnpm josh epic` only writes the
-  repository it runs in — run it in that repository's checkout, or fall back to `gh api
-  repos/<owner/repo>/labels …` followed by `gh api repos/<owner/repo>/issues -f title="<epic-title>" -f
-  'labels[]=epic' -f body="<body>"`, and report that `epic:check` could not be run. The promote arm has
-  no such fallback: with no checkout there, file the children and stop.
-- **The implementing entries require a checkout and never create one — when the target is another
-  repository.** A prefix naming the session's own repository changes nothing (`fullrun kit#412` in the
-  kit checkout behaves exactly as `fullrun #412`). Otherwise resolve the checkout from `pnpm josh
-  doctor`'s map; **no checkout there, or a tree that is not clean, stops the run** with a
-  `confirmation` Telegram — cloning decides the layout of someone's machine for them, and a dirty tree
-  holds work that is not yours to stash. Otherwise the commands that act on the target execute in that
-  checkout.
-- **A named epic is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,
-  not where its children are implemented. Its state is read against that repository through `gh api`,
-  so that repository needs no checkout. The checkout rules bind each child at implementation time,
-  against **that child's** repository ("Concurrency" in `backlogrun.md`).
-- **Independent of `into <target>`**: this says which repository the run acts on, `into` says which
-  epic the artifact joins — `kickoff kit#new into joshuafolkken/kit#909` is one correct line.
+**The prefix and its procedure are `target-repository.md`, read at its point of use — the moment an
+entry is typed with an `owner/repo#` prefix or a short `repo#` name.** It names the repository the run
+acts on; a short name expands by the session owner and is first-party by construction, an explicit
+foreign owner is a third-party target that stops the run, and an implementing entry resolves that
+repository's checkout from `pnpm josh doctor` rather than cloning. No prefix leaves the target as the
+session's own repository, so a run without one never reaches it. `target-repository.md` is the single
+source.
 
 ## 2d. A prerequisite discovered mid-run — a dependency, not a park
 
@@ -823,39 +751,13 @@ single source of every one of them.
 
 ## 3. What stays resident, and what is read from here
 
-**Before either question below, ask question 0:** `prompts/collaboration-workflow/residency.md` → question 0 — can the rule's answer be computed from mechanically readable inputs alone? If yes, it is a decision oracle and neither question below applies; `pnpm josh oracle:list` shows the existing ones. Only a no reaches the first question.
-
-**The first question is whether the rule's trigger can be named:**
-
-> **Can the moment the rule begins to bind be named as one tool call?**
-
-**A rule whose trigger can be named moves its body out of `CLAUDE.md`.** It goes on the enumeration in
-`prompts/collaboration-workflow/rule-delivery.md`, and a hook refuses that call and states the rule —
-cheaper than resident prose, because it costs nothing on every other turn, and **stronger, because a
-refusal cannot be skimmed past**. **Relocating is not deleting** — the rule's text survives, on a
-stronger channel.
-
-**What stays behind is the trigger and the criterion, one line, because the channel reaches one
-harness.** `CLAUDE.md` is agent-agnostic by construction — `AGENTS.md`, `GEMINI.md` and `.cursorrules`
-are pointers to it, and a Codex, Gemini or Cursor session runs no `.claude/settings.json` hook at all;
-so does a Claude Code session with the guard's own off-switch set. **The gain is the body, not the
-line.** A rule may leave residency entirely only where the agent that has to obey it is always this
-harness.
-
-Only a rule whose trigger cannot be named reaches the second question:
-
-**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.** That
-test has exactly one input: when does the rule first bind — before a command has started, or after.
-Everything a run reaches only *after* it has read this skill is routed to from `CLAUDE.md`, never
-restated there.
-
-`CLAUDE.md` is the only document this section is about. `AGENTS.md` and `GEMINI.md` hold no rules at
-all — they are pointers to it.
-
-**How much of a resident rule is resident is `rule-residency.md`, and it is read when a rule is
-actually being placed, moved or retired.** The two questions above decide *whether*; that file decides
-*how much*, and carries the trigger-plus-pointer shape a resident rule takes, the enumeration of every
-resident rule that has an on-demand counterpart, the retirement route and its three tests, and the
-readings of the retired `rule:value` measurement. **No run reaches it** — the moment it binds is a turn spent editing
-these documents, never a turn spent executing an Issue. It is the single source of everything it
-carries.
+**The residency criterion and its procedure are `rule-residency.md`, read only when a rule is being
+placed, moved or retired — never at any entry, and never during a run.** It carries question 0 (is the
+answer computable from mechanically readable inputs, so it is a decision oracle — `pnpm josh
+oracle:list`), the first question (can the trigger be named as one tool call, so the body moves out of
+`CLAUDE.md` to a hook via `prompts/collaboration-workflow/rule-delivery.md`), the second question
+(does it have to fire on a turn where no skill was loaded, so it stays in `CLAUDE.md`), and the
+procedure that decides how much of a resident rule is resident — the trigger-plus-pointer shape, the
+enumeration of every resident rule with an on-demand counterpart, and the retirement route and its
+three tests. `rule-residency.md` is the single source; the moment it binds is a turn spent editing
+these documents, never a turn spent executing an Issue.
