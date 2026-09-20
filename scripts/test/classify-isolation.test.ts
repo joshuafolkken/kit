@@ -54,7 +54,7 @@ describe('classify_pilot_files — the generated candidate list', () => {
 	it('returns a sorted, duplicate-free list of files that exist on disk', () => {
 		expect(candidates.length).toBeGreaterThan(0)
 		expect(new Set(candidates).size).toBe(candidates.length)
-		expect([...candidates].toSorted((left, right) => left.localeCompare(right))).toEqual(candidates)
+		expect([...candidates].toSorted(classify_isolation.by_code_point)).toEqual(candidates)
 		for (const file of candidates) expect(existsSync(file), file).toBe(true)
 	})
 
