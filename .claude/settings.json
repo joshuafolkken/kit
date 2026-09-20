@@ -72,7 +72,7 @@
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion",
 				"hooks": [
 					{
 						"type": "command",

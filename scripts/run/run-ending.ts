@@ -88,14 +88,26 @@ function describe_exit(record: ClaudeResultEvent): string {
 	return `exit record: subtype=${record.subtype ?? 'unknown'}, is_error=${String(record.is_error)}, num_turns=${number_turns}, permission_denials=${String(record.permission_denials)}`
 }
 
+// The refused interactive ask, as a clause the park comment can carry the question and options in — or
+// empty when the child asked nothing (joshuafolkken/kit#2201). This is the backstop for a child that
+// slipped past the `PreToolUse` refusal: the question is stranded in the exit record's
+// `permission_denials`, and lifting it here spares the parent opening the JSONL by hand.
+function refused_ask_clause(record: ClaudeResultEvent | undefined): string {
+	const ask = record?.refused_ask
+
+	return ask === undefined ? '' : ` the refused interactive ask was — ${ask};`
+}
+
 // The basis the park comment carries: which exit-record fields were read, the count of refused tool
-// calls, and whether uncommitted work is still on disk for the parent to stash.
+// calls, any refused interactive ask, and whether uncommitted work is still on disk for the parent to
+// stash.
 function abandoned_evidence(traces: EndingTraces): string {
 	const record =
 		traces.exit_record === undefined ? EXIT_UNREADABLE : describe_exit(traces.exit_record)
+	const ask = refused_ask_clause(traces.exit_record)
 	const tree = traces.is_tree_dirty ? 'uncommitted work remains' : 'the tree is clean'
 
-	return `${record}; the Issue is OPEN and no cut was recorded (${tree}), so the child ended mid-implementation — include this basis in the park comment.`
+	return `${record};${ask} the Issue is OPEN and no cut was recorded (${tree}), so the child ended mid-implementation — include this basis in the park comment.`
 }
 
 function evidence_of(verdict: EndingVerdict, traces: EndingTraces): string {

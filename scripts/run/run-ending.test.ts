@@ -14,6 +14,7 @@ const SUCCESS_EXIT: ClaudeResultEvent = {
 	subtype: 'success',
 	num_turns: 53,
 	permission_denials: 3,
+	refused_ask: undefined,
 	reason: undefined,
 	usage: undefined,
 }
@@ -81,5 +82,21 @@ describe('the basis an abandoned verdict carries', () => {
 		expect(run_ending.decide(traces({ is_tree_dirty: false })).evidence).toContain(
 			'the tree is clean',
 		)
+	})
+
+	// **The backstop for a child that slipped past the `PreToolUse` refusal** (joshuafolkken/kit#2201):
+	// its stranded question is lifted out of the exit record and into the park basis, so the parent does
+	// not open the JSONL by hand.
+	it('carries the refused interactive ask when the exit record preserved one', () => {
+		const exit_record = { ...SUCCESS_EXIT, refused_ask: 'Which library? [zod / valibot]' }
+
+		expect(run_ending.decide(traces({ exit_record })).evidence).toContain(
+			'the refused interactive ask was — Which library? [zod / valibot]',
+		)
+	})
+
+	// A child that asked nothing leaves the basis unchanged — no empty ask clause dangling in it.
+	it('says nothing about a refused ask when the child asked nothing', () => {
+		expect(run_ending.decide(traces()).evidence).not.toContain('refused interactive ask')
 	})
 })

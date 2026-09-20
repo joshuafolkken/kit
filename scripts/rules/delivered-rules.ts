@@ -9,6 +9,7 @@ import { filing_cap } from './filing-cap'
 import { gh_api } from './gh-api'
 import { git_force } from './git-force'
 import { issue_scout } from './issue-scout'
+import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
@@ -431,6 +432,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: lane_park.LANE_PARK_REASON,
 		keeps: on_bash_command(lane_park.records_the_park),
 	},
+	// **joshuafolkken/kit#2034's rule, one tool-call earlier** (joshuafolkken/kit#2201). `lane-park`
+	// fires on the `confirmation` notify a routed child reaches; a child that reaches for
+	// `AskUserQuestion` never gets there, because the harness ends its turn at the refused ask. This
+	// row's trigger is that ask, so the refusal becomes an instruction — park the question — instead of
+	// the child's death. Its trigger reads the input's tool name and consults the dispatch mark, like
+	// `lane-park`, and shares no command with any Bash row, so it claims no `gh` / `git` / `josh` call.
+	// It fires on every occurrence (`decide` returns true), the disposition `git-force.ts` takes: an
+	// interactive ask must never succeed in a child, and the route is always the park, never a reissue.
+	lane_interactive_ask.ROW,
 	// **The three Bash-string gaps the deny glob cannot express** (joshuafolkken/kit#2120), each reading
 	// the command's argv rather than a literal a glob keys on. They share no trigger with any row above —
 	// force/delete is `git push` / `git branch`, the worktree change is `git checkout` / `restore` /
@@ -675,6 +685,7 @@ const delivered_rules = {
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON,
 	ISSUE_SCOUT_REASON: issue_scout.ISSUE_SCOUT_REASON,
+	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
