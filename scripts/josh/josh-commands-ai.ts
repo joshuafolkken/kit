@@ -284,6 +284,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	'split:assess': {
+		script: 'scripts/split/split-assess-cli.ts',
+		description:
+			'Measure the branch change size (tests excluded) and answer the split assessment size question: split | single',
+		category: 'AI tools',
+		reference: ['[--json]', 'automation', ['none']],
+	},
 	'oracle:list': {
 		script: 'scripts/rules/oracle-list-cli.ts',
 		description: 'Print the decision oracles — commands that answer a rule question mechanically',
