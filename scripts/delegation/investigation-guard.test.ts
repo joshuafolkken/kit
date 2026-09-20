@@ -297,7 +297,7 @@ describe('investigation_refusal — a dispatched lane child is exempt', () => {
 	it('refuses nothing at the threshold while marked as a lane child', () => {
 		const transcript = write_transcript('lane-child', at_threshold_lines())
 
-		expect(lane_guard_policy.fires_in_lane_child('investigation')).toBe(false)
+		expect(lane_guard_policy.mode_in_lane_child('investigation')).toBe('off')
 		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
 	})
 

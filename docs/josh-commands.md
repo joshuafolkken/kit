@@ -106,8 +106,9 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 ```
 
 - `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
-- **Suppressed in a dispatched lane child** (`JOSH_LANE_CHILD`), because the reissue-in-one-turn correction ends a headless child's turn instead of guiding it — decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`, not per guard (joshuafolkken/kit#2138).
-- Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable. One refusal per run.
+- **Downgraded to a notice in a dispatched lane child** (`JOSH_LANE_CHILD`), because a _refusal_ ends a headless child's turn instead of guiding it — so the guidance is delivered as a non-blocking notice (no `permissionDecision`, the call proceeds) rather than dropped. Decided from the one-place three-valued enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`, not per guard (joshuafolkken/kit#2138, joshuafolkken/kit#2164).
+- **Fires more than once per run.** The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again every `REFIRE_EVERY` further single-call turns (the `N` of joshuafolkken/kit#2164, a single constant in `time-batch-guard.ts`, equal to the initial limit). A call the run re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence. This replaces the old one-firing-per-run behavior, which fell silent for the rest of a run that ignored it.
+- Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
 
 ### `josh investigation:guard`
 
@@ -155,7 +156,7 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery p
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
-**Which of the three fire in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, whether each guard fires for a lane child (`JOSH_LANE_CHILD`): `investigation` and `batching` stand down, while `rule` stays on — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the three behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `notice` (the guidance is delivered without a `permissionDecision`, so the child is nudged toward batching rather than killed — and the lane child is where the cost that guard cuts is largest), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh stop:guard`
 

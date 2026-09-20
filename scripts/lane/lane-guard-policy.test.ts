@@ -2,10 +2,11 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { lane_guard_policy } from './lane-guard-policy'
 
-// joshuafolkken/kit#2138: the enumeration that decides which `PreToolUse` guards fire in a dispatched
-// lane child. What is pinned here is the policy itself — the per-guard verdict, the fail-safe default,
-// and that a suppression is read only for a real lane child. Each guard's own suite pins that its live
-// behavior matches the verdict named here (`investigation-guard.test.ts`, `batch-guard.test.ts`,
+// joshuafolkken/kit#2138, joshuafolkken/kit#2164: the enumeration that decides how each `PreToolUse`
+// guard behaves in a dispatched lane child. What is pinned here is the policy itself — the per-guard
+// three-valued mode (`refuse` / `notice` / `off`), the fail-safe default, and that a mode other than the
+// main-line default is read only for a real lane child. Each guard's own suite pins that its live
+// behavior matches the mode named here (`investigation-guard.test.ts`, `batch-guard.test.ts`,
 // `delivered-rules.test.ts`), so the enumeration and the guards cannot disagree.
 
 const LANE_ISSUE = '2138'
@@ -17,19 +18,27 @@ const PLAIN_DIRECTORY = path.join(BASE_DIRECTORY, 'checkout')
 const LANE_CHILD_SOURCE = { JOSH_LANE_CHILD: LANE_ISSUE }
 const NO_MARK_SOURCE = {}
 
-describe('lane_guard_policy.fires_in_lane_child', () => {
+describe('lane_guard_policy.mode_in_lane_child', () => {
 	it.each([
-		['investigation', false],
-		['batching', false],
-		['rule', true],
-	])('says %j fires in a lane child: %s', (id, fires) => {
-		expect(lane_guard_policy.fires_in_lane_child(id)).toBe(fires)
+		['investigation', 'off'],
+		['batching', 'notice'],
+		['rule', 'refuse'],
+	])('says %j behaves as %s in a lane child', (id, mode) => {
+		expect(lane_guard_policy.mode_in_lane_child(id)).toBe(mode)
 	})
 
-	// The fail-safe direction `delegation-policy.ts` takes: a guard nobody classified fires, so a
-	// suppression is never the silent default.
-	it('fires for a guard that is not enumerated', () => {
-		expect(lane_guard_policy.fires_in_lane_child('unlisted-guard')).toBe(true)
+	// The fail-safe direction `delegation-policy.ts` takes: a guard nobody classified keeps the
+	// main-line default (`refuse`), so a silent downgrade is never possible.
+	it('refuses for a guard that is not enumerated', () => {
+		expect(lane_guard_policy.mode_in_lane_child('unlisted-guard')).toBe('refuse')
+	})
+
+	// The enumeration may only ever name one of the three known modes — a fourth spelling is a typo the
+	// wrappers would read as neither `refuse` nor `notice` nor `off`, so it is caught here.
+	it('gives every row one of the three known modes', () => {
+		for (const entry of lane_guard_policy.LANE_GUARD_POLICY) {
+			expect(['refuse', 'notice', 'off']).toContain(entry.mode_in_lane_child)
+		}
 	})
 })
 
@@ -51,15 +60,50 @@ describe('lane_guard_policy — the enumeration is the whole of it', () => {
 	})
 })
 
+describe('lane_guard_policy.mode_here', () => {
+	// In a marked lane child every guard takes its enumerated mode — this is the table the wrappers read.
+	it.each([
+		['investigation', 'off'],
+		['batching', 'notice'],
+		['rule', 'refuse'],
+	])('gives %j its enumerated mode %s in a marked lane child', (id, mode) => {
+		expect(lane_guard_policy.mode_here(id, LANE_DIRECTORY, LANE_CHILD_SOURCE)).toBe(mode)
+	})
+
+	// No mark: a person working in a lane sees every guard refuse, exactly as the main line does.
+	it.each([['investigation'], ['batching'], ['rule']])(
+		'gives %j the main-line default without the lane-child mark',
+		(id) => {
+			expect(lane_guard_policy.mode_here(id, LANE_DIRECTORY, NO_MARK_SOURCE)).toBe('refuse')
+		},
+	)
+
+	// A mark carried into a checkout that is not a lane is read as a person's, not a child's.
+	it('gives the main-line default outside a lane checkout', () => {
+		expect(lane_guard_policy.mode_here('batching', PLAIN_DIRECTORY, LANE_CHILD_SOURCE)).toBe(
+			'refuse',
+		)
+	})
+})
+
 describe('lane_guard_policy.is_suppressed_here', () => {
-	// A suppressed guard stands down only where the session is a dispatched lane child for this checkout.
-	it('suppresses a non-firing guard in a marked lane child', () => {
+	// `is_suppressed_here` is the `off` mode alone — the guard says nothing at all.
+	it('suppresses an off-mode guard in a marked lane child', () => {
 		expect(
 			lane_guard_policy.is_suppressed_here('investigation', LANE_DIRECTORY, LANE_CHILD_SOURCE),
 		).toBe(true)
 	})
 
-	it('never suppresses a guard that fires in a lane child', () => {
+	// **A notice-mode guard is not suppressed**: it still speaks, without a `permissionDecision`. This is
+	// the distinction kit#2164 turns on — read as suppressed, the batching guard would go silent in the
+	// lane child instead of notifying.
+	it('does not suppress a notice-mode guard in a marked lane child', () => {
+		expect(
+			lane_guard_policy.is_suppressed_here('batching', LANE_DIRECTORY, LANE_CHILD_SOURCE),
+		).toBe(false)
+	})
+
+	it('never suppresses a refuse-mode guard in a lane child', () => {
 		expect(lane_guard_policy.is_suppressed_here('rule', LANE_DIRECTORY, LANE_CHILD_SOURCE)).toBe(
 			false,
 		)

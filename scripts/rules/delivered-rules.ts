@@ -561,10 +561,12 @@ const BATCH_REFUSAL_WINDOW_MS = 10_000
 // lost for the run with nothing recorded to say so. That is the silent deletion the stand-aside
 // exists to prevent, arrived at from the other side.
 function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	// In a dispatched lane child the batching guard is suppressed (joshuafolkken/kit#2138), so it will
-	// refuse nothing — and the stand-aside must agree, or a lone rule trigger (`shell-body`) would be
-	// stepped aside from for a batching refusal that can no longer come and lost for the run.
-	if (lane_guard_policy.is_suppressed_here('batching')) return false
+	// In a dispatched lane child the batching guard no longer refuses (joshuafolkken/kit#2138,
+	// joshuafolkken/kit#2164): its mode is `notice`, so it advises without a `permissionDecision`. Either
+	// way it will *refuse* nothing there, and the stand-aside must agree — or a lone rule trigger
+	// (`shell-body`) would be stepped aside from for a batching refusal that can no longer come and lost
+	// for the run. The test is therefore "will it refuse", i.e. mode `refuse`, not "is it off".
+	if (lane_guard_policy.mode_here('batching') !== 'refuse') return false
 
 	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
 
