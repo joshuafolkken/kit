@@ -121,6 +121,7 @@ const ALIASES: Record<string, string> = {
 	rpy: 'repo:party',
 	rmg: 'run:merge',
 	rrv: 'run:review',
+	rev: 'run:event',
 	sp: 'stash:pop',
 	lno: 'lane:open',
 	lnc: 'lane:close',
