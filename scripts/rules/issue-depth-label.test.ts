@@ -97,10 +97,13 @@ describe('the filing-time rule in SKILL.md §2i', () => {
 	// no depth label, because it has no subject of its own to read one off.
 	it.each([
 		'.claude/skills/workflow-commands/kickoff.md',
-		'.claude/skills/workflow-commands/fullrun.md',
+		// joshuafolkken/kit#2189 moved `fullrun`'s new-Issue step list to `fullrun-steps.md`, so its
+		// filing command lives there; `halfrun.md` keeps its own abbreviated template.
+		'.claude/skills/workflow-commands/fullrun-steps.md',
 		'.claude/skills/workflow-commands/halfrun.md',
-		// §2d's prerequisite filing command, which stayed in the entry file when §2i's procedure moved.
-		'.claude/skills/workflow-commands/SKILL.md',
+		// §2d's prerequisite filing command moved with the section body to `prerequisite.md`
+		// (joshuafolkken/kit#2189).
+		'.claude/skills/workflow-commands/prerequisite.md',
 		'prompts/review.md',
 		'prompts/collaboration-workflow/wip-cap.md',
 		'prompts/collaboration-workflow/upstream-interrupt.md',

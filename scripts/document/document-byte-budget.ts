@@ -87,7 +87,12 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#2161 moved §2a / §2c / §3's bodies out of SKILL.md into `into-target.md`,
 	// `target-repository.md` and `rule-residency.md`, so SKILL.md shrinks and the two new files and
 	// `rule-residency.md` grow — a relocation, held on both sides by the ratchet.
-	{ path: '.claude/skills/workflow-commands/SKILL.md', bytes: 57_145 },
+	// joshuafolkken/kit#2189 trimmed the simple workflow entries to a manifest: §2z / §2d / §2f / §2g's
+	// bodies left SKILL.md for `needs-human-review.md`, `prerequisite.md`, `working-tree-hold.md` and
+	// `issue-comments.md`, §1 / §2 were compressed to a trigger-and-pointer manifest, and `fullrun.md`'s
+	// step lists moved to `fullrun-steps.md` — so SKILL.md and `fullrun.md` / `halfrun.md` shrink while
+	// five new companion files appear, a relocation held on both sides.
+	{ path: '.claude/skills/workflow-commands/SKILL.md', bytes: 33_874 },
 	{ path: '.claude/skills/workflow-commands/background-commands.md', bytes: 8180 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', bytes: 26_291 },
 	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', bytes: 26_442 },
@@ -97,16 +102,21 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 6240 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
 	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
-	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 16_604 },
-	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 11_479 },
+	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 5355 },
+	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 4680 },
+	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 5578 },
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 3156 },
+	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 6980 },
 	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 7599 },
 	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
+	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 4370 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_956 },
 	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 26_629 },
+	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 5420 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 23_282 },
 	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
+	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
 	{ path: 'docs/josh-commands.md', bytes: 99_147 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },

@@ -37,15 +37,14 @@ describe('lane_child_read_set.costed — the point-of-use trim', () => {
 	})
 
 	// The gate, the PR and a park are the child's own, so their point-of-use documents stay.
-	it.each([
-		'chain-rule.md',
-		'background-commands.md',
-		'followup.md',
-		'latest-gate.md',
-		'backlogrun-park.md',
-	])('keeps %s the child does reach', (file) => {
-		expect(files).toContain(file)
-	})
+	// `latest-gate.md` is not among them (joshuafolkken/kit#2189): the dependency update runs once per
+	// session in the parent, never in a dispatched child, so it is a `SKIPPED_POINT_OF_USE` entry above.
+	it.each(['chain-rule.md', 'background-commands.md', 'followup.md', 'backlogrun-park.md'])(
+		'keeps %s the child does reach',
+		(file) => {
+			expect(files).toContain(file)
+		},
+	)
 })
 
 describe('lane_child_read_set.costed — the SKILL.md section trim', () => {

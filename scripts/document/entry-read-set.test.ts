@@ -10,12 +10,15 @@ import { entry_read_set } from './entry-read-set'
 // these against itself and say nothing about the documents.
 
 const ROOT = process.cwd()
-// `fullrun` reads its own file, `split-assessment.md` and the skill; it cites `followup-reference.md`
-// at one out-of-set section ("When `pnpm josh release` runs"), so it exercises the section-saving
-// measurement — reading that section rather than the whole file it sits in. (Before
-// joshuafolkken/kit#2010 it cited `backlogrun.md`'s "The hand-off" and "Progress while the run is
-// quiet"; that content moved to `backlogrun`'s point-of-use phase documents, which are not counted.)
+// `fullrun` reads its own manifest and the skill; it cites `split-assessment.md` at one out-of-set
+// section ("The question"), so it exercises the section-saving measurement — reading that section
+// rather than the whole file it sits in. (joshuafolkken/kit#2189 turned the command files into
+// manifests: `split-assessment.md` left the entry table and became a section-cite of the split
+// decision, and the release-ask pointer at `followup-reference.md` moved into `fullrun-steps.md`,
+// read on demand rather than at the entry.)
 const SECTION_CITER = 'fullrun'
+const SPLIT_QUESTION_HEADING = 'The question'
+const SPLIT_FILE = 'split-assessment.md'
 const BACKLOGRUN = 'backlogrun.md'
 const CHAIN_RULE = 'chain-rule.md'
 const BACKGROUND_COMMANDS = 'background-commands.md'
@@ -134,8 +137,10 @@ describe('entry_read_set.read_set — which files', () => {
 
 describe('entry_read_set — backlogrun reads its child files at the point of use (joshuafolkken/kit#2161)', () => {
 	const ENTRY = 'backlogrun'
-	const SPLIT = 'split-assessment.md'
-	const PER_ENTRY: ReadonlyArray<string> = ['fullrun.md', SPLIT]
+	const SPLIT = SPLIT_FILE
+	const FULLRUN_FILE = 'fullrun.md'
+	const PER_ENTRY: ReadonlyArray<string> = [FULLRUN_FILE, SPLIT]
+	const IMPLEMENTING_AND_PLAN: ReadonlyArray<string> = [SECTION_CITER, 'halfrun', PLAN_ONLY]
 
 	// The parent orchestrates and never implements: a dispatched child reads both inside its own
 	// delegated fullrun unit, so neither is a backlogrun entry read.
@@ -143,17 +148,25 @@ describe('entry_read_set — backlogrun reads its child files at the point of us
 		expect(entry_read_set.read_set(ROOT, ENTRY).files).not.toContain(file)
 	})
 
-	// The same two files stay entry reads for an entry that implements one issue directly — the
-	// distinction the global point-of-use set cannot express.
-	it('keeps fullrun.md and split-assessment.md in the fullrun entry read', () => {
-		expect(entry_read_set.read_set(ROOT, 'fullrun').files).toEqual(
-			expect.arrayContaining([...PER_ENTRY]),
-		)
+	// `fullrun.md` stays the entry file of a `fullrun`; `split-assessment.md` left the entry table in
+	// joshuafolkken/kit#2189 and is now section-cited ("The question") by every command manifest, so it
+	// is no longer read whole at the entry of `fullrun` / `halfrun` / `kickoff`.
+	it('keeps fullrun.md the entry file of a fullrun, split-assessment.md out of its whole-file read', () => {
+		const { files } = entry_read_set.read_set(ROOT, SECTION_CITER)
+
+		expect(files).toContain(FULLRUN_FILE)
+		expect(files).not.toContain(SPLIT)
 	})
 
-	it.each(['halfrun', 'kickoff'])('keeps split-assessment.md in the %s entry read', (entry) => {
-		expect(entry_read_set.read_set(ROOT, entry).files).toContain(SPLIT)
-	})
+	it.each(IMPLEMENTING_AND_PLAN)(
+		'section-cites split-assessment.md from the %s manifest',
+		(entry) => {
+			const cited = entry_read_set.read_set(ROOT, entry).sections
+			const split = cited.find((reference) => reference.file === SPLIT)
+
+			expect(split?.heading).toBe(SPLIT_QUESTION_HEADING)
+		},
+	)
 
 	it('classifies the child files as point-of-use for backlogrun and no other entry', () => {
 		const classified = [...(entry_read_set.POINT_OF_USE_BY_ENTRY.get(ENTRY) ?? [])]
@@ -264,9 +277,7 @@ describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkk
 describe('entry_read_set.read_set — which sections', () => {
 	it('collects the sections its own documents point at, out of the set', () => {
 		expect(entry_read_set.read_set(ROOT, SECTION_CITER).sections).toEqual(
-			expect.arrayContaining([
-				{ file: 'followup-reference.md', heading: 'When `pnpm josh release` runs' },
-			]),
+			expect.arrayContaining([{ file: SPLIT_FILE, heading: SPLIT_QUESTION_HEADING }]),
 		)
 	})
 
