@@ -493,6 +493,19 @@ pnpm josh obf                 # alias
 
 Related: [`josh followup`](#josh-followup).
 
+### `josh measure:rerun` · `josh mrr`
+
+Re-run a behavior-change Issue's declared baseline after it merges and print the before/after pair. It reads the `## ベースライン` section of a body file, runs each `` `<command>` → <value> `` entry, and prints the recorded value beside the re-measured one — the merge-time re-read a prose rule never gets (joshuafolkken/kit#2178).
+
+```bash
+pnpm josh measure:rerun /tmp/issue-body.md
+pnpm josh mrr /tmp/issue-body.md   # alias
+```
+
+**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
+
+Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](#josh-issuelint).
+
 ### `josh main:sync`
 
 Checkout the default branch and pull the latest changes with `git pull --ff-only` (the strategy is named by the command, not read from git config). Alias behavior is also reached as `pnpm josh ms`.
@@ -820,6 +833,8 @@ pnpm josh issue:lint /tmp/issue-body.md
 ```
 
 Prints `ok` (exit 0) when every heading is present, or each missing heading name (exit 1). A heading has to be a line of its own — one mentioned inside a sentence is not the section heading. The judgement half (is the prose specific enough?) is out of scope; this is the mechanical half alone (joshuafolkken/kit#2123).
+
+A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to two headings — `## 発火点` and `## ベースライン` (joshuafolkken/kit#2212). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun--josh-mrr) re-runs the baseline.
 
 ### `josh issue:backlinks`
 

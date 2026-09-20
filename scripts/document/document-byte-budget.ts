@@ -84,7 +84,10 @@ const SLACK_BYTES = 512
 // mandated `josh run:review` section — the composite that starts the gate beside the review, its
 // command reference and its `--join` verdict — landing against a document already at its mark, the
 // branch's merge with `main` layering the section on top of a document `main` had already filled.
-const JOSH_COMMANDS_CEILING_BYTES = 103_552
+// joshuafolkken/kit#2212 raised it four slack units (103,552 → 105,600) for the mandated `josh
+// measure:rerun` section and the `josh issue:lint` behavior-change note — the after-merge baseline
+// re-run and the firing-point/baseline checks it adds — landing against a document already at its mark.
+const JOSH_COMMANDS_CEILING_BYTES = 105_600
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -131,7 +134,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 102_833 },
+	{ path: 'docs/josh-commands.md', bytes: 104_599 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -144,7 +147,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_147 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4494 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 3103 },
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 19_064 },
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 22_054 },
 	{ path: 'prompts/collaboration-workflow/latest-first.md', bytes: 2625 },
 	{ path: 'prompts/collaboration-workflow/no-clones.md', bytes: 1614 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 22_971 },
