@@ -1356,6 +1356,24 @@ The default waits only for the gate to _start_ (never for the checks to pass) an
 the mechanical form of "a review verdict is not adopted over a red gate". The overlap's reader is
 joshuafolkken/kit#2179 and `chain-rule.md`.
 
+### `josh run:event`
+
+Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205); alias
+`rev`. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
+lane child append to one stream that survives a session cut; `--from` reads everything after a position,
+`--last` the newest event alone.
+
+```bash
+pnpm josh run:event --append <kind> <text>   # append one event; prints its position
+pnpm josh run:event --from <position>         # every event after <position>, in order
+pnpm josh run:event --last                    # the newest event alone
+```
+
+`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `cut`, `stop`,
+`pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge` and `park`
+in-process; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
+without limit.
+
 ### `josh run:progress`
 
 Report an unattended run's progress once it has gone quiet — the one josh command meant to be started and left running in the background.

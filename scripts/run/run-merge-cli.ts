@@ -4,6 +4,8 @@ import { parseArgs } from 'node:util'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
+import { run_event_stream } from './run-event-stream'
+import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_issue_number } from './run-issue-number'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
@@ -185,6 +187,8 @@ async function on_merged(ctx: MergeContext): Promise<number> {
 
 	if (refused !== undefined) return report_count_refused(refused)
 
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, `#${ctx.child} merged`)
+
 	if (await run_merge_steps.is_over_budget(ctx.over)) return emit(OVER_TOKEN, SUCCESS_EXIT_CODE)
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
@@ -200,6 +204,11 @@ async function on_failed(ctx: MergeContext): Promise<number> {
 
 		return emit(STOP_TOKEN, FAILURE_EXIT_CODE)
 	}
+
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.PARK,
+		`#${ctx.child} parked (needs-decision)`,
+	)
 
 	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
 		return emit(STOP_TOKEN, SUCCESS_EXIT_CODE)
