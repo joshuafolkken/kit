@@ -179,9 +179,9 @@ Run unit and E2E tests
 
 > **Audience:** developer · **Side effects:** processes
 
-_No arguments._
+`[--match]`
 
-Report whether the working-tree change needs a test (required/exempt/satisfied)
+Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin
 
 ---
 
@@ -645,6 +645,16 @@ Say whether a run step may go to a cheaper execution tier
 
 ---
 
+### `josh disposition` · `josh dp`
+
+> **Audience:** automation · **Side effects:** none
+
+`<path...>`
+
+Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)
+
+---
+
 ### `josh doc:read` · `josh dcr`
 
 > **Audience:** automation · **Side effects:** none
@@ -742,6 +752,16 @@ Claude Code hook: refuse a read once the unedited-read threshold is reached agai
 `<issue>`
 
 Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading
+
+---
+
+### `josh issue:cite` · `josh ici`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue...> [--repo <owner/repo>]`
+
+Print the paste-ready number-link citation line for each issue, in one call
 
 ---
 

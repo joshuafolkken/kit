@@ -230,11 +230,14 @@ pnpm josh test:related --silent            # flags are forwarded to vitest
 
 ### `josh test:declared`
 
-Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`).
+Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`). On `required` the detail names each untested file's type — `E2E` under `src/routes/`, `Unit` elsewhere (`prompts/testing-guide.md` §1).
 
 ```bash
-pnpm josh test:declared   # alias: josh td
+pnpm josh test:declared           # alias: josh td
+pnpm josh test:declared --match   # check Step 0 declarations on stdin
 ```
+
+`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
 
 ### `josh test:e2e`
 
@@ -849,6 +852,23 @@ pnpm josh issue:scout "<title>" --body "follows on from #1246"
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
 
+### `josh issue:cite`
+
+Print the paste-ready number-link citation line for each issue in one call, so the correct session-facing form — `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <summary>` — costs one command rather than a title read per issue. The summary is the issue's own title, fetched; adapt it to the session language when it matters.
+
+```bash
+pnpm josh issue:cite 2220                                  # alias: josh ici
+pnpm josh issue:cite 2220 1758 1252                        # several numbers, read concurrently
+pnpm josh issue:cite 45 --repo joshuafolkken/app-kit       # bare numbers in another repository
+pnpm josh issue:cite joshuafolkken/app-kit#45 2220         # per-token owner/repo#N notation
+```
+
+**Options:**
+
+- `--repo <owner/repo>` — the repository for every bare number; a token written `owner/repo#N` overrides it for itself.
+
+Citation lines go to stdout so the block stays paste-ready; a number that resolves to nothing or a read that failed is named on stderr rather than dropped, and any failure sets a non-zero exit. Any non-numeric token refuses the whole call. The [`Stop` hook's citation notice](../prompts/collaboration-workflow/issue-citation.md) points at this command with the numbers it detected already filled in.
+
 ### `josh pkg:scout`
 
 Before the Package-First tier decision, rank candidate packages by measured metrics so Tier A ("clearly best") and Tier B ("genuine toss-up") are read off the output rather than judged (joshuafolkken/kit#2216). It queries the npm registry and prints one line per candidate: npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
@@ -1152,6 +1172,14 @@ pnpm josh review:round2 --json              # the verdict and the reason, machin
 - `--json` — machine-readable verdict and reason.
 
 `skip` on **Arm A** (the fix delta is empty) or **Arm B** (every path in the fix delta is inert by [`josh review:brief --level-only`](#josh-reviewbrief)'s classification); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one non-inert path. Full reasoning: `prompts/review.md`.
+
+### `josh disposition`
+
+Say whether a review finding **reaches a runtime path** (`runtime`, any non-inert path) or is inert (`non-runtime`) — the machine half of the three-way disposition, sharing `review-level.ts`'s inert set, so only "is the defect confirmed" is left to a person. Verdict on stdout, reason on stderr. Full reasoning: `prompts/review.md` → "Three-way disposition after the cap".
+
+```bash
+pnpm josh disposition <path...>   # → runtime | non-runtime ; alias: josh dp
+```
 
 ### `josh review:attest`
 

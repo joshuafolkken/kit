@@ -42,7 +42,7 @@ Req N: ...
 | `src/routes/` pages, UI components with user interaction          | E2E (Playwright)          |
 | `.ts`/`.js` utilities, `src/lib/server/`, display-only components | Unit/Integration (Vitest) |
 
-When ambiguous, ask the user.
+**The type is decided from the path, not by asking.** A change under `src/routes/` takes E2E; every other runtime path takes Unit — a component with interaction is reached through the route that renders it, and that route is under `src/routes/`. `pnpm josh test:declared` prints the type each untested runtime file calls for on its `required` detail line, so the choice never becomes a stop.
 
 ### Test file naming & placement (one unambiguous rule)
 

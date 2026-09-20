@@ -9,10 +9,18 @@
 // **It is a notice, never a refusal.** A citation-format slip is not worth blocking a stop over, and
 // the cost of a false positive is high — so the row emits `systemMessage` and lets the stop proceed.
 
-// An Issue number: `#` and its digits. `\d+` is greedy, so an optional `owner/repo` prefix would add
-// nothing to whether the mention is bare — the `#N` alone locates it, and its enclosure decides the
-// rest. One quantifier, no backtracking.
-const ISSUE_REFERENCE = /#\d+/gu
+// An Issue number: `#` and its digits. One quantifier, no backtracking — the `#N` alone locates the
+// mention, and any `owner/repo` prefix is read off the surrounding text (`repo_prefix`) rather than
+// folded into the pattern, so the scan never carries two variable-length segments (sonar super-linear).
+const ISSUE_NUMBER = /#\d+/gu
+// The characters that bound an `owner/repo` prefix: whitespace, another `#`, and the brackets a
+// citation or prose wraps a reference in. Tested one character at a time by the prefix scan, so that
+// scan stays linear.
+const REFERENCE_BOUNDARY = /[\s#()[\]<>|]/u
+// A well-formed `owner/repo`: exactly one slash between two non-empty segments — the same shape
+// `issue:cite`'s parser accepts. A path-like run (`src/lib`, `a/b/c`) is not one, so it is not emitted
+// as a prefix that would make the suggested `issue:cite` call refuse the very reference it names.
+const OWNER_REPO = /^[^\s/#]+\/[^\s/#]+$/u
 // A markdown link, with its text captured as group 1: `[text](target)`. Each class excludes *both*
 // of its delimiters — no `[`/`]` in the text, no `(`/`)` in the target — so neither star is ambiguous
 // against a nested bracket and there is nothing to backtrack.
@@ -39,17 +47,51 @@ function is_linked_at(message: string, index: number): boolean {
 }
 
 // **The message text alone, never a GitHub-bound artifact.** An Issue body or comment is passed to
-// `gh` as a `Bash` argument, not spoken in `last_assistant_message`, so those never reach this
-// predicate — which is exactly the "silent on GitHub-bound artifacts" behavior the issue asks for, obtained by what
-// the stop guard reads rather than by a second exclusion here.
-function has_bare_reference(message: string): boolean {
-	for (const match of message.matchAll(ISSUE_REFERENCE)) {
-		if (!is_linked_at(message, match.index)) return true
-	}
+// `gh` as a `Bash` argument, not spoken in `last_assistant_message`, so those never reach here — which
+// is exactly the "silent on GitHub-bound artifacts" behavior the issue asks for, obtained by what the
+// stop guard reads rather than by a second exclusion here.
+//
+// The `owner/repo` written immediately before a `#N`, or '' when the mention is bare — the run of
+// non-boundary characters ending at the `#`, kept only when it holds a `/`. Read backwards a
+// character at a time so a repository name of any length costs its own length and no more.
+function repo_prefix(message: string, hash_index: number): string {
+	let start = hash_index
+	while (start > 0 && !REFERENCE_BOUNDARY.test(message.charAt(start - 1))) start -= 1
 
-	return false
+	const token = message.slice(start, hash_index)
+
+	return OWNER_REPO.test(token) ? token : ''
 }
 
-const issue_citation = { has_bare_reference }
+// The bare references in the message, in the order they appear and de-duplicated: the correcting
+// notice names them and turns them into `issue:cite` arguments, so a reference cited twice is not
+// nudged about twice. Each carries its `owner/repo` prefix when it had one, so a cross-repository
+// mention is corrected to the right repository.
+function bare_references(message: string): ReadonlyArray<string> {
+	const found: Array<string> = []
+
+	for (const match of message.matchAll(ISSUE_NUMBER)) {
+		const { index } = match
+		if (!is_linked_at(message, index)) found.push(`${repo_prefix(message, index)}${match[0]}`)
+	}
+
+	return [...new Set(found)]
+}
+
+function has_bare_reference(message: string): boolean {
+	return bare_references(message).length > 0
+}
+
+// The token `issue:cite` takes for one reference: a qualified `owner/repo#N` is passed as-is, a bare
+// `#N` loses its `#` so the command reads `issue:cite 123` rather than `issue:cite #123`.
+function cite_argument(reference: string): string {
+	return reference.startsWith('#') ? reference.slice(1) : reference
+}
+
+function cite_arguments(references: ReadonlyArray<string>): ReadonlyArray<string> {
+	return references.map((reference) => cite_argument(reference))
+}
+
+const issue_citation = { bare_references, cite_arguments, has_bare_reference }
 
 export { issue_citation }

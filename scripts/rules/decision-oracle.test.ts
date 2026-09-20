@@ -1,6 +1,7 @@
 import { clone_scan } from '#scripts/clone/clone-scan'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { COMMAND_MAP } from '#scripts/josh/josh-logic'
+import { disposition } from '#scripts/review/disposition-logic'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
 import { oracle_list_cli } from '#scripts/rules/oracle-list-cli'
 import { run_hold_cli } from '#scripts/run/run-hold-cli'
@@ -86,6 +87,22 @@ describe('vocabulary matches the code for latest:scope oracle', () => {
 
 	it('skip verdict is in declared vocabulary', () => {
 		expect(SCOPE_ORACLE?.vocabulary).toContain(latest_scope_cli.SKIPPED_SCOPE)
+	})
+})
+
+describe('vocabulary matches the code for disposition oracle', () => {
+	const DISPOSITION_ORACLE = decision_oracle.find_oracle('disposition')
+
+	it('disposition oracle exists', () => {
+		expect(DISPOSITION_ORACLE).toBeDefined()
+	})
+
+	it('runtime verdict is in declared vocabulary', () => {
+		expect(DISPOSITION_ORACLE?.vocabulary).toContain(disposition.RUNTIME)
+	})
+
+	it('non-runtime verdict is in declared vocabulary', () => {
+		expect(DISPOSITION_ORACLE?.vocabulary).toContain(disposition.NON_RUNTIME)
 	})
 })
 
