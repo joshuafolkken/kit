@@ -15,6 +15,16 @@ Claude Code hook: refuse a third consecutive single-call turn (reads the tool ca
 
 ---
 
+### `josh bytes` · `josh by`
+
+> **Audience:** developer · **Side effects:** none
+
+`<files...>`
+
+Print an agent-read document's byte size against its ceiling and the headroom left
+
+---
+
 ### `josh check` · `josh c`
 
 > **Audience:** developer · **Side effects:** processes

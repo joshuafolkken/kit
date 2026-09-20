@@ -52,6 +52,7 @@ pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - Falls back to the whole tree (naming which case) when no changed file is lintable.
+- Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a mandated documentation update over its ceiling fails here in seconds rather than at the 80–90-second gate, and the green record is withheld until both lint and the byte check pass.
 
 ### `josh lines`
 
@@ -67,6 +68,22 @@ scripts/hooks/format-edited-file.ts  230/300 code lines (76%), 70 to spare
 ```
 
 - Count is lint's own (`skipBlankLines` / `skipComments`); `near from` marks 85%. Never fails on a large file — a non-zero exit means the argument list was unusable.
+
+### `josh bytes`
+
+Print how many bytes an agent-read document has against its recorded byte ceiling and how many remain — the byte counterpart of `josh lines`, so a mandated documentation update that would cross the ceiling is seen right after the edit rather than at the gate.
+
+```bash
+pnpm josh bytes docs/josh-commands.md           # one document; alias: josh by
+pnpm josh bytes                                 # scan: every budgeted document near its ceiling
+```
+
+```
+docs/josh-commands.md  99968/100480 bytes · 512 left
+```
+
+- Path is repository-root-relative (a leading `./` is stripped); a path with no budget entry reads `not counted`.
+- An over-budget row names the exact value to record in `document-byte-budget.ts`. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
 
 ### `josh format`
 

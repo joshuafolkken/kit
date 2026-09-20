@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { document_byte_check } from '#scripts/document/document-byte-check'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { ESLINT_RELATED_CACHE_FILE } from '#scripts/josh/josh-command-types'
@@ -40,6 +41,29 @@ async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
 	)
 }
 
+// The byte check over the same scope the lint just ran: the resolved file list when narrowed, and
+// the whole budget when lint fell back to the whole tree — so the byte check is a superset in the
+// fallback exactly as lint is, never an empty list that would pass silently (joshuafolkken/kit#2176).
+function byte_check_exit_code(scope: ChangedFileScope, root: string): number {
+	if (scope.mode === 'all') return document_byte_check.check_all(root)
+
+	return document_byte_check.check_files(root, scope.files)
+}
+
+// The lint result folded together with the fast byte-ceiling check (joshuafolkken/kit#2176): the
+// same check the gate's `document-byte-budget.test.ts` runs, brought forward to this between-edits
+// path so a mandated documentation update over its ceiling surfaces in seconds. It reads no change
+// of its own — it takes the files this run already resolved, so the git contract is the lint
+// command's alone. A lint failure is reported as-is; only a green lint runs the byte check, so the
+// two never race to the exit code, and a green tree here is green on both — which is what the record
+// below then vouches for.
+async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<number> {
+	const lint_exit = await lint_exit_code(scope)
+	if (lint_exit !== 0) return lint_exit
+
+	return byte_check_exit_code(scope, root)
+}
+
 // The narrowing line is printed before either child starts, so a scoped run is never read as a
 // whole one, and a fallback says which of the two it was rather than looking like a narrow run
 // that found nothing.
@@ -64,7 +88,7 @@ async function run_related_lint(command_arguments: ReadonlyArray<string>): Promi
 	process.stdout.write(`${lint_related_scope.describe_scope(scope, root)}\n`)
 
 	const before = await scoped_green.read_before(command_arguments)
-	const exit_code = await lint_exit_code(scope)
+	const exit_code = await scoped_exit_code(scope, root)
 
 	await scoped_green.record_if_green(review_stamps.lint_related_stamp, { before, exit_code })
 

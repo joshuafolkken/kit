@@ -74,8 +74,11 @@ const SLACK_BYTES = 512
 // its mark. joshuafolkken/kit#2188 raised it four slack units (97,920 → 99,968) for the mandated
 // `josh run:next` and `josh doc:read` sections — the state-driven step manifest and the Bash-cap-safe
 // whole-document read path, their command references and their behavior tables — landing against a
+// document already at its mark. joshuafolkken/kit#2176 raised it two slack units (99,968 → 100,992)
+// for the mandated `josh bytes` section — the byte counterpart of `josh lines`, its command reference
+// and the note that `josh lint:related` now runs the fast byte-ceiling check — landing against a
 // document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 99_968
+const JOSH_COMMANDS_CEILING_BYTES = 100_992
 
 // Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
 // enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
@@ -122,7 +125,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4274 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 4685 },
 	{ path: 'CLAUDE.md', bytes: 26_907 },
-	{ path: 'docs/josh-commands.md', bytes: 99_147 },
+	{ path: 'docs/josh-commands.md', bytes: 100_298 },
 	{ path: 'prompts/agent-rules.md', bytes: 3472 },
 	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
@@ -168,8 +171,19 @@ function recorded_bytes_for(relative_path: string): number | undefined {
 	return DOCUMENT_BYTE_BUDGET.find((entry) => entry.path === relative_path)?.bytes
 }
 
+// The bytes an entry has left before its ceiling — the ceiling minus the document's current size.
+// Negative when the document is already over. `josh bytes` prints it as the headroom before an edit,
+// the same number `josh lines` prints for code lines (joshuafolkken/kit#2176).
+function remaining_bytes(recorded_bytes: number, current_bytes: number): number {
+	return ceiling_for(recorded_bytes) - current_bytes
+}
+
 // The failure message the size test raises — names the file, its current byte size, its ceiling, and
 // where to raise the ceiling (this file), per the acceptance criteria.
+//
+// **It names the exact value to record** (joshuafolkken/kit#2176): the recorded size follows the
+// document's actual size, so the number to write is the current size itself — a reader raising the
+// ceiling copies it rather than computing `current − slack` by hand.
 function over_budget_message(
 	relative_path: string,
 	current_bytes: number,
@@ -178,7 +192,7 @@ function over_budget_message(
 	const ceiling = ceiling_for(recorded_bytes).toString()
 	const current = current_bytes.toString()
 	const recorded = `${recorded_bytes.toString()} + ${SLACK_BYTES.toString()} slack`
-	const raise_hint = `raise its recorded size in scripts/document/document-byte-budget.ts so the reason shows in the PR diff`
+	const raise_hint = `raise its recorded size to ${current} in scripts/document/document-byte-budget.ts so the reason shows in the PR diff`
 
 	return `${relative_path} is ${current} bytes, over its ${ceiling}-byte ceiling (recorded ${recorded}). Shrink the document, or ${raise_hint}.`
 }
@@ -208,6 +222,7 @@ const document_byte_budget = {
 	ceiling_for,
 	over_budget_message,
 	recorded_bytes_for,
+	remaining_bytes,
 	stale_budget_message,
 }
 

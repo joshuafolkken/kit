@@ -34,6 +34,7 @@ const ALIASES: Record<string, string> = {
 	l: 'lint',
 	lr: 'lint:related',
 	ln: 'lines',
+	by: 'bytes',
 	f: 'format',
 	fd: 'format:edited',
 	bg: 'batch:guard',
