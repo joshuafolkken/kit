@@ -108,6 +108,21 @@ describe('run_event_stream.read_last — the degenerate read', () => {
 	})
 })
 
+describe('run_event_stream.format_event — the line a reader relays', () => {
+	it('joins the instant, the kind and the text into one legible line', () => {
+		const line = run_event_stream.format_event({
+			pos: 4,
+			at: AT,
+			kind: KIND.MERGE,
+			text: '#7 merged',
+		})
+
+		expect(line).toContain(AT)
+		expect(line).toContain(KIND.MERGE)
+		expect(line).toContain('#7 merged')
+	})
+})
+
 describe('run_event_stream.append — the bound', () => {
 	it('keeps at most EVENT_CAP events and drops the oldest', () => {
 		const target = fresh_target()
