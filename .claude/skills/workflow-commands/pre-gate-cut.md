@@ -362,4 +362,27 @@ the trigger, `scripts/rules/lane-park.test.ts` pins that it fires for a marked c
 and stays silent everywhere else, and the row joins the enumeration in
 `prompts/collaboration-workflow/rule-delivery.md`.
 
+### The interactive ask is refused one call earlier
+
+**The stop-notify guard fired one tool-call too late** (joshuafolkken/kit#2201). A child that reaches
+for `AskUserQuestion` never reaches the notify: the harness refuses an interactive ask in a headless
+session by **ending the turn**, so the notify guard above never fires and the question dies in the exit
+record's `permission_denials`. Measured on 2026-09-20 inside `backlogrun #2163 --only`: **#2178**'s
+child hit a Tier B branch, called `AskUserQuestion`, was refused, and left an OPEN Issue with
+`in-progress` and no question — the very failure #2034 set out to prevent, one call upstream of the
+trigger it chose.
+
+So `pnpm josh rule:guard` **refuses `AskUserQuestion` for a marked lane child**, one call before the
+stop it would have reached. A hook deny returns to the model rather than ending the turn, so the
+refusal becomes an instruction — park the question — and the child continues to record it. It fires on
+**every occurrence** (an interactive ask must never succeed in a child; the route is always the park,
+never a reissue of the ask), and stays silent for a person working in a lane, who carries no mark.
+
+**And a child that slips past it is still recoverable.** `pnpm josh run:ending` lifts the refused ask —
+the question and its option labels — out of the exit record's `permission_denials` and into the
+`abandoned` verdict's park basis, so the parent puts it into the park comment instead of opening the
+JSONL by hand. `scripts/rules/lane-interactive-ask.ts` implements the trigger,
+`scripts/rules/lane-interactive-ask.test.ts` pins both directions, and
+`scripts/agent/interactive-ask.ts` is the shared extractor the guard and `run:ending` both read.
+
 This file is the single source of the rule.

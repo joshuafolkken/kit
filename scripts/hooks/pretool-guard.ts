@@ -15,7 +15,9 @@ import { batch_outcome } from './batch-guard'
 //
 // **The verdict is identical to running the three in turn**, and that is the whole point. Each guard
 // self-gates on the tool name inside its own `is_candidate` / trigger, so running all three on the
-// union matcher (`Bash|Edit|Read|Write`) refuses exactly what the three separate entries did. A
+// union matcher (`Bash|Edit|Read|Write|AskUserQuestion`) refuses exactly what the three separate
+// entries did — `AskUserQuestion` is matched for the rule guard's lane-child interactive-ask row
+// (joshuafolkken/kit#2201), and the batching and investigation guards self-gate away from it. A
 // refusal from any guard wins first; only when none refuses is the batch guard's non-blocking notice
 // (the whole-file-write notice, joshuafolkken/kit#1848) emitted. Each guard still honours its own
 // switch (`JOSH_BATCH_GUARD` / `JOSH_INVESTIGATION_GUARD` / `JOSH_RULE_GUARD`) internally, so this

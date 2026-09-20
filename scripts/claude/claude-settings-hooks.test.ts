@@ -64,15 +64,17 @@ const TOOL_SEPARATORS = /[|,]/u
 // density line it used to also carry (joshuafolkken/kit#1337) is not worth that per-call cost, and
 // the batching it fed now rides the consolidated PreToolUse guard, which does intervene before the call.
 const FORMAT_TOOLS = ['Edit', 'Write']
-// The union of the three composed guards' matchers, since one process now answers for all of them.
+// The union of the composed guards' matchers, since one process now answers for all of them.
 // `Bash` is where the rule delivery guard (joshuafolkken/kit#1524) and the read-only half of the
 // batching guard bind; `Edit` carries the largest share of the batching guard's recoverable round
 // trips (joshuafolkken/kit#1762); `Read` is the shape a run spends most of its investigation in
 // (joshuafolkken/kit#1798); `Write` earns the batching guard's non-blocking notice
-// (joshuafolkken/kit#1848). Each composed guard self-gates on the tool name inside its own candidate
+// (joshuafolkken/kit#1848); `AskUserQuestion` is where the lane-child interactive-ask rule binds
+// (joshuafolkken/kit#2201) — without it in the matcher the hook never sees the ask a headless child
+// must be routed away from. Each composed guard self-gates on the tool name inside its own candidate
 // test, so naming the union is safe — a guard the call does not concern returns "allow" without ever
 // reading the transcript.
-const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write']
+const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion']
 // The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
 // rather than a push that dies after the unit suite has already run.

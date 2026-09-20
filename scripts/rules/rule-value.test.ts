@@ -235,19 +235,21 @@ describe('rule_value.measure — rules nothing can score', () => {
 	})
 
 	// **Every rule but the ones that cannot have a compliance test** (joshuafolkken/kit#1764,
-	// joshuafolkken/kit#2118, joshuafolkken/kit#2119, joshuafolkken/kit#2120). The investigation row
-	// declares none because no call-shaped test can tell a delegation of the reading from any other
-	// dispatch; the test-declared row declares none because its verdict is a working-tree read the
-	// transcript never records, so no recorded call reveals whether the commit carried a test; the
-	// filing-cap row declares none because staying under a cap is not a call; the three Bash-string
-	// gaps (`git-force`, `worktree-mutation`, `file-body`) declare none because the act each guards
-	// against is destructive or billed and the safe alternative is the *absence* of a call — a push
-	// never made, a stash never raw, an Edit that is not a Bash call at all; and `third-party-write`
-	// declares none for the same reason (joshuafolkken/kit#2122) — not writing to another owner's
-	// tracker is the absence of a call, not a call. The module's doctrine is
-	// that such a rule reads unmeasured rather than as compliant. Naming them exactly keeps the guard
-	// over every other row, the batching one included, rather than exempting a whole registry to make
-	// room for the exceptions.
+	// joshuafolkken/kit#2118, joshuafolkken/kit#2119, joshuafolkken/kit#2120, joshuafolkken/kit#2201).
+	// The investigation row declares none because no call-shaped test can tell a delegation of the
+	// reading from any other dispatch; the test-declared row declares none because its verdict is a
+	// working-tree read the transcript never records, so no recorded call reveals whether the commit
+	// carried a test; the filing-cap row declares none because staying under a cap is not a call; the
+	// three Bash-string gaps (`git-force`, `worktree-mutation`, `file-body`) declare none because the
+	// act each guards against is destructive or billed and the safe alternative is the *absence* of a
+	// call — a push never made, a stash never raw, an Edit that is not a Bash call at all;
+	// `third-party-write` declares none for the same reason (joshuafolkken/kit#2122) — not writing to
+	// another owner's tracker is the absence of a call, not a call; and `lane-interactive-ask` declares
+	// none for the same reason (joshuafolkken/kit#2201) — not asking a person is the absence of a call,
+	// and the compliance a routed child does make is the park `lane-park` already scores. The module's
+	// doctrine is that such a rule reads unmeasured rather than as compliant. Naming them exactly keeps
+	// the guard over every other row, the batching one included, rather than exempting a whole registry
+	// to make room for the exceptions.
 	it('declares a compliance test on every rule but the ones that cannot have one', () => {
 		const unmeasured = rule_value
 			.measure([[session(FILING)]])
@@ -258,6 +260,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			'third-party-write',
 			FILING_CAP_ID,
 			'test-declared',
+			'lane-interactive-ask',
 			'git-force',
 			'worktree-mutation',
 			'file-body',
