@@ -731,7 +731,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:event": [
-      "--append <kind> <text> | --from <position> | --last",
+      "--append <kind> <text> | --from|--follow <n> | --last",
       "automation",
       [
         "files",

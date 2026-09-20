@@ -265,9 +265,9 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'run:event': {
 		script: 'scripts/run/run-event-cli.ts',
 		description:
-			'Append to or read the run’s append-only event stream (--append <kind> <text> | --from <position> | --last)',
+			'Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)',
 		category: 'AI tools',
-		reference: ['--append <kind> <text> | --from <position> | --last', 'automation', ['files']],
+		reference: ['--append <kind> <text> | --from|--follow <n> | --last', 'automation', ['files']],
 	},
 	...LANE_COMMANDS,
 	'investigation:guard': {

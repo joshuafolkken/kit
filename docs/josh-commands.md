@@ -1371,13 +1371,20 @@ joshuafolkken/kit#2179 and `chain-rule.md`.
 Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205); alias
 `rev`. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
 lane child append to one stream that survives a session cut; `--from` reads everything after a position,
-`--last` the newest event alone.
+`--last` the newest event alone, and `--follow` the reader an attached session relays with
+(joshuafolkken/kit#2207).
 
 ```bash
 pnpm josh run:event --append <kind> <text>   # append one event; prints its position
-pnpm josh run:event --from <position>         # every event after <position>, in order
+pnpm josh run:event --from <position>         # every event after <position>, in order (JSON)
+pnpm josh run:event --follow <position>       # relay new events, waiting for one; position on stderr
 pnpm josh run:event --last                    # the newest event alone
 ```
+
+`--follow` is `--from` that waits: it returns the moment an event is past `<position>` and otherwise at
+the interval, so an attached session sees a new event at once and the run's aliveness while quiet. Events
+go to standard output to relay verbatim and the next position to standard error — the same before and
+after a cut, the stream the run's, the position the caller's.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `cut`, `stop`,
 `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge` and `park`
