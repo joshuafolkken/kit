@@ -8,6 +8,7 @@ import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
 import { gh_api } from './gh-api'
 import { git_force } from './git-force'
+import { issue_fold } from './issue-fold'
 import { issue_scout } from './issue-scout'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
@@ -324,6 +325,13 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// over-cap filing is delivered `wip-cap`, then `issue-scout`, then `filing-cap` across its reissues.
 	issue_scout.ROW,
 	filing_cap.ROW,
+	// **`issue-fold` shares the same filing trigger** (joshuafolkken/kit#2213), listed after
+	// `filing-cap`: it refuses a *second* filing the run has not folded, once per run, stood down off
+	// the tail when the run has already folded or has filed nothing earlier. It is another instance of
+	// the admissible overlap — the losing rule's delivery is still correct one reissue later — so a
+	// scout-less, unfolded, over-cap second filing is delivered `wip-cap`, then `issue-scout`, then
+	// `filing-cap`, then `issue-fold` across its reissues.
+	issue_fold.ROW,
 	{
 		id: 'issue-comments',
 		is_trigger: on_bash_command(is_body_only_issue_read),
@@ -644,9 +652,7 @@ const GUARDS = new Map(DELIVERED_RULES.map((rule) => [rule.id, guard_of(rule)]))
 // records land in the shared temp directory rather than under any directory a test owns, and a record
 // left behind would silence the next case exactly as it silences the next call.
 function delivery_path(rule_id: string, transcript_path: string): string {
-	const guard = GUARDS.get(rule_id)
-
-	return guard === undefined ? '' : guard.refusal_path(transcript_path)
+	return GUARDS.get(rule_id)?.refusal_path(transcript_path) ?? ''
 }
 
 // **The first entry whose delivery actually fires wins — not the first whose trigger matches.** Only
@@ -684,6 +690,7 @@ const delivered_rules = {
 	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON,
+	ISSUE_FOLD_REASON: issue_fold.ISSUE_FOLD_REASON,
 	ISSUE_SCOUT_REASON: issue_scout.ISSUE_SCOUT_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,

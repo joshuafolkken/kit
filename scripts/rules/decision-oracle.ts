@@ -11,6 +11,8 @@
 const CHAIN_RULE_MD = '.claude/skills/workflow-commands/chain-rule.md'
 const BACKLOGRUN_PROGRESS_MD = '.claude/skills/workflow-commands/backlogrun-progress.md'
 const SKILL_2E = '.claude/skills/workflow-commands/SKILL.md → §2e'
+const SPLIT_ASSESSMENT_QUESTION =
+	'.claude/skills/workflow-commands/split-assessment.md → The question'
 const PRE_GATE_CUT_MD = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const BACKLOGRUN_MD = '.claude/skills/workflow-commands/backlogrun.md'
 
@@ -141,6 +143,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: SKILL_2E,
 	},
 	{
+		name: 'issue:fold',
+		decision: 'Whether findings filed from one session fold into one issue or stay separate',
+		args: '<title...>',
+		vocabulary: ['fold', 'separate', 'no-fold-needed'],
+		single_source: SPLIT_ASSESSMENT_QUESTION,
+	},
+	{
 		name: 'pkg:scout',
 		decision: 'Whether the top package candidate is clearly best (Tier A) or a near-tie (Tier B)',
 		args: '<keywords>',
@@ -239,7 +248,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether a change size clears the split guide (the split assessment size question)',
 		args: '[--json]',
 		vocabulary: ['split', 'single'],
-		single_source: '.claude/skills/workflow-commands/split-assessment.md → The question',
+		single_source: SPLIT_ASSESSMENT_QUESTION,
 	},
 	{
 		name: 'sonar:hotspots',

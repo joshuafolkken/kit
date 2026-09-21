@@ -298,7 +298,9 @@ record the dependency in the epic, and — under `fullrun` / `halfrun` — **sto
 `backlogrun` — **continue** (`backlogrun-park.md` → "A prerequisite discovered mid-run"). It is the
 third of four mid-run discoveries, distinct from an upstream defect, a split (`split-assessment.md`)
 and an observation (§2i). The full table, the filing command, the `-u`/`stash:pop` steps and the
-10-per-run cap are `prerequisite.md`, its single source, read at that trigger.
+10-per-run cap are `prerequisite.md`, its single source, read at that trigger. **When the prerequisite
+is the run's second filing, `pnpm josh issue:fold` runs first** (§2e), and `pnpm josh rule:guard`
+refuses the second `gh api … issues` call until it has.
 
 ## 2e. Before filing a new Issue — `pnpm josh issue:scout`
 
@@ -396,6 +398,11 @@ answer under `backlogrun` parks the run without saying so.
   means do not file (`prompts/collaboration-workflow/wip-cap.md`).
 - **Run `pnpm josh issue:scout "<title>"` before the `gh api … issues` call**, as before any other
   filing (§2e).
+- **When this is the run's second filing, run `pnpm josh issue:fold` first.** Several findings from one
+  session fold into one Issue by default — the filing-time counterpart to the split assessment, reading
+  the same two questions (`split-assessment.md` → "The same two questions decide the filing-time fold").
+  `pnpm josh rule:guard` refuses the second `gh api … issues` call until it is folded; the first filing
+  asks nothing.
 - **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
   tracks is one `epic:next` never offers. **Where that epic's root carries `auto-ok` the filing joins
   the backlog's pool** (`backlogrun-steps.md` → "What one invocation approves").

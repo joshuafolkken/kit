@@ -1,3 +1,4 @@
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import {
@@ -29,6 +30,25 @@ beforeEach(() => {
 afterAll(() => {
 	harness.cleanup()
 })
+
+// A `pnpm josh issue:fold` call appended to a tail, so the fold gate stands down for a run that has
+// already folded. The cap suite uses it to isolate `filing-cap` from the fold gate, exactly as the
+// scout in every fixture tail isolates it from `issue-scout`.
+function with_fold(tail: string): string {
+	return [
+		tail,
+		time_transcript_fixture.josh_call_line(
+			20,
+			time_transcript_fixture.BRANCH,
+			'pnpm josh issue:fold "a" "b"',
+		),
+	].join('\n')
+}
+
+// A scouted tail carrying one prior filing and then a fold call.
+function folded_tail(): string {
+	return with_fold(filings_tail(1))
+}
 
 describe('rule_delivery — the scout gate at the call that files', () => {
 	it('delivers the rule on a filing the run has not scouted', () => {
@@ -69,7 +89,7 @@ describe('rule_delivery — the scout gate at the call that files', () => {
 // once-per-run WIP cap — the cap itself is read from the deliveries after that.
 describe('rule_delivery — the filing cap at the call past the ceiling', () => {
 	it('says nothing while the run is under the cap', () => {
-		const tail = filings_tail(filing_cap.FILING_CAP - 1)
+		const tail = with_fold(filings_tail(filing_cap.FILING_CAP - 1))
 		const payload = payload_of('cap-under', FILING_API_COMMAND, 'Bash', tail)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
@@ -93,8 +113,33 @@ describe('rule_delivery — the filing cap at the call past the ceiling', () => 
 	// A guard-refused filing did not create an Issue, so it does not count: ten filings with one refused
 	// is nine, and the tenth is allowed.
 	it('does not count a guard-refused filing toward the cap', () => {
-		const tail = filings_tail(filing_cap.FILING_CAP, 1)
+		const tail = with_fold(filings_tail(filing_cap.FILING_CAP, 1))
 		const payload = payload_of('cap-refused', FILING_API_COMMAND, 'Bash', tail)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
+		expect(rule_delivery(payload, A_LATER_MS)).toBeUndefined()
+	})
+})
+
+// Each tail carries the scout so `issue-scout` stands down, and the WIP cap is consumed by the first
+// delivery — the fold gate itself is read from the deliveries after that.
+describe('rule_delivery — the fold gate at the second filing', () => {
+	it('says nothing on the first filing, with nothing to fold with', () => {
+		const payload = payload_of('fold-first', FILING_API_COMMAND, 'Bash', filings_tail(0))
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
+		expect(rule_delivery(payload, A_LATER_MS)).toBeUndefined()
+	})
+
+	it('delivers on a second filing the run has not folded', () => {
+		const payload = payload_of('fold-second', FILING_API_COMMAND, 'Bash', filings_tail(1))
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
+		expect(rule_delivery(payload, A_LATER_MS)).toBe(delivered_rules.ISSUE_FOLD_REASON)
+	})
+
+	it('says nothing on a second filing the run has already folded', () => {
+		const payload = payload_of('fold-done', FILING_API_COMMAND, 'Bash', folded_tail())
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, A_LATER_MS)).toBeUndefined()
