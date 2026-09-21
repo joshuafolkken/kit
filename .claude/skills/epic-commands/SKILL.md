@@ -41,7 +41,7 @@ the label-clearing rule itself is `backlogrun-park.md` → "park and continue".
 - **A decision about a child the epic already tracks** cannot use that flag: an insertion with nothing
   to add is refused outright. Until joshuafolkken/kit#1162 adds an entry point for already-tracked
   children, write the child comments with
-  `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` on each child the answer
+  `pnpm josh issue:comment <N> --body-file <path>` on each child the answer
   applies to, and **say in the report that the epic's `## Decisions` entry is still pending** — the
   entry going unwritten is how two of the four most recent placements in joshuafolkken/kit#1262 ended
   up with a child comment and nothing on the epic.

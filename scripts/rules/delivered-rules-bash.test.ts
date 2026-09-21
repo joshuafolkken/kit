@@ -121,6 +121,33 @@ describe('file-body — the inline body write the deny list cannot see', () => {
 	})
 })
 
+// First-party owner, so `third-party-write` stays silent and the exactly-one invariant reads this
+// rule alone — the harness resolves the real session owner (`joshuafolkken`), so `repos/o/r` would
+// trip that row first.
+describe('raw-field-body — the literal @path a raw field flag posts as text', () => {
+	const COMMENTS = 'repos/joshuafolkken/kit/issues/5/comments'
+	const AT_PATH_COMMENT = `gh api ${COMMENTS} -f body=@/tmp/park.md`
+
+	it.each([
+		['short flag', AT_PATH_COMMENT],
+		['long raw flag', `gh api ${COMMENTS} --raw-field body=@/tmp/park.md`],
+	])('delivers on the %s misfire', (_name, command) => {
+		expect(delivered_for(`rfb-${_name}`, command)).toBe(delivered_rules.RAW_FIELD_BODY_REASON)
+	})
+
+	it.each([
+		['file-reading -F', `gh api ${COMMENTS} -F body=@/tmp/park.md`],
+		['file-reading --field', `gh api ${COMMENTS} --field body=@/tmp/park.md`],
+		['the josh command', 'pnpm josh issue:comment 5 --body-file /tmp/park.md'],
+	])('is silent on the safe %s form', (_name, command) => {
+		expect(delivered_for(`rfb-safe-${_name}`, command)).toBeUndefined()
+	})
+
+	it(CLAIMED_TITLE, () => {
+		expect(rules_claiming(AT_PATH_COMMENT)).toBe(ONE_RULE)
+	})
+})
+
 describe('josh-git-bare — the confirmation-less push the run reissues with -y', () => {
 	it('delivers on a bare `pnpm josh git`', () => {
 		expect(delivered_for('jg-bare', BARE_JOSH_GIT)).toBe(josh_git_bare.JOSH_GIT_BARE_REASON)

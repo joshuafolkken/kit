@@ -83,7 +83,7 @@ AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎる�
 
 **自動判断の記録**: 本来確認すべき Tier A の分岐を自動判断したときは、候補と理由を記録する:
 
-- Issue 駆動ワークフロー内（`kickoff` / `halfrun` / `fullrun` / `backlogrun`）: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="..."` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する
+- Issue 駆動ワークフロー内（`kickoff` / `halfrun` / `fullrun` / `backlogrun`）: `pnpm josh issue:comment <N> --body-file <path>` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する
 - Issue が存在しない会話タスク: 同じ内容を「Auto-decided: `<choice>` over `<alt>` because `<reason>`」の1行として応答に明示する
 
 ### 確認待ちで停止するときの Telegram 通知（`confirmation`）

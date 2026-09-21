@@ -908,6 +908,22 @@ pnpm josh issue:cite joshuafolkken/app-kit#45 2220         # per-token owner/rep
 
 Citation lines go to stdout so the block stays paste-ready; a number that resolves to nothing or a read that failed is named on stderr rather than dropped, and any failure sets a non-zero exit. Any non-numeric token refuses the whole call. The [`Stop` hook's citation notice](../prompts/collaboration-workflow/issue-citation.md) points at this command with the numbers it detected already filled in.
 
+### `josh issue:comment`
+
+Post one comment to an issue (a PR comment is an issue comment over REST) with the body passed by path, and print the comment URL. It is the write side the read commands lacked — before it, every park, decision record and plan comment fell to a raw `gh api … body=@<path>`, where `-f` / `--raw-field` sends the literal `@<path>` and `-F` / `--field` reads the file, one character apart and silent when wrong (joshuafolkken/kit#2304). One command removes the choice.
+
+```bash
+pnpm josh issue:comment 2304 --body-file /tmp/park.md   # the body from a file — no shell evaluates it
+pnpm josh issue:comment 2304 --body "a short note"      # inline, for a body with no backticks or $
+```
+
+**Options:**
+
+- `--body <text>` — the comment body, inline. Trimmed, with `\n` expanded to a newline.
+- `--body-file <path>` — read the body from a file, or from stdin with `-`. The safe form the rule steers every caller toward.
+
+The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared with `notify` / `followup`, so no shell evaluates it; `--body` and `--body-file` at once is refused rather than ranked. `pnpm josh rule:guard` refuses the `-f body=@…` misfire before it runs (the `raw-field-body` row), so the literal `@<path>` cannot reach GitHub.
+
 ### `josh pkg:scout`
 
 Before the Package-First tier decision, rank candidate packages by measured metrics so Tier A ("clearly best") and Tier B ("genuine toss-up") are read off the output rather than judged (joshuafolkken/kit#2216). It queries the npm registry and prints one line per candidate: npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.

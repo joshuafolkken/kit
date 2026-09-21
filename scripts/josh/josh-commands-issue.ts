@@ -44,6 +44,12 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: [ISSUES_WITH_REPO, 'automation', ['network']],
 	},
+	'issue:comment': {
+		script: 'scripts/issue/issue-comment-cli.ts',
+		description: 'Post one comment to an issue from a file, so no shell expands the body',
+		category: 'AI tools',
+		reference: ['<issue> --body <text> | --body-file <path>', 'automation', ['network']],
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

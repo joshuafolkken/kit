@@ -35,13 +35,24 @@ joshuafolkken/kit#1198 のコメントは `!` も発火すると書いていた�
 **本文をファイルに書いて、パスで渡す。** シェルは本文を一切解釈しない。
 
 ```bash
-gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>
+pnpm josh issue:comment <N> --body-file <path>
 gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>
 pnpm josh followup "<title> #<N>" --notify-message-file <path>
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 ```
 
-**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、上の 1 行目がそのまま使える。`gh issue comment` / `gh pr comment` にも `--body-file` はあるが、本リポジトリの配布ドキュメントは GraphQL 経由の `gh` サブコマンドを実行可能ブロックに書かない（クラウドセッションでは 403 になる。`scripts/gh/gh-document-guard.test.ts`）。
+**PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、`pnpm josh issue:comment <N> --body-file <path>` がそのまま使える。`gh issue comment` / `gh pr comment` にも `--body-file` はあるが、本リポジトリの配布ドキュメントは GraphQL 経由の `gh` サブコマンドを実行可能ブロックに書かない（クラウドセッションでは 403 になる。`scripts/gh/gh-document-guard.test.ts`）。
+
+### コメント投稿は `pnpm josh issue:comment` の 1 綴りだけ（joshuafolkken/kit#2304）
+
+**`gh api` には「本文をパスで渡す」の綴りが 2 つあり、片方は黙って壊れる。**
+
+- `gh api ... -F body=@<path>` ／ `--field body=@<path>` — `@` で始まる値を**ファイルとして読む**。正しい
+- `gh api ... -f body=@<path>` ／ `--raw-field body=@<path>` — 値を**そのまま送る**。`@<path>` というリテラル文字列がコメントとして投稿される
+
+`-f` と `-F` は 1 文字違いで、どちらでも `gh` は終了コード 0 でコメント URL を返す。**壊れたことが分かるのは後で人が Issue を見たときだけ**である（joshuafolkken/kit#2304 は park コメント 2 件がこれで失われた）。
+
+だから **Issue／PR コメントの投稿は `pnpm josh issue:comment <N> --body-file <path>` ただ 1 綴りに寄せる** — 間違ったフラグを選ぶ余地が無く、本文は `cli-body.ts` を通ってパスで渡るためシェルも評価しない。`-f body=@…` の綴りは実行前に `pnpm josh rule:guard` が拒否する（列挙表の `raw-field-body` 行、`scripts/rules/raw-field-body.ts`）。上の Issue body 書き換え（`-X PATCH ... --field body=@<path>`）は `-F` 側で安全なので綴りを変えない。
 
 `--body-file` / `--notify-message-file` はいずれも `-` で標準入力を読む（`gh issue create --body-file -` と同じ約束）。読み取りは `scripts/josh/cli-body.ts` の 1 本だけで、`josh notify` / `josh followup` / `epic --rationale-file` / `epic --decision-file` の 4 つがそれを共有する。**`--body` と `--body-file` の同時指定は拒否する** — 優先順位を決めると、ファイルを渡したつもりの呼び出しが、避けようとしていたインライン文字列をそのまま送ってしまう。
 
@@ -66,5 +77,6 @@ pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 
 - `scripts/josh/cli-body.test.ts` — バッククォート・`$` を含む本文がファイル経由で無改変に通ること、`-` が標準入力を読むこと、通常ファイル以外の読める経路（`/dev/stdin`・プロセス置換）を開けること、インラインとファイルの同時指定を拒否すること
 - `scripts/rules/shell-body-trigger.test.ts` — 危険な綴りで発火し、プレースホルダ・`@file` 形式・エスケープ済み `\$` では無言であること。`body=` のどちら側に引用符があっても発火すること、`$( … )` で包んでもバッククォートは免除されないこと、`$( … )` の中の引用符で捕捉が切れないことを、いずれも発火・非発火の対で固定する
+- `scripts/rules/raw-field-body.test.ts` — `-f` ／ `--raw-field body=@` の綴りで発火し、`-F` ／ `--field body=@`・`@` を含まない本文・`labels[]=`・`pnpm josh issue:comment` では無言であること
 - `scripts/rules/delivered-rules.test.ts` — 上の引き金が列挙表の行に配線されており、非 `Bash` ツールでは無言であること
 - `scripts/rules/shell-body-rule.test.ts` — 常駐 1 行がこの文書を指しており、配送文が被害・安全な綴り・再発行の指示を運ぶこと。**この一覧そのものも固定する** — 一覧が「あるスイートが何を固定しているか」を書きながら、そのケースが存在しないという食い違いが実際に起きた（`-` の標準入力）
