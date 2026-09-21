@@ -1401,6 +1401,19 @@ facts to one step: a `CLOSED` issue is already done, a `required` dependency sco
 It is the consumer #2165's `run:prep` was built to have and the foundation the entry-read trim of epic
 #2166 rests on.
 
+### `josh run:step`
+
+Prints the run's next single action, computed from the event stream (`run:event`), the carry record
+(`run:carry`) and the issue state (`run:prep`) — never the conversation; alias `rsp`
+(joshuafolkken/kit#2248). It lifts `run:next`'s fold from an _event_ to a whole _run_, printing one
+line: a runnable command for a phase that has one (`followup` after a PR opens, `run:merge <N>` after a
+merge, `backlog:next` after a park, `run:cut --resume <N>` after a cut), a fixed verdict otherwise
+(`implement`, `human-review`, `update-deps`, `already-done`, `wait`, `stop`, `unknown`), or a `decide:`
+line for the one Tier-B point it surfaces — a spent whole-run budget. It dispatches rather than
+re-decides: a merged child's outcome stays `run:merge`'s, the next issue `backlog:next`'s. `run:next`
+is now its degenerate form — the pre-implementation position mapped to prose over the one shared
+mapping, so there is no second implementation.
+
 ### `josh repo:party`
 
 Says whether a repository is **first-party** or **third-party** — computed by owner equality, not

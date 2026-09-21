@@ -1135,6 +1135,16 @@ Bundle a run’s read-only status: issue state, cost verdict, carry counters
 
 ---
 
+### `josh run:step` · `josh rsp`
+
+> **Audience:** automation · **Side effects:** network, files
+
+`<issue>`
+
+Print the run’s next single action, computed from the event stream, carry record and issue state
+
+---
+
 ### `josh run:wake` · `josh rw`
 
 > **Audience:** automation · **Side effects:** processes, notifications

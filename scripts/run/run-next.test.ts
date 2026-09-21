@@ -2,6 +2,7 @@ import type { IssueState } from '#scripts/issue/issue-state'
 import { describe, expect, it } from 'vitest'
 import { run_next, type NextInput } from './run-next'
 import type { PrepParts } from './run-prep'
+import { run_step } from './run-step'
 
 const OPEN_STATE: IssueState = { state: 'OPEN', labels: [], is_human_review: false }
 const REVIEW_STATE: IssueState = {
@@ -52,6 +53,26 @@ describe('run_next.next_step', () => {
 		const step = run_next.next_step(input({ state: 'CLOSED', latest_scope: 'required' }))
 
 		expect(step).toBe(run_next.ALREADY_DONE_STEP)
+	})
+})
+
+describe('run_next is the degenerate form of run:step', () => {
+	const PROSE_OF: Record<string, string> = {
+		[run_step.ALREADY_DONE]: run_next.ALREADY_DONE_STEP,
+		[run_step.HUMAN_REVIEW]: run_next.HUMAN_REVIEW_STEP,
+		[run_step.IMPLEMENT]: run_next.IMPLEMENT_STEP,
+		[run_step.UNKNOWN]: run_next.UNKNOWN_STEP,
+		[run_step.UPDATE_DEPS]: run_next.LATEST_STEP,
+	}
+
+	it.each([
+		input({}),
+		input({ state: 'CLOSED' }),
+		input({ state: undefined }),
+		input({ latest_scope: 'required' }),
+		input({ is_human_review: true }),
+	])('maps run:step’s verdict to its prose for %o', (next_input) => {
+		expect(run_next.next_step(next_input)).toBe(PROSE_OF[run_step.pre_verdict(next_input)])
 	})
 })
 

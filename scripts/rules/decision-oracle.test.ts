@@ -7,6 +7,7 @@ import { disposition } from '#scripts/review/disposition-logic'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
 import { oracle_list_cli } from '#scripts/rules/oracle-list-cli'
 import { run_hold_cli } from '#scripts/run/run-hold-cli'
+import { run_step } from '#scripts/run/run-step'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { describe, expect, it } from 'vitest'
 
@@ -154,6 +155,18 @@ describe('the #2235 oracles are on the enumeration', () => {
 			lane_occupancy.STOPPED,
 			lane_occupancy.UNKNOWN,
 		])
+	})
+})
+
+describe('vocabulary matches the code for run:step oracle', () => {
+	const STEP_ORACLE = decision_oracle.find_oracle('run:step')
+
+	it('run:step oracle exists', () => {
+		expect(STEP_ORACLE).toBeDefined()
+	})
+
+	it('declares exactly the verdict tokens run:step can print', () => {
+		expect(STEP_ORACLE?.vocabulary).toEqual(run_step.VOCABULARY)
 	})
 })
 

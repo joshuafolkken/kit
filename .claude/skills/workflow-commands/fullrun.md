@@ -2,7 +2,9 @@
 
 **This file is the manifest, not the procedure** (joshuafolkken/kit#2189). It carries the ordered
 steps as terse triggers and pointers; the fine print of each step is read on demand from the file its
-pointer names, and `pnpm josh run:next <N>` prints which step the run is at from the run's state.
+pointer names, and `pnpm josh run:step <N>` prints the run's next single action, computed from the
+event stream, the carry record and the issue state (`run:next` is its pre-implementation degenerate
+form, and the two share one mapping).
 `chain-rule.md`, `followup.md`, `background-commands.md` and `latest-gate.md` are **not entry
 reads** — each is fetched at its point of use, in the turn that reaches it. The step lists themselves
 are `fullrun-steps.md`, read when a step needs its detail.
@@ -28,7 +30,8 @@ are `fullrun-steps.md`, read when a step needs its detail.
    (`issue-comments.md`), `issue:state`'s state/labels/`human_review`, and `latest:scope`'s dependency
    scope in one report, run beside `run:hold` and `cost --cut` in the same turn. The §2g comment stops,
    the `human_review` stop and the dependency decision are read off it.
-5. **Print the next step — `pnpm josh run:next <N>`** — and follow it into `fullrun-steps.md`: the
+5. **Print the next action — `pnpm josh run:step <N>`** (`run:next` for the prose form of the
+   pre-implementation step) — and follow it into `fullrun-steps.md`: the
    `fullrun #N` list or the `fullrun new` list. Before implementing, `git switch main && git pull`, then
    `pnpm josh latest:scope` — update dependencies only on `required` (`latest-gate.md`), never on every
    run. The list ends in the verification gate (`chain-rule.md` → "Run the review-to-merge chain"),

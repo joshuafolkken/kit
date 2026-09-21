@@ -224,6 +224,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['network']],
 	},
+	'run:step': {
+		script: 'scripts/run/run-step-cli.ts',
+		description:
+			'Print the run’s next single action, computed from the event stream, carry record and issue state',
+		category: 'AI tools',
+		reference: ['<issue>', 'automation', ['network', 'files']],
+	},
 	'repo:party': {
 		script: 'scripts/discovery/repo-party-cli.ts',
 		description:
