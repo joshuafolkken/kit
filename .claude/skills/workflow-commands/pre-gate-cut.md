@@ -316,16 +316,70 @@ prohibition.
 
 ## Measurement
 
-The mechanism is what makes the per-call context drop possible; the drop itself is measured on a real
-dispatched lane run with `pnpm josh cost` and the run-timing report, comparing the average context per
-request before and after. **Until that run is measured it is reported as unmeasured** — the bytes a
-record holds, the cache a session keeps and the billed cost are distinct, and only a measured run
-tells whether the average fell.
+Measured on the **2026-09-21 `backlogrun`** (joshuafolkken/kit#2279) — thirteen dispatched lane
+children (every lane whose implementation began before that day's `10:24Z` batch, excluding `#2258`,
+re-run later). Their transcripts survive under `~/.claude/projects/-Users-…-kit-lanes-<N>/` (one
+`.jsonl` per session), read after the fact though every worktree is gone.
 
-**The implementation-phase cut's drop is measured the same way, and is likewise unmeasured until
-then** (joshuafolkken/kit#1933): one changed `backlogrun` compares the average and maximum context
-per request of each lane against the 2026-09-13 run recorded in the issue, and until that run exists
-the effect of the 200_000 threshold is reported as unmeasured.
+**The reproducible command.** `josh cost` and the loop below sum the billed input `cost --cut` reads —
+`input_tokens + cache_creation + cache_read`, deduped by `requestId`:
+
+```bash
+# Latest (resumed) session average — exactly what `cost --cut` measures. The path maps to the
+# transcript slug even after the worktree is deleted.
+pnpm josh cost --path /Users/<you>/Development/.kit-lanes/<N> --over 999999999
+
+# Avg and max billed input per request of every session, oldest first.
+for f in ~/.claude/projects/-Users-<you>-Development--kit-lanes-<N>/*.jsonl; do
+  jq -rn '[inputs
+    | select(.type=="assistant" and .message.model!="<synthetic>" and .message.usage!=null)
+    | {id:(.requestId//.message.id//.uuid),
+       billed:(.message.usage.input_tokens
+               +(.message.usage.cache_creation_input_tokens//0)
+               +(.message.usage.cache_read_input_tokens//0))}]
+    | group_by(.id) | map(.[0].billed)
+    | {requests:length, avg:((add/length)|round), max:max}' "$f"
+done
+```
+
+`josh cost --over` reads the latest session only; its average matches the `jq` `avg` byte for byte —
+verified on `#2267`'s resumed session at **53549 over 16 requests**.
+
+**The pre-gate cut's drop, measured.** Every completing lane child splits into an implementation
+session and a resumed gate→merge session whose per-request context falls sharply:
+
+| Lane  | Sessions | Impl session avg / max | Resumed session avg / max |
+| ----- | -------- | ---------------------- | ------------------------- |
+| #2240 | 2    | 178374 / 273802        | 55010 / 71158             |
+| #2257 | 2    | 169392 / 246430        | 101461 / 135016           |
+| #2255 | 2    | 133676 / 170870        | 60214 / 73523             |
+| #2267 | 2    | 132988 / 201874        | 53549 / 64323             |
+| #2254 | 2    | 130545 / 198724        | 54797 / 69250             |
+| #2244 | 2    | 126299 / 182737        | 53398 / 65016             |
+| #2256 | 2    | 120201 / 162079        | 49000 / 55824             |
+| #2251 | 2    | 111508 / 169062        | 60506 / 73996             |
+| #2249 | 2    | 80609 / 114614         | 69103 / 86634             |
+| #2250 | 2    | 77114 / 113708         | 50189 / 57925             |
+| #2236 | 3    | 137553 / 191313¹       | 66156 / 84542             |
+| #2213 | 1    | 180526 / 248626        | — (never cut)             |
+| #2248 | 1    | 163938 / 233185        | — (never cut)             |
+
+¹ `#2236` ran in three sessions; the figure is its largest (66-request) one.
+
+Across the eleven lanes that cut, the implementation session averaged ~130k billed input per request
+and the resumed session ~60k — the accumulated thinking the pre-gate cut drops (`#2267`: 132988 →
+53549). The two uncut lanes (`#2213`, `#2248`) sit at the top of the range — the
+per-request cost the cut removes — and every implementation session stays under the 2026-09-13 uncut
+baseline of **208k–386k** median context per request.
+
+**The 200_000 threshold did not fire.** `cost --cut` compares the *session average* billed input per
+request (`cost-verdict.ts` `per_request_cost`) against `CONTEXT_CUT_THRESHOLD` (200_000). The highest
+session average in the batch is **180526** (`#2213`), so no lane ever tripped the implementation-phase
+cut — every split above is the *unconditional* pre-gate cut. The peak
+*single-request* context (the table's max column) did cross 200k in five lanes — `#2240`, `#2213`,
+`#2257`, `#2248`, `#2267` — but the average the threshold watches stayed under. Whether the threshold
+should be lowered, or measured against recent rather than whole-session context, is a behavior
+change — deferred to joshuafolkken/kit#2282, not decided here.
 
 ## A lane child records its park before it stops
 
