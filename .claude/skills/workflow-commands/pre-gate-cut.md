@@ -379,6 +379,14 @@ cut — every split above is the *unconditional* pre-gate cut. The peak
 *single-request* context (the table's max column) did cross 200k in five lanes — `#2240`, `#2213`,
 `#2257`, `#2248`, `#2267` — but the average the threshold watches stayed under.
 
+**Every session above is a lane child; no parent session was in the batch (joshuafolkken/kit#2295).**
+The thirteen sessions are dispatched lane children, and a lane child is short-lived — it implements one
+Issue, is cut, and its resumed half gates and merges. A short session's whole-session average sits close
+to its tail, so measuring the average never lags the child. A `backlogrun` parent is the opposite: it
+supervises for hours across many children, and its context only grows — so the whole-session average
+lags its current context by dozens of requests. The batch that justified the whole-session statistic
+never contained the one session type the statistic mis-serves.
+
 ### The threshold stays — a safety net not firing is not a miscalibration (joshuafolkken/kit#2282)
 
 **joshuafolkken/kit#2282 weighed three options against the measurement above and kept the status quo:
@@ -408,6 +416,32 @@ not a cut that fires on a typical lane.
   measurement, or changes the parent's between-child hand-off too — a far wider behavior change, again
   with no measured harm behind it. The pre-gate cut already caps every resumed session near 60k, so the
   peak the average misses is bounded regardless.
+
+### The parent hands off on recent context, not the whole-session average (joshuafolkken/kit#2295)
+
+**joshuafolkken/kit#2295 revisited option 2 with the parent session #2282 never measured, and
+changed the statistic — `cost_verdict.per_request_cost` now averages the most recent
+`RECENT_REQUEST_WINDOW` (10) requests rather than the whole session.** The threshold is untouched
+(still 200_000), and the measurement is still *one* — the parent's `pnpm josh cost --cut`, which the
+child's implementation-phase cut still reads and never a second of its own. Only the definition of that
+single statistic changed.
+
+- **The measurement above did not disprove option 2; it never tested it.** Every session in the batch
+  was a short-lived lane child (see "no parent session was in the batch"), for which recent-average and
+  whole-session-average nearly coincide. The 2026-09-21 parent session `567f8eac` — 186 requests, 7
+  hours — was measured directly for #2295: its own context first crossed 200k at request 65, but the
+  session average did not cross until request 150, **85 requests (~4 hours) later**. The whole-session
+  average lagged the parent's real context by that much, and the lag paid ~$7.88 in billed input keeping
+  an oversized parent supervising past the point a cut was due.
+- **It is not the forbidden second measurement.** #1933 forbids the child pricing its cut on a
+  statistic the parent does not share. #2295 keeps one statistic that both read; it redefines that
+  statistic. "The measurement is the parent hand-off's, never a second one" still holds — the child's
+  `IMPLEMENTATION_CONTEXT_THRESHOLD` cut and the parent's between-child hand-off both read the same
+  recent-window `per_request_cost`.
+- **The child's behavior is unchanged in practice.** On a short session the recent-10 average tracks
+  the whole-session average, so a lane child cuts where it always did; only the long parent, whose
+  context genuinely outran its average, hands off earlier. That is the asymmetry option 2 could not see
+  from a batch of children alone.
 
 ## A lane child records its park before it stops
 

@@ -35,16 +35,15 @@ function same_project(cwd: string, target: string): boolean {
 	return cost_transcript.session_cwd(cwd) === cost_transcript.session_cwd(target)
 }
 
-function session_input(
+// The billed input each request paid, oldest first (joshuafolkken/kit#2295). Each `token_count`
+// event carries `last_token_usage` — that request's own input — so the per-request sequence the
+// hand-off's recent window reads is those deltas, not a cumulative-total difference. A session
+// resumed with inherited context is excluded for free: the inherited tokens are in the cumulative
+// total, never in a request's own `last_token_usage`.
+function billed_per_request(
 	usages: ReadonlyArray<z.infer<typeof TOKEN_COUNT_SCHEMA>['payload']['info']>,
-): number | undefined {
-	const first = usages.at(0)
-	const latest = usages.at(-1)
-	if (first === undefined || latest === undefined) return undefined
-	const baseline = first.total_token_usage.input_tokens - first.last_token_usage.input_tokens
-	const input_tokens = latest.total_token_usage.input_tokens - baseline
-
-	return input_tokens < 0 ? undefined : input_tokens
+): ReadonlyArray<number> {
+	return usages.map((usage) => usage.last_token_usage.input_tokens)
 }
 
 function measurement_from(
@@ -64,11 +63,10 @@ function measurement_from(
 		return parsed.success ? [parsed.data.payload.info] : []
 	})
 	const session = metadata.find((entry) => entry.payload.id === thread_id)
-	const input_tokens = session_input(usages)
-	if (session === undefined || input_tokens === undefined) return undefined
+	if (session === undefined || usages.length === 0) return undefined
 	if (!same_project(session.payload.cwd, target)) return undefined
 
-	return { request_count: usages.length, billed_input_tokens: input_tokens }
+	return { billed_input_per_request: billed_per_request(usages) }
 }
 
 function rollout_files(home: string, thread_id: string): Array<string> {

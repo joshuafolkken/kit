@@ -140,8 +140,7 @@ describe('cost_cli.run --cut provider source', () => {
 		[CONTEXT_CUT_THRESHOLD + 1, 'over'],
 	])('uses Codex usage %i for the OpenAI cut boundary', (tokens, verdict) => {
 		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
-			request_count: 1,
-			billed_input_tokens: tokens,
+			billed_input_per_request: [tokens],
 		})
 		const claude = vi.spyOn(cost_corpus, 'load_corpus')
 
@@ -169,8 +168,7 @@ describe('cost_cli.session_verdict', () => {
 		[CONTEXT_CUT_THRESHOLD + 1, 'over'],
 	])('answers %i tokens as %s at the shared boundary', (tokens, verdict) => {
 		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
-			request_count: 1,
-			billed_input_tokens: tokens,
+			billed_input_per_request: [tokens],
 		})
 
 		expect(cost_cli.session_verdict(CWD, OPENAI_ENV)).toBe(verdict)
@@ -183,8 +181,7 @@ describe('cost_cli.session_verdict', () => {
 
 	it('answers unmeasurable when the session has no requests', () => {
 		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
-			request_count: 0,
-			billed_input_tokens: 0,
+			billed_input_per_request: [],
 		})
 
 		expect(cost_cli.session_verdict(CWD, OPENAI_ENV)).toBe(cost_cli.UNMEASURABLE_VERDICT)
