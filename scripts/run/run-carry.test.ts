@@ -103,6 +103,7 @@ describe('a record written by one session and read by the next', () => {
 				filed: 0,
 				cuts: 0,
 				failures: 0,
+				outages: 0,
 			},
 		})
 	})
@@ -148,6 +149,18 @@ describe('the consecutive-failure streak', () => {
 	})
 })
 
+// joshuafolkken/kit#2240: the outage streak is its own counter — it rises with outages and never
+// touches the failure streak, and a merge or a genuine child failure (both proving the API reachable)
+// resets it, while a bookkeeping-only change leaves it standing.
+it('the consecutive-outage streak rises and resets only when the API proves reachable', () => {
+	const two = run_carry.apply_change(target(), begun(), { outages: 2 })
+
+	expect(two).toMatchObject({ outages: 2, failures: 0 })
+	expect(run_carry.apply_change(target(), two, { merged: 1 }).outages).toBe(0)
+	expect(run_carry.apply_change(target(), two, { failures: 1 }).outages).toBe(0)
+	expect(run_carry.apply_change(target(), two, { filed: 1 }).outages).toBe(2)
+})
+
 describe('the whole-run bound', () => {
 	it('is spent once the record is older than eight hours', () => {
 		begun()
@@ -163,6 +176,7 @@ describe('the whole-run bound', () => {
 			filed: 0,
 			cuts: 0,
 			failures: 0,
+			outages: 0,
 		}
 
 		expect(run_carry.is_expired(undated, START)).toBe(true)
@@ -308,6 +322,7 @@ describe('a cut declares the hand-off', () => {
 			filed: cut.filed,
 			cuts: cut.cuts,
 			failures: cut.failures,
+			outages: cut.outages,
 			done: undefined,
 			owner_pid: DEAD_PID,
 			owner_start: undefined,

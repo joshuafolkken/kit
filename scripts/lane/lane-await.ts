@@ -160,5 +160,5 @@ const lane_await = {
 	wait_for_any,
 }
 
-export type { AwaitOptions, AwaitState, CheckConfig }
+export type { AwaitState, CheckConfig }
 export { lane_await }

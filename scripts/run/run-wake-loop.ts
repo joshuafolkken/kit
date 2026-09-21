@@ -150,5 +150,5 @@ const run_wake_loop = {
 	step,
 }
 
-export type { LoopPorts, LoopStop, StepOutcome }
+export type { LoopPorts, LoopStop }
 export { run_wake_loop }

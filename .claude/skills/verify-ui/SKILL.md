@@ -15,10 +15,12 @@ green while spacing, layout and styling are visibly broken. This skill is the lo
 In order:
 
 1. The routes given as arguments (`/verify-ui / /blog`).
-2. Otherwise, derive them from the change: read `git diff` (and `git diff main...HEAD` on a feature
-   branch) and take the routes whose components, styles or copy the diff touches. A change to a
-   shared component means every route that renders it — pick the ones a reader would notice.
-3. If neither yields a route, ask which screen to look at. Do not guess.
+2. Otherwise, derive the candidates with `pnpm josh ui:routes` (alias `josh uir`): it reads the
+   change (the branch diff, or the staged diff with `--staged`) and lists the routes it touches,
+   tracing a changed shared component to the routes that render it. From that list **pick the ones a
+   reader would notice** — that narrowing is the judgement the command leaves to you.
+3. If it derives no route — it prints that plainly rather than guessing — ask which screen to look
+   at. Do not guess.
 
 State the list before capturing, so a wrong route is caught before the build.
 

@@ -195,5 +195,5 @@ const run_progress_read = {
 	stamp_target,
 }
 
-export type { ObservationRead, ObservationRequest }
+export type { ObservationRead }
 export { run_progress_read }

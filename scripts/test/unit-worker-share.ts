@@ -246,5 +246,4 @@ const unit_worker_share = {
 	worker_arguments,
 }
 
-export type { RunMarker }
 export { unit_worker_share }

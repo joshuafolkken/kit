@@ -1,11 +1,13 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { test_declared_changed } from '#scripts/test/test-declared-changed'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 import { run_tail } from './run-tail'
+import { test_declared_commit } from './test-declared-commit'
 
 // joshuafolkken/kit#1510: the trigger has to fire on the foreground push step and on nothing else.
 // Fired too widely it refuses a `git commit` whose message quotes the step, or the recovery path that
@@ -15,6 +17,14 @@ import { run_tail } from './run-tail'
 
 const BASH = 'Bash'
 const RUN_TAIL = 'run-tail'
+const DECLARED = 'test-declared'
+// **The run-tail assertions are about the push step, not the working tree** (joshuafolkken/kit#2169).
+// `test-declared` is listed before `run-tail` and reads the live tree at trigger time, so without a
+// fixed verdict this suite failed whenever the developer's own tree carried an untested runtime change.
+// A `.md` path is exempt, so `test-declared` stays silent and only run-tail's decision is under test.
+const EXEMPT_TREE: ReadonlyArray<string> = ['docs/note.md']
+// An untested runtime change — the `required` verdict, for the direction where `test-declared` speaks.
+const RUNTIME_TREE: ReadonlyArray<string> = ['scripts/thing.ts']
 const FOREGROUND_PUSH = 'pnpm josh git -y "Stop a run tail idling #1510"'
 // The documented recovery path: the push already landed, so this only opens the pull request.
 const SKIPPED_PUSH = 'pnpm josh git -y --skip-commit --skip-push'
@@ -53,6 +63,13 @@ function payload_of(
 	})
 }
 
+// The run-tail delivery, run with the working tree fixed exempt so `test-declared` stays silent and the
+// assertion is about run-tail alone (joshuafolkken/kit#2169). The seam is restored the moment the call
+// returns, so it never leaks into the next test.
+function deliver(payload: string, now_ms: number): string | undefined {
+	return test_declared_changed.with_paths(EXEMPT_TREE, () => rule_delivery(payload, now_ms))
+}
+
 // Assigned rather than deleted: an empty value is not one the disabled list recognizes, so the guard
 // reads as on exactly as it does on a fresh machine.
 beforeEach(() => {
@@ -62,6 +79,7 @@ beforeEach(() => {
 afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RUN_TAIL, transcript), { force: true })
+		rmSync(delivered_rules.delivery_path(DECLARED, transcript), { force: true })
 	}
 
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
@@ -159,7 +177,7 @@ describe('is_push_step_call and is_backgrounded_push_step', () => {
 
 describe('rule_delivery — the run tail at the call that pushes in the foreground', () => {
 	it('delivers the rule on the foreground commit-push-PR step', () => {
-		const reason = rule_delivery(payload_of(RUN_TAIL, FOREGROUND_PUSH), NOW_MS)
+		const reason = deliver(payload_of(RUN_TAIL, FOREGROUND_PUSH), NOW_MS)
 
 		expect(reason).toBe(delivered_rules.RUN_TAIL_REASON)
 	})
@@ -170,8 +188,8 @@ describe('rule_delivery — the run tail at the call that pushes in the foregrou
 	it('delivers again on the next foreground push rather than once per run', () => {
 		const payload = payload_of('run-tail-repeat', FOREGROUND_PUSH)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.RUN_TAIL_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.RUN_TAIL_REASON)
+		expect(deliver(payload, NOW_MS)).toBe(delivered_rules.RUN_TAIL_REASON)
+		expect(deliver(payload, NOW_MS + 1)).toBe(delivered_rules.RUN_TAIL_REASON)
 	})
 
 	// **The rule obeyed costs nothing**, which is what makes refusing the foreground call honest: the
@@ -179,14 +197,14 @@ describe('rule_delivery — the run tail at the call that pushes in the foregrou
 	it('says nothing once the same step is issued in the background', () => {
 		const payload = payload_of('run-tail-background', FOREGROUND_PUSH, BASH, true)
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(deliver(payload, NOW_MS)).toBeUndefined()
 	})
 
 	// **Never wired to a write** (joshuafolkken/kit#1390), the same omission every row depends on.
 	it('says nothing about a write tool even when its input looks like the push step', () => {
 		const payload = payload_of('run-tail-write', FOREGROUND_PUSH, 'Edit')
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(deliver(payload, NOW_MS)).toBeUndefined()
 	})
 
 	// The recovery path opens a pull request for a push that already succeeded. Refusing it would
@@ -194,13 +212,37 @@ describe('rule_delivery — the run tail at the call that pushes in the foregrou
 	it('says nothing about the recovery path that skips the push', () => {
 		const payload = payload_of('run-tail-skip', SKIPPED_PUSH)
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(deliver(payload, NOW_MS)).toBeUndefined()
 	})
 
 	// The push step is never a candidate of the batching guard, so this row has no stand-aside to
 	// make — which is why `decide` is supplied rather than falling to `is_first_delivery`.
 	it('is not a call the batching guard may also refuse', () => {
 		expect(time_batch_guard.is_guarded_call(call_of(FOREGROUND_PUSH))).toBe(false)
+	})
+})
+
+// **The seam that keeps the run-tail assertions off the live tree** (joshuafolkken/kit#2169). Before it,
+// `rule_delivery` read `git status` at trigger time, so the three assertions above failed whenever the
+// developer's own tree carried an untested runtime change. Injecting the verdict pins both directions:
+// `required` means `test-declared` speaks first, `exempt` means the push is run-tail's alone.
+describe('the working-tree seam — the verdict the run-tail delivery runs under', () => {
+	it('delivers test-declared first when the injected tree is an untested runtime change', () => {
+		const payload = payload_of('seam-required', FOREGROUND_PUSH)
+		const reason = test_declared_changed.with_paths(RUNTIME_TREE, () =>
+			rule_delivery(payload, NOW_MS),
+		)
+
+		expect(reason).toBe(test_declared_commit.REASON)
+	})
+
+	it('leaves the foreground push to run-tail when the injected tree is exempt', () => {
+		const payload = payload_of('seam-exempt', FOREGROUND_PUSH)
+		const reason = test_declared_changed.with_paths(EXEMPT_TREE, () =>
+			rule_delivery(payload, NOW_MS),
+		)
+
+		expect(reason).toBe(delivered_rules.RUN_TAIL_REASON)
 	})
 })
 

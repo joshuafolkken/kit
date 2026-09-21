@@ -62,4 +62,3 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.
 // literal they widen to `string`, and a caller comparing against them then type-checks against any
 // string at all. Constants are exempt from the namespace grouping convention for this reason.
 export { managed_config_scope_cli, MANAGED_ANSWER, CLEAN_ANSWER }
-export type { SyncScope }

@@ -10,6 +10,7 @@
  *        tsx scripts-ai/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
  */
 import { git_epic_add, type AddChildrenInput } from '../scripts/git/git-epic-add'
+import { git_epic_reconcile } from '../scripts/git/git-epic-reconcile'
 import { git_epic_remove } from '../scripts/git/git-epic-remove'
 import { git_epic_run } from '../scripts/git/git-epic-run'
 import { git_gh_command } from '../scripts/git/git-gh-command'
@@ -23,6 +24,7 @@ const USAGE = [
 	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
+	'       josh epic --reconcile <E>',
 ].join('\n')
 const FAILURE_EXIT_CODE = 1
 
@@ -131,6 +133,20 @@ async function run_removal(argv: ReadonlyArray<string>): Promise<number> {
 	})
 }
 
+// Reconcile an epic's declaration with its recorded relations. No decision file and no children: the
+// repair reads what the epic already records rather than being told an order (joshuafolkken/kit#2235).
+async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli.parse_reconcile_arguments(argv)
+
+	if (parsed === undefined) {
+		console.error(`✖ An epic number is required.\n${USAGE}`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await git_epic_reconcile.reconcile_epic(parsed.epic_number)
+}
+
 async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_create_arguments(argv)
 
@@ -152,6 +168,7 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 // `--add` is checked before `--promote`: both name an existing issue first, and only the flag
 // distinguishes "insert into this epic" from "turn this issue into one".
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (epic_cli.is_reconciliation(argv)) return await run_reconciliation(argv)
 	if (epic_cli.is_removal(argv)) return await run_removal(argv)
 	if (epic_cli.is_addition(argv)) return await run_addition(argv)
 	if (epic_cli.is_promotion(argv)) return await run_promotion(argv)

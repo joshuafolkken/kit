@@ -132,4 +132,4 @@ const dependabot_pin_logic = {
 }
 
 export { dependabot_pin_logic }
-export type { DependabotPinOps, PrResult, SyncOptions }
+export type { DependabotPinOps }

@@ -69,4 +69,3 @@ function main(): void {
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 export { bump_version, compute_new_version, write_version }
-export type { BumpType }

@@ -41,5 +41,5 @@ function run_josh(cli_arguments: ReadonlyArray<string>, options: CliOptions = {}
 
 const josh_cli_fixture = { run_josh, REPO_ROOT }
 
-export type { CliOptions, CliResult }
+export type { CliResult }
 export { josh_cli_fixture }

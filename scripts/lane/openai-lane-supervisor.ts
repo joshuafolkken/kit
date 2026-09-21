@@ -283,7 +283,9 @@ async function recovered_resume(lane: LaneInfo, nonce: string): Promise<boolean 
 	if (child_pid === undefined) return false
 	await wait_for_inherited_child(child_pid, read_state(lane.directory, nonce)?.child_process_start)
 
-	return (await standing_cut(lane.issue)) === undefined ? undefined : true
+	if ((await standing_cut(lane.issue)) === undefined) return undefined
+
+	return true
 }
 
 async function run_claimed(

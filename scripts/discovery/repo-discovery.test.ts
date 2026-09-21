@@ -7,10 +7,13 @@ import { repo_discovery } from './repo-discovery'
 const KIT = 'kit'
 const APP_KIT = 'app-kit'
 const KIT_REMOTE = 'git@github.com:joshuafolkken/kit.git'
+const APP_KIT_REMOTE = 'git@github.com:joshuafolkken/app-kit.git'
+const APP_KIT_KEY = 'joshuafolkken/app-kit'
 const KIT_KEY = 'joshuafolkken/kit'
 const GIT = '.git'
 const CONFIG = 'config'
 const SELF_HOSTED_REMOTE = 'git@git.example.com:joshuafolkken/kit.git'
+const KIT_WORKTREE = 'kit-worktree'
 const FAR_PATH = '/Users/example/elsewhere/far'
 
 const state = { workspace: '' }
@@ -34,6 +37,22 @@ function make_repository(name: string, origin_url?: string): string {
 function make_worktree(main_repository: string, name: string): string {
 	const git_directory = path.join(main_repository, GIT, 'worktrees', name)
 	const work_tree = path.join(state.workspace, name)
+
+	mkdirSync(git_directory, { recursive: true })
+	writeFileSync(path.join(git_directory, 'commondir'), '../..\n')
+	mkdirSync(work_tree, { recursive: true })
+	writeFileSync(path.join(work_tree, GIT), `gitdir: ${git_directory}\n`)
+
+	return work_tree
+}
+
+// A linked work tree parked away from its main checkout, as a lane is: the work tree sits under
+// `<main>/.kit-lanes/<name>`, so its own parent holds none of the repository's siblings — only the
+// main tree's parent does. Its `.git` file points at `<main>/.git/worktrees/<name>`, whose
+// `commondir` resolves back to `<main>/.git`, so discovery must walk up to `<main>` to find them.
+function make_parked_worktree(main_repository: string, name: string): string {
+	const git_directory = path.join(main_repository, GIT, 'worktrees', name)
+	const work_tree = path.join(main_repository, '.kit-lanes', name)
 
 	mkdirSync(git_directory, { recursive: true })
 	writeFileSync(path.join(git_directory, 'commondir'), '../..\n')
@@ -67,7 +86,7 @@ describe('repo_discovery.read_origin_url', () => {
 	})
 
 	it('reads the shared config of a linked worktree, which holds none of its own', () => {
-		const linked = make_worktree(make_repository(KIT, KIT_REMOTE), 'kit-worktree')
+		const linked = make_worktree(make_repository(KIT, KIT_REMOTE), KIT_WORKTREE)
 
 		expect(repo_discovery.read_origin_url(linked)).toBe(KIT_REMOTE)
 	})
@@ -97,6 +116,44 @@ describe('repo_discovery.read_origin_url', () => {
 	})
 })
 
+// Where to look for a repository's siblings. A linked work tree is parked wherever it was created —
+// a lane lives among that repository's other lanes — so its own parent holds no sibling at all.
+describe('repo_discovery.main_worktree', () => {
+	it('is the given path for an ordinary checkout', () => {
+		const kit = make_repository(KIT, KIT_REMOTE)
+
+		expect(repo_discovery.main_worktree(kit)).toBe(kit)
+	})
+
+	it('is the main work tree for a linked one', () => {
+		const kit = make_repository(KIT, KIT_REMOTE)
+
+		expect(repo_discovery.main_worktree(make_worktree(kit, KIT_WORKTREE))).toBe(kit)
+	})
+
+	// A submodule resolves to `<super>/.git/modules/<path>`, whose parent is not a work tree, so the
+	// given path is the only honest answer.
+	it('is the given path for a submodule, whose git directory has no work tree for a parent', () => {
+		const embedded = path.join(state.workspace, GIT, 'modules', 'vendor', KIT)
+		const consumer = path.join(state.workspace, 'vendor', KIT)
+
+		mkdirSync(embedded, { recursive: true })
+		writeFileSync(path.join(embedded, CONFIG), `[remote "origin"]\n\turl = ${KIT_REMOTE}\n`)
+		mkdirSync(consumer, { recursive: true })
+		writeFileSync(path.join(consumer, GIT), `gitdir: ${embedded}\n`)
+
+		expect(repo_discovery.main_worktree(consumer)).toBe(consumer)
+	})
+
+	it('is the given path for a directory that is not a work tree', () => {
+		const plain = path.join(state.workspace, 'notes')
+
+		mkdirSync(plain, { recursive: true })
+
+		expect(repo_discovery.main_worktree(plain)).toBe(plain)
+	})
+})
+
 describe('repo_discovery.resolve_current_owner', () => {
 	it('takes the owner from the repository own origin', () => {
 		expect(repo_discovery.resolve_current_owner(make_repository(KIT, KIT_REMOTE))).toBe(
@@ -118,7 +175,7 @@ describe('repo_discovery.discover_repositories — what the scan finds', () => {
 		const map = repo_discovery.discover_repositories(kit, {})
 
 		expect(map.get(KIT_KEY)).toBe(kit)
-		expect(map.get('joshuafolkken/app-kit')).toBe(app_kit)
+		expect(map.get(APP_KIT_KEY)).toBe(app_kit)
 	})
 
 	it('keys a checkout by its origin rather than by its directory name', () => {
@@ -128,6 +185,23 @@ describe('repo_discovery.discover_repositories — what the scan finds', () => {
 		expect(repo_discovery.discover_repositories(kit, {}).get('joshuafolkken/game-kit')).toBe(
 			renamed,
 		)
+	})
+})
+
+// A lane is a linked work tree parked among its repository's other lanes, so scanning its own parent
+// finds none of the siblings; discovery has to anchor on the main work tree, which is what every
+// caller running in a lane (`doctor`, `propagate`, `backlog:next`, `epic:next`, `clone:scan`) relies
+// on (joshuafolkken/kit#2233).
+describe('repo_discovery.discover_repositories — called from within a lane', () => {
+	it('finds the siblings beside the main work tree, not those beside the lane', () => {
+		const kit = make_repository(KIT, KIT_REMOTE)
+		const app_kit = make_repository(APP_KIT, APP_KIT_REMOTE)
+		const lane = make_parked_worktree(kit, '2233')
+
+		const map = repo_discovery.discover_repositories(lane, {})
+
+		expect(map.get(KIT_KEY)).toBe(kit)
+		expect(map.get(APP_KIT_KEY)).toBe(app_kit)
 	})
 })
 
@@ -145,7 +219,7 @@ describe('repo_discovery.discover_repositories — what the scan refuses', () =>
 	it('produces an empty map when the current repository own owner is unknown', () => {
 		const repository = make_repository(KIT, SELF_HOSTED_REMOTE)
 
-		make_repository(APP_KIT, 'git@github.com:joshuafolkken/app-kit.git')
+		make_repository(APP_KIT, APP_KIT_REMOTE)
 
 		expect(repo_discovery.discover_repositories(repository, {}).size).toBe(0)
 	})

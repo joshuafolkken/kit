@@ -1,3 +1,5 @@
+import { markdown_section } from './markdown-section'
+
 // The Issue body template's four headings (`prompts/collaboration-workflow/issue-template.md`) are a
 // fixed shape, but unlike an epic — which `josh epic:check` verifies — nothing checks that a filed
 // Issue carries them. This reports the ones a body is missing (joshuafolkken/kit#2123). The headings
@@ -9,19 +11,11 @@ const REQUIRED_HEADINGS: ReadonlyArray<string> = [
 	'## 受け入れ条件',
 ]
 
-function heading_lines(body: string): ReadonlyArray<string> {
-	return body.split('\n').map((line) => line.trim())
-}
-
-// A heading is present when a line is exactly it — a required heading (see REQUIRED_HEADINGS) mentioned
-// inside a sentence is not the section heading, and matching a substring would accept it.
-function has_heading(body: string, heading: string): boolean {
-	return heading_lines(body).includes(heading)
-}
-
-// The required headings a body lacks, in template order; an empty array is a conforming body.
+// The required headings a body lacks, in template order; an empty array is a conforming body. A heading
+// is present when a line is exactly it (`markdown_section.has_line`) — one mentioned inside a sentence
+// is not the section heading.
 function missing_headings(body: string): ReadonlyArray<string> {
-	return REQUIRED_HEADINGS.filter((heading) => !has_heading(body, heading))
+	return REQUIRED_HEADINGS.filter((heading) => !markdown_section.has_line(body, heading))
 }
 
 const issue_lint = {

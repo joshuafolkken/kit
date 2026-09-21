@@ -36,7 +36,6 @@ function read_spawn_stderr(result: { stderr?: string }): string {
 	return result.stderr ?? ''
 }
 
-export type { SpawnResult }
 export {
 	read_spawn_stderr,
 	read_spawn_stdout,

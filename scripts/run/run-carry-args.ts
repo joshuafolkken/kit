@@ -214,5 +214,5 @@ const run_carry_args = {
 	to_request,
 }
 
-export type { CountRequest, OptionValue, ParsedValues, Request }
+export type { CountRequest, ParsedValues, Request }
 export { run_carry_args }

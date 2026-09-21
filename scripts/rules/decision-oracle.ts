@@ -28,6 +28,14 @@ const UNKNOWN = 'unknown'
 const NONE = 'none'
 const NOT_A_LANE = 'not-a-lane'
 const BUSY = 'busy'
+// Lane liveness verdicts shared by the lane:list oracle and asserted against `lane_occupancy` in its
+// test. `LIVE` is the silent norm; `STOPPED` and `UNKNOWN` lead the difference lines.
+const LIVE = 'live'
+const STOPPED = 'stopped'
+// The verdicts `epic --reconcile` prints; kept in step with the `git_epic_reconcile` constants in its
+// test.
+const RECONCILED = 'reconciled'
+const NOTHING_TO_RECONCILE = 'nothing to reconcile'
 
 // Arguments shared by more than one oracle entry.
 const ISSUE_N_ARG = '<N>'
@@ -43,8 +51,10 @@ interface DecisionOracle {
 	command?: string
 	// The arguments to pass, shown in the printed listing.
 	args: string
-	// The fixed-vocabulary tokens the command prints on stdout. An issue number is not a
-	// vocabulary token; only the named string verdicts appear here.
+	// The fixed-vocabulary tokens the command emits — on standard output for a pure decision command,
+	// or on the difference lines of a listing command (`lane:list`) whose standard output is reserved
+	// for its listing. An issue number is not a vocabulary token; only the named string verdicts appear
+	// here, and each is kept in step with the constant its emitting module exports.
 	vocabulary: ReadonlyArray<string>
 	// The single-source document for the decision procedure, in `file.md → section` form.
 	single_source: string
@@ -72,6 +82,13 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		args: '[--round-1-closed]',
 		vocabulary: [REQUIRED, SKIP],
 		single_source: CHAIN_RULE_MD,
+	},
+	{
+		name: 'disposition',
+		decision: 'Whether a review finding reaches a runtime path, so it may be filed',
+		args: '<path...>',
+		vocabulary: ['runtime', 'non-runtime'],
+		single_source: 'prompts/review.md → Three-way disposition after the cap',
 	},
 	{
 		name: 'review:attest',
@@ -122,6 +139,21 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		args: '<title>',
 		vocabulary: ['Duplicates:', 'Epic:'],
 		single_source: SKILL_2E,
+	},
+	{
+		name: 'pkg:scout',
+		decision: 'Whether the top package candidate is clearly best (Tier A) or a near-tie (Tier B)',
+		args: '<keywords>',
+		vocabulary: ['clear', 'close'],
+		single_source: 'CLAUDE.md → Package-First Development',
+	},
+	{
+		name: 'issue:lint',
+		decision:
+			'Whether a behavior-change issue declares a deliverable firing point and a re-runnable baseline',
+		args: '<path>',
+		vocabulary: ['ok', '✖ missing heading', '✖ firing point', '✖ baseline'],
+		single_source: 'prompts/collaboration-workflow/issue-template.md',
 	},
 	{
 		name: 'issue:state',
@@ -195,6 +227,51 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		vocabulary: [OVER, 'human-review', STOP, RETRY, BUSY],
 		single_source: BACKLOGRUN_MD,
 	},
+	{
+		name: 'refactor:scan',
+		decision: 'Whether the refactoring scope still holds high- or medium-priority candidates',
+		args: '',
+		vocabulary: ['clear', 'candidates', 'error'],
+		single_source: 'prompts/refactoring.md',
+	},
+	{
+		name: 'split:assess',
+		decision: 'Whether a change size clears the split guide (the split assessment size question)',
+		args: '[--json]',
+		vocabulary: ['split', 'single'],
+		single_source: '.claude/skills/workflow-commands/split-assessment.md → The question',
+	},
+	{
+		name: 'sonar:hotspots',
+		decision: 'The Step B disposition for each SonarCloud hotspot on a pull request',
+		args: '<PR>',
+		vocabulary: ['excluded', 'local', 'fix', 'defer', 'unreadable'],
+		single_source: 'prompts/sonar-hotspot-handling.md',
+	},
+	{
+		name: 'clone:scan',
+		decision: 'Whether cross-file or cross-repository code duplication exists',
+		args: '',
+		vocabulary: ['clean', 'clones:'],
+		single_source: 'prompts/collaboration-workflow/no-clones.md',
+	},
+	{
+		name: 'epic:reconcile',
+		command: 'epic',
+		decision:
+			"Whether an epic's declaration matches its recorded relations, and the repair when it does not",
+		args: '--reconcile <E>',
+		vocabulary: [RECONCILED, NOTHING_TO_RECONCILE],
+		single_source: 'docs/josh-commands.md → `josh epic --reconcile`',
+	},
+	{
+		name: 'lane:list',
+		decision:
+			'Whether each in-progress issue holds a live lane, and the two-directional difference',
+		args: '',
+		vocabulary: [LIVE, STOPPED, UNKNOWN],
+		single_source: 'docs/josh-commands.md → The `in-progress` / lane difference',
+	},
 ]
 
 // Returns the command name for an oracle entry. When `command` is omitted from the entry,
@@ -213,5 +290,4 @@ const decision_oracle = {
 	get_command,
 }
 
-export type { DecisionOracle }
 export { decision_oracle }

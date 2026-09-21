@@ -10,15 +10,23 @@ import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 // them a read of a file the child was about to edit. So a guard whose correction is a denial cannot fire
 // as one in a child.
 //
-// **But a denial is not the only way a guard can speak, and that is what kit#2164 corrects.** A guard
-// can also raise a *notice* — a non-blocking `additionalContext` that carries the same guidance without
-// a `permissionDecision`, so the turn is never ended. The lane child holds the most expensive runs
-// (64% of measured cost), and taking the batching guard entirely off there is what let the run's tool
-// density fall to one call per turn. So the choice is three-valued, not two:
+// **But a denial is not the only way a guard can speak, and that is what kit#2164 tried.** A guard can
+// also raise a *notice* — a non-blocking `additionalContext` that carries the same guidance without a
+// `permissionDecision`, so the turn is never ended. kit#2164 downgraded the batching guard to a notice
+// in the child for exactly that reason. So the choice is three-valued, not two:
 //
 //   - `refuse` — deny the call (the main-line default; the child keeps this for the safety rules).
 //   - `notice` — let the call through but attach the guidance, so a headless child is nudged, not killed.
 //   - `off`    — say nothing at all, for a guard whose remedy the child cannot carry out.
+//
+// **The notice did not move the number, and that is what kit#2178 corrects.** The lane child that ran
+// right after kit#2164 merged came in at 1.00 calls per turn on both sides of the first notice
+// (transcript `f39efeb5`), and nine indisputably independent edits immediately after a notice still went
+// out one per turn. That is the third refutation of "advise and it will be obeyed": kit#1304 distributed
+// the norm as prose and kit#1329 / kit#1337 put the density in front of the running run, and neither
+// moved the number either. So the batching guard is `off` in the child now — advice measured not to work
+// is not worth the per-turn context cost of carrying it — while the `notice` mode stays a valid spelling
+// for a future guard whose guidance a child can actually act on.
 //
 // **It is an enumeration and not a judgement, for the reason `delegation-policy.ts` is one.** "This
 // guard's mode in a child" is a call made under the same pressure that produced the misfire. The list is
@@ -55,15 +63,15 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 	},
 	{
 		id: 'batching',
-		mode_in_lane_child: 'notice',
+		mode_in_lane_child: 'off',
 		because:
-			'the reissue-in-one-turn correction is guidance a child can act on — batch the next calls — but a *refusal* ends its turn instead of guiding it, so kit#2164 delivers it as a non-blocking notice: the child is nudged toward batching without being killed, and the lane child is where the cost this whole guard exists to cut is largest',
+			'a refusal ends a child turn so it cannot fire as one (kit#2138), and the notice kit#2164 replaced it with did not move the density: the lane child after kit#2164 merged ran at 1.00 calls per turn on both sides of the notice (transcript f39efeb5) and kept editing one file per turn even across nine independent edits — the third refutation of advice after kit#1304 (prose) and kit#1329 / kit#1337 (density in front of the run), so kit#2178 takes it off rather than pay the per-turn context cost of guidance measured not to work',
 	},
 	{
 		id: 'rule',
 		mode_in_lane_child: 'refuse',
 		because:
-			'it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules a child must still obey (`shell-body`, `piped-verification`); a blanket suppression would disarm exactly the guards written for the child',
+			"it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules a child must still obey (`shell-body`, `piped-verification`); a blanket suppression would disarm exactly the guards written for the child. The pre-gate-cut refusal does collateral a sibling call batched in the same turn — a `PreToolUse` deny cancels the turn's other parallel calls, which is the harness behavior kit#2177 measured on #2160 (gate refused, its batched `review:brief` cancelled) — and that collateral is not avoidable at the guard level. `notice` was considered for the pre-gate-cut point and rejected: kit#1864 measured the cut taken 0 times while it was carried as prose, and a notice is prose in front of the run (kit#2178 measured a lane-child notice not moving the number), so a notice would drop enforcement without a procedural replacement. kit#2177 supplies that replacement in the procedure instead — the chain orders the cut before the gate, so the cut is issued on its own (its `cut` verdict ends the turn, batching with nothing) and the gate runs in the fresh process where the carried cut keeps this guard silent; the refusal therefore stays `refuse` as insurance and the collateral is gone from the default path rather than from the guard",
 	},
 ]
 
@@ -116,5 +124,5 @@ const lane_guard_policy = {
 	is_suppressed_here,
 }
 
-export type { LaneGuardEntry, LaneGuardId, LaneGuardMode }
+export type { LaneGuardMode }
 export { lane_guard_policy }

@@ -1,9 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { epic_busy } from '#scripts/epic/epic-busy'
+import { git_gh_command } from '#scripts/git/git-gh-command'
 import { run_carry } from '#scripts/run/run-carry'
 import { lane_await } from './lane-await'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
+import { lane_occupancy } from './lane-occupancy'
 import { lane_open, type OpenOutcome } from './lane-open'
 import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -176,10 +179,64 @@ async function close_command(rest: ReadonlyArray<string>): Promise<number> {
 	return report_close(await lane_close.close_lane(issue))
 }
 
+const OCCUPANCY_UNREADABLE =
+	'Could not read the `in-progress` listing, so the lane/label difference was not checked — that is not "everything agrees"; check `gh auth status`.'
+
+// The `in-progress` issues this repository shows running, read the way `epic:next` reads lane
+// occupancy — never rebuilt (joshuafolkken/kit#2235). A read that could not see the whole listing is
+// `undefined`, so the difference is skipped rather than computed against a set known to be partial.
+async function to_holder_numbers(repo: string): Promise<ReadonlyArray<number> | undefined> {
+	const read = await epic_busy.read_repository(repo)
+	if (read.kind === 'idle') return []
+
+	return read.kind === 'busy' ? read.issues.map((issue) => issue.number) : undefined
+}
+
+async function read_in_progress(): Promise<ReadonlyArray<number> | undefined> {
+	try {
+		const repo = await git_gh_command.repo_get_name_with_owner()
+
+		return repo === undefined ? undefined : await to_holder_numbers(repo)
+	} catch {
+		return undefined
+	}
+}
+
+// A stranded lane's work tree is gone, so it holds no issue: it counts as no lane rather than a live
+// one, which is what turns its surviving `in-progress` label into a `stopped` anomaly.
+function live_lane_issues(lanes: ReadonlyArray<LaneInfo>): Array<number> {
+	return lanes.filter((lane) => !lane.is_stranded).map((lane) => Number(lane.issue))
+}
+
+// The lane/label difference, printed to standard error beside the listing. Wrapped so a GitHub read
+// that fails skips only this section — `lane:list`'s job is to list the lanes it already read.
+async function report_occupancy(lanes: ReadonlyArray<LaneInfo>): Promise<void> {
+	const in_progress = await read_in_progress()
+
+	if (in_progress === undefined) {
+		console.error(OCCUPANCY_UNREADABLE)
+
+		return
+	}
+
+	const report = lane_occupancy.classify(in_progress, {
+		kind: 'lanes',
+		issues: live_lane_issues(lanes),
+	})
+	const described = lane_occupancy.describe(report)
+
+	if (described !== undefined) console.error(described)
+}
+
 async function list_command(rest: ReadonlyArray<string>): Promise<number> {
 	if (rest.length > 0) return report_usage()
 
-	return report_lanes(await lane_registry.list_lanes())
+	const lanes = await lane_registry.list_lanes()
+	const code = report_lanes(lanes)
+
+	await report_occupancy(lanes)
+
+	return code
 }
 
 async function prune_command(rest: ReadonlyArray<string>): Promise<number> {

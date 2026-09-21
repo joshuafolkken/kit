@@ -15,6 +15,16 @@ Claude Code hook: refuse a third consecutive single-call turn (reads the tool ca
 
 ---
 
+### `josh bytes` · `josh by`
+
+> **Audience:** developer · **Side effects:** none
+
+`<files...>`
+
+Print an agent-read document's byte size against its ceiling and the headroom left
+
+---
+
 ### `josh check` · `josh c`
 
 > **Audience:** developer · **Side effects:** processes
@@ -125,6 +135,16 @@ Claude Code hook: the batch, investigation and rule guards in one process (reads
 
 ---
 
+### `josh refactor:scan` · `josh rfs`
+
+> **Audience:** automation · **Side effects:** processes
+
+_No arguments._
+
+List refactoring candidates in the changed scope by category and answer clear/candidates
+
+---
+
 ### `josh session:lang` · `josh sl`
 
 > **Audience:** automation · **Side effects:** none
@@ -159,9 +179,9 @@ Run unit and E2E tests
 
 > **Audience:** developer · **Side effects:** processes
 
-_No arguments._
+`[--match]`
 
-Report whether the working-tree change needs a test (required/exempt/satisfied)
+Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin
 
 ---
 
@@ -225,6 +245,16 @@ Carry the published release into every consumer repository next to this one
 
 ---
 
+### `josh sonar:hotspots` · `josh shs`
+
+> **Audience:** automation · **Side effects:** network
+
+`<PR>`
+
+Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
+
+---
+
 ### `josh sync` · `josh sy`
 
 > **Audience:** developer · **Side effects:** files
@@ -242,6 +272,16 @@ Sync config files
 `[--staged] [--json]`
 
 Say whether this change touches a file josh sync distributes
+
+---
+
+### `josh ui:routes` · `josh uir`
+
+> **Audience:** automation · **Side effects:** none
+
+`[--staged]`
+
+List the screenshot-target routes the current change touches
 
 ## Workflow
 
@@ -282,6 +322,16 @@ Merge origin default branch into the current branch
 _No arguments._
 
 Checkout default branch and pull latest (refuses inside a lane)
+
+---
+
+### `josh measure:rerun` · `josh mrr`
+
+> **Audience:** automation · **Side effects:** processes, files
+
+`<path>`
+
+Re-run a merged issue’s baseline command and print the before/after pair
 
 ---
 
@@ -541,7 +591,7 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 `[--exclude <n>[,<n>...]] [--repo <owner/repo>]`
 
-Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epics
+Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics
 
 ---
 
@@ -565,6 +615,16 @@ Print the whole backlog as a plan: ready now, waiting on what, waiting on a pers
 
 ---
 
+### `josh clone:scan` · `josh cs`
+
+> **Audience:** automation · **Side effects:** files
+
+_No arguments._
+
+Count code duplication across files and first-party repositories, printing each clone as file:line pairs
+
+---
+
 ### `josh cost` · `josh co`
 
 > **Audience:** automation · **Side effects:** none
@@ -582,6 +642,16 @@ Report a run's token and credit cost from Claude Code's session transcripts
 `<step> | --list`
 
 Say whether a run step may go to a cheaper execution tier
+
+---
+
+### `josh disposition` · `josh dp`
+
+> **Audience:** automation · **Side effects:** none
+
+`<path...>`
+
+Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)
 
 ---
 
@@ -682,6 +752,16 @@ Claude Code hook: refuse a read once the unedited-read threshold is reached agai
 `<issue>`
 
 Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading
+
+---
+
+### `josh issue:cite` · `josh ici`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue...> [--repo <owner/repo>]`
+
+Print the paste-ready number-link citation line for each issue, in one call
 
 ---
 
@@ -815,6 +895,26 @@ Print the decision oracles — commands that answer a rule question mechanically
 
 ---
 
+### `josh pkg:scout` · `josh pks`
+
+> **Audience:** automation · **Side effects:** network
+
+`<keywords> [--size <n>]`
+
+Rank package candidates by measured metrics so the Package-First tier decision is read, not judged
+
+---
+
+### `josh read:files` · `josh rf`
+
+> **Audience:** automation · **Side effects:** none
+
+`<path> [<path> ...]`
+
+Read several files in one call so edit targets fold into one turn
+
+---
+
 ### `josh read:set` · `josh rs`
 
 > **Audience:** automation · **Side effects:** none
@@ -915,6 +1015,16 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 ---
 
+### `josh run:event` · `josh rev`
+
+> **Audience:** automation · **Side effects:** files
+
+`--append <kind> <text> | --from|--follow <n> | --last`
+
+Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)
+
+---
+
 ### `josh run:hold` · `josh rh`
 
 > **Audience:** automation · **Side effects:** files
@@ -985,6 +1095,26 @@ Release this working tree's run record
 
 ---
 
+### `josh run:report` · `josh rrp`
+
+> **Audience:** automation · **Side effects:** files, network
+
+_No arguments._
+
+Generate the session-facing report from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends
+
+---
+
+### `josh run:review` · `josh rrv`
+
+> **Audience:** automation · **Side effects:** processes, files
+
+`[--join]`
+
+Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)
+
+---
+
 ### `josh run:status` · `josh rst`
 
 > **Audience:** automation · **Side effects:** network
@@ -1012,6 +1142,16 @@ Wake the next session of a cut backlogrun from outside the conversation
 _No arguments._
 
 Guard: exits non-zero when lane children are in-flight but the watcher has not pinged recently
+
+---
+
+### `josh split:assess` · `josh sa`
+
+> **Audience:** automation · **Side effects:** none
+
+`[--json]`
+
+Measure the branch change size (tests excluded) and answer the split assessment size question: split | single
 
 ---
 

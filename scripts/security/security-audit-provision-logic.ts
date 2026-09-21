@@ -3,7 +3,13 @@ import { security_audit_logic } from './security-audit-logic'
 // Pinned, because an unpinned fetch is a binary nobody chose running against every lockfile in every
 // consumer repository. The checksums below belong to this exact tag: bumping one without the other
 // installs nothing at all, which is the failure that is visible rather than the one that is not.
-const SCANNER_VERSION = '2.5.1'
+//
+// v2.6.0 is the floor because every earlier build parses only a fraction of pnpm-lock.yaml — the
+// 2.5.1 and 2.3.5 scanners both read 19 of 584 packages and reported the tree clean while four High
+// advisories sat in it (joshuafolkken/kit#2200). A scanner below the floor is a false negative, so
+// the provisioned version and the floor move together.
+const SCANNER_VERSION = '2.6.0'
+const MINIMUM_SCANNER_VERSION = SCANNER_VERSION
 const RELEASE_BASE_URL = 'https://github.com/google/osv-scanner/releases/download'
 
 const WINDOWS_PLATFORM = 'win32'
@@ -54,14 +60,14 @@ const ARCHITECTURE_NAMES: Readonly<Record<string, string>> = {
 // are the release's own file names rather than anything this project's naming convention covers.
 /* eslint-disable @typescript-eslint/naming-convention -- upstream release asset file names */
 const ASSET_CHECKSUMS: Readonly<Record<string, string>> = {
-	'osv-scanner_darwin_amd64': '9f89beb6c3d784893cb1cae0a3d56c529bfe91075418c2f9440c45b79654198b',
-	'osv-scanner_darwin_arm64': '75c44d6332f892a1e56286f4105a98ed751ae28d215ca0a8b65cc00d84103054',
-	'osv-scanner_linux_amd64': 'f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be',
-	'osv-scanner_linux_arm64': '3d0f5aa5a6baa8eb32bcef247388e149ef6030a6634ccae6fa0d62681fb27a6d',
+	'osv-scanner_darwin_amd64': '60c5296637e977b28eeda5c7f13573e447659a632922737f94d11fa7e30ad6ca',
+	'osv-scanner_darwin_arm64': '98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4',
+	'osv-scanner_linux_amd64': 'ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108',
+	'osv-scanner_linux_arm64': '2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4',
 	'osv-scanner_windows_amd64.exe':
-		'25e42f5ef6711fd8c0fb45390972205891dd44c6bd02ac93f0f63e8e98d9bfb6',
+		'e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6',
 	'osv-scanner_windows_arm64.exe':
-		'33feb0b210a3e5ea7b338c719defc899f8833d990cdd297bcad4ff1a2586ec8b',
+		'ca1379da0e408279ef2c85cde0846a903495738a91c7b065a208048437c1686c',
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -143,22 +149,67 @@ function format_provision_error(reason: string): string {
 	return `Could not provision osv-scanner: ${reason}. The pre-push audit will report the missing binary.`
 }
 
+// `osv-scanner --version` prints `osv-scanner version: X.Y.Z` on its first line; the rest of the
+// block (`osv-scalibr version:`, `commit:`) is deliberately not matched so a scalibr version never
+// stands in for the scanner's. `undefined` means the output did not carry a scanner version at all,
+// which the caller treats as "cannot confirm the floor" rather than as a pass.
+const SCANNER_VERSION_PATTERN = /osv-scanner version:\s*(\d+\.\d+\.\d+)/u
+
+function parse_scanner_version(version_output: string): string | undefined {
+	return SCANNER_VERSION_PATTERN.exec(version_output)?.[1]
+}
+
+function to_version_parts(version: string): Array<number> {
+	return version.split('.').map(Number)
+}
+
+// Numeric per-segment compare rather than a string one, so `2.10.0` is not read as older than
+// `2.6.0`. A missing segment counts as zero, which is what lets a two-part version compare against a
+// three-part floor without a special case.
+function compare_versions(left: string, right: string): number {
+	const left_parts = to_version_parts(left)
+	const right_parts = to_version_parts(right)
+	const length = Math.max(left_parts.length, right_parts.length)
+
+	for (let index = 0; index < length; index += 1) {
+		const difference = (left_parts[index] ?? 0) - (right_parts[index] ?? 0)
+		if (difference !== 0) return difference
+	}
+
+	return 0
+}
+
+function meets_version_floor(version: string): boolean {
+	return compare_versions(version, MINIMUM_SCANNER_VERSION) >= 0
+}
+
+// Printed when the only scanner available parses the lockfile short of the floor: its "no issues
+// found" is not proof the tree is clean, only that a blinkered scanner read too little to object. The
+// distinction the acceptance criteria ask for — a small package count told apart from a genuine pass.
+function format_below_floor(version: string): string {
+	return `osv-scanner ${version} is below the required v${MINIMUM_SCANNER_VERSION}; older builds parse only part of pnpm-lock.yaml, so a clean result here is not proof the lockfile is clean. Run \`pnpm josh audit:provision --force\` to install v${SCANNER_VERSION}.`
+}
+
 const security_audit_provision_logic = {
 	FORCED_DOWNLOAD_TIMEOUT_MS,
 	RETRY_INTERVAL_MS,
 	SESSION_DOWNLOAD_TIMEOUT_MS,
 	SCANNER_VERSION,
+	MINIMUM_SCANNER_VERSION,
 	build_asset_name,
 	build_download_timeout,
 	build_download_url,
 	build_staging_path,
 	format_already_present,
+	format_below_floor,
 	format_checksum_mismatch,
 	format_download_failure,
 	format_installed,
 	format_provision_error,
 	format_recent_failure,
 	format_unsupported_platform,
+	meets_version_floor,
+	parse_scanner_version,
 	resolve_asset,
 }
 

@@ -92,7 +92,6 @@ function to_review_decision(reviews_json: string): string {
 
 const git_gh_pr_review = { to_review_decision, parse_rest_reviews }
 
-export type { RestReview }
 export {
 	git_gh_pr_review,
 	to_review_decision,

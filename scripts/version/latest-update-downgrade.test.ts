@@ -13,6 +13,11 @@ const UPGRADED = JSON.stringify({ dependencies: { tsx: '^4.24.0' }, devDependenc
 const ORIGINAL_LOCK = 'lockfile: installed'
 const REWRITTEN_LOCK = 'lockfile: downgraded'
 
+// The update runs in two stages now (joshuafolkken/kit#2200): the direct-dependency `--latest` bump,
+// then an argument-less re-resolution of the indirect tiers. Both run once per `main`; neither is a
+// retry of the other, which is what these rollback tests are pinning.
+const UPDATE_STAGE_COUNT = 2
+
 const tree = { package_json: INSTALLED, lockfile: ORIGINAL_LOCK }
 
 const read_mock = vi.hoisted(() => vi.fn())
@@ -119,11 +124,12 @@ describe('latest_update.main — what a rollback must not do', () => {
 
 	// Excluding the offender from the update targets does not exclude it from resolution — while its
 	// installed version sits above the newest allowed one, pnpm cannot resolve the tree at all, so a
-	// retry could only fail. Verified against the real registry during #736.
-	it('does not retry the update', () => {
+	// retry could only fail. Verified against the real registry during #736. Each of the two stages
+	// runs exactly once; the rollback does not re-run either of them.
+	it('does not retry the update after a rollback', () => {
 		latest_update.main()
 
-		expect(execa_sync_mock).toHaveBeenCalledOnce()
+		expect(execa_sync_mock).toHaveBeenCalledTimes(UPDATE_STAGE_COUNT)
 	})
 
 	// The notice claims the tree was left exactly as found, so this sync — which rewrites
@@ -156,10 +162,10 @@ describe('latest_update.main — an update that moves forward', () => {
 		expect(tree.package_json).toBe(UPGRADED)
 	})
 
-	it('runs the update once, without a retry', () => {
+	it('runs each stage once, without a retry', () => {
 		latest_update.main()
 
-		expect(execa_sync_mock).toHaveBeenCalledOnce()
+		expect(execa_sync_mock).toHaveBeenCalledTimes(UPDATE_STAGE_COUNT)
 	})
 
 	it('builds the update command from the overrides alone', () => {

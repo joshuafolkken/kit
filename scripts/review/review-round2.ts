@@ -136,5 +136,4 @@ const review_round2 = {
 	verdict_for_delta,
 }
 
-export type { RoundTwoDecision, RoundTwoInput, RoundTwoVerdict }
 export { review_round2 }

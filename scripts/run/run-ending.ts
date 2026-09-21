@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { agent_exit_record } from '#scripts/agent/agent-exit-record'
+import { api_outage } from '#scripts/agent/api-outage'
 import type { ClaudeResultEvent } from '#scripts/agent/claude-result-event'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
 import { issue_state } from '#scripts/issue/issue-state'
@@ -23,17 +24,28 @@ import { run_liveness } from './run-liveness'
 // record is read for the *basis* the park comment carries: which fields said so, and how many tool
 // calls the harness refused (`permission_denials`, the direct cause of the 2118 stop).
 //
-// **The four words are a different question from `run:liveness`'s four**, deliberately non-overlapping:
-// `merged` / `cut` / `abandoned` / `unreadable` answer "how did it end", where `alive` / `stopped` /
-// `settled` / `undetermined` answer "is it still going".
+// **The words are a different question from `run:liveness`'s four**, deliberately non-overlapping:
+// `merged` / `cut` / `outage` / `abandoned` / `unreadable` answer "how did it end", where `alive` /
+// `stopped` / `settled` / `undetermined` answer "is it still going".
+//
+// **`outage` splits the mid-implementation ending in two** (joshuafolkken/kit#2240). A child that ended
+// mid-implementation because it could not reach the API is not a child that stalled on its own: the
+// exit record carries a transport-failure signature, read mechanically by `api-outage.ts`. The parent
+// reads it to leave the outage child re-dispatchable rather than parking it and counting it against
+// the consecutive-failure guard, which is meant to notice the environment — not to be tripped by it.
 
 const MERGED_VERDICT = 'merged'
 const CUT_VERDICT = 'cut'
+const OUTAGE_VERDICT = 'outage'
 const ABANDONED_VERDICT = 'abandoned'
 const UNREADABLE_VERDICT = 'unreadable'
 
 type EndingVerdict =
-	typeof MERGED_VERDICT | typeof CUT_VERDICT | typeof ABANDONED_VERDICT | typeof UNREADABLE_VERDICT
+	| typeof MERGED_VERDICT
+	| typeof CUT_VERDICT
+	| typeof OUTAGE_VERDICT
+	| typeof ABANDONED_VERDICT
+	| typeof UNREADABLE_VERDICT
 
 // `state` alone answers the merged-vs-open question; the labels a settled child carries are
 // `run:liveness`'s concern, not this one. gh's `--json` casing is upper, so the compare is against
@@ -66,20 +78,31 @@ const REASONS: Record<EndingVerdict, string> = {
 	[MERGED_VERDICT]: 'The child ran to completion: its Issue is CLOSED.',
 	[CUT_VERDICT]:
 		'The child took a cut and handed the run to a successor: a cut record for this issue is carried.',
+	[OUTAGE_VERDICT]:
+		'The child could not reach the API: its exit record ended in error on a transport-failure signature. Do not count it against the consecutive-failure guard — the environment, not the child, is at fault.',
 	[ABANDONED_VERDICT]:
 		'The child ended mid-implementation without a cut: its Issue is OPEN and no cut was recorded. A normal exit code does not make this a completion.',
 	[UNREADABLE_VERDICT]:
 		'A trace could not be read — the Issue state or the exit record — so how the child ended cannot be told.',
 }
 
-// The verdict never consults `is_error`: a child that exits `is_error: false` while its Issue is still
-// OPEN and uncut is `abandoned`, not `merged` — the exact confusion this command removes.
+// The mid-implementation ending, split by whether the exit record could not reach the API. A missing
+// record is unreadable; an outage record is `outage`; anything else is `abandoned`.
+function mid_implementation_verdict(record: ClaudeResultEvent | undefined): EndingVerdict {
+	if (record === undefined) return UNREADABLE_VERDICT
+
+	return api_outage.is_outage(record) ? OUTAGE_VERDICT : ABANDONED_VERDICT
+}
+
+// The verdict never consults `is_error` for completion: a child that exits `is_error: false` while its
+// Issue is still OPEN and uncut is `abandoned`, not `merged` — the exact confusion this command
+// removes. `is_error` is read only inside the outage split, where a transport failure ends in error.
 function verdict_of(traces: EndingTraces): EndingVerdict {
 	if (traces.is_cut_taken) return CUT_VERDICT
 	if (traces.is_child_closed === undefined) return UNREADABLE_VERDICT
 	if (traces.is_child_closed) return MERGED_VERDICT
 
-	return traces.exit_record === undefined ? UNREADABLE_VERDICT : ABANDONED_VERDICT
+	return mid_implementation_verdict(traces.exit_record)
 }
 
 function describe_exit(record: ClaudeResultEvent): string {
@@ -88,18 +111,41 @@ function describe_exit(record: ClaudeResultEvent): string {
 	return `exit record: subtype=${record.subtype ?? 'unknown'}, is_error=${String(record.is_error)}, num_turns=${number_turns}, permission_denials=${String(record.permission_denials)}`
 }
 
+// The refused interactive ask, as a clause the park comment can carry the question and options in — or
+// empty when the child asked nothing (joshuafolkken/kit#2201). This is the backstop for a child that
+// slipped past the `PreToolUse` refusal: the question is stranded in the exit record's
+// `permission_denials`, and lifting it here spares the parent opening the JSONL by hand.
+function refused_ask_clause(record: ClaudeResultEvent | undefined): string {
+	const ask = record?.refused_ask
+
+	return ask === undefined ? '' : ` the refused interactive ask was — ${ask};`
+}
+
 // The basis the park comment carries: which exit-record fields were read, the count of refused tool
-// calls, and whether uncommitted work is still on disk for the parent to stash.
+// calls, any refused interactive ask, and whether uncommitted work is still on disk for the parent to
+// stash.
 function abandoned_evidence(traces: EndingTraces): string {
 	const record =
 		traces.exit_record === undefined ? EXIT_UNREADABLE : describe_exit(traces.exit_record)
+	const ask = refused_ask_clause(traces.exit_record)
 	const tree = traces.is_tree_dirty ? 'uncommitted work remains' : 'the tree is clean'
 
-	return `${record}; the Issue is OPEN and no cut was recorded (${tree}), so the child ended mid-implementation — include this basis in the park comment.`
+	return `${record};${ask} the Issue is OPEN and no cut was recorded (${tree}), so the child ended mid-implementation — include this basis in the park comment.`
+}
+
+// The basis an outage verdict carries: the exit-record fields, and the transport-failure signature the
+// reason matched, so a person sees why it was read as the environment failing rather than the child.
+function outage_evidence(record: ClaudeResultEvent | undefined): string {
+	if (record === undefined) return EXIT_UNREADABLE
+
+	const marker = api_outage.outage_marker(record)
+
+	return `${describe_exit(record)}; the exit record ended in error on a transport-failure signature (${marker ?? 'unknown'}), so the child never reached the API.`
 }
 
 function evidence_of(verdict: EndingVerdict, traces: EndingTraces): string {
 	if (verdict === ABANDONED_VERDICT) return abandoned_evidence(traces)
+	if (verdict === OUTAGE_VERDICT) return outage_evidence(traces.exit_record)
 
 	return traces.exit_record === undefined ? EXIT_UNREADABLE : describe_exit(traces.exit_record)
 }
@@ -183,4 +229,11 @@ const run_ending = {
 }
 
 export type { EndingDecision, EndingRequest, EndingTraces, EndingVerdict }
-export { ABANDONED_VERDICT, CUT_VERDICT, MERGED_VERDICT, run_ending, UNREADABLE_VERDICT }
+export {
+	ABANDONED_VERDICT,
+	CUT_VERDICT,
+	MERGED_VERDICT,
+	OUTAGE_VERDICT,
+	run_ending,
+	UNREADABLE_VERDICT,
+}

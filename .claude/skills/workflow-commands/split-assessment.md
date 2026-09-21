@@ -43,6 +43,12 @@ round 1's cost is dominated by a fixed part that two Issues pay twice, so there 
 which splitting to cut it pays). **A proposal to add a size threshold that splits more is required to
 say why that data does not reach it.**
 
+**The size half is measured, not eyeballed — `pnpm josh split:assess`.** It counts the branch's
+changed files and changed lines with test files excluded and answers `split` / `single` on size
+alone, so the guide can be checked against real diffs after the fact rather than trusted from an
+estimate. It answers the **size** question only; separability (question 1) stays a judgement, which is
+why a `split` from this command is the size condition met, not a decision to divide the Issue.
+
 ## What each entry point does with the answer
 
 | Entry | Single | Two or more |

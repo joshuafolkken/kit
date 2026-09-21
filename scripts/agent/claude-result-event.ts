@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { interactive_ask } from './interactive-ask'
 
 const RESULT_EVENT_SCHEMA = z.looseObject({
 	type: z.literal('result'),
@@ -24,6 +25,11 @@ interface ClaudeResultEvent {
 	subtype: string | undefined
 	num_turns: number | undefined
 	permission_denials: number
+	// The refused interactive ask lifted out of `permission_denials` (joshuafolkken/kit#2201). Where a
+	// child reached for `AskUserQuestion` and was refused, its question and options are stranded in the
+	// exit record; `run:ending` puts them into the park comment so a person can answer, instead of the
+	// parent opening the JSONL by hand. Undefined when no denial was an interactive ask.
+	refused_ask: string | undefined
 	reason: string | undefined
 	usage:
 		| {
@@ -71,6 +77,7 @@ function decode(value: unknown): ClaudeResultEvent | undefined {
 		subtype: usable_reason(parsed.data.subtype),
 		num_turns: numeric_value(parsed.data.num_turns),
 		permission_denials: denial_count(parsed.data.permission_denials),
+		refused_ask: interactive_ask.refused_ask_of(parsed.data.permission_denials),
 		reason: is_error
 			? (usable_reason(parsed.data.result) ?? usable_reason(parsed.data.subtype))
 			: undefined,

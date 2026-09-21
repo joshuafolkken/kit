@@ -271,5 +271,5 @@ const lane_open = {
 	read_root_environment,
 }
 
-export type { LanePlan, OpenOutcome }
+export type { OpenOutcome }
 export { lane_open }

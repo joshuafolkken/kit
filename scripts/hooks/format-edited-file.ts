@@ -414,4 +414,4 @@ export {
 	ESLINT_DAEMON,
 	PROCESS_TIMEOUT_MS,
 }
-export type { BinRoutes, CommandOutcome, CommandRunner, FormatCommand }
+export type { CommandRunner, FormatCommand }

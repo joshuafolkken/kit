@@ -71,10 +71,18 @@ describe('stop_rules.stop_outcome — pre-gate cut', () => {
 })
 
 describe('stop_rules.stop_outcome — issue citation', () => {
-	it('notices a bare #N in the reply', () => {
-		expect(stop_rules.stop_outcome(context({ message: 'done in #123' })).notice).toBe(
-			stop_rules.ISSUE_CITATION_NOTICE,
-		)
+	it('corrects a bare #N by naming it and the issue:cite call that fixes it', () => {
+		const { notice } = stop_rules.stop_outcome(context({ message: 'done in #123 and #456' }))
+
+		expect(notice).toContain('#123, #456')
+		expect(notice).toContain('pnpm josh issue:cite 123 456')
+		expect(notice).toContain('issue-citation.md')
+	})
+
+	it('carries an owner/repo#N reference through to the issue:cite argument', () => {
+		const { notice } = stop_rules.stop_outcome(context({ message: 'see joshuafolkken/kit#45' }))
+
+		expect(notice).toContain('pnpm josh issue:cite joshuafolkken/kit#45')
 	})
 
 	it('is silent on a link-form citation', () => {

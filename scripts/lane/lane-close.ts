@@ -173,5 +173,5 @@ const lane_close = {
 	remove_lane,
 }
 
-export type { CloseKind, CloseOutcome, LaneTargets, SweepOutcome }
+export type { CloseKind, CloseOutcome, SweepOutcome }
 export { lane_close }

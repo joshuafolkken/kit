@@ -132,5 +132,5 @@ const run_wake_session = {
 	wake_argv,
 }
 
-export type { LaunchArgv as WakeArgv, LaunchRequest, LaunchResult } from './detached-launch'
+export type { LaunchRequest, LaunchResult } from './detached-launch'
 export { run_wake_session }

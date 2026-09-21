@@ -62,5 +62,4 @@ function repo_target(segment: string): RepoTarget | undefined {
 
 const gh_api = { GH_API_COMMAND, GH_FLAGS, is_gh_api, is_read, is_write, repo_target }
 
-export type { RepoTarget }
 export { gh_api }

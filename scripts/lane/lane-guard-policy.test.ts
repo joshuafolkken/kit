@@ -21,10 +21,18 @@ const NO_MARK_SOURCE = {}
 describe('lane_guard_policy.mode_in_lane_child', () => {
 	it.each([
 		['investigation', 'off'],
-		['batching', 'notice'],
+		['batching', 'off'],
 		['rule', 'refuse'],
 	])('says %j behaves as %s in a lane child', (id, mode) => {
 		expect(lane_guard_policy.mode_in_lane_child(id)).toBe(mode)
+	})
+
+	// **The #2164 non-regression, pinned at the enumeration.** kit#2138 measured a child killed before
+	// its commit by three refusals; kit#2164's whole point was that the batching guard must never refuse
+	// in a lane child again. Whatever else kit#2178 changed the mode to, it may never be `refuse` —
+	// asserted on its own so a future edit back to a refusal is caught here, not in a dead lane child.
+	it('never refuses batching in a lane child, so a child is not killed by it (kit#2164)', () => {
+		expect(lane_guard_policy.mode_in_lane_child('batching')).not.toBe('refuse')
 	})
 
 	// The fail-safe direction `delegation-policy.ts` takes: a guard nobody classified keeps the
@@ -58,13 +66,24 @@ describe('lane_guard_policy — the enumeration is the whole of it', () => {
 			expect(entry.because.length).toBeGreaterThan(0)
 		}
 	})
+
+	// **kit#2177 records the pre-gate-cut collateral trade-off here.** The refusal collaterals a batched
+	// sibling and that is not avoidable at the guard level, so the enumeration is where the `notice`
+	// option and the reason it was rejected are kept — the record the acceptance condition asks for.
+	it('records the pre-gate-cut collateral and the rejected notice option on the rule row', () => {
+		const rule_entry = lane_guard_policy.entry_for('rule')
+
+		expect(rule_entry?.because).toContain('collateral')
+		expect(rule_entry?.because).toContain('notice')
+		expect(rule_entry?.because).toContain('kit#2177')
+	})
 })
 
 describe('lane_guard_policy.mode_here', () => {
 	// In a marked lane child every guard takes its enumerated mode — this is the table the wrappers read.
 	it.each([
 		['investigation', 'off'],
-		['batching', 'notice'],
+		['batching', 'off'],
 		['rule', 'refuse'],
 	])('gives %j its enumerated mode %s in a marked lane child', (id, mode) => {
 		expect(lane_guard_policy.mode_here(id, LANE_DIRECTORY, LANE_CHILD_SOURCE)).toBe(mode)
@@ -94,13 +113,13 @@ describe('lane_guard_policy.is_suppressed_here', () => {
 		).toBe(true)
 	})
 
-	// **A notice-mode guard is not suppressed**: it still speaks, without a `permissionDecision`. This is
-	// the distinction kit#2164 turns on — read as suppressed, the batching guard would go silent in the
-	// lane child instead of notifying.
-	it('does not suppress a notice-mode guard in a marked lane child', () => {
+	// **The batching guard is suppressed in a lane child now (kit#2178).** kit#2164's notice was measured
+	// not to move the density, so it is `off` there — it says nothing at all, exactly as the investigation
+	// guard does. `is_suppressed_here` is what the batch-guard wrapper reads to skip the guard entirely.
+	it('suppresses the off-mode batching guard in a marked lane child', () => {
 		expect(
 			lane_guard_policy.is_suppressed_here('batching', LANE_DIRECTORY, LANE_CHILD_SOURCE),
-		).toBe(false)
+		).toBe(true)
 	})
 
 	it('never suppresses a refuse-mode guard in a lane child', () => {

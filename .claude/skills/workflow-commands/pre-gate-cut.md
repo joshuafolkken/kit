@@ -54,6 +54,15 @@ a lane it cuts.
 
 ## Taking the cut
 
+**The order is fixed in the chain, not left to the refusal to enforce** (joshuafolkken/kit#2177).
+`chain-rule.md` step 1 issues `pnpm josh run:cut <N>` after `pnpm josh main:merge`, before the scoped
+pair and the gate, so the default path takes the cut before anything reads the tree for the gate and
+the guard refusal below never fires on the happy path. Because the `cut` verdict ends the turn the
+command is issued on its own, batching with nothing a refusal could collateral; the gate then runs in
+the fresh process, where the carried cut keeps the guard silent. This removes the wasted round trip
+joshuafolkken/kit#2160 measured — an uncut gate refused, its batched `review:brief` cancelled, then
+cut and resume back to the same place.
+
 At the pre-gate boundary, issue:
 
 ```bash
@@ -86,6 +95,11 @@ is carried, and hands back the command above with what each verdict obliges. It 
 conclusion joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each reached after measuring prose that
 moved the number not at all: a step a run is free to skip is the step that gets skipped under time
 pressure, and `run:hold` — the one boundary step that never gets missed — is the one that refuses.
+
+**With the ordered step above (joshuafolkken/kit#2177) the refusal is insurance, not the primary
+trigger.** The chain now issues the cut before the gate, so a child on the happy path never reaches an
+uncut gate; the refusal remains for the child that still does, but its wasted round trip and collateral
+cancel are gone from the default path.
 
 - **It fires for a marked child and nowhere else** (joshuafolkken/kit#1904). The `PreToolUse` hook
   answers synchronously, so it reads two facts off the world: the working directory is a lane —
@@ -361,5 +375,28 @@ This section is the single source of the lane-child park rule; `scripts/rules/la
 the trigger, `scripts/rules/lane-park.test.ts` pins that it fires for a marked child on a stop notify
 and stays silent everywhere else, and the row joins the enumeration in
 `prompts/collaboration-workflow/rule-delivery.md`.
+
+### The interactive ask is refused one call earlier
+
+**The stop-notify guard fired one tool-call too late** (joshuafolkken/kit#2201). A child that reaches
+for `AskUserQuestion` never reaches the notify: the harness refuses an interactive ask in a headless
+session by **ending the turn**, so the notify guard above never fires and the question dies in the exit
+record's `permission_denials`. Measured on 2026-09-20 inside `backlogrun #2163 --only`: **#2178**'s
+child hit a Tier B branch, called `AskUserQuestion`, was refused, and left an OPEN Issue with
+`in-progress` and no question — the very failure #2034 set out to prevent, one call upstream of the
+trigger it chose.
+
+So `pnpm josh rule:guard` **refuses `AskUserQuestion` for a marked lane child**, one call before the
+stop it would have reached. A hook deny returns to the model rather than ending the turn, so the
+refusal becomes an instruction — park the question — and the child continues to record it. It fires on
+**every occurrence** (an interactive ask must never succeed in a child; the route is always the park,
+never a reissue of the ask), and stays silent for a person working in a lane, who carries no mark.
+
+**And a child that slips past it is still recoverable.** `pnpm josh run:ending` lifts the refused ask —
+the question and its option labels — out of the exit record's `permission_denials` and into the
+`abandoned` verdict's park basis, so the parent puts it into the park comment instead of opening the
+JSONL by hand. `scripts/rules/lane-interactive-ask.ts` implements the trigger,
+`scripts/rules/lane-interactive-ask.test.ts` pins both directions, and
+`scripts/agent/interactive-ask.ts` is the shared extractor the guard and `run:ending` both read.
 
 This file is the single source of the rule.

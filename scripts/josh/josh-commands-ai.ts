@@ -1,5 +1,7 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import { ISSUE_COMMANDS } from './josh-commands-issue'
 import { LANE_COMMANDS } from './josh-commands-lane'
+import { SPLIT_COMMANDS } from './josh-commands-split'
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
@@ -7,25 +9,13 @@ const ISSUE_WITH_OPTIONS = '<issue> [options]'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const AI_COMMANDS: Record<string, CommandEntry> = {
-	'issue:read': {
-		script: 'scripts/issue/issue-read-cli.ts',
-		description: "Print each issue's title, body and every comment on it, in one call",
-		category: 'AI tools',
-		reference: ['<issue...>', 'automation', ['network']],
-	},
-	'issue:state': {
-		script: 'scripts/issue/issue-state-cli.ts',
+	...ISSUE_COMMANDS,
+	'pkg:scout': {
+		script: 'scripts/package/package-scout-cli.ts',
 		description:
-			"Print each issue's state and labels, in the spelling the documents compare against",
+			'Rank package candidates by measured metrics so the Package-First tier decision is read, not judged',
 		category: 'AI tools',
-		reference: ['<issue...> [--repo <owner/repo>]', 'automation', ['network']],
-	},
-	'issue:scout': {
-		script: 'scripts/issue/issue-scout-cli.ts',
-		description:
-			'Before filing: say whether an issue like this exists and which epic it belongs to',
-		category: 'AI tools',
-		reference: ['<title> [--body <summary>]', 'automation', ['network']],
+		reference: ['<keywords> [--size <n>]', 'automation', ['network']],
 	},
 	'stash:pop': {
 		script: 'scripts/git/stash-pop-cli.ts',
@@ -72,7 +62,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'backlog:next': {
 		script: 'scripts/backlog/backlog-next.ts',
 		description:
-			'Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epics',
+			'Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics',
 		category: 'AI tools',
 		reference: ['[--exclude <n>[,<n>...]] [--repo <owner/repo>]', 'automation', ['network']],
 	},
@@ -120,6 +110,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Read a whole document safely: print it, or point at the Read tool when over the Bash cap',
 		category: 'AI tools',
 		reference: ['<file>', 'automation', ['none']],
+	},
+	'read:files': {
+		script: 'scripts/document/read-files-cli.ts',
+		description: 'Read several files in one call so edit targets fold into one turn',
+		category: 'AI tools',
+		reference: ['<path> [<path> ...]', 'automation', ['none']],
 	},
 	time: {
 		script: 'scripts/time/time-cli.ts',
@@ -242,6 +238,27 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: [ISSUE_WITH_OPTIONS, 'automation', ['git', 'network']],
 	},
+	'run:review': {
+		script: 'scripts/run/run-review-cli.ts',
+		description:
+			'Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
+		category: 'AI tools',
+		reference: ['[--join]', 'automation', ['processes', 'files']],
+	},
+	'run:event': {
+		script: 'scripts/run/run-event-cli.ts',
+		description:
+			'Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)',
+		category: 'AI tools',
+		reference: ['--append <kind> <text> | --from|--follow <n> | --last', 'automation', ['files']],
+	},
+	'run:report': {
+		script: 'scripts/run/run-report-cli.ts',
+		description:
+			'Generate the session-facing report from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
+		category: 'AI tools',
+		reference: ['', 'automation', ['files', 'network']],
+	},
 	...LANE_COMMANDS,
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
@@ -271,6 +288,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	...SPLIT_COMMANDS,
 	'oracle:list': {
 		script: 'scripts/rules/oracle-list-cli.ts',
 		description: 'Print the decision oracles — commands that answer a rule question mechanically',

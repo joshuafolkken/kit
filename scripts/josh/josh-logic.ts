@@ -323,7 +323,6 @@ const josh_logic = {
 
 export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'
-export type { TsxRunner }
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {

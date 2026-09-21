@@ -13,11 +13,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "blo": "backlog:offer",
     "blp": "backlog:plan",
     "bp": "bump",
+    "by": "bytes",
     "c": "check",
     "cm": "check-commit-message",
     "co": "cost",
+    "cs": "clone:scan",
     "dcr": "doc:read",
     "dg": "delegate",
+    "dp": "disposition",
     "dr": "doctor",
     "ds": "doc:section",
     "ea": "epic:audit",
@@ -35,6 +38,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "gp": "pr",
     "i": "init",
     "ibl": "issue:backlinks",
+    "ici": "issue:cite",
     "ig": "investigation:guard",
     "iln": "issue:lint",
     "ird": "issue:read",
@@ -56,12 +60,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ls": "latest:scope",
     "lu": "latest:update",
     "mm": "main:merge",
+    "mrr": "measure:rerun",
     "ms": "main:sync",
     "nf": "notify",
     "obf": "observations:flush",
     "ol": "oracle:list",
     "ov": "overrides",
     "pg": "propagate",
+    "pks": "pkg:scout",
     "pm": "prevent-main-commit",
     "ppu": "pre-push-unit",
     "pt": "port",
@@ -76,6 +82,9 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "re": "release",
     "red": "run:ending",
     "res": "release:scope",
+    "rev": "run:event",
+    "rf": "read:files",
+    "rfs": "refactor:scan",
     "rg": "run:progress",
     "rh": "run:hold",
     "rl": "report:lint",
@@ -84,6 +93,8 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rp": "run:prep",
     "rpy": "repo:party",
     "rr": "run:release",
+    "rrp": "run:report",
+    "rrv": "run:review",
     "rs": "read:set",
     "rst": "run:status",
     "rt": "reconcile-templates",
@@ -91,8 +102,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rv": "run:liveness",
     "rw": "run:wake",
     "rwg": "run:watcher:guard",
+    "sa": "split:assess",
     "sd": "cspell:dot",
     "sg": "stop:guard",
+    "shs": "sonar:hotspots",
     "sl": "session:lang",
     "sp": "stash:pop",
     "ss": "secretlint-scan",
@@ -105,6 +118,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "tr": "test:related",
     "tu": "test:unit",
     "u": "latest",
+    "uir": "ui:routes",
     "v": "version",
   },
   "references": {
@@ -182,6 +196,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "bytes": [
+      "<files...>",
+      "developer",
+      [
+        "none",
+      ],
+    ],
     "check": [
       "[arguments...]",
       "developer",
@@ -194,6 +215,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "clone:scan": [
+      "",
+      "automation",
+      [
+        "files",
       ],
     ],
     "cost": [
@@ -212,6 +240,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "delegate": [
       "<step> | --list",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "disposition": [
+      "<path...>",
       "automation",
       [
         "none",
@@ -346,6 +381,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "issue:backlinks": [
       "<issue>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "issue:cite": [
+      "<issue...> [--repo <owner/repo>]",
       "automation",
       [
         "network",
@@ -516,6 +558,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "measure:rerun": [
+      "<path>",
+      "automation",
+      [
+        "processes",
+        "files",
+      ],
+    ],
     "notify": [
       "--task-type <type> --body <text>",
       "automation",
@@ -543,6 +593,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "maintainer",
       [
         "files",
+      ],
+    ],
+    "pkg:scout": [
+      "<keywords> [--size <n>]",
+      "automation",
+      [
+        "network",
       ],
     ],
     "port": [
@@ -602,6 +659,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "read:files": [
+      "<path> [<path> ...]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "read:set": [
       "[<entry>] [--json]",
       "automation",
@@ -614,6 +678,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "maintainer",
       [
         "files",
+      ],
+    ],
+    "refactor:scan": [
+      "",
+      "automation",
+      [
+        "processes",
       ],
     ],
     "release": [
@@ -695,6 +766,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "run:event": [
+      "--append <kind> <text> | --from|--follow <n> | --last",
+      "automation",
+      [
+        "files",
+      ],
+    ],
     "run:hold": [
       "[issue]",
       "automation",
@@ -745,6 +823,22 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "run:report": [
+      "",
+      "automation",
+      [
+        "files",
+        "network",
+      ],
+    ],
+    "run:review": [
+      "[--join]",
+      "automation",
+      [
+        "processes",
+        "files",
+      ],
+    ],
     "run:status": [
       "<issue> [--repo <owner/repo>]",
       "automation",
@@ -776,6 +870,20 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "session:lang": [
       "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "sonar:hotspots": [
+      "<PR>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "split:assess": [
+      "[--json]",
       "automation",
       [
         "none",
@@ -817,7 +925,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "test:declared": [
-      "",
+      "[--match]",
       "developer",
       [
         "processes",
@@ -847,6 +955,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "time": [
       "[options]",
       "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "ui:routes": [
+      "[--staged]",
+      "automation",
       [
         "none",
       ],

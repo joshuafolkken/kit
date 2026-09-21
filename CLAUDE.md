@@ -97,6 +97,7 @@ Read from a `.env` file at the project root by the AI scripts, `josh port` and `
 
 - Before building a feature, check whether a well-maintained package already solves the problem rather than writing original code first, and propose replacing hand-rolled implementations with a suitable package when it improves maintainability.
 - Prefer modern, actively-maintained packages (maintenance, popularity, bundle size, TypeScript support, license, fit). **If one is clearly the best fit, select it** (Tier A — log it); **only when two or more are genuinely close**, present about three ranked options and let the user choose.
+- **Measure the choice before you judge it — `pnpm josh pkg:scout <keywords>`.** It ranks the candidate packages by downloads, last publish, bundled types, license and install size, and prints `clear` when the leader is ahead by at least the near-tie threshold (select it, Tier A) or `close` when the top two are within it (ask, Tier B) — so "clearly best" and "genuine toss-up" are read off the output rather than decided by impression.
 
 ## Code Change Rules
 
@@ -135,7 +136,7 @@ Docs- or config-only changes still run `pnpm josh gate`.
 
 ## Pre-commit Self-Review (mandatory)
 
-Before every `git commit` (follow-up commits included), self-review against `prompts/review.md`: the staged diff, and `git diff main...HEAD` before opening or updating a PR. Level from `pnpm josh review:brief --level-only`; resolve all high/medium findings; iterate — **at most two reviews in total**, the second a verification pass over the fix delta. Then route each remaining non-High finding through the three-way disposition: fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path, or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.** A confirmed High blocks rather than buying a third round; CI runs no Claude review, so this pass is authoritative. `prompts/review.md` → "Review round cap".
+Before every `git commit` (follow-up commits included), self-review against `prompts/review.md`: the staged diff, and `git diff main...HEAD` before opening or updating a PR. Level from `pnpm josh review:brief --level-only`; resolve all high/medium findings; iterate — **at most two reviews in total**, the second a verification pass over the fix delta. Then route each remaining non-High finding through the three-way disposition: fix in place, file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path — `pnpm josh disposition <path>` answers `runtime` / `non-runtime`, so the only judgement left is whether the defect is confirmed — or drop it with a one-line PR note (the default). **A filed finding is run through `pnpm josh epic:bundle <new>` before the current Issue closes.** A confirmed High blocks rather than buying a third round; CI runs no Claude review, so this pass is authoritative. `prompts/review.md` → "Review round cap".
 
 ## Doc Sync Rules
 

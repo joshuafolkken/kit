@@ -126,5 +126,4 @@ function short_cluster_has(token: string, letters: string): boolean {
 
 const git_argv = { parse, short_cluster_has, words_of }
 
-export type { GitCall }
 export { git_argv }

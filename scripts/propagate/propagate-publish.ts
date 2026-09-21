@@ -176,5 +176,4 @@ const propagate_publish = {
 	wait_for_publish,
 }
 
-export type { PublishWaitResult, PublishWaitState, WaitOptions }
 export { propagate_publish }

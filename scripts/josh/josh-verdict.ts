@@ -108,5 +108,4 @@ const josh_verdict = {
 	read_verdict,
 }
 
-export type { JoshVerdict }
 export { josh_verdict }

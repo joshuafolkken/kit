@@ -7,7 +7,10 @@ import {
 } from './josh-command-types'
 
 const FILE_ARGUMENTS = '[files...]'
+const REQUIRED_FILE_ARGUMENTS = '<files...>'
 const FILTER_ARGUMENTS = '[filters...]'
+const MATCH_ARGUMENTS = '[--match]'
+const PATH_ARGUMENTS = '<path...>'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
@@ -33,7 +36,21 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/lines/lines-command.ts',
 		description: "Print a file's code lines against the max-lines limit and the headroom left",
 		category: 'Development',
-		reference: ['<files...>', 'developer', ['none']],
+		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
+	},
+	'refactor:scan': {
+		script: 'scripts/refactor/refactor-scan-cli.ts',
+		description:
+			'List refactoring candidates in the changed scope by category and answer clear/candidates',
+		category: 'Development',
+		reference: ['', 'automation', ['processes']],
+	},
+	bytes: {
+		script: 'scripts/bytes/bytes-command.ts',
+		description:
+			"Print an agent-read document's byte size against its ceiling and the headroom left",
+		category: 'Development',
+		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
 	},
 	format: {
 		// prettier first here, unlike `format:edited`, and deliberately: `eslint --fix` exits 1
@@ -119,9 +136,17 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'test:declared': {
 		script: 'scripts/test/test-declared.ts',
-		description: 'Report whether the working-tree change needs a test (required/exempt/satisfied)',
+		description:
+			'Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin',
 		category: 'Development',
-		reference: ['', 'developer', ['processes']],
+		reference: [MATCH_ARGUMENTS, 'developer', ['processes']],
+	},
+	disposition: {
+		script: 'scripts/review/disposition-cli.ts',
+		description:
+			'Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)',
+		category: 'AI tools',
+		reference: [PATH_ARGUMENTS, 'automation', ['none']],
 	},
 	'e2e:retry-check': {
 		script: 'scripts/test/e2e-retry-check.ts',

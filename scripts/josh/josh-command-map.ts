@@ -1,5 +1,6 @@
 import type { CommandCategory, CommandEntry } from './josh-command-types'
 import { AI_COMMANDS } from './josh-commands-ai'
+import { CLONE_COMMANDS } from './josh-commands-clone'
 import { DEV_COMMANDS } from './josh-commands-development'
 import { HOOKS_COMMANDS } from './josh-commands-hooks'
 import { LINT_COMMANDS } from './josh-commands-lint'
@@ -27,6 +28,7 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 	...HOOKS_COMMANDS,
 	...AI_COMMANDS,
 	...LINT_COMMANDS,
+	...CLONE_COMMANDS,
 }
 
 const ALIASES: Record<string, string> = {
@@ -34,6 +36,7 @@ const ALIASES: Record<string, string> = {
 	l: 'lint',
 	lr: 'lint:related',
 	ln: 'lines',
+	by: 'bytes',
 	f: 'format',
 	fd: 'format:edited',
 	bg: 'batch:guard',
@@ -55,6 +58,7 @@ const ALIASES: Record<string, string> = {
 	fu: 'followup',
 	nf: 'notify',
 	obf: 'observations:flush',
+	mrr: 'measure:rerun',
 	ms: 'main:sync',
 	mm: 'main:merge',
 	bp: 'bump',
@@ -82,6 +86,8 @@ const ALIASES: Record<string, string> = {
 	ird: 'issue:read',
 	ist: 'issue:state',
 	isc: 'issue:scout',
+	ici: 'issue:cite',
+	pks: 'pkg:scout',
 	iln: 'issue:lint',
 	ibl: 'issue:backlinks',
 	rl: 'report:lint',
@@ -99,10 +105,13 @@ const ALIASES: Record<string, string> = {
 	ds: 'doc:section',
 	rs: 'read:set',
 	dcr: 'doc:read',
+	rf: 'read:files',
+	rfs: 'refactor:scan',
 	tm: 'time',
 	rb: 'review:brief',
 	r2: 'review:round2',
 	ra: 'review:attest',
+	dp: 'disposition',
 	dg: 'delegate',
 	rh: 'run:hold',
 	rr: 'run:release',
@@ -117,6 +126,9 @@ const ALIASES: Record<string, string> = {
 	rn: 'run:next',
 	rpy: 'repo:party',
 	rmg: 'run:merge',
+	rrp: 'run:report',
+	rrv: 'run:review',
+	rev: 'run:event',
 	sp: 'stash:pop',
 	lno: 'lane:open',
 	lnc: 'lane:close',
@@ -133,6 +145,10 @@ const ALIASES: Record<string, string> = {
 	sg: 'stop:guard',
 	ev: 'eval',
 	ol: 'oracle:list',
+	sa: 'split:assess',
+	shs: 'sonar:hotspots',
+	uir: 'ui:routes',
+	cs: 'clone:scan',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through

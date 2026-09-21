@@ -7,6 +7,12 @@ words:
   # for joshuafolkken/kit#2138 change directory into a lane checkout to exercise the dispatched-child
   # path, and the teardown comments name that act.
   - chdirs
+  # "A copy still matches after reindentation" — `josh clone:scan` normalizes whitespace before it
+  # fingerprints a block, so a block copied and reindented (its leading whitespace changed) still
+  # hashes the same (joshuafolkken/kit#2217). Named in the clone-detection code and its tests.
+  - reindent
+  - reindented
+  - reindentation
   # "An unenumerated guard fires" — a guard not listed in the `lane-guard-policy.ts` enumeration
   # (joshuafolkken/kit#2138). Names the fail-safe default in the code comment and its test.
   - unenumerated
@@ -33,6 +39,14 @@ words:
   # unusable dependency graph (joshuafolkken/kit#1663) — the literal text a reader greps for.
   - getaddrinfo
   - ENOTFOUND
+  # "Re-dispatchable" — a lane child that ended on an API outage is left dispatchable again in the same
+  # run rather than parked (joshuafolkken/kit#2240). Named across the `run:merge` / `run:ending` code,
+  # the workflow docs and their tests.
+  - dispatchable
+  # The connection-error signature the Anthropic client emits when the API refused the socket, matched
+  # mechanically to tell an API outage apart from a child that stalled (joshuafolkken/kit#2240). It is
+  # the literal marker text `api-outage.ts` greps the exit record for.
+  - connectionrefused
   # The registry host `docs/cloud-session.md` lists among the outbound hosts a cloud container has to
   # allow (joshuafolkken/kit#1565). It is the domain `registry.npmjs.org`, not a prose word.
   - npmjs
@@ -48,6 +62,9 @@ words:
   # left behind, and `test-repository-guard.ts` cites it three times as the reason the guard has to
   # name what it caught.
   - reflog
+  # git's own name for the `--numstat` diff format — added/deleted line counts per file, tab-delimited.
+  # `josh split:assess` reads it to size a change (joshuafolkken/kit#2218).
+  - numstat
   # What `josh review:attest` calls a review that read a checkout other than the one it was briefed
   # on (joshuafolkken/kit#1522). cspell derives "targeted" but not the "mis-" compound.
   - mistargeted
@@ -200,3 +217,11 @@ words:
   # `eslint/rules/english-only-prose.js` when it inspects a no-substitution template title
   # (joshuafolkken/kit#2124). It is the AST spelling, not a coined word.
   - quasis
+  # OSV-Scanner's own package-extraction library, named in the `--version` banner the scanner floor
+  # parses (joshuafolkken/kit#2200). It appears only in `scripts/security/security-audit-provision-logic.ts`
+  # and its suite, both internal to this package.
+  - scalibr
+  # A binary that cannot be spawned at all (ENOENT), described in `scripts/security/security-audit.ts`'s
+  # comment on why a version that cannot be read is treated as below the floor (joshuafolkken/kit#2200).
+  # The negated form of "able to be spawned", which cspell does not derive from "spawn".
+  - unspawnable

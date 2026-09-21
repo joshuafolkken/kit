@@ -82,7 +82,6 @@ const git_gh_pr_rollup = {
 	to_status_check_rollup,
 }
 
-export type { RollupElement }
 export {
 	git_gh_pr_rollup,
 	to_status_check_rollup,

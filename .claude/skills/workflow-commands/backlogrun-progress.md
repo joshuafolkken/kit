@@ -85,25 +85,32 @@ stamp computed for it** — the command prints the `at` stamp and the `next` fie
 **The line carries observations, never "still running", and nothing in it is a verification result** —
 no gate, no CI, no check rollup, because the command reads none of them.
 
-**The invariant is a tier, not a mechanism** (joshuafolkken/kit#2156). Three tiers say how much of a
-person's attention a signal takes: **interrupt** reaches for it now (a Telegram — `confirmation`,
-`completion`, `warning`), **ambient** is seen without being asked for (a line that is simply there), and
-**requested** is read only once a person thinks to type for it. **The heartbeat sits at the ambient
-tier, and stays there across a `backlogrun` session cut — never promoted to interrupt, never demoted to
-requested.** Writing this as a *mechanism* ("a pull, not a push") is what let the ambient surface vanish
-at the cut with the words still reading as kept: a pull is still a pull once the terminal it was seen on
-is gone.
+**The invariant is a tier, not a mechanism** (joshuafolkken/kit#2156, joshuafolkken/kit#2207). Three
+tiers say how much of a person's attention a signal takes: **interrupt** reaches for it now (a Telegram —
+`confirmation`, `completion`, `warning`), **ambient** is seen without being asked for (a line that is
+simply there), and **requested** is read only once a person thinks to type for it. **The heartbeat sits
+at the ambient tier, and stays there across a `backlogrun` session cut — never promoted to interrupt,
+never demoted to requested.**
+
+**The report surface belongs to the run, not to the session** (joshuafolkken/kit#2207). The run's
+session-facing events — a plan posted, a child launched, a PR opened, a review round, a park, a cut, a
+stop, a merge — are appended to one ordered stream keyed to the run's identity (`pnpm josh run:event`),
+which survives the cut because it is the run's and not any one session's. **Every session is a writer;
+whichever session is attached to a terminal is the reader.** The reader follows the stream from its own
+last position — `pnpm josh run:event --follow <position>` returns the moment a new event lands and
+otherwise at the interval, so a person sees progress arrive at once and still sees the run is alive when
+it is quiet — and relays the events it prints. **This is the same reader before and after the cut**,
+because a cut moves who executes, never where the stream lives or where a reader stands in it. Writing
+ambient as a *mechanism* ("a pull, not a push") is what let the surface vanish at the cut with the words
+still reading as kept; anchoring it to the run's stream is what keeps it.
 
 **Interrupt is withheld on purpose**: no Telegram, because `confirmation` and `completion` are what
 interrupt a person, and a line every fifteen minutes on a phone is the fatigue that stops them being
-read. **Ambient is realized differently either side of the cut, and both are the same tier.** Before the
-cut the session is the person's, so the terminal is the ambient surface. After it the parent is a
-headless `claude -p backlogrun` the `run:wake` supervisor started, so the watcher mirrors every line
-into a plain-text log beside the report record — `pnpm josh run:progress --path` names it — and a person
-keeps it open with `tail -F` to watch the run stream on without asking. The record still holds the last
-line, which `pnpm josh run:wake --list` relays and names the ambient log beside; that relay is the
-requested tier, the floor the ambient surface is not allowed to fall to, which is why `--mark` keeps
-rather than blanks the line.
+read. **`pnpm josh run:wake --list` is the requested tier** — the degenerate last-event read of the same
+stream the follow reads, for a person who types for one line rather than following. **`tail -F` on the
+raw stream file is a recovery path, not the ambient surface** — the follow is how progress is seen
+without asking, and the raw `tail` is what a person falls back to when the relay has stopped. It is
+named for that role in `--list`'s own output, beside the follow it is the fallback for.
 
 **A stop is an interrupt, and only a stop** (joshuafolkken/kit#2136). The heartbeat says a run is still
 going; a run that has _stopped_ — every remaining child blocked behind a parked one, the backlog drained
@@ -253,23 +260,34 @@ single non-numeric line as the verdict.
    the ownership guard.
 
    ```bash
-   next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID")
+   next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
    # a child number (or several, one per free lane) to run next, or a verdict token
    ```
 
-   **What the one call does is decided by what the child turned out to be** — read from its GitHub state,
-   never from a log: a **merged** child (CLOSED) is counted into the carry record (which resets the
-   failure streak), then `pnpm josh ms`, `pnpm josh lane:close <N>`, and the counters mirrored onto the
-   epic comment; a **parked** child (OPEN, `needs-decision` or `already-done`) is left alone and not
-   counted; a **failed** child (OPEN, neither label) has its stale `in-progress` dropped, is parked with
-   `needs-decision`, and is counted against the consecutive-failure guard. **A turn whose whole content
-   is one read, or one two-line progress report, is the shape this collapses.**
+   **Pass `--output <path>` — the child's transcript** (joshuafolkken/kit#2240). It is what lets the
+   composite tell an API-outage ending apart from a genuine child failure: without it an OPEN, unparked
+   child is a plain failure as before, so the flag is how the outage split is turned on.
+
+   **What the one call does is decided by what the child turned out to be** — read from its GitHub state
+   (and, for the failed case alone, its exit record), never from a log: a **merged** child (CLOSED) is
+   counted into the carry record (which resets the failure streak), then `pnpm josh ms`,
+   `pnpm josh lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (OPEN,
+   `needs-decision` or `already-done`) is left alone and not counted; an **outage** child (OPEN, neither
+   label, but the exit record shows it could not reach the API) has its stale `in-progress` dropped, is
+   **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable —
+   a run of consecutive outages trips its own guard and stops the run as an environment failure
+   (joshuafolkken/kit#2240); a **failed** child (OPEN, neither label, not an outage) has its stale
+   `in-progress` dropped, is parked with `needs-decision`, and is counted against the consecutive-failure
+   guard. **A turn whose whole content is one read, or one two-line progress report, is the shape this
+   collapses.**
 
    **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
-   `error` pass through), the composite adds four verdict tokens: `over` — the merge crossed the budget,
+   `error` pass through), the composite adds five verdict tokens: `over` — the merge crossed the budget,
    so hand the lanes over and take the cut ("The hand-off" below); `human-review` — the child stopped
    before its commit, the run's own ending (SKILL.md → §2z), so stop; `stop` — the consecutive-failure
-   guard tripped; and `retry` — the child's state could not be read, so re-read before deciding.
+   guard tripped; `environment` — the consecutive-**outage** guard tripped, so the API is down and the
+   run stops as an environment failure rather than the children's (joshuafolkken/kit#2240); and `retry`
+   — the child's state could not be read, so re-read before deciding.
 
    **The counters are the carry record's, and the epic progress comment is generated from it** (see "The
    counters live in the record" below). **The hand-off check is folded into the merge branch of the one
@@ -571,11 +589,15 @@ itself refuses to run outside the supplier repository. Every other session finis
 repository has no children left.
 
 Per-child completion notifications are unchanged: `pnpm josh followup` sends one each. Send an epic
-**start** notification when the run begins, and an epic **completion** summary at the end naming what was
-merged, what was parked and why, and what was filed.
+**start** notification when the run begins, and an epic **completion** summary at the end. **Do not
+compose that summary by hand — `pnpm josh run:report` generates it from the run's event stream**
+(joshuafolkken/kit#2249): it renders what merged, what parked and why, and what was cut, reusing
+`format_event`, and closes with the release tail below. Its output is the Telegram body too — pass it to
+`pnpm josh notify --body-file` so the summary a session shows and the message off-screen are one text
+from one generator, never a second wording of the same facts.
 
 **That same session asks `pnpm josh release:scope` once, after the last child has merged** — in the
 primary checkout, after the last lane is closed, and never once per child. `followup-reference.md` →
-"When `pnpm josh release` runs" is the single source for the position and the three answers. On
-`required` the epic completion summary closes with the request and the exact command; on `unknown` it
-says `unknown`, never `skip`.
+"When `pnpm josh release` runs" is the single source for the position and the three answers. `run:report`
+appends that answer as the summary's closing line: on `required` the request and the exact command, on
+`unknown` the word `unknown`, never rounded to `skip`.

@@ -43,5 +43,4 @@ const run_watcher_guard = {
 	check,
 }
 
-export type { GuardResult }
 export { run_watcher_guard }

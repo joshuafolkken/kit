@@ -112,5 +112,4 @@ const related_scope = {
 }
 
 export type { ScopeMode } from '#scripts/git/changed-file-scope'
-export type { RelatedScope }
 export { related_scope }

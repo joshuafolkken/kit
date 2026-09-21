@@ -211,5 +211,5 @@ const overrides_check = {
 	SNAPSHOT_PATH,
 }
 
-export type { OverridesDiff, AddedEntry, RemovedEntry, ModifiedEntry, OverridesSources }
+export type { OverridesDiff, OverridesSources }
 export { overrides_check }

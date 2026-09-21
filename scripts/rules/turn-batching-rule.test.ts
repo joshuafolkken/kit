@@ -200,3 +200,28 @@ describe(`${RESIDENCY} — names the suite that pins the rule`, () => {
 		expect(read_unwrapped(RESIDENCY)).toContain(SUITE_PATH)
 	})
 })
+
+// joshuafolkken/kit#2202: the batching guard is off in a lane child (kit#2178), so the only thing that
+// can fold mid-implementation independent edits is a composite command at a pre-determined point —
+// `read:files`, routed at the Step 0 seam. The command and its two documentation homes are pinned
+// together so a rename cannot leave the routing pointing at a command that is gone.
+describe('kit#2202 — the read:files lever is documented and routed', () => {
+	const REPORT_FORMAT = `${WORKFLOW_PROMPT_DIRECTORY}/report-format.md`
+	const READ_FILES_COMMAND = 'pnpm josh read:files'
+	const LEVER_HEADING = '実装中の独立編集に効く合成コマンド'
+
+	it('turn-batching.md carries the lever section and names the command', () => {
+		const content = read_unwrapped(CANONICAL)
+
+		expect(content).toContain(LEVER_HEADING)
+		expect(content).toContain(READ_FILES_COMMAND)
+		expect(content).toContain('joshuafolkken/kit#2202')
+	})
+
+	it('report-format.md routes the run to it at the Step 0 seam', () => {
+		const content = read_unwrapped(REPORT_FORMAT)
+
+		expect(content).toContain(READ_FILES_COMMAND)
+		expect(content).toContain(LEVER_HEADING)
+	})
+})
