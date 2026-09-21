@@ -299,8 +299,8 @@ function list_sessions(directory: string): Array<SessionFile> {
 // Every session found across a set of candidate directories (joshuafolkken/kit#1825), newest first and
 // each `session_id` kept once. `transcript_directories` is what produces the set; a session file lives
 // under exactly one slug, so the candidates normally hold disjoint sets and the dedupe is what keeps a
-// run counted a single time should the same session ever surface under both — a merge must not double
-// what it measured.
+// run counted a single time should the same session ever surface under more than one candidate
+// directory — a merge must not double what it measured.
 function list_sessions_across(directories: ReadonlyArray<string>): Array<SessionFile> {
 	const seen = new Set<string>()
 	const merged = directories.flatMap((directory) => list_sessions(directory))
