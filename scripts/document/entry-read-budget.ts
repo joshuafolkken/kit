@@ -44,12 +44,13 @@ interface EntryBudget {
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// Raised in joshuafolkken/kit#2289 when `pre-gate-cut.md` joined the point-of-use set: its ~29KB
 	// read is a point-of-use read every entry's total now counts, a correction of an under-count rather
-	// than new reading.
-	{ entry: 'kickoff', bytes: 266_240 },
+	// than new reading. Raised again in joshuafolkken/kit#2282 when the same document grew by its
+	// status-quo decision record — the entries that read it to their block ceiling crossed a boundary.
+	{ entry: 'kickoff', bytes: 270_336 },
 	{ entry: 'fullrun', bytes: 266_240 },
 	{ entry: 'halfrun', bytes: 266_240 },
 	{ entry: 'backlogrun', bytes: 270_336 },
-	{ entry: LANE_CHILD, bytes: 139_264 },
+	{ entry: LANE_CHILD, bytes: 143_360 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
