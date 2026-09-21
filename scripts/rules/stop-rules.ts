@@ -16,10 +16,11 @@ import { issue_citation } from './issue-citation'
 // permission envelope. The stop guard is a second *entry* on the one foundation, exactly as
 // `pretool-guard` is one — not a second copy of the plumbing.
 //
-// **Two rules refuse, one only notices.** Missing the stop notification or leaving a hold on a clean
-// tree costs a person a silent wait or a trampled tree, so those block the stop. A bare `#N` in the
-// reply is a citation slip a false positive would punish more than the slip itself, so it is a notice
-// and the stop proceeds.
+// **All three rules refuse** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
+// on a clean tree costs a person a silent wait or a trampled tree; a bare `#N` in the reply reaches
+// the person watching but not the model that could fix it, so it too blocks — `{"decision":"block"}`
+// is the one channel a `Stop` hook has to the model, and `stop_hook_active` caps a false positive at a
+// single wasted turn. The detection is tightened to match (`issue-citation.ts`).
 
 const SWITCH_ENV_KEY = 'JOSH_STOP_GUARD'
 const BLOCK_DECISION = 'block'
@@ -55,10 +56,9 @@ interface StopContext {
 
 interface StopOutcome {
 	reason: string | undefined
-	notice: string | undefined
 }
 
-const NO_OUTCOME: StopOutcome = { reason: undefined, notice: undefined }
+const NO_OUTCOME: StopOutcome = { reason: undefined }
 
 // **A mid-workflow stop is announced off-screen before it happens.** `CLAUDE.md` → "Mid-workflow stop
 // notification" requires the `confirmation` Telegram before any pause; the hold is what says a run is
@@ -83,24 +83,23 @@ const HOLD_RELEASE_REASON =
 	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty — this ' +
 	'row is silent there. Release it, then stop again.'
 
-// **A citation slip, not a refusal.** The stop proceeds; the notice reaches the person watching.
-//
-// **It corrects rather than advises.** The bare `#N` is already on screen and the hook cannot unsay
-// it, so the notice does the one thing that helps the *next* reply: it names the numbers it detected
-// and hands over the exact `issue:cite` call that prints the paste-ready lines. The rule itself is not
-// restated — it is resident in `CLAUDE.md` — only pointed at.
-const ISSUE_CITATION_NOTICE =
+// **A refusal that corrects rather than advises** (joshuafolkken/kit#2247). The bare `#N` is already
+// on screen and the hook cannot unsay it, so the reason does the one thing that helps the *next* reply:
+// it names the numbers it detected and hands over the exact `issue:cite` call that prints the
+// paste-ready lines, then asks for the reply to be reissued with those links in place. The rule itself
+// is not restated — it is resident in `CLAUDE.md` — only pointed at.
+const ISSUE_CITATION_REASON =
 	'Session-facing output cites an Issue as a number-link so the reader can click through and see ' +
-	'which repository it is (`CLAUDE.md`, `prompts/collaboration-workflow/issue-citation.md`). This is ' +
-	'a notice only; the stop proceeds.'
+	'which repository it is (`CLAUDE.md`, `prompts/collaboration-workflow/issue-citation.md`).'
 
-function build_citation_notice(references: ReadonlyArray<string>): string {
+function build_citation_reason(references: ReadonlyArray<string>): string {
 	const numbers = references.join(', ')
 	const command = `pnpm josh issue:cite ${issue_citation.cite_arguments(references).join(' ')}`
 
 	return (
-		`ℹ issue citation: your reply names an Issue as a bare \`#N\` (${numbers}). Run \`${command}\` ` +
-		`to print the paste-ready citation lines, then use those in your next reply. ${ISSUE_CITATION_NOTICE}`
+		`⛔ issue citation: your reply names an Issue as a bare \`#N\` (${numbers}). Run \`${command}\` ` +
+		`to print the paste-ready citation lines, then reissue your reply with those number-links in ` +
+		`place of the bare references. ${ISSUE_CITATION_REASON}`
 	)
 }
 
@@ -112,43 +111,34 @@ function needs_release(context: StopContext): boolean {
 	return context.hold_present && context.tree_clean
 }
 
-// The block half, first-wins. Two things stand both rules down: `stop_hook_active` (the loop-breaker,
-// so a run that already got one continuation this prompt may stop) and a pre-gate cut in flight (a
-// lane child's automatic turn-end, not a person-waiting pause).
+function citation_reason(message: string): string | undefined {
+	const references = issue_citation.bare_references(message)
+	if (references.length === 0) return undefined
+
+	return build_citation_reason(references)
+}
+
+// First-wins across all three rules. Two things stand every rule down: `stop_hook_active` (the
+// loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
+// flight (a lane child's automatic turn-end, not a person-waiting pause). The two existing rules keep
+// their order ahead of the citation rule, so a stop that both still owes its notify and holds a bare
+// `#N` still reports the notify first.
 function block_reason(context: StopContext): string | undefined {
 	if (context.stop_hook_active || context.cut_pending) return undefined
 	if (needs_notify(context)) return STOP_NOTIFY_REASON
 	if (needs_release(context)) return HOLD_RELEASE_REASON
 
-	return undefined
+	return citation_reason(context.message)
 }
 
-function notice_text(context: StopContext): string | undefined {
-	const references = issue_citation.bare_references(context.message)
-	if (references.length === 0) return undefined
-
-	return build_citation_notice(references)
-}
-
-// The block path decides first; the notice is asked only when nothing blocks, so a refused stop never
-// also carries a citation notice about a reply the run has not finished.
 function stop_outcome(context: StopContext): StopOutcome {
-	const reason = block_reason(context)
-
-	if (reason !== undefined) return { reason, notice: undefined }
-
-	return { reason: undefined, notice: notice_text(context) }
+	return { reason: block_reason(context) }
 }
 
 // The documented shape a `Stop` hook blocks with: `reason` is fed back to Claude, which then continues
 // instead of stopping. Plain stdout is not it — only this envelope holds the stop.
 function block_envelope(reason: string): string {
 	return JSON.stringify({ decision: BLOCK_DECISION, reason })
-}
-
-// A non-blocking notice: the stop proceeds and `systemMessage` is what the person watching sees.
-function notice_envelope(notice: string): string {
-	return JSON.stringify({ systemMessage: notice })
 }
 
 function parse_stop_payload(raw_payload: string): StopPayload | undefined {
@@ -163,15 +153,13 @@ function is_enabled(): boolean {
 
 const stop_rules = {
 	HOLD_RELEASE_REASON,
-	ISSUE_CITATION_NOTICE,
+	ISSUE_CITATION_REASON,
 	NO_OUTCOME,
 	STOP_NOTIFY_REASON,
 	SWITCH_ENV_KEY,
 	block_envelope,
 	block_reason,
 	is_enabled,
-	notice_envelope,
-	notice_text,
 	parse_stop_payload,
 	stop_outcome,
 }

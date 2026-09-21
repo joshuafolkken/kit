@@ -42,7 +42,7 @@ describe('stop_rules — each delivered text names its single source', () => {
 		expect(stop_rules.HOLD_RELEASE_REASON).toContain('§2f')
 	})
 
-	it('the issue citation notice points at issue-citation.md', () => {
-		expect(stop_rules.ISSUE_CITATION_NOTICE).toContain('issue-citation.md')
+	it('the issue citation reason points at issue-citation.md', () => {
+		expect(stop_rules.ISSUE_CITATION_REASON).toContain('issue-citation.md')
 	})
 })
