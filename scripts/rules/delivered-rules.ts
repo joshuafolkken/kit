@@ -16,6 +16,7 @@ import { lane_park } from './lane-park'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
+import { raw_field_body } from './raw-field-body'
 import { rule_body_guard } from './rule-body-guard'
 import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
@@ -240,15 +241,12 @@ const { carries_a_body, is_shell_evaluated_body, keeps_body_safe } = shell_body_
 // half that reads as unbelievable — the substituted text is *executed*, not discarded.
 const SHELL_BODY_REASON =
 	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
-	'contains a backtick or a `$`. The shell evaluates both before the command runs, so the text is ' +
-	'executed rather than merely mangled — joshuafolkken/kit#1198 recorded a PR comment whose own ' +
-	"words ran as git commands and switched a lane's work tree onto main. Write the body to a file " +
-	'and pass it by path: `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` (a ' +
-	'PR comment is an issue comment), `pnpm josh followup --notify-message-file <path>`, `pnpm josh ' +
-	"notify --body-file <path>`, and `--body-file <path>` wherever a command offers it. `$'…'` " +
-	'quoting is the other safe form and is unchanged. The rule and what the trigger cannot see are in ' +
-	'`prompts/collaboration-workflow/shell-body.md`. Reissue this call once the body is in a file — ' +
-	'it fires once per run and cannot repeat on the call in hand.'
+	'contains a backtick or a `$`, so the shell runs it — the text is executed rather than merely ' +
+	'mangled (joshuafolkken/kit#1198). Write the body to a file and pass it by path: `pnpm josh ' +
+	'issue:comment <N> --body-file <path>`, `pnpm josh followup --notify-message-file <path>`, or ' +
+	"`--body-file <path>` wherever offered. `$'…'` quoting is the other safe form; the rule and the " +
+	"trigger's blind spots are in `prompts/collaboration-workflow/shell-body.md`. Reissue this call " +
+	'once the body is in a file — it fires once per run and cannot repeat on the call in hand.'
 
 // **Keeping the WIP cap is counting the open Issues**, which is the one act the rule asks for before
 // a filing.
@@ -344,6 +342,13 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(keeps_body_safe),
 		reaches: on_bash_command(carries_a_body),
 	},
+	// **The sibling of `shell-body`, one call further along** (joshuafolkken/kit#2304). `shell-body`
+	// refuses a body passed inline so the shell evaluates it; this refuses a body passed by path with
+	// the raw field flag (`-f` / `--raw-field body=@<path>`), which posts the literal `@<path>`. It
+	// claims no command any row above does — `shell-body` triggers on a backtick or `$`, which the
+	// `@<path>` misfire carries neither, and `is_issue_filing` leaves the comment endpoint alone — so
+	// the exactly-one-rule invariant over its fixtures holds. It fires on every occurrence (`git-force.ts`).
+	raw_field_body.ROW,
 	{
 		id: 'piped-verification',
 		is_trigger: on_bash_command(piped_verification.is_masked_verification),
@@ -711,6 +716,7 @@ const delivered_rules = {
 	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
+	RAW_FIELD_BODY_REASON: raw_field_body.RAW_FIELD_BODY_REASON,
 	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,

@@ -785,6 +785,16 @@ Print the paste-ready number-link citation line for each issue, in one call
 
 ---
 
+### `josh issue:comment` · `josh icm`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue> --body <text> | --body-file <path>`
+
+Post one comment to an issue from a file, so no shell expands the body
+
+---
+
 ### `josh issue:fold` · `josh isf`
 
 > **Audience:** automation · **Side effects:** none

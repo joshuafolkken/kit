@@ -32,6 +32,9 @@ const TRIGGER_SUITE = 'scripts/rules/shell-body-trigger.test.ts'
 const STDIN_CLAIM = '`-` が標準入力を読むこと'
 // Named once: the enumeration, both residency lists and this suite have to agree on the command.
 const GUARD_COMMAND = 'pnpm josh rule:guard'
+// The single safe spelling the rule steers every caller toward — asserted in the delivered text and
+// again at the topic file, so it is named once here rather than duplicated across the two.
+const ISSUE_COMMENT_SPELLING = 'pnpm josh issue:comment <N> --body-file <path>'
 // The measurement the rule rests on, and the most quotable part of it — so it is the first thing that
 // would be pasted back into an always-loaded document.
 const MEASUREMENT = '履歴展開は非対話では無効'
@@ -49,7 +52,7 @@ describe('the delivered text — what the refusal states', () => {
 		'contains a backtick or a `$`',
 		'executed rather than merely mangled',
 		'--body-file <path>',
-		'--field body=@<path>',
+		ISSUE_COMMENT_SPELLING,
 		'--notify-message-file',
 		'Reissue this call once the body is in a file',
 	])('carries %j', (marker) => {
@@ -104,7 +107,7 @@ describe(`${CANONICAL} — carries the damage, the measurement and the safe spel
 		'**テキストが実行されること**',
 		// Both call sites, because fixing one and leaving the other is what the Issue was filed over.
 		'--notify-message',
-		'gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>',
+		ISSUE_COMMENT_SPELLING,
 		// `$'…'` stays correct, so the rule cannot be read as deprecating the form `CLAUDE.md` uses.
 		"**`$'…'` も安全である。**",
 		// The reader that makes the two call sites one implementation rather than two.

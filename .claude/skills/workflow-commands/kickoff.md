@@ -6,8 +6,8 @@
   **normalize the title**: if the title is not in English or can be phrased more clearly, derive a
   better English title and run `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` →
   analyze requirements → **scope assessment per `split-assessment.md`** → post the plan to the Issue (if
-  body is blank, `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"`; otherwise `gh api
-  repos/{owner}/{repo}/issues/<N>/comments -f body="<plan>"`) → send Telegram notification → **stop**
+  body is blank, `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"`; otherwise
+  `pnpm josh issue:comment <N> --body-file <path>`) → send Telegram notification → **stop**
   (do not implement). **When the assessment finds two or more separately-mergeable deliverables**, take
   the split path instead of posting a plan: create the children as in `kickoff new`, then either
   **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2> ... [--ordered] [--rationale-file

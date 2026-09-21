@@ -105,7 +105,7 @@ const LANE_PARK_REASON =
 	'the parent to guess from a log. Before you notify and stop: apply `needs-decision` and post a ' +
 	'comment carrying the question, the options, and whether work was stashed — ' +
 	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'` then " +
-	'`gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>`. If this stop is a ' +
+	'`pnpm josh issue:comment <N> --body-file <path>`. If this stop is a ' +
 	'`needs-human-review` or `already-done` one, that label is already on the Issue and there is nothing ' +
 	'to add. Then reissue this notify — it fires once per run and cannot repeat on the call in hand. The ' +
 	'procedure is `.claude/skills/workflow-commands/pre-gate-cut.md` → "A lane child records its park ' +

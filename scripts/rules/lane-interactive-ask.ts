@@ -50,7 +50,7 @@ const LANE_INTERACTIVE_ASK_REASON =
 	'placed the same rule one tool-call too late). Do not ask: park the decision instead. Apply ' +
 	'`needs-decision` and post a comment carrying the question, the options and whether work was stashed — ' +
 	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'` then " +
-	'`gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` — then send the ' +
+	'`pnpm josh issue:comment <N> --body-file <path>` — then send the ' +
 	'`confirmation` Telegram and stop. The procedure is ' +
 	'`.claude/skills/workflow-commands/pre-gate-cut.md` → "A lane child records its park before it stops", ' +
 	'and the park itself is `backlogrun-park.md` → "park and continue". This rule fires on every ' +
