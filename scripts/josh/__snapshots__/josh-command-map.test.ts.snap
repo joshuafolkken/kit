@@ -15,6 +15,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bp": "bump",
     "by": "bytes",
     "c": "check",
+    "ca": "cases",
     "cm": "check-commit-message",
     "co": "cost",
     "cs": "clone:scan",
@@ -204,6 +205,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "none",
+      ],
+    ],
+    "cases": [
+      "<path...>",
+      "automation",
+      [
+        "files",
       ],
     ],
     "check": [

@@ -615,6 +615,16 @@ Print the whole backlog as a plan: ready now, waiting on what, waiting on a pers
 
 ---
 
+### `josh cases` · `josh ca`
+
+> **Audience:** automation · **Side effects:** files
+
+`<path...>`
+
+Read changed paths and print the I/O boundaries crossed and their mandatory abnormal cases: network | process | fs | none
+
+---
+
 ### `josh clone:scan` · `josh cs`
 
 > **Audience:** automation · **Side effects:** files

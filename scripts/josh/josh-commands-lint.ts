@@ -24,6 +24,13 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['(reads stdin)', 'automation', ['none']],
 	},
+	cases: {
+		script: 'scripts/cases/cases-cli.ts',
+		description:
+			'Read changed paths and print the I/O boundaries crossed and their mandatory abnormal cases: network | process | fs | none',
+		category: 'AI tools',
+		reference: ['<path...>', 'automation', ['files']],
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

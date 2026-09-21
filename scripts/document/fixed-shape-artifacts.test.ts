@@ -28,6 +28,28 @@ describe('report:lint agrees with report-format.md', () => {
 	it('routes the mechanical half to the command', () => {
 		expect(document).toContain('josh report:lint')
 	})
+
+	it.each(report_lint.CASE_VOCABULARY)('defines the first-tier case %s', (token) => {
+		expect(document).toContain(token)
+	})
+
+	it('defines the two case-tier markers and the never-breaks escape', () => {
+		expect(document).toContain(report_lint.CASE_LABEL)
+		expect(document).toContain(report_lint.BREAK_LABEL)
+		expect(document).toContain(report_lint.NO_BREAK_ESCAPE)
+	})
+
+	it('requires the second tier to hold the declared number of conditions', () => {
+		expect(document).toContain(String(report_lint.MIN_BREAK_CONDITIONS))
+	})
+
+	it('adds the execution-evidence line to the completion report', () => {
+		expect(document).toContain('実行証跡')
+	})
+
+	it('routes the boundary cases to the cases command', () => {
+		expect(document).toContain('josh cases')
+	})
 })
 
 describe('issue:lint agrees with issue-template.md', () => {
@@ -59,5 +81,13 @@ describe('the observation ledger grammar agrees with observation-filing.md', () 
 		expect(read_repo_file(OBSERVATION_FILING)).toContain(
 			'- k:<slug> | d<n> | <YYYY-MM-DD> | <where> | <what>',
 		)
+	})
+
+	it('carries the user-found bug entry, keyed by the kind of miss at depth 1', () => {
+		const document = read_repo_file(OBSERVATION_FILING)
+
+		expect(document).toContain('user-found')
+		expect(document).toContain('k:missed-')
+		expect(document).toContain('d1')
 	})
 })

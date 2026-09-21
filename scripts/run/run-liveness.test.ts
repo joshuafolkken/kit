@@ -94,6 +94,30 @@ describe('the stop a unit leaves, whether or not it reached the implementation',
 	})
 })
 
+// joshuafolkken/kit#2277: a stopped child is no longer booked as a failure and parked. It is routed
+// through `run:merge --output`, which reads the exit record and re-dispatches an API-outage child or
+// parks an abandoned one — so the advice sends the parent there rather than straight to a park.
+describe('a stopped child is classified through run:merge, not parked outright', () => {
+	it.each([
+		['clean', false],
+		['dirty', true],
+	])('routes the %s stop through run:merge to classify the ending', (_label, is_tree_dirty) => {
+		const { advice } = run_liveness.decide(arrange_traces({ is_tree_dirty }))
+
+		expect(advice).toContain('run:merge <N> --output')
+		expect(advice).toContain('re-dispatches')
+	})
+
+	it('asks for a stash before classifying only when the checkout is dirty', () => {
+		expect(run_liveness.decide(arrange_traces({ is_tree_dirty: true })).advice).toContain(
+			'git stash push -u',
+		)
+		expect(run_liveness.decide(arrange_traces({ is_tree_dirty: false })).advice).not.toContain(
+			'git stash',
+		)
+	})
+})
+
 describe('a live unit is never booked as stopped', () => {
 	it('answers alive while the output is still moving', () => {
 		expect(run_liveness.decide(arrange_traces({ is_output_frozen: false })).verdict).toBe(
