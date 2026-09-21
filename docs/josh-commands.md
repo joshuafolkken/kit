@@ -1463,6 +1463,20 @@ The default waits only for the gate to _start_ (never for the checks to pass) an
 the mechanical form of "a review verdict is not adopted over a red gate". The overlap's reader is
 joshuafolkken/kit#2179 and `chain-rule.md`.
 
+### `josh run:report`
+
+Generates the session-facing report _from_ the run's event stream, rather than composing the wording by
+hand each run (joshuafolkken/kit#2249); alias `rrp`. It reuses `run:event`'s `format_event` for every
+line — merges, parks with their reason, cuts — and appends the release tail `release:scope` decides (the
+request and the command on `required`, `unknown` printed as `unknown`, silent on `skip`). The printed
+body is the Telegram body too: `josh notify --body-file` sends exactly this output, so a session's
+summary and the off-screen message are one string from one generator, and the AI writes only Step 0's
+three lines.
+
+```bash
+pnpm josh run:report   # print the report; the same text josh notify sends
+```
+
 ### `josh run:event`
 
 Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205); alias

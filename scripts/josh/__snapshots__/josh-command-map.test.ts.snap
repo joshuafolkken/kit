@@ -93,6 +93,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rp": "run:prep",
     "rpy": "repo:party",
     "rr": "run:release",
+    "rrp": "run:report",
     "rrv": "run:review",
     "rs": "read:set",
     "rsp": "run:step",
@@ -821,6 +822,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "files",
+      ],
+    ],
+    "run:report": [
+      "",
+      "automation",
+      [
+        "files",
+        "network",
       ],
     ],
     "run:review": [
