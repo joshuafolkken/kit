@@ -377,9 +377,37 @@ request (`cost-verdict.ts` `per_request_cost`) against `CONTEXT_CUT_THRESHOLD` (
 session average in the batch is **180526** (`#2213`), so no lane ever tripped the implementation-phase
 cut — every split above is the *unconditional* pre-gate cut. The peak
 *single-request* context (the table's max column) did cross 200k in five lanes — `#2240`, `#2213`,
-`#2257`, `#2248`, `#2267` — but the average the threshold watches stayed under. Whether the threshold
-should be lowered, or measured against recent rather than whole-session context, is a behavior
-change — deferred to joshuafolkken/kit#2282, not decided here.
+`#2257`, `#2248`, `#2267` — but the average the threshold watches stayed under.
+
+### The threshold stays — a safety net not firing is not a miscalibration (joshuafolkken/kit#2282)
+
+**joshuafolkken/kit#2282 weighed three options against the measurement above and kept the status quo:
+the 200_000 `CONTEXT_CUT_THRESHOLD` is unchanged, and it is measured against the session average as
+before.** The implementation-phase cut stays a safety net for a pathologically long implementation,
+not a cut that fires on a typical lane.
+
+- **"It never fired" is the safety net waiting, not a wrong threshold.** The cut was built
+  (joshuafolkken/kit#1933) for the pathological regime the 2026-09-13 `backlogrun` measured — 208k–386k
+  median context per request. The 2026-09-21 batch never entered that regime: the *unconditional*
+  pre-gate cut carries the context-reduction work single-handed (~130k → ~60k per request), and even the
+  two lanes that never cut (`#2213`, `#2248`) stayed under that 208k baseline. The mechanism did not
+  fire because there was no pathological session to catch — which is the safety net behaving correctly,
+  not a number set too high. 200_000 sits below the 208k floor of the regime it guards, so a genuinely
+  runaway implementation would still trip it.
+- **Lowering the threshold (option 1) perturbs a shared value with no measured problem to justify it.**
+  `CONTEXT_CUT_THRESHOLD` is the *same* constant the parent hand-off between children uses
+  (`backlogrun-progress.md` → "The hand-off"), so lowering it to fire on a typical lane also makes the
+  parent hand off between children more eagerly — and it adds mid-implementation churn to lanes the
+  pre-gate cut already handles. The measurement shows the current system is healthy, so there is nothing
+  to buy.
+- **Measuring recent rather than whole-session context (option 2) would need a second measurement — the
+  one thing joshuafolkken/kit#1933 forbids.** The single-request peaks that crossed 200k are real, and
+  the session average does understate a session whose context grew. But the child's cut is required to
+  read the *parent's* measurement, never a second one ("The measurement is the parent hand-off's, never
+  a second one"). Switching the child to a recent-context measure either builds that forbidden second
+  measurement, or changes the parent's between-child hand-off too — a far wider behavior change, again
+  with no measured harm behind it. The pre-gate cut already caps every resumed session near 60k, so the
+  peak the average misses is bounded regardless.
 
 ## A lane child records its park before it stops
 
