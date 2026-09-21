@@ -42,9 +42,10 @@ record's `done` field rather than shrinking the string.
 ## 1. Which file to read
 
 Read this file, then the one for the command that was typed. The command file is a **manifest** — the
-ordered steps as terse triggers and pointers; `pnpm josh run:next <N>` prints which step the run is
-at, and each step's detail is read on demand from the file its pointer names (for `fullrun`, the step
-lists are `fullrun-steps.md`).
+ordered steps as terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single
+action — computed from the event stream, the carry record and the issue state, never the conversation
+(`run:next` is its pre-implementation degenerate form) — and each step's detail is read on demand from
+the file its pointer names (for `fullrun`, the step lists are `fullrun-steps.md`).
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |

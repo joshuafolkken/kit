@@ -1,17 +1,16 @@
-import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import type { PrepParts } from './run-prep'
+import { run_step, type PreVerdict } from './run-step'
 
 // `josh run:next <N>` — the next step a `fullrun` takes, printed from the run's state
 // (joshuafolkken/kit#2188). It is the foundation the epic #2166 rests on: the entry read is trimmed by
 // replacing prose that a reader has to interpret with a command that answers "what now" from the same
 // state `run:prep` already gathered, so the answer is computed rather than judged.
 //
-// **This is the manifest, not the whole procedure.** It prints one line — the step the run is at,
-// keyed on the three facts `run:prep`'s summary carries (the issue state, whether it stops before its
-// commit, and whether a dependency update is owed). The later children of #2166 fold more of the
-// prose into commands that read on from here; this one lays the state → step mapping down.
-
-const CLOSED = 'CLOSED'
+// **It is now the degenerate form of `run:step`** (joshuafolkken/kit#2248). `run:step` computes a run's
+// position from the event stream, the carry record and the issue state; a `fullrun` with nothing emitted
+// yet is at its pre-implementation position, which is exactly what this prints. The state → step mapping
+// lives once, in `run-step.ts`'s `pre_verdict`, and this maps each verdict to the prose sentence a
+// reader expects — so there is no second implementation of the mapping.
 
 const ALREADY_DONE_STEP =
 	'Issue is CLOSED — nothing to run. Verify it against merged code before starting.'
@@ -22,6 +21,16 @@ const HUMAN_REVIEW_STEP =
 const IMPLEMENT_STEP = 'Implement, then run the verification gate (refactor, gate, /code-review).'
 const UNKNOWN_STEP =
 	'State could not be read — resolve the failure in run:prep before deciding the next step.'
+
+// The prose sentence for each pre-implementation verdict `run:step` computes. The verdict set is
+// `run-step.ts`'s, so a new position can never be printed here without a sentence to print it with.
+const STEP_OF: Record<PreVerdict, string> = {
+	'already-done': ALREADY_DONE_STEP,
+	'human-review': HUMAN_REVIEW_STEP,
+	implement: IMPLEMENT_STEP,
+	unknown: UNKNOWN_STEP,
+	'update-deps': LATEST_STEP,
+}
 
 // The four facts a step is keyed on, lifted off `PrepParts` so the mapping is a pure function of state
 // and the CLI does the reading. `state` is `undefined` exactly when `run:prep` could not read it.
@@ -39,17 +48,11 @@ function to_input(parts: PrepParts): NextInput {
 	}
 }
 
-// **Ordered guards, because the facts are not independent.** A closed issue is terminal whatever else
-// is true; a required update is the earliest action; `needs-human-review` changes where the run ends,
-// so it is surfaced ahead of the ordinary implement step. An unreadable state answers last rather than
-// falling through to `implement`, which would send a run past a read that failed.
+// The prose for the pre-implementation position `run:step` computes — the degenerate case where the
+// run has emitted no event yet. The ordering of the guards is `run-step.ts`'s `pre_verdict`, so the two
+// never disagree about which fact wins.
 function next_step(input: NextInput): string {
-	if (input.state === undefined) return UNKNOWN_STEP
-	if (input.state === CLOSED) return ALREADY_DONE_STEP
-	if (input.latest_scope === latest_scope_cli.REQUIRED_SCOPE) return LATEST_STEP
-	if (input.is_human_review) return HUMAN_REVIEW_STEP
-
-	return IMPLEMENT_STEP
+	return STEP_OF[run_step.pre_verdict(input)]
 }
 
 function format_report(parts: PrepParts): string {

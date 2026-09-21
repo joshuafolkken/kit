@@ -28,6 +28,7 @@ const UNKNOWN = 'unknown'
 const NONE = 'none'
 const NOT_A_LANE = 'not-a-lane'
 const BUSY = 'busy'
+const HUMAN_REVIEW = 'human-review'
 // Lane liveness verdicts shared by the lane:list oracle and asserted against `lane_occupancy` in its
 // test. `LIVE` is the silent norm; `STOPPED` and `UNKNOWN` lead the difference lines.
 const LIVE = 'live'
@@ -224,7 +225,17 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		name: 'run:merge',
 		decision: 'The post-merge batch step: confirm child, advance, or report a stop condition',
 		args: ISSUE_N_ARG,
-		vocabulary: [OVER, 'human-review', STOP, RETRY, BUSY],
+		vocabulary: [OVER, HUMAN_REVIEW, STOP, RETRY, BUSY],
+		single_source: BACKLOGRUN_MD,
+	},
+	{
+		name: 'run:step',
+		decision: 'The run’s next single action, computed from the event stream, carry and issue state',
+		args: ISSUE_N_ARG,
+		// The non-command answers: `run:step` prints a runnable command for a phase with one to run, and
+		// one of these verdicts otherwise. A command line is not a vocabulary token, exactly as an issue
+		// number is not one for `backlog:next`.
+		vocabulary: ['implement', HUMAN_REVIEW, 'update-deps', 'already-done', WAIT, STOP, UNKNOWN],
 		single_source: BACKLOGRUN_MD,
 	},
 	{

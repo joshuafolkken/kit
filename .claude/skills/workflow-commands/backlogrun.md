@@ -13,6 +13,12 @@ plus every child of an epic whose root carries it, ordered by dependency and gro
 `#N1 #N2 …` it runs those named items in the order they were typed, one at a time, and **then** drains
 that same backlog. **`--only` stops it after the named list**, draining nothing.
 
+**The loop's current position is computed, not carried in the conversation.** `pnpm josh run:step <N>`
+reads where the run is from the event stream, the carry record and the issue state, and prints the next
+single action — a runnable command, or the one point a person has to judge — so a session cut, a
+compaction or a fresh resume reaches the same next step from the same three inputs
+(joshuafolkken/kit#2248).
+
 **A named item may be a single issue or an epic** (joshuafolkken/kit#1985, folding in the old
 `epicrun` keyword). A single-issue item is one `fullrun`; **a named epic runs its children in
 dependency order across the free lanes, and the run does not advance to the next named item until
