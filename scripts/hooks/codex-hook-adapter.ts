@@ -3,8 +3,9 @@ import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
-import { density_envelope, format_edited_payload } from './format-edited-file'
+import { build_envelope, compose_context, format_edited_payload } from './format-edited-file'
 import { pretool_guard } from './pretool-guard'
 
 const APPLY_PATCH_TOOL = 'apply_patch'
@@ -18,6 +19,9 @@ const PATCH_MOVE_PATTERN = /^\*\*\* Move to: (.+)$/gmu
 // at most two together and no later work, so every formatter that starts retains the 15-second
 // margin inside the Codex hook's 90-second timeout. Remaining files are left to the verification gate.
 const MAX_PARALLEL_FORMATS = 2
+// One patch can touch several files, each returning its own unfixed-lint block; a blank line between
+// them keeps the blocks readable when they are joined into the single envelope below.
+const DIAGNOSTIC_SEPARATOR = '\n\n'
 
 // Codex deliberately reports its canonical tool name even when an Edit or Write matcher selected
 // the hook. Its apply_patch body is `tool_input.command`; the Claude-shaped handlers downstream
@@ -29,7 +33,7 @@ const codex_payload_schema = z.looseObject({
 })
 const patch_input_schema = z.object({ command: z.string().min(1) })
 
-type PayloadFormatter = (raw_payload: string, project_root: string) => Promise<void>
+type PayloadFormatter = (raw_payload: string, project_root: string) => Promise<string | undefined>
 
 function parse_payload(raw_payload: string): z.infer<typeof codex_payload_schema> | undefined {
 	try {
@@ -91,22 +95,32 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 	return pretool_guard.pretool_outcome(pretool_payload(raw_payload))
 }
 
+// The formatters apply what eslint could fix silently and return what it could not; each patched
+// file's unfixed block is joined so the whole patch's lint problems reach the model on one edit
+// (joshuafolkken/kit#2275). `undefined` when every file was clean, so the ordinary patch adds nothing.
 async function format_posttool_payloads(
 	raw_payload: string,
 	project_root: string,
 	formatter: PayloadFormatter = format_edited_payload,
-): Promise<void> {
+): Promise<string | undefined> {
 	const planned = posttool_payloads(raw_payload).slice(0, MAX_PARALLEL_FORMATS)
-
-	await bounded_pool.bounded_map(planned, MAX_PARALLEL_FORMATS, async (payload) => {
-		await formatter(payload, project_root)
+	const results = await bounded_pool.bounded_map(planned, MAX_PARALLEL_FORMATS, async (payload) => {
+		return await formatter(payload, project_root)
 	})
+	const blocks = results.filter((block): block is string => block !== undefined)
+
+	return blocks.length === 0 ? undefined : blocks.join(DIAGNOSTIC_SEPARATOR)
 }
 
-function write_density(raw_payload: string): void {
-	const envelope = density_envelope(raw_payload)
+// The density line and the unfixed-lint blocks reach the model the same way — as additionalContext on
+// this one hook — so they are joined into the single envelope a `PostToolUse` payload can carry rather
+// than written as two objects the harness could not parse.
+async function write_posttool_context(raw_payload: string): Promise<void> {
+	const notice = time_density_hook.density_notice(raw_payload)
+	const diagnostics = await format_posttool_payloads(raw_payload, process.cwd())
+	const context = compose_context(notice, diagnostics)
 
-	if (envelope !== undefined) process.stdout.write(`${envelope}\n`)
+	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
 }
 
 async function run(raw_payload: string, mode: string): Promise<void> {
@@ -117,8 +131,7 @@ async function run(raw_payload: string, mode: string): Promise<void> {
 	}
 
 	if (mode === POSTTOOL_MODE) {
-		write_density(raw_payload)
-		await format_posttool_payloads(raw_payload, process.cwd())
+		await write_posttool_context(raw_payload)
 
 		return
 	}
