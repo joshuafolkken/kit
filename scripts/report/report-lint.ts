@@ -33,6 +33,31 @@ const CLI_FLAG_PATTERN = /(?:^|\s)--[a-z]/u
 const BOLD_MARKER = '**'
 const LEADING_LABEL_PUNCTUATION = /^[\s:：]+/u
 
+// The case-based test declaration (joshuafolkken/kit#2246): the changes section carries a first tier
+// of fixed-vocabulary cases — each non-applicable one crossed out with a reason — and a second tier
+// of at-least-three "if it breaks" conditions. This checks the mechanical half: the two tier markers
+// are present, an N/A cross-out carries a reason, and the second tier holds enough conditions (or the
+// "never breaks" escape). Whether the cases are the right ones stays the judgement half.
+// `report-format.md` is the single source and the document test pins these against it.
+const CASE_LABEL = 'ケース'
+const CASE_VOCABULARY: ReadonlyArray<string> = [
+	'正常',
+	'空・0件',
+	'1件',
+	'多数',
+	'境界',
+	'不正入力',
+	'重複',
+	'順序',
+	'null',
+]
+const BREAK_LABEL = '壊れるとしたら'
+const NA_LABEL = '該当なし'
+const NO_BREAK_ESCAPE = 'どう呼ばれても壊れない'
+const MIN_BREAK_CONDITIONS = 3
+const LIST_ITEM_PATTERN = /^\s*(?:\d+\.|[-*])\s+/u
+const REASON_SEPARATORS = /^[\s:：—|、,.。-]+/u
+
 function first_content_line(summary: string): string {
 	return (
 		summary
@@ -121,6 +146,82 @@ function intrusion_violations(summary: string): ReadonlyArray<string> {
 	)
 }
 
+// The changes region is every line after CHANGES_LABEL; the case checks apply there, since the two
+// tiers and their markers live under the changes section alone.
+function changes_region_lines(summary: string): ReadonlyArray<string> {
+	const lines = summary.split('\n')
+	const start = line_index_of(lines, CHANGES_LABEL)
+
+	return start < 0 ? [] : lines.slice(start + 1)
+}
+
+// The case checks run only when the section exists — a wholly missing section is already a missing
+// label, so gating here keeps one absence from printing as two violations.
+function has_changes_section(summary: string): boolean {
+	return summary.includes(CHANGES_LABEL)
+}
+
+// The text after the N/A marker in a segment, with separators stripped — empty means no reason given.
+function reason_after_na(segment: string): string {
+	return segment
+		.slice(segment.indexOf(NA_LABEL) + NA_LABEL.length)
+		.replace(REASON_SEPARATORS, '')
+		.trim()
+}
+
+// Cases are listed on one line separated by `/`, so each N/A cross-out is checked in its own segment
+// — a reasonless second cross-out on a line whose first one carries a reason must not escape.
+function line_has_reasonless_na(line: string): boolean {
+	return line
+		.split('/')
+		.some((segment) => segment.includes(NA_LABEL) && reason_after_na(segment).length === 0)
+}
+
+function na_lines_without_reason(lines: ReadonlyArray<string>): ReadonlyArray<string> {
+	return lines.filter((line) => line_has_reasonless_na(line))
+}
+
+function break_marker_index(lines: ReadonlyArray<string>): number {
+	return lines.findIndex((line) => line.includes(BREAK_LABEL))
+}
+
+// The count of list items after the second-tier marker. Over-counting a later change block's items
+// only relaxes the check, never fires a false violation, so the simple whole-tail count is enough.
+function break_condition_count(lines: ReadonlyArray<string>): number {
+	const start = break_marker_index(lines)
+	if (start < 0) return 0
+
+	return lines.slice(start + 1).filter((line) => LIST_ITEM_PATTERN.test(line)).length
+}
+
+function case_line_violations(summary: string): ReadonlyArray<string> {
+	if (!has_changes_section(summary)) return []
+	if (changes_region_lines(summary).some((line) => line.includes(CASE_LABEL))) return []
+
+	return [`✖ no case tier (${CASE_LABEL}:) in ${CHANGES_LABEL}`]
+}
+
+function na_reason_violations(summary: string): ReadonlyArray<string> {
+	if (!has_changes_section(summary)) return []
+
+	return na_lines_without_reason(changes_region_lines(summary)).map(
+		() => `✖ ${NA_LABEL} without a reason — say why the case does not apply`,
+	)
+}
+
+function break_violations(summary: string): ReadonlyArray<string> {
+	if (!has_changes_section(summary)) return []
+
+	const lines = changes_region_lines(summary)
+	if (lines.some((line) => line.includes(NO_BREAK_ESCAPE))) return []
+	if (break_marker_index(lines) < 0) return [`✖ no ${BREAK_LABEL} tier in ${CHANGES_LABEL}`]
+	if (break_condition_count(lines) >= MIN_BREAK_CONDITIONS) return []
+
+	return [
+		`✖ ${BREAK_LABEL} needs ${String(MIN_BREAK_CONDITIONS)} conditions or "${NO_BREAK_ESCAPE}"`,
+	]
+}
+
 // Every violation the mechanical checks find, in a fixed order; an empty array is a clean summary.
 function lint_report(summary: string): ReadonlyArray<string> {
 	return [
@@ -128,6 +229,9 @@ function lint_report(summary: string): ReadonlyArray<string> {
 		...label_violations(summary),
 		...length_violations(summary),
 		...intrusion_violations(summary),
+		...case_line_violations(summary),
+		...na_reason_violations(summary),
+		...break_violations(summary),
 	]
 }
 
@@ -135,6 +239,12 @@ const report_lint = {
 	lint_report,
 	REQUIRED_LABELS,
 	MAX_OVERVIEW_CHARS,
+	CASE_LABEL,
+	CASE_VOCABULARY,
+	BREAK_LABEL,
+	NA_LABEL,
+	NO_BREAK_ESCAPE,
+	MIN_BREAK_CONDITIONS,
 }
 
 export { report_lint }
