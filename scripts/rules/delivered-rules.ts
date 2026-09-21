@@ -10,6 +10,7 @@ import { gh_api } from './gh-api'
 import { git_force } from './git-force'
 import { issue_fold } from './issue-fold'
 import { issue_scout } from './issue-scout'
+import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
 import { piped_verification } from './piped-verification'
@@ -283,23 +284,21 @@ function reads_issue_comments(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => fetches_issue_comments(segment))
 }
 
-const ASKS_ABOUT_THE_CUT = on_bash_command(pre_gate_cut.asks_about_the_cut)
-const CLAIMS_THE_HOLD = on_bash_command(pre_gate_cut.claims_the_hold)
-
 // **The occasion the pre-gate cut governs, in the one shape that separates a cut run's two halves**
 // (joshuafolkken/kit#1867). Asking about the cut is what a lane child does whatever it goes on to do;
 // claiming the working tree is what only the process on the near side of the boundary does, because
 // the `resume` verdict tells its counterpart to skip that claim. A run doing both reached the
 // boundary; a run that asked without claiming is the session the cut produced, which had no cut of
-// its own to take and belongs in no denominator.
+// its own to take and belongs in no denominator. Both predicates are inlined at their one use here —
+// `reaches` is read only by the offline `rule:value` measurement, never the live delivery path.
 function reaches_the_pre_gate_boundary(
 	call: GuardedCall,
 	_turn: ReadonlyArray<GuardedCall>,
 	run: ReadonlyArray<GuardedCall>,
 ): boolean {
-	if (!ASKS_ABOUT_THE_CUT(call)) return false
+	if (!on_bash_command(pre_gate_cut.asks_about_the_cut)(call)) return false
 
-	return run.some((issued) => CLAIMS_THE_HOLD(issued))
+	return run.some((issued) => on_bash_command(pre_gate_cut.claims_the_hold)(issued))
 }
 
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
@@ -449,6 +448,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// It fires on every occurrence (`decide` returns true), the disposition `git-force.ts` takes: an
 	// interactive ask must never succeed in a child, and the route is always the park, never a reissue.
 	lane_interactive_ask.ROW,
+	// **The parent budget commands a lane child must never run** (joshuafolkken/kit#2267). A dispatched
+	// child that ran `pnpm josh run:merge` read its `busy` as a competing session and parked its Issue
+	// unimplemented — but the live carry record is the parent that launched it, never a competitor. This
+	// row refuses `run:merge` / `run:carry` in a lane child and hands back the mechanical branch: the
+	// record is the parent's, so continue implementing rather than park or ask. Its trigger claims a
+	// `josh` subcommand no other row does (the filing rows are `gh`, `run-tail` is `git push`), so it
+	// overlaps nothing. It fires on every occurrence (`decide` returns true): a child must never run
+	// these, and the route is always "continue", never a reissue (`git-force.ts`).
+	lane_carry_conflict.ROW,
 	// **The three Bash-string gaps the deny glob cannot express** (joshuafolkken/kit#2120), each reading
 	// the command's argv rather than a literal a glob keys on. They share no trigger with any row above —
 	// force/delete is `git push` / `git branch`, the worktree change is `git checkout` / `restore` /

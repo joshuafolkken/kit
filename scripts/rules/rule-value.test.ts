@@ -261,6 +261,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			FILING_CAP_ID,
 			'test-declared',
 			'lane-interactive-ask',
+			'lane-carry-conflict',
 			'git-force',
 			'worktree-mutation',
 			'file-body',
