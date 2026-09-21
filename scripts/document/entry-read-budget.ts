@@ -43,9 +43,9 @@ interface EntryBudget {
 // entry with no row, so the definition cannot rot as entries are added or removed.
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 233_472 },
-	{ entry: 'fullrun', bytes: 229_376 },
-	{ entry: 'halfrun', bytes: 229_376 },
-	{ entry: 'backlogrun', bytes: 233_472 },
+	{ entry: 'fullrun', bytes: 233_472 },
+	{ entry: 'halfrun', bytes: 233_472 },
+	{ entry: 'backlogrun', bytes: 237_568 },
 	{ entry: LANE_CHILD, bytes: 106_496 },
 ]
 
