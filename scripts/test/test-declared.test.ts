@@ -65,3 +65,39 @@ describe('test_declared match mode', () => {
 		).toBe(`test-not-created: Unit — ${RUNTIME_FILE}`)
 	})
 })
+
+// joshuafolkken/kit#2297: an unknown flag is refused rather than ignored, `--help` prints the usage
+// (including the `--match` stdin form), and a `required` verdict names the one command to run next.
+describe('test_declared flag parsing', () => {
+	it('rejects an unknown flag rather than re-printing the verdict', () => {
+		expect(test_declared.parse(['--bogus'])).toBeUndefined()
+	})
+
+	it('parses --help', () => {
+		expect(test_declared.parse(['--help'])).toStrictEqual({ is_help: true, is_match: false })
+	})
+
+	it('parses --match', () => {
+		expect(test_declared.parse(['--match'])).toStrictEqual({ is_help: false, is_match: true })
+	})
+
+	it('defaults to no flags on an empty argv', () => {
+		expect(test_declared.parse([])).toStrictEqual({ is_help: false, is_match: false })
+	})
+
+	it('prints the --match stdin form in its usage', () => {
+		expect(test_declared.USAGE).toContain('--match')
+		expect(test_declared.USAGE).toContain('pnpm josh test:declared --match < summary.md')
+	})
+})
+
+describe('test_declared.next_step', () => {
+	it('names the next command for a required verdict', () => {
+		expect(test_declared.next_step('required')).toContain('--match')
+	})
+
+	it('leaves nothing to run next for exempt or satisfied', () => {
+		expect(test_declared.next_step('exempt')).toBeUndefined()
+		expect(test_declared.next_step('satisfied')).toBeUndefined()
+	})
+})

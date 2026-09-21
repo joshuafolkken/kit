@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
 import { run_prep_cli } from './run-prep-cli'
@@ -45,6 +46,7 @@ async function gather(issue_number: string): Promise<StepInput> {
 		latest_scope: parts.latest_scope,
 		last_event: run_reads.last_event,
 		carry_kind: run_reads.carry_kind,
+		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 	}
 }
 

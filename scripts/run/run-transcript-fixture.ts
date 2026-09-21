@@ -24,6 +24,7 @@ const DEFAULTS: StepInput = {
 	latest_scope: 'skip',
 	last_event: undefined,
 	carry_kind: 'none',
+	is_lane_child: false,
 }
 
 // One turn of a run: `label` names the position the run has reached in words, and `at` is the change

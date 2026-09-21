@@ -10,6 +10,7 @@ import { gh_api } from './gh-api'
 import { git_force } from './git-force'
 import { issue_fold } from './issue-fold'
 import { issue_scout } from './issue-scout'
+import { josh_git_bare } from './josh-git-bare'
 import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
@@ -456,6 +457,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// overlaps nothing. It fires on every occurrence (`decide` returns true): a child must never run
 	// these, and the route is always "continue", never a reissue (`git-force.ts`).
 	lane_carry_conflict.ROW,
+	// **A `pnpm josh git` with no `-y` cannot succeed from an agent** (joshuafolkken/kit#2297). It
+	// prompts to confirm the staging, the no-TTY prompt cancels, and the run reissues with `-y` after
+	// throwing away the time it took to fail. This row refuses the bare call and hands back the `-y`
+	// form. It is disjoint from `run-tail` by the flag — that row requires `-y`, this refuses its
+	// absence — so no two rows claim one command. It fires on every occurrence (`decide` returns true):
+	// a bare call wastes the same time each time, so the route is always the `-y` reissue
+	// (`git-force.ts`).
+	josh_git_bare.ROW,
 	// **The three Bash-string gaps the deny glob cannot express** (joshuafolkken/kit#2120), each reading
 	// the command's argv rather than a literal a glob keys on. They share no trigger with any row above —
 	// force/delete is `git push` / `git branch`, the worktree change is `git checkout` / `restore` /
@@ -722,8 +731,6 @@ const delivered_rules = {
 	is_body_only_issue_read,
 	is_enabled,
 	is_issue_filing,
-	is_masked_verification: piped_verification.is_masked_verification,
-	is_wait_timer: early_heartbeat.is_wait_timer,
 }
 
 export type { DeliveredRule, MeasuredRule }
