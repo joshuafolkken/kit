@@ -46,10 +46,12 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// read is a point-of-use read every entry's total now counts, a correction of an under-count rather
 	// than new reading. Raised again in joshuafolkken/kit#2282 when the same document grew by its
 	// status-quo decision record — the entries that read it to their block ceiling crossed a boundary.
+	// Raised once more in joshuafolkken/kit#2295 when the same document recorded the recent-context
+	// hand-off decision that superseded #2282's option 2 — `fullrun` and `halfrun` crossed a block.
 	{ entry: 'kickoff', bytes: 270_336 },
-	{ entry: 'fullrun', bytes: 266_240 },
-	{ entry: 'halfrun', bytes: 266_240 },
-	{ entry: 'backlogrun', bytes: 270_336 },
+	{ entry: 'fullrun', bytes: 270_336 },
+	{ entry: 'halfrun', bytes: 270_336 },
+	{ entry: 'backlogrun', bytes: 274_432 },
 	{ entry: LANE_CHILD, bytes: 143_360 },
 ]
 

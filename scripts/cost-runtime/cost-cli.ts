@@ -134,8 +134,9 @@ function anthropic_measurement(target: string): OverMeasurement | undefined {
 	if (session === undefined) return undefined
 
 	return {
-		request_count: session.records.length,
-		billed_input_tokens: cost_usage.billed_input(cost_usage.sum_totals(session.records)),
+		billed_input_per_request: session.records.map((record) =>
+			cost_usage.billed_input(record.totals),
+		),
 	}
 }
 
@@ -195,7 +196,9 @@ function run_over(
 // A measurement priced against the shared cut threshold, or `unmeasurable` for the empty session a
 // `report_over` would refuse. Split from `session_verdict` so neither carries more than one decision.
 function verdict_of(measurement: OverMeasurement | undefined): CostVerdict {
-	if (measurement === undefined || measurement.request_count === 0) return UNMEASURABLE_VERDICT
+	if (measurement === undefined || measurement.billed_input_per_request.length === 0) {
+		return UNMEASURABLE_VERDICT
+	}
 
 	return cost_verdict.classify(measurement, CONTEXT_CUT_THRESHOLD)
 }

@@ -160,7 +160,7 @@
 		"ora": "^9.4.1",
 		"semver": "^7.8.5",
 		"strip-json-comments": "^5.0.3",
-		"tsx": "^4.23.13",
+		"tsx": "^4.23.15",
 		"typescript-eslint": "^8.70.0",
 		"zod": "^4.6.5"
 	},
