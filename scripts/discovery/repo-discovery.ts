@@ -134,12 +134,21 @@ function main_worktree(repository_path: string): string {
 // The map for the repository at `repository_path`. Empty when that repository's own owner cannot be
 // determined: without it there is nothing to compare siblings against, and a map built without the
 // owner restriction is exactly what must never be produced.
+//
+// **Discovery is anchored on the main work tree, resolved here rather than by each caller.** A linked
+// work tree — a lane — is parked among that repository's other lanes, so scanning *its* parent finds
+// none of the siblings; `main_worktree` turns the given path into the main checkout, whose parent
+// holds them. Every command that discovers repositories (`doctor`, `propagate`, `backlog:next`,
+// `epic:next`, `clone:scan`) goes through here, so the anchor lives in one place instead of being
+// re-applied at each call site. For an ordinary checkout, a submodule or a non-repository the
+// resolution is a no-op (`main_worktree` returns the given path), so nothing but a lane is affected.
 function discover_repositories(repository_path: string, environment = process.env): RepoMap {
-	const current_owner = resolve_current_owner(repository_path)
+	const main = main_worktree(repository_path)
+	const current_owner = resolve_current_owner(main)
 	if (current_owner === undefined) return new Map<string, string>()
 
 	return repo_map_logic.build_repository_map(
-		scan_siblings(path.dirname(repository_path)),
+		scan_siblings(path.dirname(main)),
 		current_owner,
 		environment[OVERRIDE_ENV_KEY],
 	)

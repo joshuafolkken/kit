@@ -8,12 +8,16 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 // along with the tree that held it, and what stops a closed-and-reopened lane taking the seat a
 // running lane is still using.
 
-// Only `worktree_list` is stubbed, and that is load-bearing: `list_lanes` reading the lane root from
-// `repository_root()` again would answer the *current* work tree, which inside a lane is the lane —
-// and every test here would fail on the missing stub rather than passing on a wrong root.
+// `worktree_list` feeds the lane enumeration, and `repository_root` feeds the main-root resolution
+// `list_lanes` derives the lane root from. Both are load-bearing: the root now comes from
+// `main_repository_root`, which resolves the current work tree through `repo_discovery.main_worktree`
+// (joshuafolkken/kit#2233), so a real `repository_root()` would answer the machine's own checkout and
+// every test here would look for lanes under the wrong root.
 vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { worktree_list: vi.fn() } }))
+vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 
 const { git_worktree } = await import('#scripts/git/git-worktree')
+const { git_command } = await import('#scripts/git/git-command')
 const { lane_registry } = await import('./lane-registry')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-registry-test-'))
@@ -21,7 +25,8 @@ const MAIN_TREE = path.join(scratch, 'kit')
 // What `lane_paths.default_lane_root(MAIN_TREE)` derives, since that is what `list_lanes` now asks
 // for: a work tree only counts as a lane when it sits at `<lane root>/<issue>`, and the root is
 // derived from the main work tree the listing names first.
-const LANE_ROOT = path.join(scratch, '.kit-lanes')
+const LANE_DIRECTORY = '.kit-lanes'
+const LANE_ROOT = path.join(scratch, LANE_DIRECTORY)
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
@@ -63,6 +68,9 @@ beforeEach(() => {
 	// that has one set would send `lane_root` somewhere other than the scratch tree and fail every
 	// test below. Blank is how `lane_paths` spells "not set", so this pins the default path.
 	vi.stubEnv('JOSH_LANE_ROOT', '')
+	// `main_repository_root` resolves the lane root from the current work tree; the fixture stands in
+	// the main tree, which has no `.git` on disk, so `main_worktree` returns it unchanged.
+	vi.mocked(git_command.repository_root).mockResolvedValue(MAIN_TREE)
 	rmSync(LANE_ROOT, { force: true, recursive: true })
 	mkdirSync(LANE_ROOT, { recursive: true })
 })
@@ -167,6 +175,27 @@ describe('what does not count as a lane', () => {
 		const detached = ['worktree /somewhere', HEAD_LINE, 'detached'].join('\n')
 
 		expect(lane_registry.parse_block(detached, LANE_ROOT)).toBeUndefined()
+	})
+})
+
+describe('the main work tree root', () => {
+	// `main_repository_root` no longer parses the worktree listing; it resolves the current work tree
+	// through `repo_discovery.main_worktree` (joshuafolkken/kit#2233). Run inside a lane, that walks the
+	// lane's `.git`/`commondir` up to the main checkout — the one resolver the sync discovery callers
+	// share.
+	it('resolves the current work tree to the main checkout through the shared resolver', async () => {
+		const issue = '2233'
+		const main = path.join(scratch, 'delegation-main')
+		const git_directory = path.join(main, '.git', 'worktrees', issue)
+		const lane = path.join(main, LANE_DIRECTORY, issue)
+
+		mkdirSync(git_directory, { recursive: true })
+		writeFileSync(path.join(git_directory, 'commondir'), '../..\n')
+		mkdirSync(lane, { recursive: true })
+		writeFileSync(path.join(lane, '.git'), `gitdir: ${git_directory}\n`)
+		vi.mocked(git_command.repository_root).mockResolvedValue(lane)
+
+		expect(await lane_registry.main_repository_root()).toBe(main)
 	})
 })
 
