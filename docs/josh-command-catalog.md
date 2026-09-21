@@ -765,6 +765,16 @@ Print the paste-ready number-link citation line for each issue, in one call
 
 ---
 
+### `josh issue:fold` · `josh isf`
+
+> **Audience:** automation · **Side effects:** none
+
+`<title>... [--not-separable] [--json]`
+
+Before a second filing: say whether findings from this session fold into one issue
+
+---
+
 ### `josh issue:lint` · `josh iln`
 
 > **Audience:** automation · **Side effects:** files

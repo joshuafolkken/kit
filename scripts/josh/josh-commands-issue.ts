@@ -31,6 +31,13 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<title> [--body <summary>]', 'automation', ['network']],
 	},
+	'issue:fold': {
+		script: 'scripts/issue/issue-fold-cli.ts',
+		description:
+			'Before a second filing: say whether findings from this session fold into one issue',
+		category: 'AI tools',
+		reference: ['<title>... [--not-separable] [--json]', 'automation', ['none']],
+	},
 	'issue:cite': {
 		script: 'scripts/issue/issue-cite-cli.ts',
 		description: 'Print the paste-ready number-link citation line for each issue, in one call',

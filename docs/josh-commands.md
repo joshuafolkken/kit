@@ -852,6 +852,23 @@ pnpm josh issue:scout "<title>" --body "follows on from #1246"
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
 
+### `josh issue:fold` · `josh isf`
+
+Before a run files a **second** finding in one session, answer whether the findings fold into one issue or stay separate — the filing-time counterpart to the split assessment, reading its same two questions (separability, and whether the whole clearly exceeds one verification gate).
+
+```bash
+pnpm josh issue:fold "First finding" "Second finding"                 # alias: josh isf → fold | separate | no-fold-needed
+pnpm josh issue:fold "a" "b" --not-separable                          # the pair is really one deliverable → fold
+pnpm josh issue:fold "a" "b" --json                                   # the verdict and reason, machine-readable
+```
+
+**Options:**
+
+- `--not-separable` — declare the judgement half: the findings are one deliverable, so they fold whatever their size.
+- `--json` — print the verdict and reason as JSON.
+
+The size half is [`josh split:assess`](#josh-splitassess--josh-sa)'s own verdict, called not recomputed — the counting and the guide are single-sourced there. `separate` needs both halves (separable **and** over the size guide); every other case folds, and a lone candidate answers `no-fold-needed` without measuring. **An unreadable diff measures as under the guide, so an unanswerable size folds** rather than tipping to `separate`. `pnpm josh rule:guard` delivers the fold gate at a run's second `gh api … issues` call, never the first.
+
 ### `josh issue:cite`
 
 Print the paste-ready number-link citation line for each issue in one call, so the correct session-facing form — `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <summary>` — costs one command rather than a title read per issue. The summary is the issue's own title, fetched; adapt it to the session language when it matters.

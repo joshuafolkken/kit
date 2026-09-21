@@ -21,6 +21,18 @@ no longer splits anything** — it is now a necessary condition rather than a su
 numbers has already answered no. They are read against the whole request's estimate, not against the
 diff a first pass happens to produce, and a request that lands at 11 files is not thereby a split.
 
+## The same two questions decide the filing-time fold
+
+**The entry's split decision and the filing-time fold decision are the same two conditions, stated
+here once.** This assessment asks whether *one request* is several deliverables; the fold decision asks
+whether *several findings from one session* are one Issue — and reads the **same two questions in the
+same conjunction**: separability, and whether the whole clearly exceeds one gate.
+`pnpm josh issue:fold "<title>" …` answers `fold` / `separate` / `no-fold-needed`; its size half is
+`pnpm josh split:assess`, called not recomputed, and `separate` needs both halves exactly as `split`
+does. **There is no second criterion.** §2i's observation, the review round cap's branch 2 and §2d's
+prerequisite each route a second filing through it, delivered by `pnpm josh rule:guard` at the run's
+second `gh api … issues` call, never the first.
+
 ## Why the default is not to split
 
 **The rules were manufacturing Issues faster than runs could close them.** Execution was never the

@@ -42,10 +42,11 @@ const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const ISSUE_SCOUT = 'issue-scout'
 const FILING_CAP_ID = 'filing-cap'
-// A filing is claimed by all three filing rows; a filing whose body also carries a backtick adds
-// `shell-body` (joshuafolkken/kit#2119).
-const FILING_RULE_COUNT = 3
-const FILING_WITH_BODY_RULE_COUNT = 4
+// A filing is claimed by all four filing rows — the WIP cap, the scout gate, the per-run cap and the
+// fold gate (joshuafolkken/kit#2119, joshuafolkken/kit#2213); a filing whose body also carries a
+// backtick adds `shell-body`.
+const FILING_RULE_COUNT = 4
+const FILING_WITH_BODY_RULE_COUNT = 5
 const NOW_MS = 1_700_000_000_000
 // Later than any turn the transcript fixture can carry, so the batching guard's recorded refusal
 // covers the whole open sequence whatever wall clock the fixture used — the state where it has
@@ -439,20 +440,22 @@ describe('DELIVERED_RULES — trigger overlap', () => {
 		expect(rules_claiming(command)).toBe(1)
 	})
 
-	// **A filing is the deliberate overlap: three rows claim it** (joshuafolkken/kit#2119) — the WIP
-	// cap, the scout gate and the per-run cap — resolved by the reissue chain rather than by a single
-	// winner, so the claim count is asserted rather than the exactly-one invariant above.
+	// **A filing is the deliberate overlap: four rows claim it** (joshuafolkken/kit#2119,
+	// joshuafolkken/kit#2213) — the WIP cap, the scout gate, the per-run cap and the fold gate —
+	// resolved by the reissue chain rather than by a single winner, so the claim count is asserted
+	// rather than the exactly-one invariant above.
 	it.each([FILING_COMMAND, FILING_API_COMMAND])(
-		'is claimed by the three filing rules: %j',
+		'is claimed by the four filing rules: %j',
 		(command) => {
 			expect(rules_claiming(command)).toBe(FILING_RULE_COUNT)
 		},
 	)
 
 	// **The overlap order, asserted rather than assumed** (joshuafolkken/kit#1198,
-	// joshuafolkken/kit#2119). A filing whose body carries a backtick is claimed by four rows; with the
-	// run already scouted the scout gate and the cap stand down, so `wip-cap` is delivered first and
-	// `shell-body` on the reissue — the stamps are keyed per `id`, so nothing is lost by losing the race.
+	// joshuafolkken/kit#2119). A filing whose body carries a backtick is claimed by five rows; with the
+	// run already scouted the scout gate and the cap stand down, and the fold gate stands down on a
+	// first filing, so `wip-cap` is delivered first and `shell-body` on the reissue — the stamps are
+	// keyed per `id`, so nothing is lost by losing the race.
 	it('delivers the second rule on the reissue when a filing also carries an evaluated body', () => {
 		const command = 'gh api repos/o/r/issues -f title="x" -f body="see `pnpm josh ms`"'
 		const payload = payload_of('overlap', command, 'Bash', scouted_tail())
