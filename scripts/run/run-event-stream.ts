@@ -44,6 +44,7 @@ const EVENT_KIND = {
 	CHILD_LAUNCH: 'child-launch',
 	MERGE: 'merge',
 	PARK: 'park',
+	OUTAGE: 'outage',
 	CUT: 'cut',
 	STOP: 'stop',
 	PR_OPENED: 'pr-opened',

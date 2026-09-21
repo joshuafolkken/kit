@@ -68,6 +68,13 @@ interface RunCarry {
 	// in a row stop the run, and a child that merged in between breaks the streak. Read through
 	// `apply_change`, never bumped from outside, so the reset stays with the increment.
 	failures: number
+	// The consecutive-API-outage streak (joshuafolkken/kit#2240). It is kept apart from `failures`
+	// because a child that could not reach the API is not a child that failed: an outage is not counted
+	// against the consecutive-failure guard, and this streak is its own environment-broken guard — a run
+	// of outages stops the run rather than re-dispatching into a dead API forever. **A merge or a genuine
+	// child failure resets it**, because both prove the API was reachable; only a further outage adds to
+	// it. Defaulted to zero so a record written before this field existed still parses.
+	outages: number
 	// The process spending the budget, as the caller declared it with `--owner`. `run-hold.ts` records
 	// a pid it explicitly does not read back, because the process that claims a work tree is the
 	// short-lived `josh run:hold` itself; here the owner is the parent loop's own session, which
@@ -127,6 +134,10 @@ interface CarryChange {
 	// change as `merged` — a child either merged or it did not — and a change that carries `merged`
 	// resets the streak regardless of this field.
 	failures?: number
+	// One API-outage child to add to the outage streak (joshuafolkken/kit#2240). Never sent with
+	// `merged` or `failures` — a child either merged, failed, or could not reach the API — and both of
+	// those reset this streak.
+	outages?: number
 	// One issue number to add to `done`, not a count. It is the one field of a change that names a
 	// thing rather than an amount, because what a resumed named-issue run needs is *which* issues are
 	// finished.
@@ -152,6 +163,8 @@ const run_carry_schema = z.object({
 	// Defaulted, so a record written before this field existed parses with a zero streak rather than
 	// failing to read — the same backward-compatibility the optional owner fields below carry.
 	failures: z.number().default(0),
+	// Defaulted for the same backward-compatibility as `failures` (joshuafolkken/kit#2240).
+	outages: z.number().default(0),
 	// Optional, so a record written by the previous shape still parses. Read as "no owner declared",
 	// which is the not-provably-live answer rather than a live one.
 	owner_pid: z.number().optional(),
@@ -225,6 +238,7 @@ function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry
 		filed: NO_INCREMENT,
 		cuts: NO_INCREMENT,
 		failures: NO_INCREMENT,
+		outages: NO_INCREMENT,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 	}
@@ -272,7 +286,7 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
-	const { invocation, started_at, merged, filed, cuts, failures, done } = carry
+	const { invocation, started_at, merged, filed, cuts, failures, outages, done } = carry
 	// The recorded fields are named rather than spread from `carry`, so the previous owner cannot
 	// survive an adoption by a caller that declared none. **`done` is carried across**: the whole point
 	// of the resumption is that the successor does not re-run what the cut session finished.
@@ -283,6 +297,7 @@ function adopt_carry(
 		filed,
 		cuts,
 		failures,
+		outages,
 		done,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
@@ -315,6 +330,23 @@ function next_failures(carry: RunCarry, change: CarryChange): number {
 	return carry.failures + (change.failures ?? NO_INCREMENT)
 }
 
+// **An outage adds to the streak; a merge or a genuine child failure resets it** (joshuafolkken/kit#2240).
+// The streak counts the API being unreachable one child after another, so anything that proves it *was*
+// reachable — a merge, or a child that failed on its own after reaching it — breaks the run. A change
+// that touches neither the outage count nor the two reachability signals (a bare `--filed`, `--cut` or
+// `--done`) leaves the streak where it stood.
+function has_increment(value: number | undefined): boolean {
+	return (value ?? NO_INCREMENT) > NO_INCREMENT
+}
+
+function next_outages(carry: RunCarry, change: CarryChange): number {
+	if (has_increment(change.outages)) return carry.outages + (change.outages ?? NO_INCREMENT)
+
+	const is_reachable = has_increment(change.merged) || has_increment(change.failures)
+
+	return is_reachable ? NO_INCREMENT : carry.outages
+}
+
 function apply_change(target: string, carry: RunCarry, change: CarryChange): RunCarry {
 	const cuts = change.cuts ?? NO_INCREMENT
 	const next: RunCarry = {
@@ -323,6 +355,7 @@ function apply_change(target: string, carry: RunCarry, change: CarryChange): Run
 		filed: carry.filed + (change.filed ?? NO_INCREMENT),
 		cuts: carry.cuts + cuts,
 		failures: next_failures(carry, change),
+		outages: next_outages(carry, change),
 		done: next_done(carry, change.done),
 		// A cut declares the hand-off; any other count is the run carrying on, which spends it.
 		is_handed_off: cuts > NO_INCREMENT,
@@ -423,7 +456,7 @@ function done_note(carry: RunCarry): string {
 }
 
 function describe_carry(carry: RunCarry): string {
-	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.failures)} failed in a row, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
+	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.failures)} failed in a row, ${String(carry.outages)} outage(s) in a row, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
 }
 
 function expired_message(carry: RunCarry): string {

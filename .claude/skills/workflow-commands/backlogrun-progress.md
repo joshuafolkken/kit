@@ -260,23 +260,34 @@ single non-numeric line as the verdict.
    the ownership guard.
 
    ```bash
-   next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID")
+   next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
    # a child number (or several, one per free lane) to run next, or a verdict token
    ```
 
-   **What the one call does is decided by what the child turned out to be** — read from its GitHub state,
-   never from a log: a **merged** child (CLOSED) is counted into the carry record (which resets the
-   failure streak), then `pnpm josh ms`, `pnpm josh lane:close <N>`, and the counters mirrored onto the
-   epic comment; a **parked** child (OPEN, `needs-decision` or `already-done`) is left alone and not
-   counted; a **failed** child (OPEN, neither label) has its stale `in-progress` dropped, is parked with
-   `needs-decision`, and is counted against the consecutive-failure guard. **A turn whose whole content
-   is one read, or one two-line progress report, is the shape this collapses.**
+   **Pass `--output <path>` — the child's transcript** (joshuafolkken/kit#2240). It is what lets the
+   composite tell an API-outage ending apart from a genuine child failure: without it an OPEN, unparked
+   child is a plain failure as before, so the flag is how the outage split is turned on.
+
+   **What the one call does is decided by what the child turned out to be** — read from its GitHub state
+   (and, for the failed case alone, its exit record), never from a log: a **merged** child (CLOSED) is
+   counted into the carry record (which resets the failure streak), then `pnpm josh ms`,
+   `pnpm josh lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (OPEN,
+   `needs-decision` or `already-done`) is left alone and not counted; an **outage** child (OPEN, neither
+   label, but the exit record shows it could not reach the API) has its stale `in-progress` dropped, is
+   **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable —
+   a run of consecutive outages trips its own guard and stops the run as an environment failure
+   (joshuafolkken/kit#2240); a **failed** child (OPEN, neither label, not an outage) has its stale
+   `in-progress` dropped, is parked with `needs-decision`, and is counted against the consecutive-failure
+   guard. **A turn whose whole content is one read, or one two-line progress report, is the shape this
+   collapses.**
 
    **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
-   `error` pass through), the composite adds four verdict tokens: `over` — the merge crossed the budget,
+   `error` pass through), the composite adds five verdict tokens: `over` — the merge crossed the budget,
    so hand the lanes over and take the cut ("The hand-off" below); `human-review` — the child stopped
    before its commit, the run's own ending (SKILL.md → §2z), so stop; `stop` — the consecutive-failure
-   guard tripped; and `retry` — the child's state could not be read, so re-read before deciding.
+   guard tripped; `environment` — the consecutive-**outage** guard tripped, so the API is down and the
+   run stops as an environment failure rather than the children's (joshuafolkken/kit#2240); and `retry`
+   — the child's state could not be read, so re-read before deciding.
 
    **The counters are the carry record's, and the epic progress comment is generated from it** (see "The
    counters live in the record" below). **The hand-off check is folded into the merge branch of the one

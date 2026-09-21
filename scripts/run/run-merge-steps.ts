@@ -32,6 +32,10 @@ interface MergeContext {
 	repo: string | undefined
 	over: number
 	owner: CarryOwner
+	// The child's transcript output path, when the caller passed `--output`. Read to tell an API-outage
+	// ending apart from a genuine child failure (joshuafolkken/kit#2240); absent leaves outage detection
+	// off, so the child is classified from its GitHub state alone as before.
+	output?: string | undefined
 }
 
 interface FailedResult {
@@ -143,6 +147,28 @@ async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 	return { carry, is_parked, is_refused: false }
 }
 
+// The outcome of counting an outage: the record to read the streak against, and whether the count was
+// refused because this session does not own the budget (joshuafolkken/kit#2240).
+interface OutageResult {
+	carry: RunCarry | undefined
+	is_refused: boolean
+}
+
+// An API-outage child: count the outage into its own streak and drop the stale `in-progress` so the
+// child is offerable again, but **do not** park it with `needs-decision` — the environment failed, not
+// the child, so it is re-dispatchable in the same run (joshuafolkken/kit#2240). Returns the record so
+// the caller can read the outage streak against its guard. Returns `is_refused: true` without touching
+// labels when the carry record rejected the count (joshuafolkken/kit#2114).
+async function do_outage(ctx: MergeContext): Promise<OutageResult> {
+	const result = await apply_carry(ctx, run_merge.change_of('outage'))
+
+	if (result.kind === 'refused') return { carry: result.carry, is_refused: true }
+
+	await remove_in_progress(ctx.child)
+
+	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }
+}
+
 // The hand-off check, asked at a merge alone. A subprocess that cannot measure exits non-zero, which
 // is read as `over` — "could not measure" is never "still cheap".
 async function is_over_budget(over: number): Promise<boolean> {
@@ -170,8 +196,9 @@ const run_merge_steps = {
 	ask_next,
 	do_failed,
 	do_merged,
+	do_outage,
 	is_over_budget,
 }
 
-export type { MergeContext }
+export type { MergeContext, OutageResult }
 export { run_merge_steps }

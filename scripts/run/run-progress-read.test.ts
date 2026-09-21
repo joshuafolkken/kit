@@ -48,6 +48,7 @@ const A_CARRY = {
 	filed: 0,
 	cuts: 0,
 	failures: 0,
+	outages: 0,
 }
 const A_LANE_OBSERVATION = { issue: '1900', state: 'open' }
 const A_LANE_INFO = {

@@ -30,6 +30,7 @@ const HANDED_OFF_CARRY = {
 	filed: 0,
 	cuts: 1,
 	failures: 0,
+	outages: 0,
 	is_handed_off: true as const,
 }
 
@@ -48,6 +49,28 @@ describe('run_merge_steps.do_failed — parking is part of the result', () => {
 			is_parked: false,
 			is_refused: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#2240: an API-outage child is left re-dispatchable — its `in-progress` is dropped so
+// the next offer can hand it back, but it is never parked with `needs-decision`.
+describe('run_merge_steps.do_outage — re-dispatchable, never parked', () => {
+	it('drops in-progress but does not add needs-decision', async () => {
+		await run_merge_steps.do_outage(CONTEXT)
+
+		expect(remove_label_mock).toHaveBeenCalledTimes(1)
+		expect(add_label_mock).not.toHaveBeenCalled()
+	})
+
+	it('returns is_refused and skips label writes when the record is handed off', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
+
+		const result = await run_merge_steps.do_outage(CONTEXT)
+
+		expect(result.is_refused).toBe(true)
+		expect(remove_label_mock).not.toHaveBeenCalled()
+		expect(add_label_mock).not.toHaveBeenCalled()
 	})
 })
 

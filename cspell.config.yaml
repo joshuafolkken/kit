@@ -39,6 +39,14 @@ words:
   # unusable dependency graph (joshuafolkken/kit#1663) — the literal text a reader greps for.
   - getaddrinfo
   - ENOTFOUND
+  # "Re-dispatchable" — a lane child that ended on an API outage is left dispatchable again in the same
+  # run rather than parked (joshuafolkken/kit#2240). Named across the `run:merge` / `run:ending` code,
+  # the workflow docs and their tests.
+  - dispatchable
+  # The connection-error signature the Anthropic client emits when the API refused the socket, matched
+  # mechanically to tell an API outage apart from a child that stalled (joshuafolkken/kit#2240). It is
+  # the literal marker text `api-outage.ts` greps the exit record for.
+  - connectionrefused
   # The registry host `docs/cloud-session.md` lists among the outbound hosts a cloud container has to
   # allow (joshuafolkken/kit#1565). It is the domain `registry.npmjs.org`, not a prose word.
   - npmjs

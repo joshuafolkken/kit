@@ -18,15 +18,24 @@ const CLOSED_STATE = 'CLOSED'
 // resets the streak (`run-carry.ts` → `next_failures`), so the guard trips only on an environment
 // failing every child it is handed rather than on failures scattered across a long run.
 const CONSECUTIVE_FAILURE_LIMIT = 3
+// Three API outages in a row stop the run too (joshuafolkken/kit#2240) — the same shape as the failure
+// guard, over its own streak. An outage is a child that could not reach the API, so a run of them is
+// the environment being down; stopping is what keeps the run from re-dispatching into a dead API
+// forever. A merge or a genuine child failure resets it (`run-carry.ts` → `next_outages`).
+const CONSECUTIVE_OUTAGE_LIMIT = 3
 const ONE = 1
 
-// What a returned child turned out to be, decided from its GitHub state alone.
+// What a returned child turned out to be, decided from its GitHub state and — for the failed case
+// alone — the exit record.
 // - `merged`      — CLOSED; the child finished and its pull request merged.
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (SKILL.md → §2z).
 // - `parked`      — OPEN and carrying `needs-decision` or `already-done`; a person still owns it.
-// - `failed`      — OPEN and carrying neither; the child did not finish.
+// - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API; not
+//                   the child's failure, so it is re-dispatchable and uncounted against the failure guard
+//                   (joshuafolkken/kit#2240).
+// - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `unresolved`  — the state could not be read; re-read before deciding.
-type ChildOutcome = 'merged' | 'human-review' | 'parked' | 'failed' | 'unresolved'
+type ChildOutcome = 'merged' | 'human-review' | 'parked' | 'outage' | 'failed' | 'unresolved'
 
 function is_closed(state: IssueState): boolean {
 	return state.state.toUpperCase() === CLOSED_STATE
@@ -43,14 +52,25 @@ function is_parked(state: IssueState): boolean {
 // **CLOSED means merged, whatever labels it carries** — a child that finished and merged keeps the
 // `needs-human-review` a person put on it, so that label is read only on an OPEN child
 // (`backlogrun-progress.md` → "Running a named epic's children").
-function classify_child(state: IssueState | undefined): ChildOutcome {
+// An OPEN child's outcome: a person's review, a park, or the failed/outage split. `is_outage` is
+// consulted only here, in the last case — an OPEN, unparked child that could not reach the API is an
+// `outage`, not a `failed` (joshuafolkken/kit#2240).
+function open_outcome(state: IssueState, is_outage: boolean): ChildOutcome {
+	if (state.is_human_review) return 'human-review'
+
+	if (is_parked(state)) return 'parked'
+
+	return is_outage ? 'outage' : 'failed'
+}
+
+// `is_outage` is read from the child's exit record by the CLI and matters only for an OPEN child — a
+// CLOSED child is merged regardless of how the process exited.
+function classify_child(state: IssueState | undefined, is_outage = false): ChildOutcome {
 	if (state === undefined) return 'unresolved'
 
 	if (is_closed(state)) return 'merged'
 
-	if (state.is_human_review) return 'human-review'
-
-	return is_parked(state) ? 'parked' : 'failed'
+	return open_outcome(state, is_outage)
 }
 
 // The counter change a child's outcome implies. A merge counts a merge (which resets the failure
@@ -62,11 +82,19 @@ function change_of(outcome: ChildOutcome): CarryChange | undefined {
 
 	if (outcome === 'failed') return { failures: ONE }
 
+	if (outcome === 'outage') return { outages: ONE }
+
 	return undefined
 }
 
 function is_guard_tripped(failures: number): boolean {
 	return failures >= CONSECUTIVE_FAILURE_LIMIT
+}
+
+// The outage guard, over its own streak (joshuafolkken/kit#2240). Same shape as the failure guard: a
+// run of consecutive outages is the environment being down, so the run stops rather than re-dispatching.
+function is_outage_guard_tripped(outages: number): boolean {
+	return outages >= CONSECUTIVE_OUTAGE_LIMIT
 }
 
 // The progress comment, generated from the single-source carry record so the counters live in one
@@ -80,16 +108,19 @@ function counters_comment(carry: RunCarry): string {
 		`- merged: ${String(carry.merged)}`,
 		`- filed: ${String(carry.filed)}`,
 		`- consecutive failures: ${String(carry.failures)}`,
+		`- consecutive outages: ${String(carry.outages)}`,
 		`- cuts crossed: ${String(carry.cuts)}`,
 	].join('\n')
 }
 
 const run_merge = {
 	CONSECUTIVE_FAILURE_LIMIT,
+	CONSECUTIVE_OUTAGE_LIMIT,
 	change_of,
 	classify_child,
 	counters_comment,
 	is_guard_tripped,
+	is_outage_guard_tripped,
 }
 
 export type { ChildOutcome }
