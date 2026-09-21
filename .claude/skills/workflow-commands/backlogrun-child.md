@@ -220,28 +220,34 @@ guard, and go back to step 1.
    record it on the Issue. `-u` is not optional, and the comment is what gets the stash popped — by
    message, `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`, never a positional
    `git stash pop` that a shared stack lets another lane divert.
-2. **Remove `in-progress`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
-3. **Classify how the child ended** — `pnpm josh run:ending <N> --output <path>`
-   (joshuafolkken/kit#2139). `run:liveness` said it stopped; this says *how* — `abandoned` for a child
-   that ended mid-implementation without a cut, told apart from a `merged` one even when it exited
-   `is_error: false`, and **`outage` for one that ended because it could not reach the API**
-   (joshuafolkken/kit#2240). The basis it prints (the exit-record fields it read and the
-   `permission_denials` count, or the transport-failure signature for an outage) is what a person needs
-   to see without opening the log.
-4. **An `abandoned` ending is booked as a failure** — count it against the consecutive-failure guard and
-   park it with `needs-decision` and a comment naming what `run:liveness` answered and what it read,
-   **and the basis `run:ending` printed** — its exit-record fields and denial count go into the comment
-   verbatim. **An `outage` ending is not**: the child never reached the API, so it is **not** counted
-   against the consecutive-failure guard and **not** parked with `needs-decision` — it stays
-   re-dispatchable in the same run. A run of consecutive outages trips the separate outage guard, which
-   stops the run as an environment failure rather than the children's.
-5. **Go back to step 1 of the loop.**
+2. **Classify how the child ended and act, in one call** — `pnpm josh run:merge <N> --output <path>`
+   (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic). **It is the same composite a
+   returned child takes** (`backlogrun-progress.md` → "Running a named epic's children"), reached here
+   from the poll rather than from a return — so a stopped child and a returned one run through **one**
+   decision, never a second copy of it (joshuafolkken/kit#2277). It **reads the child's exit record
+   without waiting for the unit to return**, telling an `outage` — a child that could not reach the API
+   (joshuafolkken/kit#2240) — apart from an `abandoned` one that stopped mid-implementation, and it drops
+   the stale `in-progress` itself, so there is no separate label-removal step:
+   - **outage** — the child never reached the API, so it is counted into its own outage streak and
+     **re-dispatched in the same run** by being offered again, **not** parked with `needs-decision` and
+     **not** counted against the consecutive-failure guard. The re-dispatch is bounded by one constant —
+     `CONSECUTIVE_OUTAGE_LIMIT` in `scripts/run/run-merge.ts` — so a run of outages trips the separate
+     outage guard, at which point the command prints `environment` and the run stops as an environment
+     failure rather than the children's. It never re-dispatches into a dead API forever.
+   - **abandoned** — counted against the consecutive-failure guard and parked with `needs-decision`,
+     exactly as a failed child. A silent retry would re-run a half-written tree; that guard is the only
+     thing that notices the environment rather than the children is at fault.
+3. **Read the token it printed and take that branch** — a next child number to run (the re-dispatched
+   outage child among them), `environment` / `stop` to end the run, or `busy` / `retry` to re-read —
+   the same tokens the merge event reads (`backlogrun-progress.md` → "Running a named epic's children").
+   Then go back to step 1 of the loop.
 
-**An abandoned ending is booked as a failure rather than restarted.** A silent retry re-runs a child
-whose tree may be half-written, and the consecutive-failure guard is the only thing that notices the
-environment rather than the children is at fault. **An outage is the environment failing, not the
-child** — counting it against that same guard is what joshuafolkken/kit#2240 removes, so an outage
-never lands on the failure streak and a persistent outage stops the run on its own guard instead.
+**Why the poll routes through `run:merge` rather than booking the stop itself.** The counting, the
+re-dispatch cap and the park all live in one place, so the poll cannot drift from the return path:
+counting the outage into its streak is what lets the cap trip, and skipping the count would
+re-dispatch into a dead API without bound. Reading the exit record here — not waiting for a unit that
+an API outage may never return — is what turns a 400-minute wait into a same-run re-dispatch
+(joshuafolkken/kit#2277).
 
 ## Audit before the first child
 

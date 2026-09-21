@@ -211,9 +211,25 @@ single non-numeric line as the verdict.
    `lane:await` watches local process presence and exits when any named child confirms-complete,
    waking the parent at the actual completion rather than at the next heartbeat interval. **The
    re-confirm delay and poll interval are the command's, not the agent's** — pass only the issue
-   numbers. On that wake ask `pnpm josh run:liveness <N> --output <path> --process <what
-   `pgrep -laf "fullrun #<N>$"` found>` where that file has been unchanged for the silent-unit
-   window. **The flag is what you saw, never what kind of child it is.**
+   numbers.
+
+   **A `lane:await` wake is a confirmed-gone process, so classify the ending at once — do not wait out
+   the silent-unit window** (joshuafolkken/kit#2277). `lane:await` exits only after the child's process
+   has disappeared and stayed gone across its re-confirm delay, which is the definitive end signal; a
+   child that died reaching the API wrote its last line — an `API Error` — just before it went, so a
+   `run:liveness` poll would read that fresh output as `alive` and sit for the whole 30-minute silent-unit
+   window before it ever said `stopped` (the measured 402-/52-minute waits). So on a `lane:await` wake go
+   straight to `pnpm josh run:merge <N> --output <path>` — the composite reads the child's **exit
+   record**, decisive whether the child merged, died on an outage, or abandoned mid-implementation
+   ("Running a named epic's children" reads its tokens). An outage child is re-dispatched in the same run
+   and a run of them trips the environment guard; nothing waits for a person.
+
+   **`run:liveness` stays the fallback for a lane no `lane:await` is watching** — a handed-over lane a
+   resumed session polls ("Picking the lanes up in the fresh session"). Ask
+   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "fullrun #<N>$"` found>` where
+   that file has been unchanged for the silent-unit window; on `stopped` its own advice routes the child
+   through the same `run:merge --output` classification. **The flag is what you saw, never what kind of
+   child it is.**
 
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
