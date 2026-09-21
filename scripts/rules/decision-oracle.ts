@@ -178,6 +178,14 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		single_source: 'prompts/collaboration-workflow/issue-template.md',
 	},
 	{
+		name: 'cases',
+		decision:
+			'Each I/O boundary a change crosses (network, process, fs) and the abnormal cases it owes',
+		args: '<path...>',
+		vocabulary: ['network', 'process', 'fs', NONE],
+		single_source: 'prompts/collaboration-workflow/report-format.md → 変更とテスト',
+	},
+	{
 		name: 'issue:state',
 		decision: "An issue's state, labels, and human-review flag",
 		args: ISSUE_N_ARG,

@@ -15,6 +15,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bp": "bump",
     "by": "bytes",
     "c": "check",
+    "ca": "cases",
     "cm": "check-commit-message",
     "co": "cost",
     "cs": "clone:scan",
@@ -101,6 +102,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rst": "run:status",
     "rt": "reconcile-templates",
     "rug": "rule:guard",
+    "ruv": "rule:value",
     "rv": "run:liveness",
     "rw": "run:wake",
     "rwg": "run:watcher:guard",
@@ -203,6 +205,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "none",
+      ],
+    ],
+    "cases": [
+      "<path...>",
+      "automation",
+      [
+        "files",
       ],
     ],
     "check": [
@@ -750,6 +759,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rule:guard": [
       "",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "rule:value": [
+      "",
+      "developer",
       [
         "none",
       ],

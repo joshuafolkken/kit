@@ -32,6 +32,7 @@ pnpm josh gate --no-unit   # the three static checks only (CI only)
 - Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
 - Exit `1` if any check failed. Refuses any argument other than the three flags.
+- The unit leg is the long pole; [`josh test:unit`](#josh-testunit) runs it as a two-project split — same files, less wall clock, not fewer tests.
 
 ### `josh lint`
 
@@ -88,8 +89,10 @@ pnpm josh bytes                                 # scan: every budgeted document 
 
 ```
 docs/josh-commands.md  111777/114688 bytes · 2911 left
+entry fullrun  227672/229376 bytes · 1704 left
 ```
 
+- The scan closes with one row per workflow entry — the **primary** budget (`entry-read-budget.ts`), the total each entry reads against its ceiling — so the main budget is no longer a number the gate reveals only when it fails (joshuafolkken/kit#2271). The per-document rows above them are the fallback budget, covering the documents no entry reads.
 - Path is repository-root-relative (a leading `./` is stripped); a path with no budget entry reads `not counted`.
 - The recorded ceiling is block-quantized — the next 4 KB multiple at or above the document's size (`document-byte-budget.ts`, joshuafolkken/kit#2231), so a document growing within its block needs no ceiling edit and parallel command-adding lanes stop conflicting on this record. An over-budget row names the value to record: the next block multiple, not the raw current size. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
 
@@ -116,6 +119,7 @@ Format the single file an agent just edited. Not run by hand: `.claude/settings.
 
 - eslint runs first (warm `eslint_d`, cache `.eslintcache.edit`), prettier last. Never fails; skips `node_modules` / `.git` at any depth, `dist` / `build` at top level.
 - Carries a density line via `hookSpecificOutput.additionalContext` under set conditions.
+- **Reports the problems `eslint --fix` could not fix** on the same `additionalContext`, lifted from the `--fix` pass's own stdout (no extra process) — file, `line:col` and rule name, so they are seen on the edit rather than deferred to the gate. What eslint fixed is applied silently; a file that runs prettier alone (`.md` / `.yml`) reports nothing. The block is cut to a bounded length and marked when a lint dump would be large. It never sets `permissionDecision`, so the edit is not turned into a failure.
 
 ### `josh batch:guard`
 
@@ -131,8 +135,8 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 ```
 
 - `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
-- **Off in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), and the notice kit#2164 replaced it with was measured not to move the density (1.00 calls per turn on both sides of it, the third refutation of advice after kit#1304 and kit#1329 / kit#1337), so kit#2178 takes the guard off rather than pay the per-turn context cost of guidance that does not work. Decided from the one-place three-valued enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`, not per guard; `notice` stays valid for a future guard whose guidance a child can act on.
-- **Fires more than once per run.** The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again every `REFIRE_EVERY` further single-call turns (the `N` of joshuafolkken/kit#2164, a single constant in `time-batch-guard.ts`, equal to the initial limit). A call the run re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence. This replaces the old one-firing-per-run behavior, which fell silent for the rest of a run that ignored it.
+- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), so the guard downgrades to a non-blocking notice — the call proceeds with the guidance attached. kit#2178 took kit#2164's notice `off` after it did not move the density; with it `off` it fired **zero** times across the 2026-09-21 backlogrun measured next, so the 1.147 read there is the rate with no guidance. kit#2276 re-enables it with the two things #2164's lacked — it **names the concrete recent calls** and **recurs every single-call turn** — to be re-measured, redesigned rather than kept if it misses the target. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`.
+- **Fires more than once per run.** The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the **refusal** every `REFIRE_EVERY` further turns (the initial limit), the **notice** every `NOTICE_REFIRE_EVERY` (joshuafolkken/kit#2276, tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence — replacing the old one-firing-per-run behavior that fell silent for the rest of a run that ignored it.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
 
 ### `josh investigation:guard`
@@ -181,7 +185,7 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery p
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
-**How each of the three behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `off` too (kit#2164 downgraded it to a `notice`, but the notice was measured not to move the density, so kit#2178 takes it off — the `notice` mode remains valid for a future guard whose guidance a child can act on), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the three behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh stop:guard`
 
@@ -215,6 +219,7 @@ pnpm josh test:unit
 
 - `vitest` installed with **no** `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
+- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pilot-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set (joshuafolkken/kit#2170) — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
 
 ### `josh test:related`
 
@@ -1280,9 +1285,25 @@ pnpm josh oracle:list
 
 Single source: `scripts/rules/decision-oracle.ts`.
 
+### `josh rule:value`
+
+Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered.
+
+```bash
+pnpm josh rule:value
+```
+
+- Transcripts are grouped by the run they belong to, so a lane's transcript counts with the parent that dispatched it rather than as a run of its own.
+- It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
+- Called once per iteration from the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure (joshuafolkken/kit#2271). Single source: `scripts/rules/rule-value-cli.ts`.
+
 ### `josh clone:scan`
 
 Count code duplication across files and first-party repos (`JOSH_REPO_PATHS` included) — the measurement `no-clones` lacked. Output: `clean`, or `clones: <N>` then each clone `[same-file|cross-file|cross-repo]` with `file:line` (exit 0). Single source: `scripts/clone/clone-scan.ts`.
+
+### `josh cases`
+
+Read changed paths and print the I/O boundaries the diff crosses (`network` / `process` / `fs` / `none`) and, for each, the mandatory abnormal cases a test declaration must account for (non-200, timeout, empty response, malformed JSON, rate limit). A decision oracle: the unit suite blocks network by design, so these cases are confronted at declaration time. Single source: `scripts/cases/cases-cli.ts`.
 
 ### `josh run:hold` / `josh run:release`
 
