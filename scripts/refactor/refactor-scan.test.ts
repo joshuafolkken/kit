@@ -3,8 +3,17 @@ import type { CategoryResult, Priority } from './refactor-lint'
 import { refactor_scan } from './refactor-scan'
 
 const HIGH: Priority = 'high'
+const LOW: Priority = 'low'
 const SCOPE_PREFIX = 'scope: 12 files (seed 4,'
 const CANDIDATES_VERDICT = 'verdict: candidates (1 high/medium)'
+const CLEAR_VERDICT = 'verdict: clear'
+
+const LOW_CATEGORY: CategoryResult = {
+	key: 'unused-code',
+	label: 'unused code',
+	priority: LOW,
+	candidates: [{ location: 'scripts/a.ts:1', rule: '@typescript-eslint/no-unused-vars' }],
+}
 
 function category(candidate_count: number): CategoryResult {
 	const candidates = Array.from({ length: candidate_count }, (_unused, index) => ({
@@ -22,9 +31,13 @@ const EMPTY: CategoryResult = {
 	candidates: [],
 }
 
-describe('refactor_scan.total_candidates', () => {
-	it('sums candidates across categories', () => {
-		expect(refactor_scan.total_candidates([category(2), EMPTY])).toBe(2)
+describe('refactor_scan.convergence_candidates', () => {
+	it('counts high- and medium-priority candidates', () => {
+		expect(refactor_scan.convergence_candidates([category(2), EMPTY])).toBe(2)
+	})
+
+	it('excludes low-priority candidates from the count', () => {
+		expect(refactor_scan.convergence_candidates([category(2), LOW_CATEGORY])).toBe(2)
 	})
 })
 
@@ -36,15 +49,23 @@ describe('refactor_scan.verdict_token', () => {
 	it('is candidates when any category holds one', () => {
 		expect(refactor_scan.verdict_token([category(1)])).toBe(refactor_scan.CANDIDATES)
 	})
+
+	it('is clear when only a low-priority candidate remains', () => {
+		expect(refactor_scan.verdict_token([LOW_CATEGORY])).toBe(refactor_scan.CLEAR)
+	})
 })
 
 describe('refactor_scan.verdict_line', () => {
 	it('reports clear with no count', () => {
-		expect(refactor_scan.verdict_line([EMPTY])).toBe('verdict: clear')
+		expect(refactor_scan.verdict_line([EMPTY])).toBe(CLEAR_VERDICT)
 	})
 
 	it('reports the high/medium total when candidates remain', () => {
 		expect(refactor_scan.verdict_line([category(2)])).toBe('verdict: candidates (2 high/medium)')
+	})
+
+	it('does not count a low-priority candidate toward the verdict', () => {
+		expect(refactor_scan.verdict_line([LOW_CATEGORY])).toBe(CLEAR_VERDICT)
 	})
 })
 

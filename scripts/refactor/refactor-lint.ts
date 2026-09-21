@@ -3,15 +3,16 @@ import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { execa } from 'execa'
 import { z } from 'zod'
 
-// The mechanical half of `prompts/refactoring.md` §4.2 (joshuafolkken/kit#2180): five of its seven
-// search items are already decided by ESLint. Rather than read the checklist and grep by hand, the
-// project's own eslint is asked in JSON and its findings are bucketed into the checklist's items.
+// The mechanical half of `prompts/refactoring.md` (joshuafolkken/kit#2255): the refactoring
+// priorities ESLint already decides. Rather than read the checklist and grep by hand, the project's
+// own eslint is asked in JSON and its findings are bucketed into the checklist's items.
 //
 // **The count is the gate's own, not a second one.** As in `line-budget.ts`, the project's eslint is
 // spawned — its findings, its rule severities — so this can never disagree with `pnpm josh gate`
-// about what is there. Item 2 (namespace-object export) is deliberately absent: it has no rule yet,
-// which is what the new `namespace-object-export` rule adds, and once it fires it appears here like
-// any other. Items 7 (side-effect idempotency) and §4.1's "similar UI structure" stay prose.
+// about what is there. `local/namespace-object-export` is now among the rules queried — the rule
+// exists, so the oracle reads it like any other rather than deferring it to the gate. Only the two
+// priorities with no rule stay prose (side-effect idempotency and "similar UI structure"), and
+// `refactor-scan-prompt-sync.test.ts` fails if this list and the prompt drift apart.
 
 const ESLINT_BIN = 'eslint'
 const PNPM = 'pnpm'
@@ -21,9 +22,10 @@ const PNPM_EXEC = 'exec'
 const FORMAT_FLAGS: ReadonlyArray<string> = ['--format', 'json', '--no-inline-config']
 const PROCESS_TIMEOUT_MS = 180_000
 
-type Priority = 'high' | 'medium'
+type Priority = 'high' | 'medium' | 'low'
 const HIGH: Priority = 'high'
 const MEDIUM: Priority = 'medium'
+const LOW: Priority = 'low'
 
 interface RefactorCategory {
 	key: string
@@ -32,8 +34,10 @@ interface RefactorCategory {
 	rules: ReadonlyArray<string>
 }
 
-// The §4.2 items ESLint decides, each with the rules that populate it. Item numbers follow the issue:
-// 1 (lines & complexity), 3 (type safety), 4 (duplicate string), 5 (duplicate code), 6 (magic number).
+// The refactoring priorities ESLint decides, each with the rules that populate it — the high- and
+// medium-priority convergence items plus the one low-priority item (unused code), which is reported
+// but never counted toward convergence. `refactor-scan-prompt-sync.test.ts` pins this list against
+// the prompt, so a rule added here without the prompt (or the reverse) fails.
 const CATEGORIES: ReadonlyArray<RefactorCategory> = [
 	{
 		key: 'lines-complexity',
@@ -46,6 +50,12 @@ const CATEGORIES: ReadonlyArray<RefactorCategory> = [
 		label: 'type safety',
 		priority: HIGH,
 		rules: ['@typescript-eslint/no-explicit-any'],
+	},
+	{
+		key: 'namespace-export',
+		label: 'namespace-object export',
+		priority: HIGH,
+		rules: ['local/namespace-object-export'],
 	},
 	{
 		key: 'duplicate-code',
@@ -64,6 +74,18 @@ const CATEGORIES: ReadonlyArray<RefactorCategory> = [
 		label: 'magic number',
 		priority: MEDIUM,
 		rules: ['@typescript-eslint/no-magic-numbers'],
+	},
+	{
+		key: 'naming-convention',
+		label: 'variable naming',
+		priority: MEDIUM,
+		rules: ['@typescript-eslint/naming-convention'],
+	},
+	{
+		key: 'unused-code',
+		label: 'unused code',
+		priority: LOW,
+		rules: ['@typescript-eslint/no-unused-vars'],
 	},
 ]
 
@@ -141,8 +163,8 @@ function empty_buckets(): Map<string, Array<Candidate>> {
 	return buckets
 }
 
-// The five §4.2 categories with their candidates, in the fixed order above so the report reads the
-// same every run. A category with no findings is kept, printed as zero rather than dropped.
+// The categories with their candidates, in the fixed order above so the report reads the same every
+// run. A category with no findings is kept, printed as zero rather than dropped.
 function categorize(results: Array<LintResult>, root: string): ReadonlyArray<CategoryResult> {
 	const buckets = empty_buckets()
 
@@ -221,6 +243,7 @@ const refactor_lint = {
 	CATEGORIES,
 	HIGH,
 	MEDIUM,
+	LOW,
 }
 
 export type { CategoryResult, Priority }

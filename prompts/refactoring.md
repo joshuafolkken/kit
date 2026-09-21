@@ -19,12 +19,10 @@ pnpm josh refactor:scan
 
 - **対象ファイルの特定**: 作業ツリーの変更＋main との差分＋未追跡ファイルを起点とし、いずれも無ければ `scripts/` 配下。`demo`・`src/routes/stories`・先頭に `/* @refactor-ignore */` を持つファイルは除外する。
 - **スコープ拡張**: 起点ファイルから import グラフを双方向（import 元・import 先）に最大3段階たどり、新規0件で止める。拡張後のファイル集合を印字する。
-- **候補の集計**: プロジェクト自身の eslint に JSON で問い合わせ、次を件数と `file:line` で印字する — 行数・複雑度（`max-lines` / `max-lines-per-function` / `complexity` / `sonarjs/cognitive-complexity`）、型の安全性（`no-explicit-any`）、重複コード（`no-identical-functions`）、重複文字列（`no-duplicate-string`）、マジックナンバー（`no-magic-numbers`）。件数は gate の eslint と同一なので `pnpm josh gate` と食い違わない。
-- **収束判定**: 高・中優先度の候補が0件なら `verdict: clear`、残っていれば `verdict: candidates`。これが「優先度高・中が0件」の判定である。
+- **候補の集計**: プロジェクト自身の eslint に JSON で問い合わせ、次を件数と file:line で印字する — 行数・複雑度（`max-lines` / `max-lines-per-function` / `complexity` / `sonarjs/cognitive-complexity`）、型の安全性（`@typescript-eslint/no-explicit-any`）、名前空間エクスポート（`local/namespace-object-export`）、重複コード（`sonarjs/no-identical-functions`）、変数名の書式（`@typescript-eslint/naming-convention`）、重複文字列（`sonarjs/no-duplicate-string`）、マジックナンバー（`@typescript-eslint/no-magic-numbers`）、未使用コード（低優先度: `@typescript-eslint/no-unused-vars`）。件数は gate の eslint と同一なので `pnpm josh gate` と食い違わない。
+- **収束判定**: 高・中優先度の候補が0件なら `verdict: clear`、残っていれば `verdict: candidates`。これが「優先度高・中が0件」の判定である。低優先度（未使用コード）は報告のみで収束判定には数えない。
 
 行数はコード行数であり物理行数ではない — `max-lines` / `max-lines-per-function` は `skipBlankLines` と `skipComments` を有効にして数えるので、`wc -l` ではなくこのコマンド（gate と同じ eslint）の報告で判断する。
-
-**名前空間オブジェクト化（個別エクスポートの検索）は lint ルール `local/namespace-object-export` が error として検出する**ので、`pnpm josh gate` が直接落とす。手作業の検索は不要。
 
 ---
 
@@ -66,30 +64,23 @@ pnpm josh refactor:scan
 
 ---
 
-## リファクタリング候補の優先度
+## 部分的に lint が当たる項目（目視で補う）
 
-コーディング規約・命名規則は `CLAUDE.md` を参照（規則の単一ソース。`AGENTS.md` / `GEMINI.md` はそこへの導線でしかない）。
+lint が完全に検出できる項目は `pnpm josh refactor:scan` が件数と file:line で報告する（上記「候補の集計」）。ここに挙げるのは、**規則が一部の面しか当たらず、残る面を人が判断する項目**だけである。コーディング規約・命名規則は `CLAUDE.md` を参照（規則の単一ソース。`AGENTS.md` / `GEMINI.md` はそこへの導線でしかない）。
 
 ### 高優先度
 
-1. **メインファイルの分割**: 再利用可能・独立した責任を持つ機能を別ファイルに分離
-2. **関数の分割**: 認知的複雑度4超、または25行超（コード行数）の関数、複数責任を持つ関数
-3. **ファイルの分割**: 300行超（コード行数）、複数責任、関連性の低い機能が混在
-4. **名前空間オブジェクトエクスポートの適用**: 個別エクスポートを名前空間オブジェクト化（定数のみのファイルは除外）
-5. **型定義の改善**: `any` の使用、型定義の不足。データ配列はリテラル型を保持するために `as const satisfies T` を使用しているか確認する（型注釈のみでは `string` に widened される）
-6. **副作用関数の冪等性**: 同じ状態変化やコールバック呼び出しが複数回発生しないか確認する。特に intersection observer・イベントハンドラなど「一度だけ実行すれば十分な処理」は、状態チェックによる早期 return で保護する
+- **責務の分離**: 再利用可能・独立した責任を持つ機能を別ファイルに分離する。`max-lines` は大きさだけを見るので、行数が収まっていても複数責任が混在していないかは目視で判断する。
+- **リテラル型の保持**: データ配列はリテラル型を保つために `as const satisfies T` を使っているか確認する（型注釈のみでは `string` に widen される）。`prefer-as-const` は別の場面の規則で、この判断は肩代わりしない。
 
 ### 中優先度
 
-1. **定数の抽出**: マジックナンバー・繰り返し値の定数化、ハードコード文字列の整理
-2. **変数名の改善**: 命名規則に合致しない名前、意味が不明確な名前の見直し
-3. **コードクローンの排除**: 同一・類似コードが2箇所以上 → 必ず共通化を提案
-4. **メソッド抽出**: 行数が多い・複数責任の関数を処理の塊ごとに抽出
-5. **共通コンポーネントの作成**: 同じ UI・振る舞いが複数箇所にある場合、props で差を吸収する共通コンポーネントに統合
+- **変数名の意味**: `@typescript-eslint/naming-convention` は書式（snake_case など）だけを見る。意味が不明確な名前・実態と合わない名前は目視で見直す。
+- **類似コードの共通化**: `sonarjs/no-identical-functions` は完全一致だけを検出する。似ているが同一でないコードの共通化は目視で判断する。
 
 ### 低優先度
 
-1. **コードの整理**: 未使用の変数・関数の削除、不要なコメントの削除
+- **不要コメントの整理**: 冗長・陳腐化したコメントを削除する。未使用の変数・関数は `@typescript-eslint/no-unused-vars` が検出し、`refactor:scan` が低優先度として報告する。
 
 ---
 

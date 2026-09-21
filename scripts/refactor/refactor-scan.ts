@@ -9,8 +9,9 @@ import { refactor_targets } from './refactor-targets'
 // holds, and answers whether any high- or medium-priority candidate remains.
 //
 // **It reports and never fails**, like `josh lines`: a candidate is work to do, not a gate to break,
-// so the exit code stays 0 and the answer is the printed verdict token. Every category on the list is
-// high or medium priority, so the convergence answer is simply whether the scope is empty of them.
+// so the exit code stays 0 and the answer is the printed verdict token. Convergence counts the high-
+// and medium-priority categories only; the one low-priority category (unused code) is reported but
+// never counted, so `clear` means the scope is empty of high/medium candidates.
 
 // The convergence vocabulary. `clear` is what §4.3's self-reported "no high- or medium-priority
 // candidate left" loop exit becomes once a command answers it: a token a caller can read, not a claim.
@@ -27,13 +28,16 @@ interface ScanResult {
 	verdict: string
 }
 
-function total_candidates(categories: ReadonlyArray<CategoryResult>): number {
-	return categories.reduce((sum, category) => sum + category.candidates.length, 0)
+// Convergence counts high- and medium-priority candidates only: a low-priority finding (unused code)
+// is reported but auto-implemented by nobody, so it never keeps the loop from reading `clear`.
+function convergence_candidates(categories: ReadonlyArray<CategoryResult>): number {
+	return categories
+		.filter((category) => category.priority !== refactor_lint.LOW)
+		.reduce((sum, category) => sum + category.candidates.length, 0)
 }
 
-// Every category is high or medium, so a scope with any candidate at all has not converged.
 function verdict_token(categories: ReadonlyArray<CategoryResult>): string {
-	return total_candidates(categories) === 0 ? CLEAR : CANDIDATES
+	return convergence_candidates(categories) === 0 ? CLEAR : CANDIDATES
 }
 
 function scope_line(seed_count: number, scope_count: number): string {
@@ -53,7 +57,7 @@ function category_block(category: CategoryResult): string {
 }
 
 function verdict_line(categories: ReadonlyArray<CategoryResult>): string {
-	const total = total_candidates(categories)
+	const total = convergence_candidates(categories)
 
 	return total === 0 ? `verdict: ${CLEAR}` : `verdict: ${CANDIDATES} (${String(total)} high/medium)`
 }
@@ -108,7 +112,7 @@ const refactor_scan = {
 	render_result,
 	run_scan,
 	scan,
-	total_candidates,
+	convergence_candidates,
 	verdict_line,
 	verdict_token,
 	CANDIDATES,
