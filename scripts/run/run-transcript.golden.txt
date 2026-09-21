@@ -1,0 +1,51 @@
+## child-completion
+a launched child runs through to its merge
+  start              verdict  implement
+  planned            verdict  implement
+  child launched     verdict  wait
+  child merged       command  pnpm josh run:merge 2250
+
+## park
+a child is parked and the batch moves on
+  start              verdict  implement
+  child parked       command  pnpm josh backlog:next
+
+## cut-and-resume
+the run is cut before its gate, then resumes to the merge
+  start              verdict  implement
+  cut taken          command  pnpm josh run:cut --resume 2250
+  resumed, pr open   command  pnpm josh followup
+  second review      command  pnpm josh review:round2
+  merged             command  pnpm josh run:merge 2250
+
+## lanes-full
+every lane holds a child, so the parent waits
+  start              verdict  implement
+  lanes full         verdict  wait
+
+## consecutive-failure-stop
+the failure guard stops the run
+  start              verdict  implement
+  outage             command  pnpm josh run:merge 2250
+  guard stops        verdict  stop
+
+## expired-budget
+the whole-run budget is spent — a person decides
+  start              decide   decide: whole-run budget spent — resume with `pnpm josh run:carry --resume` | discard with `pnpm josh run:carry --end`
+
+## unreadable-carry
+the carry record cannot be read
+  start              verdict  unknown
+
+## closed-already-done
+the issue is already closed, whatever the events say
+  start              verdict  already-done
+  after a merge      verdict  already-done
+
+## needs-human-review
+the issue stops before its commit for a person
+  start              verdict  human-review
+
+## update-deps-first
+a required dependency update comes before implementing
+  start              verdict  update-deps
