@@ -16,6 +16,18 @@ const SPLIT_ASSESSMENT_QUESTION =
 const PRE_GATE_CUT_MD = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const BACKLOGRUN_MD = '.claude/skills/workflow-commands/backlogrun.md'
 
+// The command reference in `docs/josh-commands.md` — one section per command, headed by the command
+// itself. joshuafolkken/kit#2190 cut `backlogrun.md` back to a manifest of pointers, so a decision it
+// used to carry inline (`run:merge`, `epic:next`, `backlog:budget`, `run:liveness`, `auto-ok:next`)
+// now has its verdict contract only in this reference. That makes it the single source and the section
+// a reader is routed to, in the same `file.md → \`josh <command>\`` form the `epic:reconcile` and
+// `lane:list` entries already use. joshuafolkken/kit#2254.
+const RUN_MERGE_REFERENCE = 'docs/josh-commands.md → `josh run:merge`'
+const EPIC_NEXT_REFERENCE = 'docs/josh-commands.md → `josh epic:next`'
+const BACKLOG_BUDGET_REFERENCE = 'docs/josh-commands.md → `josh backlog:budget`'
+const RUN_LIVENESS_REFERENCE = 'docs/josh-commands.md → `josh run:liveness`'
+const AUTO_OK_NEXT_REFERENCE = 'docs/josh-commands.md → `josh auto-ok:next`'
+
 // Command used by two separate oracle entries (run:cut:resume and run:cut:gate).
 const RUN_CUT_CMD = 'run:cut'
 
@@ -193,14 +205,14 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'Whether a backlogrun may start more work, keep watching, or finish',
 		args: '',
 		vocabulary: ['run', 'watch', STOP],
-		single_source: BACKLOGRUN_PROGRESS_MD,
+		single_source: BACKLOG_BUDGET_REFERENCE,
 	},
 	{
 		name: 'run:liveness',
 		decision: 'Whether a delegated unit is still working or has stopped without reporting',
 		args: `${ISSUE_N_ARG} --output <path>`,
 		vocabulary: ['alive', 'stopped', 'settled', 'undetermined'],
-		single_source: BACKLOGRUN_MD,
+		single_source: RUN_LIVENESS_REFERENCE,
 	},
 	{
 		name: 'stash:pop',
@@ -221,21 +233,21 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		decision: 'The next opted-in issue outside any epic, or none',
 		args: EXCLUDE_ARG,
 		vocabulary: [NONE],
-		single_source: BACKLOGRUN_MD,
+		single_source: AUTO_OK_NEXT_REFERENCE,
 	},
 	{
 		name: 'epic:next',
 		decision: "The next runnable child of an epic, or the epic's status",
 		args: '<epic>',
 		vocabulary: [WAIT, STOP, 'complete'],
-		single_source: BACKLOGRUN_MD,
+		single_source: EPIC_NEXT_REFERENCE,
 	},
 	{
 		name: 'run:merge',
 		decision: 'The post-merge batch step: confirm child, advance, or report a stop condition',
 		args: ISSUE_N_ARG,
 		vocabulary: [OVER, HUMAN_REVIEW, STOP, RETRY, BUSY],
-		single_source: BACKLOGRUN_MD,
+		single_source: RUN_MERGE_REFERENCE,
 	},
 	{
 		name: 'run:step',
