@@ -685,6 +685,16 @@ Print one section of a markdown document, for a `file.md` → "Heading" referenc
 
 ---
 
+### `josh duplicate-read:guard` · `josh drg`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Claude Code hook: refuse a second whole-file read of a path whose content has not changed since the run last read it (reads the tool call on stdin)
+
+---
+
 ### `josh epic` · `josh ep`
 
 > **Audience:** automation · **Side effects:** network

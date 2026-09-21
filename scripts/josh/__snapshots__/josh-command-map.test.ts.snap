@@ -23,6 +23,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "dg": "delegate",
     "dp": "disposition",
     "dr": "doctor",
+    "drg": "duplicate-read:guard",
     "ds": "doc:section",
     "ea": "epic:audit",
     "eb": "epic:bundle",
@@ -282,6 +283,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "files",
+      ],
+    ],
+    "duplicate-read:guard": [
+      "",
+      "automation",
+      [
+        "none",
       ],
     ],
     "e2e:retry-check": [

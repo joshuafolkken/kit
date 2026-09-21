@@ -1,4 +1,5 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import { GUARD_COMMANDS } from './josh-commands-guard'
 import { ISSUE_COMMANDS } from './josh-commands-issue'
 import { LANE_COMMANDS } from './josh-commands-lane'
 import { SPLIT_COMMANDS } from './josh-commands-split'
@@ -267,27 +268,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'automation', ['files', 'network']],
 	},
 	...LANE_COMMANDS,
-	'investigation:guard': {
-		script: 'scripts/delegation/investigation-guard.ts',
-		description:
-			'Claude Code hook: refuse a read once the unedited-read threshold is reached again (reads the tool call on stdin)',
-		category: 'AI tools',
-		reference: ['', 'automation', ['none']],
-		// **No `tsx_arguments`, for the reason `batch:guard` declares none** (joshuafolkken/kit#1342):
-		// declaring any disqualifies a command from in-process dispatch, and this one runs in front of
-		// every read. The script calls `process.loadEnvFile` itself instead, through
-		// `hook-decision.ts`.
-	},
-	'rule:guard': {
-		script: 'scripts/rules/rule-guard.ts',
-		description:
-			'Claude Code hook: deliver a trigger-delivered rule at the call that binds it (reads the tool call on stdin)',
-		category: 'AI tools',
-		reference: ['', 'automation', ['none']],
-		// **No `tsx_arguments`, for the reason the other two guards declare none**
-		// (joshuafolkken/kit#1342): declaring any disqualifies a command from in-process dispatch, and
-		// this one runs in front of every shell call.
-	},
+	...GUARD_COMMANDS,
 	'run:watcher:guard': {
 		script: 'scripts/run/run-watcher-guard-cli.ts',
 		description:

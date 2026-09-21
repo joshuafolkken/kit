@@ -40,7 +40,7 @@ import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 // The three ways a guard may behave in a lane child (joshuafolkken/kit#2164). Outside a lane child every
 // guard is `refuse`, which is why that is also the fail-safe default below.
 type LaneGuardMode = 'refuse' | 'notice' | 'off'
-type LaneGuardId = 'investigation' | 'batching' | 'rule'
+type LaneGuardId = 'investigation' | 'batching' | 'rule' | 'duplicate-read'
 
 // The mode outside a lane child, and the fail-safe for a guard nobody enumerated: a denial, the same
 // direction `delegation-policy.ts` takes, because a silenced rule is the one mistake that ships unseen.
@@ -68,6 +68,12 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 		mode_in_lane_child: 'notice',
 		because:
 			'a refusal ends a child turn so it cannot fire as one (kit#2138); kit#2164 replaced it with a notice, kit#2178 took that notice off after it did not move the density (1.00 calls per turn on both sides of it, transcript f39efeb5), and kit#2276 restores it as a notice — but a different one. #2178 turned the notice fully off, so across the 2026-09-21 backlogrun 13 runs it fired zero times and the measured 1.147 is the rate with no guidance at all, not guidance that failed. #2276 re-enables it with the two things #2164 lacked: it names the concrete recent calls the run issued one-per-turn (not just "batch more"), and it recurs every single-call turn rather than every three, so the pressure arrives as often as the mistake. The density is to be re-measured on the next backlogrun; if it still does not reach 1.40 the notice is redesigned rather than kept, per the issue',
+	},
+	{
+		id: 'duplicate-read',
+		mode_in_lane_child: 'notice',
+		because:
+			'a refusal ends a child turn so it cannot fire as one (kit#2138), and the unchanged re-reads the guard catches are measured in lane children above all (kit#2298 baseline: 8.0 per lane run) — so silencing it there (`off`) would neuter it exactly where the count lives. It takes `notice` instead: the child is nudged to scroll up to the earlier read rather than killed. The mode is a genuine experiment, as the batching notice is — a notice that does not reduce the duplicate reads on the next backlogrun is redesigned rather than kept',
 	},
 	{
 		id: 'rule',
