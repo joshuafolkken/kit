@@ -16,6 +16,7 @@ import { lane_park } from './lane-park'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
+import { rule_body_guard } from './rule-body-guard'
 import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
@@ -173,9 +174,7 @@ const NAMES_THE_BODY = /\bbody\b/u
 function projects_away_body(segment: string): boolean {
 	const projection = FIELD_PROJECTION.exec(segment)
 
-	if (projection === null) return false
-
-	return !NAMES_THE_BODY.test(projection[1] ?? '')
+	return projection !== null && !NAMES_THE_BODY.test(projection[1] ?? '')
 }
 
 function is_body_read_segment(segment: string): boolean {
@@ -466,6 +465,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	git_force.ROW,
 	worktree_guard.ROW,
 	file_body.ROW,
+	// **The first row whose trigger is an `Edit` / `Write` rather than a shell call**
+	// (joshuafolkken/kit#2272). It delivers the residency questions at the edit that writes a rule into
+	// prose, and self-gates on the tool name and the file path, so it claims no `Bash` command any row
+	// above matches — the `rules_claiming` invariant over Bash fixtures is untouched. It carries no
+	// `decide`, so it is once per run and takes the batching stand-aside `is_first_delivery` gives every
+	// default row: the batching guard treats an `Edit` as a candidate, exactly as it treats an Issue
+	// read, so this row stands aside on a batched turn and delivers on the reissue.
+	rule_body_guard.ROW,
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that
@@ -607,9 +614,7 @@ function is_first_delivery(
 	delivered_at_ms: number,
 	run: GuardRun,
 ): boolean {
-	if (delivered_at_ms !== hook_decision.NEVER_MS) return false
-
-	return !will_batch_guard_refuse(tail, call, run)
+	return delivered_at_ms === hook_decision.NEVER_MS && !will_batch_guard_refuse(tail, call, run)
 }
 
 // **For a row that decides for itself, the stand-aside changes what it protects.** For a once-per-run
