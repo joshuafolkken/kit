@@ -34,7 +34,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/agent/interactive-ask.test.ts',
 	'scripts/backlog/backlog-budget-cli.test.ts',
 	'scripts/backlog/backlog-budget.test.ts',
-	'scripts/backlog/backlog-epic-loop-fixture.test.ts',
 	'scripts/backlog/backlog-manufacturing-rule.test.ts',
 	'scripts/backlog/backlog-named.test.ts',
 	'scripts/backlog/backlog-offer.test.ts',
