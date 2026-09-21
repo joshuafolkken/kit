@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
@@ -23,10 +24,9 @@ import { batch_outcome } from './batch-guard'
 // switch (`JOSH_BATCH_GUARD` / `JOSH_INVESTIGATION_GUARD` / `JOSH_RULE_GUARD`) internally, so this
 // process needs no switch of its own.
 
-// Fold the three guards' verdicts into one. A refusal wins over everything else, and the batch
-// guard's reason is shown first to match the entry order the three separate hooks had. When nothing
-// refuses, whatever the batch guard reported (a notice, a fault, or nothing) passes through
-// untouched, since it is the only one of the three with a non-refusal disposition.
+// Fold the guards' verdicts into one. A refusal wins over everything else, and the batch guard's
+// reason is shown first to match the entry order the separate hooks had. When nothing refuses,
+// whatever the batch guard reported (a notice, a fault, or nothing) passes through untouched.
 function combine_outcomes(batch: GuardOutcome, extra_reason: string | undefined): GuardOutcome {
 	if (batch.reason !== undefined) return batch
 
@@ -37,15 +37,31 @@ function combine_outcomes(batch: GuardOutcome, extra_reason: string | undefined)
 	return batch
 }
 
-// All three run unconditionally, exactly as the three separate PreToolUse entries did: each records
-// its own once-per-run stamp, so short-circuiting on the first refusal would change which guard is
-// allowed to fire on a later call.
+function is_clear(outcome: GuardOutcome): boolean {
+	return outcome.reason === undefined && outcome.notice === undefined && outcome.fault === undefined
+}
+
+// The duplicate-read guard is `notice`-mode in a lane child, so it is the second guard that can raise a
+// non-refusal notice (joshuafolkken/kit#2298). Its notice is surfaced only where nothing else spoke —
+// a refusal from any guard, or the batch guard's own notice, wins first.
+function with_duplicate_notice(combined: GuardOutcome, notice: string | undefined): GuardOutcome {
+	if (notice === undefined || !is_clear(combined)) return combined
+
+	return { reason: undefined, notice, fault: undefined }
+}
+
+// All guards run unconditionally, exactly as the separate PreToolUse entries did: each records its own
+// once-per-run stamp, so short-circuiting on the first refusal would change which guard is allowed to
+// fire on a later call.
 function pretool_outcome(raw_payload: string): GuardOutcome {
 	const batch = batch_outcome(raw_payload)
 	const investigation = investigation_refusal(raw_payload)
+	const duplicate = duplicate_read_outcome(raw_payload)
 	const rule = delivered_rules.delivery(raw_payload)
+	const duplicate_refusal = duplicate.reason
+	const combined = combine_outcomes(batch, investigation ?? duplicate_refusal ?? rule)
 
-	return combine_outcomes(batch, investigation ?? rule)
+	return with_duplicate_notice(combined, duplicate.notice)
 }
 
 const pretool_guard = { combine_outcomes, pretool_outcome }

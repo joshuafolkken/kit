@@ -142,6 +142,7 @@ const ALIASES: Record<string, string> = {
 	lnla: 'lane:launch',
 	rwg: 'run:watcher:guard',
 	ig: 'investigation:guard',
+	drg: 'duplicate-read:guard',
 	rug: 'rule:guard',
 	ruv: 'rule:value',
 	ptg: 'pretool:guard',

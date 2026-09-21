@@ -17,12 +17,15 @@ const LANE_DIRECTORY = path.join(BASE_DIRECTORY, '.kit-lanes', LANE_ISSUE)
 const PLAIN_DIRECTORY = path.join(BASE_DIRECTORY, 'checkout')
 const LANE_CHILD_SOURCE = { JOSH_LANE_CHILD: LANE_ISSUE }
 const NO_MARK_SOURCE = {}
+// The kit#2298 guard id, named once so the enumeration cases do not repeat the literal.
+const DUPLICATE_READ = 'duplicate-read'
 
 describe('lane_guard_policy.mode_in_lane_child', () => {
 	it.each([
 		['investigation', 'off'],
 		['batching', 'notice'],
 		['rule', 'refuse'],
+		[DUPLICATE_READ, 'notice'],
 	])('says %j behaves as %s in a lane child', (id, mode) => {
 		expect(lane_guard_policy.mode_in_lane_child(id)).toBe(mode)
 	})
@@ -53,12 +56,12 @@ describe('lane_guard_policy.mode_in_lane_child', () => {
 describe('lane_guard_policy — the enumeration is the whole of it', () => {
 	// Every guard the guards themselves consult is named here, and nothing else — a guard added without a
 	// row, or a row for a guard nobody consults, is caught here rather than shipping a silent suppression.
-	it('enumerates exactly the three PreToolUse guards', () => {
+	it('enumerates exactly the four PreToolUse guards', () => {
 		const sorted = [...lane_guard_policy.KNOWN_GUARD_IDS].toSorted((left, right) =>
 			left.localeCompare(right),
 		)
 
-		expect(sorted).toEqual(['batching', 'investigation', 'rule'])
+		expect(sorted).toEqual(['batching', DUPLICATE_READ, 'investigation', 'rule'])
 	})
 
 	it('gives every row a reason', () => {
@@ -85,6 +88,7 @@ describe('lane_guard_policy.mode_here', () => {
 		['investigation', 'off'],
 		['batching', 'notice'],
 		['rule', 'refuse'],
+		[DUPLICATE_READ, 'notice'],
 	])('gives %j its enumerated mode %s in a marked lane child', (id, mode) => {
 		expect(lane_guard_policy.mode_here(id, LANE_DIRECTORY, LANE_CHILD_SOURCE)).toBe(mode)
 	})
@@ -119,6 +123,14 @@ describe('lane_guard_policy.is_suppressed_here', () => {
 	it('does not suppress the notice-mode batching guard in a marked lane child', () => {
 		expect(
 			lane_guard_policy.is_suppressed_here('batching', LANE_DIRECTORY, LANE_CHILD_SOURCE),
+		).toBe(false)
+	})
+
+	// The duplicate-read guard is `notice` in a lane child (kit#2298), not `off`, so it still speaks —
+	// `is_suppressed_here` is the `off` mode alone and must read `false` for it.
+	it('does not suppress the notice-mode duplicate-read guard in a marked lane child', () => {
+		expect(
+			lane_guard_policy.is_suppressed_here(DUPLICATE_READ, LANE_DIRECTORY, LANE_CHILD_SOURCE),
 		).toBe(false)
 	})
 

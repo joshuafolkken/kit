@@ -156,6 +156,16 @@ Refuse a file read once the run has read the threshold's worth of un-edited file
 - **Suppressed in a dispatched lane child** (`JOSH_LANE_CHILD`), because the child is itself the delegated unit the refusal asks for and cannot dispatch a sub-unit to read its own edit targets — decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` (joshuafolkken/kit#2138).
 - Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
+### `josh duplicate-read:guard`
+
+Refuse the second whole-file `Read` of a path whose content has not changed since the run last read it (joshuafolkken/kit#2298) — the re-read returns text the run already holds, and across the latest five lanes a run re-read the same unchanged path 8.0 times on average. It runs inside `pretool:guard` (composed alongside `batch:guard`, `investigation:guard` and `rule:guard`), not as a separate `PreToolUse` entry.
+
+- The transcript gives the instant the path was last read; the filesystem's `mtime` says whether it has changed since. A file whose `mtime` predates that read is refused; one that has been edited, merged or grown by a background task — anything that moves the `mtime` — is let through.
+- A read carrying an `offset` or `limit` reads a different region, so it is never refused. A stat that fails (a deleted or unreadable file) allows the call — the fallback is allow, never refuse.
+- One refusal per accumulation: a run refused once and reading on anyway is not refused again, and the refusal re-arms when a fresh successful read of the target lands after it — the same shape as `investigation:guard`.
+- **In a dispatched lane child it is a `notice`, not a refusal** (`JOSH_LANE_CHILD`), because a denial ends a headless turn — and the duplicates are measured in those children, so silencing it there would neuter it where the count lives. See the `pretool:guard` lane-child enumeration below.
+- Set `JOSH_DUPLICATE_READ_GUARD` to `off` / `0` / `false` / `no` to disable.
+
 ### `josh rule:guard`
 
 Deliver a rule at the tool call that binds it, instead of carrying it resident in `CLAUDE.md` every turn. Wired to `PreToolUse` (on `Bash` alone), fed the pending call as JSON on stdin.
@@ -183,9 +193,9 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery p
 
 ### `josh pretool:guard`
 
-The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
+The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `duplicate-read:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
-**How each of the three behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276, joshuafolkken/kit#2298). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences, kit#2298), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh stop:guard`
 
