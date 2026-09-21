@@ -179,6 +179,13 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 		expect(entry).toContain('Mid-workflow stop notification')
 	})
 
+	// joshuafolkken/kit#2296: `chain-rule.md` is how the gate itself starts, overlapped with the review,
+	// so a run that read it before the `/code-review` step had already run the gate bare. Its point-of-use
+	// trigger names the first gate launch instead.
+	it('reads chain-rule.md before the first gate launch, not before the review', () => {
+		expect(entry).toContain('Before the first `pnpm josh gate` launch')
+	})
+
 	// A command that stashes the working tree and never pops it leaves the user's changes buried in
 	// the stash list with the run reporting success. The pop is `pnpm josh stash:pop`, targeted by
 	// message, because the stash is a repository-wide stack every lane shares — a positional

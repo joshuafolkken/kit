@@ -8,6 +8,7 @@ import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
+import { edited_cspell } from './edited-cspell'
 
 // Claude Code hands a `PostToolUse` hook the tool call as JSON on stdin; for `Edit` and `Write` the
 // edited path is `tool_input.file_path`. Everything else in the payload is ignored, and a payload
@@ -459,14 +460,18 @@ function report_no_payload(): void {
 	)
 }
 
-// The lint problems come from eslint, so they are known only once the formatters have run; the
-// density line is joined to them into the single envelope the harness can parse, rather than written
-// first on its own. A hook killed at its 15s timeout is the one case this loses the density line to —
-// a run already gone pathologically wrong, per PROCESS_TIMEOUT_MS.
+// The lint problems come from eslint and the unknown words from cspell, so both are known only once
+// their processes have run; the density line is joined to them into the single envelope the harness
+// can parse, rather than written first on its own. The lint and spell blocks are composed together
+// first, then joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries
+// only one (joshuafolkken/kit#2296). A hook killed at its 15s timeout is the one case this loses the
+// density line to — a run already gone pathologically wrong, per PROCESS_TIMEOUT_MS.
 async function run_hook(payload: string): Promise<void> {
 	const notice = time_density_hook.density_notice(payload)
-	const diagnostics = await format_edited_payload(payload, process.cwd())
-	const context = compose_context(notice, diagnostics)
+	const lint = await format_edited_payload(payload, process.cwd())
+	const file_path = parse_edited_path(payload)
+	const spelling = await edited_cspell.spelling_diagnostics(file_path, process.cwd())
+	const context = compose_context(notice, compose_context(lint, spelling))
 
 	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
 }

@@ -35,6 +35,12 @@ const ISOLATED_PROJECT = 'isolated'
 // `PATH` before any worker of either project forks.
 const STATE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-state-guard.ts']
 
+// Runs in every worker of both projects, before each test, and silences the real streams for the test
+// body so a fixture's direct `process.stdout` write cannot leak into `pnpm josh test:unit`'s output
+// (joshuafolkken/kit#2296). `setupFiles` rather than `globalSetup` because it must run inside the
+// worker where the test's writes happen, not once in the main process.
+const STDOUT_GUARD: ReadonlyArray<string> = ['./scripts/test/test-stdout-guard.ts']
+
 interface UnitProjectTest {
 	name: string
 	env: Record<string, string>
@@ -43,6 +49,7 @@ interface UnitProjectTest {
 	isolate: boolean
 	testTimeout: number
 	globalSetup: ReadonlyArray<string>
+	setupFiles: ReadonlyArray<string>
 }
 
 interface UnitProject {
@@ -67,6 +74,7 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 			isolate: spec.isolate,
 			testTimeout: TEST_TIMEOUT_MS,
 			globalSetup: [...(spec.globalSetup ?? [])],
+			setupFiles: [...STDOUT_GUARD],
 		},
 	}
 }
@@ -92,6 +100,7 @@ const unit_projects = {
 	MAIN_EXCLUDE,
 	PURE_PROJECT,
 	STATE_GUARD,
+	STDOUT_GUARD,
 	UNIT_PROJECTS,
 }
 
