@@ -3,6 +3,7 @@ import { package_file } from '#scripts/claude/skill-fixture'
 import { describe, expect, it } from 'vitest'
 import { agent_read_documents } from './ai-document-fixture'
 import { document_byte_budget } from './document-byte-budget'
+import { document_reachability } from './document-reachability'
 
 const {
 	DOCUMENT_BYTE_BUDGET,
@@ -42,11 +43,25 @@ describe('agent-read document byte budget', () => {
 		},
 	)
 
-	it('budgets exactly the documents in scope — no stale entry, no un-budgeted file', () => {
+	// The secondary budget names exactly the unreached documents — the ones no entry reads
+	// (joshuafolkken/kit#2257). A document an entry reads is held by the entry total instead, so a
+	// covered document appearing here would be budgeted twice, and an unreached document missing here
+	// would be budgeted by nothing.
+	it('budgets exactly the unreached documents — no stale entry, no un-budgeted file', () => {
 		const budgeted = sorted(DOCUMENT_BYTE_BUDGET.map((entry) => entry.path))
-		const in_scope = sorted(agent_read_documents())
+		const unreached = sorted(document_reachability.unreached_documents(agent_read_documents()))
 
-		expect(budgeted).toEqual(in_scope)
+		expect(budgeted).toEqual(unreached)
+	})
+
+	// The two budgets partition the corpus: neither holds a document the other does. This is what
+	// fixes primary (entry total) and secondary (per-document) roles so they cannot double-manage a
+	// document (joshuafolkken/kit#2257).
+	it('never budgets a document some entry reads', () => {
+		const budgeted = new Set(DOCUMENT_BYTE_BUDGET.map((entry) => entry.path))
+		const covered = document_reachability.covered_documents()
+
+		expect(covered.filter((one) => budgeted.has(one))).toEqual([])
 	})
 
 	it('records every ceiling as a whole block, so no entry is a hand-picked byte count', () => {

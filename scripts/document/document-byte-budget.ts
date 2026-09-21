@@ -1,11 +1,17 @@
-// The byte ceiling for every document an agent reads in full — in one place, as a ratchet.
+// The byte ceiling for every agent-read document NO entry reads — the fallback budget, a ratchet.
 //
-// Agent-read documents (`CLAUDE.md`, `.claude/skills/**/*.md`, `prompts/**/*.md` and
-// `docs/josh-commands.md`) have been shrunk by reduction epics (joshuafolkken/kit#1929,
-// joshuafolkken/kit#1924) only to swell again, because nothing held the reduced size — a PR that
-// adds a few lines at a time goes unseen until the next reduction epic. This list is that hold:
-// `document-byte-budget.test.ts` fails `pnpm josh gate` when a document grows past its recorded
-// ceiling, when the list names a file that no longer exists, or when a file in scope has no entry
+// **This is now the secondary budget** (joshuafolkken/kit#2257). The primary one is the entry total
+// (`entry-read-budget.ts`): a document a workflow entry reads is held by that entry's total and
+// carries no ceiling here, so neither budget holds it twice. What is left for this list is the
+// documents no entry reads — the reference documents a human browses, drawn by
+// `document-reachability.ts` from `read:set`'s output rather than by a hand-written table.
+//
+// Agent-read documents (`.claude/skills/**/*.md`, `prompts/**/*.md` and `docs/josh-commands.md`) have
+// been shrunk by reduction epics (joshuafolkken/kit#1929, joshuafolkken/kit#1924) only to swell
+// again, because nothing held the reduced size — a PR that adds a few lines at a time goes unseen
+// until the next reduction epic. This list is that hold for the unreached ones:
+// `document-byte-budget.test.ts` fails `pnpm josh gate` when such a document grows past its recorded
+// ceiling, when the list names a file that no longer exists, or when an unreached file has no entry
 // here.
 //
 // THE RECORDED CEILING IS BLOCK-QUANTIZED — this is what stops parallel command-adding lanes from
@@ -53,41 +59,25 @@ function block_ceiling(size: number): number {
 	return Math.ceil(size / BLOCK_BYTES) * BLOCK_BYTES
 }
 
-// Recorded byte ceiling of each agent-read document — the block multiple at or above its size. Must
-// name exactly the set `agent_read_documents()` enumerates: the test fails on a stale entry (a file
-// that no longer exists) and on an un-budgeted file (one in scope with no entry), so the definition
-// cannot rot as documents are added or removed.
+// Recorded byte ceiling of each unreached document — the block multiple at or above its size. Must
+// name exactly the documents `document_reachability.unreached_documents()` derives: the test fails on
+// a stale entry (a file that no longer exists or that an entry now reads) and on an un-budgeted
+// unreached file, so the definition cannot rot as documents move on or off the execution path.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 32_768 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/SKILL.md', bytes: 36_864 },
-	{ path: '.claude/skills/workflow-commands/background-commands.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', bytes: 28_672 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', bytes: 28_672 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', bytes: 12_288 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 45_056 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-steps.md', bytes: 49_152 },
-	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 16_384 },
-	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 16_384 },
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 24_576 },
 	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 32_768 },
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 24_576 },
-	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
-	{ path: 'CLAUDE.md', bytes: 28_672 },
 	{ path: 'docs/josh-commands.md', bytes: 118_784 },
 	{ path: 'prompts/agent-rules.md', bytes: 4096 },
 	{ path: 'prompts/coding-standards.md', bytes: 16_384 },
