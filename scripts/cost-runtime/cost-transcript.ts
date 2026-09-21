@@ -130,20 +130,25 @@ function lane_transcript_directories(main_cwd: string, home: string): Array<stri
 }
 
 // The directories a run's transcripts might be filed under, given the working directory a command ran
-// in. Three sources are legitimate, so all are searched and `list_sessions_across` merges what they
+// in. Two sources are legitimate, so both are searched and `list_sessions_across` merges what they
 // hold:
 //   - the cwd's own slug — where a *dispatched* lane child writes, because `lane:dispatch` launches it
 //     as a `claude -p fullrun #N` process whose working directory is the lane (joshuafolkken/kit#1749);
-//   - the session-checkout's slug — where a session that stayed in the main checkout and only prefixed
-//     its commands with the lane path writes, the case `session_cwd` was added for
-//     (joshuafolkken/kit#1617);
 //   - every lane transcript directory under the main checkout's lane root — so a report run *from the
-//     main checkout* reaches the lane runs it dispatched, the reverse of the second
-//     (joshuafolkken/kit#1832).
+//     main checkout* reaches the lane runs it dispatched (joshuafolkken/kit#1832).
 //
-// **Only a checkout that resolves to itself reads the lane root**, which is what keeps the other cases
-// unchanged: a lane already resolves to its main through `session_cwd`, so it never picks up its
-// siblings, and a submodule or non-repository cwd has a lane root nothing was ever filed under.
+// **A lane never reads the main checkout it resolves to (joshuafolkken/kit#2236).** The reverse of the
+// second source — a lane reading the main checkout's slug — used to be searched as well (the
+// joshuafolkken/kit#1617 case, a session that stayed in the main checkout and only prefixed its
+// commands with the lane path). But `lane:dispatch` now runs the child *in* the lane, so the child's
+// transcript is under the lane's own slug; the main slug held only a connected conversation session's
+// transcript, which the child then measured as its own — its `--cut` verdict read that session's cost
+// and every dispatched child stopped before implementing. So the main slug is no longer a candidate
+// from a lane, and a lane's measurement reads its own records alone.
+//
+// **Only a checkout that resolves to itself reads the lane root**, which is what keeps the from-main
+// case unchanged: a lane resolves to its main through `session_cwd`, so it never picks up its siblings
+// (nor its main), and a submodule or non-repository cwd has a lane root nothing was ever filed under.
 //
 // Deduped, so a main checkout with no lanes, a submodule, or a `.git` this cannot parse searches
 // exactly one directory as before.
@@ -152,12 +157,10 @@ function lane_transcript_directories(main_cwd: string, home: string): Array<stri
 // resolving the cwd itself. It is the single point a test redirects the walk into a temporary home,
 // and a reader that re-resolved could name a directory the report never searched.
 function transcript_directories(cwd: string, home: string = homedir()): Array<string> {
-	const session = session_cwd(cwd)
 	const own = transcript_directory(cwd, home)
-	const rewritten = transcript_directory(session, home)
-	const lanes = session === cwd ? lane_transcript_directories(cwd, home) : []
+	const lanes = session_cwd(cwd) === cwd ? lane_transcript_directories(cwd, home) : []
 
-	return [...new Set([own, rewritten, ...lanes])]
+	return [...new Set([own, ...lanes])]
 }
 
 interface SessionFile {

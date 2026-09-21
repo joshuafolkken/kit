@@ -227,10 +227,10 @@ function run_context(
 	return { over: options.over, path: options.path, provider }
 }
 
-// This process's own working directory, kept as-is: the transcript search covers both a lane's own
-// slug and the main checkout that slug resolves to (joshuafolkken/kit#1825), so pre-rewriting the cwd
-// here would drop the lane's own slug and hide a dispatched child's transcript
-// (joshuafolkken/kit#1749). `time-cli.ts` gives the same reason.
+// This process's own working directory, kept as-is: from a lane the transcript search covers the
+// lane's own slug alone (joshuafolkken/kit#2236), so pre-rewriting the cwd to the main checkout here
+// would drop the lane's own slug and hide a dispatched child's transcript (joshuafolkken/kit#1749).
+// `time-cli.ts` gives the same reason.
 function run(
 	argv: ReadonlyArray<string>,
 	cwd: string = process.cwd(),
