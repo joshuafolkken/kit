@@ -426,7 +426,9 @@ single source of every one of them.
 **The residency criterion and its procedure are `rule-residency.md`, read only when a rule is being
 placed, moved or retired — never at any entry, and never during a run.** It carries question 0 (is the
 answer computable from mechanically readable inputs, so it is a decision oracle — `pnpm josh
-oracle:list`), the first question (can the trigger be named as one tool call, so the body moves out of
+oracle:list`), the ordering question (does it decide *when or in what order* rather than *what*, so it
+goes in the run driver `pnpm josh run:step` — `prompts/collaboration-workflow/residency.md` → ordering
+question), the first question (can the trigger be named as one tool call, so the body moves out of
 `CLAUDE.md` to a hook via `prompts/collaboration-workflow/rule-delivery.md`), the second question
 (does it have to fire on a turn where no skill was loaded, so it stays in `CLAUDE.md`), and the
 procedure that decides how much of a resident rule is resident — the trigger-plus-pointer shape, the
