@@ -3,6 +3,7 @@ import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { delivered_rules_harness } from './delivered-rules-harness'
+import { josh_git_bare } from './josh-git-bare'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2120: the three Bash-string rows fire through the real delivery path, and stay
@@ -18,6 +19,7 @@ const ONE_RULE = 1
 const CLAIMED_TITLE = 'is claimed by exactly one rule'
 const FORCE_CLUSTER = 'git push -uf origin main'
 const STASH_POP = 'git stash pop'
+const BARE_JOSH_GIT = 'pnpm josh git "fix the thing #5"'
 
 // A real file under the work directory, so the heredoc-to-existing-file branch is exercised through the
 // live `existsSync` rather than an injected stub — the one shape whose refusal depends on the filesystem.
@@ -143,5 +145,30 @@ describe('raw-field-body — the literal @path a raw field flag posts as text', 
 
 	it(CLAIMED_TITLE, () => {
 		expect(rules_claiming(AT_PATH_COMMENT)).toBe(ONE_RULE)
+	})
+})
+
+describe('josh-git-bare — the confirmation-less push the run reissues with -y', () => {
+	it('delivers on a bare `pnpm josh git`', () => {
+		expect(delivered_for('jg-bare', BARE_JOSH_GIT)).toBe(josh_git_bare.JOSH_GIT_BARE_REASON)
+	})
+
+	// A `-y` push carries the flag, so it is `run-tail`'s foreground push rather than this rule's — the
+	// two triggers are disjoint by the flag, so this rule never claims it.
+	it.each([
+		['-y', 'pnpm josh git -y "fix the thing #5"'],
+		['--yes', 'pnpm josh git --yes "fix the thing #5"'],
+	])('does not claim the %s form', (_name, command) => {
+		expect(delivered_for(`jgs-${_name}`, command)).not.toBe(josh_git_bare.JOSH_GIT_BARE_REASON)
+	})
+
+	it('is silent on the recovery form that skips the push', () => {
+		expect(
+			delivered_for('jgs-recovery', 'pnpm josh git -y --skip-commit --skip-push'),
+		).toBeUndefined()
+	})
+
+	it(CLAIMED_TITLE, () => {
+		expect(rules_claiming(BARE_JOSH_GIT)).toBe(ONE_RULE)
 	})
 })
