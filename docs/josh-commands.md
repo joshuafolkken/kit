@@ -31,6 +31,8 @@ pnpm josh gate --no-unit   # the three static checks only (CI only)
 
 - Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
+- **Refuses to start when the scoped pair has not been green on this tree.** A unit-included local gate reads the same record `josh review:brief` does and refuses — naming `pnpm josh lint:related && pnpm josh test:related` — so the first gate is the only gate. It never fires for `--no-unit` (CI has no scoped check in front of it) or `--force`, and `JOSH_SCOPED_GREEN=0` turns it off.
+- **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
 - Exit `1` if any check failed. Refuses any argument other than the three flags.
 - The unit leg is the long pole; [`josh test:unit`](#josh-testunit) runs it as a two-project split — same files, less wall clock, not fewer tests.
 
@@ -219,6 +221,8 @@ Run spell check, including dotfiles.
 pnpm josh cspell:dot      # includes dotfiles
 ```
 
+- Runs with `--no-progress`, so it prints only the unknown-word lines and the summary — not the per-file `N/1607 <path> cached` progress that once filled the whole output past the tool's truncation cap (joshuafolkken/kit#2296).
+
 ### `josh test:unit`
 
 Run unit tests with vitest. **Skips gracefully (exit 0)** when `vitest` is not installed. Once `vitest` and at least one test file are present, runs `vitest run`.
@@ -230,6 +234,7 @@ pnpm josh test:unit
 - `vitest` installed with **no** `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
 - **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pilot-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set (joshuafolkken/kit#2170) — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
+- **A setup file silences the real streams for each test body** (`scripts/test/test-stdout-guard.ts`), so a fixture that drives a CLI `main` cannot leak its `process.stdout` lines into the suite's output; `console.*` is untouched and the streams are restored after each test (joshuafolkken/kit#2296).
 
 ### `josh test:related`
 

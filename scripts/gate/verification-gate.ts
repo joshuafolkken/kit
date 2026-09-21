@@ -4,22 +4,16 @@ import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
-import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
-import {
-	buffered_process,
-	FAIL_EXIT_CODE,
-	type BufferedProcessResult,
-} from '#scripts/lib/buffered-process'
-import { status_icons } from '#scripts/lib/status-icons'
+import { buffered_process, FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
-import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { gate_log } from './gate-log'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
+import { gate_report, type GateStep, type GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
+import { scoped_green, type ScopedSources } from './scoped-green'
 import { type_check_step } from './type-check-step'
 
 // joshuafolkken/kit#914: the completion gate's four checks are independent and share no mutable
@@ -35,21 +29,8 @@ import { type_check_step } from './type-check-step'
 // Each step shells out to the `josh` sub-command that already defines it, rather than repeating the
 // underlying tool invocations here — one definition per check, in `josh-commands-development.ts`.
 
-const { FAIL_ICON, PASS_ICON } = status_icons
 // `process.argv` is [runner, script, ...arguments].
 const FIRST_ARGUMENT_INDEX = 2
-
-interface GateStep {
-	label: string
-	command_args: ReadonlyArray<string>
-}
-
-interface GateStepResult extends BufferedProcessResult {
-	label: string
-	// What was actually run. The type check's command is resolved per project, so a failure on the
-	// `check` step is only reproducible if the header names the command rather than the label.
-	command: string
-}
 
 const JOSH = 'josh'
 const { GATE_CHECKS, TYPE_CHECK_LABEL, UNIT_LABEL } = gate_plan
@@ -104,99 +85,6 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 	return { label: step.label, command: step.command_args.join(' '), ...result }
 }
 
-function is_gate_step_failed(result: GateStepResult): boolean {
-	return buffered_process.is_process_failed(result)
-}
-
-// A passing check's output is not read. What a green gate has to say is "all four passed", and
-// `print_gate_summary` already says it in one line — while the four bodies, vitest's per-file
-// listing among them, run to tens of kilobytes that then sit in the conversation and are re-read on
-// every later turn. The gate runs more than once per Issue, so the cost is per run, not per Issue
-// (joshuafolkken/kit#967).
-//
-// A failing check keeps its whole output: that is the one time the body is the answer. So does a
-// check that **passed without running** — `test-unit-guard` exits 0 with a notice when vitest is
-// absent, and suppressing that made a gate which ran zero tests print the same five lines as one
-// that ran them all. The marker comes from the guard itself rather than being matched by eye, so
-// the two cannot drift apart. **The guard's other empty case is no longer one of these**: vitest
-// present with no test file exits non-zero and carries no marker, so it reaches the failing branch
-// above rather than this one (joshuafolkken/kit#1224).
-function is_skip_notice(result: GateStepResult): boolean {
-	return result.output.includes(test_unit_guard.SKIP_MARKER)
-}
-
-// A check can exit 0 and still have something to say: `lint-parallel` runs eslint without
-// `--max-warnings 0`, and svelte-check reports warnings the same way. Suppressing those would let a
-// gate report "passed" with the warnings invisible, which is the same failure as hiding a skip.
-//
-// Unlike the skip marker this *is* a heuristic — the words come from third-party tools, so there is
-// no constant to share with them. It is deliberately loose: a false positive costs one printed body,
-// a false negative hides a warning, and only one of those is worth avoiding.
-const WARNING_MARKERS: ReadonlyArray<string> = ['warning', 'Warning', '⚠']
-
-function has_warnings(result: GateStepResult): boolean {
-	return WARNING_MARKERS.some((marker) => result.output.includes(marker))
-}
-
-function should_print_body(result: GateStepResult, is_verbose: boolean): boolean {
-	if (is_verbose || is_gate_step_failed(result)) return true
-
-	return is_skip_notice(result) || has_warnings(result)
-}
-
-// Seconds to one decimal, which is the resolution the answer is read at: the question a gate's
-// timing answers is "which of the four is the long pole", and no check is ever separated from
-// another by less than a tenth of a second (joshuafolkken/kit#1248).
-const MS_PER_SECOND = 1000
-const SECONDS_DECIMALS = 1
-
-function format_seconds(elapsed_ms: number): string {
-	return `${(elapsed_ms / MS_PER_SECOND).toFixed(SECONDS_DECIMALS)}s`
-}
-
-// The duration goes at the **end** of the header, after the command. The header's first job is
-// naming the one command to re-run while fixing (`docs/josh-commands.md` → `josh gate`), and a
-// number spliced in front of it would push that name out of the place a reader scans for it.
-//
-// Built rather than inlined because the log file names each section with the same string
-// (joshuafolkken/kit#1227): a header written twice is a header the two copies can disagree about,
-// and the log exists precisely to be read when the console's copy has been elided.
-function gate_step_header(result: GateStepResult): string {
-	const icon = is_gate_step_failed(result) ? FAIL_ICON : PASS_ICON
-
-	return `${icon} ${result.label} (pnpm ${result.command}) ${format_seconds(result.elapsed_ms)}`
-}
-
-function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
-	process.stdout.write(`\n${gate_step_header(result)}\n`)
-
-	if (should_print_body(result, is_verbose) && result.output) {
-		process.stdout.write(`${result.output}\n`)
-	}
-}
-
-// The total is wall-clock for the whole command, not the sum of the four — they run concurrently,
-// so a sum would report about three times what the caller waited. It is what the four are read
-// against: four checks at 9s, 5s, 3s and 15s against a total of 23s says the fan-out is working,
-// and the same four against 80s says the machine was contended rather than any check being slow.
-//
-// The log path is printed with the summary and immediately **above** the verdict line, which stays
-// last for the reason `josh-verdict.ts` gives (joshuafolkken/kit#1227).
-function print_gate_summary(
-	failed_labels: ReadonlyArray<string>,
-	elapsed_ms: number,
-	step_count: string,
-	log_path?: string,
-): void {
-	const total = format_seconds(elapsed_ms)
-	const verdict =
-		failed_labels.length === 0
-			? josh_verdict.format_gate_passed(step_count, total)
-			: josh_verdict.format_gate_failed(failed_labels.join(', '), total)
-
-	process.stdout.write(`\n${gate_log.format_log_notice(log_path)}${verdict}\n`)
-}
-
 // The record `josh review:brief` reads, written only on a fully green run and only with the tree it
 // was green on (joshuafolkken/kit#1241). `/code-review` runs in a forked process that reads none of
 // this repository's documents, so "the unit tests already passed" reaches it only if the invocation
@@ -217,7 +105,7 @@ function print_gate_summary(
 // The destination is a parameter so a test can exercise the record without overwriting the one a
 // real run may be relying on — `josh gate` and `josh review:brief` share one path by design.
 function has_nothing_to_say(result: GateStepResult): boolean {
-	return !is_skip_notice(result) && !has_warnings(result)
+	return !gate_report.is_skip_notice(result) && !gate_report.has_warnings(result)
 }
 
 async function record_green_gate(
@@ -369,6 +257,26 @@ interface GateOptions {
 	// inside `pnpm josh gate`, so a test writing to the shared path would overwrite the live gate's
 	// own log with the output of four checks that never ran.
 	log_path?: string
+	// **The scoped pre-check the CLI entry turns on** (joshuafolkken/kit#2296). Off everywhere else so
+	// that a direct `run_verification_gate` call — the whole of `verification-gate.test.ts` — is never
+	// refused by a real checkout's missing scoped record; `run_gate_command` sets it true.
+	is_scoped_enforced?: boolean
+	// The scoped records' paths, overridable so a test can plant a green pair rather than depend on the
+	// surrounding checkout's — the reason `scoped-green.ts` takes a `source` per stamp.
+	scoped_sources?: ScopedSources
+}
+
+// **The gate refuses to start when the scoped pair has not been green on this tree**
+// (joshuafolkken/kit#2296) — the same record `josh review:brief` reads, applied one step earlier so the
+// first gate is the only gate. It is the CLI entry's check alone (`is_scoped_enforced`), and it never
+// fires for CI's `--no-unit` gate or a `--force` run: CI has no scoped record in front of it, and
+// `--force` is the caller saying to run regardless. `scoped_green` owns the record and the `JOSH_SCOPED_GREEN`
+// escape hatch, so a person can always get past a record that is wrong about their tree.
+function scoped_precheck_refusal(tree: GateTree, options: GateOptions): string | undefined {
+	if (options.is_scoped_enforced !== true) return undefined
+	if (options.is_forced === true || options.is_unit_included === false) return undefined
+
+	return scoped_green.refusal_for(tree.files, tree.base, options.scoped_sources)
 }
 
 // **A partial gate records nothing green, and this is the same rule as the skip one layer out**
@@ -388,36 +296,10 @@ async function record_whole_gate(
 	await record_green_gate(results, tree.files, options.stamp_path, tree.base)
 }
 
-// Everything a finished run says, in the order a reader meets it: the four blocks, then the log the
-// blocks may have been elided out of, then the verdict. **Every check's whole output goes into the
-// log, the ones the console dropped included** — a passing body is noise on the console
-// (joshuafolkken/kit#967), and suppressed output that exists nowhere is what a `--verbose` re-run is
-// otherwise for.
-function report_gate_steps(
-	results: ReadonlyArray<GateStepResult>,
-	options: GateOptions,
-	elapsed_ms: number,
-	step_count: string,
-): ReadonlyArray<string> {
-	for (const result of results) print_gate_step(result, options.is_verbose ?? false)
-
-	const entries = results.map((result) => ({
-		header: gate_step_header(result),
-		output: result.output,
-	}))
-	const failed_labels = results
-		.filter((result) => is_gate_step_failed(result))
-		.map((result) => result.label)
-	const log_path = gate_log.write_gate_log(entries, options.log_path)
-
-	print_gate_summary(failed_labels, elapsed_ms, step_count, log_path)
-
-	return failed_labels
-}
-
 // The plan line is printed by the checked path alone. A run that announced a four-way fan-out and
 // then skipped would be describing something that never happened, and the skip's own line already
-// says everything there is to say about a gate that started no process.
+// says everything there is to say about a gate that started no process. The reporting itself is
+// `gate-report.ts`'s (joshuafolkken/kit#2296).
 async function run_checked_gate(
 	tree: GateTree,
 	options: GateOptions,
@@ -432,12 +314,12 @@ async function run_checked_gate(
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run (joshuafolkken/kit#1515).
 	const results = await run_planned_gate_steps(tree.files, plan, options.marker_path)
-	const failed_labels = report_gate_steps(
-		results,
-		options,
-		performance.now() - started_at,
-		String(plan.checks.length),
-	)
+	const failed_labels = gate_report.report_gate_steps(results, {
+		is_verbose: options.is_verbose ?? false,
+		log_path: options.log_path,
+		elapsed_ms: performance.now() - started_at,
+		step_count: String(plan.checks.length),
+	})
 
 	if (failed_labels.length > 0) return FAIL_EXIT_CODE
 
@@ -454,11 +336,11 @@ function reusable_stamp(tree: GateTree, options: GateOptions): FileMapStamp | un
 	return gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
 }
 
-async function run_verification_gate(options: GateOptions = {}): Promise<number> {
-	// Started before the tree read, so the total is what the caller waited for rather than what the
-	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
-	const started_at = performance.now()
-	const tree = await gate_tree.read_gate_tree()
+// The two ways a gate ends before it runs a check: a green record it can reuse (exit 0), and the
+// scoped pre-check refusing a tree the pair has not been green on (exit 1). `undefined` means neither
+// fired and the checks run. **Nothing else stands between the skip and the checks** (joshuafolkken/kit#1486):
+// joshuafolkken/kit#1437's `package.json` refusal was removed once children stopped bumping.
+function short_circuit_gate(tree: GateTree, options: GateOptions): number | undefined {
 	const reusable = reusable_stamp(tree, options)
 
 	if (reusable !== undefined) {
@@ -467,12 +349,24 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 		return 0
 	}
 
-	// **Nothing stands between the skip and the checks any more** (joshuafolkken/kit#1486).
-	// joshuafolkken/kit#1437 refused a gate here whenever a green record covered work whose changed
-	// files carried no `package.json`, because `pnpm josh bump minor` was certain to rewrite it and
-	// force a second gate. Children no longer bump at all — `pnpm josh release` decides the version
-	// from main's history — so that shape is now what a normal run looks like, and the refusal would
-	// reject every gate after the first green one.
+	const scoped_refusal = scoped_precheck_refusal(tree, options)
+
+	if (scoped_refusal === undefined) return undefined
+
+	process.stderr.write(`${scoped_refusal}\n`)
+
+	return FAIL_EXIT_CODE
+}
+
+async function run_verification_gate(options: GateOptions = {}): Promise<number> {
+	// Started before the tree read, so the total is what the caller waited for rather than what the
+	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
+	const started_at = performance.now()
+	const tree = await gate_tree.read_gate_tree()
+	const short_circuit = short_circuit_gate(tree, options)
+
+	if (short_circuit !== undefined) return short_circuit
+
 	return await run_checked_gate(tree, options, started_at)
 }
 
@@ -512,6 +406,7 @@ async function run_gate_command(
 	}
 
 	return await run_verification_gate({
+		is_scoped_enforced: true,
 		...options,
 		is_verbose: extra_arguments.includes(VERBOSE_FLAG),
 		is_forced: extra_arguments.includes(gate_skip.FORCE_FLAG),
@@ -535,11 +430,11 @@ const verification_gate = {
 	build_gate_step,
 	build_gate_steps,
 	clear_gate_running,
-	is_gate_step_failed,
 	mark_gate_running,
 	record_green_gate,
 	run_marked_gate_steps,
 	run_planned_gate_steps,
+	scoped_precheck_refusal,
 	with_gate_marker,
 	run_checked_gate,
 	run_gate_command,
@@ -547,5 +442,6 @@ const verification_gate = {
 	run_verification_gate,
 }
 
-export type { GateOptions, GateStep, GateStepResult }
+export type { GateOptions }
+export type { GateStep, GateStepResult } from './gate-report'
 export { GATE_TARGETS, verification_gate }

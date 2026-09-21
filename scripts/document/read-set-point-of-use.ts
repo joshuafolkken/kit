@@ -6,7 +6,8 @@
 // **Four documents leave the entry read because their first use is a named command, not the entry**
 // (joshuafolkken/kit#1797, joshuafolkken/kit#1856, joshuafolkken/kit#1873). `latest-gate.md` is read
 // when `pnpm josh latest:scope` answers `required`, `followup.md` in the turn that issues
-// `pnpm josh followup`, `chain-rule.md` before the `/code-review` step it governs, and
+// `pnpm josh followup`, `chain-rule.md` before the first `pnpm josh gate` launch it governs
+// (joshuafolkken/kit#2296 — the section is how that gate starts, overlapped with the review), and
 // `background-commands.md` before the first backgroundable command (`pnpm josh gate`). **They are
 // not deferred or summarized** — the named operational section is fetched in the same turn; only
 // `latest-gate.md` remains whole because its result branches across that document.
