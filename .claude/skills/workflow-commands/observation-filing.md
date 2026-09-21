@@ -293,6 +293,15 @@ it is counted rather than judged:
 is already open, and `pnpm josh issue:scout` is what finds it; the extra lines are evidence for that
 Issue, not new ones.
 
+### A user-found bug is recorded by its kind of miss (user-found)
+
+**A user-reported bug is fixed or filed as always; this records the *kind of miss* alongside so the
+category never recurs as a first sighting** (joshuafolkken/kit#2246). The key is the **category of
+oversight** — `k:missed-case-worktree` — so a second bug of the same kind counts against the first.
+**Depth `d1`, never `d0`**: the *kind of miss* is what a run fails to enumerate, which the table puts
+at depth 1. Nothing else changes; the `<what>` field leads with `User-reported:`, and no second
+ledger, format or threshold is added.
+
 ### A delegated child does not take this route
 
 **A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary

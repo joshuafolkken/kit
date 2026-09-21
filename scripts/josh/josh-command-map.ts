@@ -151,6 +151,7 @@ const ALIASES: Record<string, string> = {
 	shs: 'sonar:hotspots',
 	uir: 'ui:routes',
 	cs: 'clone:scan',
+	ca: 'cases',
 }
 
 // The canonical name of a `josh` subcommand: an alias expands, and anything else passes through
