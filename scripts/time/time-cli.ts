@@ -69,9 +69,10 @@ async function run_tree(cwd: string, is_json: boolean): Promise<number> {
 	return cost_run_report.run(cwd, undefined, is_json, lead)
 }
 
-// **The default is this process's own working directory, searched at both slugs.** A dispatched lane
-// child writes its transcript under the lane's own slug (joshuafolkken/kit#1749); `--path <dir>` reads
-// the target project instead of the process cwd (joshuafolkken/kit#1987).
+// **The default is this process's own working directory.** A dispatched lane child writes its
+// transcript under the lane's own slug, which is all a lane searches (joshuafolkken/kit#1749,
+// joshuafolkken/kit#2236); `--path <dir>` reads the target project instead of the process cwd
+// (joshuafolkken/kit#1987).
 async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
 	const options = parse_options(argv)
 
