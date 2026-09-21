@@ -284,12 +284,13 @@ describe('batch_refusal — a forked agent is judged on its own transcript', () 
 	})
 })
 
-describe('batch_outcome — a dispatched lane child is silent, neither notified nor refused', () => {
-	// joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178: a *refusal* ends a headless
-	// child's turn rather than guiding it, so kit#2164 downgraded the guard to a notice — but the notice
-	// was measured not to move the density (the lane child after kit#2164 merged ran at 1.00 calls per turn
-	// on both sides of it), so kit#2178 takes the guard `off` in a lane child. Set up here as
-	// `lane-park.test.ts` sets up its own lane case.
+describe('batch_outcome — a dispatched lane child is notified, not refused (kit#2276)', () => {
+	// joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276: a
+	// *refusal* ends a headless child's turn rather than guiding it, so it never fires as one in a child;
+	// kit#2164 downgraded it to a notice, kit#2178 took that notice `off` after it did not move the
+	// density, and kit#2276 restores it as a notice — the call proceeds with the guidance attached, so a
+	// headless child is nudged and never killed. Set up here as `lane-park.test.ts` sets up its own lane
+	// case.
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
@@ -300,20 +301,21 @@ describe('batch_outcome — a dispatched lane child is silent, neither notified 
 		process.chdir(ENTRY_DIRECTORY)
 	})
 
-	// The enumeration says `off`, and the guard obeys it — asserted together so the two cannot drift
+	// The enumeration says `notice`, and the guard obeys it — asserted together so the two cannot drift
 	// apart, which is the "enumeration and live behavior cannot disagree" half of the acceptance criteria.
-	it('reads its lane-child mode as off', () => {
-		expect(lane_guard_policy.mode_in_lane_child('batching')).toBe('off')
+	it('reads its lane-child mode as notice', () => {
+		expect(lane_guard_policy.mode_in_lane_child('batching')).toBe('notice')
 	})
 
-	// **The guard says nothing at all.** An `off`-mode guard is skipped before the transcript is read, so a
-	// refusable call at the limit comes back with neither a notice nor a reason and proceeds untouched —
-	// the per-turn context cost kit#2164's ineffective notice carried is gone (joshuafolkken/kit#2178).
-	it('delivers neither a notice nor a refusal on the third single-call turn in a lane child', () => {
-		const { reason, notice } = batch_outcome(payload_of('lane-silent'), NOW_MS)
+	// **The guard notifies without refusing.** A refusable call at the limit comes back with a notice that
+	// carries the guidance — and, since kit#2276, names the concrete recent calls — but no reason, so the
+	// call proceeds and the headless child's turn is never ended.
+	it('delivers a notice naming the recent calls, and no refusal, on the third single-call turn', () => {
+		const { reason, notice } = batch_outcome(payload_of('lane-notice'), NOW_MS)
 
 		expect(reason).toBeUndefined()
-		expect(notice).toBeUndefined()
+		expect(notice).toContain('batching')
+		expect(notice).toContain('Read a.ts')
 	})
 
 	// **The #2164 non-regression.** kit#2138 measured a child killed before its commit by three refusals;

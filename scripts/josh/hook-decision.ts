@@ -198,12 +198,13 @@ interface NotifySpec {
 	// The same shape as `should_block`, asked of the tail for a notify-only call. `notified_at_ms` is
 	// this disposition's own last-fired instant, never the refusal's.
 	should_notify: (tail: string, call: GuardedCall, notified_at_ms: number, run: GuardRun) => boolean
-	// The non-blocking text handed to `notice_envelope`, chosen from the call
-	// (joshuafolkken/kit#2164). A guard now notifies about more than one kind of call — the whole-file
-	// write it cannot refuse, and, in a lane child, a refusable call whose refusal is downgraded to a
-	// notice — and the two want different wording, so the text is a function of the call rather than a
-	// fixed string.
-	text: (call: GuardedCall) => string
+	// The non-blocking text handed to `notice_envelope`, chosen from the call and the tail
+	// (joshuafolkken/kit#2164, joshuafolkken/kit#2276). A guard now notifies about more than one kind of
+	// call — the whole-file write it cannot refuse, and, in a lane child, a refusable call whose refusal
+	// is downgraded to a notice — and the two want different wording, so the text is a function of the
+	// call. It is handed the tail as well so a notice can name the concrete calls the run just issued
+	// one-per-turn (#2276); a guard whose wording is fixed is free to ignore it.
+	text: (call: GuardedCall, tail: string) => string
 }
 
 interface TranscriptGuardSpec {
@@ -319,7 +320,7 @@ function notify_outcome(context: GuardContext): GuardOutcome {
 		spec.switch_key,
 	)
 
-	if (result.fired) return { reason: undefined, notice: notify.text(call), fault: undefined }
+	if (result.fired) return { reason: undefined, notice: notify.text(call, tail), fault: undefined }
 
 	return { reason: undefined, notice: undefined, fault: result.fault }
 }

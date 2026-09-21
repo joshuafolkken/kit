@@ -21,7 +21,7 @@ const NO_MARK_SOURCE = {}
 describe('lane_guard_policy.mode_in_lane_child', () => {
 	it.each([
 		['investigation', 'off'],
-		['batching', 'off'],
+		['batching', 'notice'],
 		['rule', 'refuse'],
 	])('says %j behaves as %s in a lane child', (id, mode) => {
 		expect(lane_guard_policy.mode_in_lane_child(id)).toBe(mode)
@@ -83,7 +83,7 @@ describe('lane_guard_policy.mode_here', () => {
 	// In a marked lane child every guard takes its enumerated mode — this is the table the wrappers read.
 	it.each([
 		['investigation', 'off'],
-		['batching', 'off'],
+		['batching', 'notice'],
 		['rule', 'refuse'],
 	])('gives %j its enumerated mode %s in a marked lane child', (id, mode) => {
 		expect(lane_guard_policy.mode_here(id, LANE_DIRECTORY, LANE_CHILD_SOURCE)).toBe(mode)
@@ -113,13 +113,13 @@ describe('lane_guard_policy.is_suppressed_here', () => {
 		).toBe(true)
 	})
 
-	// **The batching guard is suppressed in a lane child now (kit#2178).** kit#2164's notice was measured
-	// not to move the density, so it is `off` there — it says nothing at all, exactly as the investigation
-	// guard does. `is_suppressed_here` is what the batch-guard wrapper reads to skip the guard entirely.
-	it('suppresses the off-mode batching guard in a marked lane child', () => {
+	// **The batching guard is not suppressed in a lane child since kit#2276.** It is `notice` there again,
+	// not `off`, so `is_suppressed_here` — which is the `off` mode alone — must read `false`: the guard
+	// still speaks, it only withholds the `permissionDecision` that would end a headless child's turn.
+	it('does not suppress the notice-mode batching guard in a marked lane child', () => {
 		expect(
 			lane_guard_policy.is_suppressed_here('batching', LANE_DIRECTORY, LANE_CHILD_SOURCE),
-		).toBe(true)
+		).toBe(false)
 	})
 
 	it('never suppresses a refuse-mode guard in a lane child', () => {

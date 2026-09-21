@@ -426,19 +426,42 @@ describe('time_batch_guard.should_notify — what it will not notify', () => {
 
 		expect(time_batch_guard.should_notify(text, call, NEVER_REFUSED)).toBe(false)
 	})
+})
 
-	// The re-fire cadence governs the notice exactly as it governs the refusal (joshuafolkken/kit#2164):
-	// fewer than `REFIRE_EVERY` single-call turns have closed since the last notice, so it is not repeated
-	// yet — the same interval, read against the notice's own last-fired instant.
-	it('says nothing before REFIRE_EVERY turns have closed since the last notice', () => {
+// **The notice has its own tighter cadence since joshuafolkken/kit#2276.** A notice cannot wedge a run
+// the way a refusal can, so it recurs every `NOTICE_REFIRE_EVERY` single-call turn rather than the
+// refusal's `REFIRE_EVERY` — the `N` #2276 measured as too long, kept apart as its own single constant.
+// On the fixture grid turn 2 is the last closed turn and ends on minute 6: a notice recorded then has no
+// further single-call turn behind it, while one recorded on minute 4 has turn 2 as the single one since.
+describe('time_batch_guard.should_notify — the notice cadence (kit#2276)', () => {
+	const write_run = transcript(
+		target_turn_lines(0, ['a.ts'], WRITE_TOOL),
+		target_turn_lines(1, ['b.ts'], WRITE_TOOL),
+		target_turn_lines(2, ['c.ts'], WRITE_TOOL),
+		open_turn_lines(3, ['d.ts'], WRITE_TOOL),
+	)
+
+	it.each([
+		['no further turn has closed since', ms(6), false],
+		['one further turn has closed since', ms(4), true],
+	])('recurs correctly when %s the last notice', (_label, last_notified, expected) => {
+		expect(time_batch_guard.should_notify(write_run, WRITE_CALL, last_notified)).toBe(expected)
+	})
+})
+
+// joshuafolkken/kit#2276. The notice names the concrete recent single-call turns so a reader is shown
+// the calls to batch rather than only told to batch — the untried half of "why #2164's notice did not
+// work". The closed turns are named with their tool and file; a transcript with no such run names
+// nothing, so the notice falls back to its guidance alone.
+describe('time_batch_guard.recent_candidates', () => {
+	it('names the recent single-call turns, and nothing where there are none', () => {
 		const text = transcript(
-			target_turn_lines(0, ['a.ts'], WRITE_TOOL),
-			target_turn_lines(1, ['b.ts'], WRITE_TOOL),
-			target_turn_lines(2, ['c.ts'], WRITE_TOOL),
-			open_turn_lines(3, ['d.ts'], WRITE_TOOL),
+			target_turn_lines(0, ['a.ts']),
+			target_turn_lines(1, ['b.ts']),
+			open_turn_lines(2, ['c.ts']),
 		)
-		const after_the_sequence_began = ms(3)
 
-		expect(time_batch_guard.should_notify(text, WRITE_CALL, after_the_sequence_began)).toBe(false)
+		expect(time_batch_guard.recent_candidates(text)).toContain('Read a.ts')
+		expect(time_batch_guard.recent_candidates('')).toBe('')
 	})
 })
