@@ -18,6 +18,10 @@ import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { bash_output_cap_reader } from './bash-output-cap'
 import { document_section, type Section } from './document-section'
+import { read_set_point_of_use } from './read-set-point-of-use'
+
+const { POINT_OF_USE_FILES, POINT_OF_USE_BY_ENTRY, is_point_of_use, point_of_use_files } =
+	read_set_point_of_use
 
 const SKILL_DIRECTORY = path.join('.claude', 'skills', 'workflow-commands')
 const SKILL_FILE = 'SKILL.md'
@@ -25,61 +29,9 @@ const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
 const ONE_LINE = 1
 
-// **Four documents leave the entry read because their first use is a named command, not the entry**
-// (joshuafolkken/kit#1797, joshuafolkken/kit#1856, joshuafolkken/kit#1873). `latest-gate.md` is read
-// when `pnpm josh latest:scope` answers `required`, `followup.md` in the turn that issues
-// `pnpm josh followup`, `chain-rule.md` before the `/code-review` step it governs, and
-// `background-commands.md` before the first backgroundable command (`pnpm josh gate`). **They are
-// not deferred or summarized** — the named operational section is fetched in the same turn; only
-// `latest-gate.md` remains whole because its result branches across that document.
-// Measured on `fullrun #1783`, `followup.md` rode 55 requests before its first use. **`chain-rule.md`
-// is joshuafolkken/kit#1856's addition**: it governs the `/code-review` → `followup` chain, which in
-// `fullrun` / `queue` / `epicrun` / `backlogrun` runs *after* the first edit, so its 7,396 tokens
-// were resident from the entry for no run that had yet reached a review.
-// **`background-commands.md` is joshuafolkken/kit#1873's**: it was §2h's resident body, governing the
-// background execution of the gate, the push and the merge tail — all after the first edit — so it
-// left `SKILL.md` for the point-of-use list. `SKILL.md` → §1, "Four documents are read at the point
-// of use", is the single source.
-// **`backlogrun`'s own per-child phase documents are point-of-use too** (joshuafolkken/kit#2010):
-// `backlogrun.md` was split so the entry read carries only what binds before the first child, and the
-// four phase documents below are read from it at the step each names — dispatching a child, opening a
-// lane, the progress watcher and the hand-off, a child that cannot finish — never at the entry. Kept
-// out of the count here, exactly as the four above are. `SKILL.md` → §1 is the human source.
-// **`backlogrun-steps.md` joins them** (joshuafolkken/kit#2190): `backlogrun.md` was cut to a manifest
-// and its detailed procedure moved into `backlogrun-steps.md`, read on demand rather than at the
-// entry. Counting the manifest's pointers into it would put that prose straight back into the entry
-// figure under another name, which is exactly what this reduction removes.
-const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
-	'latest-gate.md',
-	'followup.md',
-	'chain-rule.md',
-	'background-commands.md',
-	'backlogrun-child.md',
-	'backlogrun-lanes.md',
-	'backlogrun-progress.md',
-	'backlogrun-park.md',
-	'backlogrun-steps.md',
-])
-
-// **A file an entry names but reads only later — point-of-use for that entry, an entry read for
-// another** (joshuafolkken/kit#2161). The global set above cannot express this, because a file
-// dropped there leaves *every* entry's read. `backlogrun`'s parent orchestrates and never
-// implements: a dispatched child reads `fullrun.md` and `split-assessment.md` inside its own
-// delegated `fullrun` unit (`backlogrun-child.md`), so the parent pays for neither at its entry —
-// while `fullrun`, `halfrun` and `kickoff` each read them at theirs. Keyed by entry keyword; an entry
-// the map does not name drops nothing beyond the global set.
-const POINT_OF_USE_BY_ENTRY: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-	['backlogrun', new Set(['fullrun.md', 'split-assessment.md'])],
-])
-
-const NO_PER_ENTRY_FILES: ReadonlySet<string> = new Set()
-
-// **A file is point-of-use for an entry when the global set names it, or the per-entry map does.**
-function is_point_of_use(entry: string, file: string): boolean {
-	if (POINT_OF_USE_FILES.has(file)) return true
-
-	return (POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES).has(file)
-}
+// The point-of-use classification — which documents an entry names but reads only at a later step —
+// is its own concern, split into `read-set-point-of-use.ts` in joshuafolkken/kit#2289. This file
+// reads that classification to drop those files from the entry read and to cost them separately.
 
 // The fetch cap a `cat` truncates at, and the harness default it falls back to, are read from
 // `bash-output-cap.ts` — split out in joshuafolkken/kit#2161 to keep this file under its line ceiling.
@@ -470,12 +422,6 @@ function point_of_use_cost(
 	if (reference !== undefined) return section_cost(root, reference)
 
 	return { file, heading: '', cost: cost_of(read_document(root, file)), is_resolved: true }
-}
-
-// The global point-of-use files plus the ones this entry names in its own row — for `backlogrun`,
-// `fullrun.md` and `split-assessment.md`, so the report accounts for what the child reads later.
-function point_of_use_files(entry: string): Array<string> {
-	return [...POINT_OF_USE_FILES, ...(POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES)]
 }
 
 function point_of_use_costs(root: string, entry: string): Array<SectionCost> {

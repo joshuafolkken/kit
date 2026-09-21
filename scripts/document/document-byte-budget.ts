@@ -73,7 +73,10 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 24_576 },
-	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 32_768 },
+	// `pre-gate-cut.md` left this per-document budget in joshuafolkken/kit#2289: it became a point-of-use
+	// document, so its bytes are now held by every entry's total read (`entry-read-budget.ts`) and the
+	// two budgets must not hold it twice — the reachability line moved it from `unreached` to
+	// `point-of-use`.
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 24_576 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },

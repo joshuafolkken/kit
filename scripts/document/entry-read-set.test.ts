@@ -297,6 +297,34 @@ describe('entry_read_set — backlogrun-steps.md is point-of-use (joshuafolkken/
 	})
 })
 
+describe('entry_read_set — pre-gate-cut.md is point-of-use (joshuafolkken/kit#2289)', () => {
+	// The pre-gate cut is a step every implementing run — and every dispatched lane child — reaches
+	// after the entry, and `pre-gate-cut.md` is its single source, so its read is a point-of-use read.
+	// It was silently omitted from the count: measured on the backlogrun of 2026-09-21 the lane children
+	// read it 21 times across 13 runs, the largest single document read, with no row on the point-of-use
+	// list. This is the named guard the acceptance criterion asks for — removing the file from the set
+	// fails it.
+	const PRE_GATE_CUT = 'pre-gate-cut.md'
+
+	it('classifies pre-gate-cut.md as a point-of-use document', () => {
+		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(PRE_GATE_CUT)
+	})
+
+	it('keeps pre-gate-cut.md out of the entry read of every entry', () => {
+		for (const entry of EXPECTED_ENTRIES) {
+			expect(entry_read_set.read_set(ROOT, entry).files).not.toContain(PRE_GATE_CUT)
+		}
+	})
+
+	// The saving is not a disappearance: the run reads it later, so the cost report accounts for it
+	// under the point-of-use, and the total read counts the ~7k tokens the old figure was short.
+	it.each([...IMPLEMENTING])('reports pre-gate-cut.md under the %s point-of-use', (entry) => {
+		const files = entry_read_set.costed(ROOT, entry).point_of_use.map((one) => one.file)
+
+		expect(files).toContain(PRE_GATE_CUT)
+	})
+})
+
 describe('entry_read_set — eval-gate.md is gone from the read set (joshuafolkken/kit#1922)', () => {
 	const EVAL_GATE = 'eval-gate.md'
 

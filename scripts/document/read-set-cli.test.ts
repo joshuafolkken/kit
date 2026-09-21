@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { document_section_cli } from './document-section-cli'
 import { read_set_cli } from './read-set-cli'
+import { read_set_pricing } from './read-set-pricing'
 
 // joshuafolkken/kit#1776. Both commands are read at the same place — the entry point — so both are
 // asserted here: the one that fetches a section, and the one that says what the entry costs.
@@ -130,6 +131,26 @@ describe('josh read:set', () => {
 				scoped: empty,
 			}),
 		).toBe(SUCCESS)
+	})
+})
+
+// joshuafolkken/kit#2289: every file row, section row and total row carries a per-run dollar figure,
+// and the report states the run size it assumes so the reader checks the premise rather than doing the
+// arithmetic in their head.
+describe('josh read:set — the dollar column', () => {
+	it('prints a per-run dollar figure and the assumed run size', () => {
+		const { out } = captured(() => read_set_cli.run([BACKLOGRUN], ROOT))
+
+		expect(out).toMatch(/\$\d+\.\d{2}/u)
+		expect(out).toContain(`${String(read_set_pricing.ASSUMED_REQUESTS)}-request run`)
+	})
+
+	// The dollar column is on the total row too, not only the file rows.
+	it('carries the dollar figure onto the total-read line', () => {
+		const { out } = captured(() => read_set_cli.run([BACKLOGRUN], ROOT))
+		const total = out.split('\n').find((line) => line.includes(read_set_cli.TOTAL_READ_LABEL)) ?? ''
+
+		expect(total).toMatch(/\$\d+\.\d{2}/u)
 	})
 })
 
