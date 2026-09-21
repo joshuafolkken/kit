@@ -71,41 +71,44 @@ describe('stop_rules.stop_outcome — pre-gate cut', () => {
 })
 
 describe('stop_rules.stop_outcome — issue citation', () => {
-	it('corrects a bare #N by naming it and the issue:cite call that fixes it', () => {
-		const { notice } = stop_rules.stop_outcome(context({ message: 'done in #123 and #456' }))
+	it('blocks a bare #N by naming it and the issue:cite call that fixes it', () => {
+		const { reason } = stop_rules.stop_outcome(context({ message: 'done in #123 and #456' }))
 
-		expect(notice).toContain('#123, #456')
-		expect(notice).toContain('pnpm josh issue:cite 123 456')
-		expect(notice).toContain('issue-citation.md')
+		expect(reason).toContain('#123, #456')
+		expect(reason).toContain('pnpm josh issue:cite 123 456')
+		expect(reason).toContain('issue-citation.md')
 	})
 
 	it('carries an owner/repo#N reference through to the issue:cite argument', () => {
-		const { notice } = stop_rules.stop_outcome(context({ message: 'see joshuafolkken/kit#45' }))
+		const { reason } = stop_rules.stop_outcome(context({ message: 'see joshuafolkken/kit#45' }))
 
-		expect(notice).toContain('pnpm josh issue:cite joshuafolkken/kit#45')
+		expect(reason).toContain('pnpm josh issue:cite joshuafolkken/kit#45')
 	})
 
 	it('is silent on a link-form citation', () => {
 		const message = 'done in [#123](https://github.com/o/r/issues/123)'
 
-		expect(stop_rules.stop_outcome(context({ message })).notice).toBeUndefined()
+		expect(stop_rules.stop_outcome(context({ message })).reason).toBeUndefined()
 	})
 
-	it('lets a block take precedence over a notice', () => {
+	it('does not block a bare #N once stop_hook_active is set', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({ message: 'done in #7', stop_hook_active: true }),
+		)
+
+		expect(outcome.reason).toBeUndefined()
+	})
+
+	it('lets an earlier block rule take precedence over the citation rule', () => {
 		const outcome = stop_rules.stop_outcome(context({ hold_present: true, message: 'paused #7' }))
 
 		expect(outcome.reason).toBe(stop_rules.STOP_NOTIFY_REASON)
-		expect(outcome.notice).toBeUndefined()
 	})
 })
 
 describe('stop_rules envelopes and payload', () => {
 	it('blocks with a decision envelope', () => {
 		expect(JSON.parse(stop_rules.block_envelope('r'))).toEqual({ decision: 'block', reason: 'r' })
-	})
-
-	it('notices with a systemMessage envelope', () => {
-		expect(JSON.parse(stop_rules.notice_envelope('n'))).toEqual({ systemMessage: 'n' })
 	})
 
 	it('parses a valid Stop payload and rejects a malformed one', () => {

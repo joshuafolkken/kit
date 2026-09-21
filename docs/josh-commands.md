@@ -185,7 +185,7 @@ The `PreToolUse` dispatcher that routes each pending tool call to the delivered-
 
 ### `josh stop:guard`
 
-The `Stop` hook (joshuafolkken/kit#2121): one process delivering the three stop-time rules — stop-notification and hold-release **block** the stop, issue-citation **notices** a bare `#N`. Built on `hook-decision.ts`, `lane-park.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247): one process delivering the three stop-time rules — stop-notification, hold-release and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
 ### `josh session:lang`
 

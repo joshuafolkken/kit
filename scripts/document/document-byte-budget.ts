@@ -90,7 +90,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/epic-bundle.md', bytes: 24_576 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
-	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 24_576 },
 	{ path: 'prompts/collaboration-workflow/latest-first.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/no-clones.md', bytes: 4096 },

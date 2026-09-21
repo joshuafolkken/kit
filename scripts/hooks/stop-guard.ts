@@ -79,14 +79,13 @@ async function outcome_of(raw_payload: string): Promise<StopOutcome> {
 }
 
 // Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop
-// is being held or a notice is due.
+// is being held — all three rules block, so a bare `#N` is reported the same way (joshuafolkken/kit#2247).
 async function write_stop_decision(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
 
-	const { reason, notice } = await outcome_of(raw_payload)
+	const { reason } = await outcome_of(raw_payload)
 
 	if (reason !== undefined) process.stdout.write(`${stop_rules.block_envelope(reason)}\n`)
-	else if (notice !== undefined) process.stdout.write(`${stop_rules.notice_envelope(notice)}\n`)
 }
 
 const stop_guard = { outcome_of, stop_outcome_for_payload }

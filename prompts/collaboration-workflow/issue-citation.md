@@ -32,3 +32,7 @@
 ### なぜ CLAUDE.md に常駐させるか
 
 規則の発火点は「セッション向け出力で Issue 番号を書こうとした瞬間」であり、これはワークフローのスキルを読んでいないターンでも起こる。したがって発火点（引き金）と形式は `CLAUDE.md` の Communication 節に常駐させ、本文（この節）を話題ファイルに置く。常駐側は短く保ち、詳細はここから読む。
+
+### 停止時の担保（joshuafolkken/kit#2247）
+
+`Stop` フック `pnpm josh stop:guard` が返信の地の文に裸の `#N` を見つけると**停止をブロックし**、その番号と `pnpm josh issue:cite <N...>` の実行形をモデルへ差し戻す。`{"decision":"block"}` は `Stop` からモデルへ文字を届ける唯一の経路で、`stop_hook_active` がループを断つので誤検出でも空転は 1 ターンで止まる。検出が外す範囲（リンク形式・コード・引用行・PR 参照）は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard` を参照。
