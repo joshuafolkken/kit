@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { bytes_command } from './bytes-command'
 
-const { argument_row, near_ceiling_statuses, status_row, NOT_A_FILE, NOT_BUDGETED } = bytes_command
+const { argument_row, entry_row, entry_rows, near_ceiling_statuses } = bytes_command
+const { scan_lines, status_row, NOT_A_FILE, NOT_BUDGETED } = bytes_command
 
 const JOSH_COMMANDS = 'docs/josh-commands.md'
 
@@ -57,5 +58,31 @@ describe('near_ceiling_statuses — the no-argument scan', () => {
 		const headrooms = statuses.map((status) => status.remaining)
 
 		expect(headrooms).toStrictEqual([...headrooms].toSorted((left, right) => left - right))
+	})
+})
+
+describe('entry_row — the primary per-entry budget', () => {
+	it('names the entry, its counts and the headroom left when within the ceiling', () => {
+		const row = entry_row({ entry: 'fullrun', current: 900, recorded: 1000, remaining: 100 })
+
+		expect(row).toContain('entry fullrun')
+		expect(row).toContain('900/1000 bytes')
+		expect(row).toContain('100 left')
+	})
+
+	it('names the overage when an entry reads past its ceiling', () => {
+		const row = entry_row({ entry: 'kickoff', current: 1200, recorded: 1000, remaining: -200 })
+
+		expect(row).toContain('over by 200')
+	})
+})
+
+describe('scan_lines — the scan carries the main budget below the documents', () => {
+	it('prints one entry row for every budgeted entry', () => {
+		const lines = scan_lines()
+		const entry_lines = lines.filter((line) => line.startsWith('entry '))
+
+		expect(entry_lines).toStrictEqual([...entry_rows()])
+		expect(entry_lines.length).toBeGreaterThan(0)
 	})
 })

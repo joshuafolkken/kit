@@ -615,6 +615,16 @@ Print the whole backlog as a plan: ready now, waiting on what, waiting on a pers
 
 ---
 
+### `josh cases` · `josh ca`
+
+> **Audience:** automation · **Side effects:** files
+
+`<path...>`
+
+Read changed paths and print the I/O boundaries crossed and their mandatory abnormal cases: network | process | fs | none
+
+---
+
 ### `josh clone:scan` · `josh cs`
 
 > **Audience:** automation · **Side effects:** files
@@ -992,6 +1002,16 @@ Say whether the second /code-review round is due, or may be skipped entirely
 _No arguments._
 
 Claude Code hook: deliver a trigger-delivered rule at the call that binds it (reads the tool call on stdin)
+
+---
+
+### `josh rule:value` · `josh ruv`
+
+> **Audience:** developer · **Side effects:** none
+
+_No arguments._
+
+Print each delivered rule's unaided compliance — runs reached, kept rate, refusals
 
 ---
 

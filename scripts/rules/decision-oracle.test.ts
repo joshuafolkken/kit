@@ -1,3 +1,4 @@
+import { cases } from '#scripts/cases/cases-logic'
 import { clone_scan } from '#scripts/clone/clone-scan'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { git_epic_reconcile } from '#scripts/git/git-epic-reconcile'
@@ -167,6 +168,18 @@ describe('vocabulary matches the code for run:step oracle', () => {
 
 	it('declares exactly the verdict tokens run:step can print', () => {
 		expect(STEP_ORACLE?.vocabulary).toEqual(run_step.VOCABULARY)
+	})
+})
+
+describe('vocabulary matches the code for cases oracle', () => {
+	const CASES_ORACLE = decision_oracle.find_oracle('cases')
+
+	it('cases oracle exists', () => {
+		expect(CASES_ORACLE).toBeDefined()
+	})
+
+	it('declares exactly the boundary tokens plus none', () => {
+		expect(CASES_ORACLE?.vocabulary).toEqual(cases.VOCABULARY)
 	})
 })
 

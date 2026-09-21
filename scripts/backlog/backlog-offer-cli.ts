@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
+import { rule_value_cli } from '#scripts/rules/rule-value-cli'
 import { backlog_offer, type OfferAnswer } from './backlog-offer'
 
 // `josh backlog:offer` — one composite command for a `backlogrun` loop-head event
@@ -150,6 +151,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (values === undefined) return refuse()
 
+	// The loop head is the one place `rule:value` is called from: once per iteration, the parent's
+	// context still small, so a rule that never fires shows up as a printed row rather than as
+	// something a person has to remember to measure (joshuafolkken/kit#2271). It reports to stderr and
+	// never fails, so a broken reading never stops the backlog.
+	rule_value_cli.emit()
+
 	const counts = counts_of(values)
 
 	if (counts === undefined) return refuse()
@@ -160,8 +167,10 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		counts.running,
 		counts.retries,
 	)
-	const budget_command = budget_argv(values, offer.answer)
-	const budget = await josh_command.josh_run(budget_command, should_forward_stderr)
+	const budget = await josh_command.josh_run(
+		budget_argv(values, offer.answer),
+		should_forward_stderr,
+	)
 
 	if (budget.code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
 

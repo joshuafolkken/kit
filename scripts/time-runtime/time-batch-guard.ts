@@ -83,6 +83,24 @@ const REFIRE_EVERY = CONSECUTIVE_LIMIT
 const ONE_TURN = 1
 const NONE = 0
 
+// **The notice's own re-fire interval, and the `N` joshuafolkken/kit#2276 measured as too long.** A
+// refusal that fired every single-call turn would refuse a run only one call past a reminder it just
+// answered, so `REFIRE_EVERY` holds the refusal at the initial limit. **A notice cannot wedge** — the
+// call proceeds either way — so nothing makes the notice pay that caution, and #2164 reusing the
+// refusal's three-turn cadence for it is why a lane child single-calling was nudged only once per three
+// mistakes. This is a single constant, the one the acceptance criteria name, kept apart from
+// `REFIRE_EVERY` so the refusal's cadence and the notice's cannot drift into one number that is wrong
+// for one of them.
+const NOTICE_REFIRE_EVERY = ONE_TURN
+
+// **How many of the most recent single-call turns the notice names** (joshuafolkken/kit#2276). #2164's
+// notice ended at "batch what follows" and named no call, and the density did not move; naming the
+// concrete calls the run just issued one-per-turn is the untried half of "why it did not work" — a
+// reader shown *these three reads had no dependency* has something to act on that "batch more" never
+// gave. Three, so the notice carries the sequence that tripped the limit without growing the per-turn
+// context it rides on.
+const NAMED_CANDIDATE_COUNT = 3
+
 // **The turns already closed, so the one being interrupted is not among them.** A span exists only
 // once its result has come back, and the call being judged has not run yet — so a sequence of
 // `CONSECUTIVE_LIMIT - 1` closed turns is the state in which the next call would make the third.
@@ -172,7 +190,8 @@ const NOTICE =
 	`call it is** — it never authorizes weakening a verification gate or a review: fewer turns, never ` +
 	`less work. The measured cost and the rejected mechanisms are in ` +
 	`\`prompts/collaboration-workflow/turn-batching.md\`. If this run was already batching, or the write ` +
-	`genuinely has nothing to go beside it, carry on: this fires once per run of single-call turns.`
+	`genuinely has nothing to go beside it, carry on: this recurs every ` +
+	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
 
 // The notice a *refusable* call earns instead of its refusal when the run is a dispatched lane child
 // (joshuafolkken/kit#2164). A headless `claude -p` child ends its turn on a denial, so the batching
@@ -189,7 +208,7 @@ const LANE_NOTICE =
 	`verification gate or a review: fewer turns, never less work. The measured cost and the rejected ` +
 	`mechanisms are in \`prompts/collaboration-workflow/turn-batching.md\`. If this run was already ` +
 	`batching, or the call genuinely has nothing to go beside it, carry on: this recurs every ` +
-	`${String(REFIRE_EVERY)} further single-call turns.`
+	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
 
 // The one write that is never refused, because it is the one whose reissue is **unconditional**. Every
 // other refusable write is content-addressed and so fails loudly when its turn's siblings moved the
@@ -290,12 +309,13 @@ function is_sequence_at_limit(
 	sequence: ReadonlyArray<Span>,
 	facts: BundleFacts,
 	last_fired_ms: number,
+	refire_every: number,
 ): boolean {
 	if (sequence.length < SEQUENCE_BEFORE_LIMIT || depends_on_sequence(sequence, facts)) return false
 
 	if (last_fired_ms < sequence_started_ms(sequence)) return true
 
-	return turns_since(sequence, last_fired_ms) >= REFIRE_EVERY
+	return turns_since(sequence, last_fired_ms) >= refire_every
 }
 
 // **Nothing here reads the turn the call belongs to**, because nothing can: see "What it cannot know"
@@ -310,11 +330,13 @@ function is_at_limit(
 	spans: ReadonlyArray<Span>,
 	call: GuardedCall,
 	last_fired_ms: number,
+	refire_every: number,
 ): boolean {
 	return is_sequence_at_limit(
 		time_bundles.open_sequence(spans),
 		time_bundle_call.call_facts(call.name, call.input),
 		last_fired_ms,
+		refire_every,
 	)
 }
 
@@ -348,14 +370,22 @@ function is_reissued_refusal(spans: ReadonlyArray<Span>, call: GuardedCall): boo
 	)
 }
 
-function should_block(text: string, call: GuardedCall, refused_at_ms: number): boolean {
+// `refire_every` defaults to the refusal's cadence so every existing caller reads unchanged; the
+// lane-child downgraded notice passes `NOTICE_REFIRE_EVERY` instead, so a refusable call turned into a
+// notice recurs on the notice's tighter cadence rather than the refusal's (joshuafolkken/kit#2276).
+function should_block(
+	text: string,
+	call: GuardedCall,
+	refused_at_ms: number,
+	refire_every: number = REFIRE_EVERY,
+): boolean {
 	if (!is_guarded_call(call)) return false
 
 	const { spans } = time_spans.parse_timeline(text)
 
 	if (is_reissued_refusal(spans, call)) return false
 
-	return is_at_limit(spans, call, refused_at_ms)
+	return is_at_limit(spans, call, refused_at_ms, refire_every)
 }
 
 // The notice's rule: the same sequence test, gated on the whole-file write rather than on a refusable
@@ -366,7 +396,37 @@ function should_block(text: string, call: GuardedCall, refused_at_ms: number): b
 function should_notify(text: string, call: GuardedCall, notified_at_ms: number): boolean {
 	if (!is_notice_call(call)) return false
 
-	return is_at_limit(time_spans.parse_timeline(text).spans, call, notified_at_ms)
+	const { spans } = time_spans.parse_timeline(text)
+
+	return is_at_limit(spans, call, notified_at_ms, NOTICE_REFIRE_EVERY)
+}
+
+// One recent single-call turn named the way a reader would recognize it: the tool, and the file it
+// touched where the label does not already carry it (joshuafolkken/kit#2276). `label` is the tool name
+// for a non-shell call and the command for a shell one, so the target is appended only where it adds
+// something the label has not already said.
+function describe_span(span: Span): string {
+	const target = span.targets[0] ?? ''
+	if (target === '' || span.label.includes(target)) return span.label
+
+	return `${span.label} ${target}`
+}
+
+// **The concrete half of the notice** (joshuafolkken/kit#2276): the most recent single-call turns,
+// named, so the model is shown the calls it should have batched rather than only told to batch. Parsed
+// from the tail here rather than threaded from `should_notify` because it runs only when a notice
+// actually fires, which is rare enough that the second parse costs less than carrying the spans through
+// the hook's notice contract. An empty sequence names nothing and the notice falls back to its guidance
+// alone.
+function recent_candidates(tail: string): string {
+	const named = time_bundles
+		.open_sequence(time_spans.parse_timeline(tail).spans)
+		.slice(-NAMED_CANDIDATE_COUNT)
+		.map((span) => describe_span(span))
+
+	if (named.length === NONE) return ''
+
+	return ` Just issued one per turn, so at least these could have shared a turn: ${named.join(', ')}.`
 }
 
 // **This guard's own name for its once-per-run record.** It lives beside the rule rather than in
@@ -384,7 +444,9 @@ const time_batch_guard = {
 	CONSECUTIVE_LIMIT,
 	GUARD_LABEL,
 	LANE_NOTICE,
+	NAMED_CANDIDATE_COUNT,
 	NOTICE,
+	NOTICE_REFIRE_EVERY,
 	NOTICE_STAMP_PREFIX,
 	REASON,
 	REFIRE_EVERY,
@@ -393,6 +455,7 @@ const time_batch_guard = {
 	is_guarded_call,
 	is_notice_call,
 	is_read_only_call,
+	recent_candidates,
 	should_block,
 	should_notify,
 }

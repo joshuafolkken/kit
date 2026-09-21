@@ -246,7 +246,10 @@ describe('rule_value.measure — rules nothing can score', () => {
 	// `third-party-write` declares none for the same reason (joshuafolkken/kit#2122) — not writing to
 	// another owner's tracker is the absence of a call, not a call; and `lane-interactive-ask` declares
 	// none for the same reason (joshuafolkken/kit#2201) — not asking a person is the absence of a call,
-	// and the compliance a routed child does make is the park `lane-park` already scores. The module's
+	// and the compliance a routed child does make is the park `lane-park` already scores; and `rule-body`
+	// declares none for the same reason (joshuafolkken/kit#2272) — keeping the rule is confirming the
+	// addition can be neither an oracle nor an ordering step, which no recorded call reveals, and the
+	// reissued edit that lands afterward is indistinguishable from the edit any compliant run makes. The module's
 	// doctrine is that such a rule reads unmeasured rather than as compliant. Naming them exactly keeps
 	// the guard over every other row, the batching one included, rather than exempting a whole registry
 	// to make room for the exceptions.
@@ -265,6 +268,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			'git-force',
 			'worktree-mutation',
 			'file-body',
+			'rule-body',
 			INVESTIGATION,
 		])
 	})

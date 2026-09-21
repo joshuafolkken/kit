@@ -32,6 +32,7 @@ pnpm josh gate --no-unit   # the three static checks only (CI only)
 - Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
 - Exit `1` if any check failed. Refuses any argument other than the three flags.
+- The unit leg is the long pole; [`josh test:unit`](#josh-testunit) runs it as a two-project split — same files, less wall clock, not fewer tests.
 
 ### `josh lint`
 
@@ -46,7 +47,7 @@ pnpm josh lint
 Check only the files the change touched — the lint check an implementation loop repeats between edits. Added in front of the whole-tree `josh lint`, never in place of it.
 
 ```bash
-pnpm josh lint:related                     # alias: josh lr
+pnpm josh lint:related
 pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
 ```
 
@@ -59,7 +60,7 @@ pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
 Print how many code lines a file has against the `max-lines` limit and how many remain — so splitting is decided before writing.
 
 ```bash
-pnpm josh lines scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts  # alias: josh ln
+pnpm josh lines scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts
 ```
 
 ```
@@ -82,14 +83,16 @@ pnpm josh refactor:scan
 Print how many bytes an agent-read document has against its recorded byte ceiling and how many remain — the byte counterpart of `josh lines`, so a mandated documentation update that would cross the ceiling is seen right after the edit rather than at the gate.
 
 ```bash
-pnpm josh bytes docs/josh-commands.md           # one document; alias: josh by
+pnpm josh bytes docs/josh-commands.md           # one document
 pnpm josh bytes                                 # scan: every budgeted document near its ceiling
 ```
 
 ```
 docs/josh-commands.md  111777/114688 bytes · 2911 left
+entry fullrun  227672/229376 bytes · 1704 left
 ```
 
+- The scan closes with one row per workflow entry — the **primary** budget (`entry-read-budget.ts`), the total each entry reads against its ceiling — so the main budget is no longer a number the gate reveals only when it fails (joshuafolkken/kit#2271). The per-document rows above them are the fallback budget, covering the documents no entry reads.
 - Path is repository-root-relative (a leading `./` is stripped); a path with no budget entry reads `not counted`.
 - The recorded ceiling is block-quantized — the next 4 KB multiple at or above the document's size (`document-byte-budget.ts`, joshuafolkken/kit#2231), so a document growing within its block needs no ceiling edit and parallel command-adding lanes stop conflicting on this record. An over-budget row names the value to record: the next block multiple, not the raw current size. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
 
@@ -132,8 +135,8 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 ```
 
 - `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
-- **Off in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), and the notice kit#2164 replaced it with was measured not to move the density (1.00 calls per turn on both sides of it, the third refutation of advice after kit#1304 and kit#1329 / kit#1337), so kit#2178 takes the guard off rather than pay the per-turn context cost of guidance that does not work. Decided from the one-place three-valued enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`, not per guard; `notice` stays valid for a future guard whose guidance a child can act on.
-- **Fires more than once per run.** The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again every `REFIRE_EVERY` further single-call turns (the `N` of joshuafolkken/kit#2164, a single constant in `time-batch-guard.ts`, equal to the initial limit). A call the run re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence. This replaces the old one-firing-per-run behavior, which fell silent for the rest of a run that ignored it.
+- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), so the guard downgrades to a non-blocking notice — the call proceeds with the guidance attached. kit#2178 took kit#2164's notice `off` after it did not move the density; with it `off` it fired **zero** times across the 2026-09-21 backlogrun measured next, so the 1.147 read there is the rate with no guidance. kit#2276 re-enables it with the two things #2164's lacked — it **names the concrete recent calls** and **recurs every single-call turn** — to be re-measured, redesigned rather than kept if it misses the target. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`.
+- **Fires more than once per run.** The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the **refusal** every `REFIRE_EVERY` further turns (the initial limit), the **notice** every `NOTICE_REFIRE_EVERY` (joshuafolkken/kit#2276, tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence — replacing the old one-firing-per-run behavior that fell silent for the rest of a run that ignored it.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
 
 ### `josh investigation:guard`
@@ -182,7 +185,7 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery p
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
-**How each of the three behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `off` too (kit#2164 downgraded it to a `notice`, but the notice was measured not to move the density, so kit#2178 takes it off — the `notice` mode remains valid for a future guard whose guidance a child can act on), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the three behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh stop:guard`
 
@@ -216,13 +219,14 @@ pnpm josh test:unit
 
 - `vitest` installed with **no** `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
+- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pilot-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set (joshuafolkken/kit#2170) — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
 
 ### `josh test:related`
 
 Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits. Added in front of the whole `josh test:unit`, never in place of it.
 
 ```bash
-pnpm josh test:related                     # alias: josh tr
+pnpm josh test:related
 pnpm josh test:related scripts/thing.ts    # narrow by the given files instead
 pnpm josh test:related --silent            # flags are forwarded to vitest
 ```
@@ -234,7 +238,7 @@ pnpm josh test:related --silent            # flags are forwarded to vitest
 Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`). On `required` the detail names each untested file's type — `E2E` under `src/routes/`, `Unit` elsewhere (`prompts/testing-guide.md` §1).
 
 ```bash
-pnpm josh test:declared           # alias: josh td
+pnpm josh test:declared
 pnpm josh test:declared --match   # check Step 0 declarations on stdin
 ```
 
@@ -253,7 +257,7 @@ pnpm josh test:e2e
 Report whether the preview server process died during a failed E2E attempt. Invoked by the distributed `ci.yml` between the two attempts of its E2E job.
 
 ```bash
-pnpm josh e2e:retry-check   # alias: josh er
+pnpm josh e2e:retry-check
 ```
 
 - Reads the preview server debug log (`WRANGLER_LOG_PATH`, default `e2e-web-server-logs`) and matches only when `Error in ProxyController` **and** `Network connection lost.` are in the same file. Verdict written to `$GITHUB_OUTPUT` as `crashed`; a missing/unreadable log ends at "no crash".
@@ -362,7 +366,7 @@ See [sync.md](./sync.md) for the full file list.
 Report whether the current change touches a file `josh sync` distributes.
 
 ```bash
-pnpm josh sync:scope           # the branch diff; alias: josh sys
+pnpm josh sync:scope           # the branch diff
 pnpm josh sync:scope --staged  # the staged diff instead
 pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 ```
@@ -374,20 +378,20 @@ pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 
 **Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
 
-### `josh sonar:hotspots` · `josh shs`
+### `josh sonar:hotspots`
 
 Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.
 
 ```bash
-pnpm josh sonar:hotspots 42   # alias: josh shs
+pnpm josh sonar:hotspots 42
 ```
 
-### `josh ui:routes` · `josh uir`
+### `josh ui:routes`
 
 List the screenshot-target routes the change touches: a changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived" rather than guessing; the `verify-ui` skill's §1 narrows the list.
 
 ```bash
-pnpm josh ui:routes            # the branch diff; alias: josh uir
+pnpm josh ui:routes            # the branch diff
 pnpm josh ui:routes --staged   # the staged diff instead
 ```
 
@@ -396,7 +400,7 @@ pnpm josh ui:routes --staged   # the staged diff instead
 Carry the release this repository just published into every consumer repository checked out next to it. Runs only from the supplier's own clean, up-to-date default branch; waits for the exact published version to appear in the registry before touching any consumer.
 
 ```bash
-pnpm josh propagate                     # alias: josh pg
+pnpm josh propagate
 pnpm josh propagate --dry-run           # report targets and steps, write nothing
 pnpm josh propagate --skip-publish-wait # release already known to be published
 ```
@@ -415,7 +419,7 @@ The opposite direction — one consumer catching itself up from its own checkout
 Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each one's managed files, verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](#josh-propagate), sharing the same step order.
 
 ```bash
-pnpm josh adopt           # alias: josh ad
+pnpm josh adopt
 pnpm josh adopt --dry-run # report the steps without touching anything
 ```
 
@@ -515,20 +519,18 @@ Commit the observation ledger (`docs/observations.md`) as a docs-only pull reque
 
 ```bash
 pnpm josh observations:flush
-pnpm josh obf                 # alias
 ```
 
-**Behavior:** refuses off the default branch (naming `pnpm josh ms`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand.
+**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand.
 
 Related: [`josh followup`](#josh-followup).
 
-### `josh measure:rerun` · `josh mrr`
+### `josh measure:rerun`
 
 Re-run a behavior-change Issue's declared baseline after it merges and print the before/after pair. It reads the `## ベースライン` section of a body file, runs each `` `<command>` → <value> `` entry, and prints the recorded value beside the re-measured one — the merge-time re-read a prose rule never gets (joshuafolkken/kit#2178).
 
 ```bash
 pnpm josh measure:rerun /tmp/issue-body.md
-pnpm josh mrr /tmp/issue-body.md   # alias
 ```
 
 **Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
@@ -537,7 +539,7 @@ Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint
 
 ### `josh main:sync`
 
-Checkout the default branch and pull the latest changes with `git pull --ff-only` (the strategy is named by the command, not read from git config). Alias behavior is also reached as `pnpm josh ms`.
+Checkout the default branch and pull the latest changes with `git pull --ff-only` (the strategy is named by the command, not read from git config).
 
 ```bash
 pnpm josh main:sync
@@ -592,7 +594,7 @@ pnpm josh release --dry-run   # count and report, write nothing
 Say whether a release is owed, so the moment one is cut is not a judgement. Reads the same fetch-then-count as `josh followup`, so the two never disagree.
 
 ```bash
-pnpm josh release:scope          # → required | skip | unknown ; alias: josh res
+pnpm josh release:scope          # → required | skip | unknown
 pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 ```
 
@@ -609,7 +611,7 @@ pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 Show the global-install version, the current project version, and the latest published version — plus the **running binary** (the install that actually executed, resolved from `import.meta.url`), the single source of truth for which `josh` produced the report. A not-installed target reports `not installed`; a stale one gets a `Run:` hint with the upgrade command. A release inside the `.npmrc` `minimum-release-age` window prints a `Held:` line. When the `josh` first on `PATH` is not the pnpm-global install, a PATH-shadowing warning names both paths and points to [`josh doctor --fix`](#josh-doctor).
 
 ```bash
-pnpm josh version             # alias: josh v
+pnpm josh version
 pnpm josh version --upgrade   # upgrade global + project to latest, then re-run fix-gh-packages
 ```
 
@@ -622,7 +624,7 @@ pnpm josh version --upgrade   # upgrade global + project to latest, then re-run 
 Check that every dependency range this package **publishes** still resolves for a consumer. For each `dependencies` entry it runs `pnpm view <name>@<range> version` under safe-chain's shims, so the age-filtered view a consumer installs under is observed rather than modelled. `devDependencies`, peer ranges, and non-registry protocols (`workspace:*`, `catalog:`, `file:`, `link:`, git URLs) are set aside and printed, not probed.
 
 ```bash
-pnpm josh ranges   # alias: josh r
+pnpm josh ranges
 ```
 
 **Output / exit codes:** fails closed — a range resolves only when the output contains a `semver`-parsable version; a probe that cannot answer (network, auth) is reported unresolvable. Probing `@joshuafolkken/*` dependencies needs `NODE_AUTH_TOKEN` — run `export NODE_AUTH_TOKEN=$(gh auth token)` first for a bare invocation. To fix a violation, lower the floor to a release already outside the age window (e.g. `^4.23.4` instead of `^4.23.5`).
@@ -636,7 +638,7 @@ pnpm josh ranges   # alias: josh r
 Diagnose — and optionally repair — PATH shadowing of the global `josh`.
 
 ```bash
-pnpm josh doctor          # alias: josh dr — diagnose only
+pnpm josh doctor          # diagnose only
 pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
 pnpm josh doctor --ports  # also print the per-repository port-seed table
 ```
@@ -744,7 +746,7 @@ Update pnpm via corepack, update all dependencies to latest, and run a security 
 pnpm josh latest            # full update (corepack + update + audit)
 pnpm josh latest:corepack   # update pnpm only
 pnpm josh latest:update     # update dependencies only
-pnpm josh latest:scope      # → required | skip — does this run have to update?  (alias: ls)
+pnpm josh latest:scope      # → required | skip — does this run have to update?
 ```
 
 `josh latest` never lowers a version: a supply-chain age gate can make the registry report an older release as newest, so `latest:update` rolls the whole tree back rather than writing a silent downgrade. It reports the overrides verdict itself and separately fails the run if `pnpm-lock.yaml` no longer honours an unconditional override.
@@ -788,7 +790,7 @@ Runs [secretlint](https://github.com/secretlint/secretlint) over the staged path
 Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green. Wired in by `lefthook/base.yml` as the pre-push `test-unit` command. Reuse requires the gate's file map, base commit and non-empty record to match, plus an empty `git status --porcelain` so the pushed HEAD equals the verified tree; otherwise the whole suite runs. A project with no vitest prints a skip notice; one with vitest but no test file fails.
 
 ```bash
-pnpm josh pre-push-unit                    # alias: josh ppu
+pnpm josh pre-push-unit
 JOSH_PRE_PUSH_FORCE=1 git push             # run the suite even on a tree recorded green
 ```
 
@@ -799,7 +801,7 @@ JOSH_PRE_PUSH_FORCE=1 git push             # run the suite even on a tree record
 Type-checks the whole project for the pre-commit hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green. Wired in by `lefthook/base.yml` as the pre-commit `type-check` command; runs `pnpm exec tsc --noEmit` when it runs. Reuse requires the gate's file map, base commit and non-empty record to match, that every `git status --porcelain` entry be fully staged (so the committed index equals the verified tree), and that the gate's type-check step be `tsc --noEmit` (projects using a `josh-app` / `josh-game` `check:ci` shim always run the full check). Nothing is forwarded to `tsc`; an argument other than `--force` is refused.
 
 ```bash
-pnpm josh pre-commit-type-check             # alias: josh ptc
+pnpm josh pre-commit-type-check
 JOSH_PRE_COMMIT_FORCE=1 git commit          # type-check even on a tree recorded green
 ```
 
@@ -816,7 +818,7 @@ Helpers for AI-assisted development workflows.
 Print each issue's title, state, body and every comment in one call, replacing separate `gh api` body and comments reads.
 
 ```bash
-pnpm josh issue:read 1715                    # alias: josh ird
+pnpm josh issue:read 1715
 pnpm josh issue:read 1715 1567 1605          # several numbers, read concurrently
 ```
 
@@ -843,7 +845,7 @@ State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue
 Before an issue is filed, answer the two questions every filing asks: has this already been filed, and which epic does it belong to.
 
 ```bash
-pnpm josh issue:scout "Stop the gate re-running after every edit"   # alias: josh isc
+pnpm josh issue:scout "Stop the gate re-running after every edit"
 pnpm josh issue:scout "<title>" --body "follows on from #1246"
 ```
 
@@ -853,12 +855,12 @@ pnpm josh issue:scout "<title>" --body "follows on from #1246"
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
 
-### `josh issue:fold` · `josh isf`
+### `josh issue:fold`
 
 Before a run files a **second** finding in one session, answer whether the findings fold into one issue or stay separate — the filing-time counterpart to the split assessment, reading its same two questions (separability, and whether the whole clearly exceeds one verification gate).
 
 ```bash
-pnpm josh issue:fold "First finding" "Second finding"                 # alias: josh isf → fold | separate | no-fold-needed
+pnpm josh issue:fold "First finding" "Second finding"                 # fold | separate | no-fold-needed
 pnpm josh issue:fold "a" "b" --not-separable                          # the pair is really one deliverable → fold
 pnpm josh issue:fold "a" "b" --json                                   # the verdict and reason, machine-readable
 ```
@@ -868,14 +870,14 @@ pnpm josh issue:fold "a" "b" --json                                   # the verd
 - `--not-separable` — declare the judgement half: the findings are one deliverable, so they fold whatever their size.
 - `--json` — print the verdict and reason as JSON.
 
-The size half is [`josh split:assess`](#josh-splitassess--josh-sa)'s own verdict, called not recomputed — the counting and the guide are single-sourced there. `separate` needs both halves (separable **and** over the size guide); every other case folds, and a lone candidate answers `no-fold-needed` without measuring. **An unreadable diff measures as under the guide, so an unanswerable size folds** rather than tipping to `separate`. `pnpm josh rule:guard` delivers the fold gate at a run's second `gh api … issues` call, never the first.
+The size half is [`josh split:assess`](#josh-splitassess)'s own verdict, called not recomputed — the counting and the guide are single-sourced there. `separate` needs both halves (separable **and** over the size guide); every other case folds, and a lone candidate answers `no-fold-needed` without measuring. **An unreadable diff measures as under the guide, so an unanswerable size folds** rather than tipping to `separate`. `pnpm josh rule:guard` delivers the fold gate at a run's second `gh api … issues` call, never the first.
 
 ### `josh issue:cite`
 
 Print the paste-ready number-link citation line for each issue in one call, so the correct session-facing form — `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <summary>` — costs one command rather than a title read per issue. The summary is the issue's own title, fetched; adapt it to the session language when it matters.
 
 ```bash
-pnpm josh issue:cite 2220                                  # alias: josh ici
+pnpm josh issue:cite 2220
 pnpm josh issue:cite 2220 1758 1252                        # several numbers, read concurrently
 pnpm josh issue:cite 45 --repo joshuafolkken/app-kit       # bare numbers in another repository
 pnpm josh issue:cite joshuafolkken/app-kit#45 2220         # per-token owner/repo#N notation
@@ -892,7 +894,7 @@ Citation lines go to stdout so the block stays paste-ready; a number that resolv
 Before the Package-First tier decision, rank candidate packages by measured metrics so Tier A ("clearly best") and Tier B ("genuine toss-up") are read off the output rather than judged (joshuafolkken/kit#2216). It queries the npm registry and prints one line per candidate: npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
 
 ```bash
-pnpm josh pkg:scout "date formatting" --size 5   # alias: josh pks
+pnpm josh pkg:scout "date formatting" --size 5
 ```
 
 `--size <n>` sets how many candidates to fetch and rank (default 10). The verdict reads the top two's relative lead `(top − second) / top`: `clear` when the leader is ahead by at least 15% (select it, Tier A), `close` when within it (ask the user, Tier B). A failed per-candidate read leaves that metric blank (`—`).
@@ -907,7 +909,7 @@ pnpm josh issue:lint /tmp/issue-body.md
 
 Prints `ok` (exit 0) when every heading is present, or each missing heading name (exit 1). A heading has to be a line of its own — one mentioned inside a sentence is not the section heading. The judgement half (is the prose specific enough?) is out of scope; this is the mechanical half alone (joshuafolkken/kit#2123).
 
-A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to two headings — `## 発火点` and `## ベースライン` (joshuafolkken/kit#2212). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun--josh-mrr) re-runs the baseline.
+A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to two headings — `## 発火点` and `## ベースライン` (joshuafolkken/kit#2212). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun) re-runs the baseline.
 
 ### `josh issue:backlinks`
 
@@ -934,7 +936,7 @@ Prints `ok` (exit 0), or the violations one per line (exit 1). The judgement hal
 Pop the stash whose message matches, and no other. The stash is a repository-wide stack every work tree shares, so a bare `git stash pop` — or a positional `stash@{n}` read before another lane pushed — takes whichever entry now sits on top; that is how one lane's parked work reached another's tree (joshuafolkken/kit#2050). This resolves the selector from the message immediately before the pop, targeting the entry itself rather than a position that moves.
 
 ```bash
-pnpm josh stash:pop "backlogrun: parked #2028"                 # alias: josh sp
+pnpm josh stash:pop "backlogrun: parked #2028"
 pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # into a lane's work tree
 ```
 
@@ -1007,7 +1009,7 @@ When the `## Dependencies` declaration and the native `blocked-by` relations dis
 List an epic's runnable children, bundled per repository. All state lives on GitHub, so asking again after any interruption gives the same answer.
 
 ```bash
-pnpm josh epic:next 858                            # alias: josh en
+pnpm josh epic:next 858
 pnpm josh epic:next 858 --repo joshuafolkken/kit   # just the next child for one repository
 pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free lane there
 ```
@@ -1024,7 +1026,7 @@ Several leading epic arguments merge into one candidate pool per repository. A c
 Say whether a newly filed issue belongs with ones already in the backlog. It finds candidates and recommends; it writes nothing.
 
 ```bash
-pnpm josh epic:bundle 874   # alias: josh eb
+pnpm josh epic:bundle 874
 ```
 
 Only two things count as a signal: the two issues referring to each other in prose, or an already-recorded `blocked-by`. A similar title never counts on its own.
@@ -1045,7 +1047,7 @@ Prints an `Order:` line with an `Evidence:` block, or `Order: none declared — 
 Read an epic's children against each other and report what contradicts what — where `epic:check` verifies one epic's format, this reads inside the children.
 
 ```bash
-pnpm josh epic:audit 858   # alias: josh ea
+pnpm josh epic:audit 858
 ```
 
 | Check                | Level     | What it means                                                                                                  |
@@ -1075,7 +1077,7 @@ pnpm josh epic:check 700
 Print the next opted-in standalone issue an unattended run may pick up outside an epic. Read-only; ranks newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open.
 
 ```bash
-pnpm josh auto-ok:next                 # alias: josh ao
+pnpm josh auto-ok:next
 pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 # create the label once, where wanted:
 gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
@@ -1090,7 +1092,7 @@ stdout is one token — the issue number, or `none`, or empty with exit 1 if the
 Order the whole opted-in backlog in one command — standalone `auto-ok` issues plus the descendants of every epic whose root carries `auto-ok`, followed transitively through nested epics (joshuafolkken/kit#2244). Read-only. Tokens are bare numbers scoped to the repository.
 
 ```bash
-pnpm josh backlog:next                 # alias: josh bl
+pnpm josh backlog:next
 pnpm josh backlog:next --exclude 1630  # skip the issue just merged
 ```
 
@@ -1103,7 +1105,7 @@ stdout is one token per line (all exit 0 unless noted): `<number>…` (each an i
 The whole backlog rendered as a plan a person reads before a run starts — four sections on stdout, using `backlog:next`'s own classification. Separate because that command's stdout is bare tokens a loop branches on.
 
 ```bash
-pnpm josh backlog:plan                 # alias: josh blp
+pnpm josh backlog:plan
 pnpm josh backlog:plan --exclude 1630  # after #1630 merged
 ```
 
@@ -1116,7 +1118,7 @@ Sections: **Ready now** (runnable children, grouped by repository = the parallel
 Say whether a `backlogrun` may start more work, keep watching, or finish. Read-only. Maps `backlog:next`'s answer into a budget verdict.
 
 ```bash
-pnpm josh backlog:budget --answer candidates --started "$started" --active "$active"   # alias: josh bb
+pnpm josh backlog:budget --answer candidates --started "$started" --active "$active"
 pnpm josh backlog:budget --answer exhausted  --started "$started" --active "$active" --idle 60
 pnpm josh backlog:budget --answer candidates --started "$started" --active "$active" --merged 3 --running 2 --max 5
 ```
@@ -1131,7 +1133,7 @@ stdout is the verdict word (reason to stderr): `run` (start what was offered), `
 
 ### `josh backlog:offer`
 
-Collapse a `backlogrun` loop-head event into one call (alias `josh blo`): run `backlog:next`, map its answer to the budget word `backlogrun-steps.md` → "The loop" fixes, run `backlog:budget`, return the verdict — two turns folded into one where the parent's context is largest, as `run:merge` did for a merge event.
+Collapse a `backlogrun` loop-head event into one call: run `backlog:next`, map its answer to the budget word `backlogrun-steps.md` → "The loop" fixes, run `backlog:budget`, return the verdict — two turns folded into one where the parent's context is largest, as `run:merge` did for a merge event.
 
 ```bash
 pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --retries 1
@@ -1164,7 +1166,7 @@ Procedure: [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workf
 Print the whole `/code-review` invocation — level, what `josh gate` proved, target and checkout. Pass the output to `/code-review`; the level is on line one.
 
 ```bash
-pnpm josh review:brief            # round 1; alias: josh rb
+pnpm josh review:brief            # round 1
 pnpm josh review:brief --round 2  # verification pass, scoped to the fix delta
 pnpm josh review:brief --level-only          # the level alone (pre-commit review)
 pnpm josh review:brief --level-only --json   # level and reason, machine-readable
@@ -1194,7 +1196,7 @@ One non-inert path decides the whole change; an empty diff also takes `medium`. 
 Say whether the second `/code-review` round is due, or may be skipped. Run it once round 1's fixes are in.
 
 ```bash
-pnpm josh review:round2                     # → required ; alias: josh r2
+pnpm josh review:round2                     # → required
 pnpm josh review:round2 --round-1-closed    # → required | skip
 pnpm josh review:round2 --json              # the verdict and the reason, machine-readable
 ```
@@ -1209,7 +1211,7 @@ pnpm josh review:round2 --json              # the verdict and the reason, machin
 Say whether a review finding **reaches a runtime path** (`runtime`, any non-inert path) or is inert (`non-runtime`) — the machine half of the three-way disposition, sharing `review-level.ts`'s inert set, so only "is the defect confirmed" is left to a person. Verdict on stdout, reason on stderr. Full reasoning: `prompts/review.md` → "Three-way disposition after the cap".
 
 ```bash
-pnpm josh disposition <path...>   # → runtime | non-runtime ; alias: josh dp
+pnpm josh disposition <path...>   # → runtime | non-runtime
 ```
 
 ### `josh review:attest`
@@ -1218,7 +1220,7 @@ Record, or verify, which checkout a `/code-review` actually read — it is forke
 
 ```bash
 pnpm josh review:attest <nonce>   # run by the review, from the checkout it read
-pnpm josh review:attest --check   # run by the run, before it acts on the review; alias: josh ra
+pnpm josh review:attest --check   # run by the run, before it acts on the review
 ```
 
 - `<nonce>` — attest the checkout the review read.
@@ -1231,7 +1233,7 @@ Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded a
 Say whether a step of a run may go to a cheaper execution tier. Verdict to stdout, reason to stderr.
 
 ```bash
-pnpm josh delegate gate-fix   # → delegate ; alias: josh dg
+pnpm josh delegate gate-fix   # → delegate
 pnpm josh delegate review     # → keep
 pnpm josh delegate --list     # the enumeration, and what was rejected and why
 ```
@@ -1262,38 +1264,54 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
-### `josh split:assess` · `josh sa`
+### `josh split:assess`
 
 Measure a branch's change size and answer the split assessment's size question. It counts changed files and changed lines against `main`, **excluding test files** (`*.test.ts` / `*.e2e.ts`), and answers `split` only when both guides are exceeded together, `single` otherwise.
 
 ```bash
-pnpm josh split:assess          # → single ; alias: josh sa
+pnpm josh split:assess          # → single
 pnpm josh split:assess --json   # the verdict and the reason, machine-readable
 ```
 
 `split` needs **both** the file guide (10) and the line guide (400) exceeded; either alone, or an empty diff, is `single` — the conservative default of `.claude/skills/workflow-commands/split-assessment.md` → "The question". It answers the **size** question only: separability stays a judgement, so `split` is the size condition met, not a decision to divide the Issue. Untracked files have no diff base — commit before measuring for an exact count.
 
-### `josh oracle:list` · `josh ol`
+### `josh oracle:list`
 
 Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → question 0). Each row carries the command, its answer vocabulary and its single-source document. Adding a new oracle means adding a row here and nowhere else.
 
 ```bash
-pnpm josh oracle:list   # alias: josh ol
+pnpm josh oracle:list
 ```
 
 Single source: `scripts/rules/decision-oracle.ts`.
 
-### `josh clone:scan` · `josh cs`
+### `josh rule:value`
+
+Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered.
+
+```bash
+pnpm josh rule:value
+```
+
+- Transcripts are grouped by the run they belong to, so a lane's transcript counts with the parent that dispatched it rather than as a run of its own.
+- It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
+- Called once per iteration from the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure (joshuafolkken/kit#2271). Single source: `scripts/rules/rule-value-cli.ts`.
+
+### `josh clone:scan`
 
 Count code duplication across files and first-party repos (`JOSH_REPO_PATHS` included) — the measurement `no-clones` lacked. Output: `clean`, or `clones: <N>` then each clone `[same-file|cross-file|cross-repo]` with `file:line` (exit 0). Single source: `scripts/clone/clone-scan.ts`.
+
+### `josh cases`
+
+Read changed paths and print the I/O boundaries the diff crosses (`network` / `process` / `fs` / `none`) and, for each, the mandatory abnormal cases a test declaration must account for (non-200, timeout, empty response, malformed JSON, rate limit). A decision oracle: the unit suite blocks network by design, so these cases are confronted at declaration time. Single source: `scripts/cases/cases-cli.ts`.
 
 ### `josh run:hold` / `josh run:release`
 
 Guard a working tree so only one run holds it at a time — `run:hold` claims it, `run:release` clears the claim. The unit is the working tree, so two lanes of one repository key differently.
 
 ```bash
-pnpm josh run:hold 1091          # claim for issue 1091; alias: josh rh
-pnpm josh run:release 1091       # release this run's own record; alias: josh rr
+pnpm josh run:hold 1091          # claim for issue 1091
+pnpm josh run:release 1091       # release this run's own record
 pnpm josh run:release --force    # clear a record left by a run that has ended
 ```
 
@@ -1306,7 +1324,7 @@ pnpm josh run:release --force    # clear a record left by a run that has ended
 Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` continues the authorized run instead of starting a second one.
 
 ```bash
-pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"   # alias: josh rc
+pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"
 pnpm josh run:carry --json                          # read the record back in a resumed session
 pnpm josh run:carry --cut --owner "$PPID"           # hand the record off before a cut
 pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"  # adopt a record no cut handed off
@@ -1326,7 +1344,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 Continue a cut `backlogrun` by waking the next session from outside the conversation. It reads the carry record and wakes only on `carried`, handed off by `run:carry --cut`.
 
 ```bash
-pnpm josh run:wake --start                 # launch the detached supervisor; alias: josh rw
+pnpm josh run:wake --start                 # launch the detached supervisor
 pnpm josh run:wake --list                  # supervisor state, cut/wake counts, latest progress line
 pnpm josh run:wake --stop                  # stop it
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
@@ -1343,7 +1361,7 @@ Cut a dispatched lane child before the verification gate. OpenAI uses its lane s
 relaunches directly. With no matching supervisor, OpenAI returns `failed` before writing the cut.
 
 ```bash
-pnpm josh run:cut 1839            # take the cut and hand it to a fresh process; alias: josh rct
+pnpm josh run:cut 1839            # take the cut and hand it to a fresh process
 pnpm josh run:cut --resume 1839   # a fresh process's entry check
 pnpm josh run:cut --end           # clear the record
 ```
@@ -1355,7 +1373,7 @@ pnpm josh run:cut --end           # clear the record
 Say whether the delegated unit running a child is still working, or stopped without reporting. Two traces decide it: whether the transcript grew, and whether a child process is alive.
 
 ```bash
-pnpm josh run:liveness 1169 --output <path> --process none   # alias: josh rv
+pnpm josh run:liveness 1169 --output <path> --process none
 pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 --repo joshuafolkken/app-kit
 ```
 
@@ -1372,7 +1390,7 @@ pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 
 Classify how a dispatched lane child _ended_ — a different question from `run:liveness`'s "is it still going". `run:liveness` cannot see a child that stopped mid-implementation: its output freezes exactly as a completed child's does, and a `subtype: success` exit reads as a clean finish. This reads three traces the child leaves behind — a carried cut record (it handed off), a CLOSED Issue (it merged), or an OPEN Issue with no cut (it ended in the middle) — and, for the last, prints the exit-record basis a park comment should carry.
 
 ```bash
-pnpm josh run:ending 2118 --output <path>                       # alias: josh red
+pnpm josh run:ending 2118 --output <path>
 pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 ```
 
@@ -1385,17 +1403,16 @@ pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 
 ### `josh run:prep`
 
-Bundles the reads a run makes before its first edit into one call; alias `rp`.
+Bundles the reads a run makes before its first edit into one call.
 
 ### `josh run:status`
 
 Bundles a run's read-only status — issue state, `cost --cut` verdict, and carry counters — in one
-call; alias `rst`, `--repo` for a cross-repo child. Writes nothing (joshuafolkken/kit#2165).
+call, `--repo` for a cross-repo child. Writes nothing (joshuafolkken/kit#2165).
 
 ### `josh run:next`
 
-Prints the next step a `fullrun` takes, computed from the run's state rather than read out of prose;
-alias `rn` (joshuafolkken/kit#2188). It reads exactly what `run:prep` reads — the issue state, the
+Prints the next step a `fullrun` takes, computed from the run's state rather than read out of prose (joshuafolkken/kit#2188). It reads exactly what `run:prep` reads — the issue state, the
 `human_review` line and the dependency scope — by calling `run:prep`'s own gather, and maps the four
 facts to one step: a `CLOSED` issue is already done, a `required` dependency scope is updated first, a
 `needs-human-review` issue stops before its commit, and everything else is the ordinary implement step.
@@ -1405,7 +1422,7 @@ It is the consumer #2165's `run:prep` was built to have and the foundation the e
 ### `josh run:step`
 
 Prints the run's next single action, computed from the event stream (`run:event`), the carry record
-(`run:carry`) and the issue state (`run:prep`) — never the conversation; alias `rsp`
+(`run:carry`) and the issue state (`run:prep`) — never the conversation
 (joshuafolkken/kit#2248). It lifts `run:next`'s fold from an _event_ to a whole _run_, printing one
 line: a runnable command for a phase that has one (`followup` after a PR opens, `run:merge <N>` after a
 merge, `backlog:next` after a park, `run:cut --resume <N>` after a cut), a fixed verdict otherwise
@@ -1418,7 +1435,7 @@ mapping, so there is no second implementation.
 ### `josh repo:party`
 
 Says whether a repository is **first-party** or **third-party** — computed by owner equality, not
-judged (joshuafolkken/kit#2122); alias `rpy`. Prints one of `first-party` / `third-party` / `unknown`
+judged (joshuafolkken/kit#2122). Prints one of `first-party` / `third-party` / `unknown`
 on stdout, and the two owners it compared on stderr.
 
 ```bash
@@ -1436,7 +1453,7 @@ repository we do not own (a read passes untouched).
 
 ### `josh run:merge`
 
-Collapses a `backlogrun` merge event into one call (joshuafolkken/kit#2024); alias `rmg`. The parent
+Collapses a `backlogrun` merge event into one call (joshuafolkken/kit#2024). The parent
 calls it once at a child's return and reads back the next child number — or a control verdict.
 
 ```bash
@@ -1467,7 +1484,7 @@ the API is down), `retry` (unreadable), `busy` (refused count; exit 1).
 ### `josh run:review`
 
 Starts the gate in the background and prints the whole `/code-review` brief in one call, so a lane
-child launches the two together and they overlap (joshuafolkken/kit#2179); alias `rrv`. It composes
+child launches the two together and they overlap (joshuafolkken/kit#2179). It composes
 `josh gate` and `josh review:brief` and changes neither, so `review:attest --check`'s nonce/checkout
 contract is minted exactly as before.
 
@@ -1484,7 +1501,7 @@ joshuafolkken/kit#2179 and `chain-rule.md`.
 ### `josh run:report`
 
 Generates the session-facing report _from_ the run's event stream, rather than composing the wording by
-hand each run (joshuafolkken/kit#2249); alias `rrp`. It reuses `run:event`'s `format_event` for every
+hand each run (joshuafolkken/kit#2249). It reuses `run:event`'s `format_event` for every
 line — merges, parks with their reason, cuts — and appends the release tail `release:scope` decides (the
 request and the command on `required`, `unknown` printed as `unknown`, silent on `skip`). The printed
 body is the Telegram body too: `josh notify --body-file` sends exactly this output, so a session's
@@ -1497,8 +1514,7 @@ pnpm josh run:report   # print the report; the same text josh notify sends
 
 ### `josh run:event`
 
-Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205); alias
-`rev`. Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
+Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205). Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
 lane child append to one stream that survives a session cut; `--from` reads everything after a position,
 `--last` the newest event alone, and `--follow` the reader an attached session relays with
 (joshuafolkken/kit#2207).
@@ -1525,7 +1541,7 @@ without limit.
 Report an unattended run's progress once it has gone quiet — the one josh command meant to be started and left running in the background.
 
 ```bash
-pnpm josh run:progress --output <path>           # alias: josh rg
+pnpm josh run:progress --output <path>
 pnpm josh run:progress --once                    # five labelled lines now, whatever the clock says
 pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 ```
@@ -1541,10 +1557,10 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 
 ### `josh run:watcher:guard`
 
-Guard hook: exits non-zero when lane children are in-flight but `run:progress` has not pinged its life record recently (within three watcher ticks, roughly 90 s). Wired as a `PreToolUse` hook so the agent cannot issue the next Bash call while the watcher is stale. Alias `josh rwg`.
+Guard hook: exits non-zero when lane children are in-flight but `run:progress` has not pinged its life record recently (within three watcher ticks, roughly 90 s). Wired as a `PreToolUse` hook so the agent cannot issue the next Bash call while the watcher is stale.
 
 ```bash
-pnpm josh run:watcher:guard   # alias: josh rwg
+pnpm josh run:watcher:guard
 ```
 
 **Output / exit codes:** exits 0 when no lane children are in-flight or the watcher is fresh. Exits 1 and writes a note to stderr telling the user to restart `run:progress --wait` before proceeding.
@@ -1554,11 +1570,11 @@ pnpm josh run:watcher:guard   # alias: josh rwg
 Open and close a lane: one linked git work tree with its own branch and its own port seat. `lane:open` cuts from `refs/remotes/origin/<default>` (falling back to the local branch), attaches to an existing `<N>-lane` branch, installs dependencies (`pnpm install --frozen-lockfile`), and warms the gate caches from the main checkout. It also copies the pre-built hook bundles (`dist/hooks/`) from the main checkout so the lane's Claude Code hooks launch off `node dist/hooks/<name>.js` rather than the slower `pnpm josh …` fallback — those bundles are git-ignored, so a lane's work tree never carries them otherwise. A consumer repository needs no such copy: its hook commands already point at `node_modules/@joshuafolkken/kit/dist/hooks/`, which the install materializes; only kit's own lanes use work-tree-relative paths. When the main checkout has no bundles (a clone that never ran `pnpm build`), the lane opens on the fallback path, and a copy that fails never fails the open — best-effort, exactly like the gate-cache warming.
 
 ```bash
-pnpm josh lane:open 1490    # prints the lane directory on stdout; alias: josh lno
-pnpm josh lane:close 1490   # alias: josh lnc
+pnpm josh lane:open 1490    # prints the lane directory on stdout
+pnpm josh lane:close 1490
 pnpm josh lane:close --all
-pnpm josh lane:list         # alias: josh lnl
-pnpm josh lane:prune        # alias: josh lnp
+pnpm josh lane:list
+pnpm josh lane:prune
 ```
 
 **Options:**
@@ -1589,7 +1605,7 @@ The record lives in the lane's own `.env`; a lane whose `.env` cannot be read is
 
 #### `josh lane:dispatch`
 
-Start a lane's child as a detached OS process, so cutting this session abandons nothing. Alias `josh lnd`.
+Start a lane's child as a detached OS process, so cutting this session abandons nothing.
 
 ```bash
 pid=$(pnpm josh lane:dispatch 1749)   # prints the child's pid; a refusal is an empty capture and exit 1
@@ -1618,17 +1634,17 @@ evaluation procedure](./backlogrun-worker-evaluation.md).
 
 #### `josh lane:await`
 
-Block until any of the named in-flight lane children confirms it has completed, then print which issue finished. Alias `josh lna`.
+Block until any of the named in-flight lane children confirms it has completed, then print which issue finished.
 
 ```bash
-pnpm josh lane:await 1749 1750   # block until either lane completes; alias: josh lna
+pnpm josh lane:await 1749 1750   # block until either lane completes
 ```
 
 Polls each child's process every 5 s with a 15 s re-confirm window, so a process that briefly disappears (the pre-gate cut handoff) is not mistakenly declared done. Prints the issue number of the first child that confirms completion and exits 0; does not exit until one confirms.
 
 #### `josh lane:launch`
 
-Collapse a `backlogrun` lane-start event into one call (alias `josh lnla`): open the lane, then — only with `--stash`, which the caller passes for the first lane alone — pop that stash into it and re-install against the lock it brought in, then dispatch the child. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
+Collapse a `backlogrun` lane-start event into one call: open the lane, then — only with `--stash`, which the caller passes for the first lane alone — pop that stash into it and re-install against the lock it brought in, then dispatch the child. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
 
 ```bash
 pid=$(pnpm josh lane:launch 1749) || exit 1                                                  # every lane after the first
@@ -1643,7 +1659,7 @@ Answer whether the next turn exceeds a threshold from active-provider usage. `--
 
 ```bash
 pnpm josh cost --cut             # compare billed input per request with the shared 200,000 context-cut threshold
-pnpm josh cost --over <tokens>   # compare with an explicit limit; alias: josh co
+pnpm josh cost --over <tokens>   # compare with an explicit limit
 pnpm josh cost --cut --path <dir> # Anthropic project or current OpenAI worktree
 ```
 
@@ -1656,7 +1672,7 @@ pnpm josh cost --cut --path <dir> # Anthropic project or current OpenAI worktree
 Print one section of a markdown document, so a `` `X.md` → "Heading" `` pointer costs a heading rather than a whole file.
 
 ```bash
-pnpm josh doc:section <file.md> "<heading>"   # alias: josh ds
+pnpm josh doc:section <file.md> "<heading>"
 pnpm josh doc:section backlogrun.md "The hand-off"
 ```
 
@@ -1674,7 +1690,7 @@ pnpm josh doc:section backlogrun.md "The hand-off"
 Say what a workflow entry point reads before it starts, and what that read costs.
 
 ```bash
-pnpm josh read:set              # every entry point; alias: josh rs
+pnpm josh read:set              # every entry point
 pnpm josh read:set backlogrun   # one of them
 pnpm josh read:set backlogrun --json
 ```
@@ -1700,7 +1716,7 @@ Two figures under one definition, which is what makes a before and an after comp
 
 ### `josh doc:read`
 
-A Bash-cap-safe read path for a whole document; alias `dcr` (joshuafolkken/kit#2188).
+A Bash-cap-safe read path for a whole document (joshuafolkken/kit#2188).
 
 ```bash
 pnpm josh doc:read CLAUDE.md          # under the cap: prints the document
@@ -1715,7 +1731,7 @@ pnpm josh doc:read backlogrun.md      # over the cap: prints a directive, no con
 
 ### `josh read:files`
 
-Read several files in one call, so the reads that precede a run's edits fold into one turn; alias `rf` (joshuafolkken/kit#2202).
+Read several files in one call, so the reads that precede a run's edits fold into one turn (joshuafolkken/kit#2202).
 
 ```bash
 pnpm josh read:files a.ts b.ts c.ts   # under the cap: prints each file under its own header
@@ -1734,7 +1750,7 @@ pnpm josh read:files a.ts big.ts      # over the cap: prints a directive to Read
 Report where a run's wall clock went, read from the same transcripts `josh cost` prices and, for the part no transcript records (CI, merge), from GitHub.
 
 ```bash
-pnpm josh time                  # the last run tree, wall clock and cost by role; alias: josh tm
+pnpm josh time                  # the last run tree, wall clock and cost by role
 pnpm josh time --run            # the same run-tree scope, named explicitly
 pnpm josh time --json           # the same figures, machine-readable
 pnpm josh time --path <dir>     # read another project's transcripts from this checkout
