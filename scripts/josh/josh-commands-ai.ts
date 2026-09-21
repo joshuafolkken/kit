@@ -252,6 +252,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['--append <kind> <text> | --from|--follow <n> | --last', 'automation', ['files']],
 	},
+	'run:report': {
+		script: 'scripts/run/run-report-cli.ts',
+		description:
+			'Generate the session-facing report from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
+		category: 'AI tools',
+		reference: ['', 'automation', ['files', 'network']],
+	},
 	...LANE_COMMANDS,
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
