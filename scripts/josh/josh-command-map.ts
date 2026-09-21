@@ -143,6 +143,7 @@ const ALIASES: Record<string, string> = {
 	rwg: 'run:watcher:guard',
 	ig: 'investigation:guard',
 	rug: 'rule:guard',
+	ruv: 'rule:value',
 	ptg: 'pretool:guard',
 	sg: 'stop:guard',
 	ev: 'eval',

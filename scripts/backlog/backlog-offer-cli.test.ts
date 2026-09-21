@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
+const rule_value_emit_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/rules/rule-value-cli', () => ({
+	rule_value_cli: { emit: rule_value_emit_mock },
+}))
 
 const { backlog_offer_cli } = await import('./backlog-offer-cli')
 
@@ -27,6 +31,7 @@ const info_lines: Array<string> = []
 
 beforeEach(() => {
 	josh_run_mock.mockReset()
+	rule_value_emit_mock.mockReset()
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -95,6 +100,14 @@ describe('backlog_offer_cli.run — the output the loop reads', () => {
 		await answer_for({ code: OK, out: 'wait' }, 'watch', RUNNING)
 
 		expect(info_lines).toStrictEqual(['watch'])
+	})
+
+	// The loop head is `rule:value`'s one call site — every valid iteration measures the delivered
+	// rules so a rule that never fires appears as a printed row (joshuafolkken/kit#2271).
+	it('measures the delivered rules once per iteration', async () => {
+		await answer_for({ code: OK, out: '12' }, 'run')
+
+		expect(rule_value_emit_mock).toHaveBeenCalledTimes(1)
 	})
 
 	it('fails when backlog:budget refuses the invocation', async () => {

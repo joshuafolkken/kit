@@ -88,8 +88,10 @@ pnpm josh bytes                                 # scan: every budgeted document 
 
 ```
 docs/josh-commands.md  111777/114688 bytes · 2911 left
+entry fullrun  227672/229376 bytes · 1704 left
 ```
 
+- The scan closes with one row per workflow entry — the **primary** budget (`entry-read-budget.ts`), the total each entry reads against its ceiling — so the main budget is no longer a number the gate reveals only when it fails (joshuafolkken/kit#2271). The per-document rows above them are the fallback budget, covering the documents no entry reads.
 - Path is repository-root-relative (a leading `./` is stripped); a path with no budget entry reads `not counted`.
 - The recorded ceiling is block-quantized — the next 4 KB multiple at or above the document's size (`document-byte-budget.ts`, joshuafolkken/kit#2231), so a document growing within its block needs no ceiling edit and parallel command-adding lanes stop conflicting on this record. An over-budget row names the value to record: the next block multiple, not the raw current size. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
 
@@ -1281,6 +1283,18 @@ pnpm josh oracle:list   # alias: josh ol
 ```
 
 Single source: `scripts/rules/decision-oracle.ts`.
+
+### `josh rule:value` · `josh ruv`
+
+Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered.
+
+```bash
+pnpm josh rule:value
+```
+
+- Transcripts are grouped by the run they belong to, so a lane's transcript counts with the parent that dispatched it rather than as a run of its own.
+- It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
+- Called once per iteration from the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure (joshuafolkken/kit#2271). Single source: `scripts/rules/rule-value-cli.ts`.
 
 ### `josh clone:scan` · `josh cs`
 

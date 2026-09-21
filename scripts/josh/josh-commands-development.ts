@@ -52,6 +52,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
 	},
+	'rule:value': {
+		script: 'scripts/rules/rule-value-cli.ts',
+		description:
+			"Print each delivered rule's unaided compliance — runs reached, kept rate, refusals",
+		category: 'AI tools',
+		reference: ['', 'developer', ['none']],
+	},
 	format: {
 		// prettier first here, unlike `format:edited`, and deliberately: `eslint --fix` exits 1
 		// whenever a non-autofixable error remains, so putting it first behind `&&` would mean one
