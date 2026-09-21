@@ -11,7 +11,9 @@ below only as history.
 
 ## Whether a rule stays
 
-**Before either question below, ask question 0:** `prompts/collaboration-workflow/residency.md` → question 0 — can the rule's answer be computed from mechanically readable inputs alone? If yes, it is a decision oracle and neither question below applies; `pnpm josh oracle:list` shows the existing ones. Only a no reaches the first question.
+**Before either question below, ask question 0:** `prompts/collaboration-workflow/residency.md` → question 0 — can the rule's answer be computed from mechanically readable inputs alone? If yes, it is a decision oracle and neither question below applies; `pnpm josh oracle:list` shows the existing ones. Only a no reaches the ordering question.
+
+**Then ask the ordering question:** `prompts/collaboration-workflow/residency.md` → ordering question — does the rule decide *when or in what order* to act rather than *what*? If so it belongs in the run driver's state transitions (`pnpm josh run:step`, `scripts/run/run-step.ts`), not either channel below. Only a rule that decides *what* reaches the first question.
 
 **The first question is whether the rule's trigger can be named:**
 

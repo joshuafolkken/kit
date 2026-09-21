@@ -34,10 +34,9 @@ are `fullrun-steps.md`, read when a step needs its detail.
    pre-implementation step) — and follow it into `fullrun-steps.md`: the
    `fullrun #N` list or the `fullrun new` list. Before implementing, `git switch main && git pull`, then
    `pnpm josh latest:scope` — update dependencies only on `required` (`latest-gate.md`), never on every
-   run. The list ends in the verification gate (`chain-rule.md` → "Run the review-to-merge chain"),
-   `pnpm josh followup` (`followup.md` → "Run `pnpm josh followup`"; the gate and push are
-   backgrounded — `background-commands.md` → "Background the gate and push"), `pnpm josh ms`, and the
-   release ask.
+   run. `run:step` names every later action in order — the verification gate, `pnpm josh followup`,
+   `pnpm josh ms`, the release ask — each read at the point-of-use doc the header lists, never
+   re-narrated here (`residency.md` → ordering question).
 
 ## The progress step and the lane-child seam
 
