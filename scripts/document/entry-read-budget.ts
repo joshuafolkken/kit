@@ -22,6 +22,7 @@
 
 import { statSync } from 'node:fs'
 import path from 'node:path'
+import { backlogrun_parent_read_set } from './backlogrun-parent-read-set'
 import { document_byte_budget } from './document-byte-budget'
 import { document_reachability } from './document-reachability'
 import { entry_read_set, type ReadSetCost } from './entry-read-set'
@@ -29,6 +30,7 @@ import { lane_child_read_set } from './lane-child-read-set'
 
 const { block_ceiling } = document_byte_budget
 const { LANE_CHILD } = lane_child_read_set
+const { BACKLOGRUN } = backlogrun_parent_read_set
 const NOTHING = 0
 
 interface EntryBudget {
@@ -43,7 +45,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 233_472 },
 	{ entry: 'fullrun', bytes: 229_376 },
 	{ entry: 'halfrun', bytes: 229_376 },
-	{ entry: 'backlogrun', bytes: 237_568 },
+	{ entry: 'backlogrun', bytes: 233_472 },
 	{ entry: LANE_CHILD, bytes: 106_496 },
 ]
 
@@ -53,6 +55,8 @@ function byte_size(root: string, relative_path: string): number {
 
 function entry_cost(root: string, entry: string): ReadSetCost {
 	if (entry === LANE_CHILD) return lane_child_read_set.costed(root)
+
+	if (entry === BACKLOGRUN) return backlogrun_parent_read_set.costed(root)
 
 	return entry_read_set.costed(root, entry)
 }

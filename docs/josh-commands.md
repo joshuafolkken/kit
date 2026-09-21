@@ -1693,6 +1693,7 @@ Two figures under one definition, which is what makes a before and an after comp
 - A `-- read at the point of use, not at the entry --` block lists `latest-gate.md`, `followup.md`, `chain-rule.md` and `background-commands.md` with their costs; they are listed, not counted in `whole`/`scoped`.
 - `total read` sums the scoped entry read and the point-of-use documents that entry actually reaches — the figure a before/after compares.
 - **`lane-child` is a synthetic entry**, not a table keyword: `pnpm josh read:set lane-child` prints the trimmed set a dispatched lane child (`JOSH_LANE_CHILD`) reads — it drops the point-of-use documents the parent owns (child dispatch, lane opening, the progress watcher and the hand-off) and reads the entry-only `SKILL.md` sections (§2a/§2c/§2e/§2i/§3) at the section level, so its `total read` falls well below a normal `fullrun`'s (joshuafolkken/kit#2021).
+- **`backlogrun` prints a trimmed parent set** the same way (joshuafolkken/kit#2256): the parent is the scheduler and never implements, so the implementer-only `SKILL.md` sections (§2a/§2f/§2g/§3) are read at the section level rather than whole. It is a _different_ trim from the lane child's — the parent keeps §0/§2b/§2c/§2e/§2i, which are the scheduler's own, and drops no point-of-use document, since it is the one dispatching children and running lanes.
 
 **Output / exit codes:** an unrecognized keyword is refused with the known ones listed, rather than reporting a saving of zero.
 
