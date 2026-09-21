@@ -8,8 +8,13 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 // reads and writes are real, because "a second reading of the same disk finds it" is the whole
 // claim under test and a mocked registry would assert nothing about it.
 vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { worktree_list: vi.fn() } }))
+// `list_lanes` derives the lane root from `main_repository_root`, which now resolves the current work
+// tree through `repo_discovery.main_worktree` (joshuafolkken/kit#2233); a real `repository_root()`
+// would answer the machine's own checkout, so it is stubbed to the fixture's main tree.
+vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 
 const { git_worktree } = await import('#scripts/git/git-worktree')
+const { git_command } = await import('#scripts/git/git-command')
 const { lane_output } = await import('./lane-output')
 const { lane_registry } = await import('./lane-registry')
 
@@ -65,6 +70,8 @@ function recorded_lines(): Array<string> {
 }
 
 beforeEach(() => {
+	// The fixture stands in the main tree, which has no `.git` on disk, so `main_worktree` returns it.
+	vi.mocked(git_command.repository_root).mockResolvedValue(MAIN_TREE)
 	open_lane_on_disk(SEAT_LINE)
 })
 

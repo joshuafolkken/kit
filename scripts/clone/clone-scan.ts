@@ -103,12 +103,12 @@ function repo_identity(repo_path: string): string {
 // beside it, de-duplicated by identity — the current tree wins, so a worktree of it is dropped — so
 // each repository is scanned exactly once.
 //
-// **Discovery is asked from the main work tree, never from `root` directly.** A `backlogrun` child
-// runs in a lane, whose only neighbors are that repository's other lanes; asked there, discovery
-// returns nothing and the cross-repository half of this command's answer silently becomes `clean`.
-// The current tree is still scanned as `root`, so a lane reports its own working state.
+// **Discovery anchors on the main work tree, which `discover_repositories` resolves from `root`.** A
+// `backlogrun` child runs in a lane, whose only neighbors are that repository's other lanes; asked
+// from there, discovery walks up to the main checkout so it still finds the siblings. The current
+// tree is scanned as `root` regardless, so a lane reports its own working state.
 function scan_roots(root: string): Array<string> {
-	const map = repo_discovery.discover_repositories(repo_discovery.main_worktree(root))
+	const map = repo_discovery.discover_repositories(root)
 	const seen = new Set<string>()
 	const roots: Array<string> = []
 
