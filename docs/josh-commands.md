@@ -1363,7 +1363,7 @@ pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 - `--output <path>` — the child's transcript, absolute and under the home or temp directory (validated the same way `run:liveness --output` is).
 - `--repo <owner/name>` — a child in another repository.
 
-**Output / exit codes:** stdout is one token; stderr carries the reason and the basis. `merged`, `cut`, `abandoned` exit 0; `unreadable` exits 1. The verdict never reads `is_error: false` as a completion — completion is the CLOSED Issue — so a normal exit that abandoned the run is told apart from one that finished it. For `abandoned` the basis names which exit-record fields were read (`subtype`, `num_turns`, `permission_denials` count) and whether uncommitted work remains, ready to paste into the park comment. The four words are deliberately disjoint from `run:liveness`'s `alive` / `stopped` / `settled` / `undetermined`.
+**Output / exit codes:** stdout is one token; stderr carries the reason and the basis. `merged`, `cut`, `outage`, `abandoned` exit 0; `unreadable` exits 1. The verdict never reads `is_error: false` as a completion — completion is the CLOSED Issue. A mid-implementation ending is split in two (joshuafolkken/kit#2240): `outage` when the exit record ended in error on a transport-failure signature — the API could not be reached — and `abandoned` otherwise. The `abandoned` basis names the exit-record fields read (`subtype`, `num_turns`, `permission_denials`) and whether work remains; the `outage` basis names the signature, so the parent leaves the child re-dispatchable.
 
 ### `josh run:prep`
 
@@ -1409,21 +1409,24 @@ Collapses a `backlogrun` merge event into one call (joshuafolkken/kit#2024); ali
 calls it once at a child's return and reads back the next child number — or a control verdict.
 
 ```bash
-next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID")
+next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
 pnpm josh run:merge <N> --owner "$PPID"   # backlog offer (no epic)
 ```
 
 Confirms the child from GitHub and, by what it turned out to be, does the post-merge steps: a **merged**
 child (CLOSED) is counted into the carry record (which resets the failure streak), then `main:sync`,
 `lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
-or `already-done`) is left alone; a **failed** child has its stale `in-progress` dropped, is parked with
-`needs-decision`, and is counted against the consecutive-failure guard.
+or `already-done`) is left alone; an **outage** child (OPEN, unparked, exit record shows it could not
+reach the API — joshuafolkken/kit#2240) has its stale `in-progress` dropped but is **not** parked and
+**not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
+stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
+`--output <path>` names the transcript the outage split reads; absent, it is off.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
 `over` (the merge crossed the shared 200,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
-before its commit — stop), `stop` (failure guard), `retry` (state unreadable), and `busy` (refused
-count; exit 1).
+before its commit — stop), `stop` (failure guard), `environment` (the consecutive-outage guard tripped —
+the API is down), `retry` (unreadable), `busy` (refused count; exit 1).
 
 **Options:**
 
@@ -1467,9 +1470,9 @@ the interval, so an attached session sees a new event at once and the run's aliv
 go to standard output to relay verbatim and the next position to standard error — the same before and
 after a cut, the stream the run's, the position the caller's.
 
-`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `cut`, `stop`,
-`pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge` and `park`
-in-process; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
+`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
+`stop`, `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge`, `park`
+and `outage`; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
 without limit.
 
 ### `josh run:progress`

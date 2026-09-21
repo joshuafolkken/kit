@@ -269,6 +269,7 @@ const HANDED_OFF_CARRY = {
 	filed: 0,
 	cuts: 1,
 	failures: 0,
+	outages: 0,
 	is_handed_off: true as const,
 }
 

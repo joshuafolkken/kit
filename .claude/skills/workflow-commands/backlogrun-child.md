@@ -224,16 +224,24 @@ guard, and go back to step 1.
 3. **Classify how the child ended** — `pnpm josh run:ending <N> --output <path>`
    (joshuafolkken/kit#2139). `run:liveness` said it stopped; this says *how* — `abandoned` for a child
    that ended mid-implementation without a cut, told apart from a `merged` one even when it exited
-   `is_error: false`. The basis it prints (the exit-record fields it read and the `permission_denials`
-   count) is what a person needs to see without opening the log.
-4. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
-   naming what `run:liveness` answered and what it read, **and the basis `run:ending` printed** — for
-   an `abandoned` ending, its exit-record fields and denial count go into the comment verbatim.
+   `is_error: false`, and **`outage` for one that ended because it could not reach the API**
+   (joshuafolkken/kit#2240). The basis it prints (the exit-record fields it read and the
+   `permission_denials` count, or the transport-failure signature for an outage) is what a person needs
+   to see without opening the log.
+4. **An `abandoned` ending is booked as a failure** — count it against the consecutive-failure guard and
+   park it with `needs-decision` and a comment naming what `run:liveness` answered and what it read,
+   **and the basis `run:ending` printed** — its exit-record fields and denial count go into the comment
+   verbatim. **An `outage` ending is not**: the child never reached the API, so it is **not** counted
+   against the consecutive-failure guard and **not** parked with `needs-decision` — it stays
+   re-dispatchable in the same run. A run of consecutive outages trips the separate outage guard, which
+   stops the run as an environment failure rather than the children's.
 5. **Go back to step 1 of the loop.**
 
-**It is booked as a failure rather than restarted.** A silent retry re-runs a child whose tree may be
-half-written, and the consecutive-failure guard is the only thing that notices the environment rather
-than the children is at fault.
+**An abandoned ending is booked as a failure rather than restarted.** A silent retry re-runs a child
+whose tree may be half-written, and the consecutive-failure guard is the only thing that notices the
+environment rather than the children is at fault. **An outage is the environment failing, not the
+child** — counting it against that same guard is what joshuafolkken/kit#2240 removes, so an outage
+never lands on the failure streak and a persistent outage stops the run on its own guard instead.
 
 ## Audit before the first child
 

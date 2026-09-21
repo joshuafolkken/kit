@@ -49,6 +49,7 @@ const CARRY: RunCarry = {
 	filed: 0,
 	cuts: 0,
 	failures: 0,
+	outages: 0,
 }
 const CARRY_DESC = 'backlogrun --max 5 started …; 2 merged'
 
