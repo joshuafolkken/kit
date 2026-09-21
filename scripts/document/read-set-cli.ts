@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { backlogrun_parent_read_set } from './backlogrun-parent-read-set'
 import { entry_read_set, type ReadSetCost, type SectionCost } from './entry-read-set'
 import { lane_child_read_set } from './lane-child-read-set'
 
@@ -18,6 +19,7 @@ import { lane_child_read_set } from './lane-child-read-set'
 // run pays with `josh doc:section`. Neither figure drops a document and neither drops a rule: the
 // difference is entirely the part of a referenced file that the reference never pointed at.
 
+const { BACKLOGRUN } = backlogrun_parent_read_set
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const FLAG_PREFIX = '-'
@@ -40,6 +42,15 @@ const LANE_CHILD_NOTE: ReadonlyArray<string> = [
 	'  a dispatched lane child (`JOSH_LANE_CHILD`) reads this trimmed set:',
 	'  - skips the point-of-use documents the parent owns — child dispatch, lane opening, the progress watcher and the hand-off',
 	'  - omits SKILL.md §0/§2a/§2b/§2c/§2e/§2i/§3 — dispatch already authorized the run and a leaf child never uses them',
+]
+// **The `backlogrun` parent reads a trimmed set of its own** — a scheduler that never implements, so
+// the implementer-only `SKILL.md` sections are read section by section rather than whole
+// (joshuafolkken/kit#2256). A *different* trim from the lane child's: the parent keeps §0/§2b/§2c/§2e/
+// §2i, which are the scheduler's own, and drops no point-of-use document.
+const BACKLOGRUN_PARENT_NOTE: ReadonlyArray<string> = [
+	'  the backlogrun parent (scheduler) reads this trimmed set:',
+	'  - omits SKILL.md §2a/§2f/§2g/§3 — the parent never implements, so it claims no tree and files no `into` target',
+	'  - keeps every point-of-use document — the parent is the one dispatching children and running lanes',
 ]
 const FETCH_RULE =
 	'fetch: one `Read` call per file — never `cat`, and never two files in one command.'
@@ -168,7 +179,11 @@ function total_lines(report: ReadSetCost, width: number): Array<string> {
 }
 
 function note_lines(report: ReadSetCost): Array<string> {
-	return report.entry === lane_child_read_set.LANE_CHILD ? [...LANE_CHILD_NOTE, ''] : []
+	if (report.entry === lane_child_read_set.LANE_CHILD) return [...LANE_CHILD_NOTE, '']
+
+	if (report.entry === BACKLOGRUN) return [...BACKLOGRUN_PARENT_NOTE, '']
+
+	return []
 }
 
 function report_lines(report: ReadSetCost): Array<string> {
@@ -211,6 +226,8 @@ function unknown_entries(wanted: ReadonlyArray<string>, root: string): Array<str
 
 function costed_entry(root: string, entry: string): ReadSetCost {
 	if (entry === lane_child_read_set.LANE_CHILD) return lane_child_read_set.costed(root)
+
+	if (entry === BACKLOGRUN) return backlogrun_parent_read_set.costed(root)
 
 	return entry_read_set.costed(root, entry)
 }
