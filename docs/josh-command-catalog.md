@@ -1095,6 +1095,16 @@ Release this working tree's run record
 
 ---
 
+### `josh run:report` · `josh rrp`
+
+> **Audience:** automation · **Side effects:** files, network
+
+_No arguments._
+
+Generate the session-facing report from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends
+
+---
+
 ### `josh run:review` · `josh rrv`
 
 > **Audience:** automation · **Side effects:** processes, files
