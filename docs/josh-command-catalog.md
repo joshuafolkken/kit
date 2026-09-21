@@ -591,7 +591,7 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 `[--exclude <n>[,<n>...]] [--repo <owner/repo>]`
 
-Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epics
+Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics
 
 ---
 

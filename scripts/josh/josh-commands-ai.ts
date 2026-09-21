@@ -62,7 +62,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'backlog:next': {
 		script: 'scripts/backlog/backlog-next.ts',
 		description:
-			'Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epics',
+			'Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics',
 		category: 'AI tools',
 		reference: ['[--exclude <n>[,<n>...]] [--repo <owner/repo>]', 'automation', ['network']],
 	},

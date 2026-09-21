@@ -207,7 +207,7 @@ function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): Reado
 // is one answer and two renderings of it. `undefined` is the refusal — already reported.
 async function resolve(context: PoolContext): Promise<EpicNextResult | undefined> {
 	const references = backlog_pool
-		.opted_in_epics(context.opted_in.issues)
+		.opted_in_epics(context.opted_in.issues, context.tracking.index)
 		.map((number) => ({ number }))
 	const { reads, notices, refusal } = await epic_next_read.read_snapshots(references, context.repo)
 
