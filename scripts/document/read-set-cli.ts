@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { backlogrun_parent_read_set } from './backlogrun-parent-read-set'
 import { entry_read_set, type ReadSetCost, type SectionCost } from './entry-read-set'
 import { lane_child_read_set } from './lane-child-read-set'
+import { read_set_pricing } from './read-set-pricing'
 
 // `josh read:set` — what this entry point reads before it starts, and what that costs
 // (joshuafolkken/kit#1776).
@@ -29,6 +30,12 @@ const NOTHING = 0
 const PERCENT = 100
 const LABEL_GUTTER = 4
 const NUMBER_WIDTH = 9
+const DOLLAR_WIDTH = 7
+const DOLLAR_DECIMALS = 2
+// The premise the dollar column is read against: each figure is what that read costs *per run of this
+// size*, because an entry-read token rides every request as cached context. Printed rather than
+// assumed, so a reader checks the assumption instead of guessing it (joshuafolkken/kit#2289).
+const PREMISE = `  $ = cost per run, assuming a ${String(read_set_pricing.ASSUMED_REQUESTS)}-request run (each entry-read token re-read from cache per request)`
 const USAGE = 'Usage: josh read:set [<entry>] [--json]'
 const WHOLE_LABEL = 'whole — every referenced file read in full'
 const SCOPED_LABEL = 'scoped — referenced sections only'
@@ -61,6 +68,15 @@ function to_number(value: number): string {
 	return value.toLocaleString('en-US').padStart(NUMBER_WIDTH)
 }
 
+// The per-run dollar cost of a row, from its token count. Priced by `read-set-pricing`, which reads
+// `cost-pricing.ts`'s rates rather than carrying its own, so this column never becomes a second price
+// list (joshuafolkken/kit#2289).
+function to_dollars(tokens: number): string {
+	return `$${read_set_pricing.dollars_per_run(tokens).toFixed(DOLLAR_DECIMALS)}`.padStart(
+		DOLLAR_WIDTH,
+	)
+}
+
 // The column is sized from the longest label in this report rather than from a constant: the section
 // labels carry a file name *and* a heading, so a fixed width pushed them past it and the `tok` / `B`
 // columns stopped lining up with the file rows above (joshuafolkken/kit#1776 review round 1).
@@ -70,7 +86,7 @@ function row(
 	width: number,
 	note = '',
 ): string {
-	return `  ${label.padEnd(width)}${to_number(cost.tokens)} tok ${to_number(cost.bytes)} B${note}`
+	return `  ${label.padEnd(width)}${to_number(cost.tokens)} tok ${to_number(cost.bytes)} B ${to_dollars(cost.tokens)}${note}`
 }
 
 // **The tool is printed per file rather than left to be judged, and it is `Read` on every row.** A
@@ -191,6 +207,7 @@ function report_lines(report: ReadSetCost): Array<string> {
 
 	return [
 		`entry: ${report.entry}`,
+		PREMISE,
 		...note_lines(report),
 		...file_lines(report, width),
 		...section_lines(report, width),

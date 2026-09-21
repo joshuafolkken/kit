@@ -15,9 +15,13 @@ const BYTES_PER_KB = 1024
 const REQUIRED_SAVING_BYTES = 35 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
 // Raised from 30k when joshuafolkken/kit#2119 added two delivered-rule rows (the scout and the
-// per-run filing cap) to `rule-delivery.md`, which the child reads whole. The #2021 acceptance
-// criterion the trim exists for is the 35KB saving vs `fullrun`, which is pinned above and unaffected.
-const MAX_TOTAL_TOKENS = 31_000
+// per-run filing cap) to `rule-delivery.md`, which the child reads whole. Raised again to 40k in
+// joshuafolkken/kit#2289: `pre-gate-cut.md` joined the point-of-use set, so the ~9.8k tokens a lane
+// child *already* read at the pre-gate cut but the count omitted now appear in this total. The
+// increase is a correction of an under-count, not new reading. The #2021 acceptance criterion the
+// trim exists for is the 35KB saving vs `fullrun`, which is pinned above and unaffected — both sides
+// gained the same document.
+const MAX_TOTAL_TOKENS = 40_000
 const NOTHING = 0
 
 function total_read_bytes(report: ReturnType<typeof entry_read_set.costed>): number {

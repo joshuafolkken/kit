@@ -42,11 +42,14 @@ interface EntryBudget {
 // size. Names exactly the entries `known_entries` offers: the test fails on a stale entry and on an
 // entry with no row, so the definition cannot rot as entries are added or removed.
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
-	{ entry: 'kickoff', bytes: 233_472 },
-	{ entry: 'fullrun', bytes: 233_472 },
-	{ entry: 'halfrun', bytes: 233_472 },
-	{ entry: 'backlogrun', bytes: 237_568 },
-	{ entry: LANE_CHILD, bytes: 106_496 },
+	// Raised in joshuafolkken/kit#2289 when `pre-gate-cut.md` joined the point-of-use set: its ~29KB
+	// read is a point-of-use read every entry's total now counts, a correction of an under-count rather
+	// than new reading.
+	{ entry: 'kickoff', bytes: 266_240 },
+	{ entry: 'fullrun', bytes: 266_240 },
+	{ entry: 'halfrun', bytes: 266_240 },
+	{ entry: 'backlogrun', bytes: 270_336 },
+	{ entry: LANE_CHILD, bytes: 139_264 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
