@@ -1005,6 +1005,16 @@ Claude Code hook: deliver a trigger-delivered rule at the call that binds it (re
 
 ---
 
+### `josh rule:value` · `josh ruv`
+
+> **Audience:** developer · **Side effects:** none
+
+_No arguments._
+
+Print each delivered rule's unaided compliance — runs reached, kept rate, refusals
+
+---
+
 ### `josh run:carry` · `josh rc`
 
 > **Audience:** automation · **Side effects:** files

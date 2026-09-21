@@ -102,6 +102,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rst": "run:status",
     "rt": "reconcile-templates",
     "rug": "rule:guard",
+    "ruv": "rule:value",
     "rv": "run:liveness",
     "rw": "run:wake",
     "rwg": "run:watcher:guard",
@@ -758,6 +759,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rule:guard": [
       "",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "rule:value": [
+      "",
+      "developer",
       [
         "none",
       ],

@@ -2,6 +2,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
+import { entry_read_budget } from '#scripts/document/entry-read-budget'
 
 // The repository-root-relative path resolved to an absolute one, keyed off this file's own location
 // rather than the process cwd — so a path typed the way the budget records it resolves the same from
@@ -10,6 +11,10 @@ import { document_byte_budget } from '#scripts/document/document-byte-budget'
 function package_file(relative_path: string): string {
 	return fileURLToPath(new URL(`../../${relative_path}`, import.meta.url))
 }
+
+// The repository root, the base `entry-read-budget.ts` measures each entry's total read against — the
+// same two-levels-up offset `package_file` resolves a document by.
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
 // `josh bytes` — the byte counterpart of `josh lines` (joshuafolkken/kit#2176). A mandated
 // documentation update that grows an agent-read document past its byte ceiling is invisible until
@@ -102,10 +107,47 @@ function near_ceiling_statuses(): ReadonlyArray<DocumentStatus> {
 		.toSorted((left, right) => left.remaining - right.remaining)
 }
 
-function run_scan(): number {
-	const rows = near_ceiling_statuses().map((status) => status_row(status))
+interface EntryStatus {
+	entry: string
+	current: number
+	recorded: number
+	remaining: number
+}
 
-	process.stdout.write(`${rows.length === 0 ? NONE_NEAR : rows.join('\n')}\n`)
+function entry_status_of(entry: string, recorded: number): EntryStatus {
+	const current = entry_read_budget.entry_total_bytes(REPO_ROOT, entry)
+	const remaining = document_byte_budget.remaining_bytes(recorded, current)
+
+	return { entry, current, recorded, remaining }
+}
+
+function remaining_phrase(remaining: number): string {
+	return remaining < 0 ? `over by ${(-remaining).toString()}` : `${remaining.toString()} left`
+}
+
+// The primary budget, one row per entry: the total each workflow entry reads against its recorded
+// ceiling and the headroom left — printed on every scan, so the main budget is no longer a number the
+// gate reveals only when it fails (joshuafolkken/kit#2271).
+function entry_row(status: EntryStatus): string {
+	const counts = `${status.current.toString()}/${status.recorded.toString()} bytes`
+
+	return `entry ${status.entry}${ROW_GAP}${counts} · ${remaining_phrase(status.remaining)}`
+}
+
+function entry_rows(): ReadonlyArray<string> {
+	return entry_read_budget.ENTRY_READ_BUDGET.map((one) =>
+		entry_row(entry_status_of(one.entry, one.bytes)),
+	)
+}
+
+function scan_lines(): ReadonlyArray<string> {
+	const near = near_ceiling_statuses().map((status) => status_row(status))
+
+	return [near.length === 0 ? NONE_NEAR : near.join('\n'), ...entry_rows()]
+}
+
+function run_scan(): number {
+	process.stdout.write(`${scan_lines().join('\n')}\n`)
 
 	return 0
 }
@@ -128,8 +170,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const bytes_command = {
 	argument_row,
+	entry_row,
+	entry_rows,
 	near_ceiling_statuses,
 	run_bytes,
+	scan_lines,
 	status_row,
 	NONE_NEAR,
 	NOT_A_FILE,
