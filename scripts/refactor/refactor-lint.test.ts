@@ -6,6 +6,7 @@ const FILE = '/repo/scripts/a.ts'
 const MAX_LINES = 'max-lines'
 const NO_ANY = '@typescript-eslint/no-explicit-any'
 const NO_MAGIC = '@typescript-eslint/no-magic-numbers'
+const NO_UNUSED = '@typescript-eslint/no-unused-vars'
 const LINES_COMPLEXITY = 'lines-complexity'
 
 interface RawMessage {
@@ -59,6 +60,28 @@ describe('refactor_lint.categorize', () => {
 
 		expect(categories).toHaveLength(refactor_lint.CATEGORIES.length)
 		expect(categories.every((category) => category.candidates.length === 0)).toBe(true)
+	})
+})
+
+describe('refactor_lint.categorize buckets the rules added in #2255', () => {
+	it('buckets local/namespace-object-export under namespace-object export', () => {
+		expect(
+			candidates_of('namespace-export', [{ ruleId: 'local/namespace-object-export', line: 5 }]),
+		).toHaveLength(1)
+	})
+
+	it('buckets naming-convention under variable naming', () => {
+		expect(
+			candidates_of('naming-convention', [
+				{ ruleId: '@typescript-eslint/naming-convention', line: 2 },
+			]),
+		).toHaveLength(1)
+	})
+
+	it('buckets no-unused-vars under unused code with its location', () => {
+		expect(candidates_of('unused-code', [{ ruleId: NO_UNUSED, line: 9 }])).toStrictEqual([
+			{ location: 'scripts/a.ts:9', rule: NO_UNUSED },
+		])
 	})
 })
 
