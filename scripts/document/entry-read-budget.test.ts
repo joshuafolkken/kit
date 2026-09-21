@@ -50,6 +50,27 @@ describe('entry-read byte budget — the primary ceiling on what an entry reads'
 	})
 })
 
+// joshuafolkken/kit#2294 was the FIRST downward move on this ratchet — `pre-gate-cut.md` was
+// compressed, so every entry that reads it crossed a block downward. These are the pre-#2294 ceilings;
+// a recorded value back at or above one of them is the ratchet silently climbing past the reduction,
+// which is exactly what the downward move exists to prevent.
+const PRE_2294_CEILING: ReadonlyMap<string, number> = new Map([
+	['kickoff', 270_336],
+	['fullrun', 270_336],
+	['halfrun', 270_336],
+	['backlogrun', 274_432],
+	['lane-child', 143_360],
+])
+
+describe('the first downward ratchet move (joshuafolkken/kit#2294) is held', () => {
+	it.each(ENTRY_READ_BUDGET)('$entry stays below its pre-#2294 ceiling', ({ entry, bytes }) => {
+		const previous = PRE_2294_CEILING.get(entry)
+
+		expect(previous, `${entry} must have a pre-#2294 ceiling recorded`).toBeDefined()
+		if (previous !== undefined) expect(bytes).toBeLessThan(previous)
+	})
+})
+
 describe('the raise/lower messages name the concrete block value to record', () => {
 	it('over-budget names the next block multiple to raise to', () => {
 		const recorded = block_ceiling(1000)
