@@ -588,10 +588,11 @@ const BATCH_REFUSAL_WINDOW_MS = 10_000
 // exists to prevent, arrived at from the other side.
 function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
 	// In a dispatched lane child the batching guard no longer refuses (joshuafolkken/kit#2138,
-	// joshuafolkken/kit#2164, joshuafolkken/kit#2178): its mode is `off`, so it says nothing at all. It
-	// will *refuse* nothing there, and the stand-aside must agree — or a lone rule trigger (`shell-body`)
-	// would be stepped aside from for a batching refusal that can no longer come and lost for the run. The
-	// test is therefore "will it refuse", i.e. mode `refuse`, not "is it off".
+	// joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276): its mode is `notice`, so it
+	// speaks but never denies. It will *refuse* nothing there, and the stand-aside must agree — or a lone
+	// rule trigger (`shell-body`) would be stepped aside from for a batching refusal that can no longer
+	// come and lost for the run. The test is therefore "will it refuse", i.e. mode `refuse`, not "is it
+	// notice or off".
 	if (lane_guard_policy.mode_here('batching') !== 'refuse') return false
 
 	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))

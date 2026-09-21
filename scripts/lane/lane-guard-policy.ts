@@ -19,14 +19,16 @@ import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 //   - `notice` — let the call through but attach the guidance, so a headless child is nudged, not killed.
 //   - `off`    — say nothing at all, for a guard whose remedy the child cannot carry out.
 //
-// **The notice did not move the number, and that is what kit#2178 corrects.** The lane child that ran
-// right after kit#2164 merged came in at 1.00 calls per turn on both sides of the first notice
-// (transcript `f39efeb5`), and nine indisputably independent edits immediately after a notice still went
-// out one per turn. That is the third refutation of "advise and it will be obeyed": kit#1304 distributed
-// the norm as prose and kit#1329 / kit#1337 put the density in front of the running run, and neither
-// moved the number either. So the batching guard is `off` in the child now — advice measured not to work
-// is not worth the per-turn context cost of carrying it — while the `notice` mode stays a valid spelling
-// for a future guard whose guidance a child can actually act on.
+// **The notice did not move the number, kit#2178 took it off, and kit#2276 restores it changed.** The
+// lane child that ran right after kit#2164 merged came in at 1.00 calls per turn on both sides of the
+// first notice (transcript `f39efeb5`), so kit#2178 turned the batching notice `off` in the child rather
+// than pay the per-turn context cost of guidance measured not to work. But with it off, the notice fired
+// **zero** times across the 2026-09-21 backlogrun the density was next measured on, so the 1.147 read
+// there is the rate with no guidance at all — not a second measurement of the notice failing. kit#2276
+// therefore restores it as `notice`, with the two things #2164's lacked: it names the concrete recent
+// calls the run issued one-per-turn, and it recurs every single-call turn rather than every three. The
+// mode stays a genuine experiment — the density is re-measured on the next backlogrun, and a notice that
+// still does not move it is redesigned rather than kept.
 //
 // **It is an enumeration and not a judgement, for the reason `delegation-policy.ts` is one.** "This
 // guard's mode in a child" is a call made under the same pressure that produced the misfire. The list is
@@ -63,9 +65,9 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 	},
 	{
 		id: 'batching',
-		mode_in_lane_child: 'off',
+		mode_in_lane_child: 'notice',
 		because:
-			'a refusal ends a child turn so it cannot fire as one (kit#2138), and the notice kit#2164 replaced it with did not move the density: the lane child after kit#2164 merged ran at 1.00 calls per turn on both sides of the notice (transcript f39efeb5) and kept editing one file per turn even across nine independent edits — the third refutation of advice after kit#1304 (prose) and kit#1329 / kit#1337 (density in front of the run), so kit#2178 takes it off rather than pay the per-turn context cost of guidance measured not to work',
+			'a refusal ends a child turn so it cannot fire as one (kit#2138); kit#2164 replaced it with a notice, kit#2178 took that notice off after it did not move the density (1.00 calls per turn on both sides of it, transcript f39efeb5), and kit#2276 restores it as a notice — but a different one. #2178 turned the notice fully off, so across the 2026-09-21 backlogrun 13 runs it fired zero times and the measured 1.147 is the rate with no guidance at all, not guidance that failed. #2276 re-enables it with the two things #2164 lacked: it names the concrete recent calls the run issued one-per-turn (not just "batch more"), and it recurs every single-call turn rather than every three, so the pressure arrives as often as the mistake. The density is to be re-measured on the next backlogrun; if it still does not reach 1.40 the notice is redesigned rather than kept, per the issue',
 	},
 	{
 		id: 'rule',
