@@ -108,14 +108,19 @@ function to_children(issues: ReadonlyArray<OpenIssueData>, repo: string): Array<
 	return issues.map((issue) => to_child(issue, repo))
 }
 
-// The epic roots whose `auto-ok` stands for every child.
+// The epics whose `auto-ok` stands for their children — the opted-in roots and, transitively, every
+// nested epic reached through their task lists (joshuafolkken/kit#2244, extending joshuafolkken/kit#1668).
 //
-// They come out of the opted-in listing itself: an epic that carries `auto-ok` is a row in that
-// listing which also carries `epic`. So no second listing has to read an epic's labels, and a child
-// is never asked for one of its own — the root's label is the approval, exactly as typing
-// `epicrun #<E>` approves every merge inside `#<E>`.
-function opted_in_epics(issues: ReadonlyArray<OpenIssueData>): ReadonlyArray<number> {
-	return [...epic_index.opted_in_epic_numbers(issues)]
+// The roots come out of the opted-in listing itself: an epic that carries `auto-ok` is a row in that
+// listing which also carries `epic`, so no second listing reads an epic's labels. From each root the
+// closure follows the tracking index down into a nested epic and its own nested epics, so a person's
+// one label on the root approves the whole subtree — exactly as typing `epicrun #<E>` approves every
+// merge inside `#<E>`, however deep.
+function opted_in_epics(
+	issues: ReadonlyArray<OpenIssueData>,
+	tracking: ReadonlyMap<number, ReadonlyArray<number>>,
+): ReadonlyArray<number> {
+	return [...epic_index.reachable_epic_numbers(tracking, issues)]
 }
 
 // The rows that stand for themselves. An epic root is a container rather than work, so it is never a

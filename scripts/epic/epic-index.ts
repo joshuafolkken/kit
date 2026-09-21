@@ -74,6 +74,63 @@ function opted_in_epic_numbers(issues: ReadonlyArray<OpenIssueData>): ReadonlySe
 	)
 }
 
+// The reverse of the tracking index — which children each epic lists, keyed by the epic. `index`
+// answers child → its tracking epics; the closure walk below needs epic → its children, so the
+// mapping is inverted once here rather than scanned per step.
+function push_child(map: Map<number, Array<number>>, parent: number, child: number): void {
+	map.set(parent, [...(map.get(parent) ?? []), child])
+}
+
+function invert_tracking(
+	index: ReadonlyMap<number, ReadonlyArray<number>>,
+): Map<number, Array<number>> {
+	const children_of = new Map<number, Array<number>>()
+
+	for (const [child, parents] of index) {
+		for (const parent of parents) push_child(children_of, parent, child)
+	}
+
+	return children_of
+}
+
+// An epic's children that are themselves epics — the only edges the closure walk follows. A child is
+// an epic when it lists children of its own, so it is a key of the inverted index; a plain leaf child
+// is never chased, and a childless nested epic has nothing to expand and drops out with no cost.
+function child_epics_of(
+	children_of: ReadonlyMap<number, ReadonlyArray<number>>,
+	epic: number,
+): ReadonlyArray<number> {
+	return (children_of.get(epic) ?? []).filter((child) => children_of.has(child))
+}
+
+// Every epic an `auto-ok` root opts in — the root itself and, transitively, every nested epic reached
+// through its task list and theirs in turn (joshuafolkken/kit#2244). A person puts `auto-ok` on a root
+// to approve everything under it, and the direct-children-only reading (joshuafolkken/kit#1668) stopped
+// one level short: a grandchild fell out as "not opted in", though the same reasoning that admits the
+// child admits it. So the root's approval is read down the whole subtree rather than one level of it.
+//
+// **Unlimited depth, and it terminates.** The epic graph is finite — every node is an open epic, capped
+// at the listing limit — so no depth bound is needed to stop the walk; the `visited` set turns a cycle
+// or a self-reference into a node already seen rather than an edge walked again, and an epic reachable
+// through two roots is added once by that same set.
+function reachable_epic_numbers(
+	index: ReadonlyMap<number, ReadonlyArray<number>>,
+	opted_in: ReadonlyArray<OpenIssueData>,
+): ReadonlySet<number> {
+	const children_of = invert_tracking(index)
+	const visited = new Set<number>()
+	const stack = [...opted_in_epic_numbers(opted_in)]
+
+	while (stack.length > 0) {
+		const epic = stack.pop()
+		if (epic === undefined || visited.has(epic)) continue
+		visited.add(epic)
+		stack.push(...child_epics_of(children_of, epic).filter((child) => !visited.has(child)))
+	}
+
+	return visited
+}
+
 // **Which wins when an epic's declared order and a child's own `auto-ok` disagree — the single
 // source** (joshuafolkken/kit#1668, narrowing joshuafolkken/kit#1633).
 //
@@ -99,11 +156,17 @@ function opted_in_epic_numbers(issues: ReadonlyArray<OpenIssueData>): ReadonlySe
 // reads as tracked by nobody who would offer it, and the standalone half hands it over while the
 // opted-in epic hands it over too. The epic named as the reason is the first opted-in one in listing
 // order — any of them is withholding it, and picking by position keeps the sentence deterministic.
+//
+// **The opted-in set is the transitive closure, not one level of it** (joshuafolkken/kit#2244). A
+// child of a nested epic is withheld from the standalone half exactly when that nested epic is one the
+// backlog is going to offer — which, since the closure reaches it, it now is. Withholding only the
+// direct roots' children here would leave a nested epic's child offered both through the epic and
+// standalone, the double-offer this whole rule exists to prevent.
 function withheld_children(
 	index: ReadonlyMap<number, ReadonlyArray<number>>,
 	opted_in: ReadonlyArray<OpenIssueData>,
 ): ReadonlyMap<number, number> {
-	const epics = opted_in_epic_numbers(opted_in)
+	const epics = reachable_epic_numbers(index, opted_in)
 	const withheld = new Map<number, number>()
 
 	for (const [child, tracked_by] of index) {
@@ -138,6 +201,7 @@ const epic_index = {
 	build_tracking_index,
 	fetch_epics,
 	opted_in_epic_numbers,
+	reachable_epic_numbers,
 	withheld_children,
 }
 

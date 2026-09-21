@@ -1069,7 +1069,7 @@ stdout is one token — the issue number, or `none`, or empty with exit 1 if the
 
 ### `josh backlog:next`
 
-Order the whole opted-in backlog in one command — standalone `auto-ok` issues plus the children of every epic whose root carries `auto-ok`. Read-only. Tokens are bare numbers scoped to the repository.
+Order the whole opted-in backlog in one command — standalone `auto-ok` issues plus the descendants of every epic whose root carries `auto-ok`, followed transitively through nested epics (joshuafolkken/kit#2244). Read-only. Tokens are bare numbers scoped to the repository.
 
 ```bash
 pnpm josh backlog:next                 # alias: josh bl
