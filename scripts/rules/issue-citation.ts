@@ -6,8 +6,11 @@
 // it is. The stop guard reads `last_assistant_message` — the turn's session-facing text — and this
 // predicate answers whether a bare number slipped into it.
 //
-// **It is a notice, never a refusal.** A citation-format slip is not worth blocking a stop over, and
-// the cost of a false positive is high — so the row emits `systemMessage` and lets the stop proceed.
+// **It blocks the stop, so a false positive costs a wasted turn** (joshuafolkken/kit#2247). The nudge
+// now reaches the model rather than the person, so the detection is tightened to what is genuinely a
+// bare citation: a `#N` inside a fenced code block, inside an inline-code span, on a quote line, or
+// right after `PR` / `pull request` is not a citation slip and is skipped. The scan is line-based so
+// each exclusion is decided from the one line the mention sits on.
 
 // An Issue number: `#` and its digits. One quantifier, no backtracking — the `#N` alone locates the
 // mention, and any `owner/repo` prefix is read off the surrounding text (`repo_prefix`) rather than
@@ -25,6 +28,20 @@ const OWNER_REPO = /^[^\s/#]+\/[^\s/#]+$/u
 // of its delimiters — no `[`/`]` in the text, no `(`/`)` in the target — so neither star is ambiguous
 // against a nested bracket and there is nothing to backtrack.
 const MARKDOWN_LINK = /\[([^[\]]*)\]\([^()]*\)/gu
+// A fenced-code delimiter line: three or more backticks or tildes after optional indentation — both
+// delimiters CommonMark allows. Toggling on each one brackets the fenced block, so a `closes #N` shown
+// in a `gh api` example never reads as a slip whichever fence the reply drew it with.
+const FENCE_MARKER = /^\s*(?:`{3,}|~{3,})/u
+// A quote line: a `>` after optional indentation. An Issue body quoted back carries its own `#N`, and
+// a quote is not the run's own citation.
+const QUOTE_LINE = /^\s*>/u
+// A `#N` written as a PR reference: `PR` or `pull request` (word-bounded) right before it. `#N` alone
+// cannot tell an Issue from a PR, but the preceding word can, and reading it needs no network round
+// trip inside the hook.
+const PR_PREFIX = /\b(?:pr|pull request)\s*$/iu
+// Two backticks bracket one inline-code span, so an odd count of them before an index means the index
+// sits inside a span.
+const BACKTICK_PAIR = 2
 
 // Whether a markdown link's *text* span — between the `[` and the `]`, never its `(target)` — covers
 // `index`. A `#N` inside the text is the approved `[#N](url)` citation; one in the target is not
@@ -36,10 +53,11 @@ function text_span_covers(link: RegExpMatchArray, index: number): boolean {
 	return index >= start && index < end
 }
 
-// The whole message is searched for a link whose text span covers this index, so `see [#12](url) and
-// #34` reads the first as linked and the second as bare.
-function is_linked_at(message: string, index: number): boolean {
-	for (const link of message.matchAll(MARKDOWN_LINK)) {
+// The line is searched for a link whose text span covers this index, so `see [#12](url) and #34`
+// reads the first as linked and the second as bare. The scan is line-based (`is_bare_at` passes one
+// line), so a link and the `#N` it wraps must sit on the same line — which they always do.
+function is_linked_at(line: string, index: number): boolean {
+	for (const link of line.matchAll(MARKDOWN_LINK)) {
 		if (text_span_covers(link, index)) return true
 	}
 
@@ -63,16 +81,54 @@ function repo_prefix(message: string, hash_index: number): string {
 	return OWNER_REPO.test(token) ? token : ''
 }
 
-// The bare references in the message, in the order they appear and de-duplicated: the correcting
-// notice names them and turns them into `issue:cite` arguments, so a reference cited twice is not
-// nudged about twice. Each carries its `owner/repo` prefix when it had one, so a cross-repository
-// mention is corrected to the right repository.
+// Whether the index sits inside an inline-code span: an odd number of backticks precede it on the line.
+function is_inline_code_at(line: string, index: number): boolean {
+	const backticks = line.slice(0, index).split('`').length - 1
+
+	return backticks % BACKTICK_PAIR === 1
+}
+
+// Whether the `#N` at this index on the line is a real bare citation rather than an excluded mention —
+// a linked reference, an inline-code span, or a PR reference read off the word before it.
+function is_bare_at(line: string, index: number): boolean {
+	if (is_linked_at(line, index) || is_inline_code_at(line, index)) return false
+
+	return !PR_PREFIX.test(line.slice(0, index))
+}
+
+// The bare references on one non-excluded line are appended in order, each carrying its `owner/repo`
+// prefix when it had one.
+function collect_line_references(line: string, found: Array<string>): void {
+	for (const match of line.matchAll(ISSUE_NUMBER)) {
+		const { index } = match
+		if (is_bare_at(line, index)) found.push(`${repo_prefix(line, index)}${match[0]}`)
+	}
+}
+
+// The message lines that sit outside every fenced-code block, with the fence delimiter lines
+// themselves dropped: toggling on each delimiter brackets the block, so a `#N` shown in an example is
+// never scanned.
+function lines_outside_fences(message: string): ReadonlyArray<string> {
+	const lines: Array<string> = []
+	let is_in_fence = false
+
+	for (const line of message.split('\n')) {
+		if (FENCE_MARKER.test(line)) is_in_fence = !is_in_fence
+		else if (!is_in_fence) lines.push(line)
+	}
+
+	return lines
+}
+
+// The bare references in the message, in the order they appear and de-duplicated: the block reason
+// names them and turns them into `issue:cite` arguments, so a reference cited twice is not nudged
+// about twice. Fenced-code blocks and quote lines are skipped, so a `#N` shown in an example or quoted
+// from an Issue body is not read as the run's own citation.
 function bare_references(message: string): ReadonlyArray<string> {
 	const found: Array<string> = []
 
-	for (const match of message.matchAll(ISSUE_NUMBER)) {
-		const { index } = match
-		if (!is_linked_at(message, index)) found.push(`${repo_prefix(message, index)}${match[0]}`)
+	for (const line of lines_outside_fences(message)) {
+		if (!QUOTE_LINE.test(line)) collect_line_references(line, found)
 	}
 
 	return [...new Set(found)]

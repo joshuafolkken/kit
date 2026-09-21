@@ -59,6 +59,43 @@ describe('issue_citation.bare_references', () => {
 	})
 })
 
+describe('issue_citation.bare_references — tightened detection', () => {
+	it('ignores a #N inside a fenced code block', () => {
+		const message = 'run this:\n```\ngh api ... closes #12\n```\ndone'
+
+		expect(issue_citation.bare_references(message)).toEqual([])
+	})
+
+	it('ignores a #N inside a tilde-fenced code block', () => {
+		const message = 'run this:\n~~~\ngh api ... closes #12\n~~~\ndone'
+
+		expect(issue_citation.bare_references(message)).toEqual([])
+	})
+
+	it('ignores a #N inside an inline-code span', () => {
+		expect(issue_citation.bare_references('the example `closes #34` is fine')).toEqual([])
+	})
+
+	it('ignores a #N on a quote line', () => {
+		expect(issue_citation.bare_references('quoting the body:\n> fixes #56 later')).toEqual([])
+	})
+
+	it('ignores a #N read as a PR reference', () => {
+		expect(issue_citation.bare_references('landed in PR #78')).toEqual([])
+		expect(issue_citation.bare_references('see pull request #90')).toEqual([])
+	})
+
+	it('still flags a bare #N outside the fence, code, quote and PR cases', () => {
+		const message = '```\ncode #1\n```\ntracked by #99'
+
+		expect(issue_citation.bare_references(message)).toEqual(['#99'])
+	})
+
+	it('does not read a word merely ending in "pr" as a PR reference', () => {
+		expect(issue_citation.bare_references('the expr #5 broke')).toEqual(['#5'])
+	})
+})
+
 describe('issue_citation.cite_arguments', () => {
 	it('strips the # from a bare reference so issue:cite reads a number', () => {
 		expect(issue_citation.cite_arguments(['#123', '#456'])).toEqual(['123', '456'])
