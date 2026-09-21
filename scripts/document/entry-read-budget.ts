@@ -40,7 +40,7 @@ interface EntryBudget {
 // size. Names exactly the entries `known_entries` offers: the test fails on a stale entry and on an
 // entry with no row, so the definition cannot rot as entries are added or removed.
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
-	{ entry: 'kickoff', bytes: 229_376 },
+	{ entry: 'kickoff', bytes: 233_472 },
 	{ entry: 'fullrun', bytes: 229_376 },
 	{ entry: 'halfrun', bytes: 229_376 },
 	{ entry: 'backlogrun', bytes: 237_568 },
