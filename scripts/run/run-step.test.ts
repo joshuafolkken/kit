@@ -4,6 +4,8 @@ import { run_step, type StepInput } from './run-step'
 
 const KIND = run_event_stream.EVENT_KIND
 const ISSUE = '2248'
+const MERGE_COMMAND = `pnpm josh run:merge ${ISSUE}`
+const FOLLOWUP_COMMAND = 'pnpm josh followup'
 
 function input(overrides: Partial<StepInput>): StepInput {
 	return {
@@ -13,6 +15,7 @@ function input(overrides: Partial<StepInput>): StepInput {
 		latest_scope: 'skip',
 		last_event: undefined,
 		carry_kind: 'none',
+		is_lane_child: false,
 		...overrides,
 	}
 }
@@ -83,10 +86,10 @@ describe('run_step.next_action — pre-implementation position', () => {
 
 describe('run_step.next_action — event-driven position', () => {
 	it.each([
-		[KIND.PR_OPENED, 'pnpm josh followup'],
+		[KIND.PR_OPENED, FOLLOWUP_COMMAND],
 		[KIND.REVIEW_ROUND, 'pnpm josh review:round2'],
-		[KIND.MERGE, `pnpm josh run:merge ${ISSUE}`],
-		[KIND.OUTAGE, `pnpm josh run:merge ${ISSUE}`],
+		[KIND.MERGE, MERGE_COMMAND],
+		[KIND.OUTAGE, MERGE_COMMAND],
 		[KIND.PARK, 'pnpm josh backlog:next'],
 		[KIND.CUT, `pnpm josh run:cut --resume ${ISSUE}`],
 	])('dispatches to a command after %s', (last_event, line) => {
@@ -98,6 +101,32 @@ describe('run_step.next_action — event-driven position', () => {
 		[KIND.STOP, run_step.STOP],
 	])('answers a verdict after %s', (last_event, line) => {
 		expect(run_step.next_action(input({ last_event })).line).toBe(line)
+	})
+})
+
+// joshuafolkken/kit#2297: a dispatched lane child is never handed `run:merge` — the parent's budget
+// command, which returns `busy` in a child (joshuafolkken/kit#2267). It stops at a parent-only
+// position instead, so the child is never pointed at a command the runtime guard would refuse.
+describe('run_step.next_action — the lane child never reaches run:merge', () => {
+	it.each([[KIND.MERGE], [KIND.OUTAGE]])('answers stop after %s in a lane child', (last_event) => {
+		expect(run_step.next_action(input({ last_event, is_lane_child: true })).line).toBe(
+			run_step.STOP,
+		)
+	})
+
+	it.each([[KIND.MERGE], [KIND.OUTAGE]])(
+		'still dispatches run:merge after %s outside a lane',
+		(last_event) => {
+			expect(run_step.next_action(input({ last_event, is_lane_child: false })).line).toBe(
+				MERGE_COMMAND,
+			)
+		},
+	)
+
+	it('leaves the other event positions unchanged in a lane child', () => {
+		const action = run_step.next_action(input({ last_event: KIND.PR_OPENED, is_lane_child: true }))
+
+		expect(action.line).toBe(FOLLOWUP_COMMAND)
 	})
 })
 

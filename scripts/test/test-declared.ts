@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
 import { test_declared_changed } from './test-declared-changed'
 import { test_declared_logic, type Verdict } from './test-declared-logic'
 import { test_declared_match, type MatchResult } from './test-declared-match'
@@ -16,13 +17,57 @@ import { test_type_logic } from './test-type-logic'
 // line against the change set, printing `match` / `type-mismatch` / `path-missing` /
 // `test-not-created` per line and exiting non-zero on any mismatch (joshuafolkken/kit#2181).
 
-const MATCH_FLAG = '--match'
 const CLEAN_EXIT = 0
 const MISMATCH_EXIT = 1
 const MATCH_STATUS = 'match'
 const ARGV_OFFSET = 2
 const NO_DECLARATIONS =
 	'no Test: declarations parsed from stdin — pipe the Step 0 work summary in, e.g. `pnpm josh test:declared --match < summary.md`'
+
+// **An unknown flag is a refusal, not a default** — `scripts/time/time-cli.ts` states the same
+// convention (joshuafolkken/kit#2297). Ignoring `--foo` and re-printing the verdict is what sent a
+// reader off to read the source by hand, so a misspelled or retired flag stops here with the usage.
+const PARSE_ARGS_OPTIONS = {
+	help: { type: 'boolean', short: 'h', default: false },
+	match: { type: 'boolean', default: false },
+} as const
+
+const USAGE = [
+	'Usage: josh test:declared [--match] [--help]',
+	'  (no flags)  print required | exempt | satisfied for the working-tree diff',
+	'  --match     read a Step 0 work summary on stdin and check each `Test:` line against the',
+	'              change set, e.g. `pnpm josh test:declared --match < summary.md`',
+	'  --help, -h  print this usage',
+].join('\n')
+
+// The one command a `required` verdict leaves to run next: declare a test for each named runtime file,
+// then verify the declarations against the change set (joshuafolkken/kit#2297). Printed after the
+// detail so the verdict-to-detail mapping the report test pins stays untouched.
+const NEXT_STEP =
+	'next: declare a test for each runtime file above, then verify with `pnpm josh test:declared --match < summary.md`'
+
+interface Options {
+	is_help: boolean
+	is_match: boolean
+}
+
+// The parsed flags, or `undefined` when an unknown one was passed — the strict parse is what turns a
+// typo into a refusal rather than a silent re-print of the verdict.
+function parse(argv: ReadonlyArray<string>): Options | undefined {
+	try {
+		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
+
+		return { is_help: values.help, is_match: values.match }
+	} catch {
+		return undefined
+	}
+}
+
+// The next command a verdict leaves to run, or `undefined` when there is nothing to do next. Only
+// `required` owes one — an untested runtime change is the one verdict a person acts on.
+function next_step(verdict: Verdict): string | undefined {
+	return verdict === 'required' ? NEXT_STEP : undefined
+}
 
 // A runtime file with the test type its path calls for, so the required detail says which kind of
 // test to add rather than only that one is missing (joshuafolkken/kit#2181).
@@ -56,6 +101,10 @@ function run(): void {
 
 	process.stdout.write(`${verdict}\n`)
 	process.stderr.write(`${detail}\n`)
+
+	const next = next_step(verdict)
+
+	if (next !== undefined) process.stderr.write(`${next}\n`)
 }
 
 function format_match(result: MatchResult): string {
@@ -79,10 +128,30 @@ function run_match(summary: string, changed: ReadonlyArray<string>): number {
 	return results.every((result) => result.status === MATCH_STATUS) ? CLEAN_EXIT : MISMATCH_EXIT
 }
 
-// Returns the exit code so the entry point assigns `process.exitCode` in one expression — the default
-// verdict path prints and returns clean, the match path reads stdin and gates on the result.
+// Prints the usage and returns the exit code: clean for an explicit `--help`, a mismatch for an
+// unknown flag — the flag was not understood, so the verdict must not be re-printed as though it were.
+function print_usage(is_help: boolean): number {
+	if (is_help) {
+		process.stdout.write(`${USAGE}\n`)
+
+		return CLEAN_EXIT
+	}
+
+	process.stderr.write(`${USAGE}\n`)
+
+	return MISMATCH_EXIT
+}
+
+// Returns the exit code so the entry point assigns `process.exitCode` in one expression — an unknown
+// flag prints the usage and gates, `--help` prints it clean, the default verdict path prints and
+// returns clean, and the match path reads stdin and gates on the result.
 async function main(argv: ReadonlyArray<string>): Promise<number> {
-	if (!argv.includes(MATCH_FLAG)) {
+	const options = parse(argv)
+
+	if (options === undefined) return print_usage(false)
+	if (options.is_help) return print_usage(true)
+
+	if (!options.is_match) {
 		run()
 
 		return CLEAN_EXIT
@@ -97,6 +166,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await main(process.argv.slice(ARGV_OFFSET))
 }
 
-const test_declared = { detail_for, format_match, report, run, run_match }
+const test_declared = {
+	USAGE,
+	detail_for,
+	format_match,
+	next_step,
+	parse,
+	report,
+	run,
+	run_match,
+}
 
 export { test_declared }

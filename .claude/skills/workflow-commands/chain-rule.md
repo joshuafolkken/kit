@@ -13,7 +13,9 @@ Review results and successful pushes are never turn boundaries.
    Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts `pnpm josh gate` in
    the background and prints the whole `/code-review` brief in one call, so the gate and the review
    overlap rather than the review waiting on the gate (joshuafolkken/kit#2179). Launch the
-   `/code-review` subagent with that brief. Never load the review skill in the main line.
+   `/code-review` subagent as the `general-purpose` agent type with that brief — it carries every tool,
+   so it can load the review skill and, with `--fix`, apply findings; a guessed type name fails with
+   `Agent type not found` (joshuafolkken/kit#2297). Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
    and gate. Do not version-bump a child; `pnpm josh release` decides the version from main's history.
@@ -74,8 +76,8 @@ once here; the measurements that motivated each one live in the linked Issues.
   of its own. Clean has two halves: no confirmed High is standing, and nothing was routed to branch 1 of
   the disposition (joshuafolkken/kit#1333).
 - **The review runs in a subagent, never a main-line skill load** — `/code-review` is spawned through
-  the `Agent` tool in its own context; a mid-run `Skill` load rewrites the whole cached prompt prefix,
-  which is what makes it expensive (joshuafolkken/kit#1855).
+  the `Agent` tool in its own context, as the agent type step 1 names; a mid-run `Skill` load rewrites
+  the whole cached prompt prefix, which is what makes it expensive (joshuafolkken/kit#1855).
 - **The brief names the checkout, and a review that read another one is refused** — `pnpm josh
   review:brief` prints the checkout root, branch and HEAD and a nonce; the review runs `pnpm josh
   review:attest <nonce>` from the tree it read, and `pnpm josh review:attest --check` must answer `ok`

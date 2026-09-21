@@ -76,6 +76,10 @@ interface StepInput extends PreInput {
 	last_event: string | undefined
 	carry_kind: CarryRead['kind']
 	issue_number: string
+	// Whether this run is a dispatched lane child, read by the CLI from the dispatch mark
+	// (`lane-child-marker.ts`). A child must never be handed `run:merge` — that is the parent's own
+	// budget command and returns `busy` in a child (joshuafolkken/kit#2267, joshuafolkken/kit#2297).
+	is_lane_child: boolean
 }
 
 interface StepAction {
@@ -107,8 +111,19 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.STOP]: () => verdict(STOP),
 }
 
-// An event the table does not name leaves the position unknown rather than guessing a next step.
-function event_action(event: string, issue_number: string): StepAction {
+// The parent-only positions a dispatched lane child must never act on. `run:merge` is the parent's
+// budget command — a child that ran it read the `busy` it got back as a competing session and parked
+// its Issue unimplemented (joshuafolkken/kit#2267). A merge or an outage is the parent's to classify,
+// so a child at one has nothing to run and stops rather than being handed `run:merge`
+// (joshuafolkken/kit#2297).
+const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
+
+// An event the table does not name leaves the position unknown rather than guessing a next step. A
+// lane child at a parent-only position stops instead — the runtime refusal `lane-carry-conflict.ts`
+// delivers is the same rule one call later, so this keeps a child from ever being pointed at it.
+function event_action(event: string, issue_number: string, is_lane_child: boolean): StepAction {
+	if (is_lane_child && PARENT_ONLY_EVENTS.has(event)) return verdict(STOP)
+
 	return EVENT_ACTIONS[event]?.(issue_number) ?? verdict(UNKNOWN)
 }
 
@@ -139,7 +154,7 @@ function next_action(input: StepInput): StepAction {
 	if (terminal !== undefined) return terminal
 	if (is_pre_implementation(input.last_event)) return verdict(pre_verdict(input))
 
-	return event_action(input.last_event ?? '', input.issue_number)
+	return event_action(input.last_event ?? '', input.issue_number, input.is_lane_child)
 }
 
 const run_step = {

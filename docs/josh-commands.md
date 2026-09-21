@@ -190,6 +190,7 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 - **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
 - **The pre-gate cut row**: the trigger is a `Bash` call that runs `pnpm josh gate` from a **lane** working tree that **has not yet taken its cut**, handing over `pnpm josh run:cut <N>` with what each of its six verdicts obliges. It exists because the step was carried as prose and fired **0 times in 6 lane children**; `--resume`, `--end` and `--json` do not count as taking the cut. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source of the procedure.
+- **Bare `pnpm josh git`** — trigger is a `pnpm josh git` with no `-y` / `--yes` (joshuafolkken/kit#2297); it prompts to confirm the staging, cancels with no TTY, and the run reissues with `-y` after throwing the time away. Hands over `pnpm josh git -y "<title> #<N>"`. Disjoint from the run-tail push row by the flag — that one requires `-y`, this refuses its absence — and it fires on every occurrence.
 
 Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery per run.
 
@@ -250,12 +251,15 @@ pnpm josh test:related --silent            # flags are forwarded to vitest
 
 ### `josh test:declared`
 
-Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`). On `required` the detail names each untested file's type — `E2E` under `src/routes/`, `Unit` elsewhere (`prompts/testing-guide.md` §1).
+Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`). On `required` the detail names each untested file's type — `E2E` under `src/routes/`, `Unit` elsewhere (`prompts/testing-guide.md` §1) — and then the one command to run next: declare a test for each and verify with `pnpm josh test:declared --match < summary.md` (joshuafolkken/kit#2297).
 
 ```bash
 pnpm josh test:declared
 pnpm josh test:declared --match   # check Step 0 declarations on stdin
+pnpm josh test:declared --help    # print usage, including the --match stdin form
 ```
+
+An unknown flag is refused with the usage rather than ignored (joshuafolkken/kit#2297), the same convention `josh time` follows.
 
 `--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
 
@@ -1446,6 +1450,11 @@ line for the one Tier-B point it surfaces — a spent whole-run budget. It dispa
 re-decides: a merged child's outcome stays `run:merge`'s, the next issue `backlog:next`'s. `run:next`
 is now its degenerate form — the pre-implementation position mapped to prose over the one shared
 mapping, so there is no second implementation.
+
+In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
+outage position prints `stop` rather than `run:merge <N>` (joshuafolkken/kit#2297): `run:merge` is the
+parent's own budget command and returns `busy` in a child, so a child is never pointed at it (the
+complement of the runtime `lane-carry-conflict` refusal).
 
 ### `josh repo:party`
 
