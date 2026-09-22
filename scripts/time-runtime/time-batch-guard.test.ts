@@ -1,46 +1,37 @@
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_batch_guard } from './time-batch-guard'
+import {
+	CHAINED_SED_CALL,
+	DELEGATION_TOOL,
+	EDIT_CALL,
+	EDIT_LABEL,
+	EDIT_TOOL,
+	FILE_READ_LABEL,
+	FRESH_CALL,
+	FRESH_PATH,
+	IN_PLACE_SED_CALL,
+	JOSH_CALL,
+	NEVER_REFUSED,
+	QUOTED_PATTERN,
+	REDIRECTION_CALL,
+	SED_LABEL,
+	SHELL_READ_CALL,
+	transcript,
+	WRITE_CALL,
+	WRITE_LABEL,
+	WRITE_TOOL,
+} from './time-batch-guard-fixtures'
 
 // The guard reads a transcript rather than a span list, because the run of single-call turns it asks
 // about is a shape only the raw lines carry: the turn in flight has issued no result yet, so it has no
 // span, and where a turn ends is written on the lines rather than derivable from the spans. The fixture
-// writes the lines Claude Code writes, so every case below is a transcript a run could have had.
+// writes the lines Claude Code writes, so every case below is a transcript a run could have had. The
+// calls, labels and `transcript` builder are in `time-batch-guard-fixtures.ts`.
 //
 // The minute grid is the fixture's: turn `n` issues on minute `2n + 1` and is answered on `2n + 2`.
 
 const { open_turn_lines, target_turn_lines, refused_turn_lines, ms } = time_transcript_fixture
-
-const NEVER_REFUSED = 0
-const FRESH_PATH = 'scripts/fresh.ts'
-// A path-shaped word that appears only inside quotes (joshuafolkken/kit#1611).
-const QUOTED_PATTERN = 'scripts/time'
-const FRESH_CALL = { name: 'Read', input: { file_path: FRESH_PATH } }
-// The two calls both tables below name, and their labels, so neither the fixture nor the wording is
-// written twice.
-const EDIT_LABEL = 'an edit'
-const SED_LABEL = 'an in-place sed'
-const FILE_READ_LABEL = 'a file read'
-const EDIT_TOOL = 'Edit'
-// Named the way this harness names it. Neither spelling of the delegation tool is in the bundleable
-// set, so the case below would read the same under `Task`.
-const DELEGATION_TOOL = 'Agent'
-const WRITE_TOOL = 'Write'
-const WRITE_LABEL = 'a whole-file write'
-const EDIT_CALL = { name: EDIT_TOOL, input: { file_path: FRESH_PATH } }
-const IN_PLACE_SED_CALL = { name: 'Bash', input: { command: `sed -i '' s/a/b/ ${FRESH_PATH}` } }
-const SHELL_READ_CALL = { name: 'Bash', input: { command: `cat ${FRESH_PATH}` } }
-const JOSH_CALL = { name: 'Bash', input: { command: 'pnpm josh gate' } }
-const CHAINED_SED_CALL = {
-	name: 'Bash',
-	input: { command: `cat notes.md && sed -i '' s/a/b/ ${FRESH_PATH}` },
-}
-const REDIRECTION_CALL = { name: 'Bash', input: { command: "jq '.x' a.json > b.json" } }
-const WRITE_CALL = { name: WRITE_TOOL, input: { file_path: FRESH_PATH } }
-
-function transcript(...groups: Array<Array<string>>): string {
-	return groups.flat().join('\n')
-}
 
 describe('time_batch_guard.should_block — the run of single-call turns', () => {
 	it('refuses the call that would make a third consecutive single-call turn', () => {
@@ -446,22 +437,5 @@ describe('time_batch_guard.should_notify — the notice cadence (kit#2276)', () 
 		['one further turn has closed since', ms(4), true],
 	])('recurs correctly when %s the last notice', (_label, last_notified, expected) => {
 		expect(time_batch_guard.should_notify(write_run, WRITE_CALL, last_notified)).toBe(expected)
-	})
-})
-
-// joshuafolkken/kit#2276. The notice names the concrete recent single-call turns so a reader is shown
-// the calls to batch rather than only told to batch — the untried half of "why #2164's notice did not
-// work". The closed turns are named with their tool and file; a transcript with no such run names
-// nothing, so the notice falls back to its guidance alone.
-describe('time_batch_guard.recent_candidates', () => {
-	it('names the recent single-call turns, and nothing where there are none', () => {
-		const text = transcript(
-			target_turn_lines(0, ['a.ts']),
-			target_turn_lines(1, ['b.ts']),
-			open_turn_lines(2, ['c.ts']),
-		)
-
-		expect(time_batch_guard.recent_candidates(text)).toContain('Read a.ts')
-		expect(time_batch_guard.recent_candidates('')).toBe('')
 	})
 })
