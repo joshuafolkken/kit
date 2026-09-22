@@ -1,19 +1,26 @@
 import { firing_point } from '#scripts/rules/firing-point'
 import { baseline_measure } from './baseline-measure'
 import { markdown_section } from './markdown-section'
+import { reproduction_measure } from './reproduction-measure'
 
-// A behavior-change Issue owes two headings the ordinary template does not — a firing-point heading
-// (the tool call the rule breaks on) and a baseline heading (a re-runnable measurement). This checks
-// them, but only for an Issue that declares itself one, and never asks the model to judge whether it
-// is (joshuafolkken/kit#2212). The declaration, the headings and the grammars are the template's,
-// pinned by the document test.
+// A behavior-change Issue owes three headings the ordinary template does not — a firing-point heading
+// (the tool call the rule breaks on), a baseline heading (a re-runnable measurement) and a
+// reproduction heading (the command and its actual output). This checks them, but only for an Issue
+// that declares itself one, and never asks the model to judge whether it is (joshuafolkken/kit#2212,
+// joshuafolkken/kit#2353). The declaration, the headings and the grammars are the template's, pinned
+// by the document test.
 
 // The body declares itself a behavior-change Issue with this exact line under its opening heading.
-// Read from the declaration, never inferred, so a code-only Issue is never held to the two headings.
+// Read from the declaration, never inferred, so a code-only Issue is never held to the headings.
 const DECLARATION_LINE = '- 種別: 振る舞い変更'
 const FIRING_POINT_HEADING = '## 発火点'
 const BASELINE_HEADING = '## ベースライン'
-const REQUIRED_HEADINGS: ReadonlyArray<string> = [FIRING_POINT_HEADING, BASELINE_HEADING]
+const REPRODUCTION_HEADING = '## 再現'
+const REQUIRED_HEADINGS: ReadonlyArray<string> = [
+	FIRING_POINT_HEADING,
+	BASELINE_HEADING,
+	REPRODUCTION_HEADING,
+]
 
 // A template placeholder line — the `<...>` guidance a filed Issue replaces. It is not a firing point.
 const PLACEHOLDER_PREFIX = '<'
@@ -76,18 +83,31 @@ function baseline_problem(body: string): string | undefined {
 	return 'baseline must be written as `command → value`, not prose (it has to be re-runnable)'
 }
 
+// The reproduction section is checked for format only where the heading is present — a missing heading
+// is already reported by `heading_problems`, so reporting it here too would double the message.
+function reproduction_problem(body: string): string | undefined {
+	if (!markdown_section.has_line(body, REPRODUCTION_HEADING)) return undefined
+
+	if (reproduction_measure.has_command_output(body)) return undefined
+
+	return 'reproduction must be a command and its actual output (a fenced block), not prose ("確認した" is not re-runnable)'
+}
+
 function heading_problems(body: string): ReadonlyArray<string> {
 	return missing_headings(body).map((heading) => `missing heading: ${heading}`)
 }
 
 // Every behavior-change problem a body has, or an empty array. A body that does not declare itself a
-// behavior-change Issue has none — the two headings are not required of it.
+// behavior-change Issue has none — the headings are not required of it.
 function problems(body: string): ReadonlyArray<string> {
 	if (!is_target(body)) return []
 
-	return [...heading_problems(body), firing_point_problem(body), baseline_problem(body)].filter(
-		(problem): problem is string => problem !== undefined,
-	)
+	return [
+		...heading_problems(body),
+		firing_point_problem(body),
+		baseline_problem(body),
+		reproduction_problem(body),
+	].filter((problem): problem is string => problem !== undefined)
 }
 
 const behavior_change_lint = {
