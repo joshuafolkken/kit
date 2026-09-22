@@ -745,6 +745,16 @@ Claude Code hook: refuse a second whole-file read of a path whose content has no
 
 ---
 
+### `josh edit:files` · `josh ef`
+
+> **Audience:** automation · **Side effects:** none
+
+`<plan-path>`
+
+Apply several content-addressed edits from a plan in one call
+
+---
+
 ### `josh epic` · `josh ep`
 
 > **Audience:** automation · **Side effects:** network

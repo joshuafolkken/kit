@@ -224,6 +224,11 @@ const LANE_NOTICE =
 // the matcher leaves `Write` out for the cost reason above rather than relying on this line alone.
 const WHOLE_FILE_WRITE_TOOL = 'Write'
 
+// The one tool the write-side fold names (joshuafolkken/kit#2366). A span's label is its tool name for
+// everything but Bash (`time-spans.ts`), so this is how a recent single-call turn is read as an edit
+// that `edit:files` could fold — distinct from `Write`, which this command cannot content-address.
+const EDIT_TOOL = 'Edit'
+
 // Whether this call is one the guard could ever refuse, asked before any transcript is read. **The
 // caller uses it to skip that read**: a quarter-megabyte read inside a hook that holds every call is
 // not worth paying on a `pnpm josh` invocation the answer can never be about.
@@ -447,6 +452,29 @@ function read_fold_directive(sequence: ReadonlyArray<Span>): string {
 	return ` Fold them into one call: \`pnpm josh read:files ${paths.join(' ')}\`.`
 }
 
+// **The write-side counterpart of the read fold** (joshuafolkken/kit#2366): the recent single-call
+// `Edit` turns, folded into one `edit:files` call. The read fold pastes a whole command because a read
+// is addressed by its path alone; an edit carries its own text, so the fold names the files and points
+// at the command that applies a plan of edits over them in one call — the composite command the model
+// can emit in a single turn where reissuing the edits as parallel `tool_use` blocks is the shape it
+// resists. Only `Edit` counts: a whole-file `Write` creates content this command cannot content-address,
+// and it earns its own notice already. Below two edits there is nothing to fold.
+function write_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
+	const paths = sequence
+		.filter((span) => span.label === EDIT_TOOL)
+		.map((span) => span.targets[0] ?? '')
+		.filter((path) => path !== '' && time_bundle_call.has_extension(path))
+
+	return [...new Set(paths)]
+}
+
+function write_fold_directive(sequence: ReadonlyArray<Span>): string {
+	const paths = write_targets(sequence)
+	if (paths.length < FOLD_MINIMUM) return ''
+
+	return ` Fold them into one \`pnpm josh edit:files\` call with a plan over: ${paths.join(' ')}.`
+}
+
 // **The concrete half of the notice** (joshuafolkken/kit#2276): the most recent single-call turns,
 // named, so the model is shown the calls it should have batched rather than only told to batch — and,
 // since kit#2311, the one `read:files` call that folds them where they were reads. Parsed from the tail
@@ -461,8 +489,9 @@ function recent_candidates(tail: string): string {
 	if (recent.length === NONE) return ''
 
 	const named = recent.map((span) => describe_span(span)).join(', ')
+	const folds = `${read_fold_directive(recent)}${write_fold_directive(recent)}`
 
-	return ` Just issued one per turn, so at least these could have shared a turn: ${named}.${read_fold_directive(recent)}`
+	return ` Just issued one per turn, so at least these could have shared a turn: ${named}.${folds}`
 }
 
 // **This guard's own name for its once-per-run record.** It lives beside the rule rather than in
