@@ -1629,7 +1629,7 @@ stale `in-progress` dropped, is parked with `needs-decision`, and counts against
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
-`over` (the merge crossed the shared 200,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
+`over` (the merge crossed the shared 150,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
 before its commit — stop), `stop` (failure guard), `environment` (the consecutive-outage guard tripped —
 the API is down), `retry` (unreadable), `busy` (refused count; exit 1).
 
@@ -1830,10 +1830,10 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 ### `josh cost`
 
-Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 200,000 limit; `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
+Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 150,000 limit; `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
 
 ```bash
-pnpm josh cost --cut             # compare billed input per request with the shared 200,000 context-cut threshold
+pnpm josh cost --cut             # compare billed input per request with the shared 150,000 context-cut threshold
 pnpm josh cost --over <tokens>   # compare with an explicit limit
 pnpm josh cost --cut --path <dir> # Anthropic project or current OpenAI worktree
 ```

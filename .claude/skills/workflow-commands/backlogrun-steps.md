@@ -40,7 +40,7 @@ carrying into the next run and applies `auto-ok` to them, so the next run can pi
 waiting for a person — the single path on which a run labels its own input. This is not the
 self-widening the rule guards against, because the brakes in "The brake that replaces the promise"
 below bound it with no exception: a retrospective's filings are counted against the ten-per-invocation
-ceiling, the WIP cap of 30, `--max`, the 200,000-token session budget and the 8-hour whole-run bound
+ceiling, the WIP cap of 30, `--max`, the 150,000-token session budget and the 8-hour whole-run bound
 exactly as any other filing is. And a retrospective that judges nothing worth carrying files nothing,
 so the "file → drain → file again" loop converges the moment improvements run out. Every other filing
 route is unchanged: `auto-ok` stays a person's to apply.

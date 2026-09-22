@@ -34,7 +34,7 @@ call reports `hold`.
    continues; `over` (or unanswerable) stops before the title with a `confirmation` Telegram carrying
    the figure and the resume command (`fullrun #<N>` / `fullrun new`), then `pnpm josh run:release`.
    **Skip it when dispatched by `backlogrun`** (that batch owns the question). `backlogrun-progress.md`
-   → "The hand-off" is the single source of the check and the shared 200,000 threshold.
+   → "The hand-off" is the single source of the check and the shared 150,000 threshold.
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body/comments
    (`issue-comments.md`), `issue:state`'s state/labels/`human_review`, and `latest:scope`'s dependency
    scope in one report, run beside `run:hold` and `cost --cut` in the same turn. The §2g comment stops,
