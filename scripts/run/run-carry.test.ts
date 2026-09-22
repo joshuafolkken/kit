@@ -149,16 +149,16 @@ describe('the consecutive-failure streak', () => {
 	})
 })
 
-// joshuafolkken/kit#2240: the outage streak is its own counter — it rises with outages and never
-// touches the failure streak, and a merge or a genuine child failure (both proving the API reachable)
-// resets it, while a bookkeeping-only change leaves it standing.
-it('the consecutive-outage streak rises and resets only when the API proves reachable', () => {
-	const two = run_carry.apply_change(target(), begun(), { outages: 2 })
+// joshuafolkken/kit#2240, #2317: the outage streak is its own counter — it rises with outages and never
+// touches the failure streak, a merge or a genuine child failure resets it, and `apply_change` threads
+// the clock through so a burst folds. The fold *arithmetic* is `run-carry-streak.test.ts`'s; this pins
+// the integration — the streak advances through the record and the fold timestamp is recorded on it.
+it('the consecutive-outage streak advances through the record and records its fold timestamp', () => {
+	const at = new Date('2026-09-22T00:00:00.000Z')
+	const one = run_carry.apply_change(target(), begun(), { outages: 1 }, at)
 
-	expect(two).toMatchObject({ outages: 2, failures: 0 })
-	expect(run_carry.apply_change(target(), two, { merged: 1 }).outages).toBe(0)
-	expect(run_carry.apply_change(target(), two, { failures: 1 }).outages).toBe(0)
-	expect(run_carry.apply_change(target(), two, { filed: 1 }).outages).toBe(2)
+	expect(one).toMatchObject({ outages: 1, failures: 0, last_outage_at: at.toISOString() })
+	expect(run_carry.apply_change(target(), one, { merged: 1 }, at).outages).toBe(0)
 })
 
 describe('the whole-run bound', () => {
@@ -323,6 +323,7 @@ describe('a cut declares the hand-off', () => {
 			cuts: cut.cuts,
 			failures: cut.failures,
 			outages: cut.outages,
+			last_outage_at: cut.last_outage_at,
 			done: undefined,
 			owner_pid: DEAD_PID,
 			owner_start: undefined,

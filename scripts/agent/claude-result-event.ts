@@ -8,6 +8,7 @@ const RESULT_EVENT_SCHEMA = z.looseObject({
 	num_turns: z.unknown().optional(),
 	permission_denials: z.unknown().optional(),
 	result: z.unknown().optional(),
+	session_id: z.unknown().optional(),
 	usage: z.unknown().optional(),
 })
 const USAGE_SCHEMA = z.looseObject({
@@ -31,6 +32,11 @@ interface ClaudeResultEvent {
 	// parent opening the JSONL by hand. Undefined when no denial was an interactive ask.
 	refused_ask: string | undefined
 	reason: string | undefined
+	// The Claude Code session identifier the `-p --output-format stream-json` run wrote on its result
+	// event (joshuafolkken/kit#2317). An `outage` re-dispatch reads it to resume the disconnected child's
+	// stored session — recovering its accumulated context — rather than starting a fresh `fullrun`.
+	// Undefined when the event carried none, which sends the re-dispatch down the fresh fallback.
+	session_id: string | undefined
 	usage:
 		| {
 				input_tokens?: number | undefined
@@ -81,6 +87,7 @@ function decode(value: unknown): ClaudeResultEvent | undefined {
 		reason: is_error
 			? (usable_reason(parsed.data.result) ?? usable_reason(parsed.data.subtype))
 			: undefined,
+		session_id: usable_reason(parsed.data.session_id),
 		usage: usage_of(parsed.data.usage),
 	}
 }

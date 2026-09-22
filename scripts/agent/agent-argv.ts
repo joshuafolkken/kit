@@ -22,11 +22,40 @@ function build(invocation: string, profile: AgentProfile, cwd?: string): AgentAr
 		: claude_agent_argv.build(invocation, profile)
 }
 
+// The resume counterpart of `build` (joshuafolkken/kit#2317). Only the Claude path resumes by session
+// id; an OpenAI lane carries no such id at the outage re-dispatch, so it falls back to a fresh build —
+// which is never reached in practice, because `lane-resume.ts` only plans a resume for an Anthropic
+// provider. The fallback keeps this total rather than throwing on a provider it was not handed.
+function build_resume(
+	invocation: string,
+	profile: AgentProfile,
+	session_id: string,
+	cwd?: string,
+): AgentArgv {
+	return profile.provider === 'openai'
+		? codex_agent_argv.build(invocation, profile, cwd)
+		: claude_agent_argv.build_resume(invocation, profile, session_id)
+}
+
 function with_profile_in(invocation: string, profile: AgentProfile, cwd: string): AgentArgvResult {
 	const diagnostic = agent_diagnostics.check(profile)
 	if (diagnostic.kind === 'rejected') return diagnostic
 
 	return { kind: 'argv', argv: build(invocation, profile, cwd), profile }
+}
+
+// A resume build under the same profile diagnostics as `with_profile_in`, so a lane re-dispatch that
+// resumes a session runs the identical readiness check a fresh one does (joshuafolkken/kit#2317).
+function with_resume_in(
+	invocation: string,
+	profile: AgentProfile,
+	session_id: string,
+	cwd: string,
+): AgentArgvResult {
+	const diagnostic = agent_diagnostics.check(profile)
+	if (diagnostic.kind === 'rejected') return diagnostic
+
+	return { kind: 'argv', argv: build_resume(invocation, profile, session_id, cwd), profile }
 }
 
 function with_profile(invocation: string, profile: AgentProfile): AgentArgvResult {
@@ -59,7 +88,15 @@ function resolve_in(
 		: with_profile_in(invocation, resolved.profile, cwd)
 }
 
-const agent_argv = { build, resolve, resolve_in, with_profile, with_profile_in }
+const agent_argv = {
+	build,
+	build_resume,
+	resolve,
+	resolve_in,
+	with_profile,
+	with_profile_in,
+	with_resume_in,
+}
 
 export type { AgentArgv, AgentArgvResult }
 export { agent_argv }

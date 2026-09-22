@@ -17,6 +17,7 @@ function record(over: Partial<ClaudeResultEvent> = {}): ClaudeResultEvent {
 		permission_denials: 0,
 		refused_ask: undefined,
 		reason: undefined,
+		session_id: undefined,
 		usage: undefined,
 		...over,
 	}

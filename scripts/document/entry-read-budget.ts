@@ -51,11 +51,13 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// crossed a block downward, so the recorded ceilings drop to the block multiples the stale-ratchet
 	// message named rather than staying loose above the reduction. `kickoff` and the lane child rose one
 	// block again in joshuafolkken/kit#2312 when `pre-gate-cut.md` recorded the resume-side cost the
-	// conditional cut is built on; the other entries stayed within their block.
+	// conditional cut is built on; the other entries stayed within their block. `backlogrun` rose one
+	// block in joshuafolkken/kit#2317 when `backlogrun-child.md`'s outage section recorded the
+	// session-resume re-dispatch and the outage-fold window.
 	{ entry: 'kickoff', bytes: 258_048 },
 	{ entry: 'fullrun', bytes: 253_952 },
 	{ entry: 'halfrun', bytes: 253_952 },
-	{ entry: 'backlogrun', bytes: 258_048 },
+	{ entry: 'backlogrun', bytes: 262_144 },
 	{ entry: LANE_CHILD, bytes: 131_072 },
 ]
 
