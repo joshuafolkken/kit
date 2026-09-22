@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { bash_triggers } from './bash-triggers'
+import { shell_segments } from './shell-segments'
+import { tail_commands } from './tail-commands'
 
 // The trigger and the delivered text behind the `rule-body` row of `delivered-rules.ts`
 // (joshuafolkken/kit#2272). It delivers the residency questions at the one moment they are skipped —
@@ -21,9 +24,15 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 //
 // **No `decide`, so once per run.** The refusal changes what the run *knows* — that a new rule owes
 // question 0 and the ordering question — which is the shape `rule-delivery.md` says once-per-run is
-// right for: told once, the run applies it to every later rule it writes. It declares no `keeps`,
-// because keeping the rule is *not* writing the prose, which is the absence of a call rather than a
-// call (`git-force.ts`).
+// right for: told once, the run applies it to every later rule it writes.
+//
+// **The stand-down is what turned the reminder into a check** (joshuafolkken/kit#2324). Until now the
+// row only *reminded* — it fired once and let the reissue through unconditionally, so "reissue and it
+// goes" meant a computable rule could still be written into prose with nothing having answered the two
+// questions. Now the pass condition is a *record*: the run has run `pnpm josh oracle:list` (question 0)
+// and `pnpm josh run:step` (the ordering question) earlier in the transcript. Both present, the edit is
+// stood down; either missing, it is refused. It passes on answering the questions, not on reading the
+// reminder. Keeping the rule is therefore running those two commands, which `keeps` names.
 
 // The two edit tools the `PreToolUse` matcher routes here. A `Write` carries the whole new file; an
 // `Edit` carries the region as `old_string` / `new_string`.
@@ -139,20 +148,58 @@ const RULE_BODY_REASON =
 	'run — once you have confirmed the rule can be neither an oracle nor an ordering step, reissue this ' +
 	'edit and it will go through.'
 
-// The row itself, so `delivered-rules.ts` spreads one entry. No `decide` (once per run) and no `keeps`
-// (not writing the prose is the absence of a call, not a call).
+// The two placement oracles the residency questions name: question 0 is `pnpm josh oracle:list`, the
+// ordering question is `pnpm josh run:step` (its degenerate pre-implementation form `run:next` counts
+// too). A run that answered both has run each earlier in the transcript.
+const PLACEMENT_ORACLES: ReadonlyArray<ReadonlySet<string>> = [
+	new Set(['oracle:list']),
+	new Set(['run:step', 'run:next']),
+]
+
+function ran_oracle(tail_commands_run: ReadonlyArray<string>, names: ReadonlySet<string>): boolean {
+	return tail_commands_run.some((command) =>
+		shell_segments
+			.segments_of(command)
+			.some((segment) => shell_segments.is_josh_command(segment, names)),
+	)
+}
+
+// The `already_satisfied` stand-down: the run has answered both placement questions, so this edit asks
+// for nothing new. Read off the transcript tail, the way the filing rows read their prior scout.
+function answered_placement(tail: string, _call: GuardedCall): boolean {
+	const commands = tail_commands.prior_bash_commands(tail)
+
+	return PLACEMENT_ORACLES.every((names) => ran_oracle(commands, names))
+}
+
+// Keeping the rule: a call that runs one of the two placement oracles. Segment-wise, so a spelling
+// quoted inside another command is not read as the consultation it is not.
+function runs_placement_oracle(command: string): boolean {
+	return PLACEMENT_ORACLES.some((names) =>
+		shell_segments
+			.segments_of(command)
+			.some((segment) => shell_segments.is_josh_command(segment, names)),
+	)
+}
+
+// The row itself, so `delivered-rules.ts` spreads one entry. Once per run with the placement-verdict
+// stand-down; `keeps` names running the placement oracles, the act the stand-down reads.
 const ROW = {
 	id: 'rule-body',
 	is_trigger: writes_rule_prose,
 	reason: RULE_BODY_REASON,
+	already_satisfied: answered_placement,
+	keeps: bash_triggers.on_bash_command(runs_placement_oracle),
 }
 
 const rule_body_guard = {
 	RULE_BODY_REASON,
 	ROW,
 	adds_rule_prose,
+	answered_placement,
 	is_rule_document,
 	prose_of,
+	runs_placement_oracle,
 	writes_rule_prose,
 }
 
