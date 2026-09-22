@@ -13,7 +13,7 @@ const FAILURE_EXIT_CODE = 1
 
 function report_none(): number {
 	console.info(cases.NONE)
-	console.error('no network, process or filesystem boundary crossed')
+	console.error('no network, process, filesystem or time boundary crossed')
 
 	return 0
 }
