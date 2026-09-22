@@ -3,6 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
+import { run_carry_streak } from './run-carry-streak'
 import { run_invocation } from './run-invocation'
 
 // joshuafolkken/kit#1714: a `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour
@@ -75,6 +76,11 @@ interface RunCarry {
 	// child failure resets it**, because both prove the API was reachable; only a further outage adds to
 	// it. Defaulted to zero so a record written before this field existed still parses.
 	outages: number
+	// When the last *counted* outage was booked, so a burst of outages from one network event folds into
+	// a single streak step rather than several (joshuafolkken/kit#2317). Read by `run-carry-streak.ts`
+	// against its fold window; set only when an outage counts, cleared when the API proves reachable.
+	// Optional and `| undefined` for the same disk round-trip reason the owner fields carry.
+	last_outage_at?: string | undefined
 	// The process spending the budget, as the caller declared it with `--owner`. `run-hold.ts` records
 	// a pid it explicitly does not read back, because the process that claims a work tree is the
 	// short-lived `josh run:hold` itself; here the owner is the parent loop's own session, which
@@ -165,6 +171,8 @@ const run_carry_schema = z.object({
 	failures: z.number().default(0),
 	// Defaulted for the same backward-compatibility as `failures` (joshuafolkken/kit#2240).
 	outages: z.number().default(0),
+	// Optional, so a record written before the outage fold existed still parses (joshuafolkken/kit#2317).
+	last_outage_at: z.string().optional(),
 	// Optional, so a record written by the previous shape still parses. Read as "no owner declared",
 	// which is the not-provably-live answer rather than a live one.
 	owner_pid: z.number().optional(),
@@ -286,10 +294,12 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
-	const { invocation, started_at, merged, filed, cuts, failures, outages, done } = carry
+	const { invocation, started_at, merged, filed, cuts } = carry
+	const { failures, outages, last_outage_at, done } = carry
 	// The recorded fields are named rather than spread from `carry`, so the previous owner cannot
 	// survive an adoption by a caller that declared none. **`done` is carried across**: the whole point
-	// of the resumption is that the successor does not re-run what the cut session finished.
+	// of the resumption is that the successor does not re-run what the cut session finished. The outage
+	// fold timestamp carries too, so a burst spanning the hand-off still folds (joshuafolkken/kit#2317).
 	const next: RunCarry = {
 		invocation,
 		started_at,
@@ -298,6 +308,7 @@ function adopt_carry(
 		cuts,
 		failures,
 		outages,
+		last_outage_at,
 		done,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
@@ -320,42 +331,26 @@ function next_done(carry: RunCarry, done: number | undefined): ReadonlyArray<num
 	return current.includes(done) ? current : [...current, done]
 }
 
-// **A merge resets the streak; every other change adds to it.** The consecutive-failure guard trips
-// on children failing one after another, so a child that merged in between is what breaks the run —
-// the reset lives here, with the increment, rather than in a caller that could forget it
-// (joshuafolkken/kit#2024).
-function next_failures(carry: RunCarry, change: CarryChange): number {
-	if ((change.merged ?? NO_INCREMENT) > NO_INCREMENT) return NO_INCREMENT
-
-	return carry.failures + (change.failures ?? NO_INCREMENT)
-}
-
-// **An outage adds to the streak; a merge or a genuine child failure resets it** (joshuafolkken/kit#2240).
-// The streak counts the API being unreachable one child after another, so anything that proves it *was*
-// reachable — a merge, or a child that failed on its own after reaching it — breaks the run. A change
-// that touches neither the outage count nor the two reachability signals (a bare `--filed`, `--cut` or
-// `--done`) leaves the streak where it stood.
-function has_increment(value: number | undefined): boolean {
-	return (value ?? NO_INCREMENT) > NO_INCREMENT
-}
-
-function next_outages(carry: RunCarry, change: CarryChange): number {
-	if (has_increment(change.outages)) return carry.outages + (change.outages ?? NO_INCREMENT)
-
-	const is_reachable = has_increment(change.merged) || has_increment(change.failures)
-
-	return is_reachable ? NO_INCREMENT : carry.outages
-}
-
-function apply_change(target: string, carry: RunCarry, change: CarryChange): RunCarry {
+// The streak arithmetic — the two consecutive counters and the outage fold — is `run-carry-streak.ts`'s
+// (joshuafolkken/kit#2317), so the reset-with-the-increment rule lives with it rather than in a caller
+// that could forget it. `now` is threaded in so the fold window is measured against the record and
+// injectable in tests; it defaults to the wall clock like the other reads here.
+function apply_change(
+	target: string,
+	carry: RunCarry,
+	change: CarryChange,
+	now: Date = new Date(),
+): RunCarry {
 	const cuts = change.cuts ?? NO_INCREMENT
+	const streak = run_carry_streak.next_state(carry, change, now)
 	const next: RunCarry = {
 		...carry,
 		merged: carry.merged + (change.merged ?? NO_INCREMENT),
 		filed: carry.filed + (change.filed ?? NO_INCREMENT),
 		cuts: carry.cuts + cuts,
-		failures: next_failures(carry, change),
-		outages: next_outages(carry, change),
+		failures: streak.failures,
+		outages: streak.outages,
+		last_outage_at: streak.last_outage_at,
 		done: next_done(carry, change.done),
 		// A cut declares the hand-off; any other count is the run carrying on, which spends it.
 		is_handed_off: cuts > NO_INCREMENT,

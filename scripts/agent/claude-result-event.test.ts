@@ -73,3 +73,26 @@ describe('the refused interactive ask the decoder lifts', () => {
 		expect(event?.refused_ask).toBeUndefined()
 	})
 })
+
+// **The session id an outage re-dispatch resumes from** (joshuafolkken/kit#2317). It sits on the result
+// event of a `stream-json` run; without it the re-dispatch cannot resume and falls back to a fresh run.
+describe('the session id the decoder exposes', () => {
+	const SESSION = '1d34ae8b-6f89-44b7-9f0f-42a67c44e650'
+
+	it('reads the session id off a result event', () => {
+		const event = claude_result_event.decode({
+			type: 'result',
+			is_error: true,
+			result: 'The socket connection was closed unexpectedly',
+			session_id: SESSION,
+		})
+
+		expect(event?.session_id).toBe(SESSION)
+	})
+
+	it('leaves the session id undefined when the event carried none', () => {
+		const event = claude_result_event.decode({ type: 'result', is_error: false })
+
+		expect(event?.session_id).toBeUndefined()
+	})
+})
