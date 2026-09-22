@@ -26,7 +26,7 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 		// string constant crosses no boundary at test time, so matching `https://` text alone
 		// would fire `network` on every markdown edit and defeat the oracle.
 		pattern: /\b(?:fetch|axios|undici|node:https?|XMLHttpRequest)\b/u,
-		cases: ['非200', 'タイムアウト', '空レスポンス', '不正JSON', 'レート制限'],
+		cases: ['非200', 'タイムアウト', '接続断', '空レスポンス', '不正JSON', 'レート制限'],
 	},
 	{
 		boundary: 'process',
