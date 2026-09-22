@@ -230,10 +230,15 @@ guard, and go back to step 1.
    the stale `in-progress` itself, so there is no separate label-removal step:
    - **outage** — the child never reached the API, so it is counted into its own outage streak and
      **re-dispatched in the same run** by being offered again, **not** parked with `needs-decision` and
-     **not** counted against the consecutive-failure guard. The re-dispatch is bounded by one constant —
-     `CONSECUTIVE_OUTAGE_LIMIT` in `scripts/run/run-merge.ts` — so a run of outages trips the separate
-     outage guard, at which point the command prints `environment` and the run stops as an environment
-     failure rather than the children's. It never re-dispatches into a dead API forever.
+     **not** counted against the consecutive-failure guard. **The re-dispatch resumes the child's
+     session** (joshuafolkken/kit#2317): `lane:dispatch` reads the `session_id` off the exit record and
+     relaunches with `--resume`, keeping its context and losing only the last round-trip; with no session
+     id it falls back to a fresh `fullrun`, and the report says which path it took. **A burst of outages
+     from one network event folds into a single streak step** — outages inside a two-minute window count
+     once — so one disconnection hitting several children no longer trips the guard. The re-dispatch is
+     bounded by `CONSECUTIVE_OUTAGE_LIMIT` in `scripts/run/run-merge.ts`, so *distinct* outages (spaced
+     past the fold window, as a dead API produces) trip the separate outage guard, at which point the
+     command prints `environment` and the run stops. It never re-dispatches into a dead API forever.
    - **abandoned** — counted against the consecutive-failure guard and parked with `needs-decision`,
      exactly as a failed child. A silent retry would re-run a half-written tree; that guard is the only
      thing that notices the environment rather than the children is at fault.

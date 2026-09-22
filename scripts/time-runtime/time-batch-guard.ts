@@ -412,21 +412,57 @@ function describe_span(span: Span): string {
 	return `${span.label} ${target}`
 }
 
+// **The fewest reads that a composite call can fold** (joshuafolkken/kit#2311). One path is a single
+// call already, so nothing folds below two — the directive is withheld and the run keeps the guidance
+// alone, exactly as it does when the recent turns were not reads at all.
+const FOLD_MINIMUM = 2
+
+// **The recent single-call turns that were file reads, each named by the one path it read.** A fold
+// needs a *file* path, so three targets are dropped: one that named none (a bare `pwd`), a write (a run
+// of edits has nothing for `read:files` to do), and a directory (`ls scripts/` names `scripts/`, which
+// `read:files` cannot read — it would emit `Cannot read scripts/` and exit 1, so the paste-ready
+// command must never carry it). The directory test is `has_extension` reused from the target scanner,
+// not a second copy. Deduped, so a run that read one file twice folds it once and names it once.
+function read_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
+	const paths = sequence
+		.filter((span) => span.is_bundleable && !span.is_writing)
+		.map((span) => span.targets[0] ?? '')
+		.filter((path) => path !== '' && time_bundle_call.has_extension(path))
+
+	return [...new Set(paths)]
+}
+
+// **The composite-command half of the notice** (joshuafolkken/kit#2311): the single call that folds the
+// recent single-call reads, handed to the run ready to paste. Naming the concrete calls did not move the
+// density (#2276) — the notice still asked the model to *reissue them in one turn*, which is a request
+// for the parallel `tool_use` blocks the model structurally resists. The lever measured to move
+// round-trip density is a composite command that folds a routine section into one call (`read:files`,
+// kit#2202); so the guard now offers *that* command, the one the model can emit in a single turn,
+// rather than another way to say "batch". Below two reads there is nothing to fold, so it is empty and
+// the guidance stands alone.
+function read_fold_directive(sequence: ReadonlyArray<Span>): string {
+	const paths = read_targets(sequence)
+	if (paths.length < FOLD_MINIMUM) return ''
+
+	return ` Fold them into one call: \`pnpm josh read:files ${paths.join(' ')}\`.`
+}
+
 // **The concrete half of the notice** (joshuafolkken/kit#2276): the most recent single-call turns,
-// named, so the model is shown the calls it should have batched rather than only told to batch. Parsed
-// from the tail here rather than threaded from `should_notify` because it runs only when a notice
-// actually fires, which is rare enough that the second parse costs less than carrying the spans through
-// the hook's notice contract. An empty sequence names nothing and the notice falls back to its guidance
-// alone.
+// named, so the model is shown the calls it should have batched rather than only told to batch — and,
+// since kit#2311, the one `read:files` call that folds them where they were reads. Parsed from the tail
+// here rather than threaded from `should_notify` because it runs only when a notice actually fires,
+// which is rare enough that the second parse costs less than carrying the spans through the hook's
+// notice contract. An empty sequence names nothing and the notice falls back to its guidance alone.
 function recent_candidates(tail: string): string {
-	const named = time_bundles
+	const recent = time_bundles
 		.open_sequence(time_spans.parse_timeline(tail).spans)
 		.slice(-NAMED_CANDIDATE_COUNT)
-		.map((span) => describe_span(span))
 
-	if (named.length === NONE) return ''
+	if (recent.length === NONE) return ''
 
-	return ` Just issued one per turn, so at least these could have shared a turn: ${named.join(', ')}.`
+	const named = recent.map((span) => describe_span(span)).join(', ')
+
+	return ` Just issued one per turn, so at least these could have shared a turn: ${named}.${read_fold_directive(recent)}`
 }
 
 // **This guard's own name for its once-per-run record.** It lives beside the rule rather than in

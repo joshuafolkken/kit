@@ -363,6 +363,26 @@ Commit the observation ledger as a pull request of its own, and merge it
 
 Create PR only (skip commit and push)
 
+---
+
+### `josh review:findings` · `josh rvf`
+
+> **Audience:** developer · **Side effects:** files
+
+_No arguments._
+
+Count review findings by category from the observation ledger
+
+---
+
+### `josh review:record` · `josh rvr`
+
+> **Audience:** automation · **Side effects:** files
+
+`--issue <N> [<category>:<severity>:<file> ...]`
+
+Record a review round’s findings in the observation ledger
+
 ## Versioning
 
 ### `josh bump` · `josh bp`

@@ -15,6 +15,7 @@ import { josh_git_bare } from './josh-git-bare'
 import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
+import { lane_switch_main } from './lane-switch-main'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
@@ -234,9 +235,9 @@ const ISSUE_COMMENTS_REASON =
 	'fires once per run and cannot repeat on the call in hand.'
 
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
-// the value — is `shell-body-trigger.ts`, beside its own cases. A row states its trigger and its
-// text; a model of zsh quoting is more than a row.
-const { carries_a_body, is_shell_evaluated_body, keeps_body_safe, SHELL_BODY_REASON } =
+// the value — is `shell-body-trigger.ts`, beside its own cases, as is the refusal text. A row states
+// its trigger and its text; a model of zsh quoting is more than a row.
+const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_safe } =
 	shell_body_trigger
 
 // **Keeping the WIP cap is counting the open Issues**, which is the one act the rule asks for before
@@ -452,6 +453,16 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// overlaps nothing. It fires on every occurrence (`decide` returns true): a child must never run
 	// these, and the route is always "continue", never a reissue (`git-force.ts`).
 	lane_carry_conflict.ROW,
+	// **The `git switch main` a lane child can never succeed at** (joshuafolkken/kit#2313), the fifth of
+	// the "always fails" misfires joshuafolkken/kit#2297 catalogued. A lane is a linked work tree and the
+	// primary checkout holds the default branch, so a child's `git switch main` fails structurally
+	// (`already used by worktree`); this refuses it before it fails and hands back the next command —
+	// skip the step, `pnpm josh main:merge` brings the default in during the gate. Its trigger reads the
+	// dispatch mark and the lane branch like `lane-carry-conflict`, and claims a `git switch` no row
+	// above matches — `git-force` is `git push` / `git branch`, `worktree-mutation` is `git checkout --`
+	// / `restore` / `stash` — so no two rows claim one command. It fires on every occurrence (`decide`
+	// returns true): a child must never run this, and the route is always "continue" (`git-force.ts`).
+	lane_switch_main.ROW,
 	// **A `pnpm josh git` with no `-y` cannot succeed from an agent** (joshuafolkken/kit#2297). It
 	// prompts to confirm the staging, the no-TTY prompt cancels, and the run reissues with `-y` after
 	// throwing away the time it took to fail. This row refuses the bare call and hands back the `-y`
@@ -483,8 +494,10 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// right thing to do first — end the process and drop the accumulated context — and on the reissue in
 	// the fresh, under-threshold process this row is silent and `rule-body` delivers, the "losing rule's
 	// delivery still correct one reissue later" reading any admissible overlap needs. It carries no
-	// `decide`, so it is once per run: after a cut the fresh session's own transcript reads under
-	// threshold, so the row re-arms per resume rather than per edit.
+	// `decide`, so it is silent only **between a cut and its resume**: the implementation resume clears
+	// the record (joshuafolkken/kit#2310, `run-cut-cli.ts`), so the carried-record check stops silencing
+	// the guard, and the fresh session's own transcript reads under threshold — the row re-arms per
+	// resume rather than per edit, instead of a lingering record silencing it for the rest of the run.
 	//
 	// **No `reaches`, because the occasion is live-only.** `pre-gate-cut` gives a `reaches` because both
 	// its halves leave a command-string trace (`run:cut --resume` at entry); this row's occasion —

@@ -24,7 +24,12 @@ josh git -y "<title> #<N>"` → the follow-up filing and `pnpm josh epic:bundle`
 `pnpm josh followup`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`,
 default `ja`). Before implementing, run `git switch main && git pull`, then `pnpm josh latest:scope`
 and update dependencies only on `required` — `latest-gate.md` is its single source, and on `required`
-load the `dependency-update` skill afterwards. When running `pnpm josh followup`, pass an
+load the `dependency-update` skill afterwards. **A dispatched lane child skips the `git switch main &&
+git pull`**: `git switch main` is refused in a lane (the primary checkout holds the default branch, so
+the switch fails with `already used by worktree`), the lane was branched from a fresh default before it
+opened, and the latest default is brought in during the gate by `pnpm josh main:merge`. The parent runs
+`git switch main && git pull` in the primary checkout, never the child — `backlogrun-lanes.md` and
+`backlogrun-child.md` are the single sources. When running `pnpm josh followup`, pass an
 implementation summary via `--notify-message` in the session language, leading with the three
 plain-language lines: `"Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n-
 <change1>\n- <change2>"`. **`pnpm josh followup` waits for CI, verifies AI review findings, sends the

@@ -556,6 +556,11 @@ const time_bundle_call = {
 	// Exported for the batching guard's own word scan (joshuafolkken/kit#1390), so the two scanners
 	// cannot come to disagree about where one word of a shell line ends and the next begins.
 	words_of,
+	// Exported for the read-fold notice (joshuafolkken/kit#2311), which offers `read:files <path>` only
+	// over file-shaped targets — a bare directory like `scripts/` is a target here but not something
+	// `read:files` can read, so the notice reuses this test rather than keep a second copy that could
+	// drift from what counts as a file path.
+	has_extension,
 	// Exported for `time-writes.ts` (joshuafolkken/kit#1509), which needs the same two answers to say
 	// *which* files an in-place `sed` wrote. Two copies of this test disagreed in both directions at
 	// once — one called a piped `grep -i` a write, the other missed a bundled `sed -ni`.

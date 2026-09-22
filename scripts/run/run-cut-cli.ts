@@ -248,10 +248,29 @@ function resume_verdict_for(cut_record: RunCut): string {
 	return cut_record.phase === run_cut.IMPLEMENTATION_PHASE ? RESUME_IMPL_VERDICT : RESUME_VERDICT
 }
 
-function adopt(target: string, cut_record: RunCut): number {
-	const adopted = run_cut.adopt_cut(target, cut_record)
+// **An implementation-phase resume removes the record; a pre-gate one marks it handed off**
+// (joshuafolkken/kit#2310). The two cuts have different multiplicities sharing one record: the pre-gate
+// cut fires once per lane, so its record must survive to answer a second resume `handed-off`
+// (joshuafolkken/kit#1935); the implementation cut may fire again whenever a long implementation
+// re-crosses the threshold, so its record is cleared on resume — both `pre-gate-cut.ts` and
+// `implementation-cut.ts` read `carried_cut_sync`, and a lingering record would keep them silent for the
+// rest of the run, re-creating the "fired 0 times" state this issue removed. A double cut stays
+// impossible either way: `begin_cut`'s exclusive create is what prevents it, not the record the guard
+// once leaned on.
+function take_over(target: string, cut_record: RunCut): RunCut | undefined {
+	if (cut_record.phase !== run_cut.IMPLEMENTATION_PHASE) {
+		return run_cut.adopt_cut(target, cut_record)
+	}
 
-	if (adopted === undefined) return report_busy(cut_record)
+	run_cut.end_cut(target)
+
+	return cut_record
+}
+
+function adopt(target: string, cut_record: RunCut): number {
+	const taken = take_over(target, cut_record)
+
+	if (taken === undefined) return report_busy(cut_record)
 
 	return report(resume_verdict_for(cut_record), SUCCESS_EXIT_CODE)
 }

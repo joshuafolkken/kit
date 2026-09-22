@@ -33,3 +33,31 @@ describe('is_gate_step_failed', () => {
 		expect(gate_report.is_gate_step_failed(result_of('lint', 'josh lint', PASS))).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#2318: the withholding path is narrower than the print path. A benign line that
+// merely contains the word "warning" — a Vite config deprecation on `test:unit` — printed a body but
+// must never withhold the green record, because that turns a green gate's `run:review --join` red.
+function passed_saying(label: string, output: string): GateStepResult {
+	return { label, command: `josh ${label}`, exit_code: PASS, output, elapsed_ms: 1 }
+}
+
+const VITE_DEPRECATION =
+	"(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`.\n" +
+	'Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.'
+const ESLINT_WARNING = 'src/a.ts:1:1  warning  Unexpected console statement'
+
+describe('has_checker_warning', () => {
+	it.each(['lint', 'check'])('withholds for a %s step that passed with warnings', (label) => {
+		expect(gate_report.has_checker_warning(passed_saying(label, ESLINT_WARNING))).toBe(true)
+	})
+
+	it('does not withhold for a benign warning line from a non-checker step', () => {
+		expect(gate_report.has_checker_warning(passed_saying('test:unit', VITE_DEPRECATION))).toBe(
+			false,
+		)
+	})
+
+	it('does not withhold a checker step that said nothing warning-shaped', () => {
+		expect(gate_report.has_checker_warning(passed_saying('lint', 'all files pass'))).toBe(false)
+	})
+})

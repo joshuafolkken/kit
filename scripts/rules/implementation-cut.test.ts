@@ -4,7 +4,7 @@ import path from 'node:path'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/run-cut'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { implementation_cut, type LaneCostState } from './implementation-cut'
 
@@ -213,4 +213,6 @@ describe('IMPLEMENTATION_CUT_REASON', () => {
 	})
 })
 
-rmSync(WORK_DIRECTORY, { recursive: true, force: true })
+afterAll(() => {
+	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
+})

@@ -17,6 +17,7 @@ const OUTAGE_EXIT: ClaudeResultEvent = {
 	permission_denials: 0,
 	refused_ask: undefined,
 	reason: 'Unable to connect to API (ConnectionRefused)',
+	session_id: undefined,
 	usage: undefined,
 }
 
@@ -27,6 +28,7 @@ const SUCCESS_EXIT: ClaudeResultEvent = {
 	permission_denials: 3,
 	refused_ask: undefined,
 	reason: undefined,
+	session_id: undefined,
 	usage: undefined,
 }
 

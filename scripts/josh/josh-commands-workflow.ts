@@ -61,6 +61,23 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Workflow',
 		reference: ['', 'automation', ['git', 'network']],
 	},
+	// The one write path for a `/code-review` round's findings (joshuafolkken/kit#2325). It appends a
+	// `- rf:` line per finding — or one zero-finding line for a clean round — to the observation ledger,
+	// so `observations:flush` commits them and the recurrence count survives the run.
+	'review:record': {
+		script: 'scripts/review/review-record-cli.ts',
+		description: 'Record a review round’s findings in the observation ledger',
+		category: 'Workflow',
+		reference: ['--issue <N> [<category>:<severity>:<file> ...]', 'automation', ['files']],
+	},
+	// The reader over what `review:record` wrote (joshuafolkken/kit#2325): each recurring category’s
+	// count, and the number of zero-finding rounds that distinguishes a quiet category from an unwatched one.
+	'review:findings': {
+		script: 'scripts/review/review-findings-cli.ts',
+		description: 'Count review findings by category from the observation ledger',
+		category: 'Workflow',
+		reference: ['', 'developer', ['files']],
+	},
 	// After a behavior-change Issue merges, re-run its declared baseline and print before/after; a value
 	// that did not move appends a refuted-premise line to the observation ledger (joshuafolkken/kit#2212).
 	'measure:rerun': {

@@ -37,15 +37,24 @@ interface GateCheck {
 	reserved_cores: number
 }
 
+const LINT_LABEL = 'lint'
 const TYPE_CHECK_LABEL = 'check'
 const UNIT_LABEL = 'test:unit'
+
+// The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
+// (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
+// reusing a record taken from such a run would hide them (joshuafolkken/kit#1328). Every other step's
+// warning-shaped output — a Vite config deprecation printed by `test:unit`, say — is not a per-tree
+// finding and repeats every run, so it must not withhold the record. This is what `has_checker_warning`
+// narrows the withholding path down to (joshuafolkken/kit#2318).
+const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LABEL]
 
 // The three checks that read the tree without running it, in the order their output is printed.
 // They are named apart from the unit suite because CI runs them on their own runner
 // (joshuafolkken/kit#1226): the unit suite is the only check that fans out across every core, so on
 // a 4-core GitHub runner it and the other three spent the whole job taking cores off each other.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
-	{ label: 'lint', target: 'lint', reserved_cores: 2 },
+	{ label: LINT_LABEL, target: 'lint', reserved_cores: 2 },
 	{ label: TYPE_CHECK_LABEL, target: 'check', reserved_cores: 1 },
 	{ label: 'cspell', target: 'cspell:dot', reserved_cores: 1 },
 ]
@@ -296,11 +305,13 @@ function format_gate_plan(
 
 const gate_plan = {
 	GATE_CHECKS,
+	LINT_LABEL,
 	MEASURED_CORES,
 	RESERVED_CORES,
 	STATIC_CHECKS,
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
+	WARNING_CHECKER_LABELS,
 	format_gate_plan,
 	format_machine,
 	format_unit_cap,

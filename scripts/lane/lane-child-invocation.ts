@@ -15,6 +15,25 @@ function resume_invocation(issue: string): string {
 	return `${preamble} ${child_invocation(issue)}`
 }
 
-const lane_child_invocation = { CHILD_INVOCATION, child_invocation, resume_invocation }
+// The prompt an `outage` re-dispatch gives a resumed child (joshuafolkken/kit#2317). Its session was
+// relaunched with `--resume`, so its full context is already loaded — the preamble tells it not to
+// re-read the entry documents and to find where it stopped with `run:step`, redoing only the last
+// action if it did not complete.
+//
+// **It ends with `child_invocation` on purpose, not as decoration** — for the same reason
+// `resume_invocation` does: the parent's liveness poll is `pgrep -laf "<invocation>$"`, so the trailing
+// `fullrun #<N>` keeps the relaunched process matching, and it is the ordinary run the child carries on.
+function outage_resume_invocation(issue: string): string {
+	const preamble = `Resuming the lane child for issue #${issue} after an API disconnection — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`
+
+	return `${preamble} ${child_invocation(issue)}`
+}
+
+const lane_child_invocation = {
+	CHILD_INVOCATION,
+	child_invocation,
+	outage_resume_invocation,
+	resume_invocation,
+}
 
 export { lane_child_invocation }

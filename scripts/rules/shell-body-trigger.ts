@@ -181,8 +181,9 @@ function carries_a_body(command: string): boolean {
 
 // The instruction in the shape a refusal can carry: what the shell is about to do, the safe
 // spellings, and the reissue sentence every delivery needs. The damage is named because it is the
-// half that reads as unbelievable — the substituted text is *executed*, not discarded. It lives beside
-// its trigger, as every newer row's reason does, rather than inline in the enumeration.
+// half that reads as unbelievable — the substituted text is *executed*, not discarded. It lives here
+// beside its trigger rather than inline in the enumeration, the shape every newer row's reason takes
+// (`git-force.ts`, `lane-carry-conflict.ts`).
 const SHELL_BODY_REASON =
 	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
 	'contains a backtick or a `$`, so the shell runs it — the text is executed rather than merely ' +

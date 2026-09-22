@@ -4,6 +4,7 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 import { status_icons } from '#scripts/lib/status-icons'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_log } from './gate-log'
+import { gate_plan } from './gate-plan'
 
 // The gate's console reporting, split out of `verification-gate.ts` so that file stays under its line
 // ceiling while it grows the scoped pre-check and the failure summary (joshuafolkken/kit#2296). Nothing
@@ -54,6 +55,18 @@ const WARNING_MARKERS: ReadonlyArray<string> = ['warning', 'Warning', '⚠']
 
 function has_warnings(result: GateStepResult): boolean {
 	return WARNING_MARKERS.some((marker) => result.output.includes(marker))
+}
+
+// The withholding path's counterpart to `has_warnings`, and deliberately narrower than it
+// (joshuafolkken/kit#2318). `has_warnings` is read by `should_print_body`, where a false positive
+// costs one printed body — the loose match above is right there. `record_green_gate` reads *this*
+// one, where a false positive is not one printed line but the whole green record withheld, which
+// turns a green gate's `run:review --join` red. So the record is withheld only for a warning from a
+// checker that actually emits per-tree warnings (`WARNING_CHECKER_LABELS`), never for a benign line
+// from another tool that happens to contain the word — a Vite config deprecation on `test:unit` was
+// the line that stopped a green gate's commit chain.
+function has_checker_warning(result: GateStepResult): boolean {
+	return gate_plan.WARNING_CHECKER_LABELS.includes(result.label) && has_warnings(result)
 }
 
 function should_print_body(result: GateStepResult, is_verbose: boolean): boolean {
@@ -164,6 +177,7 @@ const gate_report = {
 	format_failure_actions,
 	format_seconds,
 	gate_step_header,
+	has_checker_warning,
 	has_warnings,
 	is_gate_step_failed,
 	is_skip_notice,

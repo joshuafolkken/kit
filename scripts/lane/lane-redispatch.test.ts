@@ -1,10 +1,12 @@
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { detached_launch } from '#scripts/run/detached-launch'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_child_invocation } from './lane-child-invocation'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -83,5 +85,47 @@ describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', (
 		expect(lane_dispatch.describe(no_lane, RELEASED_CHILD)).toContain(
 			`pnpm josh lane:open ${RELEASED_CHILD}`,
 		)
+	})
+})
+
+// joshuafolkken/kit#2317: an `outage` re-dispatch resumes the disconnected child's session rather than
+// starting a fresh `fullrun`, recovering its context. The fresh path is already pinned by the suite
+// above (no exit record is written, so it plans fresh); this writes an outage exit record into the
+// lane's own log so the re-dispatch reads it and resumes.
+describe('re-dispatching an outage child by resuming its session', () => {
+	const SESSION = '1d34ae8b-6f89-44b7-9f0f-42a67c44e650'
+	const OUTAGE_LINE = JSON.stringify({
+		type: 'result',
+		is_error: true,
+		result: 'The socket connection was closed unexpectedly',
+		session_id: SESSION,
+	})
+
+	function write_outage_log(): void {
+		mkdirSync(path.dirname(DERIVED_LOG), { recursive: true })
+		writeFileSync(DERIVED_LOG, `${OUTAGE_LINE}\n`, 'utf8')
+	}
+
+	afterEach(() => {
+		rmSync(DERIVED_LOG, { force: true })
+	})
+
+	it('launches the resume argv carrying the stored session id', async () => {
+		write_outage_log()
+		await lane_dispatch.dispatch_child(RELEASED_CHILD)
+		const resumed = claude_agent_argv.build_resume(
+			lane_child_invocation.outage_resume_invocation(RELEASED_CHILD),
+			agent_role_profile.DEFAULT_PROFILES.worker,
+			SESSION,
+		)
+
+		expect(launch.mock.calls[0]?.[0].argv).toStrictEqual(resumed)
+	})
+
+	it('reports that the session was resumed', async () => {
+		write_outage_log()
+		const outcome = await lane_dispatch.dispatch_child(RELEASED_CHILD)
+
+		expect(lane_dispatch.describe(outcome, RELEASED_CHILD)).toContain(`Resumed session ${SESSION}`)
 	})
 })

@@ -201,16 +201,24 @@ whose recent-context cost is over threshold, handing back `pnpm josh run:cut --i
 `PreToolUse` refusal lands *before* the edit does, so the tree is at the consistent state the previous
 edit left it, never mid-edit. Issue it: `cut` ends the turn, the rest leave this process implementing;
 a fresh process's `pnpm josh run:cut --resume <N>` then answers **`resume-impl`**, so it **skips the
-title, plan, hold claim and split assessment** and **continues implementation** rather than gating. The
-exclusive create and spent hand-off (joshuafolkken/kit#1935) hold here too, so a lane may cross the
-boundary several times, each with exactly one successor.
+title, plan, hold claim and split assessment** and **continues implementation** rather than gating.
+Unlike the pre-gate cut, **the implementation resume clears the record** rather than marking it handed
+off (joshuafolkken/kit#2310): the pre-gate cut fires once per lane, so its record must survive to
+answer a second resume `handed-off` (joshuafolkken/kit#1935), but this one may fire again on a long
+implementation, so its record is removed on resume. A double cut is still impossible — `begin_cut`'s
+exclusive create is what prevents it — so a lane crosses this boundary several times, each with exactly
+one successor.
 
 - **It fires for a marked child and nowhere else** — the dispatch mark against this lane's own issue,
   as the pre-gate cut reads it, so a person editing in a lane sees no refusal.
-- **It fires once per run** — after the cut the fresh transcript reads under threshold, so the row
-  re-arms per resume, not per edit; the verdicts that leave this process implementing each need the
-  reissued edit to go through, so refusing every time would wedge them.
-- **It is silent between a cut and its resume** — a carried record naming this issue keeps it quiet.
+- **It re-arms per resume, not per edit** — the resume clears the record, so both this guard and the
+  pre-gate guard (which read the same record through `carried_cut_sync`) stop being silenced by it, and
+  the fresh transcript then reads under threshold until the context grows again. A lingering record
+  would silence both for the rest of the run — the "fired 0 times" state joshuafolkken/kit#2310 removed.
+  The verdicts that leave this process implementing each need the reissued edit to go through, so
+  refusing every time would wedge them.
+- **It is silent between a cut and its resume** — a carried record naming this issue keeps it quiet
+  until the resume clears it.
 
 `scripts/rules/implementation-cut.ts` implements the trigger, `scripts/rules/implementation-cut.test.ts`
 pins it, and the row joins `prompts/collaboration-workflow/rule-delivery.md`. **A child that ended

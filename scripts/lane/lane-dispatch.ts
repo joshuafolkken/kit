@@ -1,15 +1,17 @@
-import { agent_argv, type AgentArgv } from '#scripts/agent/agent-argv'
+import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
+import { run_ending } from '#scripts/run/run-ending'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_resume, type ResumePlan } from './lane-resume'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
 // `josh lane:dispatch <issue-number>` — start a lane's child as an operating-system process of its own
@@ -45,6 +47,8 @@ const WARNING_RECOVERY =
 // The discriminant for a dispatch refused because the `in-progress` marker could not be applied, named
 // once rather than inlined at each use.
 const LABEL_UNSET_KIND = 'label-unset'
+// The role a lane child runs under, resolved once so the fresh and resume builders read the same one.
+const RESOLVED_ROLE = agent_role_profile.WORKER
 
 interface Dispatched {
 	kind: 'dispatched'
@@ -53,6 +57,10 @@ interface Dispatched {
 	log_path: string
 	pid: number
 	profile: AgentProfile
+	// The session id this dispatch resumed, or `undefined` when it started fresh (joshuafolkken/kit#2317).
+	// `describe` reports which path was taken, so an `outage` re-dispatch says whether it recovered the
+	// disconnected child's context or fell back to a fresh run.
+	resumed_from: string | undefined
 	// What the launcher reported while starting the child. **A launch can succeed with notes**, and
 	// that combination is the one this field exists for: `detached_launch.launch` treats a log it could
 	// not open as a reason to lose the diagnosis rather than a reason not to start the session, so the
@@ -79,10 +87,17 @@ interface StartRequest {
 	invocation: string
 	argv: AgentArgv
 	profile: AgentProfile
+	resumed_from: string | undefined
 }
 
 type Prepared =
-	| { kind: 'prepared'; invocation: string; argv: AgentArgv; profile: AgentProfile }
+	| {
+			kind: 'prepared'
+			invocation: string
+			argv: AgentArgv
+			profile: AgentProfile
+			resumed_from: string | undefined
+	  }
 	| { kind: 'rejected'; note: string }
 
 /** The prompt the headless child is given: `fullrun #<N>`, and nothing a caller supplied verbatim. */
@@ -151,6 +166,19 @@ function failed_start(
 	}
 }
 
+// The `dispatched` outcome, built from the request the launch was composed from — one place so the
+// three launch paths cannot drift on which fields a dispatched child carries (the resume flag among
+// them, joshuafolkken/kit#2317). The request's `argv` rides along harmlessly, as it did before.
+// **`kind` is written last on purpose**: the request was spread from a `Prepared`, so it still carries
+// `kind: 'prepared'` at runtime, and letting the spread win would mislabel the outcome.
+function dispatched_of(
+	request: StartRequest,
+	pid: number,
+	notes: ReadonlyArray<string>,
+): Dispatched {
+	return { ...request, pid, notes, kind: 'dispatched' }
+}
+
 function existing_dispatch(request: StartRequest): DispatchOutcome | undefined {
 	if (request.profile.provider !== 'openai') return undefined
 	const active = openai_lane_supervisor.active(request.lane.directory)
@@ -164,7 +192,7 @@ function existing_dispatch(request: StartRequest): DispatchOutcome | undefined {
 		)
 	}
 
-	return { kind: 'dispatched', ...request, pid: active.pid, notes: [] }
+	return dispatched_of(request, active.pid, [])
 }
 
 function launch_argv(request: StartRequest, nonce: string | undefined): AgentArgv {
@@ -179,7 +207,7 @@ async function openai_dispatched_start(
 	notes: ReadonlyArray<string>,
 	nonce: string | undefined,
 ): Promise<DispatchOutcome> {
-	const { lane, log_path, invocation, profile } = request
+	const { lane } = request
 	const owner = await openai_lane_supervisor.wait_for_active(lane.directory)
 
 	if (owner?.issue !== lane.issue) {
@@ -196,7 +224,7 @@ async function openai_dispatched_start(
 		)
 	}
 
-	return { kind: 'dispatched', lane, invocation, log_path, pid: owner.pid, profile, notes }
+	return dispatched_of(request, owner.pid, notes)
 }
 
 async function dispatched_start(
@@ -205,11 +233,9 @@ async function dispatched_start(
 	notes: ReadonlyArray<string>,
 	nonce: string | undefined,
 ): Promise<DispatchOutcome> {
-	const { lane, log_path, invocation, profile } = request
-
-	return profile.provider === 'openai'
+	return request.profile.provider === 'openai'
 		? await openai_dispatched_start(request, notes, nonce)
-		: { kind: 'dispatched', lane, invocation, log_path, pid, profile, notes }
+		: dispatched_of(request, pid, notes)
 }
 
 async function started(request: StartRequest): Promise<DispatchOutcome> {
@@ -236,13 +262,40 @@ async function started(request: StartRequest): Promise<DispatchOutcome> {
 	return await dispatched_start(request, result.pid, notes, nonce)
 }
 
-function prepared(lane: LaneInfo): Prepared {
-	const invocation = child_invocation(lane.issue)
-	const built = agent_argv.resolve_in(invocation, agent_role_profile.WORKER, lane.directory)
+// Build the argv the plan calls for: a resume carries the stored session id, a fresh start does not.
+// Both run the same profile diagnostics under the already-resolved profile, so a resume is refused for
+// exactly the reasons a fresh dispatch is (joshuafolkken/kit#2317).
+function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): AgentArgvResult {
+	if (plan.kind === 'resume') {
+		return agent_argv.with_resume_in(plan.invocation, profile, plan.session_id, lane.directory)
+	}
 
-	return built.kind === 'rejected'
-		? built
-		: { kind: 'prepared', invocation, argv: built.argv, profile: built.profile }
+	return agent_argv.with_profile_in(plan.invocation, profile, lane.directory)
+}
+
+// **The re-dispatch decides resume-or-fresh from the lane's own exit record** (joshuafolkken/kit#2317).
+// The record is read from the log the previous dispatch of this lane wrote — a first dispatch finds
+// none and starts fresh, an `outage` ending with a session id resumes it. The provider is resolved
+// first because the resume mechanism is Claude Code's, and an OpenAI lane falls back to fresh.
+function prepared(lane: LaneInfo): Prepared {
+	const resolved = agent_role_profile.resolve(RESOLVED_ROLE)
+
+	if (resolved.kind === 'rejected') return resolved
+
+	const record = run_ending.read_exit(default_log_path(lane))
+	const plan = lane_resume.plan(lane.issue, record, resolved.profile.provider)
+	const built = built_for(plan, resolved.profile, lane)
+
+	if (built.kind === 'rejected') return built
+	const resumed_from = plan.kind === 'resume' ? plan.session_id : undefined
+
+	return {
+		kind: 'prepared',
+		invocation: plan.invocation,
+		argv: built.argv,
+		profile: built.profile,
+		resumed_from,
+	}
 }
 
 // **The parent claims the marker before it starts the child**, so the window in which a running child
@@ -318,6 +371,17 @@ function log_sentence(outcome: Dispatched, issue: string): string {
 	return ` It writes to ${outcome.log_path}. To poll it, ${poll}.`
 }
 
+// Whether this dispatch resumed the disconnected child's session or started fresh — the report the
+// `outage` re-dispatch owes (joshuafolkken/kit#2317). A fresh start says so too, so the absence of a
+// resume is never silent when an outage record was present.
+function resume_sentence(outcome: Dispatched): string {
+	if (outcome.resumed_from === undefined) {
+		return ' Started fresh — no resumable session was found in the lane record.'
+	}
+
+	return ` Resumed session ${outcome.resumed_from} — the disconnected child's context was recovered.`
+}
+
 // Never throws: it is reached from `warn_of_problem`, and a formatter that raised would lose the very
 // message the warning exists to carry — the pid among it, with the child already running.
 function describe(outcome: DispatchOutcome, issue: string): string {
@@ -335,7 +399,7 @@ function describe(outcome: DispatchOutcome, issue: string): string {
 		return `The child for #${issue} did not start: ${outcome.note}. Its log is at ${outcome.log_path}.`
 	}
 
-	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${log_sentence(outcome, issue)}`
+	return `Dispatched \`${outcome.invocation}\` as process ${String(outcome.pid)} in ${outcome.lane.directory} with ${agent_role_profile.describe(outcome.profile)}.${resume_sentence(outcome)}${log_sentence(outcome, issue)}`
 }
 
 /**
