@@ -246,6 +246,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 	},
+	'run:stranded': {
+		script: 'scripts/run/run-stranded-cli.ts',
+		// `.env` rather than the ambient environment: the strand notification needs the Telegram
+		// credentials, the same reason `run:wake` carries these flags.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Report whether the run is stranded — budget handed off, owner gone, and no supervisor watching',
+		category: 'AI tools',
+		reference: ['', 'automation', ['processes', 'notifications']],
+	},
 	...SPLIT_COMMANDS,
 	'oracle:list': {
 		script: 'scripts/rules/oracle-list-cli.ts',

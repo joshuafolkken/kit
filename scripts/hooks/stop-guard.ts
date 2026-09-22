@@ -7,6 +7,7 @@ import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
 import { run_hold } from '#scripts/run/run-hold'
+import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 
@@ -89,6 +90,12 @@ async function write_stop_decision(raw_payload: string): Promise<void> {
 	// marker, sends a notification — and swallows its own failures, so it can never change the decision
 	// below or hold the stop.
 	await backlog_stalled_detect.run_stall_check()
+
+	// The strand check rides the same boundary for the same reason, and is the step before the stall
+	// (joshuafolkken/kit#2375): the stall detector needs a live driver that could dispatch, and this one
+	// fires when that driver is gone — the budget handed off, the owner dead, no supervisor watching. It
+	// too only reports and swallows its own failures, so it never touches the stop decision below.
+	await run_stranded_detect.run_stranded_check()
 
 	const { reason } = await outcome_of(raw_payload)
 

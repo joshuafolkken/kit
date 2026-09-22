@@ -150,6 +150,7 @@ const ALIASES: Record<string, string> = {
 	lna: 'lane:await',
 	lnla: 'lane:launch',
 	rwg: 'run:watcher:guard',
+	rsd: 'run:stranded',
 	ig: 'investigation:guard',
 	drg: 'duplicate-read:guard',
 	rug: 'rule:guard',

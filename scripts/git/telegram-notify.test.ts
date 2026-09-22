@@ -119,6 +119,14 @@ describe('build_text — confirmation header', () => {
 	})
 })
 
+describe('build_text — stranded header', () => {
+	it('uses 🚨 + the nobody-is-driving label', () => {
+		const result = build_text(make_base({ task_type: 'stranded' }))
+
+		expect(result).toBe(`🚨 ${REPO_NAME}: Run stranded — nobody is driving it\n${ISSUE_TITLE}`)
+	})
+})
+
 describe('build_text — body and URL blocks', () => {
 	it('separates body from issue title with a blank line, URLs as separated blocks', () => {
 		const result = build_text(

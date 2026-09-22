@@ -17,8 +17,19 @@ const telegram_environment_schema = z.object({
 // merged alongside something that did not work; a stall is the opposite — the run is alive and has not
 // finished, it has simply stopped advancing while ready work waits for a free lane. The ⏳ icon says
 // exactly that: not done, not broken, just not moving.
+// **`stranded` is not `stalled`** (joshuafolkken/kit#2375). A stall is a *live* run that is not
+// dispatching; a strand is the step before it — the run's own driver is gone. The session that cut the
+// budget handed it off and died, no successor claimed it, and no supervisor is watching, so nothing can
+// take the next step at all. The 🚨 icon says a run needs a hand, not that ready work is merely waiting.
 type TelegramTaskType =
-	'planning' | 'completion' | 'failure' | 'warning' | 'kickoff_retry' | 'confirmation' | 'stalled'
+	| 'planning'
+	| 'completion'
+	| 'failure'
+	| 'warning'
+	| 'kickoff_retry'
+	| 'confirmation'
+	| 'stalled'
+	| 'stranded'
 
 interface TelegramSendInput {
 	task_type: TelegramTaskType
@@ -47,6 +58,7 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	kickoff_retry: { icon: '🔄', label: 'Kickoff retry' },
 	confirmation: { icon: '⏸️', label: 'Confirmation required' },
 	stalled: { icon: '⏳', label: 'Ready work is sitting undispatched' },
+	stranded: { icon: '🚨', label: 'Run stranded — nobody is driving it' },
 }
 
 const NOT_CONFIGURED_PREFIX = 'Telegram is not configured'
@@ -348,12 +360,43 @@ async function stalled(input: StalledInput): Promise<boolean> {
 	)
 }
 
+interface StrandedInput {
+	body: string
+	recovery: string
+}
+
+/**
+ * Push the 🚨 stranded type — a run whose driver is gone and which nothing can advance
+ * (joshuafolkken/kit#2375). Off-screen is the whole point, as it is for `stalled`: the state is
+ * invisible on the terminal because the session that would show it has died, so the person hears about
+ * it where they are not watching, rather than by asking.
+ *
+ * **`stalled`'s shape exactly** — the repository looked up under the shared bound, the tolerant
+ * `send_or_report` so a Telegram timeout never fails the detector that is only reporting, and the
+ * caller's own `recovery` line naming the command that hands the run to a fresh supervisor. No
+ * `issue_title`: the header label already names what this is.
+ */
+async function stranded(input: StrandedInput): Promise<boolean> {
+	return await send_or_report(
+		{
+			task_type: 'stranded',
+			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
+			issue_title: undefined,
+			body: input.body,
+			issue_url: undefined,
+			pr_url: undefined,
+		},
+		input.recovery,
+	)
+}
+
 const telegram_notify = {
 	REPO_LOOKUP_TIMEOUT_MS,
 	confirm,
 	send,
 	send_or_report,
 	stalled,
+	stranded,
 	warn,
 }
 
