@@ -9,6 +9,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ap": "audit:provision",
     "bb": "backlog:budget",
     "bg": "batch:guard",
+    "bh": "behavior",
     "bl": "backlog:next",
     "blo": "backlog:offer",
     "blp": "backlog:plan",
@@ -206,6 +207,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "behavior": [
+      "",
+      "developer",
+      [
+        "files",
       ],
     ],
     "bump": [
