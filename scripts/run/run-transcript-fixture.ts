@@ -27,6 +27,9 @@ const DEFAULTS: StepInput = {
 	is_retrospective_done: false,
 	is_lane_child: false,
 	is_consumer: false,
+	// The switch defaults off in production (joshuafolkken/kit#2370); the transcript sets it on so the
+	// golden keeps exercising the retrospective positions it documents. The off path is unit-tested.
+	is_retrospective_enabled: true,
 }
 
 // One turn of a run: `label` names the position the run has reached in words, and `at` is the change

@@ -136,3 +136,31 @@ describe('run_step_cli.run', () => {
 		expect(gather_mock).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#2370: the retrospective is opt-in, so the same stop position prints the
+// retrospective command only when `JOSH_RETROSPECTIVE` is set to an enabling value.
+describe('run_step_cli.run — the JOSH_RETROSPECTIVE switch', () => {
+	beforeEach(() => {
+		read_last_mock.mockReturnValue({ pos: 1, at: 'now', kind: 'stop', text: '' })
+	})
+
+	afterEach(() => {
+		delete process.env['JOSH_RETROSPECTIVE']
+	})
+
+	it('stops with no command at a stop when the switch is unset', async () => {
+		delete process.env['JOSH_RETROSPECTIVE']
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).toBe(run_step.STOP)
+	})
+
+	it('dispatches the retrospective at a stop when the switch is enabled', async () => {
+		process.env['JOSH_RETROSPECTIVE'] = 'on'
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).toBe(run_step.RETROSPECTIVE_COMMAND)
+	})
+})

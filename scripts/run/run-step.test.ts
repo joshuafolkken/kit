@@ -18,6 +18,7 @@ function input(overrides: Partial<StepInput>): StepInput {
 		is_retrospective_done: false,
 		is_lane_child: false,
 		is_consumer: false,
+		is_retrospective_enabled: true,
 		...overrides,
 	}
 }
@@ -172,6 +173,14 @@ describe('run_step.next_action — the end-of-run retrospective at the stop posi
 			run_step.STOP,
 		)
 	})
+
+	// joshuafolkken/kit#2370: the retrospective defaults off, so a stop with the switch disabled stops
+	// with no command — the behavior the position had before the retrospective existed.
+	it('stops with no command when the retrospective switch is off', () => {
+		expect(
+			run_step.next_action(input({ last_event: KIND.STOP, is_retrospective_enabled: false })).line,
+		).toBe(run_step.STOP)
+	})
 })
 
 // joshuafolkken/kit#2335: the retrospective fires at the drain — the moment the backlog empties —
@@ -201,6 +210,14 @@ describe('run_step.next_action — the retrospective at the drain, before the id
 		expect(run_step.next_action(input({ last_event: KIND.DRAIN, is_consumer: true })).line).toBe(
 			run_step.WAIT,
 		)
+	})
+
+	// joshuafolkken/kit#2370: with the switch off the drain still watches on — a `WAIT`, not the
+	// retrospective command — so the opt-in default changes what fires, not the position itself.
+	it('waits without a retrospective when the switch is off', () => {
+		expect(
+			run_step.next_action(input({ last_event: KIND.DRAIN, is_retrospective_enabled: false })).line,
+		).toBe(run_step.WAIT)
 	})
 })
 

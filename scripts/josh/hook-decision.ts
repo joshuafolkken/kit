@@ -54,6 +54,18 @@ function is_switch_enabled(key: string): boolean {
 	return !DISABLED_VALUES.includes((process.env[key] ?? '').trim().toLowerCase())
 }
 
+// The opt-in counterpart of `DISABLED_VALUES`: an unset variable stays off, and only one of these
+// spellings turns the switch on. A switch that must default off cannot be read with `is_switch_enabled`
+// — that one defaults on — so the value list is spelled out here rather than inverted at the call site,
+// keeping a typo from silently enabling what was meant to stay disabled (joshuafolkken/kit#2370).
+const ENABLED_VALUES: ReadonlyArray<string> = ['on', '1', 'true', 'yes']
+
+// Read at call time for the same reason as `is_switch_enabled`, so a suite that switches the variable
+// between cases is not answered from a module-load cache.
+function is_switch_opt_in(key: string): boolean {
+	return ENABLED_VALUES.includes((process.env[key] ?? '').trim().toLowerCase())
+}
+
 function parse_hook_payload(raw_payload: string): HookPayload | undefined {
 	const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
 
@@ -445,6 +457,7 @@ function report_no_payload(command: string): void {
 
 const hook_decision = {
 	DISABLED_VALUES,
+	ENABLED_VALUES,
 	NEVER_MS,
 	create_refusal_stamp,
 	create_transcript_guard,
@@ -452,6 +465,7 @@ const hook_decision = {
 	emit_outcome,
 	fault_notice,
 	is_switch_enabled,
+	is_switch_opt_in,
 	load_environment_file,
 	notice_envelope,
 	parse_hook_payload,

@@ -1572,6 +1572,15 @@ outage position prints `stop` rather than `run:merge <N>` (joshuafolkken/kit#229
 parent's own budget command and returns `busy` in a child, so a child is never pointed at it (the
 complement of the runtime `lane-carry-conflict` refusal).
 
+The **end-of-run retrospective is opt-in**, gated by `JOSH_RETROSPECTIVE`
+(joshuafolkken/kit#2370). The drain and stop positions print the retrospective command only when it is
+set to `on` / `1` / `true` / `yes` (trimmed, case-insensitive), and print `wait` / `stop` otherwise.
+Its **default is off** — an unset or unrecognized value leaves it off, so a typo cannot enable it and a
+checkout that writes nothing to `.env` never auto-files improvement issues. The switch gates only
+whether the step is printed: the retrospective's own logic is untouched, `pnpm josh retrospective`
+still runs by hand, and the three existing exclusions (a lane child, a done retrospective, a consumer
+checkout) are unchanged.
+
 ### `josh repo:party`
 
 Says whether a repository is **first-party** or **third-party** — computed by owner equality, not

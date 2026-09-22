@@ -94,6 +94,11 @@ interface StepInput extends PreInput {
 	// (`lane-child-marker.ts`). A child must never be handed `run:merge` — that is the parent's own
 	// budget command and returns `busy` in a child (joshuafolkken/kit#2267, joshuafolkken/kit#2297).
 	is_lane_child: boolean
+	// Whether the end-of-run retrospective is switched on, read by the CLI from `JOSH_RETROSPECTIVE`
+	// (joshuafolkken/kit#2370). It defaults **off** — the auto-filed improvement issues the step drives
+	// are opt-in — so a run that leaves the variable unset never prints the retrospective step, while the
+	// retrospective's own logic is untouched and `pnpm josh retrospective` still runs by hand.
+	is_retrospective_enabled: boolean
 }
 
 interface StepAction {
@@ -140,11 +145,15 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
 
 // Whether a run at a winding-down position still owes its end-of-run retrospective
-// (joshuafolkken/kit#2328) — false for a dispatched lane child, where the batch runs one at its own end
-// and never a child's (the `release:scope` precedent), for a run whose retrospective has already run this
-// invocation, and in a consumer checkout, where the kit-only command is refused. The two positions that
-// consult it are the drain and the stop; both read exactly this, so the exclusion set is single-sourced.
+// (joshuafolkken/kit#2328) — false when the switch is off (the opt-in default, joshuafolkken/kit#2370),
+// for a dispatched lane child, where the batch runs one at its own end and never a child's (the
+// `release:scope` precedent), for a run whose retrospective has already run this invocation, and in a
+// consumer checkout, where the kit-only command is refused. The switch is read first, so a run that has
+// not opted in never consults the other three. The two positions that consult it are the drain and the
+// stop; both read exactly this, so the exclusion set is single-sourced.
 function is_retrospective_owed(input: StepInput): boolean {
+	if (!input.is_retrospective_enabled) return false
+
 	return !input.is_lane_child && !input.is_retrospective_done && !input.is_consumer
 }
 
