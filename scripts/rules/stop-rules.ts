@@ -68,9 +68,9 @@ const STOP_NOTIFY_REASON =
 	'Telegram was sent this turn, so a person is being left to wait off-screen without knowing the run ' +
 	'paused. `CLAUDE.md` → "Mid-workflow stop notification" requires ' +
 	'`pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$\'<reason>\'` before any ' +
-	'mid-workflow pause. Send it, then stop again — this fires only while the hold is held and no ' +
-	'notify is on the transcript, and `stop_hook_active` lets a second stop through so a run is never ' +
-	'wedged.'
+	'mid-workflow pause. Send it, then end with a one-line confirmation that it was sent — do not repeat ' +
+	'your previous reply. This fires only while the hold is held and no notify is on the transcript, and ' +
+	'`stop_hook_active` lets a second stop through so a run is never wedged.'
 
 // **A clean tree that still holds is a tree the next run will trample.** `SKILL.md` → §2f: a stop that
 // leaves the tree clean releases the hold; a `halfrun` pre-commit stop and a `needs-human-review` stop
@@ -81,13 +81,16 @@ const HOLD_RELEASE_REASON =
 	'you hold it. `.claude/skills/workflow-commands/SKILL.md` → §2f: a stop that leaves the tree clean ' +
 	'releases the hold with `pnpm josh run:release <N>` (bare for a `new` entry). A `halfrun` ' +
 	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty — this ' +
-	'row is silent there. Release it, then stop again.'
+	'row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
+	'not repeat your previous reply.'
 
 // **A refusal that corrects rather than advises** (joshuafolkken/kit#2247). The bare `#N` is already
 // on screen and the hook cannot unsay it, so the reason does the one thing that helps the *next* reply:
 // it names the numbers it detected and hands over the exact `issue:cite` call that prints the
-// paste-ready lines, then asks for the reply to be reissued with those links in place. The rule itself
-// is not restated — it is resident in `CLAUDE.md` — only pointed at.
+// paste-ready lines, then asks for the corrected citation lines alone — not the whole reply reissued
+// (joshuafolkken/kit#2329). Reprinting the whole reply is what made the correction read as a duplicate;
+// the bare copy already scrolled past stays, and the fix follows it as a short correction. The rule
+// itself is not restated — it is resident in `CLAUDE.md` — only pointed at.
 const ISSUE_CITATION_REASON =
 	'Session-facing output cites an Issue as a number-link so the reader can click through and see ' +
 	'which repository it is (`CLAUDE.md`, `prompts/collaboration-workflow/issue-citation.md`).'
@@ -98,8 +101,8 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 
 	return (
 		`⛔ issue citation: your reply names an Issue as a bare \`#N\` (${numbers}). Run \`${command}\` ` +
-		`to print the paste-ready citation lines, then reissue your reply with those number-links in ` +
-		`place of the bare references. ${ISSUE_CITATION_REASON}`
+		`to print the paste-ready citation lines, then print the corrected citation lines alone — do not ` +
+		`repeat your previous reply. ${ISSUE_CITATION_REASON}`
 	)
 }
 

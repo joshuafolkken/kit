@@ -5,6 +5,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { z } from 'zod'
 import {
 	epic_bundle,
@@ -364,24 +365,32 @@ function warn_about_gaps(backlog: FetchedBacklog): void {
 	warn_cutoff(epic_bundle_gaps.epic_gap(backlog.epic_cutoff ?? NO_CUTOFF, BACKLOG_LIMIT))
 }
 
-function report_decision(subject: BacklogIssue, backlog: FetchedBacklog): number {
+function report_decision(subject: BacklogIssue, backlog: FetchedBacklog, repo: string): number {
 	const others = backlog.issues.filter((issue) => issue.number !== subject.number)
 	const is_established = epic_bundle_gaps.is_membership_established(backlog.epic_cutoff)
 	const decision = epic_bundle.decide_bundle(subject, others)
 
-	console.info(format_decision(decision, subject, others, is_established))
+	// The `Related:` / `Children:` listings name issues as `#N`; linkified here so the recommendation a
+	// run copies into its reply carries clickable references rather than bare ones (joshuafolkken/kit#2329).
+	const report = format_decision(decision, subject, others, is_established)
+
+	console.info(issue_citation.linkify(report, repo))
 
 	return SUCCESS_EXIT_CODE
 }
 
 // Widen, report what the read could not cover, then decide. Split out of `report_for`, which is
 // otherwise all guard clauses.
-async function report_widened(subject: BacklogIssue, backlog: FetchedBacklog): Promise<number> {
+async function report_widened(
+	subject: BacklogIssue,
+	backlog: FetchedBacklog,
+	repo: string,
+): Promise<number> {
 	const widened = await widen_with_referenced(subject, backlog)
 
 	warn_about_gaps(widened)
 
-	return report_decision(subject, widened)
+	return report_decision(subject, widened, repo)
 }
 
 // The recommendation for one issue, from the open backlog around it.
@@ -402,7 +411,7 @@ async function report_for(issue_number: number, repo: string): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await report_widened(subject, backlog)
+	return await report_widened(subject, backlog, repo)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

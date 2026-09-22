@@ -147,7 +147,7 @@ describe('epic_report.format_result', () => {
 			classification({ runnable: [child(1), child(3, APP_KIT)] }),
 			[],
 		)
-		const text = epic_report.format_result(result)
+		const text = epic_report.format_result(result, KIT)
 
 		expect(text).toContain(KIT)
 		expect(text).toContain(APP_KIT)
@@ -158,7 +158,7 @@ describe('epic_report.format_result', () => {
 			classification({ time: [child(2)], human: [child(3)] }),
 			[],
 		)
-		const text = epic_report.format_result(result)
+		const text = epic_report.format_result(result, KIT)
 
 		expect(text).toContain('#2')
 		expect(text).toContain('#3')
@@ -177,6 +177,22 @@ describe('epic_report.format_result', () => {
 			{ kind: 'cycle', message: CYCLE_MESSAGE },
 		])
 
-		expect(epic_report.format_result(result)).toContain(CYCLE_MESSAGE)
+		expect(epic_report.format_result(result, KIT)).toContain(CYCLE_MESSAGE)
+	})
+})
+
+describe('epic_report.format_result — cross-repository children', () => {
+	// A cross-repository child is written `owner/repo#N`, not a bare `#N` a downstream linkify would
+	// resolve against the current repository and point at a different issue there (#2329). A local
+	// child stays bare.
+	it('qualifies a cross-repository candidate and leaves a local one bare', () => {
+		const result = epic_report.build_result(
+			classification({ runnable: [child(1), child(3, APP_KIT)] }),
+			[],
+		)
+		const text = epic_report.format_result(result, KIT)
+
+		expect(text).toContain(`${APP_KIT}#3`)
+		expect(text).toContain('    #1')
 	})
 })

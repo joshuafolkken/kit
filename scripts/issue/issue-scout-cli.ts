@@ -10,6 +10,7 @@ import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
 import { PAGE_CEILING_CAUSE } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_label_schema } from '#scripts/git/schemas'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { z } from 'zod'
 import {
 	issue_scout,
@@ -322,6 +323,28 @@ function format_report(
 	].join('\n')
 }
 
+type Widened = Awaited<ReturnType<typeof epic_bundle_cli.widen_with_referenced>>
+type ClosedListing = Awaited<ReturnType<typeof read_recently_closed>>
+
+// The report a run copies into its reply, with every `#N` in the `Related:` / `Target epic:` /
+// duplicate listings linkified so the references it carries are clickable rather than bare
+// (joshuafolkken/kit#2329).
+function linkified_report(
+	draft: BacklogIssue,
+	widened: Widened,
+	closed: ClosedListing,
+	repo: string,
+): string {
+	const report_text = format_report(
+		draft,
+		widened.issues,
+		epic_bundle_gaps.is_membership_established(widened.epic_cutoff),
+		closed.rows ?? [],
+	)
+
+	return issue_citation.linkify(report_text, repo)
+}
+
 // The backlog is read without its `blocked-by` relations: a draft has no number, so no recorded
 // dependency can name it and it declares none — the reads cannot change either half of the answer,
 // and skipping them takes one request per open issue off the command a run makes before every filing.
@@ -347,14 +370,7 @@ async function report(args: ScoutArguments, repo: string): Promise<number> {
 	warn_about_closed(closed)
 	// The same cut `warn_about_gaps` reports on standard error, read once more so standard output is
 	// held to it too — a ⚠ beside an executable instruction is not what stops a run acting on it.
-	console.info(
-		format_report(
-			draft,
-			widened.issues,
-			epic_bundle_gaps.is_membership_established(widened.epic_cutoff),
-			closed.rows ?? [],
-		),
-	)
+	console.info(linkified_report(draft, widened, closed, repo))
 
 	return SUCCESS_EXIT_CODE
 }
