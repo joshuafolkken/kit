@@ -521,8 +521,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// oracle's command first, stood down once it has — `issue-scout`'s shape read from the registry
 	// rather than hand-written. Listed last so an oracle whose firing point overlaps a filing
 	// (`issue:lint`) delivers on the reissue, after `wip-cap` / `issue-scout` / `filing-cap` /
-	// `issue-fold` have each had their turn. The non-overlapping firing points (`pkg:scout` on a package
-	// add, `release:scope` on `pnpm josh followup`) claim commands no row above matches.
+	// `issue-fold` have each had their turn. The non-overlapping firing point (`pkg:scout` on a package
+	// add) claims a command no row above matches.
 	...oracle_consulted.ROWS,
 ]
 

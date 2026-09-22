@@ -32,18 +32,9 @@ function is_package_add(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => PACKAGE_ADD.test(segment))
 }
 
-// `pnpm josh followup` — the merge-and-release step `release:scope` decides the release owed after.
-const FOLLOWUP_NAMES: ReadonlySet<string> = new Set(['followup'])
-
-function is_followup(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, FOLLOWUP_NAMES))
-}
-
-// The three firing points wired first — the oracles whose governed call can be named without guessing:
-// the package add, the Issue filing, and the release step. The rest declare why none can be named, so
-// the unenforced oracles are visible rather than silently missing.
+// The two firing points wired — the oracles whose governed call can be named without guessing: the
+// package add and the Issue filing. The rest declare why none can be named, so the unenforced oracles
+// are visible rather than silently missing.
 const FIRING: ReadonlyMap<string, FiringPoint> = new Map([
 	[
 		'pkg:scout',
@@ -59,14 +50,14 @@ const FIRING: ReadonlyMap<string, FiringPoint> = new Map([
 			governs: bash_triggers.is_issue_filing,
 		},
 	],
-	['release:scope', { describes: 'a release step (`pnpm josh followup`)', governs: is_followup }],
 ])
 
-// The reason an oracle names no firing point, in three recurring shapes plus the four already gated
-// elsewhere. `PHASE` — the governed act is a run phase, not one shell call. `READ` — it answers a status
-// question and governs no action of its own. `SELF` — the command is itself the act, with nothing
-// earlier to gate. A guard for any of these would fire on the wrong turn or double-gate a call another
-// rule already claims.
+// The reason an oracle names no firing point, in three recurring shapes plus the one-off reasons for
+// oracles already gated or sequenced elsewhere. `PHASE` — the governed act is a run phase, not one
+// shell call. `READ` — it answers a status question and governs no action of its own. `SELF` — the
+// command is itself the act, with nothing earlier to gate. A guard for any of these would fire on the
+// wrong turn or double-gate a call another rule already claims; `release:scope` (joshuafolkken/kit#2334)
+// is the one that *trails* rather than gates — it reads state that only exists after the merge.
 const PHASE =
 	'the act it governs is a phase of a run, not a single shell call a trigger can anchor on'
 const READ = 'it answers a status question and governs no action of its own to gate before'
@@ -78,8 +69,13 @@ const LATEST_SCOPE_REASON =
 const EPIC_BUNDLE_REASON =
 	'it runs after a filing to place it, and that filing is already gated by `issue-scout`; it has no ' +
 	'earlier call of its own'
+const RELEASE_SCOPE_REASON =
+	'it reads the release owed *after* `pnpm josh followup` has merged (`git_followup_pending`), so it ' +
+	'trails the merge rather than gating it; a firing on `followup` would gate a check that must run ' +
+	'once the merge is done, reading a pre-merge state that has not yet arrived'
 
 const NOT_NAMED: ReadonlyMap<string, string> = new Map([
+	['release:scope', RELEASE_SCOPE_REASON],
 	['delegate', PHASE],
 	['review:level', READ],
 	['review:round2', READ],
@@ -148,7 +144,6 @@ const oracle_firing = {
 	NOT_NAMED,
 	declaration_for,
 	firing_oracles,
-	is_followup,
 	is_package_add,
 }
 

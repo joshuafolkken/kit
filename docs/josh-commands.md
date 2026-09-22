@@ -1343,7 +1343,7 @@ Print the decision oracles — commands that answer a rule question from mechani
 pnpm josh oracle:list
 ```
 
-- **The firing point is what makes an oracle enforced** (joshuafolkken/kit#2324). A declared firing point — the action the oracle must precede — wires a generic `oracle-consulted` delivered rule that refuses that action until the oracle's command has run (`scripts/rules/oracle-consulted.ts`). Three are wired first: `pkg:scout` (a package add), `issue:lint` (an Issue filing) and `release:scope` (`pnpm josh followup`). The rest declare why no firing point can be named and stay **visibly unenforced** rather than silently so, so a new oracle must always answer whether it has a firing point.
+- **The firing point is what makes an oracle enforced** (joshuafolkken/kit#2324). A declared firing point — the action the oracle must precede — wires a generic `oracle-consulted` delivered rule that refuses that action until the oracle's command has run (`scripts/rules/oracle-consulted.ts`). Two are wired: `pkg:scout` (a package add) and `issue:lint` (an Issue filing). `release:scope` is on the reason side, not a firing point: it reads the release owed _after_ `pnpm josh followup` merges, so it trails the merge rather than gating it (joshuafolkken/kit#2334). The rest declare why no firing point can be named and stay **visibly unenforced** rather than silently so, so a new oracle must always answer whether it has a firing point.
 - Single source: `scripts/rules/decision-oracle.ts` (the enumeration) and `scripts/rules/oracle-firing.ts` (the firing points).
 
 ### `josh rule:value`

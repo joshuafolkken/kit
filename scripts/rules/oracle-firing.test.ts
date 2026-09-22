@@ -4,12 +4,12 @@ import { oracle_firing } from './oracle-firing'
 
 // joshuafolkken/kit#2324: every decision oracle owes a firing-point declaration — the governed action,
 // or the reason none can be named. This suite pins the totality (no oracle is left undeclared, none
-// declares both) and the three wired predicates match their governed call and reject the near-misses.
+// declares both) and the two wired predicates match their governed call and reject the near-misses.
 
 const ORACLE_NAMES = decision_oracle.DECISION_ORACLES.map((oracle) => oracle.name)
-const WIRED = ['pkg:scout', 'issue:lint', 'release:scope']
+const WIRED = ['pkg:scout', 'issue:lint']
+const RELEASE_SCOPE = 'release:scope'
 const PKG_ADD = 'pnpm add lodash'
-const FOLLOWUP = 'pnpm josh followup'
 const LEAVES_ALONE = 'leaves %j alone'
 const JOSH_GATE = 'pnpm josh gate'
 
@@ -42,13 +42,22 @@ describe('the firing / not-named maps cover the registry exactly', () => {
 	})
 })
 
-describe('the three wired firing points are the clearly-nameable ones', () => {
+describe('the two wired firing points are the clearly-nameable ones', () => {
 	it.each(WIRED)('%s declares a firing point', (name) => {
 		expect(oracle_firing.declaration_for(name).firing_point).toBeDefined()
 	})
 
-	it('exactly three oracles declare a firing point', () => {
+	it('exactly two oracles declare a firing point', () => {
 		expect(oracle_firing.firing_oracles()).toHaveLength(WIRED.length)
+	})
+
+	// release:scope reads the release owed *after* followup merges, so it trails the merge rather than
+	// gating it — a reason side, not a firing point (joshuafolkken/kit#2334).
+	it('release:scope declares a reason, not a firing point', () => {
+		const declaration = oracle_firing.declaration_for(RELEASE_SCOPE)
+
+		expect(declaration.firing_point).toBeUndefined()
+		expect(declaration.not_firing_reason).toBeTruthy()
 	})
 })
 
@@ -66,14 +75,4 @@ describe('is_package_add — the add, not the bare install', () => {
 			expect(oracle_firing.is_package_add(command)).toBe(false)
 		},
 	)
-})
-
-describe('is_followup — the release step', () => {
-	it.each([FOLLOWUP, 'pnpm josh followup --merge'])('reads %j as followup', (command) => {
-		expect(oracle_firing.is_followup(command)).toBe(true)
-	})
-
-	it.each([JOSH_GATE, 'pnpm josh git -y "x"', 'echo followup'])(LEAVES_ALONE, (command) => {
-		expect(oracle_firing.is_followup(command)).toBe(false)
-	})
 })
