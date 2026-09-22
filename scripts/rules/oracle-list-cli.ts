@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { decision_oracle } from './decision-oracle'
+import { oracle_firing } from './oracle-firing'
 
 // `josh oracle:list` — print the decision oracles enumeration (joshuafolkken/kit#2117).
 //
@@ -10,10 +11,22 @@ import { decision_oracle } from './decision-oracle'
 
 const ARGV_OFFSET = 2
 const INDENT = '  '
-const FIELD_WIDTH = 9
+const FIELD_WIDTH = 10
 
 function pad_field(label: string): string {
 	return label.padEnd(FIELD_WIDTH)
+}
+
+// The firing point an oracle governs, or the reason none is named — one line either way, so `oracle:list`
+// shows at a glance which oracles a guard enforces and which stay visibly unenforced (joshuafolkken/kit#2324).
+function firing_line(oracle: (typeof decision_oracle.DECISION_ORACLES)[0]): string {
+	const declaration = oracle_firing.declaration_for(oracle.name)
+
+	if (declaration.firing_point !== undefined) {
+		return `${INDENT}${INDENT}${pad_field('fires on')}${declaration.firing_point.describes}`
+	}
+
+	return `${INDENT}${INDENT}${pad_field('no firing')}${declaration.not_firing_reason ?? ''}`
 }
 
 function format_oracle(oracle: (typeof decision_oracle.DECISION_ORACLES)[0]): string {
@@ -27,6 +40,7 @@ function format_oracle(oracle: (typeof decision_oracle.DECISION_ORACLES)[0]): st
 		`${INDENT}${INDENT}${pad_field('decision')}${oracle.decision}`,
 		`${INDENT}${INDENT}${pad_field('command')}${command_with_args}`,
 		`${INDENT}${INDENT}${pad_field('answers')}${oracle.vocabulary.join(' | ')}`,
+		firing_line(oracle),
 		`${INDENT}${INDENT}${pad_field('source')}${oracle.single_source}`,
 	].join('\n')
 }

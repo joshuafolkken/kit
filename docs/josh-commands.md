@@ -1337,13 +1337,14 @@ pnpm josh split:assess --json   # the verdict and the reason, machine-readable
 
 ### `josh oracle:list`
 
-Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → question 0). Each row carries the command, its answer vocabulary and its single-source document. Adding a new oracle means adding a row here and nowhere else.
+Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → question 0). Each row carries the command, its answer vocabulary, its **firing point** (or the reason none can be named) and its single-source document. Adding a new oracle means adding a row here and a firing-point declaration in `scripts/rules/oracle-firing.ts`, and nowhere else.
 
 ```bash
 pnpm josh oracle:list
 ```
 
-Single source: `scripts/rules/decision-oracle.ts`.
+- **The firing point is what makes an oracle enforced** (joshuafolkken/kit#2324). A declared firing point — the action the oracle must precede — wires a generic `oracle-consulted` delivered rule that refuses that action until the oracle's command has run (`scripts/rules/oracle-consulted.ts`). Three are wired first: `pkg:scout` (a package add), `issue:lint` (an Issue filing) and `release:scope` (`pnpm josh followup`). The rest declare why no firing point can be named and stay **visibly unenforced** rather than silently so, so a new oracle must always answer whether it has a firing point.
+- Single source: `scripts/rules/decision-oracle.ts` (the enumeration) and `scripts/rules/oracle-firing.ts` (the firing points).
 
 ### `josh rule:value`
 

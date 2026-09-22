@@ -246,13 +246,13 @@ describe('rule_value.measure — rules nothing can score', () => {
 	// `third-party-write` declares none for the same reason (joshuafolkken/kit#2122) — not writing to
 	// another owner's tracker is the absence of a call, not a call; and `lane-interactive-ask` declares
 	// none for the same reason (joshuafolkken/kit#2201) — not asking a person is the absence of a call,
-	// and the compliance a routed child does make is the park `lane-park` already scores; and `rule-body`
-	// declares none for the same reason (joshuafolkken/kit#2272) — keeping the rule is confirming the
-	// addition can be neither an oracle nor an ordering step, which no recorded call reveals, and the
-	// reissued edit that lands afterward is indistinguishable from the edit any compliant run makes. The module's
-	// doctrine is that such a rule reads unmeasured rather than as compliant. Naming them exactly keeps
-	// the guard over every other row, the batching one included, rather than exempting a whole registry
-	// to make room for the exceptions.
+	// and the compliance a routed child does make is the park `lane-park` already scores. **`rule-body`
+	// left this list in joshuafolkken/kit#2324**: the placement-verdict stand-down made keeping the rule
+	// a *recorded* act — running `pnpm josh oracle:list` and `pnpm josh run:step` — so a call now reveals
+	// the compliance the #2272 doctrine said none could, and the row declares a `keeps`. The module's
+	// doctrine is that a rule with no recorded compliance call reads unmeasured rather than as compliant.
+	// Naming them exactly keeps the guard over every other row, the batching one and the oracle-consulted
+	// rows included, rather than exempting a whole registry to make room for the exceptions.
 	it('declares a compliance test on every rule but the ones that cannot have one', () => {
 		const unmeasured = rule_value
 			.measure([[session(FILING)]])
@@ -271,7 +271,6 @@ describe('rule_value.measure — rules nothing can score', () => {
 			'git-force',
 			'worktree-mutation',
 			'file-body',
-			'rule-body',
 			INVESTIGATION,
 		])
 	})

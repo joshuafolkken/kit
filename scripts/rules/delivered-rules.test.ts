@@ -42,11 +42,11 @@ const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const ISSUE_SCOUT = 'issue-scout'
 const FILING_CAP_ID = 'filing-cap'
-// A filing is claimed by all four filing rows — the WIP cap, the scout gate, the per-run cap and the
-// fold gate (joshuafolkken/kit#2119, joshuafolkken/kit#2213); a filing whose body also carries a
-// backtick adds `shell-body`.
-const FILING_RULE_COUNT = 4
-const FILING_WITH_BODY_RULE_COUNT = 5
+// A filing is claimed by five filing rows — the WIP cap, the scout gate, the per-run cap, the fold
+// gate (joshuafolkken/kit#2119, joshuafolkken/kit#2213) and the `issue:lint` oracle-consulted row
+// (joshuafolkken/kit#2324); a filing whose body also carries a backtick adds `shell-body`.
+const FILING_RULE_COUNT = 5
+const FILING_WITH_BODY_RULE_COUNT = 6
 const NOW_MS = 1_700_000_000_000
 // Later than any turn the transcript fixture can carry, so the batching guard's recorded refusal
 // covers the whole open sequence whatever wall clock the fixture used — the state where it has
@@ -73,7 +73,7 @@ const SHELL_BODY = 'shell-body'
 // comment rather than a filing, so exactly one row claims it.
 const EVALUATED_BODY_COMMAND =
 	'gh api repos/joshuafolkken/kit/issues/1198/comments -f body="see `pnpm josh ms`"'
-const { open_turn_lines, target_turn_lines } = time_transcript_fixture
+const { BRANCH, josh_call_line, open_turn_lines, target_turn_lines } = time_transcript_fixture
 
 // Three consecutive single-call turns with the third still open — the one shape `batch:guard`
 // refuses, and therefore the one shape this guard has to stay quiet on.
@@ -245,10 +245,12 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call once you have counted')
 	})
 
-	// The tail carries a scout, so the second call is not claimed by `issue-scout` — this block is about
-	// the WIP cap alone (joshuafolkken/kit#2119).
+	// The tail carries a scout and an `issue:lint`, so the second call is claimed by neither
+	// `issue-scout` nor the `issue:lint` oracle-consulted row — this block is about the WIP cap alone
+	// (joshuafolkken/kit#2119, joshuafolkken/kit#2324).
 	it(ONCE_PER_RUN, () => {
-		const payload = payload_of('repeat', FILING_COMMAND, 'Bash', scouted_tail())
+		const lint_call = josh_call_line(1, BRANCH, 'pnpm josh issue:lint x.md')
+		const payload = payload_of('repeat', FILING_COMMAND, 'Bash', `${scouted_tail()}\n${lint_call}`)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
@@ -440,21 +442,22 @@ describe('DELIVERED_RULES — trigger overlap', () => {
 		expect(rules_claiming(command)).toBe(1)
 	})
 
-	// **A filing is the deliberate overlap: four rows claim it** (joshuafolkken/kit#2119,
-	// joshuafolkken/kit#2213) — the WIP cap, the scout gate, the per-run cap and the fold gate —
-	// resolved by the reissue chain rather than by a single winner, so the claim count is asserted
-	// rather than the exactly-one invariant above.
+	// **A filing is the deliberate overlap: five rows claim it** (joshuafolkken/kit#2119,
+	// joshuafolkken/kit#2213, joshuafolkken/kit#2324) — the WIP cap, the scout gate, the per-run cap, the
+	// fold gate and the `issue:lint` oracle-consulted row — resolved by the reissue chain rather than by
+	// a single winner, so the claim count is asserted rather than the exactly-one invariant above.
 	it.each([FILING_COMMAND, FILING_API_COMMAND])(
-		'is claimed by the four filing rules: %j',
+		'is claimed by the five filing rules: %j',
 		(command) => {
 			expect(rules_claiming(command)).toBe(FILING_RULE_COUNT)
 		},
 	)
 
 	// **The overlap order, asserted rather than assumed** (joshuafolkken/kit#1198,
-	// joshuafolkken/kit#2119). A filing whose body carries a backtick is claimed by five rows; with the
-	// run already scouted the scout gate and the cap stand down, and the fold gate stands down on a
-	// first filing, so `wip-cap` is delivered first and `shell-body` on the reissue — the stamps are
+	// joshuafolkken/kit#2119, joshuafolkken/kit#2324). A filing whose body carries a backtick is claimed
+	// by six rows; with the run already scouted the scout gate and the cap stand down, and the fold gate
+	// stands down on a first filing, so `wip-cap` is delivered first and `shell-body` on the reissue —
+	// the `issue:lint` oracle row is last and would deliver only on a further reissue. The stamps are
 	// keyed per `id`, so nothing is lost by losing the race.
 	it('delivers the second rule on the reissue when a filing also carries an evaluated body', () => {
 		const command = 'gh api repos/o/r/issues -f title="x" -f body="see `pnpm josh ms`"'

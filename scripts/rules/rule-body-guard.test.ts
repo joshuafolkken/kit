@@ -4,6 +4,7 @@ import path from 'node:path'
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_body_guard } from './rule-body-guard'
@@ -51,10 +52,10 @@ function edit_call(file_path: string, old_string: string, new_string: string): G
 	return { name: EDIT, input: { file_path, old_string, new_string } }
 }
 
-function edit_payload(name: string, old_string: string, new_string: string): string {
+function edit_payload(name: string, old_string: string, new_string: string, history = ''): string {
 	const transcript = path.join(WORK_DIRECTORY, `${name}.jsonl`)
 
-	writeFileSync(transcript, '')
+	writeFileSync(transcript, history)
 	WRITTEN_TRANSCRIPTS.add(transcript)
 
 	const tool_input = { file_path: CLAUDE_PATH, old_string, new_string }
@@ -65,6 +66,16 @@ function edit_payload(name: string, old_string: string, new_string: string): str
 		tool_name: EDIT,
 		tool_input,
 	})
+}
+
+// A transcript tail carrying prior `pnpm josh oracle:list` / `pnpm josh run:step` calls — the record
+// the placement stand-down reads. `run:step` takes an issue-number argument; `oracle:list` takes none.
+const { BRANCH, josh_call_line } = time_transcript_fixture
+const ORACLE_LIST_CALL = josh_call_line(1, BRANCH, 'pnpm josh oracle:list')
+const RUN_STEP_CALL = josh_call_line(2, BRANCH, 'pnpm josh run:step 2324')
+
+function placement_tail(): string {
+	return [ORACLE_LIST_CALL, RUN_STEP_CALL].join('\n')
 }
 
 beforeEach(() => {
@@ -186,6 +197,41 @@ describe('rule_delivery — end to end through the enumeration', () => {
 		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
 
 		expect(claiming).toHaveLength(1)
+	})
+})
+
+describe('rule_delivery — the placement-verdict stand-down (joshuafolkken/kit#2324)', () => {
+	// Both placement oracles answered earlier in the run: the edit passes on the record, not the reminder.
+	it('stands down once oracle:list and run:step are both on the tail', () => {
+		const payload = edit_payload('answered', '', RULE_SENTENCE, placement_tail())
+
+		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+	})
+
+	// Only one answered: the record is incomplete, so the edit is still refused.
+	it('still refuses when only oracle:list is on the tail', () => {
+		const payload = edit_payload('half-answered', '', RULE_SENTENCE, ORACLE_LIST_CALL)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
+	})
+})
+
+describe('answered_placement — read off the tail', () => {
+	const CALL: GuardedCall = { name: EDIT, input: { file_path: CLAUDE_PATH } }
+
+	it('is true when both placement oracles ran', () => {
+		expect(rule_body_guard.answered_placement(placement_tail(), CALL)).toBe(true)
+	})
+
+	it('is false when neither ran', () => {
+		expect(rule_body_guard.answered_placement('', CALL)).toBe(false)
+	})
+
+	it('accepts run:next as the ordering-question answer', () => {
+		const run_next = josh_call_line(2, BRANCH, 'pnpm josh run:next 1')
+		const tail = [ORACLE_LIST_CALL, run_next].join('\n')
+
+		expect(rule_body_guard.answered_placement(tail, CALL)).toBe(true)
 	})
 })
 

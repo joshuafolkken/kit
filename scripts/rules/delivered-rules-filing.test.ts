@@ -50,6 +50,25 @@ function folded_tail(): string {
 	return with_fold(filings_tail(1))
 }
 
+// A `pnpm josh issue:lint` call, so the `issue:lint` oracle-consulted row stands down for a run that
+// has linted (joshuafolkken/kit#2324) — the newest filing row, isolated the same way the scout and the
+// fold are. `with_lint` appends it to a tail; `lint_only` is the whole tail for a case that needs the
+// scout gate to still fire (no scout on the tail) while the oracle row stands down.
+function with_lint(tail: string): string {
+	return [
+		tail,
+		time_transcript_fixture.josh_call_line(
+			21,
+			time_transcript_fixture.BRANCH,
+			'pnpm josh issue:lint x.md',
+		),
+	].join('\n')
+}
+
+function lint_only(): string {
+	return with_lint('')
+}
+
 describe('rule_delivery — the scout gate at the call that files', () => {
 	it('delivers the rule on a filing the run has not scouted', () => {
 		const payload = payload_of('scout-missing', FILING_API_COMMAND)
@@ -59,7 +78,7 @@ describe('rule_delivery — the scout gate at the call that files', () => {
 	})
 
 	it('says nothing on a filing the run has already scouted', () => {
-		const payload = payload_of('scouted', FILING_API_COMMAND, 'Bash', scouted_tail())
+		const payload = payload_of('scouted', FILING_API_COMMAND, 'Bash', with_lint(scouted_tail()))
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, A_LATER_MS)).toBeUndefined()
@@ -77,7 +96,7 @@ describe('rule_delivery — the scout gate at the call that files', () => {
 	})
 
 	it('delivers once per run rather than once per call', () => {
-		const payload = payload_of('scout-repeat', FILING_API_COMMAND)
+		const payload = payload_of('scout-repeat', FILING_API_COMMAND, 'Bash', lint_only())
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, A_LATER_MS)).toBe(delivered_rules.ISSUE_SCOUT_REASON)
@@ -89,7 +108,7 @@ describe('rule_delivery — the scout gate at the call that files', () => {
 // once-per-run WIP cap — the cap itself is read from the deliveries after that.
 describe('rule_delivery — the filing cap at the call past the ceiling', () => {
 	it('says nothing while the run is under the cap', () => {
-		const tail = with_fold(filings_tail(filing_cap.FILING_CAP - 1))
+		const tail = with_lint(with_fold(filings_tail(filing_cap.FILING_CAP - 1)))
 		const payload = payload_of('cap-under', FILING_API_COMMAND, 'Bash', tail)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
@@ -113,7 +132,7 @@ describe('rule_delivery — the filing cap at the call past the ceiling', () => 
 	// A guard-refused filing did not create an Issue, so it does not count: ten filings with one refused
 	// is nine, and the tenth is allowed.
 	it('does not count a guard-refused filing toward the cap', () => {
-		const tail = with_fold(filings_tail(filing_cap.FILING_CAP, 1))
+		const tail = with_lint(with_fold(filings_tail(filing_cap.FILING_CAP, 1)))
 		const payload = payload_of('cap-refused', FILING_API_COMMAND, 'Bash', tail)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
@@ -125,7 +144,7 @@ describe('rule_delivery — the filing cap at the call past the ceiling', () => 
 // delivery — the fold gate itself is read from the deliveries after that.
 describe('rule_delivery — the fold gate at the second filing', () => {
 	it('says nothing on the first filing, with nothing to fold with', () => {
-		const payload = payload_of('fold-first', FILING_API_COMMAND, 'Bash', filings_tail(0))
+		const payload = payload_of('fold-first', FILING_API_COMMAND, 'Bash', with_lint(filings_tail(0)))
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, A_LATER_MS)).toBeUndefined()
@@ -139,7 +158,7 @@ describe('rule_delivery — the fold gate at the second filing', () => {
 	})
 
 	it('says nothing on a second filing the run has already folded', () => {
-		const payload = payload_of('fold-done', FILING_API_COMMAND, 'Bash', folded_tail())
+		const payload = payload_of('fold-done', FILING_API_COMMAND, 'Bash', with_lint(folded_tail()))
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, A_LATER_MS)).toBeUndefined()

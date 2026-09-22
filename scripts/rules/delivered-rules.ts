@@ -16,6 +16,7 @@ import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
 import { lane_switch_main } from './lane-switch-main'
+import { oracle_consulted } from './oracle-consulted'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
@@ -515,6 +516,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// default row: the batching guard treats an `Edit` as a candidate, exactly as it treats an Issue
 	// read, so this row stands aside on a batched turn and delivers on the reissue.
 	rule_body_guard.ROW,
+	// **The generic oracle-consulted rows, one per oracle that declared a firing point**
+	// (joshuafolkken/kit#2324). Each refuses the action the oracle governs when the run has not run that
+	// oracle's command first, stood down once it has — `issue-scout`'s shape read from the registry
+	// rather than hand-written. Listed last so an oracle whose firing point overlaps a filing
+	// (`issue:lint`) delivers on the reissue, after `wip-cap` / `issue-scout` / `filing-cap` /
+	// `issue-fold` have each had their turn. The non-overlapping firing points (`pkg:scout` on a package
+	// add, `release:scope` on `pnpm josh followup`) claim commands no row above matches.
+	...oracle_consulted.ROWS,
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that
