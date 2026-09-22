@@ -227,6 +227,23 @@ function resolve_unit_worker_cap(
 	return available_cores - RESERVED_CORES
 }
 
+// The cores a check reserves from the machine-wide budget while it runs (joshuafolkken/kit#2351). The
+// static checks declare their measured reservation; the unit suite declares the pool it will open,
+// which `unit_worker_cap` has already sized against the runs in flight. **This is the same table, read
+// once**: no second set of weights is introduced, so a change to the measured reservation moves the
+// admission with it.
+//
+// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 1 + 1) +
+// unit_cap(cores - 4)` is `cores` — which is what lets every check of a lone gate be admitted at once,
+// its concurrency unchanged. A machine below the measured one leaves the unit suite uncapped and reads
+// its weight from the same identity, `cores - RESERVED_CORES` clamped at zero, so the sum is the core
+// count there too.
+function check_weight(check: GateCheck, plan: GatePlan, available_cores: number): number {
+	if (check.label !== UNIT_LABEL) return check.reserved_cores
+
+	return plan.unit_worker_cap ?? Math.max(0, available_cores - RESERVED_CORES)
+}
+
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually
 // use, so a container with a CPU quota is sized by the quota rather than by the host.
 // The three fields together, for a caller that has already decided the numbers. The gate's own
@@ -312,6 +329,7 @@ const gate_plan = {
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
 	WARNING_CHECKER_LABELS,
+	check_weight,
 	format_gate_plan,
 	format_machine,
 	format_unit_cap,

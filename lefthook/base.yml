@@ -77,8 +77,14 @@ pre-push:
   # fails the dependencies are still out of sync, so each command falls back to installing on its
   # own exactly as it did before, and a genuinely broken tree still fails the push from inside a
   # command. Never move a correctness check into `setup`; its failure would be a warning only.
+  # Wrapped in `josh reserved-run` so this install claims a place in the machine-wide core budget
+  # (kit#2351): `josh bump` rewrites package.json right before the push, so this fires on ~every push,
+  # and eight lanes reach it around the same time — a spike the gate could not see. The weight is a
+  # conservative reservation for pnpm's parallel install, not a measurement. If the wrapper cannot
+  # start (the broken-deps case this barrier exists for) the setup fails and lefthook runs the commands
+  # anyway, exactly as it did before — pnpm's own pre-run check then installs from inside each command.
   setup:
-    - run: pnpm install
+    - run: pnpm josh reserved-run 2 -- pnpm install
   # Parallel is SAFE as of kit #676. The old collision was two pre-push commands that each
   # built + booted their own preview server on the same fixed port (4173) — historically
   # app-kit's separate `test-e2e` + `dast` — running at once. That is gone: app-kit #97
@@ -98,8 +104,12 @@ pre-push:
   # this back. Removing the barrier while leaving this `true` reopens #813.
   parallel: true
   commands:
+    # Wrapped in `josh reserved-run` so the scan claims a place in the machine-wide core budget
+    # (kit#2351) — eight lanes auditing around the same time as they push spiked a machine the gate
+    # thought it had to itself. The weight is a conservative reservation for the single-process scan,
+    # not a measurement.
     audit:
-      run: pnpm josh audit
+      run: pnpm josh reserved-run 1 -- pnpm josh audit
 
     # Routed through `josh pre-push-unit` rather than a bare `pnpm exec vitest run` so the hook can
     # read the record `pnpm josh gate` leaves behind (kit#1334). A green gate writes down the digest

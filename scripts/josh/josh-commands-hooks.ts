@@ -25,6 +25,12 @@ const HOOKS_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Git hooks',
 		reference: ['', 'automation', ['processes']],
 	},
+	'reserved-run': {
+		script: 'scripts/hooks/reserved-run.ts',
+		description: 'Git hook: run a command while holding a place in the machine-wide core budget',
+		category: 'Git hooks',
+		reference: ['<weight> -- <command...>', 'automation', ['processes']],
+	},
 	'pre-commit-type-check': {
 		script: 'scripts/gate/pre-commit-type-check.ts',
 		description: 'Git hook: type-check, reusing a green gate recorded on the committed tree',

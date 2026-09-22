@@ -108,6 +108,7 @@ const MAINTENANCE_COMMANDS: ReadonlySet<string> = new Set([
 	'prevent-main-commit',
 	'check-commit-message',
 	'pre-push-unit',
+	'reserved-run',
 	'pre-commit-type-check',
 ])
 

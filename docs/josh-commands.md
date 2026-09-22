@@ -35,6 +35,7 @@ pnpm josh gate --no-unit   # the three static checks only (CI only)
 - **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
 - Exit `1` if any check failed. Refuses any argument other than the three flags.
 - The unit leg is the long pole; [`josh test:unit`](#josh-testunit) runs it as a two-project split — same files, less wall clock, not fewer tests.
+- **Each check claims a place in a machine-wide weighted core budget before it starts, and waits while the budget is full** (`scripts/gate/core-budget.ts`, joshuafolkken/kit#2351). The weights are the same measured table the plan already uses — the static checks' reserved cores and the unit suite's worker cap — so a lone gate's four claims sum to exactly the core count and every one is admitted at once: **a solo run's concurrency and worker count are unchanged**. Under concurrency the machine-wide sum is what bounds admission, so overlapping gates can no longer each reserve the whole machine, and the "whoever started first took everything" asymmetry is gone — a later gate waits rather than shrinking everyone. A leaked place is swept on read by the same pid-and-start-time liveness the unit-run marker uses, and a reservation that never fits is admitted at minimum width after a wait cap. A gate nested inside another gate's unit suite (this repository's own gate tests) takes no place, so it never waits on cores the outer gate is holding. The pre-push `pnpm install` and `pnpm josh audit` join the same budget through [`josh reserved-run`](#josh-reserved-run).
 
 ### `josh lint`
 
@@ -842,6 +843,19 @@ JOSH_PRE_PUSH_FORCE=1 git push             # run the suite even on a tree record
 ```
 
 **Output:** on reuse, prints that the tree is already green and nothing was re-run.
+
+### `josh reserved-run`
+
+Runs a command while holding a place in the machine-wide core budget ([`josh gate`](#josh-gate)'s ledger, `scripts/gate/core-budget.ts`, joshuafolkken/kit#2351). Wired in by `lefthook/base.yml` as the pre-push `setup` install and the `audit` command, so both count toward the same budget the gate's checks reserve from — eight lanes pushing around the same time no longer spike a machine the gate thought it had to itself.
+
+```bash
+pnpm josh reserved-run 2 -- pnpm install       # hold 2 cores while installing
+pnpm josh reserved-run 1 -- pnpm josh audit    # hold 1 core while scanning
+```
+
+- `<weight> -- <command...>`: the cores to reserve, then the command to run while holding them. The weight is the caller's — a conservative reservation for these two, not a measurement.
+- Claims a place before the command starts and waits while the budget is full, exactly as a gate check does; the place is released when the command exits, on success or failure, and its exit code is forwarded.
+- A missing separator, a non-integer weight, or no command is a usage error (exit `1`) — a pre-push command that ran unguarded would be the bug this removes.
 
 ### `josh pre-commit-type-check`
 
