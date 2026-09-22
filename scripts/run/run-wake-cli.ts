@@ -226,9 +226,11 @@ function stream_lines(context: WakeContext): Array<string> {
 	return [...progress, follow]
 }
 
-// The wake count is printed beside the carry record's `cuts` rather than alone, because the two being
-// equal is the property worth being able to check — one wake per cut is the whole invariant, and since
-// joshuafolkken/kit#1746 `woke` counts records actually claimed rather than sessions started.
+// The wake count is printed beside the carry record's `cuts` rather than alone, because their relation
+// is the property worth being able to check — one wake per cut, plus one per crashed session the
+// supervisor recovered (joshuafolkken/kit#2336), so `woke >= cuts` and the gap is the recoveries.
+// `woke < cuts` is the shortfall that says a cut went unserved, and since joshuafolkken/kit#1746 `woke`
+// counts records actually claimed rather than sessions started.
 // **The outstanding line beside it is what makes a shortfall readable**: the count is observed at a
 // poll, so it lags a claim by up to one interval, and launches still outstanding are what say whether
 // a missing wake is one not yet seen or one that never arrived.
