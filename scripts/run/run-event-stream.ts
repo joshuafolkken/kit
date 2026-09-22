@@ -55,6 +55,13 @@ const EVENT_KIND = {
 	STOP: 'stop',
 	PR_OPENED: 'pr-opened',
 	REVIEW_ROUND: 'review-round',
+	// The end-of-run retrospective's result, recorded when the run marks the retrospective done
+	// (joshuafolkken/kit#2342). A retrospective that files zero improvements and one that never ran look
+	// the same from outside — no new Issue either way — so the result is put on the stream the report is
+	// generated from: the issues filed (or that none were), and the candidates dropped with why. It is
+	// emitted from the `run:carry --retrospective` close, so marking the retrospective done and recording
+	// what it found are one action rather than two the run could do only one of.
+	RETROSPECTIVE: 'retrospective',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]

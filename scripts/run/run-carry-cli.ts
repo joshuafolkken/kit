@@ -8,6 +8,8 @@ import {
 	type RunCarry,
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
+import { run_event_stream } from './run-event-stream'
+import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_stop_notify } from './run-stop-notify'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts
@@ -238,11 +240,27 @@ function report_count_refused(carry: RunCarry, is_json: boolean): number {
 	return report(BUSY_VERDICT, carry, is_json, FAILURE_EXIT_CODE)
 }
 
+// The retrospective's result on the run's event stream, so a run that filed zero improvements reads
+// apart from one whose retrospective never ran (joshuafolkken/kit#2342). It rides the `--retrospective`
+// mark rather than a call of its own, so closing the retrospective and recording what it found are one
+// action; the emit is best-effort, the same contract every other append on this stream keeps, and it
+// happens only after the mark applied — a refused count records nothing.
+async function record_retrospective(request: CountRequest): Promise<void> {
+	if (request.summary === undefined) return
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.RETROSPECTIVE, request.summary)
+}
+
 // A count against a record that is not there is `none` and exits non-zero: the loop believed it was
 // carrying a budget and it was not, and a silent zero would let the run keep its own tally instead. A
 // count against a record this session no longer owns is refused for the same reason, so the single
 // writer joshuafolkken/kit#1722 established is kept across a cut (joshuafolkken/kit#1935).
-function count(target: string, read: CarryRead, request: CountRequest, is_json: boolean): number {
+async function count(
+	target: string,
+	read: CarryRead,
+	request: CountRequest,
+	is_json: boolean,
+): Promise<number> {
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
@@ -252,6 +270,8 @@ function count(target: string, read: CarryRead, request: CountRequest, is_json: 
 	}
 
 	const carry = run_carry.apply_change(target, read.carry, request.change)
+
+	await record_retrospective(request)
 
 	return read.kind === 'expired'
 		? report_expired(carry, is_json)
@@ -293,7 +313,7 @@ async function act(target: string, request: Request, is_json: boolean): Promise<
 
 	if (request.kind === 'read') return report_read(read, is_json)
 
-	return count(target, read, request, is_json)
+	return await count(target, read, request, is_json)
 }
 
 function report_unknown(is_json: boolean): number {

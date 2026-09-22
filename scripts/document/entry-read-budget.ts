@@ -61,7 +61,8 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#2335 recorded the drain-time firing with the operational detail in
 	// `retrospective.md` (which the lane child skips) and a one-line pointer in `backlogrun-steps.md`, so
 	// every entry stayed within its block rather than climbing back to a pre-#2294 ceiling the downward
-	// ratchet holds shut.
+	// ratchet holds shut. joshuafolkken/kit#2342 added the `--summary` close to `retrospective.md` in a
+	// single sentence, kept short so every entry that reads it stays within its block.
 	{ entry: 'kickoff', bytes: 266_240 },
 	{ entry: 'fullrun', bytes: 266_240 },
 	{ entry: 'halfrun', bytes: 266_240 },

@@ -68,10 +68,13 @@ brakes that bound it, rather than restated here. Every brake still counts a retr
 ten-per-invocation ceiling, the WIP cap of 30, `--max`, the 200,000-token session budget and the 8-hour
 whole-run bound.
 
-**Close with `pnpm josh run:carry --retrospective --owner "$PPID"`.** It marks the retrospective run on
-the carry record, so `run:step` prints `stop` from then on rather than the step a second time. The mark
-rides the record across a session cut and is removed with the record at `pnpm josh run:carry --end`, so
-one invocation runs the retrospective exactly once whether or not it was cut.
+**Close with `pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID"`.** It marks the
+retrospective run on the carry record, so `run:step` prints `stop` from then on rather than the step a
+second time. The mark rides the record across a session cut and is removed with the record at
+`pnpm josh run:carry --end`, so one invocation runs the retrospective exactly once whether or not it was
+cut. **`--summary` is required** — the same close writes it as one `retrospective` event on the event
+stream (joshuafolkken/kit#2342), so a zero-filing retrospective differs from one that never ran; name
+the issues filed (or that none were) and the candidates dropped with why.
 
 **A dispatched lane child never reaches any of this** — the batch runs the retrospective at its own end,
 never a child's, exactly as it asks `release:scope` once at the batch's end. `run:step` already answers
