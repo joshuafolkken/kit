@@ -27,6 +27,7 @@ const ORDER_CONTRADICTION = 'order contradiction'
 const UNRESOLVED_REFERENCE = 'unresolved reference'
 const ORPHAN_CHILD = 'orphan child'
 const NESTED_EPIC = 'nested epic'
+const CLOSED_EPIC_OPEN_CHILDREN = 'closed epic with open children'
 
 // A child with its body, which the graph type does not carry.
 interface AuditChild extends EpicChild {
@@ -389,18 +390,62 @@ function find_nested_epics(
 		}))
 }
 
+// Check 6 — the epic itself is closed while children it tracks are still open. Unlike the five
+// checks above, this one reads the *root's* state against its children rather than the children
+// against each other (joshuafolkken/kit#2337).
+//
+// **An error, not a warning.** A closed epic never surfaces its children in the backlog — the epic
+// opt-in only fires while the epic is open — so an open child of a closed epic is stranded: it is
+// runnable work nothing will ever offer. That is a contradiction a person has to resolve (reopen the
+// epic, or close/move the children), and a `0 error(s)` summary reading "no contradiction" is exactly
+// how it went unnoticed until a user pointed at the Progress list. It is distinct from the nested and
+// orphan warnings, which describe children the run merely handles differently, not a closed container
+// silently holding open work.
+//
+// `is_epic_closed` is the confirmed state, decided by the caller — an unreadable root state is passed
+// as `false`, so a lookup that never answered does not manufacture the error.
+function closed_epic_message(open: ReadonlyArray<AuditChild>, current_repo: string): string {
+	const names = open.map((child) => shown(child, current_repo)).join(', ')
+
+	return (
+		`this epic is closed but still tracks open ${open.length === 1 ? 'child' : 'children'} (${names}). ` +
+		'A closed epic never surfaces its children in the backlog — the epic opt-in only applies while ' +
+		'the epic is open — so this work is stranded. Reopen the epic, or close or move those children.'
+	)
+}
+
+function find_closed_epic_open_children(
+	is_epic_closed: boolean,
+	children: ReadonlyArray<AuditChild>,
+	current_repo: string,
+): Array<AuditFinding> {
+	if (!is_epic_closed) return []
+	const open = children.filter((child) => !is_closed(child))
+	if (open.length === 0) return []
+
+	return [
+		{
+			level: 'error' as const,
+			check: CLOSED_EPIC_OPEN_CHILDREN,
+			message: closed_epic_message(open, current_repo),
+		},
+	]
+}
+
 const epic_audit_checks = {
 	IMPLICIT_DEPENDENCY,
 	ORDER_CONTRADICTION,
 	UNRESOLVED_REFERENCE,
 	ORPHAN_CHILD,
 	NESTED_EPIC,
+	CLOSED_EPIC_OPEN_CHILDREN,
 	reported_pairs,
 	find_implicit_dependencies,
 	find_order_contradictions,
 	find_unresolved_references,
 	find_orphans,
 	find_nested_epics,
+	find_closed_epic_open_children,
 }
 
 export type { AuditChild }

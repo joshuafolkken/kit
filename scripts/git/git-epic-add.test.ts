@@ -130,6 +130,35 @@ describe('git_epic_add.add_children — with a decision record', () => {
 	})
 })
 
+// A completed epic takes no new children: adding one produces a closed epic with open children whose
+// backlog opt-in no longer fires, so the child is stranded (joshuafolkken/kit#2337). Both directions
+// are pinned — a closed epic refuses and writes nothing, an open one proceeds.
+function stub_epic_state(state: string): void {
+	mocked_read.mockResolvedValue(
+		JSON.stringify({ number: EPIC_NUMBER, state, labels: [{ name: 'epic' }], body: EPIC_BODY }),
+	)
+}
+
+describe('git_epic_add.add_children — a closed epic', () => {
+	it('refuses the addition and writes nothing', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		stub_epic_state('CLOSED')
+
+		expect(await add()).toBe(FAILURE_EXIT_CODE)
+		expect(order).toStrictEqual([])
+		expect(error.mock.calls.some((call) => String(call[0]).includes('is closed'))).toBe(true)
+		error.mockRestore()
+	})
+
+	it('proceeds when the epic is open', async () => {
+		stub_epic_state('OPEN')
+
+		expect(await add()).toBe(SUCCESS_EXIT_CODE)
+		expect(order).toStrictEqual(['body'])
+	})
+})
+
 // A move writes no new task-list row, so the `📋 Added …` line would name an empty list. The two
 // edits are reported separately, and neither line is printed unconditionally (joshuafolkken/kit#1701).
 const PAIR_BODY = [

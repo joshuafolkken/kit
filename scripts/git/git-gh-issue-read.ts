@@ -341,8 +341,10 @@ async function issue_get_plan_fields_classified(issue_number: string): Promise<I
 	return await issue_view_json_classified(issue_number, PLAN_FIELDS)
 }
 
+// `state` rides along for `git-epic-add.ts`'s closed-epic refusal (joshuafolkken/kit#2337); every
+// other caller reads only the labels and body and ignores it, so it costs no extra request.
 async function issue_get_labels_and_body(issue_number: string): Promise<string | undefined> {
-	return await issue_view_json(issue_number, 'number,labels,body')
+	return await issue_view_json(issue_number, 'number,state,labels,body')
 }
 
 // The conversation comments of one issue, as REST serves them. `undefined` — never `'[]'` — when the

@@ -312,3 +312,42 @@ describe('epic_audit_checks.find_orphans', () => {
 		expect(epic_audit_checks.find_orphans([101], [])).toEqual([])
 	})
 })
+
+// A closed epic never surfaces its children in the backlog — the epic opt-in only fires while the
+// epic is open — so an open child of a closed epic is stranded work nothing will offer. That is a
+// contradiction the audit must report as an error rather than let read as `0 error(s)`
+// (joshuafolkken/kit#2337).
+describe('epic_audit_checks.find_closed_epic_open_children', () => {
+	it('errors when the closed epic still has an open child', () => {
+		const findings = epic_audit_checks.find_closed_epic_open_children(
+			true,
+			[closed(child(1, '')), child(2, '')],
+			REPO,
+		)
+
+		expect(findings).toHaveLength(1)
+		expect(findings[0]?.level).toBe('error')
+		expect(messages(findings)).toContain('#2')
+	})
+
+	it('says nothing when every child of the closed epic is closed', () => {
+		const findings = epic_audit_checks.find_closed_epic_open_children(
+			true,
+			[closed(child(1, '')), closed(child(2, ''))],
+			REPO,
+		)
+
+		expect(findings).toEqual([])
+	})
+
+	// An open epic with open children is the ordinary in-progress state, not a contradiction.
+	it('says nothing while the epic itself is open', () => {
+		const findings = epic_audit_checks.find_closed_epic_open_children(
+			false,
+			[child(1, ''), child(2, '')],
+			REPO,
+		)
+
+		expect(findings).toEqual([])
+	})
+})
