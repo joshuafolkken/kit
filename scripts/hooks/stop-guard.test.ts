@@ -1,11 +1,13 @@
+import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { stop_rules } from '#scripts/rules/stop-rules'
-import { afterEach, describe, expect, it } from 'vitest'
-import { stop_guard } from './stop-guard'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { stop_guard, write_stop_decision } from './stop-guard'
 
 const SWITCH_KEY = stop_rules.SWITCH_ENV_KEY
 
 afterEach(() => {
 	Reflect.deleteProperty(process.env, SWITCH_KEY)
+	vi.restoreAllMocks()
 })
 
 describe('stop_guard — fail open', () => {
@@ -21,5 +23,15 @@ describe('stop_guard — fail open', () => {
 		})
 
 		expect(await stop_guard.stop_outcome_for_payload(payload)).toEqual(stop_rules.NO_OUTCOME)
+	})
+})
+
+describe('write_stop_decision — the stall check is wired', () => {
+	it('runs the stall detector on every stop', async () => {
+		const check = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
+
+		await write_stop_decision('not json')
+
+		expect(check).toHaveBeenCalledOnce()
 	})
 })

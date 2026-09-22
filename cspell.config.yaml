@@ -58,6 +58,10 @@ words:
   # run rather than parked (joshuafolkken/kit#2240). Named across the `run:merge` / `run:ending` code,
   # the workflow docs and their tests.
   - dispatchable
+  # "Undispatched" — ready backlog work that sits with a free lane while nothing is started, the stall
+  # state the detector reports (joshuafolkken/kit#2359). Named across the `backlog:stalled` code, its
+  # command descriptions, the stall event/notify strings and the docs.
+  - undispatched
   # The connection-error signature the Anthropic client emits when the API refused the socket, matched
   # mechanically to tell an API outage apart from a child that stalled (joshuafolkken/kit#2240). It is
   # the literal marker text `api-outage.ts` greps the exit record for.
