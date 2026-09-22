@@ -1190,6 +1190,16 @@ pnpm josh backlog:plan --exclude 1630  # after #1630 merged
 
 Sections: **Ready now** (runnable children, grouped by repository = the parallelism), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
 
+### `josh backlog:stalled`
+
+Report whether ready backlog work is sitting undispatched while a lane is free and nothing has dispatched for a while (joshuafolkken/kit#2359) — the state where a run is alive but not advancing and nobody notices until a person asks. Reads three facts, weighs none: a runnable count from `backlog:next`, the free-lane count, and the age of the last `child-launch` event on the run's stream.
+
+```bash
+pnpm josh backlog:stalled
+```
+
+stdout is one verdict word, always exit 0 — it reports, it never stops: `stalled` (all three hold), `unreadable` (no run stream to key on), or `ok`. On `stalled` it leaves a `stall` marker on the run's event stream — once per episode, which is what a terminal reader following the stream sees and what `run:step` reads as `backlog:next` — and sends one `⏳` Telegram notification. The cheap conditions gate the costly one: the backlog is only read when the run is already idle past the threshold with a free lane. Wired into the Stop hook (`stop-guard`) so it fires at each loop boundary; failures are swallowed so a report never holds a stop.
+
 ### `josh backlog:budget`
 
 Say whether a `backlogrun` may start more work, keep watching, or finish. Read-only. Maps `backlog:next`'s answer into a budget verdict.

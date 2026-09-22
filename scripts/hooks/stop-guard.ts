@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
@@ -82,6 +83,12 @@ async function outcome_of(raw_payload: string): Promise<StopOutcome> {
 // is being held — all three rules block, so a bare `#N` is reported the same way (joshuafolkken/kit#2247).
 async function write_stop_decision(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
+
+	// The stall check rides the Stop hook because the stop *is* the loop boundary: a run alive but not
+	// advancing ends turns without dispatching (joshuafolkken/kit#2359). It only reports — leaves a
+	// marker, sends a notification — and swallows its own failures, so it can never change the decision
+	// below or hold the stop.
+	await backlog_stalled_detect.run_stall_check()
 
 	const { reason } = await outcome_of(raw_payload)
 
