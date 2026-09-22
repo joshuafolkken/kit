@@ -170,3 +170,63 @@ describe('invalid overrides', () => {
 		).toMatchObject({ kind: 'rejected' })
 	})
 })
+
+// joshuafolkken/kit#2382: effort is a function of the run phase, not the role alone. Only the mechanical
+// ship/bookkeeping region (the pre-gate resume) is lowered for the first merge; the judgment phases keep
+// the role default, a phase-less call is unchanged, and an env override still wins.
+describe('phase-resolved effort', () => {
+	const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_role_profile
+
+	function effort_for(environment: Record<string, string>, phase?: string): string {
+		const result = agent_role_profile.resolve(WORKER, environment, phase)
+
+		if (result.kind === 'rejected') throw new Error(result.note)
+
+		return result.profile.effort
+	}
+
+	it('lowers the worker effort in the pre-gate ship phase', () => {
+		expect(effort_for(ANTHROPIC_ENV, PRE_GATE_PHASE)).toBe('low')
+	})
+
+	it('keeps the role default in a judgment phase', () => {
+		expect(effort_for(ANTHROPIC_ENV, IMPLEMENTATION_PHASE)).toBe('medium')
+	})
+
+	it('keeps the role default when no phase is passed, so existing callers are unchanged', () => {
+		expect(effort_for(ANTHROPIC_ENV)).toBe('medium')
+	})
+
+	it('ignores an unrecognized phase and returns the role default', () => {
+		expect(effort_for(ANTHROPIC_ENV, 'nonsense')).toBe('medium')
+	})
+
+	it('lets the worker env override win over the phase value', () => {
+		expect(effort_for({ ...ANTHROPIC_ENV, JOSH_WORKER_EFFORT: 'high' }, PRE_GATE_PHASE)).toBe(
+			'high',
+		)
+	})
+})
+
+describe('with_phase_effort', () => {
+	const base = agent_role_profile.DEFAULT_PROFILES.worker
+
+	it('applies the phase effort to a stored profile and keeps its model', () => {
+		const adjusted = agent_role_profile.with_phase_effort(
+			base,
+			agent_role_profile.PRE_GATE_PHASE,
+			ANTHROPIC_ENV,
+		)
+
+		expect(adjusted).toMatchObject({ model: base.model, effort: 'low' })
+	})
+
+	it('lets an env override win over the phase for a stored profile', () => {
+		const adjusted = agent_role_profile.with_phase_effort(base, agent_role_profile.PRE_GATE_PHASE, {
+			...ANTHROPIC_ENV,
+			JOSH_WORKER_EFFORT: 'xhigh',
+		})
+
+		expect(adjusted.effort).toBe('xhigh')
+	})
+})
