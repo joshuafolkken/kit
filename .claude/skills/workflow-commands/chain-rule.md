@@ -30,6 +30,11 @@ Review results and successful pushes are never turn boundaries.
    - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
    Any round-1 fix runs its affected scoped check and the gate before `git -y`.
+   Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
+   [<category>:<severity>:<file> ...]` — a clean round is a call with no findings, which records one
+   zero-finding line rather than nothing, so the recurrence count keeps its denominator
+   (joshuafolkken/kit#2325). The line lands in the observation ledger, and the `pnpm josh followup`
+   flush commits it; `pnpm josh review:findings` reads the category tally back.
 5. After a green joined gate, background `pnpm josh git -y "<title> #<N>"`. Its completion resumes the
    same turn through branch-2 filing, `epic:bundle`, and `pnpm josh followup`. A clean round 2 merges;
    a round-2 fix is pushed before its gate, which is joined before `followup`.
