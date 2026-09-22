@@ -94,10 +94,15 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 // passed *without running* — `test-unit-guard` exits 0 with a notice when vitest is absent or the
 // project has no tests — must not become "the unit tests all passed": the gate keeps that skip
 // visible on the console, and a record erasing it would have the brief tell a review agent not to
-// re-run tests that never ran. A step that passed **with warnings** is withheld for the same reason
-// one place further on (joshuafolkken/kit#1328): since the record is now reused instead of the checks
-// being re-run, a warning printed once would never be printed again on that tree, and `has_warnings`
-// exists precisely because hiding one is the same failure as hiding a skip. A tree that moved while
+// re-run tests that never ran. A step that passed **with a checker's warnings** is withheld for the
+// same reason one place further on (joshuafolkken/kit#1328): since the record is now reused instead of
+// the checks being re-run, a warning printed once would never be printed again on that tree, and
+// hiding an eslint or svelte-check finding is the same failure as hiding a skip. It is
+// `has_checker_warning`, not `has_warnings`, that decides this (joshuafolkken/kit#2318): the loose
+// marker match is right for the print path, where a false positive costs one printed body, but here a
+// false positive withholds the whole record and turns a green gate's `run:review --join` red — so a
+// benign line from another tool (a Vite config deprecation on `test:unit`) must not withhold it. A
+// tree that moved while
 // the checks were in flight (the `PostToolUse` formatter, an editor save) is not the tree they read.
 // And a failed write leaves no record at all, which a temp-directory problem must never turn into a
 // red gate.
@@ -105,7 +110,7 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 // The destination is a parameter so a test can exercise the record without overwriting the one a
 // real run may be relying on — `josh gate` and `josh review:brief` share one path by design.
 function has_nothing_to_say(result: GateStepResult): boolean {
-	return !gate_report.is_skip_notice(result) && !gate_report.has_warnings(result)
+	return !gate_report.is_skip_notice(result) && !gate_report.has_checker_warning(result)
 }
 
 async function record_green_gate(
