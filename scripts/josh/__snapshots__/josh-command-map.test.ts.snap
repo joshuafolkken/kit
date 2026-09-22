@@ -106,6 +106,8 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rug": "rule:guard",
     "ruv": "rule:value",
     "rv": "run:liveness",
+    "rvf": "review:findings",
+    "rvr": "review:record",
     "rw": "run:wake",
     "rwg": "run:watcher:guard",
     "sa": "split:assess",
@@ -760,6 +762,20 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "review:brief": [
       "[--round <1|2>] | --level-only [--staged] [--json]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
+    "review:findings": [
+      "",
+      "developer",
+      [
+        "files",
+      ],
+    ],
+    "review:record": [
+      "--issue <N> [<category>:<severity>:<file> ...]",
       "automation",
       [
         "files",

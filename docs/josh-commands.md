@@ -556,6 +556,31 @@ pnpm josh measure:rerun /tmp/issue-body.md
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](#josh-issuelint).
 
+### `josh review:record`
+
+Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the observation ledger (`docs/observations.md`) — the same append-only file the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+
+```bash
+pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
+pnpm josh review:record --issue 2325   # a zero-finding round — records one `none` line
+```
+
+**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
+
+Related: [`josh review:findings`](#josh-reviewfindings), [`josh observations:flush`](#josh-observationsflush).
+
+### `josh review:findings`
+
+Count the recorded review findings by category (joshuafolkken/kit#2325) — the reader over what `josh review:record` wrote. It reads the observation ledger, tallies each recurring category most-frequent-first, and prints the number of zero-finding rounds, which tells a genuinely quiet category apart from one nobody looked at.
+
+```bash
+pnpm josh review:findings
+```
+
+**Behavior:** counts only `- rf:` lines, ignoring the `- k:` observation lines in the same file. The `none` sentinel lines are excluded from the category tally and reported as the zero-finding round count instead. A ledger with no finding lines prints `no review findings recorded yet`.
+
+Related: [`josh review:record`](#josh-reviewrecord).
+
 ### `josh main:sync`
 
 Checkout the default branch and pull the latest changes with `git pull --ff-only` (the strategy is named by the command, not read from git config).
