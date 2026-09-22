@@ -23,6 +23,7 @@ import { prior_comment_read } from './prior-comment-read'
 import { raw_field_body } from './raw-field-body'
 import { rule_body_guard } from './rule-body-guard'
 import { run_tail } from './run-tail'
+import { setup_cut } from './setup-cut'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
 import { test_declared_commit } from './test-declared-commit'
@@ -279,18 +280,6 @@ function reads_issue_comments(command: string): boolean {
 // claiming the working tree is what only the process on the near side of the boundary does, because
 // the `resume` verdict tells its counterpart to skip that claim. A run doing both reached the
 // boundary; a run that asked without claiming is the session the cut produced, which had no cut of
-// its own to take and belongs in no denominator. Both predicates are inlined at their one use here —
-// `reaches` is read only by the offline `rule:value` measurement, never the live delivery path.
-function reaches_the_pre_gate_boundary(
-	call: GuardedCall,
-	_turn: ReadonlyArray<GuardedCall>,
-	run: ReadonlyArray<GuardedCall>,
-): boolean {
-	if (!on_bash_command(pre_gate_cut.asks_about_the_cut)(call)) return false
-
-	return run.some((issued) => on_bash_command(pre_gate_cut.claims_the_hold)(issued))
-}
-
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// **Listed first, ahead of the filing trigger it overlaps** (joshuafolkken/kit#2122). A `gh api`
 	// that files an Issue into a repository we do not own trips both this row and `wip-cap` /
@@ -414,7 +403,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate),
 		reason: pre_gate_cut.PRE_GATE_CUT_REASON,
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
-		reaches: reaches_the_pre_gate_boundary,
+		reaches: pre_gate_cut.reaches_the_pre_gate_boundary,
 	},
 	// **The second row whose trigger consults the world beside the command** (joshuafolkken/kit#2034):
 	// "is this a dispatched lane child" is the dispatch mark against this checkout's own issue, read
@@ -508,6 +497,13 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// redesign), the same honest-unmeasured stance the batching and investigation rows take for the same
 	// reason: a trigger no transcript can reconstruct. The row itself lives in `implementation-cut.ts`.
 	implementation_cut.ROW,
+	// **The setup-phase cut, one boundary earlier than the implementation cut** (joshuafolkken/kit#2346).
+	// Its trigger is the first `Edit` / `Write` a dispatched lane child makes with the plan event newest
+	// on the run stream — the setup-then-implement boundary. Like `implementation_cut.ROW` its occasion
+	// rests on the working directory, the dispatch mark and the event stream, none of which a transcript
+	// records, so `pnpm josh rule:value` reads it as no runs rather than 0% kept; `keeps` names the
+	// compliance act for a future measurement. The row itself lives in `setup-cut.ts`.
+	setup_cut.ROW,
 	// **The first row whose trigger is an `Edit` / `Write` rather than a shell call**
 	// (joshuafolkken/kit#2272). It delivers the residency questions at the edit that writes a rule into
 	// prose, and self-gates on the tool name and the file path, so it claims no `Bash` command any row

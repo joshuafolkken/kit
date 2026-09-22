@@ -6,7 +6,7 @@ import { run_issue_number } from './run-issue-number'
 // `undefined` rather than a guessed intent — a cut that ran on a misread flag would end a process at
 // the wrong moment.
 
-const USAGE = 'Usage: josh run:cut <issue> [--impl] | --resume <issue> | --json | --end'
+const USAGE = 'Usage: josh run:cut <issue> [--impl | --setup] | --resume <issue> | --json | --end'
 
 const OPTIONS = {
 	end: { type: 'boolean' },
@@ -16,15 +16,18 @@ const OPTIONS = {
 	impl: { type: 'boolean' },
 	json: { type: 'boolean' },
 	resume: { type: 'boolean' },
+	// The setup-phase cut (joshuafolkken/kit#2346). Like `--impl` it modifies the bare cut rather than
+	// being a mode of its own; the two name different boundaries, so pairing them is refused.
+	setup: { type: 'boolean' },
 } as const
 
 interface ParsedValues {
-	values: { end?: boolean; impl?: boolean; json?: boolean; resume?: boolean }
+	values: { end?: boolean; impl?: boolean; json?: boolean; resume?: boolean; setup?: boolean }
 	positionals: ReadonlyArray<string>
 }
 
 type Request =
-	| { kind: 'cut'; issue: string; is_implementation: boolean }
+	| { kind: 'cut'; issue: string; is_implementation: boolean; is_setup: boolean }
 	| { kind: 'resume'; issue: string }
 	| { kind: 'read' }
 	| { kind: 'end' }
@@ -61,28 +64,30 @@ function issue_of(positionals: ReadonlyArray<string>): string | undefined {
 }
 
 // The mode flags are mutually exclusive; more than one is a refusal rather than a precedence order
-// the caller has to remember. `--impl` is not a mode — it modifies the bare cut — so it is refused
-// only when it accompanies one of the three that ask about a cut rather than take one.
+// the caller has to remember. `--impl` and `--setup` are not modes — they modify the bare cut — so
+// each is refused only when it accompanies one of the three that ask about a cut rather than take one,
+// and pairing the two phase flags with each other is refused because they name different boundaries.
 function is_single_mode(values: ParsedValues['values']): boolean {
 	const modes = [values.end, values.json, values.resume].filter(Boolean)
+	const phase_flags = [values.impl, values.setup].filter(Boolean)
 
-	if (modes.length > 1) return false
+	if (modes.length > 1 || phase_flags.length > 1) return false
 
-	return !(values.impl === true && modes.length > 0)
+	return !(phase_flags.length > 0 && modes.length > 0)
 }
 
-// The cut and the resume both take the sole positional issue; the cut also carries whether `--impl`
-// asked for the implementation-phase boundary, which the resume never needs.
+// The cut and the resume both take the sole positional issue; the cut also carries which phase flag —
+// `--impl` or `--setup` — named a boundary other than the pre-gate one, which the resume never needs.
 function issue_request(
 	kind: 'cut' | 'resume',
 	positionals: ReadonlyArray<string>,
-	is_implementation: boolean,
+	phase: { is_implementation: boolean; is_setup: boolean },
 ): Request | undefined {
 	const issue = issue_of(positionals)
 
 	if (issue === undefined) return undefined
 
-	return kind === 'resume' ? { kind: 'resume', issue } : { kind: 'cut', issue, is_implementation }
+	return kind === 'resume' ? { kind: 'resume', issue } : { kind: 'cut', issue, ...phase }
 }
 
 function to_request(parsed: ParsedValues): Request | undefined {
@@ -94,7 +99,10 @@ function to_request(parsed: ParsedValues): Request | undefined {
 
 	const kind = parsed.values.resume === true ? 'resume' : 'cut'
 
-	return issue_request(kind, parsed.positionals, parsed.values.impl === true)
+	return issue_request(kind, parsed.positionals, {
+		is_implementation: parsed.values.impl === true,
+		is_setup: parsed.values.setup === true,
+	})
 }
 
 const run_cut_args = { USAGE, issue_of, read_arguments, to_request }

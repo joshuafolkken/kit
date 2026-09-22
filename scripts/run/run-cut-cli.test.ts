@@ -13,6 +13,8 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
 import { run_cut, type CutState } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
+import { run_event_stream } from './run-event-stream'
+import { run_event_stream_emit } from './run-event-stream-emit'
 
 // joshuafolkken/kit#1839: these drive `josh run:cut` end to end with the git and lane reads spied, so
 // what runs for real is the record logic and the branch each verdict takes — the cut relaunches once,
@@ -37,6 +39,7 @@ const READY: CutState = { branch: BRANCH, is_dirty: true, is_held: true }
 const CONTEXT_OVER: CostVerdict = 'over'
 const CONTEXT_UNDER: CostVerdict = 'under'
 const CONTEXT_UNMEASURABLE: CostVerdict = 'unmeasurable'
+const CUT_KIND = run_event_stream.EVENT_KIND.CUT
 
 function target(): string {
 	return run_cut.cut_path(REPOSITORY)
@@ -65,6 +68,9 @@ const launch = vi.spyOn(detached_launch, 'launch')
 // pins the verdict rather than reading the live session. `over` is the beforeEach default so the cases
 // that predate the condition still cut exactly as they did.
 const session_verdict = vi.spyOn(cost_cli, 'session_verdict')
+// The stream append a cut makes is spied so the suite writes no event to the real repository; what it
+// pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
+const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -95,6 +101,7 @@ beforeEach(() => {
 	log_path.mockReturnValue(DERIVED_LOG)
 	launch.mockReturnValue({ kind: 'launched', pid: LAUNCHED_PID })
 	session_verdict.mockReturnValue(CONTEXT_OVER)
+	emit.mockResolvedValue(undefined)
 })
 
 afterAll(() => {
@@ -403,5 +410,34 @@ describe('inspecting and clearing the record', () => {
 		const code = await run_cut_cli.run(['--resume'])
 
 		expect(code).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#2346: the setup-phase cut. `--setup` cuts at the earliest boundary — the plan is
+// posted, so the setup context is done — and records that phase; its resume continues into
+// implementation, its record is cleared on resume like the implementation cut's, and every cut appends
+// a `cut` event to the run's stream so `run:step` advances past the boundary.
+describe('cutting a lane child at the setup boundary', () => {
+	// The under-threshold verdict proves the setup cut is unconditional, unlike the pre-gate cut: the
+	// setup context is below the threshold by construction, so a cost-gated cut would never fire.
+	it('cuts unconditionally, records the setup phase, and appends the cut event', async () => {
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
+
+		const code = await run_cut_cli.run(['--setup', ISSUE])
+		const read = run_cut.read_cut(target())
+
+		expect(code).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+		expect(read.kind === 'carried' ? read.cut.phase : undefined).toBe(run_cut.SETUP_PHASE)
+		expect(emit).toHaveBeenCalledWith(CUT_KIND, expect.stringContaining(ISSUE))
+	})
+
+	it('resumes into implementation and clears the record', async () => {
+		existing_cut(run_cut.SETUP_PHASE)
+
+		const code = await run_cut_cli.run(['--resume', ISSUE])
+
+		expect([code, verdict()]).toStrictEqual([0, run_cut_cli.RESUME_IMPL_VERDICT])
+		expect(run_cut.read_cut(target()).kind).toBe('none')
 	})
 })

@@ -15,7 +15,11 @@ repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`) → Read Issu
 derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`)
 → post the agreed plan only if the Issue body is blank (`gh api -X PATCH
 repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
-plan-posting step → implement → run the **verification gate** (the full procedure is `chain-rule.md`;
+plan-posting step → **emit the plan event** so `run:step` can cut at the setup→implementation boundary:
+`pnpm josh run:event --append plan "planned #<N>"` (a no-op outside a run; in a dispatched lane child it
+is what makes the setup context droppable — `run:step` then prints `pnpm josh run:cut <N> --setup`, and
+the setup-cut guard refuses the first implementation edit until the cut is taken, `scripts/rules/setup-cut.ts`)
+→ implement → run the **verification gate** (the full procedure is `chain-rule.md`;
 in outline: refactor → `pnpm josh main:merge` → `pnpm josh run:cut <N>` (the pre-gate cut, before the
 gate; a no-op outside a lane) → start `pnpm josh gate` and a subagent `/code-review`
 with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,

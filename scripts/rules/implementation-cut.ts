@@ -135,6 +135,7 @@ const ROW = {
 const implementation_cut = {
 	IMPLEMENTATION_CUT_REASON,
 	ROW,
+	is_edit_tool,
 	is_over_threshold_edit,
 	takes_the_impl_cut,
 	uncut_lane_child_issue,

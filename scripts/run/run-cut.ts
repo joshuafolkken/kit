@@ -43,6 +43,13 @@ const PRE_GATE_PHASE = 'pre-gate'
 // two phases share this whole record and the relaunch — only the resume differs, because an
 // implementation cut resumes into more implementation rather than into the gate.
 const IMPLEMENTATION_PHASE = 'implementation'
+// The earliest boundary a cut can be taken at (joshuafolkken/kit#2346). By the time the plan is
+// posted a lane child has already read the skill, the manual documents, the issue body and its
+// comments — measured at ~130,000 tokens before a single line is implemented — and every later request
+// re-reads all of it. The setup cut drops that setup context before implementation begins; like the
+// implementation cut it resumes back into implementation, so the two share one resume shape
+// (`resumes_into_implementation`).
+const SETUP_PHASE = 'setup'
 // **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
 // child decides whether to take this cut with `pnpm josh cost --cut`
 // — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
@@ -60,8 +67,21 @@ const CUT_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
 // it takes; `rev-parse` takes no lock, so anything past a second is a fault rather than slow work.
 const GIT_READ_TIMEOUT_MS = 5000
 
+// The two lines `GIT_DIRECTORY_ARGUMENTS` prints, in order: the work tree's own git directory, then the
+// common one every lane of a repository shares. `git_directories` reads the same two asynchronously.
+const WORKTREE_DIRECTORY_INDEX = 0
+const COMMON_DIRECTORY_INDEX = 1
+
 const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'
+
+// The mechanical bound on the hand-off record's serialized size (joshuafolkken/kit#2346). The cut is
+// only worth its resume while the record a fresh process reads back stays small — a record that grew
+// to carry the conversation would defeat the whole point, re-establishing at the resume the context the
+// cut dropped. Every field here is a short scalar (an issue number, a branch name, a phase, an ISO
+// timestamp, a flag), so a well-formed record is far under this; the cap exists so a field that ever
+// grew unbounded is refused at the write rather than silently carried. `begin_cut` enforces it.
+const MAX_HANDOFF_BYTES = 1024
 
 interface RunCut {
 	// The identity of the run this cut belongs to — `fullrun #<N>`, built through
@@ -197,7 +217,7 @@ function read_cut(target: string, now: Date = new Date()): CutRead {
 // The alternative errs the other way: a read fault would be taken for "already cut" and the guard
 // would go quiet on exactly the run it exists for. The cost of this direction is one refusal a lane
 // can answer by reissuing, since that row is delivered once per run.
-function worktree_git_directory_sync(): string | undefined {
+function git_directories_sync(): ReadonlyArray<string> {
 	try {
 		// The binary is resolved through `git_utilities` exactly as `git-spawn.ts` resolves it, so this
 		// call does not answer to whatever `PATH` happens to hold. It runs the binary directly with an
@@ -214,10 +234,24 @@ function worktree_git_directory_sync(): string | undefined {
 			{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: GIT_READ_TIMEOUT_MS },
 		) // NOSONAR
 
-		return output.split('\n').find((line) => line !== '')
+		return output.split('\n').filter((line) => line !== '')
 	} catch {
-		return undefined
+		return []
 	}
+}
+
+// The work tree's own git directory (index 0), the same read `git_directories` makes asynchronously —
+// the record and the pre-gate guard both key on it.
+function worktree_git_directory_sync(): string | undefined {
+	return git_directories_sync()[WORKTREE_DIRECTORY_INDEX]
+}
+
+// The common git directory (index 1) — `.git` in the main work tree and the same `.git` from inside a
+// lane, which the run's event stream keys on (joshuafolkken/kit#2346). The setup-cut guard reads the
+// stream synchronously to learn whether the plan has been posted, so it needs this key without the
+// asynchronous `git_directories` a `PreToolUse` hook cannot await.
+function common_git_directory_sync(): string | undefined {
+	return git_directories_sync()[COMMON_DIRECTORY_INDEX]
 }
 
 // **The directory is injectable so a test never has to write to the live record.** Keyed to the work
@@ -246,11 +280,28 @@ function fresh_cut(spec: CutSpec, now: Date): RunCut {
 	}
 }
 
+// **The setup and implementation cuts resume back into implementation; the pre-gate cut resumes into
+// the gate** (joshuafolkken/kit#2346). The two phases that resume into implementation share one resume
+// shape — the `resume-impl` verdict and the record cleared on adoption — so the grouping is named once
+// here rather than spelled as `phase === SETUP || phase === IMPLEMENTATION` at each call site.
+function resumes_into_implementation(phase: string): boolean {
+	return phase === SETUP_PHASE || phase === IMPLEMENTATION_PHASE
+}
+
+// Whether a record serializes within the hand-off bound. The record a fresh process reads back must
+// stay small, or the resume re-establishes the very context the cut dropped (joshuafolkken/kit#2346).
+function within_handoff_bound(cut: RunCut): boolean {
+	return Buffer.byteLength(JSON.stringify(cut), 'utf8') <= MAX_HANDOFF_BYTES
+}
+
 // **Create-exclusively, exactly as `run-hold.ts` claims a tree.** A record already here means a cut is
 // already in flight for this tree, so `undefined` is "do not launch a second one" rather than an
-// error — the exclusive create is what makes a double cut, and so a double relaunch, impossible.
+// error — the exclusive create is what makes a double cut, and so a double relaunch, impossible. A
+// record that would not fit the hand-off bound is refused the same way rather than written and carried.
 function begin_cut(target: string, spec: CutSpec, now: Date = new Date()): RunCut | undefined {
 	const cut = fresh_cut(spec, now)
+
+	if (!within_handoff_bound(cut)) return undefined
 
 	return stamp_file.create_stamp(target, cut) ? cut : undefined
 }
@@ -364,13 +415,16 @@ const run_cut = {
 	END_COMMAND,
 	IMPLEMENTATION_CONTEXT_THRESHOLD,
 	IMPLEMENTATION_PHASE,
+	MAX_HANDOFF_BYTES,
 	PRE_GATE_PHASE,
+	SETUP_PHASE,
 	adopt_cut,
 	begin_cut,
 	busy_message,
 	carried_cut_sync,
 	classify,
 	classify_resume,
+	common_git_directory_sync,
 	current_state,
 	cut_path,
 	describe_cut,
@@ -380,9 +434,11 @@ const run_cut = {
 	invocation_for,
 	is_expired,
 	read_cut,
+	resumes_into_implementation,
 	stale_message,
 	unknown_message,
 	unreadable_message,
+	within_handoff_bound,
 	worktree_directory,
 	worktree_git_directory_sync,
 }

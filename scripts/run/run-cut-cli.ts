@@ -13,6 +13,8 @@ import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { detached_launch } from './detached-launch'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
+import { run_event_stream } from './run-event-stream'
+import { run_event_stream_emit } from './run-event-stream-emit'
 
 // `josh run:cut` — the record that lets a lane child end its process before the gate and a fresh one
 // resume from it (joshuafolkken/kit#1839). `run:cut <N>` writes the record and relaunches a fresh
@@ -216,9 +218,23 @@ interface CutRequest {
 	phase: string
 }
 
-function finish_cut(target: string, lane: LaneInfo, request: CutRequest): number {
+// **Every cut appends a `cut` event to the run's stream** (joshuafolkken/kit#2346). It is what advances
+// `run:step` past the phase boundary — a setup cut emitted here is why the run's next position reads as
+// `run:cut --resume` rather than the setup cut again, and why the setup-cut guard, which reads the
+// stream's newest event, falls silent once the plan-then-cut boundary has been crossed. Best-effort by
+// the stream's contract, so a failed append never fails the cut it reports.
+async function emit_cut_event(request: CutRequest): Promise<void> {
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.CUT,
+		`#${request.issue} cut (${request.phase})`,
+	)
+}
+
+async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): Promise<number> {
 	const started = run_cut.begin_cut(target, request)
 	if (started === undefined) return report_cut_exists(target)
+
+	await emit_cut_event(request)
 
 	return is_openai_lane(lane) ? report(CUT_VERDICT, SUCCESS_EXIT_CODE) : relaunch(target, lane)
 }
@@ -236,29 +252,29 @@ async function cut(target: string, issue: string, phase: string): Promise<number
 	clear_expired(target)
 	if (!has_matching_supervisor(lane, issue)) return report_missing_supervisor(issue)
 
-	return finish_cut(target, lane, { issue, branch: state.branch, phase })
+	return await finish_cut(target, lane, { issue, branch: state.branch, phase })
 }
 
 // **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two
 // racing resumes only one wins the create and the loser is answered `busy`.
-// An implementation-phase cut resumes back into implementation; a pre-gate one into the gate. The
+// A setup or implementation cut resumes back into implementation; a pre-gate one into the gate. The
 // resuming child is told which by the verdict rather than reconstructing it from the record
-// (joshuafolkken/kit#1933).
+// (joshuafolkken/kit#1933, joshuafolkken/kit#2346).
 function resume_verdict_for(cut_record: RunCut): string {
-	return cut_record.phase === run_cut.IMPLEMENTATION_PHASE ? RESUME_IMPL_VERDICT : RESUME_VERDICT
+	return run_cut.resumes_into_implementation(cut_record.phase)
+		? RESUME_IMPL_VERDICT
+		: RESUME_VERDICT
 }
 
-// **An implementation-phase resume removes the record; a pre-gate one marks it handed off**
-// (joshuafolkken/kit#2310). The two cuts have different multiplicities sharing one record: the pre-gate
-// cut fires once per lane, so its record must survive to answer a second resume `handed-off`
-// (joshuafolkken/kit#1935); the implementation cut may fire again whenever a long implementation
-// re-crosses the threshold, so its record is cleared on resume — both `pre-gate-cut.ts` and
-// `implementation-cut.ts` read `carried_cut_sync`, and a lingering record would keep them silent for the
-// rest of the run, re-creating the "fired 0 times" state this issue removed. A double cut stays
-// impossible either way: `begin_cut`'s exclusive create is what prevents it, not the record the guard
-// once leaned on.
+// **A setup or implementation resume removes the record; a pre-gate one marks it handed off**
+// (joshuafolkken/kit#2310, joshuafolkken/kit#2346). The cuts have different multiplicities sharing one
+// record: the pre-gate cut fires once per lane, so its record must survive to answer a second resume
+// `handed-off` (joshuafolkken/kit#1935); the setup and implementation cuts are guarded by the run's
+// event stream rather than the cut record, so their records are cleared on resume — a lingering record
+// would keep the pre-gate guard, which reads `carried_cut_sync`, silent for the rest of the run. A double
+// cut stays impossible either way: `begin_cut`'s exclusive create is what prevents it.
 function take_over(target: string, cut_record: RunCut): RunCut | undefined {
-	if (cut_record.phase !== run_cut.IMPLEMENTATION_PHASE) {
+	if (!run_cut.resumes_into_implementation(cut_record.phase)) {
 		return run_cut.adopt_cut(target, cut_record)
 	}
 
@@ -322,14 +338,19 @@ function end(target: string): number {
 	return report(ENDED_VERDICT, SUCCESS_EXIT_CODE)
 }
 
-// A bare cut is the pre-gate boundary; `--impl` is the implementation-phase one (joshuafolkken/kit#1933).
-function cut_phase(is_implementation: boolean): string {
-	return is_implementation ? run_cut.IMPLEMENTATION_PHASE : run_cut.PRE_GATE_PHASE
+// A bare cut is the pre-gate boundary; `--setup` is the setup-phase one and `--impl` the
+// implementation-phase one (joshuafolkken/kit#1933, joshuafolkken/kit#2346). The two flags are mutually
+// exclusive by `run-cut-args.ts`, so the order here only picks which named boundary was asked for.
+function cut_phase(request: { is_setup: boolean; is_implementation: boolean }): string {
+	if (request.is_setup) return run_cut.SETUP_PHASE
+	if (request.is_implementation) return run_cut.IMPLEMENTATION_PHASE
+
+	return run_cut.PRE_GATE_PHASE
 }
 
 async function act(target: string, request: Request): Promise<number> {
 	if (request.kind === 'cut') {
-		return await cut(target, request.issue, cut_phase(request.is_implementation))
+		return await cut(target, request.issue, cut_phase(request))
 	}
 
 	if (request.kind === 'resume') return await resume(target, request.issue)
