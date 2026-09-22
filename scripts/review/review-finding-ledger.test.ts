@@ -76,3 +76,27 @@ describe('review_finding_ledger — aggregation', () => {
 		expect(review_finding_ledger.zero_round_count('')).toBe(0)
 	})
 })
+
+describe('review_finding_ledger — has_issue_record', () => {
+	const content = [
+		review_finding_ledger.finding_line(
+			{ category: 'bug-risks', severity: 'medium', file: 'a.ts' },
+			DATE,
+			1,
+		),
+		review_finding_ledger.zero_round_line(DATE, 3),
+	].join('\n')
+
+	it('finds a real finding line for the issue', () => {
+		expect(review_finding_ledger.has_issue_record(content, 1)).toBe(true)
+	})
+
+	it('counts a zero-finding `none` line as a record', () => {
+		expect(review_finding_ledger.has_issue_record(content, 3)).toBe(true)
+	})
+
+	it('reports no record for an issue with no line, and ignores observation lines', () => {
+		expect(review_finding_ledger.has_issue_record(content, 2)).toBe(false)
+		expect(review_finding_ledger.has_issue_record('- k:x | d1 | obs | w | h', 1)).toBe(false)
+	})
+})

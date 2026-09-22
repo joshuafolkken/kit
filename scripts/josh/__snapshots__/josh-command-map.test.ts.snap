@@ -783,7 +783,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:record": [
-      "--issue <N> [<category>:<severity>:<file> ...]",
+      "--issue <N> [<category>:<severity>:<file> ...] | --check --issue <N>",
       "automation",
       [
         "files",

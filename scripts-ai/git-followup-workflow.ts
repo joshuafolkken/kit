@@ -6,6 +6,7 @@ import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 import { cli_body } from '../scripts/josh/cli-body'
 import { review_attest } from '../scripts/review/review-attest'
+import { review_record } from '../scripts/review/review-record'
 import { load_optional_environment } from './environment-loader'
 import { parse_issue_number_from_text } from './followup-issue-number'
 import { git_followup_finish } from './git-followup-finish'
@@ -130,14 +131,50 @@ function is_merge_resolved(values: CliArguments['values']): boolean {
 // The direction is deliberate: a wrongly-refused merge costs one re-run of the review, and a wrongly
 // allowed one ships a diff nobody read. Thrown rather than reported, so no `completion` Telegram is
 // sent and nothing merges — `git_pr_followup.run` is never reached.
+// `ok` means the guard was satisfied and `not-required` means it never applied to this checkout —
+// both let the merge proceed, so the two gates below read the verdict through one predicate rather
+// than repeating the pair of statuses.
+function is_merge_permitted(status: string): boolean {
+	return status === 'ok' || status === 'not-required'
+}
+
+const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
+
+function is_valid_issue(issue_number: string | undefined): boolean {
+	return issue_number !== undefined && ISSUE_NUMBER_PATTERN.test(issue_number)
+}
+
 async function assert_review_attested(should_merge: boolean): Promise<void> {
 	if (!should_merge) return
 
 	const verdict = await review_attest.check_here()
 
-	if (verdict.status === 'ok' || verdict.status === 'not-required') return
+	if (is_merge_permitted(verdict.status)) return
 
 	throw new Error(review_attest.refusal_message(verdict))
+}
+
+// joshuafolkken/kit#2343: recording a review round was prose, and prose failed — eleven merges after
+// the instruction landed, `review:record` had never run once, so the recurrence ledger stayed blind.
+// **This is the seam where that stops being a request and becomes a gate**: a merge is refused unless
+// the round left a `- rf:` line for its issue, a zero-finding `none` line included.
+//
+// **Absence is a refusal, `missing` exactly as `assert_review_attested`'s is** — the defect this
+// exists for produced *no* line, so silence must not read as success. A checkout that keeps no ledger
+// answers `not-required` and merges as before, and a run whose issue the followup cannot identify has
+// no key to check, so it carries on rather than blocking on missing information.
+async function assert_review_recorded(
+	should_merge: boolean,
+	issue_number: string | undefined,
+): Promise<void> {
+	if (!should_merge || !is_valid_issue(issue_number)) return
+
+	const issue = Number(issue_number)
+	const verdict = await review_record.check(issue)
+
+	if (is_merge_permitted(verdict.status)) return
+
+	throw new Error(review_record.refusal_message(issue))
 }
 
 async function main(): Promise<void> {
@@ -154,6 +191,7 @@ async function main(): Promise<void> {
 	const should_merge = is_merge_resolved(cli.values)
 
 	await assert_review_attested(should_merge)
+	await assert_review_recorded(should_merge, issue_number)
 	// **The number the run reports on is the one it used**, which is the number the pull request
 	// closes where the invocation named none (joshuafolkken/kit#1539). Recovered inside `run`, so the
 	// tail records a run the command line could not identify rather than silently skipping it.
@@ -179,6 +217,7 @@ try {
 
 const git_followup_workflow = {
 	assert_review_attested,
+	assert_review_recorded,
 	parse_issue_number_from_text,
 	resolve_branch_name,
 	is_merge_resolved,

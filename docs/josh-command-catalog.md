@@ -379,9 +379,9 @@ Count review findings by category from the observation ledger
 
 > **Audience:** automation · **Side effects:** files
 
-`--issue <N> [<category>:<severity>:<file> ...]`
+`--issue <N> [<category>:<severity>:<file> ...] | --check --issue <N>`
 
-Record a review round’s findings in the observation ledger
+Record a review round’s findings, or check a round was recorded
 
 ## Versioning
 
