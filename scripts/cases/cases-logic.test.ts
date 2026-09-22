@@ -110,6 +110,10 @@ describe('cases.cases_for', () => {
 		expect(cases.cases_for(['time'])).toContain('重複発火')
 	})
 
+	it('owes connection-drop at the network boundary — the transport failure of #2317 (#2355)', () => {
+		expect(cases.cases_for(['network'])).toContain('接続断')
+	})
+
 	it('returns nothing for no boundaries', () => {
 		expect(cases.cases_for([])).toEqual([])
 	})
