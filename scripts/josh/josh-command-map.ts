@@ -132,6 +132,8 @@ const ALIASES: Record<string, string> = {
 	red: 'run:ending',
 	rg: 'run:progress',
 	rp: 'run:prep',
+	ren: 'run:entry',
+	rtl: 'run:tail',
 	rst: 'run:status',
 	rn: 'run:next',
 	rsp: 'run:step',

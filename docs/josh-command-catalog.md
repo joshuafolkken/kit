@@ -1145,6 +1145,16 @@ Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable)
 
 ---
 
+### `josh run:entry` · `josh ren`
+
+> **Audience:** automation · **Side effects:** git, network, files
+
+`<issue>`
+
+Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step
+
+---
+
 ### `josh run:event` · `josh rev`
 
 > **Audience:** automation · **Side effects:** files
@@ -1272,6 +1282,16 @@ Print the run’s next single action, computed from the event stream, carry reco
 _No arguments._
 
 Report whether the run is stranded — budget handed off, owner gone, and no supervisor watching
+
+---
+
+### `josh run:tail` · `josh rtl`
+
+> **Audience:** automation · **Side effects:** git, network
+
+`[<issue> ...]`
+
+Close a run in one call: commit the observation ledger, read the citations, decide the release scope
 
 ---
 

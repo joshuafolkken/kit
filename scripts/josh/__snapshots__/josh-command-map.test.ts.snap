@@ -89,6 +89,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rct": "run:cut",
     "re": "release",
     "red": "run:ending",
+    "ren": "run:entry",
     "rer": "reserved-run",
     "res": "release:scope",
     "rev": "run:event",
@@ -109,6 +110,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rsp": "run:step",
     "rst": "run:status",
     "rt": "reconcile-templates",
+    "rtl": "run:tail",
     "rtr": "retrospective",
     "rug": "rule:guard",
     "ruv": "rule:value",
@@ -872,6 +874,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "run:entry": [
+      "<issue>",
+      "automation",
+      [
+        "git",
+        "network",
+        "files",
+      ],
+    ],
     "run:event": [
       "--append <kind> <text> | --from|--follow <n> | --last",
       "automation",
@@ -966,6 +977,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "processes",
         "notifications",
+      ],
+    ],
+    "run:tail": [
+      "[<issue> ...]",
+      "automation",
+      [
+        "git",
+        "network",
       ],
     ],
     "run:wake": [

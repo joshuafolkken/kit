@@ -183,6 +183,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['network']],
 	},
+	// The entry sequence a lane opened on, folded into one call (joshuafolkken/kit#2372): claim the tree,
+	// read the budget, gather the issue reads and decide the pre-implementation step. `run:hold`,
+	// `cost --cut`, `run:prep` and `run:step` were four round trips re-billing a lane's full context each.
+	'run:entry': {
+		script: 'scripts/run/run-entry-cli.ts',
+		description:
+			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',
+		category: 'AI tools',
+		reference: ['<issue>', 'automation', ['git', 'network', 'files']],
+	},
 	'run:status': {
 		script: 'scripts/run/run-status-cli.ts',
 		description: 'Bundle a run’s read-only status: issue state, cost verdict, carry counters',
@@ -222,6 +232,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
 		category: 'AI tools',
 		reference: ['[--join]', 'automation', ['processes', 'files']],
+	},
+	// The post-merge sequence a run closed on, folded into one call (joshuafolkken/kit#2372): commit the
+	// observation ledger, read the completion citations and decide the release scope. `observations:flush`,
+	// `issue:cite` and `release:scope` were three round trips re-billing the run's full context each.
+	'run:tail': {
+		script: 'scripts/run/run-tail-cli.ts',
+		description:
+			'Close a run in one call: commit the observation ledger, read the citations, decide the release scope',
+		category: 'AI tools',
+		reference: ['[<issue> ...]', 'automation', ['git', 'network']],
 	},
 	'run:event': {
 		script: 'scripts/run/run-event-cli.ts',
