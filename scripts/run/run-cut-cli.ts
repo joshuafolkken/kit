@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { agent_argv } from '#scripts/agent/agent-argv'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { git_command } from '#scripts/git/git-command'
@@ -178,17 +177,18 @@ function report_missing_supervisor(issue: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
-function relaunch(target: string, lane: LaneInfo): number {
+// **The relaunched child is started at the effort of the phase it is resuming into**
+// (joshuafolkken/kit#2382). A pre-gate resume drives the gate, commit, PR and merge — the mechanical
+// ship/bookkeeping region, lowered — while a setup or implementation resume keeps the role default. The
+// phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it.
+function relaunch(target: string, lane: LaneInfo, phase: string): number {
 	const notes: Array<string> = []
 	// The relaunched child is given a resume-specific prompt, not the record's bare `fullrun #<N>`
 	// (joshuafolkken/kit#2022), so it goes straight to `run:cut --resume` without reading the
 	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
 	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
 	const invocation = lane_child_invocation.resume_invocation(lane.issue)
-	const built =
-		lane.profile === undefined
-			? agent_argv.resolve_in(invocation, agent_role_profile.WORKER, lane.directory)
-			: agent_argv.with_profile_in(invocation, lane.profile, lane.directory)
+	const built = agent_argv.resume_argv(invocation, lane.profile, phase, lane.directory)
 
 	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
 
@@ -274,7 +274,9 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 
 	await emit_cut_event(request)
 
-	return is_openai_lane(lane) ? report(CUT_VERDICT, SUCCESS_EXIT_CODE) : relaunch(target, lane)
+	return is_openai_lane(lane)
+		? report(CUT_VERDICT, SUCCESS_EXIT_CODE)
+		: relaunch(target, lane, request.phase)
 }
 
 async function cut(

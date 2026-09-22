@@ -10,8 +10,11 @@ import { delegation_policy } from './delegation-policy'
 import {
 	deny_envelope,
 	DISABLED_VALUES,
+	investigation_notice_path,
+	investigation_outcome,
 	investigation_refusal,
 	is_enabled,
+	NOTICE,
 	refusal_path,
 	SWITCH_ENV_KEY,
 } from './investigation-guard'
@@ -129,7 +132,10 @@ beforeEach(() => {
 afterAll(() => {
 	process.chdir(ENTRY_DIRECTORY)
 
-	for (const transcript of WRITTEN_TRANSCRIPTS) rmSync(refusal_path(transcript), { force: true })
+	for (const transcript of WRITTEN_TRANSCRIPTS) {
+		rmSync(refusal_path(transcript), { force: true })
+		rmSync(investigation_notice_path(transcript), { force: true })
+	}
 
 	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
@@ -278,11 +284,12 @@ describe('investigation_refusal — a file the run has edited is not re-counted'
 	})
 })
 
-describe('investigation_refusal — a dispatched lane child is exempt', () => {
-	// joshuafolkken/kit#2138: a dispatched lane child is itself the delegated unit this guard's refusal
-	// asks for, and a refusal ends its headless turn rather than guiding it — so the guard stands down,
-	// decided from the one-place enumeration. The mark and the checkout are set up here exactly as
-	// `lane-park.test.ts` sets up its own lane case.
+describe('investigation — a dispatched lane child gets a notice, not a refusal', () => {
+	// joshuafolkken/kit#2382: the guard was `off` in a lane child from kit#2138, on the reason that a
+	// child cannot dispatch a sub-unit to read its own edit targets. #2382 measured six lane children
+	// reading 4–17 unedited files each, so the reading was there to send out — the guard now delivers the
+	// same guidance as a notice, which a headless child survives (a refusal would end its turn). The mark
+	// and the checkout are set up here exactly as `lane-park.test.ts` sets up its own lane case.
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
@@ -293,12 +300,31 @@ describe('investigation_refusal — a dispatched lane child is exempt', () => {
 		process.chdir(ENTRY_DIRECTORY)
 	})
 
-	// The enumeration says so, and the guard obeys it — asserted together so the two cannot drift apart.
-	it('refuses nothing at the threshold while marked as a lane child', () => {
+	// **The acceptance condition: a notice is raised and no refusal is** — asserted together with the
+	// enumeration so the guard and the policy cannot drift apart. A `permissionDecision` would end the
+	// headless child's turn (kit#2138), so `investigation_refusal` must stay `undefined` here.
+	it('raises a notice with no refusal at the threshold while marked as a lane child', () => {
 		const transcript = write_transcript('lane-child', at_threshold_lines())
+		const outcome = investigation_outcome(payload_of(transcript), NOW_MS)
 
-		expect(lane_guard_policy.mode_in_lane_child('investigation')).toBe('off')
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+		expect(lane_guard_policy.mode_in_lane_child('investigation')).toBe('notice')
+		// `reason` undefined is the refusal being withheld — a `permissionDecision` would end the child's
+		// headless turn (kit#2138) — while `notice` carries the guidance instead.
+		expect(outcome.reason).toBeUndefined()
+		expect(outcome.notice).toBeDefined()
+	})
+
+	// **The notice names the concrete unedited files** (kit#2276, kit#2382), so the child is shown which
+	// reads to send out rather than only told to delegate — the form kit#2164 → #2178 measured not to move
+	// the number.
+	it('names the unedited files this run read in the notice', () => {
+		const transcript = write_transcript('lane-child-names', at_threshold_lines())
+		const outcome = investigation_outcome(payload_of(transcript), NOW_MS)
+
+		expect(outcome.notice).toContain('scripts/read-0.ts')
+		expect(outcome.notice).toContain('scripts/read-1.ts')
+		// The wording is the base notice with the reads appended, so it opens with the base text.
+		expect(outcome.notice).toContain(NOTICE)
 	})
 
 	// A person working in a lane carries no mark, so the guard refuses exactly as it always did — the

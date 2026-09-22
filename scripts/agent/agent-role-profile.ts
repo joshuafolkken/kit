@@ -10,6 +10,11 @@ const MAX_VALUE_LENGTH = 4096
 const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
 const PROVIDER_SCHEMA = z.enum(['anthropic', 'openai'])
 const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
+// The run phases effort may vary by (joshuafolkken/kit#2382). They are the cut boundaries a lane child
+// resumes across — `run-cut.ts` imports these names for its own cut record, so the phase a run passes
+// and the phase this table is keyed on cannot drift. A phase-less call resolves the role default, which
+// is what keeps every existing caller unchanged.
+const PHASE_SCHEMA = z.enum(['setup', 'implementation', 'pre-gate'])
 const PROFILE_SCHEMA = z.object({
 	provider: PROVIDER_SCHEMA.default('anthropic'),
 	role: ROLE_SCHEMA,
@@ -20,6 +25,7 @@ const PROFILE_SCHEMA = z.object({
 type AgentRole = z.infer<typeof ROLE_SCHEMA>
 type AgentProvider = z.infer<typeof PROVIDER_SCHEMA>
 type AgentEffort = z.infer<typeof EFFORT_SCHEMA>
+type AgentPhase = z.infer<typeof PHASE_SCHEMA>
 type AgentProfile = z.infer<typeof PROFILE_SCHEMA>
 type AgentEnvironment = Readonly<Record<string, string | undefined>>
 type ProfileResult = { kind: 'profile'; profile: AgentProfile } | { kind: 'rejected'; note: string }
@@ -30,6 +36,9 @@ type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider }
 const SCHEDULER: AgentRole = 'scheduler'
 const WORKER: AgentRole = 'worker'
 const REVIEWER: AgentRole = 'reviewer'
+const SETUP_PHASE: AgentPhase = 'setup'
+const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
+const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
 const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
 const OPENAI_PROVIDER: AgentProvider = 'openai'
 const OPENAI_MODEL = 'gpt-5.6-sol'
@@ -48,6 +57,19 @@ const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
 }
 
 const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES }
+
+// **Effort as a function of the run phase, not the role alone** (joshuafolkken/kit#2382). For the first
+// merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
+// commit, PR and merge, applying fixes the gate has already named — work SKILL.md §2b calls the opposite
+// of judgement. The design-judgment implementation phases keep the role default, as does any role/phase
+// with no entry, and the review's own judgement is the reviewer role's (`high`), untouched by lowering
+// the worker here. The investigation phase — highest output density — is left for a later merge, once
+// the delegation half of this Issue has moved its reading out.
+const SHIP_EFFORT: AgentEffort = 'low'
+type PhaseEffortTable = Partial<Record<AgentRole, Partial<Record<AgentPhase, AgentEffort>>>>
+const PHASE_EFFORT: Readonly<PhaseEffortTable> = {
+	worker: { [PRE_GATE_PHASE]: SHIP_EFFORT },
+}
 
 const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> = {
 	scheduler: { model: 'JOSH_SCHEDULER_MODEL', effort: 'JOSH_SCHEDULER_EFFORT' },
@@ -151,13 +173,54 @@ function validate(profile: AgentProfile, model_key: string): ProfileResult {
 	return { kind: 'profile', profile }
 }
 
-function resolve(role: AgentRole, environment: AgentEnvironment = process.env): ProfileResult {
+// The effort a phase resolves to before any env override: the phase's own value where the table names
+// one, otherwise the fallback (joshuafolkken/kit#2382). A phase-less or unrecognized call returns the
+// fallback unchanged, which is what keeps every existing caller reading the current default.
+function phase_effort(
+	role: AgentRole,
+	phase: string | undefined,
+	fallback: AgentEffort,
+): AgentEffort {
+	const parsed = PHASE_SCHEMA.safeParse(phase)
+	if (!parsed.success) return fallback
+
+	return PHASE_EFFORT[role]?.[parsed.data] ?? fallback
+}
+
+// The effort a stored profile takes in a phase: an env override wins, then the phase value, then the
+// profile's own effort (joshuafolkken/kit#2382). A cut relaunch that keeps a lane's stored model resolves
+// the effort through this so a person's `JOSH_WORKER_EFFORT` is never overwritten by the phase value.
+function overridden_effort(
+	profile: AgentProfile,
+	phase: string,
+	environment: AgentEnvironment,
+): AgentEffort {
+	const parsed = EFFORT_SCHEMA.safeParse(override_value(profile.role, 'effort', environment).value)
+
+	return parsed.success ? parsed.data : phase_effort(profile.role, phase, profile.effort)
+}
+
+// A stored profile with its effort resolved for the phase the run is entering, its model and provider
+// left as they were (joshuafolkken/kit#2382).
+function with_phase_effort(
+	profile: AgentProfile,
+	phase: string,
+	environment: AgentEnvironment = process.env,
+): AgentProfile {
+	return { ...profile, effort: overridden_effort(profile, phase, environment) }
+}
+
+function resolve(
+	role: AgentRole,
+	environment: AgentEnvironment = process.env,
+	phase?: string,
+): ProfileResult {
 	const selected = resolve_provider(environment)
 	if (selected.kind === 'rejected') return selected
 	const defaults = PROVIDER_PROFILES[selected.provider][role]
 	const model = model_override(role, environment, selected.provider)
 	const effort = override_value(role, 'effort', environment)
-	const resolved = resolved_effort(effort, defaults.effort)
+	const resolved = resolved_effort(effort, phase_effort(role, phase, defaults.effort))
 
 	if (resolved.kind === 'rejected') return resolved
 
@@ -185,20 +248,35 @@ const agent_role_profile = {
 	DEFAULT_PROFILES,
 	EFFORT_SCHEMA,
 	ENV_KEYS,
+	IMPLEMENTATION_PHASE,
 	LEGACY_WORKER_KEYS,
 	MAX_VALUE_LENGTH,
 	OPENAI_PROFILES,
+	PHASE_EFFORT,
+	PHASE_SCHEMA,
+	PRE_GATE_PHASE,
 	PROVIDER_SCHEMA,
 	PROFILE_SCHEMA,
 	REVIEWER,
 	SCHEDULER,
+	SETUP_PHASE,
 	WORKER,
 	describe,
 	is_safe_value,
 	parse,
+	phase_effort,
 	resolve,
 	resolve_provider,
+	with_phase_effort,
 }
 
-export type { AgentEffort, AgentEnvironment, AgentProfile, AgentProvider, AgentRole, ProfileResult }
+export type {
+	AgentEffort,
+	AgentEnvironment,
+	AgentPhase,
+	AgentProfile,
+	AgentProvider,
+	AgentRole,
+	ProfileResult,
+}
 export { agent_role_profile }
