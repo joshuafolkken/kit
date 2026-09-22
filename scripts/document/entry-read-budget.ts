@@ -63,6 +63,11 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// every entry stayed within its block rather than climbing back to a pre-#2294 ceiling the downward
 	// ratchet holds shut. joshuafolkken/kit#2342 added the `--summary` close to `retrospective.md` in a
 	// single sentence, kept short so every entry that reads it stays within its block.
+	// joshuafolkken/kit#2345 added the `implementation-unit` delegation row (full fan-out procedure in
+	// `docs/josh-commands.md` → "`josh fanout`"); `SKILL.md` §2b gained only a one-clause mention and a
+	// pointer, folded into the existing enumeration and offset by tightening §2b prose, so every entry
+	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
+	// multiple, which the downward ratchet holds shut).
 	{ entry: 'kickoff', bytes: 266_240 },
 	{ entry: 'fullrun', bytes: 266_240 },
 	{ entry: 'halfrun', bytes: 266_240 },

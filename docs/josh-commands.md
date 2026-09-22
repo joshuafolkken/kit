@@ -1305,13 +1305,14 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **The list is the whole of the rule: anything not on the list is `keep`.** A step earns its place by naming how a wrong result is caught — by something in the parent tier that costs less than redoing the step.
 
-| Step              | Delegatable because                                                                                                        |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `gate-fix`        | `pnpm josh gate` re-runs; a wrong fix fails it again, naming the file                                                      |
-| `epic-child`      | the parent reads the child's state from GitHub, so a child reported done but not merged shows as still open                |
-| `followup-filing` | the parent reads the filed Issue with `pnpm josh issue:state <new>`, so one reported filed but not created shows as absent |
-| `survey`          | the reported locations are checked directly; a fabricated or missed one fails one `grep`                                   |
-| `investigation`   | the parent opens the cited lines; an unsupported conclusion fails there, far cheaper than redoing the reading              |
+| Step                  | Delegatable because                                                                                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gate-fix`            | `pnpm josh gate` re-runs; a wrong fix fails it again, naming the file                                                                                                        |
+| `epic-child`          | the parent reads the child's state from GitHub, so a child reported done but not merged shows as still open                                                                  |
+| `followup-filing`     | the parent reads the filed Issue with `pnpm josh issue:state <new>`, so one reported filed but not created shows as absent                                                   |
+| `survey`              | the reported locations are checked directly; a fabricated or missed one fails one `grep`                                                                                     |
+| `investigation`       | the parent opens the cited lines; an unsupported conclusion fails there, far cheaper than redoing the reading                                                                |
+| `implementation-unit` | the parent runs the whole change through `pnpm josh gate` and a `/code-review` it would run anyway, so a unit's mistake fails the same backstop a serial edit passes through |
 
 **These were considered and kept**; `pnpm josh delegate <step>` answers `kept deliberately` for them, distinguishing them from a step that is merely unlisted:
 
@@ -1327,7 +1328,26 @@ pnpm josh delegate --list     # the enumeration, and what was rejected and why
 
 **`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count. **A delegation resets the counter rather than spending it** — the counting moved into `josh investigation:guard`.
 
-**The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
+**The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`. **`followup-filing` is a third such unit**: the parent composed the finding text either way, so the unit's work is mechanical. **`implementation-unit` is a fourth**: the writing of one Step 0 unit goes to a subagent while the design that decided _what_ to write stays in the main line, and only file-disjoint units split — `josh fanout` confirms that mechanically, so two subagents never race on one file. Rule: `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
+
+### `josh fanout`
+
+Say whether proposed implementation units are file-disjoint, so they may be dispatched in one fan-out turn. Each argument is one unit's comma-separated file list; the verdict is on stdout, the reason on stderr — the same shape as `josh delegate`.
+
+```bash
+pnpm josh fanout scripts/a.ts,scripts/a.test.ts scripts/b.ts   # → parallel
+pnpm josh fanout scripts/a.ts,shared.ts scripts/b.ts,shared.ts # → serial (units share shared.ts)
+pnpm josh fanout scripts/a.ts                                   # → serial (fewer than two units)
+```
+
+**File-disjointness is the necessary condition, and it is mechanical.** Two subagents editing one file in parallel race on it — the later write lands on the earlier, or the gate has to reconcile a collision the parallelism was meant to save. So the split is refused the moment any file appears in more than one unit, and the naming of what collides is on stderr. **The default is serial**: fewer than two units is nothing to run in parallel, and an Issue whose units share files stays serial exactly as one that will not split does.
+
+**This is the precondition the `implementation-unit` delegation row reads, and the procedure around it is one fan-out turn:**
+
+1. From the Step 0 change list, group the `<what changes> — Test: … — <file path>` rows into candidate units, each a set of files no other unit touches.
+2. Ask `pnpm josh fanout` with each unit's file list. On `serial`, write the change in the main line as usual. On `parallel`, continue.
+3. **Launch every unit's subagent in a single turn** — the turn-batching principle (§2h of the workflow-commands skill) reaching the `Agent` launches, not one subagent after another — each briefed with its own files and its slice of the Step 0 table.
+4. The main line keeps the design that decided _what_ to write, integrates the returned edits, and runs the one `pnpm josh gate` and `/code-review` over the whole. That gate and review — which the parent runs anyway — is the row's verifier: a unit's mistake fails the same backstop a serial edit passes through, and the disjointness `josh fanout` confirmed keeps two units from colliding on a file. The design stays in the main line, which is why `design` is rejected while the writing is delegated.
 
 ### `josh split:assess`
 

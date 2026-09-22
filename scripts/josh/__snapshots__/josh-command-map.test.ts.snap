@@ -34,6 +34,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ev": "eval",
     "f": "format",
     "fd": "format:edited",
+    "fo": "fanout",
     "fu": "followup",
     "g": "git",
     "ga": "gate",
@@ -344,6 +345,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "processes",
         "network",
+      ],
+    ],
+    "fanout": [
+      "<unit-files> <unit-files> [<unit-files> …]",
+      "automation",
+      [
+        "none",
       ],
     ],
     "followup": [
