@@ -106,6 +106,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rrp": "run:report",
     "rrv": "run:review",
     "rs": "read:set",
+    "rsd": "run:stranded",
     "rsp": "run:step",
     "rst": "run:status",
     "rt": "reconcile-templates",
@@ -968,6 +969,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "network",
         "files",
+      ],
+    ],
+    "run:stranded": [
+      "",
+      "automation",
+      [
+        "processes",
+        "notifications",
       ],
     ],
     "run:tail": [

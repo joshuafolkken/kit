@@ -1730,6 +1730,16 @@ pnpm josh run:watcher:guard
 
 **Output / exit codes:** exits 0 when no lane children are in-flight or the watcher is fresh. Exits 1 and writes a note to stderr telling the user to restart `run:progress --wait` before proceeding.
 
+### `josh run:stranded`
+
+Report whether the run has been left stranded: the budget was handed off at a cut, the session that owned it has died, no successor ever claimed it, and no `run:wake` supervisor is watching. Three facts are read and never weighed — the carry record's hand-off, the owner's liveness, and the supervisor's — so a strand is detected without any judgement. Wired into the `Stop` hook beside `backlog:stalled`, so it runs at each loop boundary; a strand emits one marker on the run's event stream and sends one 🚨 Telegram naming the recovery. It reports, it never stops: a false positive costs one notification, never a halted run or a torn-down lane.
+
+```bash
+pnpm josh run:stranded
+```
+
+**Output / exit codes:** always exits 0, printing `stranded` or `ok` on stdout. Recovery is another actor's — the notification names `run:wake --start`, which wakes a fresh successor to claim the budget; the cutting session stays refused `busy` and must not resume the run itself.
+
 ### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
 
 Open and close a lane: one linked git work tree with its own branch and its own port seat. `lane:open` cuts from `refs/remotes/origin/<default>` (falling back to the local branch), attaches to an existing `<N>-lane` branch, installs dependencies (`pnpm install --frozen-lockfile`), and warms the gate caches from the main checkout. It also copies the pre-built hook bundles (`dist/hooks/`) from the main checkout so the lane's Claude Code hooks launch off `node dist/hooks/<name>.js` rather than the slower `pnpm josh …` fallback — those bundles are git-ignored, so a lane's work tree never carries them otherwise. A consumer repository needs no such copy: its hook commands already point at `node_modules/@joshuafolkken/kit/dist/hooks/`, which the install materializes; only kit's own lanes use work-tree-relative paths. When the main checkout has no bundles (a clone that never ran `pnpm build`), the lane opens on the fallback path, and a copy that fails never fails the open — best-effort, exactly like the gate-cache warming.

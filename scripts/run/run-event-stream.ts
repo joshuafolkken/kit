@@ -68,6 +68,12 @@ const EVENT_KIND = {
 	// terminal reader following the stream sees. `run:step` reads it as `backlog:next`, so a run that
 	// stalled is pointed straight at dispatching the work rather than left waiting.
 	STALL: 'stall',
+	// The run's own driver is gone: the cut handed the budget off, the owner has died, and no supervisor
+	// is watching (joshuafolkken/kit#2375). Emitted once per strand episode by the stop-time detector,
+	// exactly as `STALL` is — the newest-event dedup keeps a run polled every stop from notifying more
+	// than once, and a terminal reader following the stream sees the line. The strand is the step before
+	// the stall: a stalled run still has a driver that could dispatch, a stranded one has none.
+	STRANDED: 'stranded',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]

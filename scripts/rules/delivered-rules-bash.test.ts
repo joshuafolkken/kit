@@ -17,6 +17,9 @@ const NOW_MS = 1_700_000_000_000
 const ONE_RULE = 1
 // The literals each used both in an it.each row and in the exactly-one-rule assertion below.
 const CLAIMED_TITLE = 'is claimed by exactly one rule'
+// Shared by the delivery blocks' silent-form assertions, so a row cannot pass under a title another
+// does not use.
+const SILENT_TITLE = 'is silent on a %s'
 const FORCE_CLUSTER = 'git push -uf origin main'
 const STASH_POP = 'git stash pop'
 const BARE_JOSH_GIT = 'pnpm josh git "fix the thing #5"'
@@ -112,7 +115,7 @@ describe('file-body — the inline body write the deny list cannot see', () => {
 	it.each([
 		['new file', "cat > new-file.ts <<'EOF'\nbody\nEOF"],
 		['read-only heredoc', "cat <<'EOF'\njust reading\nEOF"],
-	])('is silent on a %s', (_name, command) => {
+	])(SILENT_TITLE, (_name, command) => {
 		expect(delivered_for(`fbs-${_name}`, command)).toBeUndefined()
 	})
 
@@ -145,6 +148,32 @@ describe('raw-field-body — the literal @path a raw field flag posts as text', 
 
 	it(CLAIMED_TITLE, () => {
 		expect(rules_claiming(AT_PATH_COMMENT)).toBe(ONE_RULE)
+	})
+})
+
+describe('poll-loop — the output-file wait loop a lane child hand-writes', () => {
+	const GREP_POLL = 'until grep -qiE "merged|done" out.txt; do sleep 30; done'
+
+	it.each([
+		['grep', GREP_POLL],
+		['wc', 'until [ "$(wc -l < out.txt)" -ge 40 ]; do sleep 30; done'],
+		['while', 'while ! grep -q done out.txt; do sleep 5; done'],
+	])('delivers on the %s poll loop', (_name, command) => {
+		expect(delivered_for(`pl-${_name}`, command)).toBe(delivered_rules.POLL_LOOP_REASON)
+	})
+
+	// A bare `sleep` is deliberately absent: `early-heartbeat` claims it (a clock timer), and this rule
+	// stays silent on it — the disjointness `poll-loop.test.ts` asserts directly. Here the silent set is
+	// only the shapes no row at all claims.
+	it.each([
+		['stream reader', 'while read line; do echo "$line"; done < out.txt'],
+		['plain grep', 'grep -q done out.txt'],
+	])(SILENT_TITLE, (_name, command) => {
+		expect(delivered_for(`pls-${_name}`, command)).toBeUndefined()
+	})
+
+	it(CLAIMED_TITLE, () => {
+		expect(rules_claiming(GREP_POLL)).toBe(ONE_RULE)
 	})
 })
 
