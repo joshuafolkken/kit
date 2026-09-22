@@ -69,6 +69,10 @@ function edit_call(name = EDIT): { name: string; input: unknown } {
 	return { name, input: { file_path: 'scripts/x.ts', old_string: 'a', new_string: 'b' } }
 }
 
+function run_at(now_ms: number): { transcript: string; now_ms: number } {
+	return { transcript: path.join(WORK_DIRECTORY, 'transcript.jsonl'), now_ms }
+}
+
 // A verdict thunk that fails the test if it is ever read — used to prove the cost measurement is gated
 // behind the cheap tool-name and lane reads, never run on a call this guard does not own.
 function unread_verdict(): CostVerdict {
@@ -144,11 +148,14 @@ describe('is_over_threshold_edit', () => {
 		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
 	})
 
-	// A session that cannot be priced is not over threshold; `unmeasurable` is not read as a reason to cut.
-	it('says nothing when the session cannot be measured', () => {
+	// **The unmeasurable direction matches the pre-gate cut** (joshuafolkken/kit#2385): a session that
+	// cannot be priced warrants the cut as a safety net, the `verdict !== UNDER_VERDICT` reading
+	// `pre-gate-cut.ts`'s `warrants_the_cut` takes, so the two rules never disagree about whether an
+	// unmeasurable session is due a cut.
+	it('fires when the session cannot be measured, the pre-gate-cut safety-net direction', () => {
 		const state = state_of({ verdict: (): CostVerdict => UNMEASURABLE })
 
-		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(true)
 	})
 
 	// **The cost read is gated behind the cheap checks.** A non-edit call and a call outside an uncut
@@ -212,11 +219,62 @@ describe('IMPLEMENTATION_CUT_REASON', () => {
 		['never a second measurement'],
 		// One of the verdicts that leave this process implementing.
 		['not-a-lane'],
-		// The pointer, and the reissue sentence every delivery needs.
+		// The pointer every delivery names.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
-		['once per run'],
+		// **The threshold is the shared value, assembled from the constant** (joshuafolkken/kit#2385):
+		// joshuafolkken/kit#2374 lowered it and the old literal told agents the wrong number.
+		['150,000-token'],
+		// **The reissue sentence, now the per-crossing form** (joshuafolkken/kit#2385): a reissue right
+		// after a refusal passes so `busy` / `failed` cannot wedge the run, and the row fires again on the
+		// next crossing rather than once per run.
+		['reissued right after this refusal passes'],
+		['next threshold crossing rather than once per run'],
 	])('carries %j', (marker) => {
 		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(marker)
+	})
+
+	// **The old literal is gone, not merely joined by the new one** (joshuafolkken/kit#2385). A duplicate
+	// threshold — the constant assembled beside a stray `200,000` — is exactly the drift this removes, so
+	// the stale value must appear nowhere in the delivered text.
+	it('carries no stale hard-coded threshold', () => {
+		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).not.toContain('200,000')
+	})
+})
+
+describe('decide — fires per crossing, lets a reissue through', () => {
+	const OVER_THRESHOLD_MS = implementation_cut.REISSUE_WINDOW_MS * 2
+	const NOW_MS = 1_000_000
+
+	// **The first over-threshold edit of a process refuses** — no prior refusal, so `delivered_at_ms` is
+	// the never-fired instant and the reissue window cannot be open.
+	it('refuses when this row has never fired', () => {
+		expect(implementation_cut.decide(edit_call(), run_at(NOW_MS), true, 0)).toBe(true)
+	})
+
+	// **A genuinely new crossing past the window refuses again** — once per run silenced this; `decide`
+	// re-asks so the growing context is watched to the end of the process.
+	it('refuses a fresh crossing once the reissue window has passed', () => {
+		const delivered_at_ms = NOW_MS - OVER_THRESHOLD_MS
+
+		expect(implementation_cut.decide(edit_call(), run_at(NOW_MS), true, delivered_at_ms)).toBe(true)
+	})
+
+	// **The edit reissued right after a refusal passes** — the acceptance condition that a `busy` /
+	// `failed` verdict cannot wedge the run edit after edit.
+	it('lets an edit reissued inside the window through', () => {
+		const delivered_at_ms = NOW_MS - 1
+		const at = run_at(NOW_MS)
+
+		expect(implementation_cut.decide(edit_call(), at, true, delivered_at_ms)).toBe(false)
+	})
+
+	// **The predicate itself, at the two edges of the window.**
+	it.each([
+		[0, true],
+		[implementation_cut.REISSUE_WINDOW_MS - 1, true],
+		[implementation_cut.REISSUE_WINDOW_MS, false],
+	])('reads an age of %j ms as reissued=%j', (age, reissued) => {
+		expect(implementation_cut.is_reissued_refusal(NOW_MS, NOW_MS - age)).toBe(reissued)
 	})
 })
 

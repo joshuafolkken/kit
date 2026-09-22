@@ -71,7 +71,11 @@ describe(`${TOPIC_FILE} — the single source for the rule and the measurement b
 	// silent states are what keep the row worth having rather than refusing every edit a person makes.
 	it.each([
 		'**It fires for a marked child and nowhere else**',
-		'**It re-arms per resume, not per edit**',
+		// joshuafolkken/kit#2385 inverted the once-per-run framing: the row now fires per crossing and lets
+		// a reissue through, so a `busy` / `failed` verdict no longer leaves the context growing unwatched.
+		'**It fires on every threshold crossing, not once per run**',
+		'**An edit reissued right after a refusal passes**',
+		'**An unmeasurable session warrants the cut**',
 		'**It is silent between a cut and its resume**',
 		'the implementation resume clears the record',
 	])('states the boundary %j', (marker) => {
