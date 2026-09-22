@@ -7,8 +7,8 @@ import { issue_lint } from './issue-lint'
 // `josh issue:lint <path>` — read an Issue body from a file and print `ok`, or every template problem
 // one per line, exiting non-zero (joshuafolkken/kit#2123). It reads a path rather than stdin so it can
 // lint a body written to a file before the `gh api … issues` call that files it. A body that declares
-// itself a behavior-change Issue is additionally held to the firing-point and baseline rules
-// (joshuafolkken/kit#2212).
+// itself a behavior-change Issue is additionally held to the firing-point, baseline and reproduction
+// rules (joshuafolkken/kit#2212, joshuafolkken/kit#2353).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1

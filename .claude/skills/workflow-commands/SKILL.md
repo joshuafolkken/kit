@@ -194,10 +194,11 @@ Issue into a batch nobody authorized, and a cheaper review finds less. `--list` 
 **rejected** rather than absent, and `pnpm josh delegate <step>` answers `kept deliberately` for a
 step that was weighed and `kept by default` for one nobody considered.
 
-**The mechanism is not the unit.** How a thing is delegated — an isolated execution unit, an explicit
-brief, a result the parent can verify, a failure that surfaces — is separate from what is delegated.
-The units are one step of a run (`gate-fix`, `survey`) and one whole child of a batch (`epic-child`) —
-an epic's child and a named issue of a `backlogrun` alike. **They share one
+**The mechanism is not the unit** — how it is delegated is separate from what is delegated. The
+units are one step of a run (`gate-fix`, `survey`), the writing of one file-disjoint Step 0 unit
+(`implementation-unit`, fanned out when `pnpm josh fanout` reads them disjoint —
+`docs/josh-commands.md` → "`josh fanout`") and one whole child of a batch
+(`epic-child`) — an epic's child and a named issue of a `backlogrun` alike. **They share one
 mechanism** — one enumeration, one command, one verifier requirement; building a second is the clone
 `CLAUDE.md` prohibits, so **no second row like `backlogrun-child` is added**. **A batch entry point
 that does not delegate is the defect**: the per-issue procedure is `backlogrun-child.md` → "Each child runs in a
@@ -209,7 +210,7 @@ the large context it runs in at a run's tail, not the step count. A fresh unit r
 small context, handed the finding text the review round cap already composed. Its verifier is
 `epic-child`'s exactly — the parent reads the filed Issue from GitHub with `pnpm josh issue:state
 <new>`, not the unit's summary, so a follow-up reported filed but not created is still absent. The
-point of use is that branch-2 filing, and `batch:guard`'s one-call-per-step verdict is untouched.
+point of use is that branch-2 filing.
 
 **`epic-child`'s verifier is not the child's own completion report.** The parent reads the child's
 state from GitHub — `pnpm josh issue:state <N>`, the moment the unit returns — because a child reported

@@ -785,6 +785,16 @@ Run the agent rule-compliance scenarios (real Claude sessions)
 
 ---
 
+### `josh fanout` · `josh fo`
+
+> **Audience:** automation · **Side effects:** none
+
+`<unit-files> <unit-files> [<unit-files> …]`
+
+Say whether proposed implementation units are file-disjoint, so they may run in parallel
+
+---
+
 ### `josh investigation:guard` · `josh ig`
 
 > **Audience:** automation · **Side effects:** none
@@ -1089,7 +1099,7 @@ Carry one invocation’s budget across its own session cuts
 
 > **Audience:** automation · **Side effects:** files
 
-`<issue> [--impl | --setup] [--handoff <path>] | [--resume] <issue>`
+`[--resume] <issue> [--impl|--setup] [--handoff <path>]`
 
 Cut a lane child before the gate and resume a fresh process
 

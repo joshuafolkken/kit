@@ -270,6 +270,43 @@ describe('investigation is the pre-implementation reading', () => {
 	})
 })
 
+// joshuafolkken/kit#2345 puts the writing of one Step 0 unit on this same enumeration. Its verifier
+// is the gate and `/code-review` the parent runs anyway, so delegating the writing weakens no
+// backstop; the design that decided *what* to write stays in the main line, which is why `design` is
+// still rejected. And it splits only file-disjoint units — two subagents editing one file race — which
+// `josh fanout` confirms mechanically.
+const IMPL_UNIT = 'implementation-unit'
+const DESIGN = 'design'
+
+describe('implementation-unit is the writing of one Step 0 unit', () => {
+	it(DELEGATABLE_CASE, () => {
+		expect(delegation_policy.verdict_for(IMPL_UNIT)).toBe(delegation_policy.DELEGATE_VERDICT)
+	})
+
+	// The verifier is the parent-tier gate and review, not the unit's own report of success.
+	it('names the parent gate and /code-review as its verifier', () => {
+		const reason = delegation_policy.reason_for(IMPL_UNIT)
+
+		expect(reason).toContain('josh gate')
+		expect(reason).toContain('/code-review')
+	})
+
+	// File-disjointness is the necessary condition, read from `josh fanout` rather than judged.
+	it('splits only file-disjoint units, confirmed by josh fanout', () => {
+		const step = delegation_policy.find_step(IMPL_UNIT)
+
+		expect(step?.does).toContain('file-disjoint')
+		expect(step?.does).toContain('josh fanout')
+	})
+
+	// The boundary against the rejected row it is nearest to: the writing is delegated, the design is
+	// not, because a wrong design is paid for by every step after it.
+	it('keeps the design that decided what to write', () => {
+		expect(delegation_policy.verdict_for(DESIGN)).toBe(delegation_policy.KEEP_VERDICT)
+		expect(delegation_policy.reason_for(DESIGN)).toContain(KEPT_DELIBERATELY)
+	})
+})
+
 describe('delegation_policy.reason_for', () => {
 	it('gives the verifier as the reason for a delegatable step', () => {
 		expect(delegation_policy.reason_for(GATE_FIX)).toContain('josh gate')

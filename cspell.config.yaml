@@ -5,6 +5,12 @@ words:
   # A Claude Code built-in agent type, `statusline-setup` — enumerated in the known-agent-types set the
   # review-subagent document rule checks against (joshuafolkken/kit#2297).
   - statusline
+  # `josh fanout` — the command that says whether implementation units are file-disjoint, so their
+  # subagents may be launched in one fan-out turn (joshuafolkken/kit#2345).
+  - fanout
+  # The property `josh fanout` tests for: two units' file sets sharing no member. "The disjointness
+  # keeps two subagents from colliding on a file."
+  - disjointness
   # Verb coined from Node's working-directory-change call — "the lane case chdirs into a lane checkout".
   # The guard suites
   # for joshuafolkken/kit#2138 change directory into a lane checkout to exercise the dispatched-child
