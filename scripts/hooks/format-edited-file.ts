@@ -9,6 +9,7 @@ import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
 import { edited_cspell } from './edited-cspell'
+import { rewrite_notice } from './format-rewrite-notice'
 
 // Claude Code hands a `PostToolUse` hook the tool call as JSON on stdin; for `Edit` and `Write` the
 // edited path is `tool_input.file_path`. Everything else in the payload is ignored, and a payload
@@ -462,16 +463,21 @@ function report_no_payload(): void {
 
 // The lint problems come from eslint and the unknown words from cspell, so both are known only once
 // their processes have run; the density line is joined to them into the single envelope the harness
-// can parse, rather than written first on its own. The lint and spell blocks are composed together
-// first, then joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries
-// only one (joshuafolkken/kit#2296). A hook killed at its 15s timeout is the one case this loses the
-// density line to — a run already gone pathologically wrong, per PROCESS_TIMEOUT_MS.
+// can parse, rather than written first on its own. The rewrite notice is read from the file itself —
+// its content before the formatters ran against its content after — so it too is known only once they
+// have (joshuafolkken/kit#2314). The rewrite, lint and spell blocks are composed together first, then
+// joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries only one
+// (joshuafolkken/kit#2296). A hook killed at its 15s timeout is the one case this loses the density
+// line to — a run already gone pathologically wrong, per PROCESS_TIMEOUT_MS.
 async function run_hook(payload: string): Promise<void> {
 	const notice = time_density_hook.density_notice(payload)
-	const lint = await format_edited_payload(payload, process.cwd())
 	const file_path = parse_edited_path(payload)
+	const before = rewrite_notice.read_text(file_path)
+	const lint = await format_edited_payload(payload, process.cwd())
+	const rewrite = rewrite_notice.build(before, rewrite_notice.read_text(file_path))
 	const spelling = await edited_cspell.spelling_diagnostics(file_path, process.cwd())
-	const context = compose_context(notice, compose_context(lint, spelling))
+	const parts = compose_context(rewrite, compose_context(lint, spelling))
+	const context = compose_context(notice, parts)
 
 	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
 }
