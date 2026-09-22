@@ -1443,12 +1443,21 @@ Cut a dispatched lane child before the verification gate. OpenAI uses its lane s
 relaunches directly. With no matching supervisor, OpenAI returns `failed` before writing the cut.
 
 ```bash
-pnpm josh run:cut 1839            # take the cut and hand it to a fresh process
-pnpm josh run:cut --resume 1839   # a fresh process's entry check
-pnpm josh run:cut --end           # clear the record
+pnpm josh run:cut 1839                          # take the cut and hand it to a fresh process
+pnpm josh run:cut --impl 1839 --handoff h.json  # cut mid-implementation, carrying the instruction
+pnpm josh run:cut --resume 1839                 # a fresh process's entry check
+pnpm josh run:cut --end                         # clear the record
 ```
 
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`. `run:cut --resume <N>`: `fresh`, `resume`, `stale`, `busy`, or `handed-off`.
+A cut that resumes back into implementation (`--impl` / `--setup`) carries a **handoff** — the run's
+instruction verbatim and a curated list of what is done, what remains, and what was deliberately left
+alone (joshuafolkken/kit#2354). It is passed by path with `--handoff <path>`, never inlined, so a
+backtick or `$` in the instruction is not executed. The record stays small (bounded, a few short
+lines); the resume prints the handoff to stderr so the fresh process continues on the instruction
+rather than the working tree alone, and a resume that finds no instruction is refused `incomplete`
+rather than continuing blind.
+
+**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`). `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
 
 ### `josh run:liveness`
 

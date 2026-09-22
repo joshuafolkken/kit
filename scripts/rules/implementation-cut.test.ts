@@ -195,12 +195,19 @@ describe('the row in the enumeration', () => {
 
 describe('IMPLEMENTATION_CUT_REASON', () => {
 	it.each([
-		// The command that fixes it — the only thing that makes a refusal actionable.
-		['pnpm josh run:cut --impl <N>'],
+		// The command that fixes it — the only thing that makes a refusal actionable. The `--handoff <path>`
+		// is part of the actionable command, not just mentioned in prose: a resume that finds no instruction
+		// is refused `incomplete`, so an "issue this now" line that dropped the flag would strand the run
+		// (joshuafolkken/kit#2354).
+		['pnpm josh run:cut --impl <N> --handoff <path>'],
 		// What `cut` obliges, which the run cannot infer from the verdict alone.
 		['end the turn immediately'],
 		// That the fresh process continues implementing rather than going to the gate.
 		['resume-impl'],
+		// The handoff the cut must write and pass, so the resume carries the instruction
+		// (joshuafolkken/kit#2354).
+		['--handoff <path>'],
+		['deliberately did not touch'],
 		// The one measurement, so a reader knows this is not a second one (joshuafolkken/kit#1933).
 		['never a second measurement'],
 		// One of the verdicts that leave this process implementing.

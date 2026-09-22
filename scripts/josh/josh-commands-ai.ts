@@ -198,7 +198,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/run-cut-cli.ts',
 		description: 'Cut a lane child before the gate and resume a fresh process',
 		category: 'AI tools',
-		reference: ['[--resume] <issue>', 'automation', ['files']],
+		reference: [
+			'<issue> [--impl | --setup] [--handoff <path>] | [--resume] <issue>',
+			'automation',
+			['files'],
+		],
 	},
 	'run:liveness': {
 		script: 'scripts/run/run-liveness-cli.ts',

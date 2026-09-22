@@ -13,6 +13,7 @@ import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { detached_launch } from './detached-launch'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
+import { run_cut_handoff } from './run-cut-handoff'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 
@@ -43,6 +44,12 @@ const FRESH_VERDICT = 'fresh'
 // on to the gate itself, exactly as `not-a-lane` does.
 const UNDER_THRESHOLD_VERDICT = 'under-threshold'
 const STALE_VERDICT = 'stale'
+// The record matched the tree but carried no instruction to resume on, so the run was refused rather
+// than continued blind to what it was told to do (joshuafolkken/kit#2354).
+const INCOMPLETE_VERDICT = 'incomplete'
+// The `--handoff` path was given but could not be read as a handoff, or was too large for the record;
+// the cut is refused rather than taken without the instruction it was meant to carry.
+const BAD_HANDOFF_VERDICT = 'bad-handoff'
 const HANDED_OFF_VERDICT = 'handed-off'
 const BUSY_VERDICT = 'busy'
 const NOT_A_LANE_VERDICT = 'not-a-lane'
@@ -68,6 +75,24 @@ function report_busy(cut_record: RunCut): number {
 	console.error(run_cut.busy_message(cut_record))
 
 	return report(BUSY_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// The record matched the tree but carried no instruction; the run is refused rather than continued
+// without what it was told to do (joshuafolkken/kit#2354).
+function report_incomplete(cut_record: RunCut): number {
+	console.error(run_cut.incomplete_message(cut_record))
+
+	return report(INCOMPLETE_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// The `--handoff` file parsed but the assembled record would not fit the byte bound — the scalar fields
+// carry a handoff that fit alone past the cap (joshuafolkken/kit#2354).
+const HANDOFF_OVERFLOW_NOTE = '--handoff <path> would grow the cut record past its byte bound'
+
+function report_bad_handoff(note: string): number {
+	console.error(`${note}. Nothing was cut; write the handoff file and reissue.`)
+
+	return report(BAD_HANDOFF_VERDICT, FAILURE_EXIT_CODE)
 }
 
 // A successor already resumed this cut; a process woken after its own hand-off is told to stop rather
@@ -216,6 +241,9 @@ interface CutRequest {
 	branch: string
 	issue: string
 	phase: string
+	// The `--handoff` path whose instruction and work state the record carries, absent for a pre-gate
+	// cut that resumes into the gate rather than into implementation (joshuafolkken/kit#2354).
+	handoff_path?: string | undefined
 }
 
 // **Every cut appends a `cut` event to the run's stream** (joshuafolkken/kit#2346). It is what advances
@@ -231,15 +259,30 @@ async function emit_cut_event(request: CutRequest): Promise<void> {
 }
 
 async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): Promise<number> {
-	const started = run_cut.begin_cut(target, request)
-	if (started === undefined) return report_cut_exists(target)
+	const loaded = run_cut_handoff.load_handoff(request.handoff_path, run_cut.MAX_HANDOFF_BYTES)
+	if (loaded.kind === 'bad') return report_bad_handoff(loaded.note)
+
+	const spec = {
+		issue: request.issue,
+		branch: request.branch,
+		phase: request.phase,
+		handoff: loaded.handoff,
+	}
+
+	if (!run_cut.record_within_bound(spec)) return report_bad_handoff(HANDOFF_OVERFLOW_NOTE)
+	if (run_cut.begin_cut(target, spec) === undefined) return report_cut_exists(target)
 
 	await emit_cut_event(request)
 
 	return is_openai_lane(lane) ? report(CUT_VERDICT, SUCCESS_EXIT_CODE) : relaunch(target, lane)
 }
 
-async function cut(target: string, issue: string, phase: string): Promise<number> {
+async function cut(
+	target: string,
+	issue: string,
+	phase: string,
+	handoff_path?: string,
+): Promise<number> {
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
@@ -252,7 +295,7 @@ async function cut(target: string, issue: string, phase: string): Promise<number
 	clear_expired(target)
 	if (!has_matching_supervisor(lane, issue)) return report_missing_supervisor(issue)
 
-	return await finish_cut(target, lane, { issue, branch: state.branch, phase })
+	return await finish_cut(target, lane, { issue, branch: state.branch, phase, handoff_path })
 }
 
 // **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two
@@ -283,10 +326,21 @@ function take_over(target: string, cut_record: RunCut): RunCut | undefined {
 	return cut_record
 }
 
+// The carried instruction and work state, printed to standard error so the resumed session continues
+// on what the run was told to do rather than on the tree alone (joshuafolkken/kit#2354). The record is
+// cleared on adoption, so this is where it reaches the fresh process.
+function announce_handoff(cut_record: RunCut): void {
+	if (cut_record.handoff !== undefined) {
+		console.error(run_cut_handoff.describe_handoff(cut_record.handoff))
+	}
+}
+
 function adopt(target: string, cut_record: RunCut): number {
 	const taken = take_over(target, cut_record)
 
 	if (taken === undefined) return report_busy(cut_record)
+
+	announce_handoff(cut_record)
 
 	return report(resume_verdict_for(cut_record), SUCCESS_EXIT_CODE)
 }
@@ -307,6 +361,8 @@ async function verify_and_adopt(
 	if (verdict === HANDED_OFF_VERDICT) return report_handed_off(cut_record)
 
 	if (verdict === 'stale') return report_stale(cut_record)
+
+	if (verdict === INCOMPLETE_VERDICT) return report_incomplete(cut_record)
 
 	return adopt(target, cut_record)
 }
@@ -350,7 +406,7 @@ function cut_phase(request: { is_setup: boolean; is_implementation: boolean }): 
 
 async function act(target: string, request: Request): Promise<number> {
 	if (request.kind === 'cut') {
-		return await cut(target, request.issue, cut_phase(request))
+		return await cut(target, request.issue, cut_phase(request), request.handoff_path)
 	}
 
 	if (request.kind === 'resume') return await resume(target, request.issue)
@@ -398,12 +454,14 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_cut_cli = {
+	BAD_HANDOFF_VERDICT,
 	BUSY_VERDICT,
 	CUT_VERDICT,
 	ENDED_VERDICT,
 	FAILED_VERDICT,
 	FRESH_VERDICT,
 	HANDED_OFF_VERDICT,
+	INCOMPLETE_VERDICT,
 	NOT_A_LANE_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
