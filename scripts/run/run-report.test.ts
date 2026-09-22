@@ -46,6 +46,20 @@ describe('run_report.build_report — enumeration', () => {
 	})
 })
 
+describe('run_report.build_report — the retrospective result', () => {
+	// joshuafolkken/kit#2342: the retrospective's result is one more event on the stream, so the report
+	// generated from the stream carries its line without a second format — including a zero-filing result,
+	// the case that needs the record.
+	it('renders a zero-filing retrospective event as its own line', () => {
+		const RETRO_TEXT = '0 filed; dropped #2240 already merged'
+		const events = [...EVENTS, event(4, KIND.RETROSPECTIVE, RETRO_TEXT)]
+
+		const report = run_report.build_report({ events, release: SKIP })
+
+		expect(report).toContain(RETRO_TEXT)
+	})
+})
+
 describe('run_report.build_report — release tail', () => {
 	it('closes with the request and the exact command on required', () => {
 		const report = run_report.build_report({ events: EVENTS, release: REQUIRED })
