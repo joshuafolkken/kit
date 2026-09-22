@@ -34,6 +34,9 @@ describe('poll_loop.is_poll_loop — refuses the output-file wait loop', () => {
 		// A throttled stream reader sleeps but consumes input rather than probing — not a poll
 		// (joshuafolkken/kit#2371, review round 1).
 		'while read line; do sleep 0.1; echo "$line"; done < out.txt',
+		// The bare word "until" inside a command body does not turn a stream reader into a poll — the
+		// exclusion holds unless an `until` *header* is present (joshuafolkken/kit#2371, review round 2).
+		'while read line; do grep until out.txt; sleep 1; done < in.txt',
 		'sleep 30',
 		'for i in $(seq 1 5); do build; done',
 		'cat until.txt',

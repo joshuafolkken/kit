@@ -36,14 +36,15 @@ const LOOP_KEYWORD = /\b(?:while|until)\s/u
 const SLEEP_COMMAND = /\bsleep\s+\S/u
 // **A `while read … done < file` is a stream reader, not a poll**, even when its body sleeps to
 // throttle processing (joshuafolkken/kit#2371, review round 1). Its condition consumes input rather
-// than probing for a state, so the completion notification this rule points to has nothing to do with
-// it. It is excluded unless an `until` header is also present — a line carrying both is a poll that
-// merely quotes `read` somewhere, and the `until` is the tell.
+// than probing for a state — a poll never reads its condition, it *tests* it (grep, wc, a file check)
+// — so the completion notification this rule points to has nothing to do with it. A `while read`
+// header is therefore always a stream reader; a line that also carried a separate `until` poll would
+// go un-refused, which fails safe (under-refusal) and is contrived enough not to warrant the added
+// regex the attempt to catch it needed (joshuafolkken/kit#2371, review round 2).
 const STREAM_READER = /\bwhile\s+read\b/u
-const UNTIL_HEADER = /\buntil\s/u
 
 function is_stream_reader(plain: string): boolean {
-	return STREAM_READER.test(plain) && !UNTIL_HEADER.test(plain)
+	return STREAM_READER.test(plain)
 }
 
 // **Quoted spans are blanked first, and here that is load-bearing rather than tidy.** This
