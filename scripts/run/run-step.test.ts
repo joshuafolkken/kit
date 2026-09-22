@@ -86,6 +86,47 @@ describe('run_step.next_action — pre-implementation position', () => {
 	})
 })
 
+describe('run_step.next_action — the setup→implementation boundary', () => {
+	const SETUP_CUT_COMMAND = `pnpm josh run:cut ${ISSUE} --setup`
+
+	it('cuts a dispatched lane child once its plan is posted', () => {
+		expect(run_step.next_action(input({ last_event: KIND.PLAN, is_lane_child: true }))).toEqual({
+			kind: 'command',
+			line: SETUP_CUT_COMMAND,
+		})
+	})
+
+	it('does not cut before the plan is posted — an empty stream is still setup', () => {
+		expect(run_step.next_action(input({ is_lane_child: true })).line).toBe(run_step.IMPLEMENT)
+	})
+
+	it('does not cut an interactive run — only a dispatched lane child relaunches', () => {
+		expect(run_step.next_action(input({ last_event: KIND.PLAN })).line).toBe(run_step.IMPLEMENT)
+	})
+
+	it('leaves a needs-human-review position untouched — it changes where the run ends, not where it cuts', () => {
+		expect(
+			run_step.next_action(
+				input({ last_event: KIND.PLAN, is_lane_child: true, is_human_review: true }),
+			).line,
+		).toBe(run_step.HUMAN_REVIEW)
+	})
+
+	it('leaves a required dependency update ahead of the cut', () => {
+		expect(
+			run_step.next_action(
+				input({ last_event: KIND.PLAN, is_lane_child: true, latest_scope: 'required' }),
+			).line,
+		).toBe(run_step.UPDATE_DEPS)
+	})
+
+	it('reads the setup cut back as a resume once the cut event lands', () => {
+		expect(run_step.next_action(input({ last_event: KIND.CUT, is_lane_child: true })).line).toBe(
+			`pnpm josh run:cut --resume ${ISSUE}`,
+		)
+	})
+})
+
 describe('run_step.next_action — event-driven position', () => {
 	it.each([
 		[KIND.PR_OPENED, FOLLOWUP_COMMAND],

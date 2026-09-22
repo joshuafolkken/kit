@@ -3,6 +3,8 @@ import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { run_cut, type RunCut } from '#scripts/run/run-cut'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
 // The pre-gate cut, delivered at the call it binds on (joshuafolkken/kit#1864).
@@ -174,11 +176,28 @@ const PRE_GATE_CUT_REASON =
 	'`.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue the gate once the cut has answered — ' +
 	'this fires once per run, so it cannot repeat on the call in hand.'
 
+// **The pre-gate cut is two acts, one call apart** (joshuafolkken/kit#2034), so its `rule:value`
+// denominator is only the runs that reached the boundary: a run that issues the cut's entry check and,
+// somewhere in the same run, claimed the working-tree hold — the near half of the boundary a fresh
+// process never makes. Read only by the offline measurement, never the live delivery path. Moved here
+// from `delivered-rules.ts` so the pre-gate row lives with its rule, as `implementation-cut.ts`'s and
+// `setup-cut.ts`'s do (joshuafolkken/kit#2346).
+function reaches_the_pre_gate_boundary(
+	call: GuardedCall,
+	_turn: ReadonlyArray<GuardedCall>,
+	run: ReadonlyArray<GuardedCall>,
+): boolean {
+	if (!bash_triggers.on_bash_command(asks_about_the_cut)(call)) return false
+
+	return run.some((issued) => bash_triggers.on_bash_command(claims_the_hold)(issued))
+}
+
 const pre_gate_cut = {
 	PRE_GATE_CUT_REASON,
 	asks_about_the_cut,
 	claims_the_hold,
 	is_uncut_gate,
+	reaches_the_pre_gate_boundary,
 	runs_the_gate,
 	takes_the_cut,
 	uncut_lane_issue,

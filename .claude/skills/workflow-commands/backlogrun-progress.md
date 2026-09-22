@@ -422,32 +422,32 @@ ever.
   supplied — **and the cut does not happen.** Name that lane in the progress comment and go back to
   step 1 of the loop; the reading is asked again at the next merge.
 - **Every in-flight lane records a path** — **record the cut and hand the session off.** `backlogrun`
-  declares a budget — `--max`, `--idle` and the 8-hour bound — so the cut is an execution detail of
-  spending it, not a stop: count everything the session has, then run
-  `pnpm josh run:carry --cut --owner "$PPID"`, and `pnpm josh run:wake` starts the next session from
-  outside the conversation with nobody retyping the keyword. The lanes keep running and the resumed
-  session polls them from `lane:list`. Post the progress comment naming **every lane still in flight and
-  the path each one records** so the resumed session can find them. `backlogrun-steps.md` → "The session cut is inside the
-  invocation" is the single source of the carry; this reading is only where the cut is *taken*.
+  declares a budget — `--max`, `--idle` and the 8-hour bound — so the cut is an execution detail: count
+  everything the session has, then run `pnpm josh run:carry --cut --owner "$PPID"`. **Unless it answers
+  `capped`** (below), `pnpm josh run:wake` then starts the next session, which polls the still-running
+  lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
+  records**. `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of
+  the carry; this reading is only where the cut is *taken*.
+- **`capped`** — the invocation has taken its `MAX_CUTS` cuts (joshuafolkken/kit#2346), so `--cut`
+  refused and left the record un-handed-off. **Do not `run:wake` or hand off**: a wake over it recovers
+  as a crashed owner into a fresh cold session — the churn the cap prevents. Carry **this** session on
+  uncut and re-ask at the next merge.
 
 **The hand-over is what makes the cut reachable, and the drain it replaced cost the pool.** `epic:next
 --lanes` keeps the seats full, so a cut gated on an idle pool that merely happened would read `over` at
-every merge and cut at none of them. Recording the path removes that cost without giving the moment back
-up: the cut is taken at the reading itself, the lanes keep running, and the next session picks them up
-from `lane:list`.
+every merge and cut at none. Recording the path removes that cost.
 
-**A lane is handed over only where the next session can actually poll it, and that is read rather than
-assumed.** A lane whose state is `open` **and** whose recorded path is not `-` is handed over. A
-**`stranded`** lane has no work tree and so no running child — `pnpm josh lane:prune` closes it. An
-**`unreadable`** one cannot be told apart from a running child, and an `open` lane recording **no path**
-is the same case: in both, **the cut does not happen**, the lane is named in the epic progress comment,
-and the run goes back to step 1. **Never assume idle** — a wrong cut abandons a child, a missed cut only
-costs tokens.
+**A lane is handed over only where the next session can actually poll it.** A lane whose state is
+`open` **and** whose recorded path is not `-` is handed over. A **`stranded`** lane has no work tree and
+so no running child — `pnpm josh lane:prune` closes it. An **`unreadable`** one cannot be told apart
+from a running child, and an `open` lane recording **no path** is the same: **the cut does not happen**,
+the lane is named in the epic progress comment, and the run goes back to step 1. **Never assume idle** —
+a wrong cut abandons a child, a missed cut only costs tokens.
 
 **The hand-off report belongs to the stop, not to the reading.** For the one reading that does not stop —
 an `unreadable` lane, or an `open` one recording no path — the run goes back to step 1 and writes no
-hand-off report; the epic progress comment is the record. `report-format.md` → "区切りの報告" states the
-same boundary from the format's side.
+hand-off report; the epic progress comment is the record. `report-format.md` → "区切りの報告" states it
+from the format's side.
 
 **This is not a failure and not a park.** No child needs a decision; the run is either handing its lanes
 on or standing at the seam. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.

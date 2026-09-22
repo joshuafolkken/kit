@@ -45,6 +45,15 @@ const CARRY_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
 const CARRY_MAX_AGE_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
 const NO_INCREMENT = 0
 
+// The most session cuts one invocation may take (joshuafolkken/kit#2346). This bounds `cuts`, which
+// only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge (~one per
+// 50 minutes over the 8-hour whole-run budget), not the `run:cut` phase cuts a lane child takes. Each
+// cut drops the context it accumulated but pays a cold preamble to resume, so past a point the
+// re-establishment costs more than the accumulation it sheds; six sits well under the ~10 an 8-hour run
+// could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the
+// `--cut` count is refused at it rather than incrementing past it.
+const MAX_CUTS = 6
+
 const END_COMMAND = 'pnpm josh run:carry --end'
 const RESUME_COMMAND = 'pnpm josh run:carry --resume'
 const READ_COMMAND = 'pnpm josh run:carry --json'
@@ -430,6 +439,13 @@ function is_count_refused(carry: RunCarry, owner: CarryOwner): boolean {
 	return carry.is_handed_off === true || is_foreign_live_owner(carry, owner)
 }
 
+// Whether the invocation has already taken its maximum cuts (joshuafolkken/kit#2346). Read by the CLI
+// before a `--cut` count so a run that has begun to churn is refused another cut rather than paying a
+// cold preamble the accumulation it sheds no longer covers.
+function is_at_cut_cap(carry: RunCarry): boolean {
+	return carry.cuts >= MAX_CUTS
+}
+
 function end_carry(target: string): void {
 	stamp_file.remove_stamp(target)
 }
@@ -538,6 +554,7 @@ const run_carry = {
 	CARRY_MAX_AGE_HOURS,
 	CARRY_MAX_AGE_MS,
 	END_COMMAND,
+	MAX_CUTS,
 	NO_OWNER,
 	RESUME_COMMAND,
 	adopt_carry,
@@ -548,6 +565,7 @@ const run_carry = {
 	classify,
 	classify_claim,
 	count_refused_message,
+	is_at_cut_cap,
 	describe_carry,
 	end_carry,
 	expired_message,

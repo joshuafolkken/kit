@@ -180,6 +180,31 @@ function is_pre_implementation(last_event: string | undefined): boolean {
 	return last_event === undefined || last_event === run_event_stream.EVENT_KIND.PLAN
 }
 
+// **The setup→implementation boundary, decided here in the run driver rather than in prose**
+// (joshuafolkken/kit#2346). A dispatched lane child that has posted its plan has finished setup — it
+// has read the skill, the manual documents and the issue, ~130,000 tokens that every later request
+// would otherwise re-read — so its next step is to cut before implementing rather than to implement in
+// the same session. The position is exactly the `plan` event: an empty stream is a run still in setup,
+// and a `cut` event already past it. The verdict must be `implement`, so a `needs-human-review`,
+// `update-deps` or closed position — which change where the run goes, not where it cuts — is untouched.
+function is_setup_cut_position(input: StepInput, token: PreVerdict): boolean {
+	return (
+		input.last_event === run_event_stream.EVENT_KIND.PLAN &&
+		input.is_lane_child &&
+		token === IMPLEMENT
+	)
+}
+
+function pre_implementation_action(input: StepInput): StepAction {
+	const token = pre_verdict(input)
+
+	if (is_setup_cut_position(input, token)) {
+		return command(`pnpm josh run:cut ${input.issue_number} --setup`)
+	}
+
+	return verdict(token)
+}
+
 // The terminal answers read before the run's position matters: an unreadable carry record leaves the
 // position unknowable, a spent budget is the person's call, and the issue's own state can end the run
 // whatever the events say. `undefined` when none applies and the position decides.
@@ -199,7 +224,7 @@ function next_action(input: StepInput): StepAction {
 	const terminal = terminal_action(input)
 
 	if (terminal !== undefined) return terminal
-	if (is_pre_implementation(input.last_event)) return verdict(pre_verdict(input))
+	if (is_pre_implementation(input.last_event)) return pre_implementation_action(input)
 
 	const event = input.last_event ?? ''
 	const full_input_action = FULL_INPUT_ACTIONS[event]

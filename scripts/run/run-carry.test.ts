@@ -440,3 +440,15 @@ describe('a --only invocation carried across a cut', () => {
 		expect(run_carry.remaining_of(started)).toStrictEqual([1762, 1749])
 	})
 })
+
+describe('the cut cap', () => {
+	// The one increment with a ceiling: a run that has begun to churn is refused another cut, so the
+	// re-establishment a cold preamble costs cannot outgrow the accumulation the cut sheds.
+	it('is not reached below the maximum', () => {
+		expect(run_carry.is_at_cut_cap({ ...begun(), cuts: run_carry.MAX_CUTS - 1 })).toBe(false)
+	})
+
+	it('is reached at the maximum', () => {
+		expect(run_carry.is_at_cut_cap({ ...begun(), cuts: run_carry.MAX_CUTS })).toBe(true)
+	})
+})
