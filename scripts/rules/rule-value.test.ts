@@ -266,6 +266,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			'test-declared',
 			'lane-interactive-ask',
 			'lane-carry-conflict',
+			'lane-switch-main',
 			'josh-git-bare',
 			'git-force',
 			'worktree-mutation',
