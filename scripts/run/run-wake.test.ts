@@ -45,6 +45,9 @@ function input(read: CarryRead, woke_at?: string, attempts = NO_ATTEMPTS): WakeD
 }
 
 const HANDED_OFF: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
+// A carried record no cut handed off: either a live session spending the budget, or one that claimed
+// it and died. Which of the two is `is_owner_live`, not the record (joshuafolkken/kit#2336).
+const IN_FLIGHT: CarryRead = { kind: 'carried', carry: carry() }
 
 function long_ago(): string {
 	return new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
@@ -65,10 +68,17 @@ describe('run_wake.decide — whether to wake is the record’s answer', () => {
 		expect(decision).toStrictEqual({ kind: 'wake' })
 	})
 
-	it('waits on a carried record no cut handed off, because a session is spending it', () => {
-		const decision = run_wake.decide(input({ kind: 'carried', carry: carry() }))
+	it('waits on a carried record no cut handed off, because a live session is spending it', () => {
+		expect(run_wake.decide({ ...input(IN_FLIGHT), is_owner_live: true })).toStrictEqual({
+			kind: 'wait',
+		})
+	})
 
-		expect(decision).toStrictEqual({ kind: 'wait' })
+	// joshuafolkken/kit#2336. The same record with a *dead* owner is a session that claimed it and then
+	// died without cutting; answered `wait` before, it stalled the run in silence until the 8-hour
+	// bound. Now the dead owner routes into the grace/retry machinery below and the run is recovered.
+	it('wakes a carried record no cut handed off once its owner has died', () => {
+		expect(run_wake.decide(input(IN_FLIGHT))).toStrictEqual({ kind: 'wake' })
 	})
 
 	// The 8-hour whole-run bound is the carry record's expiry, so this is the only place it is

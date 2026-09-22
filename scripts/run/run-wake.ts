@@ -86,9 +86,15 @@ interface RunWake {
 	// something to signal. The start-time token is what tells a reissued pid from the original.
 	pid: number
 	process_start?: string | undefined
-	// Criterion: the number of wakes has to match the carry record's `cuts`. Counting them here is what
-	// makes that checkable rather than merely argued from the structure. **It counts cuts served, not
+	// Criterion: the number of wakes tracks the carry record's `cuts`. Counting them here is what makes
+	// that checkable rather than merely argued from the structure. **It counts cuts served, not
 	// launches**, so a retry of the same cut does not inflate it — `attempts` is what counts those.
+	//
+	// **A recovery is a wake without a cut, so `woke` may run ahead of `cuts`** (joshuafolkken/kit#2336).
+	// When a session claims the record and then dies without cutting, the supervisor re-wakes and the
+	// replacement's claim is counted here too — so `woke == cuts` becomes `woke >= cuts`, the gap being
+	// the recoveries whose replacement claim a poll observed. `woke < cuts` still means a cut went
+	// unserved, and `outstanding_line` remains the authoritative signal of a launch not yet claimed.
 	//
 	// **A cut is served when the woken session claims the carry record, not when a process starts**
 	// (joshuafolkken/kit#1746). Counted at the spawn, the number asserted the very thing the supervisor
@@ -201,11 +207,36 @@ function is_overdue(marked_at: string, now: Date): boolean {
 	return now.getTime() - marked > WAKE_GRACE_MS
 }
 
-function decide_handed_off(input: WakeDecisionInput): WakeDecision {
+// **Whether to launch, pend, retry or give up, read from the wake mark alone.** It is reached from two
+// places — a record a cut handed off whose predecessor has gone, and a record no cut handed off whose
+// owner has *died* (the recovery below) — because both ask the same question once the decision to press
+// on has been made: is a wake already out, is it still inside its grace window, and are there retries
+// left. `woke_at === undefined` is "nothing outstanding, launch"; inside the window is `pending`; past
+// it, a retry while attempts remain and otherwise `failed`.
+function decide_launch(input: WakeDecisionInput): WakeDecision {
 	if (input.woke_at === undefined) return WAKE_DECISION
 	if (!is_overdue(input.woke_at, input.now)) return PENDING_DECISION
 
 	return input.attempts < MAX_WAKE_ATTEMPTS ? WAKE_DECISION : FAILED_DECISION
+}
+
+// **A record no cut handed off is one of two things, told apart by the owner's liveness**
+// (joshuafolkken/kit#2336). A *live* owner is a session spending the budget — the ordinary in-flight
+// state, and there is nothing to do but wait. A *dead* owner is the defect this branch exists for: a
+// session that claimed the record and then exited without cutting or ending — a woken session that
+// crashed during boot, reported its state and stopped, or was ended by a stray notification — leaves
+// the record `carried`, owned by a gone process, with no hand-off. Before this the supervisor answered
+// `wait` to both and so waited on the dead one until the 8-hour bound, stopping the whole run in
+// silence. Now a dead owner is recovered through the same grace/retry machinery a hand-off uses, so a
+// crash between the claim and the next cut re-wakes rather than stranding the invocation.
+//
+// **`is_owner_live` is `!== false`, so "cannot tell" counts as living** (`run-carry.ts` →
+// `is_owner_live`): a liveness read that cannot prove death keeps the safe answer, `wait`, and never
+// double-wakes a session that is merely unreadable.
+function decide_not_handed_off(input: WakeDecisionInput): WakeDecision {
+	if (input.is_owner_live) return WAIT_DECISION
+
+	return decide_launch(input)
 }
 
 // Only before the first launch for this cut. Once a wake is out, the record's owner is whatever the
@@ -232,10 +263,10 @@ function is_predecessor_exiting(input: WakeDecisionInput): boolean {
 // The whole policy, in four lines. Nothing else in this module decides whether to wake.
 function decide(input: WakeDecisionInput): WakeDecision {
 	if (input.read.kind !== 'carried') return { kind: 'stop', reason: STOP_REASONS[input.read.kind] }
-	if (input.read.carry.is_handed_off !== true) return WAIT_DECISION
+	if (input.read.carry.is_handed_off !== true) return decide_not_handed_off(input)
 	if (is_predecessor_exiting(input)) return HOLD_DECISION
 
-	return decide_handed_off(input)
+	return decide_launch(input)
 }
 
 // Keyed on the repository's common git directory, exactly as the carry record is — one supervisor per
