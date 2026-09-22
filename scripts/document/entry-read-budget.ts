@@ -55,8 +55,8 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// block in joshuafolkken/kit#2317 when `backlogrun-child.md`'s outage section recorded the
 	// session-resume re-dispatch and the outage-fold window.
 	{ entry: 'kickoff', bytes: 258_048 },
-	{ entry: 'fullrun', bytes: 253_952 },
-	{ entry: 'halfrun', bytes: 253_952 },
+	{ entry: 'fullrun', bytes: 258_048 },
+	{ entry: 'halfrun', bytes: 258_048 },
 	{ entry: 'backlogrun', bytes: 262_144 },
 	{ entry: LANE_CHILD, bytes: 131_072 },
 ]

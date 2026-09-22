@@ -8,6 +8,7 @@ import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
 import { gh_api } from './gh-api'
 import { git_force } from './git-force'
+import { implementation_cut } from './implementation-cut'
 import { issue_fold } from './issue-fold'
 import { issue_scout } from './issue-scout'
 import { josh_git_bare } from './josh-git-bare'
@@ -479,6 +480,33 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	git_force.ROW,
 	worktree_guard.ROW,
 	file_body.ROW,
+	// **The second row whose trigger is an `Edit` / `Write` rather than a shell call**
+	// (joshuafolkken/kit#2310), and the third that consults the world beside the call: "is this a lane
+	// child whose recent-context cost has crossed the threshold" reads the dispatch mark, the cut record
+	// on disk and the synchronous `pnpm josh cost --cut` verdict — the same measurement the parent
+	// hand-off uses, never a second one (joshuafolkken/kit#1933). The `Edit` / `Write` name match runs
+	// first, then the lane read, then the transcript-priced verdict, so a run that is not a dispatched
+	// child in an uncut lane pays nothing for it. It self-gates on the tool name, so it claims no `Bash`
+	// command any row above matches — the Bash `rules_claiming` invariant is untouched.
+	//
+	// **Listed before `rule-body`, the one row it can overlap.** Both trigger on an `Edit` / `Write`; a
+	// rule-document edit made in a lane child that is already over threshold trips both. The cut is the
+	// right thing to do first — end the process and drop the accumulated context — and on the reissue in
+	// the fresh, under-threshold process this row is silent and `rule-body` delivers, the "losing rule's
+	// delivery still correct one reissue later" reading any admissible overlap needs. It carries no
+	// `decide`, so it is silent only **between a cut and its resume**: the implementation resume clears
+	// the record (joshuafolkken/kit#2310, `run-cut-cli.ts`), so the carried-record check stops silencing
+	// the guard, and the fresh session's own transcript reads under threshold — the row re-arms per
+	// resume rather than per edit, instead of a lingering record silencing it for the rest of the run.
+	//
+	// **No `reaches`, because the occasion is live-only.** `pre-gate-cut` gives a `reaches` because both
+	// its halves leave a command-string trace (`run:cut --resume` at entry); this row's occasion —
+	// crossing the threshold mid-implementation — is the working directory, the cut record and the cost
+	// verdict, none of which a transcript records. `pnpm josh rule:value` therefore reads it as no runs
+	// rather than as 0% kept (`keeps` stays, so the compliance act is named for a future measurement
+	// redesign), the same honest-unmeasured stance the batching and investigation rows take for the same
+	// reason: a trigger no transcript can reconstruct. The row itself lives in `implementation-cut.ts`.
+	implementation_cut.ROW,
 	// **The first row whose trigger is an `Edit` / `Write` rather than a shell call**
 	// (joshuafolkken/kit#2272). It delivers the residency questions at the edit that writes a rule into
 	// prose, and self-gates on the tool name and the file path, so it claims no `Bash` command any row

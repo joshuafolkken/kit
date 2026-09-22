@@ -20,9 +20,16 @@ const TEST_TIMEOUT_MS = 10_000
 // before release with: pnpm vitest run scripts/build/packed-consumer.test.ts
 const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test.ts']
 
+// **`JOSH_LANE_CHILD` is blanked so the unit suite never inherits the lane it happens to run in**
+// (joshuafolkken/kit#2310). The gate runs inside a dispatched lane child, whose mark and lane cwd would
+// otherwise make every world-consulting rule guard (`pre-gate-cut`, `implementation-cut`, `lane-park`)
+// read a delivery fixture as a real lane-child call and fire on it. A suite that wants to test
+// lane-child behavior sets the mark itself in its own `beforeEach`, exactly as it always has; blank is
+// the "no dispatch mark" a person's session carries, which `marked_issue` reads as absent.
 const ENV: Record<string, string> = {
 	CLAUDE_CODE_SESSION_ID: 'vitest-session',
 	CODEX_THREAD_ID: '',
+	JOSH_LANE_CHILD: '',
 }
 
 const PURE_PROJECT = 'pure'

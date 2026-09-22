@@ -177,49 +177,54 @@ ends its process mid-implementation and a fresh one resumes the same lane **back
 
 ### The measurement is the parent hand-off's, never a second one
 
-The child decides whether to cut with the same measurement the parent uses between children —
-`pnpm josh cost --cut` (`cost_verdict.per_request_cost`), whose single source is
-`backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
+The guard below decides whether to refuse with the same measurement the parent uses between children —
+`cost_verdict.per_request_cost`, read through `cost_cli.session_verdict` (the read-only form of
+`pnpm josh cost --cut`, the verdict the conditional pre-gate cut reads too, joshuafolkken/kit#2312),
+whose single source is `backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
 `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` both use the shared **200_000** constant
 (`CONTEXT_CUT_THRESHOLD`, aliased so the procedure, scheduler and worker tests cannot drift). No
 separate measurement or threshold is built for the lane child.
 
-```bash
-pnpm josh cost --cut     # over → cut ; under → keep implementing
-```
+### It is a guard, fired at the edit that crosses the threshold (joshuafolkken/kit#2310)
 
-### Where the boundary is
+**This step was carried as prose and fired exactly never** — the fate the pre-gate cut met before
+joshuafolkken/kit#1864. joshuafolkken/kit#1933 reasoned it *could not* be a guard, because the
+per-request cost was read **asynchronously**; but `cost_cli.session_verdict` is synchronous and is the
+exact verdict `pnpm josh cost --cut` prints — the same statistic against the same `CONTEXT_CUT_THRESHOLD`,
+no second measurement. joshuafolkken/kit#2310 measured the cost of leaving the check to the child:
+across five lanes (#2304 #2294 #2297 #2296 #2298) the verdict was read once each at session entry, where
+the context has not yet grown, so the cut fired **0 times** while 33.9% of their requests ran past
+200,000 tokens.
 
-**At a consistent working-tree boundary, never mid-edit** — the natural one is **right after a single
-check (`lint:related` / `test:related`) has gone green**, between edit batches. A cut mid-`Edit` would
-hand the fresh process a half-written tree the resume would reject.
+So `pnpm josh rule:guard` **refuses an `Edit` / `Write`** while this checkout is a dispatched lane child
+whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N>` — a
+`PreToolUse` refusal lands *before* the edit does, so the tree is at the consistent state the previous
+edit left it, never mid-edit. Issue it: `cut` ends the turn, the rest leave this process implementing;
+a fresh process's `pnpm josh run:cut --resume <N>` then answers **`resume-impl`**, so it **skips the
+title, plan, hold claim and split assessment** and **continues implementation** rather than gating.
+Unlike the pre-gate cut, **the implementation resume clears the record** rather than marking it handed
+off (joshuafolkken/kit#2310): the pre-gate cut fires once per lane, so its record must survive to
+answer a second resume `handed-off` (joshuafolkken/kit#1935), but this one may fire again on a long
+implementation, so its record is removed on resume. A double cut is still impossible — `begin_cut`'s
+exclusive create is what prevents it — so a lane crosses this boundary several times, each with exactly
+one successor.
 
-### Taking it, and resuming into implementation
+- **It fires for a marked child and nowhere else** — the dispatch mark against this lane's own issue,
+  as the pre-gate cut reads it, so a person editing in a lane sees no refusal.
+- **It re-arms per resume, not per edit** — the resume clears the record, so both this guard and the
+  pre-gate guard (which read the same record through `carried_cut_sync`) stop being silenced by it, and
+  the fresh transcript then reads under threshold until the context grows again. A lingering record
+  would silence both for the rest of the run — the "fired 0 times" state joshuafolkken/kit#2310 removed.
+  The verdicts that leave this process implementing each need the reissued edit to go through, so
+  refusing every time would wedge them.
+- **It is silent between a cut and its resume** — a carried record naming this issue keeps it quiet
+  until the resume clears it.
 
-At such a boundary, when `pnpm josh cost --cut` answers `over`, issue `pnpm josh run:cut --impl <N>`.
-The verdicts are the pre-gate cut's exactly — `cut` ends the turn, the rest leave this process
-implementing. Only the stored record differs: the implementation phase, which the resume reads. A
-fresh process's `pnpm josh run:cut --resume <N>` then answers **`resume-impl`** rather than `resume` —
-**skip the title, the plan, the fresh hold claim and the split assessment**, re-read the plan and
-decisions, and **continue implementation**; do not go to the gate. Everything else is the pre-gate
-resume's, unchanged. The exclusive create and the spent hand-off (joshuafolkken/kit#1935) hold here
-too, so a lane may cross the implementation boundary several times, each crossing dropping the thinking
-and each having exactly one successor.
-
-### It is procedure, not a guard — and why
-
-The pre-gate cut is a `PreToolUse` refusal because it fires unconditionally at one place. The
-implementation cut cannot be: its trigger is the per-request cost, read **asynchronously**, while a
-`PreToolUse` guard answers synchronously — and a synchronous approximation would be the very "separate
-measurement for the lane child" joshuafolkken/kit#1933 forbids. So the child runs `pnpm josh cost
---cut` at each boundary itself. **A child that ended mid-implementation
-without cutting is detected per-child, after the fact, by `pnpm josh run:ending <N> --output <path>`**
-(joshuafolkken/kit#2139) — it classifies the ending as `merged` / `cut` / `abandoned` / `unreadable`,
-so the `abandoned` case goes into the park comment without opening the log.
-
-**A single check (`lint:related` / `test:related`) is run after a batch of edits, not after each
-one** — every check is a boundary this cut can be taken at, but it is also a request, and running one
-after every small edit grows the context this cut bounds (joshuafolkken/kit#1383).
+`scripts/rules/implementation-cut.ts` implements the trigger, `scripts/rules/implementation-cut.test.ts`
+pins it, and the row joins `prompts/collaboration-workflow/rule-delivery.md`. **A child that ended
+without cutting is still detected after the fact by `pnpm josh run:ending <N> --output <path>`**
+(joshuafolkken/kit#2139). **A single check (`lint:related` / `test:related`) is run after a batch of
+edits, not after each one** — every check is a request too (joshuafolkken/kit#1383).
 
 ## The threshold, and the statistic it is measured against
 
@@ -230,10 +235,11 @@ changed. This supersedes joshuafolkken/kit#2282, which had kept the whole-sessio
 this recent-context option on the batch it measured — short-lived lane children that never contained a
 parent session (joshuafolkken/kit#2295), for which the two averages nearly coincide.
 
-- **The safety net stays a safety net.** The implementation-phase cut was built
-  (joshuafolkken/kit#1933) for a pathological regime a typical lane never enters, and 200_000 sits below
-  the 208k floor of that regime, so a genuinely runaway implementation still trips it — "it never fired"
-  is the net waiting.
+- **The safety net now fires.** The implementation-phase cut was built (joshuafolkken/kit#1933) for a
+  pathological regime a typical lane never enters, and 200_000 sits below the 208k floor of that regime,
+  so a genuinely runaway implementation still trips it — and joshuafolkken/kit#2310 made the guard trip
+  it actively at the edit that crosses the threshold, closing the "it never fired" gap the net had been
+  waiting on.
 - **The recent window catches the long parent the whole-session average missed.** The 2026-09-21
   parent session `567f8eac` (186 requests, 7 hours) first crossed 200k at request 65, but its
   whole-session average did not cross until request 150 — **85 requests (~4 hours) later**, ~$7.88
