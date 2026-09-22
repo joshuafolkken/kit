@@ -93,10 +93,15 @@ const SETUP_CUT_REASON =
 	'⛔ setup-phase cut: this checkout is a lane dispatched for this issue and its plan has been posted, ' +
 	'so setup is done — the skill, the manual documents and the issue body it read (~130,000 tokens) are ' +
 	'now re-read on every later request. Take the cut before this first implementation edit. ' +
-	'`pnpm josh run:cut <N> --setup` ends this process and relaunches a fresh one that resumes into ' +
+	'First write a handoff file with the Write tool — the user’s instruction verbatim, what you have ' +
+	'completed, what remains, and what you deliberately did not touch — and pass it as `--handoff <path>`, ' +
+	'so the fresh process resumes on the original instruction rather than the working tree alone ' +
+	'(joshuafolkken/kit#2354); a resume that finds no instruction is refused `incomplete` rather than ' +
+	'continuing blind. ' +
+	'`pnpm josh run:cut <N> --setup --handoff <path>` ends this process and relaunches a fresh one that resumes into ' +
 	'implementation (`resume-impl`), dropping the setup context rather than carrying it — ' +
 	'joshuafolkken/kit#2346 built the boundary and put its position in the run driver (`run:step`). Issue ' +
-	'`pnpm josh run:cut <N> --setup` now and read the verdict: on `cut`, **end the turn immediately** — ' +
+	'`pnpm josh run:cut <N> --setup --handoff <path>` now and read the verdict: on `cut`, **end the turn immediately** — ' +
 	'the fresh process owns the run and continues into implementation, so it must not be waited for; on ' +
 	'`not-a-lane`, `unready`, `busy`, `failed` or `unknown`, this process carries the run on and the edit ' +
 	'is simply the next call. Never relaunch a second process after `busy`. This fired because the ' +

@@ -842,7 +842,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:cut": [
-      "[--resume] <issue>",
+      "[--resume] <issue> [--impl|--setup] [--handoff <path>]",
       "automation",
       [
         "files",

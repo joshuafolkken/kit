@@ -122,3 +122,17 @@ describe('the row is delivered', () => {
 		expect(delivered_rules.DELIVERED_RULES.some((rule) => rule.id === 'setup-cut')).toBe(true)
 	})
 })
+
+// joshuafolkken/kit#2354: the cut must write and pass the handoff, so the resume carries the
+// instruction rather than resuming on the working tree alone.
+describe('SETUP_CUT_REASON', () => {
+	it.each([
+		['--handoff <path>'],
+		['deliberately did not touch'],
+		// The `--handoff <path>` rides on the actionable "issue this now" command, not just in prose: an
+		// issue-now line that dropped the flag would take the cut and strand the resume `incomplete`.
+		['pnpm josh run:cut <N> --setup --handoff <path>'],
+	])('carries %j', (marker) => {
+		expect(setup_cut.SETUP_CUT_REASON).toContain(marker)
+	})
+})

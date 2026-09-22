@@ -109,12 +109,17 @@ const IMPLEMENTATION_CUT_REASON =
 	'⛔ implementation-phase cut: this checkout is a lane dispatched for this issue and its recent-context ' +
 	'cost has crossed the shared 200,000-token threshold mid-implementation, so the thinking accumulated ' +
 	'so far is now re-read on every later request. Take the cut before this edit. ' +
-	'`pnpm josh run:cut --impl <N>` ends this process and relaunches a fresh one that resumes back into ' +
+	'First write a handoff file with the Write tool — the user’s instruction verbatim, what you have ' +
+	'completed, what remains, and what you deliberately did not touch — and pass it as `--handoff <path>`, ' +
+	'so the fresh process resumes on the original instruction rather than the working tree alone ' +
+	'(joshuafolkken/kit#2354); a resume that finds no instruction is refused `incomplete` rather than ' +
+	'continuing blind. ' +
+	'`pnpm josh run:cut --impl <N> --handoff <path>` ends this process and relaunches a fresh one that resumes back into ' +
 	'implementation (`resume-impl`), dropping the accumulated context rather than carrying it — ' +
 	'joshuafolkken/kit#1933 built the boundary and joshuafolkken/kit#2310 measured it firing 0 times ' +
 	'because the verdict was only ever read at session entry, where the context has not yet grown. The ' +
 	"verdict is `pnpm josh cost --cut`'s exactly — the same per-request billed-input statistic against the " +
-	'same threshold, never a second measurement. Issue `pnpm josh run:cut --impl <N>` now and read the ' +
+	'same threshold, never a second measurement. Issue `pnpm josh run:cut --impl <N> --handoff <path>` now and read the ' +
 	'verdict: on `cut`, **end the turn immediately** — the fresh process owns the run and continues ' +
 	'implementing, so it must not be waited for; on `not-a-lane`, `unready`, `busy`, `failed` or ' +
 	'`unknown`, this process carries the run on and the edit is simply the next call. Never relaunch a ' +

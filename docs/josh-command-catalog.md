@@ -1109,7 +1109,7 @@ Carry one invocation’s budget across its own session cuts
 
 > **Audience:** automation · **Side effects:** files
 
-`[--resume] <issue>`
+`[--resume] <issue> [--impl|--setup] [--handoff <path>]`
 
 Cut a lane child before the gate and resume a fresh process
 

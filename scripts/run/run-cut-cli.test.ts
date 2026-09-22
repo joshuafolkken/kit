@@ -21,8 +21,7 @@ import { run_event_stream_emit } from './run-event-stream-emit'
 // a double cut is refused, a matching tree resumes, and a relaunch failure clears the record so the
 // current process is never stranded.
 
-const TEST_PREFIX = 'run-cut-cli-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = mkdtempSync(path.join(tmpdir(), 'run-cut-cli-test-'))
 const REPOSITORY = path.join(scratch, 'repository.git')
 
 const ISSUE = '1839'
@@ -86,9 +85,13 @@ function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv
 	return built
 }
 
+// The instruction a resume into implementation requires (joshuafolkken/kit#2354); carried on every
+// declared cut here, harmless where a pre-gate cut resumes into the gate and does not read it.
+const HANDOFF = { instruction: 'go', completed: [], remaining: [], untouched: [] }
+
 // A declared cut already on disk, as a fresh process would find one at its entry.
 function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
-	run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH, phase })
+	run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH, phase, handoff: HANDOFF })
 }
 
 beforeEach(() => {
