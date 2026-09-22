@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -58,5 +59,49 @@ describe('run_event_stream_emit.emit — best-effort', () => {
 		await expect(
 			run_event_stream_emit.emit(run_event_stream.EVENT_KIND.STOP, 'x'),
 		).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#2335: `emit_once` writes a marker a watching loop re-checks every poll a single time
+// per episode — the drain marker `backlog:offer` emits so `run:step` fires the retrospective once.
+const { DRAIN } = run_event_stream.EVENT_KIND
+const DRAIN_TEXT = 'backlog drained'
+
+// A fresh repository string per test so its stamp path is its own file; a UUID rather than a shared
+// counter keeps `fresh_repository` from assigning a top-level variable.
+function fresh_repository(): string {
+	return path.join(TEMPORARY, `${randomUUID()}.git`)
+}
+
+async function drain_events(): Promise<ReadonlyArray<{ kind: string }>> {
+	const target = await run_event_stream_emit.stream_target()
+
+	if (target === undefined) throw new Error('no stream target resolved')
+
+	const events = run_event_stream.read_events(target)
+
+	rmSync(target, { force: true })
+
+	return events.filter((event) => event.kind === DRAIN)
+}
+
+describe('run_event_stream_emit.emit_once — one marker per episode', () => {
+	it('appends the first time, then skips while it is still the newest event', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)
+
+		expect(await drain_events()).toHaveLength(1)
+	})
+
+	it('appends again once a different event has intervened', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, '#7 merged')
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT)
+
+		expect(await drain_events()).toHaveLength(2)
 	})
 })

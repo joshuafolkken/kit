@@ -58,6 +58,10 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// grew by §2j: every entry that reads `SKILL.md` discovers the retrospective document, so its ~5KB
 	// and the new section crossed a block for each. The lane child is exempt — it never runs the
 	// retrospective (`run:step` answers `stop` for a child at the stop position), so it skips both.
+	// joshuafolkken/kit#2335 recorded the drain-time firing with the operational detail in
+	// `retrospective.md` (which the lane child skips) and a one-line pointer in `backlogrun-steps.md`, so
+	// every entry stayed within its block rather than climbing back to a pre-#2294 ceiling the downward
+	// ratchet holds shut.
 	{ entry: 'kickoff', bytes: 266_240 },
 	{ entry: 'fullrun', bytes: 266_240 },
 	{ entry: 'halfrun', bytes: 266_240 },

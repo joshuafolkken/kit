@@ -499,6 +499,11 @@ table above carries, now applied inside the command from the counts the loop alr
 | `watch` | Ask both commands again — at the 5-minute idle poll while the backlog is empty **and** nothing of this run's is in flight, and at the 60-second polling interval in every other case (a blocked backlog, a drain, or a watch that opened while children were still merging). *Whether the parent keeps that interval as a clock of its own* is the in-flight test: with nothing in flight the watcher declines for the whole watch and never exits, so the parent sleeps the interval itself; with something in flight the wake is the watcher's exit and the interval is only a floor on the re-ask (`backlogrun-progress.md` → "The wake exists only while something is in flight"). **Nothing is held while watching** — the working tree's hold and each drained lane were released at the last child's merge, so a watching run blocks no other run |
 | `stop` | Report and finish. The reason it printed **is** the termination reason the completion report carries |
 
+**At the drain the retrospective fires before this watch, not after it** (joshuafolkken/kit#2335):
+`backlog:offer` marks the drain on the event stream and `run:step` fires the retrospective there, so the
+watch that follows picks up its `auto-ok` filings. `retrospective.md` → "When it fires" is the single
+source, read when `run:step` prints the step.
+
 `--started` is when the invocation began; `--active` is when it last had work — the most recent ask
 that was **not** `exhausted`, and in a resumed session the moment it picked the run up. **Refreshing
 `--active` restarts the idle watch**, so an issue opted in mid-watch is picked up and the watch begins

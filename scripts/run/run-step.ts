@@ -111,8 +111,8 @@ function command(line: string): StepAction {
 
 // The action for each event a run can be positioned at, keyed on the newest one. Each dispatches to the
 // command that owns that phase; `child-launch` is the one position with no command to run — the parent
-// waits for its child. `stop` is handled apart in `stop_action`, because whether it still owes a
-// retrospective needs more than the issue number. A merge and an outage share a next step: `run:merge`
+// waits for its child. `stop` and `drain` are handled apart in `stop_action` / `drain_action`, because
+// whether either still owes a retrospective needs more than the issue number. A merge and an outage share a next step: `run:merge`
 // classifies both, including the outage's stop condition.
 const KIND = run_event_stream.EVENT_KIND
 const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
@@ -132,15 +132,36 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 // (joshuafolkken/kit#2297).
 const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
 
-// A stopped run's last owed step is the end-of-run retrospective (joshuafolkken/kit#2328) — unless this
-// run is a dispatched lane child, where the batch runs one at its own end and never a child's (the
-// `release:scope` precedent), the retrospective has already run this invocation, or this is a consumer
-// checkout, where the kit-only command is refused. All three stop with no command to run, which is what
-// the position meant before the retrospective existed.
-function stop_action(input: StepInput): StepAction {
-	if (input.is_lane_child || input.is_retrospective_done || input.is_consumer) return verdict(STOP)
+// Whether a run at a winding-down position still owes its end-of-run retrospective
+// (joshuafolkken/kit#2328) — false for a dispatched lane child, where the batch runs one at its own end
+// and never a child's (the `release:scope` precedent), for a run whose retrospective has already run this
+// invocation, and in a consumer checkout, where the kit-only command is refused. The two positions that
+// consult it are the drain and the stop; both read exactly this, so the exclusion set is single-sourced.
+function is_retrospective_owed(input: StepInput): boolean {
+	return !input.is_lane_child && !input.is_retrospective_done && !input.is_consumer
+}
 
-	return command(RETROSPECTIVE_COMMAND)
+// A stopped run's last owed step is the end-of-run retrospective. When it is not owed the position stops
+// with no command to run, which is what the position meant before the retrospective existed.
+function stop_action(input: StepInput): StepAction {
+	return is_retrospective_owed(input) ? command(RETROSPECTIVE_COMMAND) : verdict(STOP)
+}
+
+// The drain fires the retrospective *before* the idle watch, not after it (joshuafolkken/kit#2335): the
+// retrospective files the improvement issues the watch then picks up, so running it after the watch — as
+// the stop position alone did — spent the watch on an empty pool. When the retrospective is not owed the
+// run proceeds to that watch, which is a `WAIT` rather than a `STOP`: the backlog is empty but the run is
+// not ending, and the real `STOP` follows when the watch expires with the retrospective already done.
+function drain_action(input: StepInput): StepAction {
+	return is_retrospective_owed(input) ? command(RETROSPECTIVE_COMMAND) : verdict(WAIT)
+}
+
+// The two positions whose action needs the whole input rather than the issue number — a stop and a
+// drain both turn on whether the retrospective is still owed. Kept in a map so `next_action` dispatches
+// them in one branch rather than one `if` apiece (`is_retrospective_owed` is the shared gate).
+const FULL_INPUT_ACTIONS: Record<string, (input: StepInput) => StepAction> = {
+	[KIND.STOP]: stop_action,
+	[KIND.DRAIN]: drain_action,
 }
 
 // An event the table does not name leaves the position unknown rather than guessing a next step. A
@@ -181,8 +202,9 @@ function next_action(input: StepInput): StepAction {
 	if (is_pre_implementation(input.last_event)) return verdict(pre_verdict(input))
 
 	const event = input.last_event ?? ''
+	const full_input_action = FULL_INPUT_ACTIONS[event]
 
-	if (event === KIND.STOP) return stop_action(input)
+	if (full_input_action !== undefined) return full_input_action(input)
 
 	return event_action(event, input.issue_number, input.is_lane_child)
 }

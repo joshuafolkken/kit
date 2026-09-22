@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
 import { rule_value_cli } from '#scripts/rules/rule-value-cli'
+import { run_event_stream } from '#scripts/run/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { backlog_offer, type OfferAnswer } from './backlog-offer'
 
 // `josh backlog:offer` — one composite command for a `backlogrun` loop-head event
@@ -23,6 +25,12 @@ const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'offer'
 const DEFAULT_COUNT = 0
 const RUN_VERDICT = 'run'
+// The one budget verdict and mapped answer that name a drain, plus the running count that means the run
+// has nothing of its own in flight (joshuafolkken/kit#2335). Read together in `mark_drain`.
+const WATCH_VERDICT = 'watch'
+const EXHAUSTED_ANSWER = 'exhausted'
+const NO_RUNNING = 0
+const DRAIN_TEXT = 'backlog drained'
 const should_forward_stderr = true
 const COUNT_PATTERN = /^\d+$/u
 
@@ -75,9 +83,14 @@ function count_of(raw: string | undefined, fallback: number): number | undefined
 	return raw === undefined ? fallback : to_count(raw)
 }
 
+interface OfferCounts {
+	running: number
+	retries: number
+}
+
 // The two counts the mapping needs: `--running` decides `wait`, `--retries` decides `retry`. Either
 // given but unreadable refuses the whole invocation.
-function counts_of(values: ParsedValues): { running: number; retries: number } | undefined {
+function counts_of(values: ParsedValues): OfferCounts | undefined {
 	const running = count_of(text_of(values.running), DEFAULT_COUNT)
 	const retries = count_of(text_of(values.retries), DEFAULT_COUNT)
 
@@ -146,6 +159,38 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
+// The drain: the backlog is empty (`exhausted`) and nothing of the run's own is in flight, so the run is
+// about to open its idle watch. Marking the stream here — once per drain, which `emit_once` guarantees —
+// is what lets `run:step` fire the end-of-run retrospective *before* the watch rather than after it
+// (joshuafolkken/kit#2335), so the improvement issues the retrospective files are what the watch then
+// picks up. A watch that opened while children were still merging (`running > 0`) is not this drain: the
+// retrospective waits for the true idle, and the marker is emitted from the loop head for the same
+// reason `run:merge` emits its own events — the command that detects the event owns writing it.
+async function mark_drain(verdict: string, answer: string, running: number): Promise<void> {
+	if (verdict !== WATCH_VERDICT || answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return
+
+	await run_event_stream_emit.emit_once(run_event_stream.EVENT_KIND.DRAIN, DRAIN_TEXT)
+}
+
+async function decide(values: ParsedValues, counts: OfferCounts): Promise<number> {
+	const next = await josh_command.josh_run(next_argv(values), should_forward_stderr)
+	const offer = backlog_offer.answer_of(
+		{ code: next.code, tokens: to_tokens(next.out) },
+		counts.running,
+		counts.retries,
+	)
+	const budget = await josh_command.josh_run(
+		budget_argv(values, offer.answer),
+		should_forward_stderr,
+	)
+
+	if (budget.code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
+
+	await mark_drain(budget.out, offer.answer, counts.running)
+
+	return emit(budget.out, offer, values.json === true)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const values = read_values(argv)
 
@@ -161,20 +206,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (counts === undefined) return refuse()
 
-	const next = await josh_command.josh_run(next_argv(values), should_forward_stderr)
-	const offer = backlog_offer.answer_of(
-		{ code: next.code, tokens: to_tokens(next.out) },
-		counts.running,
-		counts.retries,
-	)
-	const budget = await josh_command.josh_run(
-		budget_argv(values, offer.answer),
-		should_forward_stderr,
-	)
-
-	if (budget.code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
-
-	return emit(budget.out, offer, values.json === true)
+	return await decide(values, counts)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

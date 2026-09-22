@@ -46,6 +46,12 @@ const EVENT_KIND = {
 	PARK: 'park',
 	OUTAGE: 'outage',
 	CUT: 'cut',
+	// The backlog emptied while nothing of the run's own was in flight — the drain
+	// (joshuafolkken/kit#2335). It marks the position at which the end-of-run retrospective is owed,
+	// *before* the idle watch opens, so `run:step` fires the retrospective at the drain rather than after
+	// the watch runs its course. It is not itself a stop: the run watches on once the retrospective has
+	// run, and the real `STOP` follows when the watch expires.
+	DRAIN: 'drain',
 	STOP: 'stop',
 	PR_OPENED: 'pr-opened',
 	REVIEW_ROUND: 'review-round',
