@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { hook_decision } from '#scripts/josh/hook-decision'
 import { find_package_directory } from '#scripts/josh/josh-logic'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry, type CarryRead } from './run-carry'
@@ -19,6 +20,10 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh run:step <issue-number>'
+// The opt-in switch that gates the end-of-run retrospective (joshuafolkken/kit#2370). Read here rather
+// than in `run-step.ts` so the position logic stays a pure function of its input; it defaults off, so an
+// unset variable prints no retrospective step.
+const RETROSPECTIVE_ENV_KEY = 'JOSH_RETROSPECTIVE'
 
 interface RunReads {
 	carry_kind: CarryRead['kind']
@@ -58,6 +63,7 @@ async function gather(issue_number: string): Promise<StepInput> {
 		is_retrospective_done: run_reads.is_retrospective_done,
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
+		is_retrospective_enabled: hook_decision.is_switch_opt_in(RETROSPECTIVE_ENV_KEY),
 	}
 }
 
@@ -80,6 +86,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
+	// Load `.env` on the real command path only, so `JOSH_RETROSPECTIVE` set there reaches `gather`; the
+	// unit tests call `run`/`gather` directly and are never swayed by a developer's `.env`.
+	hook_decision.load_environment_file()
 	process.exitCode = await run(argv)
 }
 

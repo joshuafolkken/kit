@@ -112,6 +112,34 @@ describe('hook_decision.is_switch_enabled', () => {
 	})
 })
 
+// joshuafolkken/kit#2370: the opt-in counterpart of `is_switch_enabled`. Where that one defaults on, this
+// one defaults off, so a switch that must stay disabled unless asked for reads through it.
+describe('hook_decision.is_switch_opt_in', () => {
+	it('is off when the variable is unset, so the switch stays disabled by default', () => {
+		process.env[SWITCH_KEY] = UNSET
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(false)
+	})
+
+	it.each([...hook_decision.ENABLED_VALUES])('is on for %s', (value) => {
+		process.env[SWITCH_KEY] = value
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(true)
+	})
+
+	it('is off for a spelling the list does not recognize, so a typo cannot enable it', () => {
+		process.env[SWITCH_KEY] = 'enable'
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(false)
+	})
+
+	it('trims and lower-cases before matching, so a padded value still reads as on', () => {
+		process.env[SWITCH_KEY] = '  ON  '
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(true)
+	})
+})
+
 describe('hook_decision.deny_envelope', () => {
 	// Only this shape stops a call, and only `permissionDecisionReason` reaches the model. Asserted as
 	// the exact object: an extra key is a shape Claude Code was not documented to accept.
