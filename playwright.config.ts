@@ -31,6 +31,13 @@ const PREVIEW_PORT = ports.resolve_preview_port()
 
 const CI_TIMEOUT = 120_000
 const LOCAL_TIMEOUT = 30_000
+// pnpm 11.27.1+ places a script it runs without a controlling terminal in its own process group, so
+// Playwright's default teardown — SIGKILL to the webServer's group — no longer reaches the `vite dev`
+// / `preview` child: it survives holding Playwright's stdio pipes open, and Playwright blocks forever
+// on the `close` event (#2386). SIGTERM, unlike SIGKILL, is relayed by that pnpm to the child, so a
+// graceful shutdown lets the server exit and the pipes close. The timeout must stay well above the
+// observed ~40ms shutdown, or Playwright falls back to killProcess() (SIGKILL) and the hang returns.
+const SHUTDOWN_TIMEOUT = 10_000
 const CI_TEST_TIMEOUT = 30_000
 const ACTION_TIMEOUT = 10_000
 const NAV_TIMEOUT = 30_000
@@ -84,18 +91,24 @@ if (!IS_CI) delete process.env['CI']
 // application; a seed reduces how often a foreign server is on the port at all.
 const IS_REUSE_ENABLED = environment_flags.is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])
 
+// Both branches share one shutdown policy — see SHUTDOWN_TIMEOUT for why SIGTERM rather than the
+// SIGKILL default. `as const` keeps the signal a literal so it satisfies Playwright's signal union.
+const GRACEFUL_SHUTDOWN = { signal: 'SIGTERM', timeout: SHUTDOWN_TIMEOUT } as const
+
 const web_server_config = IS_CI
 	? {
 			command: 'pnpm run build && pnpm run preview',
 			port: PREVIEW_PORT,
 			timeout: CI_TIMEOUT,
 			reuseExistingServer: IS_REUSE_ENABLED,
+			gracefulShutdown: GRACEFUL_SHUTDOWN,
 		}
 	: {
 			command: 'pnpm run dev',
 			port: DEV_PORT,
 			timeout: LOCAL_TIMEOUT,
 			reuseExistingServer: IS_REUSE_ENABLED,
+			gracefulShutdown: GRACEFUL_SHUTDOWN,
 		}
 
 const env_config: EnvConfig = IS_CI

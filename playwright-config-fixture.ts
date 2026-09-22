@@ -12,10 +12,16 @@ const REUSE_KEY = 'PLAYWRIGHT_REUSE_SERVER'
 const SEED_KEY = 'PORT_SEED'
 const TEMP_DIRECTORY_PREFIX = 'kit-playwright-'
 
+interface GracefulShutdown {
+	signal?: string
+	timeout?: number
+}
+
 interface WebServer {
 	command?: string
 	port?: number
 	reuseExistingServer?: boolean
+	gracefulShutdown?: GracefulShutdown
 }
 
 // One throwaway project per suite file, created as the fixture loads so no hook has to assign it.

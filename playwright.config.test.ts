@@ -20,6 +20,12 @@ const PREVIEW_COMMAND = 'pnpm run build && pnpm run preview'
 const DEV_PORT = 5173
 const PREVIEW_PORT = 4173
 
+const SHUTDOWN_SIGNAL = 'SIGTERM'
+const EXPECTED_SHUTDOWN_TIMEOUT = 10_000
+// SIGTERM from ~40ms shutdown; the window must stay wide enough that Playwright never falls back to
+// its SIGKILL killProcess() path, which is the hang this config exists to avoid.
+const MIN_SHUTDOWN_TIMEOUT = 1000
+
 async function load_max_failures(ci: string | undefined): Promise<number | undefined> {
 	const { maxFailures: max_failures } = await playwright_config_fixture.import_config(ci, undefined)
 
@@ -118,6 +124,31 @@ describe('playwright.config CI env normalization', () => {
 		await playwright_config_fixture.import_config(undefined, undefined)
 
 		expect(process.env[CI_KEY]).toBeUndefined()
+	})
+})
+
+// Regression guard for #2386: pnpm 11.27.1+ puts a terminal-less script in its own process group, so
+// Playwright's default SIGKILL teardown no longer reaches the `vite dev` / `preview` child — it
+// survives holding the stdio pipes open and Playwright blocks forever on `close`. A SIGTERM graceful
+// shutdown is relayed to the child so it exits; both branches must carry it, with a timeout wide
+// enough that Playwright never falls back to the SIGKILL killProcess() path.
+describe.each(REUSE_BRANCHES)('playwright.config webServer gracefulShutdown $label', ({ ci }) => {
+	it('requests a SIGTERM graceful shutdown', async () => {
+		const web_server = await playwright_config_fixture.load_web_server(ci, undefined)
+
+		expect(web_server.gracefulShutdown?.signal).toBe(SHUTDOWN_SIGNAL)
+	})
+
+	it('pins the shutdown timeout to the configured value', async () => {
+		const web_server = await playwright_config_fixture.load_web_server(ci, undefined)
+
+		expect(web_server.gracefulShutdown?.timeout).toBe(EXPECTED_SHUTDOWN_TIMEOUT)
+	})
+
+	it('keeps the timeout well above the shutdown time to avoid the SIGKILL fallback', async () => {
+		const web_server = await playwright_config_fixture.load_web_server(ci, undefined)
+
+		expect(web_server.gracefulShutdown?.timeout).toBeGreaterThanOrEqual(MIN_SHUTDOWN_TIMEOUT)
 	})
 })
 
