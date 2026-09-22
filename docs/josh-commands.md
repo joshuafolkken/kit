@@ -1540,6 +1540,14 @@ pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 
 Bundles the reads a run makes before its first edit into one call.
 
+### `josh run:entry`
+
+Opens a run in one call, folding the four-round-trip entry sequence a lane re-billed its context on
+(joshuafolkken/kit#2372): `run:hold`, `cost --cut` (skipped in a dispatched lane child), `run:prep` and
+`run:step`. The `entry #<N> — hold: … · cost: … · verdict: …` line carries the three facts the run
+branches on; a `busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit — the
+shape `backlog:offer` folded the parent loop head on.
+
 ### `josh run:status`
 
 Bundles a run's read-only status — issue state, `cost --cut` verdict, and carry counters — in one
@@ -1646,6 +1654,14 @@ The default waits only for the gate to _start_ (never for the checks to pass) an
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
 the mechanical form of "a review verdict is not adopted over a red gate". The overlap's reader is
 joshuafolkken/kit#2179 and `chain-rule.md`.
+
+### `josh run:tail`
+
+Closes a run in one call, folding the three-round-trip post-merge sequence (joshuafolkken/kit#2372):
+`observations:flush`, `issue:cite` (the closed issue and any follow-ups filed this run) and
+`release:scope`, run in order — the ledger commits before the release scope reads main — and joined
+under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
+merge and the push above it stay their own calls.
 
 ### `josh run:report`
 

@@ -11,6 +11,15 @@ are `fullrun-steps.md`, read when a step needs its detail.
 
 ## The ordered entry sequence
 
+**One call folds the mechanical steps of this sequence** (joshuafolkken/kit#2372): `pnpm josh
+run:entry <N>` claims the tree, reads the budget, bundles the reads and decides the pre-implementation
+step — steps 1, 3, 4 and 5 below in one round trip, so a lane no longer re-bills its context on each.
+Its `entry #<N> — hold: … · cost: … · verdict: …` line carries the three facts the run branches on; a
+`busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit, and the numbered steps
+below are the detail behind each fact (`run:entry` reuses their own logic, it does not replace their
+single sources). Step 2 — the `in-progress` label — stays its own call, applied the moment the folded
+call reports `hold`.
+
 1. **Claim the working tree — first, before anything else.** `pnpm josh run:hold <N>` (bare
    `pnpm josh run:hold` for `fullrun new`), ahead of the title, `git switch main` and a `new` entry's
    filing. `hold` continues; `busy` / `unknown` stop with a `confirmation` Telegram carrying stderr.

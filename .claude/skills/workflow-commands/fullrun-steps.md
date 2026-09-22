@@ -68,6 +68,14 @@ josh release:scope` and close the completion summary with what it answered** (`f
 
 ## The release ask — the last step of either form
 
+**One call folds the post-merge bookkeeping** (joshuafolkken/kit#2372): after the merge, `pnpm josh
+run:tail <N>` commits the observation ledger (`observations:flush`), reads the completion citations
+(`issue:cite`, given the closed issue and any follow-ups filed this run) and decides the release scope
+(`release:scope`) in one round trip, joining each under its own header. It folds only bookkeeping — the
+release ask below stays the single source of what `required` means and the Tier-C publish boundary; a
+`backlogrun` child still leaves `observations:flush`, `issue:cite` and the release ask to the batch's
+own end.
+
 Once the merge is done, `pnpm josh release:scope` says whether a release is owed — `required`, `skip`
 or `unknown`, and `unknown` is never read as `skip`. On `required` the completion summary closes with
 the request and the exact command; the run never types `pnpm josh release` itself, because publishing
