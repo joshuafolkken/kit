@@ -32,6 +32,7 @@ const PNPM_LOCKFILE = 'pnpm-lock.yaml'
 const MANAGED_SCANNER_PATH = '/managed/osv-scanner'
 const EXECUTABLE_MODE = 0o755
 const READABLE_MODE = 0o644
+const PNPM_JOSH_AUDIT = 'pnpm josh audit'
 const RETIRED_AUDIT = 'pnpm audit'
 const RETIRED_AUDIT_RUN = `run: ${RETIRED_AUDIT}`
 const RETIRED_AUDIT_FRAGMENT = `${RETIRED_AUDIT} `
@@ -322,7 +323,7 @@ describe('josh latest command audit wiring', () => {
 	it('invokes the audit via pnpm josh so it does not depend on a global josh install', () => {
 		// A bare `josh audit` fails with "command not found" when the global CLI
 		// is not installed (fresh checkout / CI); the chain must use `pnpm josh`.
-		expect(latest_command).toContain('pnpm josh audit')
+		expect(latest_command).toContain(PNPM_JOSH_AUDIT)
 		expect(latest_command).not.toMatch(/&&\s*josh audit/u)
 	})
 
@@ -337,7 +338,7 @@ describe('lefthook/base.yml pre-commit audit wiring', () => {
 	const lines = content.split('\n').map((line) => line.trim())
 
 	it('runs security audit via pnpm josh on pre-commit', () => {
-		expect(content).toContain('run: pnpm josh audit')
+		expect(content).toContain(PNPM_JOSH_AUDIT)
 	})
 
 	it('does not call the retired pnpm audit command from the pre-commit hook', () => {

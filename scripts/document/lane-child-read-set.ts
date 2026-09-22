@@ -45,10 +45,19 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // **`retrospective.md` is the parent's too** (joshuafolkken/kit#2328): the end-of-run retrospective
 // runs once at the batch's own end, never in a leaf child, so `run:step` answers `stop` for a child at
 // the stop position and the child never opens it.
+// **`backlogrun-steps.md` is the parent's too** (joshuafolkken/kit#2357): it is the scheduler's step
+// list — what one invocation approves, the named-issue order, the session-cut record, the loop and the
+// once-per-session tail — none of which a leaf child performs. Every reference to it lives in a
+// document the child never reads (`backlogrun.md`, `backlogrun-progress.md`, `retrospective.md`) or in a
+// `SKILL.md` section the child trims (§0's session-cut note, §2b, §2i, §2j), so the child has no path
+// that opens it. It was the child's single largest read — ~16,000 tokens read whole — charged for a
+// document it never reaches, so dropping it is a correction of an over-count, not a loss of any rule the
+// child needs. The parent still reads it in full.
 const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'backlogrun-child.md',
 	'backlogrun-lanes.md',
 	'backlogrun-progress.md',
+	'backlogrun-steps.md',
 	'latest-gate.md',
 	'retrospective.md',
 ])

@@ -575,6 +575,16 @@ Git hook: block commits to main
 
 ---
 
+### `josh reserved-run` · `josh rer`
+
+> **Audience:** automation · **Side effects:** processes
+
+`<weight> -- <command...>`
+
+Git hook: run a command while holding a place in the machine-wide core budget
+
+---
+
 ### `josh secretlint-scan` · `josh ss`
 
 > **Audience:** automation · **Side effects:** none
