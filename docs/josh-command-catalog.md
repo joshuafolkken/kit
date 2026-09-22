@@ -1265,6 +1265,16 @@ Print the run’s next single action, computed from the event stream, carry reco
 
 ---
 
+### `josh run:stranded` · `josh rsd`
+
+> **Audience:** automation · **Side effects:** processes, notifications
+
+_No arguments._
+
+Report whether the run is stranded — budget handed off, owner gone, and no supervisor watching
+
+---
+
 ### `josh run:wake` · `josh rw`
 
 > **Audience:** automation · **Side effects:** processes, notifications
