@@ -234,3 +234,9 @@ words:
   # comment on why a version that cannot be read is treated as below the floor (joshuafolkken/kit#2200).
   # The negated form of "able to be spawned", which cspell does not derive from "spawn".
   - unspawnable
+  # Verb coined for turning a bare `#N` into a number-link at the source that prints it — the citation
+  # formatter `issue_citation.linkify` in `scripts/rules/issue-citation.ts` (joshuafolkken/kit#2329).
+  # It and its inflections appear only in that module, the printing commands, and their suites.
+  - linkify
+  - linkified
+  - linkifies

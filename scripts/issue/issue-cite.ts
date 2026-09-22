@@ -90,6 +90,7 @@ function no_repo_line(target: CiteTarget): string {
 const issue_cite = {
 	SUMMARY_SEPARATOR,
 	citation_line,
+	issue_url,
 	label,
 	missing_line,
 	no_repo_line,

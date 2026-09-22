@@ -78,7 +78,7 @@ function stdout(): string {
 async function answer_for(children: ReadonlyArray<EpicChild>): Promise<number> {
 	const views = epic_view_fixture.single_view(snapshot(children), EPIC_NUMBER)
 
-	return await epic_next.report(views, { repo: REPO, limit: ONE_LANE, is_all_lanes: false })
+	return await epic_next.report(views, { repo: REPO, limit: ONE_LANE, is_all_lanes: false }, REPO)
 }
 
 beforeEach(() => {

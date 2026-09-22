@@ -4,6 +4,7 @@ import {
 	listing_of,
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
@@ -88,6 +89,20 @@ describe('epic_bundle_cli.format_decision — the headline', () => {
 // because the reason prints directly under the headline**: the first version of this change left the
 // reason saying "merging epics is not a call to make without asking" beneath a headline that now says
 // Tier A, so the command contradicted itself in its own two lines of output.
+// joshuafolkken/kit#2329: the command runs its human report through `issue_citation.linkify` before
+// printing, so the `Related: #N` / `Epics involved: #N` listings a run copies into its reply carry
+// clickable references — never a bare `#N` the stop guard would fire on.
+describe('epic_bundle_cli — the printed report cites issues as links', () => {
+	const decision: BundleDecision = { action: 'ask', epics: [10, 20], candidates: [2], reason: 'r' }
+
+	it('leaves no bare #N once the report is linkified', () => {
+		const printed = issue_citation.linkify(render(decision, issue(1)), REPO)
+
+		expect(issue_citation.has_bare_reference(printed)).toBe(false)
+		expect(printed).toContain(`[#2](https://github.com/${REPO}/issues/2)`)
+	})
+})
+
 describe('epic_bundle_cli — the `ask` verdict', () => {
 	const decision: BundleDecision = { action: 'ask', epics: [10, 20], candidates: [2], reason: 'r' }
 

@@ -1,4 +1,6 @@
-// The bare-`#N` predicate behind the `issue-citation` row of the stop guard (joshuafolkken/kit#2121).
+// The bare-`#N` predicate behind the `issue-citation` row of the stop guard (joshuafolkken/kit#2121),
+// and the printing-side formatter that keeps a bare `#N` out of session-facing output in the first
+// place (joshuafolkken/kit#2329).
 //
 // **Session-facing output cites an Issue as a number-link, never a bare `#N`.** `CLAUDE.md` and
 // `prompts/collaboration-workflow/issue-citation.md` require `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <short summary>`
@@ -11,6 +13,14 @@
 // bare citation: a `#N` inside a fenced code block, inside an inline-code span, on a quote line, or
 // right after `PR` / `pull request` is not a citation slip and is skipped. The scan is line-based so
 // each exclusion is decided from the one line the mention sits on.
+//
+// **`linkify` runs that same scan the other way** (joshuafolkken/kit#2329): a command whose stdout a
+// run copies into its reply passes the text through it, and every bare `#N` the predicate would flag
+// is rewritten to `[#N](url)` — which the predicate then reads as linked, so the material that fed the
+// duplicate reply is fixed where it is printed rather than scolded after it reaches the screen. The
+// same exclusions hold, so a `#N` in a fenced example or an already-linked reference is left untouched.
+
+import { issue_cite } from '#scripts/issue/issue-cite'
 
 // An Issue number: `#` and its digits. One quantifier, no backtracking — the `#N` alone locates the
 // mention, and any `owner/repo` prefix is read off the surrounding text (`repo_prefix`) rather than
@@ -96,13 +106,35 @@ function is_bare_at(line: string, index: number): boolean {
 	return !PR_PREFIX.test(line.slice(0, index))
 }
 
+// One bare reference and where it sits on its line: the `#N` text, the index its `#` starts at, and
+// the `owner/repo` prefix that precedes it (or ''). Shared so the collector and `linkify` read the
+// line the same way and cannot drift about what counts as bare.
+interface LineReference {
+	index: number
+	prefix: string
+	text: string
+}
+
+// The bare references on one line, in order — the excluded mentions (linked, inline-code, PR) already
+// dropped by `is_bare_at`, so a caller acts on citations alone.
+function line_references(line: string): ReadonlyArray<LineReference> {
+	const references: Array<LineReference> = []
+
+	for (const match of line.matchAll(ISSUE_NUMBER)) {
+		const { index } = match
+
+		if (is_bare_at(line, index)) {
+			references.push({ index, prefix: repo_prefix(line, index), text: match[0] })
+		}
+	}
+
+	return references
+}
+
 // The bare references on one non-excluded line are appended in order, each carrying its `owner/repo`
 // prefix when it had one.
 function collect_line_references(line: string, found: Array<string>): void {
-	for (const match of line.matchAll(ISSUE_NUMBER)) {
-		const { index } = match
-		if (is_bare_at(line, index)) found.push(`${repo_prefix(line, index)}${match[0]}`)
-	}
+	for (const reference of line_references(line)) found.push(`${reference.prefix}${reference.text}`)
 }
 
 // The message lines that sit outside every fenced-code block, with the fence delimiter lines
@@ -148,6 +180,58 @@ function cite_arguments(references: ReadonlyArray<string>): ReadonlyArray<string
 	return references.map((reference) => cite_argument(reference))
 }
 
-const issue_citation = { bare_references, cite_arguments, has_bare_reference }
+// One bare reference rewritten as a number-link: `[#N](url)` for a same-repo mention, or
+// `[owner/repo#N](url)` for a qualified one — the label is the reference exactly as it was written, so
+// the reader sees the number they would have, now clickable. The URL is `issue-cite`'s own assembly,
+// reused rather than restated so the two agree on the shape of a link.
+function reference_link(reference: LineReference, default_slug: string): string {
+	const slug = reference.prefix === '' ? default_slug : reference.prefix
+	const number = reference.text.slice(1)
+
+	return `[${reference.prefix}${reference.text}](${issue_cite.issue_url(slug, number)})`
+}
+
+// One eligible line with every bare reference rewritten, left to right: a reference spans its
+// `owner/repo` prefix through its `#N`, so the slice before it ends where the prefix begins and the
+// cursor resumes after the `#N`.
+function linkify_line(line: string, slug: string): string {
+	let result = ''
+	let cursor = 0
+
+	for (const reference of line_references(line)) {
+		const start = reference.index - reference.prefix.length
+
+		result += line.slice(cursor, start) + reference_link(reference, slug)
+		cursor = reference.index + reference.text.length
+	}
+
+	return result + line.slice(cursor)
+}
+
+// A line is rewritten only outside a fenced block and off a quote line, and never the fence delimiter
+// itself — the same three exclusions `bare_references` reads, so what `linkify` leaves bare is exactly
+// what the predicate would not have flagged.
+function rewrite_line(line: string, slug: string, is_in_fence: boolean): string {
+	if (is_in_fence || FENCE_MARKER.test(line) || QUOTE_LINE.test(line)) return line
+
+	return linkify_line(line, slug)
+}
+
+// Session-facing text with every bare `#N` rewritten to a number-link against `slug` (`owner/repo`),
+// so a command's stdout a run copies into its reply carries links rather than the bare references that
+// fed the duplicate reply. Fence state is carried across lines, since a fenced block spans them.
+function linkify(message: string, slug: string): string {
+	const out: Array<string> = []
+	let is_in_fence = false
+
+	for (const line of message.split('\n')) {
+		if (FENCE_MARKER.test(line)) is_in_fence = !is_in_fence
+		out.push(rewrite_line(line, slug, is_in_fence))
+	}
+
+	return out.join('\n')
+}
+
+const issue_citation = { bare_references, cite_arguments, has_bare_reference, linkify }
 
 export { issue_citation }

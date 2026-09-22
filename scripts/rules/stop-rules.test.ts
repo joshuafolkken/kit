@@ -14,6 +14,10 @@ function context(overrides: Partial<StopContext>): StopContext {
 	return { ...BASE, ...overrides }
 }
 
+// joshuafolkken/kit#2329: every stop reason ends on this, so a correction never reprints the reply.
+const NO_REPRINT = 'do not repeat your previous reply'
+const BARE_MESSAGE = 'done in #7'
+
 describe('stop_rules.stop_outcome — stop notification', () => {
 	it('refuses a held tree that stopped without notifying', () => {
 		const { reason } = stop_rules.stop_outcome(context({ hold_present: true }))
@@ -85,6 +89,14 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 		expect(reason).toContain('pnpm josh issue:cite joshuafolkken/kit#45')
 	})
 
+	// joshuafolkken/kit#2329: the fix follows the bare copy as a correction, not a reprint of the whole
+	// reply — reprinting is what read as a duplicate.
+	it('asks for the correction alone, not the whole reply reissued', () => {
+		const { reason } = stop_rules.stop_outcome(context({ message: BARE_MESSAGE }))
+
+		expect(reason).toContain(NO_REPRINT)
+	})
+
 	it('is silent on a link-form citation', () => {
 		const message = 'done in [#123](https://github.com/o/r/issues/123)'
 
@@ -93,7 +105,7 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 
 	it('does not block a bare #N once stop_hook_active is set', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ message: 'done in #7', stop_hook_active: true }),
+			context({ message: BARE_MESSAGE, stop_hook_active: true }),
 		)
 
 		expect(outcome.reason).toBeUndefined()
@@ -103,6 +115,17 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 		const outcome = stop_rules.stop_outcome(context({ hold_present: true, message: 'paused #7' }))
 
 		expect(outcome.reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	})
+})
+
+// joshuafolkken/kit#2329: all three stop reasons end on "do not repeat your previous reply" so a
+// correction never reprints the reply already on screen.
+describe('stop_rules reasons — the correction is a diff, not a reprint', () => {
+	it.each([
+		['stop notification', stop_rules.STOP_NOTIFY_REASON],
+		['hold release', stop_rules.HOLD_RELEASE_REASON],
+	])('%s does not ask for a reprint', (_name, reason) => {
+		expect(reason).toContain(NO_REPRINT)
 	})
 })
 

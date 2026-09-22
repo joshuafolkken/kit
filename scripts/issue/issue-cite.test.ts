@@ -18,6 +18,16 @@ describe('issue_cite.citation_line', () => {
 	})
 })
 
+// Exported so the printing-side `linkify` builds a link the same way rather than restating the URL
+// shape (joshuafolkken/kit#2329).
+describe('issue_cite.issue_url', () => {
+	it('assembles the issues URL for a repository and number', () => {
+		expect(issue_cite.issue_url(LOCAL_REPO, NUMBER)).toBe(
+			`https://github.com/${LOCAL_REPO}/issues/${NUMBER}`,
+		)
+	})
+})
+
 describe('issue_cite.parse_target', () => {
 	it('reads a bare number against the default repository', () => {
 		expect(issue_cite.parse_target(NUMBER, undefined)).toEqual({ number: NUMBER, repo: undefined })

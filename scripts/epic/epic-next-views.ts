@@ -96,16 +96,16 @@ function error_view(views: ReadonlyArray<EpicView>): EpicView | undefined {
 
 // The heading is added only where there is more than one epic to tell apart, so a single-epic
 // invocation prints exactly the text it printed before.
-function format_view(view: EpicView, is_many: boolean): string {
-	const text = epic_report.format_result(view.result)
+function format_view(view: EpicView, is_many: boolean, current_repo: string): string {
+	const text = epic_report.format_result(view.result, current_repo)
 
 	return is_many ? `${format_reference(view.reference)}\n${text}` : text
 }
 
-function aggregate_text(views: ReadonlyArray<EpicView>): string {
+function aggregate_text(views: ReadonlyArray<EpicView>, current_repo: string): string {
 	const is_many = views.length > ONE_EPIC
 
-	return views.map((view) => format_view(view, is_many)).join(BLOCK_SEPARATOR)
+	return views.map((view) => format_view(view, is_many, current_repo)).join(BLOCK_SEPARATOR)
 }
 
 // The running set with every issue that waits on a person taken out, and the views built from it

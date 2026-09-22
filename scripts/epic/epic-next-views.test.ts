@@ -130,10 +130,10 @@ describe('epic_next_views.error_view', () => {
 
 describe('epic_next_views.aggregate_text', () => {
 	it('heads each block with its epic when there is more than one', () => {
-		const text = epic_next_views.aggregate_text([
-			view(FIRST_EPIC, [child(FIRST_CHILD)]),
-			view(SECOND_EPIC, [child(SECOND_CHILD)]),
-		])
+		const text = epic_next_views.aggregate_text(
+			[view(FIRST_EPIC, [child(FIRST_CHILD)]), view(SECOND_EPIC, [child(SECOND_CHILD)])],
+			REPO,
+		)
 
 		expect(text).toContain(`#${String(FIRST_EPIC)}`)
 		expect(text).toContain(`#${String(SECOND_EPIC)}`)
@@ -143,7 +143,20 @@ describe('epic_next_views.aggregate_text', () => {
 	it('adds no heading for a single epic', () => {
 		const only = view(FIRST_EPIC, [child(FIRST_CHILD)])
 
-		expect(epic_next_views.aggregate_text([only])).toBe(epic_report.format_result(only.result))
+		expect(epic_next_views.aggregate_text([only], REPO)).toBe(
+			epic_report.format_result(only.result, REPO),
+		)
+	})
+
+	// A child in another repository is qualified as `owner/repo#N`, so a bare number is never
+	// linkified against the current repository and pointed at a different issue there (#2329).
+	it('qualifies a cross-repository child instead of printing a bare number', () => {
+		const text = epic_next_views.aggregate_text(
+			[view(FIRST_EPIC, [child(SECOND_CHILD, OTHER_REPO)])],
+			REPO,
+		)
+
+		expect(text).toContain(`${OTHER_REPO}#${String(SECOND_CHILD)}`)
 	})
 })
 
