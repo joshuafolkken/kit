@@ -191,9 +191,10 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 - **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
 - **The pre-gate cut row**: the trigger is a `Bash` call that runs `pnpm josh gate` from a **lane** working tree that **has not yet taken its cut**, handing over `pnpm josh run:cut <N>` with what each of its six verdicts obliges. It exists because the step was carried as prose and fired **0 times in 6 lane children**; `--resume`, `--end` and `--json` do not count as taking the cut. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source of the procedure.
+- **The implementation-phase cut row**: the trigger is an `Edit` / `Write` from a **lane** working tree that has not yet taken its cut, once the recent-context verdict (`pnpm josh cost --cut`'s, unmeasurable read `!== UNDER` on the safety-net side) is over the shared threshold, handing over `pnpm josh run:cut --impl <N> --handoff <path>`. Unlike the pre-gate row it **fires on every threshold crossing** (joshuafolkken/kit#2385): once per run left a `busy` / `failed` verdict to grow the context unwatched, so it carries `decide` and lets an edit reissued right after a refusal through. The verdict read is reused over a few-second per-checkout window. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source.
 - **Bare `pnpm josh git`** — trigger is a `pnpm josh git` with no `-y` / `--yes` (joshuafolkken/kit#2297); it prompts to confirm the staging, cancels with no TTY, and the run reissues with `-y` after throwing the time away. Hands over `pnpm josh git -y "<title> #<N>"`. Disjoint from the run-tail push row by the flag — that one requires `-y`, this refuses its absence — and it fires on every occurrence.
 
-Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery per run.
+Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Most rows deliver once per run; some — force push / branch delete, the bare-`git` and run-tail push rows, and the implementation-phase cut — fire on every occurrence.
 
 ### `josh pretool:guard`
 
