@@ -12,6 +12,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bl": "backlog:next",
     "blo": "backlog:offer",
     "blp": "backlog:plan",
+    "bls": "backlog:stalled",
     "bp": "bump",
     "by": "bytes",
     "c": "check",
@@ -188,6 +189,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "backlog:plan": [
       "[issue...] [--only]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "backlog:stalled": [
+      "",
       "automation",
       [
         "network",

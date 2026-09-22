@@ -54,16 +54,22 @@ async function emit(kind: string, text: string): Promise<void> {
  * The drain marker is the caller: `backlog:offer` runs every iteration of a watching loop, and one drain
  * event per drain is what `run:step` reads to fire the retrospective a single time. Best-effort like
  * `emit`: a failed resolve or read is swallowed rather than raised into the loop's work.
+ *
+ * **Returns whether it appended**, so a caller that pairs the marker with its own once-per-episode side
+ * effect — the stall detector sends one notification per stall (joshuafolkken/kit#2359) — fires that
+ * effect exactly when the marker was fresh. A skipped duplicate and a swallowed failure both read
+ * `false`: neither is a fresh episode.
  */
-async function emit_once(kind: string, text: string): Promise<void> {
+async function emit_once(kind: string, text: string): Promise<boolean> {
 	try {
 		const target = await stream_target()
 
-		if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return
+		if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return false
 
-		run_event_stream.append(target, kind, text, now_iso())
+		return run_event_stream.append(target, kind, text, now_iso()).appended
 	} catch {
-		// Best-effort: a failed append is dropped rather than raised into the caller's work.
+		// Best-effort: a failed append is dropped rather than raised into the loop's work.
+		return false
 	}
 }
 

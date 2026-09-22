@@ -62,6 +62,12 @@ const EVENT_KIND = {
 	// emitted from the `run:carry --retrospective` close, so marking the retrospective done and recording
 	// what it found are one action rather than two the run could do only one of.
 	RETROSPECTIVE: 'retrospective',
+	// Ready backlog work is sitting undispatched while a lane is free and nothing has dispatched for a
+	// while (joshuafolkken/kit#2359). Emitted once per stall episode by the stop-time detector, it is
+	// both the dedup marker — `emit_once` refuses a second while it is the newest event — and the line a
+	// terminal reader following the stream sees. `run:step` reads it as `backlog:next`, so a run that
+	// stalled is pointed straight at dispatching the work rather than left waiting.
+	STALL: 'stall',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]

@@ -115,14 +115,21 @@ function command(line: string): StepAction {
 // whether either still owes a retrospective needs more than the issue number. A merge and an outage share a next step: `run:merge`
 // classifies both, including the outage's stop condition.
 const KIND = run_event_stream.EVENT_KIND
+// A park and a stall share this next step: both mean runnable work is waiting to be offered
+// (joshuafolkken/kit#2359), so both are pointed at the backlog.
+const OFFER_BACKLOG = 'pnpm josh backlog:next'
 const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.PR_OPENED]: () => command('pnpm josh followup'),
 	[KIND.REVIEW_ROUND]: () => command('pnpm josh review:round2'),
 	[KIND.MERGE]: (issue_number) => command(`pnpm josh run:merge ${issue_number}`),
 	[KIND.OUTAGE]: (issue_number) => command(`pnpm josh run:merge ${issue_number}`),
-	[KIND.PARK]: () => command('pnpm josh backlog:next'),
+	[KIND.PARK]: () => command(OFFER_BACKLOG),
 	[KIND.CUT]: (issue_number) => command(`pnpm josh run:cut --resume ${issue_number}`),
 	[KIND.CHILD_LAUNCH]: () => verdict(WAIT),
+	// A stall is undispatched ready work with a free lane, so its next step is exactly a park's: offer
+	// the backlog. The detector only reports the stall; reading it here as a dispatch is what turns the
+	// report into the action that resolves it.
+	[KIND.STALL]: () => command(OFFER_BACKLOG),
 }
 
 // The parent-only positions a dispatched lane child must never act on. `run:merge` is the parent's

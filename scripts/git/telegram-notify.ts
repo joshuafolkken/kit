@@ -13,8 +13,12 @@ const telegram_environment_schema = z.object({
 // Sending `failure` (❌) there would say the merge failed, which is false and is
 // the more expensive lie of the two; sending `completion` (✅) twice says nothing went wrong, which
 // is the silence this type exists to end.
+// **`stalled` is not `warning`** (joshuafolkken/kit#2359). `warning` names a run that *finished* and
+// merged alongside something that did not work; a stall is the opposite — the run is alive and has not
+// finished, it has simply stopped advancing while ready work waits for a free lane. The ⏳ icon says
+// exactly that: not done, not broken, just not moving.
 type TelegramTaskType =
-	'planning' | 'completion' | 'failure' | 'warning' | 'kickoff_retry' | 'confirmation'
+	'planning' | 'completion' | 'failure' | 'warning' | 'kickoff_retry' | 'confirmation' | 'stalled'
 
 interface TelegramSendInput {
 	task_type: TelegramTaskType
@@ -42,6 +46,7 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	warning: { icon: '⚠️', label: 'Completed with a warning' },
 	kickoff_retry: { icon: '🔄', label: 'Kickoff retry' },
 	confirmation: { icon: '⏸️', label: 'Confirmation required' },
+	stalled: { icon: '⏳', label: 'Ready work is sitting undispatched' },
 }
 
 const NOT_CONFIGURED_PREFIX = 'Telegram is not configured'
@@ -314,11 +319,41 @@ async function confirm(input: ConfirmInput): Promise<boolean> {
 	)
 }
 
+interface StalledInput {
+	body: string
+	recovery: string
+}
+
+/**
+ * Push the ⏳ stalled type — ready backlog work with a free lane that nothing has dispatched for a while
+ * (joshuafolkken/kit#2359). Off-screen is the whole point: the state is invisible on the terminal until
+ * a person asks, so it reaches them where they are not watching.
+ *
+ * **`warn`'s shape exactly** — the repository looked up under the shared bound, the tolerant
+ * `send_or_report` so a gateway timeout at Telegram never fails the detector that is only reporting, and
+ * the caller's own `recovery` line. No `issue_title`: the header label already names what this is, and
+ * the body carries what is waiting, so a title line would only repeat the header.
+ */
+async function stalled(input: StalledInput): Promise<boolean> {
+	return await send_or_report(
+		{
+			task_type: 'stalled',
+			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
+			issue_title: undefined,
+			body: input.body,
+			issue_url: undefined,
+			pr_url: undefined,
+		},
+		input.recovery,
+	)
+}
+
 const telegram_notify = {
 	REPO_LOOKUP_TIMEOUT_MS,
 	confirm,
 	send,
 	send_or_report,
+	stalled,
 	warn,
 }
 

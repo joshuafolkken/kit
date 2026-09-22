@@ -645,6 +645,16 @@ Print the whole backlog as a plan: ready now, waiting on what, waiting on a pers
 
 ---
 
+### `josh backlog:stalled` · `josh bls`
+
+> **Audience:** automation · **Side effects:** network
+
+_No arguments._
+
+Report whether ready backlog work is sitting undispatched with a free lane and no recent dispatch
+
+---
+
 ### `josh cases` · `josh ca`
 
 > **Audience:** automation · **Side effects:** files

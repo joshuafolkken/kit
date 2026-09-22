@@ -1,4 +1,5 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import { BACKLOG_COMMANDS } from './josh-commands-backlog'
 import { GUARD_COMMANDS } from './josh-commands-guard'
 import { ISSUE_COMMANDS } from './josh-commands-issue'
 import { LANE_COMMANDS } from './josh-commands-lane'
@@ -60,33 +61,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--exclude <n>[,<n>...]] [--label <name>]', 'automation', ['network']],
 	},
-	'backlog:next': {
-		script: 'scripts/backlog/backlog-next.ts',
-		description:
-			'Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics',
-		category: 'AI tools',
-		reference: ['[--exclude <n>[,<n>...]] [--repo <owner/repo>]', 'automation', ['network']],
-	},
-	'backlog:offer': {
-		script: 'scripts/backlog/backlog-offer-cli.ts',
-		description:
-			'Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start',
-		category: 'AI tools',
-		reference: ['[options]', 'automation', ['network']],
-	},
-	'backlog:plan': {
-		script: 'scripts/backlog/backlog-plan-cli.ts',
-		description:
-			'Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope',
-		category: 'AI tools',
-		reference: ['[issue...] [--only]', 'automation', ['network']],
-	},
-	'backlog:budget': {
-		script: 'scripts/backlog/backlog-budget-cli.ts',
-		description: 'Say whether a backlogrun may start more work, keep watching, or finish',
-		category: 'AI tools',
-		reference: ['[options]', 'automation', ['none']],
-	},
+	...BACKLOG_COMMANDS,
 	cost: {
 		script: 'scripts/cost-runtime/cost-cli.ts',
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",
