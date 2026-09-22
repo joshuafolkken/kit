@@ -8,6 +8,7 @@ import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
 import { gh_api } from './gh-api'
 import { git_force } from './git-force'
+import { implementation_cut } from './implementation-cut'
 import { issue_fold } from './issue-fold'
 import { issue_scout } from './issue-scout'
 import { josh_git_bare } from './josh-git-bare'
@@ -235,19 +236,8 @@ const ISSUE_COMMENTS_REASON =
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
 // the value — is `shell-body-trigger.ts`, beside its own cases. A row states its trigger and its
 // text; a model of zsh quoting is more than a row.
-const { carries_a_body, is_shell_evaluated_body, keeps_body_safe } = shell_body_trigger
-
-// The instruction in the shape a refusal can carry: what the shell is about to do, the safe
-// spellings, and the reissue sentence every delivery needs. The damage is named because it is the
-// half that reads as unbelievable — the substituted text is *executed*, not discarded.
-const SHELL_BODY_REASON =
-	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
-	'contains a backtick or a `$`, so the shell runs it — the text is executed rather than merely ' +
-	'mangled (joshuafolkken/kit#1198). Write the body to a file and pass it by path: `pnpm josh ' +
-	'issue:comment <N> --body-file <path>`, `pnpm josh followup --notify-message-file <path>`, or ' +
-	"`--body-file <path>` wherever offered. `$'…'` quoting is the other safe form; the rule and the " +
-	"trigger's blind spots are in `prompts/collaboration-workflow/shell-body.md`. Reissue this call " +
-	'once the body is in a file — it fires once per run and cannot repeat on the call in hand.'
+const { carries_a_body, is_shell_evaluated_body, keeps_body_safe, SHELL_BODY_REASON } =
+	shell_body_trigger
 
 // **Keeping the WIP cap is counting the open Issues**, which is the one act the rule asks for before
 // a filing.
@@ -479,6 +469,31 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	git_force.ROW,
 	worktree_guard.ROW,
 	file_body.ROW,
+	// **The second row whose trigger is an `Edit` / `Write` rather than a shell call**
+	// (joshuafolkken/kit#2310), and the third that consults the world beside the call: "is this a lane
+	// child whose recent-context cost has crossed the threshold" reads the dispatch mark, the cut record
+	// on disk and the synchronous `pnpm josh cost --cut` verdict — the same measurement the parent
+	// hand-off uses, never a second one (joshuafolkken/kit#1933). The `Edit` / `Write` name match runs
+	// first, then the lane read, then the transcript-priced verdict, so a run that is not a dispatched
+	// child in an uncut lane pays nothing for it. It self-gates on the tool name, so it claims no `Bash`
+	// command any row above matches — the Bash `rules_claiming` invariant is untouched.
+	//
+	// **Listed before `rule-body`, the one row it can overlap.** Both trigger on an `Edit` / `Write`; a
+	// rule-document edit made in a lane child that is already over threshold trips both. The cut is the
+	// right thing to do first — end the process and drop the accumulated context — and on the reissue in
+	// the fresh, under-threshold process this row is silent and `rule-body` delivers, the "losing rule's
+	// delivery still correct one reissue later" reading any admissible overlap needs. It carries no
+	// `decide`, so it is once per run: after a cut the fresh session's own transcript reads under
+	// threshold, so the row re-arms per resume rather than per edit.
+	//
+	// **No `reaches`, because the occasion is live-only.** `pre-gate-cut` gives a `reaches` because both
+	// its halves leave a command-string trace (`run:cut --resume` at entry); this row's occasion —
+	// crossing the threshold mid-implementation — is the working directory, the cut record and the cost
+	// verdict, none of which a transcript records. `pnpm josh rule:value` therefore reads it as no runs
+	// rather than as 0% kept (`keeps` stays, so the compliance act is named for a future measurement
+	// redesign), the same honest-unmeasured stance the batching and investigation rows take for the same
+	// reason: a trigger no transcript can reconstruct. The row itself lives in `implementation-cut.ts`.
+	implementation_cut.ROW,
 	// **The first row whose trigger is an `Edit` / `Write` rather than a shell call**
 	// (joshuafolkken/kit#2272). It delivers the residency questions at the edit that writes a rule into
 	// prose, and self-gates on the tool name and the file path, so it claims no `Bash` command any row
