@@ -82,6 +82,7 @@ const ALIASES: Record<string, string> = {
 	cm: 'check-commit-message',
 	ss: 'secretlint-scan',
 	ppu: 'pre-push-unit',
+	rer: 'reserved-run',
 	ptc: 'pre-commit-type-check',
 	ird: 'issue:read',
 	ist: 'issue:state',

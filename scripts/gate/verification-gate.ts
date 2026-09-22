@@ -9,6 +9,7 @@ import { buffered_process, FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { core_budget } from './core-budget'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { gate_report, type GateStep, type GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
@@ -181,19 +182,79 @@ async function with_gate_marker<T>(
 	}
 }
 
+// This gate's share of the machine, resolved once at the gate's entry and carried down as one value
+// (joshuafolkken/kit#2351). `available_cores` is the budget every check reserves against; `is_reserved`
+// is false for a gate nested inside another gate's unit suite — this repository's own gate tests — so
+// the outer gate reserves and every gate beneath it does not. Captured before this gate sets
+// `JOSH_UNIT_RUN_MARKED`, which is why it is read at entry rather than re-derived here.
+interface BudgetContext {
+	available_cores: number
+	is_reserved: boolean
+}
+
+function default_budget(): BudgetContext {
+	return {
+		available_cores: availableParallelism(),
+		is_reserved: !unit_worker_share.is_nested_run(),
+	}
+}
+
+// A gate step paired with the cores it reserves from the machine-wide budget while it runs
+// (joshuafolkken/kit#2351). The weight travels with the step so `run_gate_steps` never has to re-pair a
+// step with its check by index.
+interface ReservedStep {
+	step: GateStep
+	weight: number
+}
+
+async function build_reserved_steps(
+	start_directory: string,
+	plan: GatePlan,
+	available_cores: number,
+): Promise<ReadonlyArray<ReservedStep>> {
+	return await Promise.all(
+		plan.checks.map(async (check) => ({
+			step: await build_gate_step(check, start_directory, plan),
+			weight: gate_plan.check_weight(check, plan, available_cores),
+		})),
+	)
+}
+
+// **A nested gate takes no reservation, and the budget is what makes that necessary rather than
+// merely tidy** (joshuafolkken/kit#2351). The unit step spawns the suite, which runs this repository's
+// own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
+// claimed would wait for cores the outer gate cannot free until the suite — this test included —
+// finishes.
+async function run_reserved_step(
+	reserved: ReservedStep,
+	budget: BudgetContext,
+): Promise<GateStepResult> {
+	if (!budget.is_reserved) return await run_gate_step(reserved.step)
+
+	return await core_budget.with_core_reservation(
+		reserved.weight,
+		async () => await run_gate_step(reserved.step),
+		{ budget: budget.available_cores },
+	)
+}
+
 // `bounded_pool` rather than a bare `Promise.all`, so the plan's `concurrency` is what decides how
 // many run at once (joshuafolkken/kit#1258). **The all-failures-in-one-pass property survives the
 // change** because no check ever rejects: `buffered_process` reports a non-zero exit as a value, so
 // the pool's first-failure abort — written for callers that spawn real Claude sessions — never
 // fires here and every queued check still runs. Results come back in input order however they
-// finished, which is what keeps the printed sections in declaration order.
-async function run_gate_steps(plan: GatePlan): Promise<ReadonlyArray<GateStepResult>> {
-	const steps = await build_gate_steps(process.cwd(), plan)
+// finished, which is what keeps the printed sections in declaration order. Each step first claims its
+// place in the machine-wide budget and waits while the budget is full (joshuafolkken/kit#2351).
+async function run_gate_steps(
+	plan: GatePlan,
+	budget: BudgetContext = default_budget(),
+): Promise<ReadonlyArray<GateStepResult>> {
+	const reserved = await build_reserved_steps(process.cwd(), plan, budget.available_cores)
 
 	return await bounded_pool.bounded_map(
-		steps,
+		reserved,
 		plan.concurrency,
-		async (step) => await run_gate_step(step),
+		async (entry) => await run_reserved_step(entry, budget),
 	)
 }
 
@@ -201,8 +262,9 @@ async function run_marked_gate_steps(
 	before: Record<string, string>,
 	plan: GatePlan,
 	marker_path?: string,
+	budget: BudgetContext = default_budget(),
 ): Promise<ReadonlyArray<GateStepResult>> {
-	return await with_gate_marker(before, async () => await run_gate_steps(plan), marker_path)
+	return await with_gate_marker(before, async () => await run_gate_steps(plan, budget), marker_path)
 }
 
 // **Both markers are claims about the unit suite, so a gate that is not running it makes neither**
@@ -216,11 +278,12 @@ async function run_planned_gate_steps(
 	before: Record<string, string>,
 	plan: GatePlan,
 	marker_path?: string,
+	budget: BudgetContext = default_budget(),
 ): Promise<ReadonlyArray<GateStepResult>> {
-	if (!gate_plan.has_unit_check(plan.checks)) return await run_gate_steps(plan)
+	if (!gate_plan.has_unit_check(plan.checks)) return await run_gate_steps(plan, budget)
 
 	return await unit_worker_share.with_run_marker(
-		async () => await run_marked_gate_steps(before, plan, marker_path),
+		async () => await run_marked_gate_steps(before, plan, marker_path, budget),
 	)
 }
 
@@ -234,8 +297,7 @@ async function run_planned_gate_steps(
 // count already is: that module stays a pure function of its inputs, and the machine is asked once and
 // handed to both calls. Counted *before* the unit step writes its own marker, so `+ 1` is this gate
 // (joshuafolkken/kit#1515).
-function announce_gate_plan(is_unit_included: boolean): GatePlan {
-	const available_cores = availableParallelism()
+function announce_gate_plan(is_unit_included: boolean, available_cores: number): GatePlan {
 	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
 	const plan = gate_plan.resolve_gate_plan(available_cores, concurrent_runs, is_unit_included)
 
@@ -311,14 +373,17 @@ async function run_checked_gate(
 	started_at: number,
 ): Promise<number> {
 	const is_unit_included = options.is_unit_included ?? true
-	const plan = announce_gate_plan(is_unit_included)
+	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
+	// unit suite reads the flag as set and reserves nothing (joshuafolkken/kit#2351).
+	const budget = default_budget()
+	const plan = announce_gate_plan(is_unit_included, budget.available_cores)
 	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
 	// would write it is a subprocess started a second or so after the count above, so two lanes launched
 	// together — the shape `epicrun` produces — would both read "nothing else is running" and both take
 	// the whole machine. Claimed here, after the count and before any check, it is already there when
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run (joshuafolkken/kit#1515).
-	const results = await run_planned_gate_steps(tree.files, plan, options.marker_path)
+	const results = await run_planned_gate_steps(tree.files, plan, options.marker_path, budget)
 	const failed_labels = gate_report.report_gate_steps(results, {
 		is_verbose: options.is_verbose ?? false,
 		log_path: options.log_path,

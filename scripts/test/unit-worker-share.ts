@@ -11,8 +11,9 @@ import { z } from 'zod'
 //
 // **`gate-plan.ts` sizes the unit suite from the core count and nothing else**, so six lanes running
 // `josh gate` at once each concluded "11 cores, take 7 workers" and put 42 workers on 11 cores. The
-// pre-push hook is worse: it passes no cap at all, so vitest opens one worker per core there. Measured
-// on the machine this was found on — load average 14.97 in the field, and 209 in a deliberate
+// pre-push hook once passed no cap at all; it now runs the suite through `test_unit_guard.run_guarded_unit`
+// (joshuafolkken/kit#1334), the same guard `josh test:unit` uses, so the share below applies there too.
+// Measured on the machine this was found on — load average 14.97 in the field, and 209 in a deliberate
 // reproduction of six concurrent suites, against 22 once the share below was applied.
 //
 // **What it fixes, and what it does not.** Six concurrent copies of the full suite produced ten
@@ -236,6 +237,7 @@ const unit_worker_share = {
 	SOLO_RUNS,
 	WORKER_FLAG,
 	current_share,
+	is_nested_run,
 	is_running,
 	live_run_count,
 	marker_files,

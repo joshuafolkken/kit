@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { gate_plan } from './gate-plan'
+import { gate_plan, type GateCheck } from './gate-plan'
+
+function unit_check(): GateCheck {
+	const unit = gate_plan.GATE_CHECKS.find((check) => check.label === gate_plan.UNIT_LABEL)
+	if (!unit) throw new Error('unit check missing from GATE_CHECKS')
+
+	return unit
+}
 
 // joshuafolkken/kit#1258: the gate started four checks whatever the machine was, and vitest opened
 // one worker per core inside one of them. The plan is what makes both numbers decidable, so the
@@ -169,13 +176,45 @@ describe('gate_plan.GATE_CHECKS', () => {
 	// The unit suite sizes its own pool from the machine, so counting it among the reserves would
 	// reserve cores against the very check the cap is for.
 	it('reserves nothing for the check it caps instead', () => {
-		const unit = gate_plan.GATE_CHECKS.find((check) => check.label === gate_plan.UNIT_LABEL)
-
-		expect(unit?.reserved_cores).toBe(0)
+		expect(unit_check().reserved_cores).toBe(0)
 	})
 
 	it('reserves what the other three were measured to hold', () => {
 		expect(gate_plan.RESERVED_CORES).toBe(4)
+	})
+})
+
+describe('gate_plan.check_weight — the cores a check reserves from the budget', () => {
+	// The regression the solo path rests on (joshuafolkken/kit#2351): a lone gate's four weights sum to
+	// exactly the core count, so every check is admitted at once and its concurrency and worker count are
+	// unchanged. If this sum ever moved off the core count a solo gate would start waiting on itself.
+	it('sums a solo gate to exactly the core count', () => {
+		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+		const total = plan.checks.reduce(
+			(sum, check) => sum + gate_plan.check_weight(check, plan, MEASURED_CORES),
+			0,
+		)
+
+		expect(total).toBe(MEASURED_CORES)
+	})
+
+	// The unit suite's weight is the pool it will open, which `unit_worker_cap` has already sized — not a
+	// second number kept beside the measured table.
+	it('weighs the unit suite at its worker cap', () => {
+		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+
+		expect(gate_plan.check_weight(unit_check(), plan, MEASURED_CORES)).toBe(plan.unit_worker_cap)
+	})
+
+	// Below the measured machine the suite is left uncapped, so its weight reads from the same identity
+	// — the cores left once the static checks have theirs — and the solo sum still lands on the core
+	// count.
+	it('weighs an uncapped unit suite at the cores left for it', () => {
+		const plan = gate_plan.resolve_gate_plan(MID_SIZED_CORES)
+
+		expect(gate_plan.check_weight(unit_check(), plan, MID_SIZED_CORES)).toBe(
+			MID_SIZED_CORES - gate_plan.RESERVED_CORES,
+		)
 	})
 })
 
