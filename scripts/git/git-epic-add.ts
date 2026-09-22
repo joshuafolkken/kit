@@ -1,7 +1,8 @@
+import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
-import { git_epic_read } from './git-epic-read'
+import { git_epic_read, type EpicReading } from './git-epic-read'
 import {
 	format_issue_references,
 	format_replaced_relations,
@@ -32,6 +33,19 @@ import { git_gh_command } from './git-gh-command'
 
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
+
+// A completed epic takes no new children: adding one silently produces a closed epic with unfinished
+// children, whose backlog opt-in no longer fires, so the child never surfaces and the addition is
+// lost (joshuafolkken/kit#2337). The refusal is only fired on a *confirmed* closed state — an
+// unreadable state field leaves the addition to proceed, since blocking on a lookup that never
+// answered would be the worse failure.
+function is_closed_epic(state: string | undefined): boolean {
+	return state !== undefined && epic_issue.normalize_state(state) === epic_issue.CLOSED
+}
+
+function closed_epic_error(epic_number: number): string {
+	return `Epic #${String(epic_number)} is closed — a completed epic takes no new children. Reopen it if it is not actually done, or run \`pnpm josh epic:bundle <child>\` to place the child in an open epic instead.`
+}
 
 interface AddChildrenInput {
 	epic_number: number
@@ -174,10 +188,21 @@ async function write_plan(input: AddChildrenInput, plan: AddPlan): Promise<void>
 	}
 }
 
+// The epic ready to receive children, or the reason it cannot be added to: unreadable, or closed
+// (joshuafolkken/kit#2337). Both reasons come back as a bare string the one caller prefixes `✖` onto,
+// so the two refusals read identically on stderr.
+async function read_open_epic(epic_number: number): Promise<EpicReading | { error: string }> {
+	const epic = await git_epic_read.read_epic(epic_number)
+	if ('error' in epic) return epic
+	if (is_closed_epic(epic.subject.state)) return { error: closed_epic_error(epic_number) }
+
+	return epic
+}
+
 // Insert children into an existing epic, or refuse without writing anything. Every refusal happens
 // before the body edit, so a rejected invocation leaves the epic exactly as it was.
 async function add_children(input: AddChildrenInput): Promise<number> {
-	const epic = await git_epic_read.read_epic(input.epic_number)
+	const epic = await read_open_epic(input.epic_number)
 
 	if ('error' in epic) {
 		console.error(`✖ ${epic.error}`)

@@ -12,6 +12,11 @@ import { epic_subject_schema } from './schemas'
 
 interface EpicSubject {
 	number: number
+	// The epic's own state, as GitHub returned it (`OPEN` / `CLOSED`, casing unnormalized). Only
+	// `git-epic-add.ts` reads it — to refuse adding a child to a closed epic — so it is optional: a read
+	// that came back without the field leaves it undefined, which the refusal treats as "not confirmed
+	// closed" rather than blocking (joshuafolkken/kit#2337).
+	state?: string | undefined
 	labels: ReadonlyArray<string>
 	body: string | undefined
 }
@@ -33,6 +38,7 @@ function parse_epic_subject(raw_json: string | undefined): EpicSubject | undefin
 
 	return {
 		number: parsed.number,
+		state: parsed.state,
 		labels: (parsed.labels ?? []).map((label) => label.name),
 		body: parsed.body,
 	}

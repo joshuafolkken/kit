@@ -131,6 +131,10 @@ interface AuditInput {
 	// placement decision is recorded, and therefore the whole of what check 6 reads.
 	decisions: string
 	order_comments: ReadonlyMap<string, ReadonlyArray<string>>
+	// Whether the epic's own state is confirmed closed. An unreadable state is `false`, so the
+	// closed-epic-with-open-children check never fires on a lookup that did not answer
+	// (joshuafolkken/kit#2337).
+	is_epic_closed: boolean
 }
 
 // The checks that read what the children say about each other.
@@ -163,6 +167,11 @@ function epic_findings(input: AuditInput): Array<AuditFinding> {
 		...epic_audit_checks.find_orphans(
 			input.tracked,
 			epic_audit_orphans.claimed_numbers(input.claiming),
+		),
+		...epic_audit_checks.find_closed_epic_open_children(
+			input.is_epic_closed,
+			input.children,
+			input.repo,
 		),
 	]
 }
@@ -249,6 +258,18 @@ function no_children_reason(snapshot: EpicSnapshot, epic_number: number): string
 	return undefined
 }
 
+// Whether the epic's own state is confirmed closed. Read through the same `scope_for` every other
+// read goes through, so a cross-repository epic is asked of its own repository rather than this one.
+// A read that came back shaped wrong, or a state that is not `CLOSED`, both answer `false`: the
+// finding it feeds is an error, and one must never be manufactured from a lookup that did not answer
+// (joshuafolkken/kit#2337).
+async function read_epic_closed(epic_number: number, scope?: string): Promise<boolean> {
+	const raw = await git_gh_command.issue_get_state_and_relations(String(epic_number), scope)
+	const parsed = epic_issue.parse_epic_issue(raw)
+
+	return parsed !== undefined && epic_issue.normalize_state(parsed.state) === epic_issue.CLOSED
+}
+
 // Everything the input needs once the children have been read: the declaration is parsed once here
 // and handed to both the graph anomalies and check 6, rather than parsed twice.
 async function to_audit_input(
@@ -272,6 +293,7 @@ async function to_audit_input(
 		order_pairs,
 		decisions: git_epic_decision.read_recorded_reasons(snapshot.body),
 		order_comments: await read_order_comments(order_pairs),
+		is_epic_closed: await read_epic_closed(epic_number, epic_fetch.scope_for(snapshot.repo, repo)),
 	}
 }
 
