@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,14 @@ afterAll(() => {
 
 function ledger_path(name: string): string {
 	return path.join(TEST_DIR, name)
+}
+
+function recorded_ledger(name: string): string {
+	const file = ledger_path(name)
+
+	writeFileSync(file, '- rf:none | none | - | 2026-09-22 | #2343\n', 'utf8')
+
+	return file
 }
 
 describe('review_record_cli.parse_finding', () => {
@@ -80,5 +88,37 @@ describe('review_record_cli.run', () => {
 		error.mockRestore()
 		expect(code).toBe(1)
 		expect(existsSync(file)).toBe(false)
+	})
+})
+
+describe('review_record_cli.run --check', () => {
+	it('exits 0 when the round is recorded', async () => {
+		const file = recorded_ledger('check-ok.md')
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const code = await review_record_cli.run(['--check', '--issue', '2343'], NOW, file)
+
+		info.mockRestore()
+		expect(code).toBe(0)
+	})
+
+	it('exits 0 when no ledger is kept (not-required)', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const code = await review_record_cli.run(
+			['--check', '--issue', '2343'],
+			NOW,
+			ledger_path('check-absent.md'),
+		)
+
+		info.mockRestore()
+		expect(code).toBe(0)
+	})
+
+	it('exits 1 when the round is not recorded', async () => {
+		const file = recorded_ledger('check-missing.md')
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const code = await review_record_cli.run(['--check', '--issue', '9999'], NOW, file)
+
+		error.mockRestore()
+		expect(code).toBe(1)
 	})
 })

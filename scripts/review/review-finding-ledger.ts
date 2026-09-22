@@ -130,11 +130,31 @@ function zero_round_count(content: string): number {
 		.length
 }
 
+// The issue a finding line is keyed to — its fifth field, the `#<N>` token — or `undefined` for a
+// non-finding or malformed line. The record check reads this to ask whether a given issue's round was
+// recorded at all (joshuafolkken/kit#2343).
+function issue_of(line: string): string | undefined {
+	const fields = line.trimStart().slice(FINDING_PREFIX.length).split(FIELD_SEPARATOR)
+
+	return fields.length === FIELD_COUNT ? fields[FIELD_COUNT - 1] : undefined
+}
+
+// **A `none` zero-round line counts as recorded, exactly like a real finding line does.** The gate
+// asks whether the round was recorded, not whether it found anything — reading the issue field, which
+// a zero-finding line carries too, is what keeps a clean round's single line from reading as "nobody
+// recorded this" (joshuafolkken/kit#2343).
+function has_issue_record(content: string, issue: number): boolean {
+	const target = issue_field(issue)
+
+	return content.split('\n').some((line) => is_finding_line(line) && issue_of(line) === target)
+}
+
 const review_finding_ledger = {
 	CATEGORIES,
 	SEVERITIES,
 	category_counts,
 	finding_line,
+	has_issue_record,
 	is_category,
 	is_finding_line,
 	is_severity,
