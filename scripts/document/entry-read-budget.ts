@@ -49,12 +49,14 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// recent-context hand-off. Lowered in joshuafolkken/kit#2294 — the FIRST downward move on this
 	// ratchet — when `pre-gate-cut.md` was compressed (37,786 B → ~20,300 B): every entry that reads it
 	// crossed a block downward, so the recorded ceilings drop to the block multiples the stale-ratchet
-	// message named rather than staying loose above the reduction.
-	{ entry: 'kickoff', bytes: 253_952 },
+	// message named rather than staying loose above the reduction. `kickoff` and the lane child rose one
+	// block again in joshuafolkken/kit#2312 when `pre-gate-cut.md` recorded the resume-side cost the
+	// conditional cut is built on; the other entries stayed within their block.
+	{ entry: 'kickoff', bytes: 258_048 },
 	{ entry: 'fullrun', bytes: 253_952 },
 	{ entry: 'halfrun', bytes: 253_952 },
 	{ entry: 'backlogrun', bytes: 258_048 },
-	{ entry: LANE_CHILD, bytes: 126_976 },
+	{ entry: LANE_CHILD, bytes: 131_072 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

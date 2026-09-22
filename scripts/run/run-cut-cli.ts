@@ -2,6 +2,8 @@
 import { fileURLToPath } from 'node:url'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { cost_cli } from '#scripts/cost-runtime/cost-cli'
+import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -34,6 +36,10 @@ const RESUME_VERDICT = 'resume'
 // re-reading the record.
 const RESUME_IMPL_VERDICT = 'resume-impl'
 const FRESH_VERDICT = 'fresh'
+// The recent-window context is under the shared cut threshold, so the pre-gate cut was not worth its
+// resume and nothing was cut (joshuafolkken/kit#2312). A benign, non-failing answer: the run carries
+// on to the gate itself, exactly as `not-a-lane` does.
+const UNDER_THRESHOLD_VERDICT = 'under-threshold'
 const STALE_VERDICT = 'stale'
 const HANDED_OFF_VERDICT = 'handed-off'
 const BUSY_VERDICT = 'busy'
@@ -90,6 +96,28 @@ function refuse_unready(state: CutState): number {
 	)
 
 	return report(UNREADY_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// Below the shared context threshold there is no accumulation a cut would drop, so the resume it would
+// relaunch costs more than it saves; the current process carries the run on to the gate uncut.
+function report_under_threshold(): number {
+	console.error(
+		'The recent-window context is under the shared cut threshold, so nothing was cut; a resume would cost more than the accumulation it would drop. Continue to the gate.',
+	)
+
+	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+// **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**
+// (joshuafolkken/kit#2312). `cost_cli.session_verdict` prices the recent `RECENT_REQUEST_WINDOW`
+// against `CONTEXT_CUT_THRESHOLD`, so no second threshold is introduced — an `under` session skips the
+// cut, and an unmeasurable one keeps the old unconditional cut as the safety net joshuafolkken/kit#1933
+// relies on. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
+// `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
+function skips_pre_gate_cut(phase: string): boolean {
+	if (phase !== run_cut.PRE_GATE_PHASE) return false
+
+	return cost_cli.session_verdict() === cost_verdict.UNDER_VERDICT
 }
 
 // The exclusive create lost, so a cut is already in flight for this tree — the double-cut guard. The
@@ -203,6 +231,7 @@ async function cut(target: string, issue: string, phase: string): Promise<number
 	const state = await run_cut.current_state()
 
 	if (!(await is_lane_branch(state))) return refuse_unready(state)
+	if (skips_pre_gate_cut(phase)) return report_under_threshold()
 
 	clear_expired(target)
 	if (!has_matching_supervisor(lane, issue)) return report_missing_supervisor(issue)
@@ -339,6 +368,7 @@ const run_cut_cli = {
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
 	STALE_VERDICT,
+	UNDER_THRESHOLD_VERDICT,
 	UNKNOWN_VERDICT,
 	UNREADABLE_VERDICT,
 	UNREADY_VERDICT,
