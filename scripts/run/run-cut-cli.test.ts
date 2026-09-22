@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
@@ -30,6 +31,12 @@ const LANE_DIRECTORY = '/lanes/1839'
 const DERIVED_LOG = path.join(scratch, 'lane-1839.log')
 const LAUNCHED_PID = 4242
 const READY: CutState = { branch: BRANCH, is_dirty: true, is_held: true }
+// The recent-window context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
+// tokens widen to `string` through their namespace objects, so a typed literal is what the spied
+// `session_verdict` return accepts.
+const CONTEXT_OVER: CostVerdict = 'over'
+const CONTEXT_UNDER: CostVerdict = 'under'
+const CONTEXT_UNMEASURABLE: CostVerdict = 'unmeasurable'
 
 function target(): string {
 	return run_cut.cut_path(REPOSITORY)
@@ -54,6 +61,10 @@ const default_branch = vi.spyOn(git_command, 'get_default_branch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const log_path = vi.spyOn(lane_dispatch_log, 'default_log_path')
 const launch = vi.spyOn(detached_launch, 'launch')
+// joshuafolkken/kit#2312: the pre-gate cut is conditional on the recent-window context, so the suite
+// pins the verdict rather than reading the live session. `over` is the beforeEach default so the cases
+// that predate the condition still cut exactly as they did.
+const session_verdict = vi.spyOn(cost_cli, 'session_verdict')
 const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -83,6 +94,7 @@ beforeEach(() => {
 	find_open_lane.mockResolvedValue(lane())
 	log_path.mockReturnValue(DERIVED_LOG)
 	launch.mockReturnValue({ kind: 'launched', pid: LAUNCHED_PID })
+	session_verdict.mockReturnValue(CONTEXT_OVER)
 })
 
 afterAll(() => {
@@ -137,6 +149,53 @@ describe('cutting a lane child before the gate', () => {
 		expect(code).toBe(1)
 		expect(verdict()).toBe(run_cut_cli.UNREADY_VERDICT)
 		expect(launch).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2312: the pre-gate cut is taken only when the recent-window per-request cost is
+// over the shared threshold. Below it a short lane has no accumulation worth a resume's cost, so the
+// gate runs uncut; an unmeasurable session keeps the old unconditional cut as the safety net.
+describe('the pre-gate cut is conditional on the recent-window context', () => {
+	it('skips the cut and continues to the gate when the context is under the threshold', async () => {
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
+
+		const code = await run_cut_cli.run([ISSUE])
+
+		expect(code).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.UNDER_THRESHOLD_VERDICT)
+		expect(launch).not.toHaveBeenCalled()
+		expect(run_cut.read_cut(target()).kind).toBe('none')
+	})
+
+	it('takes the cut as before when the context is over the threshold', async () => {
+		session_verdict.mockReturnValue(CONTEXT_OVER)
+
+		const code = await run_cut_cli.run([ISSUE])
+
+		expect(code).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+		expect(launch).toHaveBeenCalledOnce()
+	})
+
+	// An unmeasurable session cannot be priced, so the old unconditional cut stands as the safety net.
+	it('takes the cut when the context cannot be measured', async () => {
+		session_verdict.mockReturnValue(CONTEXT_UNMEASURABLE)
+
+		const code = await run_cut_cli.run([ISSUE])
+
+		expect(code).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+	})
+
+	// The condition guards the pre-gate phase alone; the implementation-phase caller gates its own
+	// `--impl` cut on `pnpm josh cost --cut`, so an under-threshold verdict never skips it here.
+	it('still cuts during implementation regardless of the recent-window context', async () => {
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
+
+		const code = await run_cut_cli.run(['--impl', ISSUE])
+
+		expect(code).toBe(0)
+		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
 	})
 })
 

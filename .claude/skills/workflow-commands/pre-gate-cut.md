@@ -50,7 +50,9 @@ checkout, a cut in a lane.
 `chain-rule.md` step 1 issues `pnpm josh run:cut <N>` after `pnpm josh main:merge`, before the scoped
 pair and the gate, so the default path takes the cut before anything reads the tree — removing the
 wasted round trip joshuafolkken/kit#2160 measured (an uncut gate refused, its batched `review:brief`
-cancelled, then cut and resume).
+cancelled, then cut and resume). **The command is still issued unconditionally**; `run:cut` itself
+decides whether the cut is warranted (joshuafolkken/kit#2312), so a short lane with nothing to drop is
+answered `under-threshold` and walks on to the gate rather than relaunching.
 
 At the pre-gate boundary, issue:
 
@@ -61,14 +63,17 @@ pnpm josh run:cut <N>          # alias: josh rct
 - `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the
   successor after this process exits; Anthropic relaunches directly). **End the turn immediately** —
   the fresh process owns the run.
+- `under-threshold` (0) — the recent-window per-request cost is under the shared `CONTEXT_CUT_THRESHOLD`
+  (joshuafolkken/kit#2312), so the accumulation a cut would drop is not worth a resume's cost. Nothing
+  was cut; **continue to the gate.**
 - `not-a-lane` (0) — no open lane for this issue, so not a dispatched child. **Continue to the gate.**
 - `unready` (1) — the tree is clean or on the default branch, nothing to carry. Continue to the gate.
 - `busy` (1) — a cut is already in flight for this tree (the double-cut guard). Do not relaunch.
 - `failed` (1) — no live OpenAI supervisor, or the Anthropic relaunch could not start. Continue.
 - `unknown` (1) — the git directory could not be read. Continue to the gate.
 
-**`cut` is the only verdict that ends the turn.** Every other one leaves the current process to carry
-the run on itself.
+**`cut` is the only verdict that ends the turn.** Every other one — `under-threshold` included — leaves
+the current process to carry the run on itself.
 
 ### The gate refuses until the cut has been taken (joshuafolkken/kit#1864)
 
@@ -85,6 +90,11 @@ trigger.
   `JOSH_LANE_CHILD` names that same issue. An interactive `fullrun` carries no mark and runs its gate
   untouched. `run:cut` draws its own line its own way — an open-lane lookup — which is why the guard and
   the command need not agree byte for byte; the mark makes the guard's half mechanical.
+- **It fires only when the recent-window context warrants a cut** (joshuafolkken/kit#2312). The guard
+  reads the same `cost_cli.session_verdict` `run:cut` reads, so an `under`-threshold lane is let through
+  to the gate rather than refused — the guard and the command never disagree about whether a cut was
+  due. The context read is lazy, after the command and lane checks, so an ordinary run pays nothing for
+  it.
 - **It is silent once the cut is carried**, so the resumed process goes straight to the gate.
 - **It fires once per run.** Five of the six verdicts leave this process holding the run, each needing
   the reissued gate call to pass — a refusal that repeated would wedge exactly the runs that obeyed.
@@ -221,10 +231,9 @@ this recent-context option on the batch it measured — short-lived lane childre
 parent session (joshuafolkken/kit#2295), for which the two averages nearly coincide.
 
 - **The safety net stays a safety net.** The implementation-phase cut was built
-  (joshuafolkken/kit#1933) for a pathological regime a typical lane never enters, because the
-  *unconditional* pre-gate cut carries the context reduction single-handed (~130k → ~60k per request).
-  200_000 sits below the 208k floor of that regime, so a genuinely runaway implementation still trips
-  it — "it never fired" is the net waiting.
+  (joshuafolkken/kit#1933) for a pathological regime a typical lane never enters, and 200_000 sits below
+  the 208k floor of that regime, so a genuinely runaway implementation still trips it — "it never fired"
+  is the net waiting.
 - **The recent window catches the long parent the whole-session average missed.** The 2026-09-21
   parent session `567f8eac` (186 requests, 7 hours) first crossed 200k at request 65, but its
   whole-session average did not cross until request 150 — **85 requests (~4 hours) later**, ~$7.88
@@ -234,6 +243,25 @@ parent session (joshuafolkken/kit#2295), for which the two averages nearly coinc
   cut on a statistic the parent does not share; #2295 keeps one statistic both read and redefines it.
   On a short session the recent-10 average tracks the whole-session average, so a lane child cuts where
   it always did; only the long parent hands off earlier.
+
+### The cut is conditional, and the resume side is why (joshuafolkken/kit#2312)
+
+**Until joshuafolkken/kit#2312 the pre-gate cut was _unconditional_, and the case for it recorded only
+the gain** — the context reduction it carries single-handed (~130k → ~60k per request). **The resume
+side was never priced.** A cut relaunches a fresh process that re-reads the plan and the recorded
+decisions off GitHub before the gate — a fixed re-launch ramp of ~12 requests per session. That ramp was
+**$81.01 of $435.09 (19%)** across the 32 lanes of 2026-09-21, falling hardest on the short lanes with
+the least to drop: #2282 spent **58%** of its billing on it at a 60k median context, #2295 **39%** at
+74k, #2289 **37%** at 81k — each with **0%** of its requests over 200k, billed for a resume against an
+accumulation that was never there.
+
+**So the cut is now taken only when the recent-window per-request cost is over `CONTEXT_CUT_THRESHOLD`**
+— the same statistic and threshold the implementation-phase cut reads, so **no second threshold is
+introduced**. Below it `run:cut` answers `under-threshold` and the gate runs uncut; the guard reads the
+same verdict and stays silent, so the two never disagree. A lane like #2298 (31% of requests over 200k)
+still cuts exactly as before, keeping the ~130k → ~60k gain where the accumulation is real, and an
+**unmeasurable** session keeps the old unconditional cut so a lane whose context cannot be read is never
+left uncut.
 
 ## Consistency with the chain rule
 

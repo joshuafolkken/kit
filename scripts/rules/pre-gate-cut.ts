@@ -1,3 +1,5 @@
+import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { run_cut, type RunCut } from '#scripts/run/run-cut'
@@ -96,6 +98,10 @@ interface LaneCutState {
 	directory: string
 	carried: (now?: Date) => RunCut | undefined
 	marked_issue: string | undefined
+	// **The recent-window context verdict, read lazily** (joshuafolkken/kit#2312). It is a thunk, like
+	// `carried`, so `current_state` builds the object without pricing a session — the read happens only
+	// after the command and lane checks pass, off the handful of calls that actually run a lane's gate.
+	context_verdict: () => CostVerdict
 }
 
 function current_state(): LaneCutState {
@@ -103,6 +109,7 @@ function current_state(): LaneCutState {
 		directory: process.cwd(),
 		carried: run_cut.carried_cut_sync,
 		marked_issue: lane_child_marker.marked_issue(),
+		context_verdict: cost_cli.session_verdict,
 	}
 }
 
@@ -127,13 +134,23 @@ function uncut_lane_issue(state: LaneCutState): string | undefined {
 	return state.carried()?.issue === issue ? undefined : issue
 }
 
-// **The command test comes first and the world is consulted second.** This predicate is asked of
-// every `Bash` call in the run, so the cheap string match is what keeps a git call off all of them
-// but the handful that actually run the gate.
-function is_uncut_gate(command: string, state: LaneCutState = current_state()): boolean {
-	if (!runs_the_gate(command)) return false
+// **The cut is taken only when the recent-window context is worth its resume** (joshuafolkken/kit#2312).
+// Below the shared `CONTEXT_CUT_THRESHOLD` a short lane has no accumulation a cut would drop, so the
+// gate runs uncut rather than paying for a relaunch; an unmeasurable session keeps the old
+// unconditional cut as the safety net joshuafolkken/kit#1933 relies on. The verdict is
+// `cost_cli.session_verdict`'s, the same statistic and threshold `run:cut` and the implementation-phase
+// cut read, so the guard and the command can never disagree about whether a cut was due.
+function warrants_the_cut(verdict: CostVerdict): boolean {
+	return verdict !== cost_verdict.UNDER_VERDICT
+}
 
-	return uncut_lane_issue(state) !== undefined
+// **The command test comes first and the world is consulted second.** This predicate is asked of
+// every `Bash` call in the run, so the cheap string match is what keeps a git call — and, now, a
+// transcript read — off all of them but the handful that actually run the gate.
+function is_uncut_gate(command: string, state: LaneCutState = current_state()): boolean {
+	if (!runs_the_gate(command) || uncut_lane_issue(state) === undefined) return false
+
+	return warrants_the_cut(state.context_verdict())
 }
 
 // The instruction in the shape a refusal can carry: what the cut is for, what each verdict means, and
