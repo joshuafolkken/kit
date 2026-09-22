@@ -179,7 +179,22 @@ function carries_a_body(command: string): boolean {
 	return inline_body_literals(command).length > 0
 }
 
+// The instruction in the shape a refusal can carry: what the shell is about to do, the safe
+// spellings, and the reissue sentence every delivery needs. The damage is named because it is the
+// half that reads as unbelievable — the substituted text is *executed*, not discarded. It lives here
+// beside its trigger rather than inline in the enumeration, the shape every newer row's reason takes
+// (`git-force.ts`, `lane-carry-conflict.ts`).
+const SHELL_BODY_REASON =
+	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
+	'contains a backtick or a `$`, so the shell runs it — the text is executed rather than merely ' +
+	'mangled (joshuafolkken/kit#1198). Write the body to a file and pass it by path: `pnpm josh ' +
+	'issue:comment <N> --body-file <path>`, `pnpm josh followup --notify-message-file <path>`, or ' +
+	"`--body-file <path>` wherever offered. `$'…'` quoting is the other safe form; the rule and the " +
+	"trigger's blind spots are in `prompts/collaboration-workflow/shell-body.md`. Reissue this call " +
+	'once the body is in a file — it fires once per run and cannot repeat on the call in hand.'
+
 const shell_body_trigger = {
+	SHELL_BODY_REASON,
 	carries_a_body,
 	is_safe_body_form,
 	is_shell_evaluated_body,

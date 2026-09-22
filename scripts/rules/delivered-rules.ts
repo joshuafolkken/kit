@@ -14,6 +14,7 @@ import { josh_git_bare } from './josh-git-bare'
 import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
+import { lane_switch_main } from './lane-switch-main'
 import { piped_verification } from './piped-verification'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
@@ -233,21 +234,10 @@ const ISSUE_COMMENTS_REASON =
 	'fires once per run and cannot repeat on the call in hand.'
 
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
-// the value — is `shell-body-trigger.ts`, beside its own cases. A row states its trigger and its
-// text; a model of zsh quoting is more than a row.
-const { carries_a_body, is_shell_evaluated_body, keeps_body_safe } = shell_body_trigger
-
-// The instruction in the shape a refusal can carry: what the shell is about to do, the safe
-// spellings, and the reissue sentence every delivery needs. The damage is named because it is the
-// half that reads as unbelievable — the substituted text is *executed*, not discarded.
-const SHELL_BODY_REASON =
-	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
-	'contains a backtick or a `$`, so the shell runs it — the text is executed rather than merely ' +
-	'mangled (joshuafolkken/kit#1198). Write the body to a file and pass it by path: `pnpm josh ' +
-	'issue:comment <N> --body-file <path>`, `pnpm josh followup --notify-message-file <path>`, or ' +
-	"`--body-file <path>` wherever offered. `$'…'` quoting is the other safe form; the rule and the " +
-	"trigger's blind spots are in `prompts/collaboration-workflow/shell-body.md`. Reissue this call " +
-	'once the body is in a file — it fires once per run and cannot repeat on the call in hand.'
+// the value — is `shell-body-trigger.ts`, beside its own cases, as is the refusal text. A row states
+// its trigger and its text; a model of zsh quoting is more than a row.
+const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_safe } =
+	shell_body_trigger
 
 // **Keeping the WIP cap is counting the open Issues**, which is the one act the rule asks for before
 // a filing.
@@ -462,6 +452,16 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// overlaps nothing. It fires on every occurrence (`decide` returns true): a child must never run
 	// these, and the route is always "continue", never a reissue (`git-force.ts`).
 	lane_carry_conflict.ROW,
+	// **The `git switch main` a lane child can never succeed at** (joshuafolkken/kit#2313), the fifth of
+	// the "always fails" misfires joshuafolkken/kit#2297 catalogued. A lane is a linked work tree and the
+	// primary checkout holds the default branch, so a child's `git switch main` fails structurally
+	// (`already used by worktree`); this refuses it before it fails and hands back the next command —
+	// skip the step, `pnpm josh main:merge` brings the default in during the gate. Its trigger reads the
+	// dispatch mark and the lane branch like `lane-carry-conflict`, and claims a `git switch` no row
+	// above matches — `git-force` is `git push` / `git branch`, `worktree-mutation` is `git checkout --`
+	// / `restore` / `stash` — so no two rows claim one command. It fires on every occurrence (`decide`
+	// returns true): a child must never run this, and the route is always "continue" (`git-force.ts`).
+	lane_switch_main.ROW,
 	// **A `pnpm josh git` with no `-y` cannot succeed from an agent** (joshuafolkken/kit#2297). It
 	// prompts to confirm the staging, the no-TTY prompt cancels, and the run reissues with `-y` after
 	// throwing away the time it took to fail. This row refuses the bare call and hands back the `-y`
