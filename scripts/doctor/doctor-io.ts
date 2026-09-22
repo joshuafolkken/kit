@@ -57,9 +57,7 @@ function classify_top_level(top_level: string): GitTopLevel {
 function classify_git_failure(exit_code: number | undefined, stderr: string): GitTopLevel {
 	if (exit_code === undefined) return { state: 'undetermined' }
 
-	return stderr.includes(NOT_A_REPOSITORY_MESSAGE)
-		? { state: 'outside' }
-		: { state: 'undetermined' }
+	return { state: stderr.includes(NOT_A_REPOSITORY_MESSAGE) ? 'outside' : 'undetermined' }
 }
 
 // The repository root, or a reason there is none. `--show-toplevel` is used rather than

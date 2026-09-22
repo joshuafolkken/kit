@@ -286,11 +286,11 @@ function apply_span(pending: Map<string, number>, span: Span, edited: ReadonlySe
 		return
 	}
 
-	if (is_content_read(span.label) && !is_failed_outcome(span)) {
-		const fresh = subject_targets(span.targets).filter((target) => !edited.has(target))
+	if (!is_content_read(span.label) || is_failed_outcome(span)) return
 
-		add_all(pending, fresh, span.ended_ms)
-	}
+	const fresh = subject_targets(span.targets).filter((target) => !edited.has(target))
+
+	add_all(pending, fresh, span.ended_ms)
 }
 
 function last_delegation_ms(spans: ReadonlyArray<Span>): number {
@@ -382,8 +382,9 @@ function has_cleared_the_disarm(tally: ReadTally, refused_at_ms: number): boolea
 }
 
 function is_rearmed(tally: ReadTally, refused_at_ms: number): boolean {
-	if (refused_at_ms === hook_decision.NEVER_MS) return true
-	if (has_cleared_the_disarm(tally, refused_at_ms)) return true
+	if (refused_at_ms === hook_decision.NEVER_MS || has_cleared_the_disarm(tally, refused_at_ms)) {
+		return true
+	}
 
 	return is_at_threshold(tally.pending_since)
 }
@@ -438,11 +439,10 @@ function should_block(
 	refused_at_ms: number,
 	run?: GuardRun,
 ): boolean {
-	if (!is_refusable_call(call)) return false
 	// A delegated unit is never refused (joshuafolkken/kit#1840): the remedy the refusal names — send
 	// the reading to a unit — does not exist inside one. Asked before the tail is parsed, since the
 	// answer needs none of it.
-	if (is_unit_run(run)) return false
+	if (!is_refusable_call(call) || is_unit_run(run)) return false
 
 	const tally = tally_of(text, refused_at_ms)
 

@@ -86,10 +86,11 @@ function has_recorded_dependency(subject: BacklogIssue, other: BacklogIssue): bo
 // keeps an unrelated issue out of the bundle; a wording resemblance may inform the reader's
 // judgement, but it may not be what decides.
 function is_strong_signal(subject: BacklogIssue, other: BacklogIssue): boolean {
-	if (subject.number === other.number) return false
 	// Neither side. Asked about an epic, the one-sided check found every one of its children through
 	// their own `parent: #N` line and proposed bundling a container with its contents.
-	if (subject.is_epic === true || other.is_epic === true) return false
+	if (subject.number === other.number || subject.is_epic === true || other.is_epic === true) {
+		return false
+	}
 
 	return has_mutual_reference(subject, other) || has_recorded_dependency(subject, other)
 }

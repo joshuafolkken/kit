@@ -24,6 +24,7 @@ Using the kit inside a project? See [docs/package.md](./docs/package.md).
 
 | Guide                                           | What it covers                                                                   |
 | ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| [why.md](./docs/why.md)                         | Why kit exists — the AI-development problems it solves, for practitioners        |
 | [authentication.md](./docs/authentication.md)   | One-time GitHub Packages auth — `gh` token, `NODE_AUTH_TOKEN`, `.npmrc`          |
 | [cli.md](./docs/cli.md)                         | Install and use the global `josh` CLI                                            |
 | [package.md](./docs/package.md)                 | Use the kit as a project devDependency — configs, prompts, scripts, `josh init`  |

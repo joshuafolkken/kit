@@ -188,12 +188,5 @@ const skill_migration = {
 	kept_note,
 }
 
-export type {
-	MigrationAction,
-	MigrationResult,
-	MigrationSource,
-	RemovedSkill,
-	RemovedSkillFile,
-	RemovedSkillManifest,
-}
+export type { MigrationResult, RemovedSkillManifest }
 export { skill_migration }

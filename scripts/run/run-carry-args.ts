@@ -22,7 +22,7 @@ const MIN_PID = 1
 // cannot advance a budget that is no longer its own. `--end` alone accepts it and ignores it, and a
 // usage line that offered it there would be promising an ownership check nothing performs.
 const USAGE =
-	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue>) [--owner <pid>] | --end'
+	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue> | --retrospective --summary <text>) [--owner <pid>] | --end [--stopped <reason>]'
 
 const OPTIONS = {
 	begin: { type: 'string' },
@@ -33,7 +33,22 @@ const OPTIONS = {
 	json: { type: 'boolean' },
 	merged: { type: 'string' },
 	owner: { type: 'string' },
+	// A boolean like `--cut`: it marks the end-of-run retrospective as run rather than counting an
+	// amount (joshuafolkken/kit#2328). It joins the counting group, so it carries `--owner` and is
+	// refused from a session that no longer owns the record, exactly as a merge count is.
+	retrospective: { type: 'boolean' },
 	resume: { type: 'string' },
+	// The retrospective's result carried to the event stream (joshuafolkken/kit#2342). It pairs with
+	// `--retrospective` and only with it: the mark and the result it records are one action, so a mark
+	// with nothing to read and a result no mark records are both usage errors rather than half-done
+	// closes. It is not a record field — `to_change` never carries it — so it rides the count request to
+	// the emit side alone.
+	summary: { type: 'string' },
+	// **`--stopped <reason>` rides on `--end`, so it is a modifier rather than a fifth group.** A run
+	// that halts needing a person ends its record exactly as a clean one does; the reason is what turns
+	// that end into the ⏸️ confirmation the person gets after a session cut (joshuafolkken/kit#2136).
+	// Named without `--end` it is ignored, the way a read ignores every counting flag.
+	stopped: { type: 'string' },
 } as const
 
 type OptionName = keyof typeof OPTIONS
@@ -47,13 +62,18 @@ interface CountRequest {
 	kind: 'count'
 	change: CarryChange
 	owner: CarryOwner
+	// The retrospective result to emit, present exactly when `change.retrospective` is set and never
+	// otherwise (joshuafolkken/kit#2342). The CLI reads it to append one event as it applies the mark.
+	summary?: string
 }
 
 type Request =
-	CountRequest | { kind: 'read' } | { kind: 'claim'; claim: CarryClaimRequest } | { kind: 'end' }
+	| CountRequest
+	| { kind: 'read' }
+	| { kind: 'claim'; claim: CarryClaimRequest }
+	| { kind: 'end'; stopped: string | undefined }
 
 const READ_REQUEST: Request = { kind: 'read' }
-const END_REQUEST: Request = { kind: 'end' }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
 	try {
@@ -97,6 +117,15 @@ function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
 	return Number.isSafeInteger(issue) ? { done: issue } : undefined
 }
 
+// The two boolean marks in the counting group — `--cut` and `--retrospective` — as the partial the
+// change spreads. Kept apart from `to_change` so its own decision count stays under the limit.
+function to_marks(values: ParsedValues): Pick<CarryChange, 'cuts' | 'retrospective'> {
+	const cuts = values.cut === true ? ONE_CUT : NO_INCREMENT
+	const retrospective = values.retrospective === true ? { retrospective: true } : {}
+
+	return { cuts, ...retrospective }
+}
+
 function to_change(values: ParsedValues): CarryChange | undefined {
 	const merged = to_count(values.merged)
 	const filed = to_count(values.filed)
@@ -104,7 +133,7 @@ function to_change(values: ParsedValues): CarryChange | undefined {
 
 	if (merged === undefined || filed === undefined || done === undefined) return undefined
 
-	return { merged, filed, cuts: values.cut === true ? ONE_CUT : NO_INCREMENT, ...done }
+	return { merged, filed, ...to_marks(values), ...done }
 }
 
 // **A counting flag is what makes a count, never the sum of one.** `--merged 0` is a run reporting
@@ -113,6 +142,7 @@ function to_change(values: ParsedValues): CarryChange | undefined {
 function has_count(values: ParsedValues): boolean {
 	return (
 		values.cut === true ||
+		values.retrospective === true ||
 		values.merged !== undefined ||
 		values.filed !== undefined ||
 		values.done !== undefined
@@ -150,13 +180,34 @@ function to_owner(value: OptionValue): CarryOwner | undefined {
 	return pid < MIN_PID ? undefined : run_carry.owner_of(pid)
 }
 
-// The counting group, split out so the shape below stays a flat list of exits.
+// A non-empty `--summary`, or nothing. An empty string is nothing here, so it reads as absent and the
+// pairing check below refuses it against `--retrospective`.
+function summary_text(values: ParsedValues): string | undefined {
+	const summary = text_of(values.summary)
+
+	return summary === undefined || summary === '' ? undefined : summary
+}
+
+// The mark and its result are one close: `--retrospective` needs a `--summary` to record, and a
+// `--summary` names a result no other flag records (joshuafolkken/kit#2342). Either flag without the
+// other is a usage error, so each must be present exactly when the other is.
+function is_summary_paired(values: ParsedValues): boolean {
+	return (summary_text(values) !== undefined) === (values.retrospective === true)
+}
+
+// The counting group, split out so the shape below stays a flat list of exits. The summary rides along
+// only when it is there — guaranteed paired with `--retrospective` by `is_summary_paired` — so a plain
+// `--merged` count never carries one.
 function to_count_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
 	const change = to_change(values)
 
 	if (change === undefined) return undefined
 
-	return { kind: 'count', change, owner }
+	const summary = summary_text(values)
+
+	return summary === undefined
+		? { kind: 'count', change, owner }
+		: { kind: 'count', change, owner, summary }
 }
 
 // `--begin ""` is a loop whose invocation variable was unset. A record named by nothing is one every
@@ -173,7 +224,7 @@ function to_claim_request(
 }
 
 function to_other_request(values: ParsedValues, owner: CarryOwner): Request | undefined {
-	if (values.end === true) return END_REQUEST
+	if (values.end === true) return { kind: 'end', stopped: text_of(values.stopped) }
 
 	return has_count(values) ? to_count_request(values, owner) : READ_REQUEST
 }
@@ -193,6 +244,8 @@ function to_named_request(values: ParsedValues, owner: CarryOwner): Request | un
 function to_request(values: ParsedValues): Request | undefined {
 	if (group_count(values) > ONE_GROUP) return undefined
 
+	if (!is_summary_paired(values)) return undefined
+
 	const owner = to_owner(values.owner)
 
 	if (owner === undefined) return undefined
@@ -207,5 +260,5 @@ const run_carry_args = {
 	to_request,
 }
 
-export type { CountRequest, OptionValue, ParsedValues, Request }
+export type { CountRequest, ParsedValues, Request }
 export { run_carry_args }

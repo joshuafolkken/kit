@@ -1,8 +1,10 @@
+import { readFile } from 'node:fs/promises'
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { main_sync } from '#scripts/git/main-sync'
 import { observation_ledger, OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import { observation_ledger_line, type BrokenLine } from './observation-ledger-line'
 
 // The commit path the observation ledger did not have (joshuafolkken/kit#1756). The parent session
 // that appends a line never runs `pnpm josh git`; a child runs it inside a lane work tree, which
@@ -306,6 +308,23 @@ function merged_message(branch_name: string): string {
 	return `merged \`${branch_name}\` — the appended observations are on the default branch`
 }
 
+function broken_lines_message(broken: ReadonlyArray<BrokenLine>): string {
+	const rows = broken.map((entry) => `  ${entry.line}\n    ↳ ${entry.reason}`).join('\n')
+
+	return `\`${OBSERVATION_LEDGER_PATH}\` has ${String(broken.length)} line(s) that break the ledger grammar, so \`pnpm josh observations:flush\` stops rather than committing them:\n${rows}`
+}
+
+// **A malformed line is refused before a branch is cut, not after.** The ledger path was collected
+// without a line ever being parsed (joshuafolkken/kit#2123), so a broken append could ride a flush
+// through; validating here keeps the committed ledger to its grammar.
+async function refuse_broken_ledger(): Promise<void> {
+	const broken = observation_ledger_line.broken_ledger_lines(
+		await readFile(OBSERVATION_LEDGER_PATH, 'utf8'),
+	)
+
+	if (broken.length > 0) throw new Error(broken_lines_message(broken))
+}
+
 // **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
 // definition at this point, so `git pull --ff-only` aborts on it in exactly the case a pull would
 // have been for — an upstream flush that already advanced the ledger — and reports a failure about
@@ -319,6 +338,7 @@ async function flush(now: Date): Promise<string> {
 
 	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
 
+	await refuse_broken_ledger()
 	await refuse_stale_default(default_branch)
 
 	const branch_name = branch_name_for(timestamp_for(now))
@@ -332,6 +352,7 @@ async function flush(now: Date): Promise<string> {
 const observations_flush = {
 	behind_default_message,
 	branch_name_for,
+	broken_lines_message,
 	CLEAN_MESSAGE,
 	COMMIT_MESSAGE,
 	empty_flush_message,

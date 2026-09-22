@@ -8,6 +8,8 @@ import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
+import { edited_cspell } from './edited-cspell'
+import { rewrite_notice } from './format-rewrite-notice'
 
 // Claude Code hands a `PostToolUse` hook the tool call as JSON on stdin; for `Edit` and `Write` the
 // edited path is `tool_input.file_path`. Everything else in the payload is ignored, and a payload
@@ -96,6 +98,21 @@ const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
 // a warm run takes, so reaching it means something is already wrong.
 const PROCESS_TIMEOUT_MS = 15_000
 
+// The problems eslint could not auto-fix are handed to the model verbatim from eslint's own stdout —
+// its default formatter already prints the file, the `line:col`, and the rule name the issue asks
+// for (joshuafolkken/kit#2275). A header names what the block is, since additionalContext arrives
+// with no framing of its own.
+const DIAGNOSTIC_HEADER =
+	'The edit hook could not auto-fix these lint problems; address them now rather than at the gate:'
+// additionalContext rides back on an edit, so an unbounded lint dump would balloon the run's
+// context. Past this many characters the block is cut and marked. One place, so the bound is read
+// rather than guessed.
+const MAX_DIAGNOSTIC_CHARS = 4000
+const DIAGNOSTIC_TRUNCATION_NOTICE = '\n…(diagnostics truncated)'
+// The density line first, then the lint problems, with a blank line between them when both are
+// present.
+const SECTION_SEPARATOR = '\n\n'
+
 // Where this file sits inside the kit package. `eslint_d` is kit's dependency rather than the
 // consumer's, and pnpm writes a `node_modules/.bin` shim only for a project's *direct* dependencies,
 // so a consumer's project root cannot see it and this directory can.
@@ -118,12 +135,13 @@ interface BinRoutes {
 
 // What one spawn answered. The exit code alone cannot say whether a formatter ran, because
 // `eslint --fix` exits non-zero whenever something it could not fix remains — its ordinary outcome
-// on a half-written file. Pairing it with "did anything reach stdout" is what separates the two:
-// eslint prints the problems it is exiting non-zero about, while a daemon that could not start
-// prints its reason to stderr and leaves stdout empty.
+// on a half-written file. The stdout the spawn captured is what separates the two: eslint prints the
+// problems it is exiting non-zero about, while a daemon that could not start prints its reason to
+// stderr and leaves stdout empty. It is kept whole rather than reduced to a boolean because the
+// problems eslint could not fix are reported to the model from it (joshuafolkken/kit#2275).
 interface CommandOutcome {
 	exit_code: number
-	did_write_stdout: boolean
+	stdout: string
 }
 
 type CommandRunner = (command: FormatCommand, project_root: string) => Promise<CommandOutcome>
@@ -280,7 +298,7 @@ function resolve_invocations(
 // run, which is the "permanent silent no-op rather than a slower one" the shim fallback exists to
 // prevent, reintroduced one level up.
 function is_start_failure(outcome: CommandOutcome): boolean {
-	return outcome.exit_code !== 0 && !outcome.did_write_stdout
+	return outcome.exit_code !== 0 && outcome.stdout.length === 0
 }
 
 // `cwd` is not decoration: the daemon runs each request under the cwd of the process that forwarded
@@ -301,13 +319,13 @@ async function spawn_invocation(
 		timeout: PROCESS_TIMEOUT_MS,
 	})
 
-	return { exit_code: result.exitCode ?? 1, did_write_stdout: result.stdout.length > 0 }
+	return { exit_code: result.exitCode ?? 1, stdout: result.stdout }
 }
 
 // One planned command, tried down its routes. A route is retried only when the one before it failed
 // to start — never when the formatter itself reported problems, which is its normal way of exiting.
 async function run_command(command: FormatCommand, project_root: string): Promise<CommandOutcome> {
-	let outcome: CommandOutcome = { exit_code: 0, did_write_stdout: false }
+	let outcome: CommandOutcome = { exit_code: 0, stdout: '' }
 
 	for (const invocation of resolve_invocations(command, project_root)) {
 		outcome = await spawn_invocation(invocation, project_root)
@@ -317,38 +335,82 @@ async function run_command(command: FormatCommand, project_root: string): Promis
 	return outcome
 }
 
-// Nothing here reports failure. A `PostToolUse` hook runs after the edit has landed, so a formatter
-// that cannot parse a half-written file has nothing useful to say about a write that already
-// succeeded — it stops, and the completion gate's own lint run is what reports on the file later.
-async function format_edited_file(
-	raw_payload: string,
+// eslint's stdout is diagnostics only when eslint is the command and it exited non-zero with
+// something to say. A start failure (non-zero, empty) has already been retried and carries no
+// problems, and prettier's stdout is the list of files it wrote rather than anything to act on.
+function eslint_unfixed(command: FormatCommand, outcome: CommandOutcome): string | undefined {
+	if (command.bin !== ESLINT_BIN) return undefined
+	if (outcome.exit_code === 0 || outcome.stdout.length === 0) return undefined
+
+	return outcome.stdout
+}
+
+// The block the model reads: the header, then eslint's own output, cut to the bound so a large lint
+// dump cannot balloon the run's context. `undefined` when eslint had nothing left unfixed, so the
+// ordinary edit adds nothing to additionalContext.
+function format_diagnostics(unfixed: string | undefined): string | undefined {
+	if (unfixed === undefined) return undefined
+
+	const is_over = unfixed.length > MAX_DIAGNOSTIC_CHARS
+	const body = is_over
+		? `${unfixed.slice(0, MAX_DIAGNOSTIC_CHARS)}${DIAGNOSTIC_TRUNCATION_NOTICE}`
+		: unfixed
+
+	return `${DIAGNOSTIC_HEADER}\n${body}`
+}
+
+// The fixes eslint could apply are applied silently, as before; what it could not fix is returned so
+// the model sees it on this edit rather than at the gate (joshuafolkken/kit#2275). A `PostToolUse`
+// hook still reports no failure — the edit already landed, and returning the problems is not the same
+// as failing the write.
+// Runs the planned commands in order, returning the last unfixed eslint output. Empty until eslint
+// reports something it could not fix; `eslint_unfixed` never returns an empty string, so '' stays the
+// "nothing to report" sentinel.
+async function collect_unfixed(
+	plan: ReadonlyArray<FormatCommand>,
 	runner: CommandRunner,
 	project_root: string,
-): Promise<void> {
-	const file_path = parse_edited_path(raw_payload)
-
-	if (file_path === undefined) return
-
-	const plan = [
-		...plan_commands(file_path, project_root),
-		...plan_daemon_restart(file_path, project_root),
-	]
+): Promise<string> {
+	let unfixed = ''
 
 	for (const command of plan) {
 		try {
-			await runner(command, project_root)
+			unfixed = eslint_unfixed(command, await runner(command, project_root)) ?? unfixed
 		} catch {
 			// One formatter failing to start is not a reason to skip the next: prettier runs last, and
 			// it is the one whose output the project's own lint step checks.
 			continue
 		}
 	}
+
+	return unfixed
+}
+
+async function format_edited_file(
+	raw_payload: string,
+	runner: CommandRunner,
+	project_root: string,
+): Promise<string | undefined> {
+	const file_path = parse_edited_path(raw_payload)
+
+	if (file_path === undefined) return undefined
+
+	const plan = [
+		...plan_commands(file_path, project_root),
+		...plan_daemon_restart(file_path, project_root),
+	]
+	const unfixed = await collect_unfixed(plan, runner, project_root)
+
+	return format_diagnostics(unfixed === '' ? undefined : unfixed)
 }
 
 // Provider adapters use the same live runner as the direct Claude hook without exporting that
 // implementation detail or recreating its fallback sequence.
-async function format_edited_payload(raw_payload: string, project_root: string): Promise<void> {
-	await format_edited_file(raw_payload, run_command, project_root)
+async function format_edited_payload(
+	raw_payload: string,
+	project_root: string,
+): Promise<string | undefined> {
+	return await format_edited_file(raw_payload, run_command, project_root)
 }
 
 // The one hook event this file is wired to, and the value the envelope below has to name.
@@ -362,22 +424,34 @@ const HOOK_EVENT_NAME = 'PostToolUse'
 // the documented envelope does, which is why the line cannot simply be printed. `undefined` when
 // there is nothing to say, so the ordinary edit writes nothing at all to stdout and the payload the
 // harness parses stays empty.
-function density_envelope(raw_payload: string): string | undefined {
-	const notice = time_density_hook.density_notice(raw_payload)
-
-	if (notice === undefined) return undefined
-
+// Both the density line and eslint's unfixed problems reach the model the same way — as
+// additionalContext on this one hook — and a `PostToolUse` hook's stdout carries a single envelope,
+// so the two are joined into one rather than written twice: a second JSON object on stdout would
+// leave the harness unable to parse either. No `permissionDecision` is ever set, so returning the
+// problems does not turn the edit into a failure.
+function build_envelope(additional_context: string): string {
 	return JSON.stringify({
-		hookSpecificOutput: { hookEventName: HOOK_EVENT_NAME, additionalContext: notice },
+		hookSpecificOutput: { hookEventName: HOOK_EVENT_NAME, additionalContext: additional_context },
 	})
 }
 
-// Nothing at all reaches stdout on the ordinary edit, so what the harness parses stays empty unless
-// there is something to say.
-function write_density_envelope(raw_payload: string): void {
-	const envelope = density_envelope(raw_payload)
+function density_envelope(raw_payload: string): string | undefined {
+	const notice = time_density_hook.density_notice(raw_payload)
 
-	if (envelope !== undefined) process.stdout.write(`${envelope}\n`)
+	return notice === undefined ? undefined : build_envelope(notice)
+}
+
+// The density line and the lint problems, joined when both are present. `undefined` when there is
+// nothing to say, so the ordinary edit writes nothing at all to stdout.
+function compose_context(
+	notice: string | undefined,
+	diagnostics: string | undefined,
+): string | undefined {
+	const sections = [notice, diagnostics].filter(
+		(section): section is string => section !== undefined,
+	)
+
+	return sections.length === 0 ? undefined : sections.join(SECTION_SEPARATOR)
 }
 
 // Run from a terminal there is no payload coming, and waiting for one looks like a hang.
@@ -387,20 +461,38 @@ function report_no_payload(): void {
 	)
 }
 
+// The lint problems come from eslint and the unknown words from cspell, so both are known only once
+// their processes have run; the density line is joined to them into the single envelope the harness
+// can parse, rather than written first on its own. The rewrite notice is read from the file itself —
+// its content before the formatters ran against its content after — so it too is known only once they
+// have (joshuafolkken/kit#2314). The rewrite, lint and spell blocks are composed together first, then
+// joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries only one
+// (joshuafolkken/kit#2296). A hook killed at its 15s timeout is the one case this loses the density
+// line to — a run already gone pathologically wrong, per PROCESS_TIMEOUT_MS.
+async function run_hook(payload: string): Promise<void> {
+	const notice = time_density_hook.density_notice(payload)
+	const file_path = parse_edited_path(payload)
+	const before = rewrite_notice.read_text(file_path)
+	const lint = await format_edited_payload(payload, process.cwd())
+	const rewrite = rewrite_notice.build(before, rewrite_notice.read_text(file_path))
+	const spelling = await edited_cspell.spelling_diagnostics(file_path, process.cwd())
+	const parts = compose_context(rewrite, compose_context(lint, spelling))
+	const context = compose_context(notice, parts)
+
+	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	if (process.stdin.isTTY) {
 		report_no_payload()
 	} else {
-		const payload = await text(process.stdin)
-
-		// Written before the formatters run: it costs milliseconds against their second, and a hook
-		// killed at its timeout would otherwise lose the line along with the formatting.
-		write_density_envelope(payload)
-		await format_edited_payload(payload, process.cwd())
+		await run_hook(await text(process.stdin))
 	}
 }
 
 export {
+	build_envelope,
+	compose_context,
 	density_envelope,
 	format_edited_file,
 	format_edited_payload,
@@ -412,6 +504,7 @@ export {
 	resolve_invocations,
 	select_invocation,
 	ESLINT_DAEMON,
+	MAX_DIAGNOSTIC_CHARS,
 	PROCESS_TIMEOUT_MS,
 }
-export type { BinRoutes, CommandOutcome, CommandRunner, FormatCommand }
+export type { CommandRunner, FormatCommand }

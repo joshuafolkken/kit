@@ -107,12 +107,16 @@ const rest_comment_schema = z.looseObject({
 	user: z.looseObject({ login: z.string().optional() }).nullish(),
 })
 
-// The `number,labels,body` read, for the epic check. Labels come back as objects, so the name is
-// picked out here rather than at every call site.
+// The `number,state,labels,body` read, for the epic check and the `--add` closed-epic refusal.
+// Labels come back as objects, so the name is picked out here rather than at every call site.
 const issue_label_schema = z.object({ name: z.string() })
 
+// `state` is optional because most readers ignore it — only `git-epic-add.ts` consults it, to refuse
+// adding a child to a closed epic (joshuafolkken/kit#2337). A reader that never asks the state field
+// still parses cleanly.
 const epic_subject_schema = z.object({
 	number: z.number(),
+	state: z.string().optional(),
 	labels: z.array(issue_label_schema).optional(),
 	body: z.string().optional(),
 })

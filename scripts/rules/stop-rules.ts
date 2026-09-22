@@ -1,0 +1,171 @@
+import { hook_decision } from '#scripts/josh/hook-decision'
+import { z } from 'zod'
+import { issue_citation } from './issue-citation'
+
+// The three stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121).
+//
+// **It exists because `.claude/settings.json` wired no `Stop` event.** The four events it did wire
+// (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse`) can catch the moment a call is
+// about to run, but not the moment a run *stops* or *reports* — so three rules whose inputs are all
+// mechanically readable could not be enforced structurally (`prompts/collaboration-workflow/rule-delivery.md`).
+//
+// **No second decision engine.** This loads on the same `hook_decision` foundation the PreToolUse
+// guards share — the `.env` load and the switch — and reuses `lane-park`'s stop-notification judgement
+// and `run:hold`'s record read rather than re-deriving either. What differs is only the event: a
+// `Stop` payload has no tool call, and it blocks with `{"decision":"block"}` rather than a PreToolUse
+// permission envelope. The stop guard is a second *entry* on the one foundation, exactly as
+// `pretool-guard` is one — not a second copy of the plumbing.
+//
+// **All three rules refuse** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
+// on a clean tree costs a person a silent wait or a trampled tree; a bare `#N` in the reply reaches
+// the person watching but not the model that could fix it, so it too blocks — `{"decision":"block"}`
+// is the one channel a `Stop` hook has to the model, and `stop_hook_active` caps a false positive at a
+// single wasted turn. The detection is tightened to match (`issue-citation.ts`).
+
+const SWITCH_ENV_KEY = 'JOSH_STOP_GUARD'
+const BLOCK_DECISION = 'block'
+
+// Only the fields the stop rules read. `last_assistant_message` is the turn's session-facing text —
+// Claude Code hands it directly so the transcript's async lag is never in the citation path.
+const stop_payload_schema = z.object({
+	transcript_path: z.string().min(1),
+	stop_hook_active: z.boolean().nullish(),
+	last_assistant_message: z.string().nullish(),
+})
+
+type StopPayload = z.infer<typeof stop_payload_schema>
+
+// What one stop looks like to the rules, computed once by the CLI from the payload and the world.
+interface StopContext {
+	// The `run:hold` record for this working tree is still in place (`held` or `stale`).
+	hold_present: boolean
+	// `git status --porcelain` came back empty.
+	tree_clean: boolean
+	// A `confirmation` notify is on this run's transcript tail.
+	notified: boolean
+	// The turn's session-facing reply text.
+	message: string
+	// This stop already forced a continuation earlier in the prompt — the loop-breaker Claude Code
+	// documents, so a run that will not comply is not blocked forever.
+	stop_hook_active: boolean
+	// A pre-gate cut record is in place for this work tree. A dispatched lane child ends its turn at
+	// the cut holding the tree by design and hands off to a fresh process (`pre-gate-cut.md`), so that
+	// turn-end is an automatic continuation, not the person-waiting pause the block rules are for.
+	cut_pending: boolean
+}
+
+interface StopOutcome {
+	reason: string | undefined
+}
+
+const NO_OUTCOME: StopOutcome = { reason: undefined }
+
+// **A mid-workflow stop is announced off-screen before it happens.** `CLAUDE.md` → "Mid-workflow stop
+// notification" requires the `confirmation` Telegram before any pause; the hold is what says a run is
+// mid-workflow, and the transcript is what says the notify was sent.
+const STOP_NOTIFY_REASON =
+	'⛔ mid-workflow stop notification: this working tree is still held by a run and no `confirmation` ' +
+	'Telegram was sent this turn, so a person is being left to wait off-screen without knowing the run ' +
+	'paused. `CLAUDE.md` → "Mid-workflow stop notification" requires ' +
+	'`pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$\'<reason>\'` before any ' +
+	'mid-workflow pause. Send it, then end with a one-line confirmation that it was sent — do not repeat ' +
+	'your previous reply. This fires only while the hold is held and no notify is on the transcript, and ' +
+	'`stop_hook_active` lets a second stop through so a run is never wedged.'
+
+// **A clean tree that still holds is a tree the next run will trample.** `SKILL.md` → §2f: a stop that
+// leaves the tree clean releases the hold; a `halfrun` pre-commit stop and a `needs-human-review` stop
+// keep it because their tree is dirty, which is why this row is silent whenever the tree is not clean.
+const HOLD_RELEASE_REASON =
+	'⛔ working-tree hold not released: this working tree is clean but its `run:hold` record is still in ' +
+	'place, so the next run here runs `git switch main && git pull` believing the tree is free while ' +
+	'you hold it. `.claude/skills/workflow-commands/SKILL.md` → §2f: a stop that leaves the tree clean ' +
+	'releases the hold with `pnpm josh run:release <N>` (bare for a `new` entry). A `halfrun` ' +
+	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty — this ' +
+	'row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
+	'not repeat your previous reply.'
+
+// **A refusal that corrects rather than advises** (joshuafolkken/kit#2247). The bare `#N` is already
+// on screen and the hook cannot unsay it, so the reason does the one thing that helps the *next* reply:
+// it names the numbers it detected and hands over the exact `issue:cite` call that prints the
+// paste-ready lines, then asks for the corrected citation lines alone — not the whole reply reissued
+// (joshuafolkken/kit#2329). Reprinting the whole reply is what made the correction read as a duplicate;
+// the bare copy already scrolled past stays, and the fix follows it as a short correction. The rule
+// itself is not restated — it is resident in `CLAUDE.md` — only pointed at.
+const ISSUE_CITATION_REASON =
+	'Session-facing output cites an Issue as a number-link so the reader can click through and see ' +
+	'which repository it is (`CLAUDE.md`, `prompts/collaboration-workflow/issue-citation.md`).'
+
+function build_citation_reason(references: ReadonlyArray<string>): string {
+	const numbers = references.join(', ')
+	const command = `pnpm josh issue:cite ${issue_citation.cite_arguments(references).join(' ')}`
+
+	return (
+		`⛔ issue citation: your reply names an Issue as a bare \`#N\` (${numbers}). Run \`${command}\` ` +
+		`to print the paste-ready citation lines, then print the corrected citation lines alone — do not ` +
+		`repeat your previous reply. ${ISSUE_CITATION_REASON}`
+	)
+}
+
+function needs_notify(context: StopContext): boolean {
+	return context.hold_present && !context.notified
+}
+
+function needs_release(context: StopContext): boolean {
+	return context.hold_present && context.tree_clean
+}
+
+function citation_reason(message: string): string | undefined {
+	const references = issue_citation.bare_references(message)
+	if (references.length === 0) return undefined
+
+	return build_citation_reason(references)
+}
+
+// First-wins across all three rules. Two things stand every rule down: `stop_hook_active` (the
+// loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
+// flight (a lane child's automatic turn-end, not a person-waiting pause). The two existing rules keep
+// their order ahead of the citation rule, so a stop that both still owes its notify and holds a bare
+// `#N` still reports the notify first.
+function block_reason(context: StopContext): string | undefined {
+	if (context.stop_hook_active || context.cut_pending) return undefined
+	if (needs_notify(context)) return STOP_NOTIFY_REASON
+	if (needs_release(context)) return HOLD_RELEASE_REASON
+
+	return citation_reason(context.message)
+}
+
+function stop_outcome(context: StopContext): StopOutcome {
+	return { reason: block_reason(context) }
+}
+
+// The documented shape a `Stop` hook blocks with: `reason` is fed back to Claude, which then continues
+// instead of stopping. Plain stdout is not it — only this envelope holds the stop.
+function block_envelope(reason: string): string {
+	return JSON.stringify({ decision: BLOCK_DECISION, reason })
+}
+
+function parse_stop_payload(raw_payload: string): StopPayload | undefined {
+	const parsed = stop_payload_schema.safeParse(JSON.parse(raw_payload))
+
+	return parsed.success ? parsed.data : undefined
+}
+
+function is_enabled(): boolean {
+	return hook_decision.is_switch_enabled(SWITCH_ENV_KEY)
+}
+
+const stop_rules = {
+	HOLD_RELEASE_REASON,
+	ISSUE_CITATION_REASON,
+	NO_OUTCOME,
+	STOP_NOTIFY_REASON,
+	SWITCH_ENV_KEY,
+	block_envelope,
+	block_reason,
+	is_enabled,
+	parse_stop_payload,
+	stop_outcome,
+}
+
+export type { StopContext, StopOutcome }
+export { stop_rules }

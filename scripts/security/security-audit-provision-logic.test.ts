@@ -3,15 +3,19 @@ import { security_audit_provision_logic } from './security-audit-provision-logic
 
 const {
 	SCANNER_VERSION,
+	MINIMUM_SCANNER_VERSION,
 	build_asset_name,
 	build_download_timeout,
 	build_download_url,
 	build_staging_path,
 	format_already_present,
+	format_below_floor,
 	format_checksum_mismatch,
 	format_download_failure,
 	format_installed,
 	format_unsupported_platform,
+	meets_version_floor,
+	parse_scanner_version,
 	resolve_asset,
 } = security_audit_provision_logic
 
@@ -87,7 +91,7 @@ describe('security_audit_provision_logic.resolve_asset', () => {
 
 		expect(asset?.name).toBe(DARWIN_ARM64_ASSET)
 		expect(asset?.url).toContain(`/v${SCANNER_VERSION}/${DARWIN_ARM64_ASSET}`)
-		expect(asset?.sha256).toBe('75c44d6332f892a1e56286f4105a98ed751ae28d215ca0a8b65cc00d84103054')
+		expect(asset?.sha256).toBe('98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4')
 	})
 
 	// A checksum table that had drifted out of step with the platform table would hand back a URL
@@ -144,5 +148,55 @@ describe('security_audit_provision_logic messages', () => {
 
 	it('names the pinned version it installed', () => {
 		expect(format_installed('/repo/tool/osv-scanner')).toContain(`v${SCANNER_VERSION}`)
+	})
+})
+
+// The floor is the pinned version: a provisioned build always meets it, and any earlier build is a
+// false negative that read a fraction of the lockfile (joshuafolkken/kit#2200).
+describe('security_audit_provision_logic.parse_scanner_version', () => {
+	it('reads the scanner version from the --version block', () => {
+		const output = 'osv-scanner version: 2.6.0\nosv-scalibr version: 0.4.5\ncommit: n/a'
+
+		expect(parse_scanner_version(output)).toBe('2.6.0')
+	})
+
+	// The scalibr line carries its own version right below the scanner's; matching it would let a
+	// scalibr version stand in for the scanner floor.
+	it('does not mistake the osv-scalibr version for the scanner version', () => {
+		expect(parse_scanner_version('osv-scalibr version: 9.9.9')).toBeUndefined()
+	})
+
+	it('returns undefined when the output carries no scanner version', () => {
+		expect(parse_scanner_version('command not found')).toBeUndefined()
+	})
+})
+
+describe('security_audit_provision_logic.meets_version_floor', () => {
+	it('accepts the pinned floor version itself', () => {
+		expect(meets_version_floor(MINIMUM_SCANNER_VERSION)).toBe(true)
+	})
+
+	it('rejects a build below the floor', () => {
+		expect(meets_version_floor('2.3.5')).toBe(false)
+		expect(meets_version_floor('2.5.1')).toBe(false)
+	})
+
+	// A string compare would read 2.10.0 as older than 2.6.0; the numeric per-segment compare must not.
+	it('accepts a later version whose segment sorts below the floor as a string', () => {
+		expect(meets_version_floor('2.10.0')).toBe(true)
+		expect(meets_version_floor('3.0.0')).toBe(true)
+	})
+})
+
+describe('security_audit_provision_logic.format_below_floor', () => {
+	const message = format_below_floor('2.3.5')
+
+	it('names the below-floor version and the required floor', () => {
+		expect(message).toContain('2.3.5')
+		expect(message).toContain(`v${MINIMUM_SCANNER_VERSION}`)
+	})
+
+	it('says a clean result is not proof the lockfile is clean', () => {
+		expect(message).toContain('not proof')
 	})
 })

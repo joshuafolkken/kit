@@ -8,6 +8,9 @@ import {
 	type RunCarry,
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
+import { run_event_stream } from './run-event-stream'
+import { run_event_stream_emit } from './run-event-stream-emit'
+import { run_stop_notify } from './run-stop-notify'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts
 // (joshuafolkken/kit#1714). A `backlogrun` begins it, counts a merge and a filing into it, marks each
@@ -35,6 +38,11 @@ const MISMATCH_VERDICT = 'mismatch'
 const BUSY_VERDICT = 'busy'
 const STANDING_VERDICT = 'standing'
 const UNKNOWN_VERDICT = 'unknown'
+// The invocation has taken its maximum cuts (joshuafolkken/kit#2346). A benign, non-failing refusal:
+// the run carries on uncut rather than paying a cold preamble the accumulation it would shed no longer
+// covers, exactly as an under-threshold pre-gate cut carries on to the gate.
+const CAPPED_VERDICT = 'capped'
+const NO_CUTS = 0
 
 const CLAIM_VERDICTS: Record<CarryClaim, string> = {
 	busy: BUSY_VERDICT,
@@ -237,30 +245,96 @@ function report_count_refused(carry: RunCarry, is_json: boolean): number {
 	return report(BUSY_VERDICT, carry, is_json, FAILURE_EXIT_CODE)
 }
 
+// The retrospective's result on the run's event stream, so a run that filed zero improvements reads
+// apart from one whose retrospective never ran (joshuafolkken/kit#2342). It rides the `--retrospective`
+// mark rather than a call of its own, so closing the retrospective and recording what it found are one
+// action; the emit is best-effort, the same contract every other append on this stream keeps, and it
+// happens only after the mark applied — a refused count records nothing.
+async function record_retrospective(request: CountRequest): Promise<void> {
+	if (request.summary === undefined) return
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.RETROSPECTIVE, request.summary)
+}
+
+// A cut count is the one increment with a ceiling (joshuafolkken/kit#2346); a merge or a filing has
+// none. `--cut` sets `cuts` to one, so a positive count is what marks this count a cut.
+function is_cut_count(request: CountRequest): boolean {
+	return (request.change.cuts ?? NO_CUTS) > NO_CUTS
+}
+
+// The cut cap is reached, so the cut is refused without applying it — the run carries on uncut. Said as
+// a benign verdict rather than a failure, so a loop reads `capped` and continues rather than stopping.
+function report_cut_capped(carry: RunCarry, is_json: boolean): number {
+	console.error(
+		`Cut cap reached (${String(run_carry.MAX_CUTS)} cuts); nothing was counted and the run carries on uncut.`,
+	)
+
+	return report(CAPPED_VERDICT, carry, is_json, SUCCESS_EXIT_CODE)
+}
+
+// The refusals read before a count is applied: a record this session no longer owns (handed off or
+// taken over) keeps the single writer joshuafolkken/kit#1722 established across a cut, and a cut past
+// the cap carries on uncut (joshuafolkken/kit#2346). `undefined` when neither applies, so the count
+// lands.
+function blocked_count(
+	carry: RunCarry,
+	request: CountRequest,
+	is_json: boolean,
+): number | undefined {
+	if (run_carry.is_count_refused(carry, request.owner)) {
+		return report_count_refused(carry, is_json)
+	}
+
+	if (is_cut_count(request) && run_carry.is_at_cut_cap(carry)) {
+		return report_cut_capped(carry, is_json)
+	}
+
+	return undefined
+}
+
 // A count against a record that is not there is `none` and exits non-zero: the loop believed it was
 // carrying a budget and it was not, and a silent zero would let the run keep its own tally instead. A
-// count against a record this session no longer owns is refused for the same reason, so the single
-// writer joshuafolkken/kit#1722 established is kept across a cut (joshuafolkken/kit#1935).
-function count(target: string, read: CarryRead, request: CountRequest, is_json: boolean): number {
+// count against a record this session no longer owns is refused, and a cut past the cap carries on
+// uncut, both before the change is applied (joshuafolkken/kit#1935, joshuafolkken/kit#2346).
+async function count(
+	target: string,
+	read: CarryRead,
+	request: CountRequest,
+	is_json: boolean,
+): Promise<number> {
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
 
-	if (run_carry.is_count_refused(read.carry, request.owner)) {
-		return report_count_refused(read.carry, is_json)
-	}
+	const blocked = blocked_count(read.carry, request, is_json)
+
+	if (blocked !== undefined) return blocked
 
 	const carry = run_carry.apply_change(target, read.carry, request.change)
+
+	await record_retrospective(request)
 
 	return read.kind === 'expired'
 		? report_expired(carry, is_json)
 		: report_carry(COUNTED_VERDICT, carry, is_json)
 }
 
-function finish(target: string, is_json: boolean): number {
+// **A stop over a record that is still there pushes one ⏸️ confirmation before the record goes**
+// (joshuafolkken/kit#2136). `plan` is read from the record `--end` is about to remove, so the second
+// `--end` reads `none` and plans nothing — one stop never notifies twice. A clean `--end` passes no
+// reason and stays silent, because a completed run has its own notification.
+async function finish(
+	target: string,
+	stopped: string | undefined,
+	is_json: boolean,
+): Promise<number> {
 	const read = run_carry.read_carry(target)
 
 	run_carry.end_carry(target)
+
+	const notice = run_stop_notify.plan(read, stopped)
+
+	if (notice !== undefined) await run_stop_notify.announce(notice)
 
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, SUCCESS_EXIT_CODE)
 
@@ -271,16 +345,16 @@ function finish(target: string, is_json: boolean): number {
 	return report_carry(ENDED_VERDICT, read.carry, is_json)
 }
 
-function act(target: string, request: Request, is_json: boolean): number {
+async function act(target: string, request: Request, is_json: boolean): Promise<number> {
 	if (request.kind === 'claim') return claim_record(target, request.claim, is_json)
 
-	if (request.kind === 'end') return finish(target, is_json)
+	if (request.kind === 'end') return await finish(target, request.stopped, is_json)
 
 	const read = run_carry.read_carry(target)
 
 	if (request.kind === 'read') return report_read(read, is_json)
 
-	return count(target, read, request, is_json)
+	return await count(target, read, request, is_json)
 }
 
 function report_unknown(is_json: boolean): number {
@@ -294,7 +368,7 @@ async function answer(request: Request, is_json: boolean): Promise<number> {
 
 	if (directory === undefined) return report_unknown(is_json)
 
-	return act(run_carry.carry_path(directory), request, is_json)
+	return await act(run_carry.carry_path(directory), request, is_json)
 }
 
 function refuse(): number {
@@ -329,6 +403,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const run_carry_cli = {
 	BEGAN_VERDICT,
 	BUSY_VERDICT,
+	CAPPED_VERDICT,
 	CARRIED_VERDICT,
 	COUNTED_VERDICT,
 	ENDED_VERDICT,

@@ -24,6 +24,7 @@
 | `josh epic:audit` — 子 Issue 群を横断して矛盾を検出する                        | [`epic-audit.md`](./collaboration-workflow/epic-audit.md)                               |
 | 別パッケージ起因の問題は割り込み Issue で対応する                              | [`upstream-interrupt.md`](./collaboration-workflow/upstream-interrupt.md)               |
 | クローン禁止・単一ソース化（パッケージ境界を越えても）                         | [`no-clones.md`](./collaboration-workflow/no-clones.md)                                 |
+| 設計はエレガント・シンプルを第一目標にする（仕組みを足す前に原因を問う）       | [`simplicity-first.md`](./collaboration-workflow/simplicity-first.md)                   |
 | 相談と実行を区別する（議論中にファイルを編集しない）                           | [`consultation-vs-execution.md`](./collaboration-workflow/consultation-vs-execution.md) |
 | 配布ドキュメント・設定の変更は kit に上流化する                                | [`distributed-docs.md`](./collaboration-workflow/distributed-docs.md)                   |
 | エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` は導線） | [`single-source-rules.md`](./collaboration-workflow/single-source-rules.md)             |

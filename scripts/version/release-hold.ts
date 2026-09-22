@@ -81,8 +81,7 @@ function is_release_age_hold(
 	latest: string,
 	installable: string | undefined,
 ): boolean {
-	if (version === undefined || installable === undefined) return false
-	if (version === latest) return false
+	if (version === undefined || installable === undefined || version === latest) return false
 
 	return is_at_or_above(version, installable)
 }

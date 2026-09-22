@@ -2,10 +2,43 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # A Claude Code built-in agent type, `statusline-setup` — enumerated in the known-agent-types set the
+  # review-subagent document rule checks against (joshuafolkken/kit#2297).
+  - statusline
+  # `josh fanout` — the command that says whether implementation units are file-disjoint, so their
+  # subagents may be launched in one fan-out turn (joshuafolkken/kit#2345).
+  - fanout
+  # The property `josh fanout` tests for: two units' file sets sharing no member. "The disjointness
+  # keeps two subagents from colliding on a file."
+  - disjointness
+  # Verb coined from Node's working-directory-change call — "the lane case chdirs into a lane checkout".
+  # The guard suites
+  # for joshuafolkken/kit#2138 change directory into a lane checkout to exercise the dispatched-child
+  # path, and the teardown comments name that act.
+  - chdirs
+  # "A copy still matches after reindentation" — `josh clone:scan` normalizes whitespace before it
+  # fingerprints a block, so a block copied and reindented (its leading whitespace changed) still
+  # hashes the same (joshuafolkken/kit#2217). Named in the clone-detection code and its tests.
+  - reindent
+  - reindented
+  - reindentation
+  # "An unenumerated guard fires" — a guard not listed in the `lane-guard-policy.ts` enumeration
+  # (joshuafolkken/kit#2138). Names the fail-safe default in the code comment and its test.
+  - unenumerated
   # Coined for the retirement of `josh cost` reports no rule or decision read (#2016): a column,
   # scope or module is "readerless" when nothing consumes its value. Used in the CLI comments, the
   # tests and `docs/josh-commands.md` to name what was removed and why the `--over` verdict stays.
   - readerless
+  # "The section intro cites the same words unbolded" — the prompt-sync test comment contrasts the
+  # bold header it matches against the plain (unbolded) mention nearby (joshuafolkken/kit#2255).
+  - unbolded
+  # "A safety net not firing is not a miscalibration" — the pre-gate-cut decision heading for
+  # joshuafolkken/kit#2282 names the threshold-tuning question it declines to treat as an error.
+  - miscalibration
+  # "halving it moves the unsimulated parent hand-off too" — the pre-gate-cut decision for
+  # joshuafolkken/kit#2366 names the three shared uses of CONTEXT_CUT_THRESHOLD the lane simulation
+  # did not price.
+  - unsimulated
   # Wrapped in backticks, as a past participle. `josh epic --add` writes the relation it replaced into
   # the decision record with the chain in a code span, because a line that is nothing but `#A -> #B` is
   # read as a dependency declaration anywhere in an epic body (joshuafolkken/kit#1711) — the code and
@@ -25,6 +58,18 @@ words:
   # unusable dependency graph (joshuafolkken/kit#1663) — the literal text a reader greps for.
   - getaddrinfo
   - ENOTFOUND
+  # "Re-dispatchable" — a lane child that ended on an API outage is left dispatchable again in the same
+  # run rather than parked (joshuafolkken/kit#2240). Named across the `run:merge` / `run:ending` code,
+  # the workflow docs and their tests.
+  - dispatchable
+  # "Undispatched" — ready backlog work that sits with a free lane while nothing is started, the stall
+  # state the detector reports (joshuafolkken/kit#2359). Named across the `backlog:stalled` code, its
+  # command descriptions, the stall event/notify strings and the docs.
+  - undispatched
+  # The connection-error signature the Anthropic client emits when the API refused the socket, matched
+  # mechanically to tell an API outage apart from a child that stalled (joshuafolkken/kit#2240). It is
+  # the literal marker text `api-outage.ts` greps the exit record for.
+  - connectionrefused
   # The registry host `docs/cloud-session.md` lists among the outbound hosts a cloud container has to
   # allow (joshuafolkken/kit#1565). It is the domain `registry.npmjs.org`, not a prose word.
   - npmjs
@@ -40,6 +85,9 @@ words:
   # left behind, and `test-repository-guard.ts` cites it three times as the reason the guard has to
   # name what it caught.
   - reflog
+  # git's own name for the `--numstat` diff format — added/deleted line counts per file, tab-delimited.
+  # `josh split:assess` reads it to size a change (joshuafolkken/kit#2218).
+  - numstat
   # What `josh review:attest` calls a review that read a checkout other than the one it was briefed
   # on (joshuafolkken/kit#1522). cspell derives "targeted" but not the "mis-" compound.
   - mistargeted
@@ -180,3 +228,29 @@ words:
   # park on the Issue (joshuafolkken/kit#2034) — the state the delivered rule refuses. It reaches no
   # distributed file: the word appears only in that module, its two suites and the enumeration.
   - unparked
+  # Python identifiers named in `scripts/rules/file-body.ts`'s detection patterns (joshuafolkken/kit#2120):
+  # the file-body guard refuses shell forms that write a file's body — `f.writelines(...)`,
+  # `shutil.copy`/`shutil.move` into an existing path. They appear only in that module's patterns and tests.
+  - writelines
+  - shutil
+  # English word in `scripts/rules/worktree-guard.ts` — a message-tagged stash is "findable and poppable"
+  # by `pnpm josh stash:pop` (joshuafolkken/kit#2120). Appears only in that module's comment.
+  - poppable
+  # The ESTree property name for a template literal's static string chunks (`node.quasis`), read by
+  # `eslint/rules/english-only-prose.js` when it inspects a no-substitution template title
+  # (joshuafolkken/kit#2124). It is the AST spelling, not a coined word.
+  - quasis
+  # OSV-Scanner's own package-extraction library, named in the `--version` banner the scanner floor
+  # parses (joshuafolkken/kit#2200). It appears only in `scripts/security/security-audit-provision-logic.ts`
+  # and its suite, both internal to this package.
+  - scalibr
+  # A binary that cannot be spawned at all (ENOENT), described in `scripts/security/security-audit.ts`'s
+  # comment on why a version that cannot be read is treated as below the floor (joshuafolkken/kit#2200).
+  # The negated form of "able to be spawned", which cspell does not derive from "spawn".
+  - unspawnable
+  # Verb coined for turning a bare `#N` into a number-link at the source that prints it — the citation
+  # formatter `issue_citation.linkify` in `scripts/rules/issue-citation.ts` (joshuafolkken/kit#2329).
+  # It and its inflections appear only in that module, the printing commands, and their suites.
+  - linkify
+  - linkified
+  - linkifies

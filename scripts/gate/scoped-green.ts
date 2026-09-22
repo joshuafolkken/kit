@@ -28,11 +28,14 @@ import { gate_tree, type GateTree } from './gate-tree'
 // definition of "this tree is unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where
 // two commands would start disagreeing about one working tree.
 //
-// **It refuses `josh review:brief` rather than `josh gate`, and CI is why.** `.github/workflows/ci.yml`
-// runs `pnpm josh gate --verbose --no-unit`, with no scoped check in front of it, so a gate that
-// refused would refuse CI. The brief is run by no CI job and no lefthook hook — and it is where
-// `review:attest` mints the nonce a round is counted against, so there is no path to a countable
-// review round that does not pass through it.
+// **It refuses `josh review:brief`, and now the local `josh gate` too, but never CI's**
+// (joshuafolkken/kit#2296). The brief was the first refusal point because it is where `review:attest`
+// mints the nonce a round is counted against, so no countable review round bypasses it. But the gate
+// itself runs *before* the brief, and a run that reached it on a tree the scoped pair had never read
+// paid for the gap anyway — so `verification-gate.ts` reads this same record one step earlier and
+// refuses to start. The one gate that must never be refused is CI's: `.github/workflows/ci.yml` runs
+// `pnpm josh gate --verbose --no-unit`, with no scoped check in front of it, so the gate's pre-check
+// fires only when the unit suite is included — which excludes `--no-unit` — and never under `--force`.
 
 // The escape hatch, on by default like every other distributed guard: a convention nobody can turn
 // off is one a person cannot get past on the day the record is wrong about their tree.
@@ -194,8 +197,13 @@ interface GreenRecord {
 async function record_if_green(stamp: FileMapStampAccess, record: GreenRecord): Promise<void> {
 	const { before, exit_code, target } = record
 
-	if (before === undefined || exit_code !== SUCCESS_EXIT_CODE) return
-	if (!is_unmoved(before, await gate_tree.read_gate_tree())) return
+	if (
+		before === undefined ||
+		exit_code !== SUCCESS_EXIT_CODE ||
+		!is_unmoved(before, await gate_tree.read_gate_tree())
+	) {
+		return
+	}
 
 	record_green(stamp, before, target)
 }

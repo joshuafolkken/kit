@@ -1,3 +1,4 @@
+import { run_carry } from '#scripts/run/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CloseKind } from './lane-close'
 import type { LaneInfo } from './lane-registry'
@@ -11,7 +12,24 @@ vi.mock('./lane-open', () => ({ lane_open: { open_lane: vi.fn() } }))
 vi.mock('./lane-close', () => ({
 	lane_close: { close_all_lanes: vi.fn(), close_lane: vi.fn(), prune_lanes: vi.fn() },
 }))
+vi.mock('./lane-dispatch', () => ({
+	lane_dispatch: {
+		dispatch_child: vi.fn(),
+		describe: vi.fn().mockReturnValue(''),
+		is_worth_warning: vi.fn().mockReturnValue(false),
+		warn_of_problem: vi.fn(),
+	},
+}))
 vi.mock('./lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
+// `lane:list` reads the `in-progress` listing to name the lane/label difference (joshuafolkken/kit#2235);
+// mocked so the unit suite makes no live `gh` call. An idle repository plus a known owner lets the
+// occupancy path run deterministically over the listed lanes.
+vi.mock('#scripts/git/git-gh-command', () => ({
+	git_gh_command: { repo_get_name_with_owner: vi.fn().mockResolvedValue('joshuafolkken/kit') },
+}))
+vi.mock('#scripts/epic/epic-busy', () => ({
+	epic_busy: { read_repository: vi.fn().mockResolvedValue({ kind: 'idle' }) },
+}))
 vi.mock('./lane-output', () => ({
 	lane_output: {
 		NO_OUTPUT: 'no output path',
@@ -23,6 +41,7 @@ vi.mock('./lane-output', () => ({
 
 const { lane_open } = await import('./lane-open')
 const { lane_close } = await import('./lane-close')
+const { lane_dispatch } = await import('./lane-dispatch')
 const { lane_registry } = await import('./lane-registry')
 const { lane_output } = await import('./lane-output')
 const { lane_cli } = await import('./lane-cli')
@@ -55,6 +74,8 @@ const printed: Array<string> = []
 
 beforeEach(() => {
 	printed.length = 0
+	// Default: no carry record, so the cut-session guard passes through without refusing.
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		printed.push(line)
 	})
@@ -237,5 +258,59 @@ describe('anything else', () => {
 
 		expect(await lane_cli.run(['open', '1490'])).toBe(FAILURE)
 		expect(printed).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#2114: a session that took a cut must not open new lanes or dispatch children.
+const HANDED_OFF_CARRY = {
+	invocation: 'backlogrun #1 #2',
+	started_at: new Date().toISOString(),
+	merged: 0,
+	filed: 0,
+	cuts: 1,
+	failures: 0,
+	outages: 0,
+	is_handed_off: true as const,
+}
+
+describe('lane:open cut-session guard', () => {
+	beforeEach(() => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
+	})
+
+	it('refuses and exits non-zero without calling open_lane', async () => {
+		expect(await lane_cli.run(['open', ISSUE])).toBe(FAILURE)
+		expect(vi.mocked(lane_open.open_lane)).not.toHaveBeenCalled()
+	})
+
+	it('also refuses an expired record whose budget was handed off', async () => {
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'expired', carry: HANDED_OFF_CARRY })
+
+		expect(await lane_cli.run(['open', ISSUE])).toBe(FAILURE)
+		expect(vi.mocked(lane_open.open_lane)).not.toHaveBeenCalled()
+	})
+
+	it('proceeds normally when the record is not handed off', async () => {
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({
+			kind: 'carried',
+			carry: { ...HANDED_OFF_CARRY, is_handed_off: false },
+		})
+		vi.mocked(lane_open.open_lane).mockResolvedValue({ kind: 'opened', lane: LANE })
+
+		expect(await lane_cli.run(['open', ISSUE])).toBe(SUCCESS)
+		expect(vi.mocked(lane_open.open_lane)).toHaveBeenCalled()
+	})
+})
+
+describe('lane:dispatch cut-session guard', () => {
+	beforeEach(() => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
+	})
+
+	it('refuses and exits non-zero without calling dispatch_child', async () => {
+		expect(await lane_cli.run(['dispatch', ISSUE])).toBe(FAILURE)
+		expect(vi.mocked(lane_dispatch.dispatch_child)).not.toHaveBeenCalled()
 	})
 })

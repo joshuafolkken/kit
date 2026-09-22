@@ -108,6 +108,7 @@ const MAINTENANCE_COMMANDS: ReadonlySet<string> = new Set([
 	'prevent-main-commit',
 	'check-commit-message',
 	'pre-push-unit',
+	'reserved-run',
 	'pre-commit-type-check',
 ])
 
@@ -323,7 +324,6 @@ const josh_logic = {
 
 export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'
-export type { TsxRunner }
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {

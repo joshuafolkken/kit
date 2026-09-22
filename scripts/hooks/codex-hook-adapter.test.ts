@@ -101,11 +101,14 @@ describe('Codex post-tool adaptation', () => {
 		const runner: CommandRunner = async (command) => {
 			formatted.push(command.command_arguments.at(-1) ?? '')
 
-			return { exit_code: 0, did_write_stdout: false }
+			return { exit_code: 0, stdout: '' }
 		}
 
-		const formatter = async (raw_payload: string, project_root: string): Promise<void> => {
-			await format_edited_file(raw_payload, runner, project_root)
+		const formatter = async (
+			raw_payload: string,
+			project_root: string,
+		): Promise<string | undefined> => {
+			return await format_edited_file(raw_payload, runner, project_root)
 		}
 
 		await codex_hook_adapter.format_posttool_payloads(
@@ -131,12 +134,14 @@ describe('Codex post-tool formatting budget', () => {
 		const finished: Array<string> = []
 		const releases: Array<() => void> = []
 
-		const formatter = async (raw_payload: string): Promise<void> => {
+		const formatter = async (raw_payload: string): Promise<string | undefined> => {
 			started.push(parse_edited_path(raw_payload) ?? '')
 			await new Promise<void>((resolve) => {
 				releases.push(resolve)
 			})
 			finished.push(parse_edited_path(raw_payload) ?? '')
+
+			return undefined
 		}
 
 		const run = codex_hook_adapter.format_posttool_payloads(

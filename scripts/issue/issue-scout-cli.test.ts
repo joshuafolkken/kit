@@ -28,6 +28,12 @@ const RELATED_NUMBER = 1246
 const MISSING_NUMBER = 999_999
 const EPIC_NUMBER = 1153
 
+// The command linkifies its session-facing output (joshuafolkken/kit#2329), so an issue it names in a
+// role is cited as a number-link — this is that link for one number, against the repository above.
+function link(number: number): string {
+	return `[#${String(number)}](https://github.com/${REPO}/issues/${String(number)})`
+}
+
 interface ListingRow {
 	number: number
 	title: string
@@ -233,8 +239,8 @@ describe('issue_scout_cli.run — where it belongs', () => {
 	it('names the epic that already tracks an issue the draft cites', async () => {
 		const output = await printed(CITING_DRAFT, CITED_BACKLOG)
 
-		expect(output).toContain(`Target epic: #${String(EPIC_NUMBER)}`)
-		expect(output).toContain(`Related: #${String(RELATED_NUMBER)}`)
+		expect(output).toContain(`Target epic: ${link(EPIC_NUMBER)}`)
+		expect(output).toContain(`Related: ${link(RELATED_NUMBER)}`)
 	})
 
 	it('says to file it standalone when nothing open shares a reference', async () => {
@@ -268,7 +274,7 @@ describe('issue_scout_cli.run — the epic listing was cut short', () => {
 	it('still names the candidates it did read', async () => {
 		const output = await printed_with_cut(CITING_DRAFT, CITED_BACKLOG)
 
-		expect(output).toContain(`Related: #${String(RELATED_NUMBER)}`)
+		expect(output).toContain(`Related: ${link(RELATED_NUMBER)}`)
 	})
 })
 
@@ -296,7 +302,7 @@ describe('issue_scout_cli.run — answers a cut epic listing leaves alone', () =
 	it('still names the epic the summary itself points at', async () => {
 		const output = await printed_with_cut(NAMED_EPIC_DRAFT, NAMED_EPIC_BACKLOG)
 
-		expect(output).toContain(`names #${String(EPIC_NUMBER)}`)
+		expect(output).toContain(`names ${link(EPIC_NUMBER)}`)
 		expect(output).not.toContain(epic_bundle_gaps.UNCONFIRMED_MEMBERSHIP_LINE)
 	})
 })
@@ -319,7 +325,7 @@ describe('issue_scout_cli.run — a draft that cites nothing', () => {
 			epics: [{ number: EPIC_NUMBER, body: `- [ ] #${String(RELATED_NUMBER)}` }],
 		})
 
-		expect(output).toContain(`(epic #${String(EPIC_NUMBER)})`)
+		expect(output).toContain(`(epic ${link(EPIC_NUMBER)})`)
 	})
 
 	// An epic is excluded from the candidate pool — a container is not a sibling — so a draft naming
@@ -327,7 +333,7 @@ describe('issue_scout_cli.run — a draft that cites nothing', () => {
 	it('names the epic the summary itself points at', async () => {
 		const output = await printed(NAMED_EPIC_DRAFT, NAMED_EPIC_BACKLOG)
 
-		expect(output).toContain(`names #${String(EPIC_NUMBER)}`)
+		expect(output).toContain(`names ${link(EPIC_NUMBER)}`)
 		expect(output).not.toContain(issue_scout_cli.NO_EPIC_LINE)
 	})
 

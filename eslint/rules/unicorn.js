@@ -63,7 +63,19 @@ export const unicorn_rules = {
 	// String#matchAllを優先
 	'unicorn/prefer-string-replace-all': 'error',
 	// 三項演算子を優先
-	'unicorn/prefer-ternary': 'error',
+	// このプロジェクトの早期リターン規約（単一 return が100文字未満なら一行、それ以上はブロック）と
+	// 正面衝突するため無効化。762箇所を機械的に書き換えると規約が lint プラグインの既定で上書きされる。
+	'unicorn/prefer-ternary': 'off',
+	// 配列・オブジェクトを宣言直後に条件付き push/代入する builder パターンを一律禁止するが、
+	// 複数の条件付き push が連続するケースでは展開構文の可読性が著しく低下する（build パターン）。
+	// 現在の実装スタイルを優先して無効化する。
+	'unicorn/no-immediate-mutation': 'off',
+	// Set#isSubsetOf() は ES2025 の機能で、プロジェクトの lib: ES2023 ターゲットに存在しない（TS2339）。
+	// lib を上げるまで無効化する。
+	'unicorn/prefer-set-methods': 'off',
+	// Map.groupBy() は ES2024 の機能で、プロジェクトの lib: ES2023 ターゲットに存在しない（TS2339）。
+	// lib を上げるまで無効化する。
+	'unicorn/prefer-group-by': 'off',
 	// より明確なエラーを投げる
 	'unicorn/custom-error-definition': 'error',
 	// throw new Error()の形式を強制

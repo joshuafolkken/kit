@@ -61,7 +61,7 @@ defect, a split that needs a person — **park the child and keep going.**
 
 ```bash
 gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'
-gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<what needs deciding, and the options>"
+pnpm josh issue:comment <N> --body-file <path>   # what needs deciding, and the options
 ```
 
 `in-progress` is left as it is, and the parked child does **not** hold the repository — `epic:next` gives
@@ -146,7 +146,7 @@ source; what follows is this entry's branch.
 
    ```bash
    git stash push -u -m "backlogrun: paused #<M> for prerequisite #<N>"
-   gh api repos/{owner}/{repo}/issues/<M>/comments -f body="<what was stashed, and that #<N> must land first>"
+   pnpm josh issue:comment <M> --body-file <path>   # what was stashed, and that #<N> must land first
    ```
 
    **`-u` is not optional** (a new `*.test.ts` is untracked). The comment makes the paused state

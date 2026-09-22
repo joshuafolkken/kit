@@ -48,6 +48,7 @@ function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
 		order_pairs: [],
 		decisions: '',
 		order_comments: new Map(),
+		is_epic_closed: false,
 		...overrides,
 	}
 }
@@ -194,6 +195,17 @@ describe('epic_audit_cli.audit', () => {
 		const result = epic_audit_cli.audit(audit_input({ children, contradictions }))
 
 		expect(result.findings).toHaveLength(1)
+	})
+
+	// A closed epic holding an open child is the contradiction that went unnoticed because it read as
+	// `0 error(s)` (joshuafolkken/kit#2337). The wiring is pinned here: `is_epic_closed` reaches the
+	// check and its error fails the audit.
+	it('fails when the epic is closed but still tracks an open child', () => {
+		const result = epic_audit_cli.audit(
+			audit_input({ is_epic_closed: true, children: [child(1, '')] }),
+		)
+
+		expect(result.exit_code).toBe(1)
 	})
 })
 

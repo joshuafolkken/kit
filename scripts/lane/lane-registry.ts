@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_environment } from './lane-environment'
@@ -193,27 +194,21 @@ async function worktree_blocks(): Promise<Array<string>> {
 	return listing.split(BLOCK_SEPARATOR)
 }
 
-function main_worktree(blocks: ReadonlyArray<string>): string | undefined {
-	return line_value((blocks[0] ?? '').split('\n'), WORKTREE_PREFIX)
-}
-
 /**
  * The main work tree's root, whichever work tree this was run in.
  *
  * **Every lane path is derived from here, and `git rev-parse --show-toplevel` is not it**
  * (joshuafolkken/kit#1497). That answers the *current* work tree, which inside a lane is the lane
- * itself — so `lane:list` run there looks for lanes under `<lane>/.<lane>-lanes` and reports that
- * none are open while six are running, and `lane:open` run there puts the new lane under that same
- * wrong root, reads the lane's own `.env` as the root's, and lands somewhere `list_lanes` cannot see
- * it: the seat goes unrecorded and the next lane binds the same ports. `git worktree list` names the
- * main work tree first and prints the same thing from every work tree, so one reading serves
- * `lane:list`, `lane:open` and `lane:close` alike — which is why it is here rather than copied into
- * each. The fallback is the old behavior, for a listing that named no work tree at all.
+ * itself — so `lane:list` run there would look for lanes under `<lane>/.<lane>-lanes` and report that
+ * none are open while six are running. The step from the current work tree to the main one is exactly
+ * what `repo_discovery.main_worktree` resolves from the filesystem (joshuafolkken/kit#2233), so this
+ * is a thin async layer over it: `repository_root()` names the current work tree, and the shared
+ * resolver walks its `.git`/`commondir` up to the main checkout. Keeping that walk in one place lets
+ * the synchronous discovery callers — which cannot await this — share the same answer. For an ordinary
+ * checkout the resolver is a no-op, so `main_repository_root` is unchanged outside a lane.
  */
 async function main_repository_root(): Promise<string> {
-	const blocks = await worktree_blocks()
-
-	return main_worktree(blocks) ?? (await git_command.repository_root())
+	return repo_discovery.main_worktree(await git_command.repository_root())
 }
 
 /** Every open lane of this repository, lowest issue number first. */

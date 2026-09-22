@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
@@ -43,6 +43,7 @@ const FULL_OUTCOME: OpenOutcome = { kind: 'full' }
 // disk and the seat is discoverable — or on any failure — so only a hard crash mid-open can strand
 // one, which removing the lanes-root `.seat-locks` directory clears.
 const SEAT_LOCK_DIR = '.seat-locks'
+const SEAT_LOCK_PREFIX = 'seat-'
 
 // A root with no `.env` is the normal state of a fresh clone and of CI, and it means seed 0 — the
 // same reading `ports/index.js` gives a missing file. The lane still gets a file, because the seed
@@ -76,7 +77,26 @@ function build_lane(
 }
 
 function seat_lock_path(root: string, seat: number): string {
-	return path.join(root, SEAT_LOCK_DIR, `seat-${String(seat)}`)
+	return path.join(root, SEAT_LOCK_DIR, `${SEAT_LOCK_PREFIX}${String(seat)}`)
+}
+
+// Release the seat lock — idempotent (`force`), so calling it after the `.env` write and again in the
+// `finally` that covers an earlier failure both land safely.
+function release_seat_lock(lock: string): void {
+	rmSync(lock, { recursive: true, force: true })
+}
+
+// How many opens are in flight right now, read straight off disk: each holds one seat lock from its
+// seat claim until its `.env` is written, so the count of lock entries is the count of lanes still
+// being created. A missing directory is none held — the normal state when no open is running.
+function open_in_flight_count(root: string): number {
+	try {
+		return readdirSync(path.join(root, SEAT_LOCK_DIR)).filter((entry) =>
+			entry.startsWith(SEAT_LOCK_PREFIX),
+		).length
+	} catch {
+		return 0
+	}
 }
 
 // Claim `lock` by creating it exclusively — `false` when another open already holds it. The parent
@@ -104,16 +124,25 @@ function reserve_seat(root: string, free: ReadonlyArray<number>): SeatReservatio
 }
 
 /**
- * Refuse to allocate while a live lane's seat cannot be read.
+ * Refuse to allocate while a live lane's seat cannot be read — but a lane still being opened is not
+ * one of those.
  *
- * Skipping such a lane would read its seat as free and hand its ports to the new one, which is a
+ * Skipping a broken lane would read its seat as free and hand its ports to the new one, which is a
  * collision nothing reports until an E2E run fails somewhere else. Failing here names the lane and
  * what to do about it.
+ *
+ * **A lane git already lists but whose `.env` is not yet on disk is mid-open, not broken**
+ * (joshuafolkken/kit#2147). It holds a seat lock from its seat claim until its `.env` write — the
+ * whole window in which it reads as unreadable — and that lock keeps its seat off this open's table
+ * (`reserve_seat` cannot claim a locked seat), so tolerating it here cannot cause a collision. The
+ * count of held locks is the count of opens in flight, so only the unreadable lanes beyond it are
+ * genuinely broken and stop the allocation. A lock stranded by a hard crash masks a broken lane the
+ * same way; removing the `.seat-locks` directory clears it.
  */
-function guard_unreadable(lanes: ReadonlyArray<LaneInfo>): void {
+function guard_unreadable(root: string, lanes: ReadonlyArray<LaneInfo>): void {
 	const unreadable = lane_registry.unreadable_lanes(lanes)
 
-	if (unreadable.length === 0) return
+	if (unreadable.length <= open_in_flight_count(root)) return
 
 	const named = unreadable.map((lane) => `#${lane.issue} (${lane.directory})`).join(', ')
 
@@ -177,12 +206,18 @@ function build_plan(
 // failure is recoverable by re-running the install alone.
 //
 // **The gate's verification caches are seeded from the main checkout before the install**
-// (joshuafolkken/kit#1849), so the lane's first `josh gate` is warm rather than cold. It is
-// best-effort and runs after the `.env` write for the same reason the install does: a lane whose
-// warming found nothing still carries its seat and is perfectly usable, cold first gate and all.
+// (joshuafolkken/kit#1849), so the lane's first `josh gate` is warm rather than cold. The pre-built
+// hook bundles are seeded the same way (joshuafolkken/kit#2160): `dist/hooks/` is git-ignored, so a
+// lane's work tree never carries it and every Claude Code hook drops to the slow `pnpm josh …`
+// fallback without this copy. Both are best-effort and run after the `.env` write for the same reason
+// the install does: a lane whose warming found nothing still carries its seat and is perfectly
+// usable, cold first gate and fallback hooks and all.
 async function materialize(plan: LanePlan, source_root: string): Promise<void> {
-	// The seat lock is released in `finally`: on success the `.env` is on disk and the seat is
-	// discoverable by the next open, and on failure nothing was created that should hold it.
+	// The seat lock is released the moment the `.env` is on disk — from then the lane is readable and
+	// its seat discoverable, so nothing more holds the seat. It must **not** ride the multi-minute
+	// install: a lock outlasting the unreadable window would inflate `open_in_flight_count` and mask a
+	// genuinely broken lane (joshuafolkken/kit#2147). The `finally` covers a failure before the `.env`
+	// is written, where nothing was created that should hold it.
 	try {
 		mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
 
@@ -190,10 +225,12 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 
 		await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
 		writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
+		release_seat_lock(plan.seat_lock)
 		lane_cache.seed_caches(source_root, plan.lane.directory)
+		lane_cache.seed_hook_bundles(source_root, plan.lane.directory)
 		guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
 	} finally {
-		rmSync(plan.seat_lock, { recursive: true, force: true })
+		release_seat_lock(plan.seat_lock)
 	}
 }
 
@@ -214,9 +251,10 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 
 	if (existing !== undefined) return { kind: 'already-open', lane: existing }
 
-	guard_unreadable(lanes)
-
 	const root = lane_paths.lane_root(repository_root)
+
+	guard_unreadable(root, lanes)
+
 	const plan = build_plan(repository_root, root, issue, lanes)
 
 	if (plan === undefined) return FULL_OUTCOME
@@ -233,5 +271,5 @@ const lane_open = {
 	read_root_environment,
 }
 
-export type { LanePlan, OpenOutcome }
+export type { OpenOutcome }
 export { lane_open }

@@ -10,8 +10,8 @@ leaves the work as one Issue:
 
 1. **Does the request contain two or more deliverables that could each be merged separately?**
 2. **Does the whole of it clearly exceed what one verification gate can confirm in one pass?** The
-   guide is **about 10 changed files and about 400 changed lines**. Under that, it is one Issue however
-   many separable pieces a reader can name inside it.
+   guide is **about 10 changed files and about 400 changed lines** (test files excluded).
+   Under that, it is one Issue however many separable pieces a reader can name inside it.
 
 Separately mergeable is still the first test, and it is unchanged: a change that must land in one
 commit to be correct is one deliverable however big it is. What changed is that **separability alone
@@ -20,6 +20,18 @@ no longer splits anything** — it is now a necessary condition rather than a su
 **The guide is a guide, and "clearly" is the operative word.** A run that has to argue itself past the
 numbers has already answered no. They are read against the whole request's estimate, not against the
 diff a first pass happens to produce, and a request that lands at 11 files is not thereby a split.
+
+## The same two questions decide the filing-time fold
+
+**The entry's split decision and the filing-time fold decision are the same two conditions, stated
+here once.** This assessment asks whether *one request* is several deliverables; the fold decision asks
+whether *several findings from one session* are one Issue — and reads the **same two questions in the
+same conjunction**: separability, and whether the whole clearly exceeds one gate.
+`pnpm josh issue:fold "<title>" …` answers `fold` / `separate` / `no-fold-needed`; its size half is
+`pnpm josh split:assess`, called not recomputed, and `separate` needs both halves exactly as `split`
+does. **There is no second criterion.** §2i's observation, the review round cap's branch 2 and §2d's
+prerequisite each route a second filing through it, delivered by `pnpm josh rule:guard` at the run's
+second `gh api … issues` call, never the first.
 
 ## Why the default is not to split
 
@@ -42,6 +54,12 @@ the size-dependent part is merely divided between the halves (measured in joshua
 round 1's cost is dominated by a fixed part that two Issues pay twice, so there is no diff size at
 which splitting to cut it pays). **A proposal to add a size threshold that splits more is required to
 say why that data does not reach it.**
+
+**The size half is measured, not eyeballed — `pnpm josh split:assess`.** It counts the branch's
+changed files and changed lines with test files excluded and answers `split` / `single` on size
+alone, so the guide can be checked against real diffs after the fact rather than trusted from an
+estimate. It answers the **size** question only; separability (question 1) stays a judgement, which is
+why a `split` from this command is the size condition met, not a decision to divide the Issue.
 
 ## What each entry point does with the answer
 

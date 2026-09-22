@@ -6,6 +6,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_classify } from './epic-classify'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
@@ -278,7 +279,7 @@ async function report_single(
 	const broken = epic_next_views.error_view(views)
 
 	if (broken !== undefined) {
-		return refuse(epic_next_views.format_view(broken, views.length > ONE_EPIC))
+		return refuse(epic_next_views.format_view(broken, views.length > ONE_EPIC, request.repo))
 	}
 
 	const has_candidate = views.some(
@@ -304,11 +305,13 @@ function note_unchecked_exclusion(views: ReadonlyArray<EpicView>): void {
 }
 
 // One block per epic, and the notice printed once for all of them rather than once each: it says
-// what this listing does not check, which is the same sentence however many graphs it covers.
-function report_aggregate(views: ReadonlyArray<EpicView>): number {
+// what this listing does not check, which is the same sentence however many graphs it covers. The
+// listing names each epic and its children as `#N`, linkified against the current repository so the
+// output a run reads carries clickable references rather than bare ones (joshuafolkken/kit#2329).
+function report_aggregate(views: ReadonlyArray<EpicView>, current_repo: string): number {
 	note_unchecked_exclusion(views)
 
-	const text = epic_next_views.aggregate_text(views)
+	const text = epic_next_views.aggregate_text(views, current_repo)
 
 	if (epic_next_views.error_view(views) !== undefined) {
 		console.error(text)
@@ -316,7 +319,7 @@ function report_aggregate(views: ReadonlyArray<EpicView>): number {
 		return FAILURE_EXIT_CODE
 	}
 
-	console.info(text)
+	console.info(issue_citation.linkify(text, current_repo))
 
 	return SUCCESS_EXIT_CODE
 }
@@ -340,11 +343,12 @@ function note_external(views: ReadonlyArray<EpicView>): void {
 async function report(
 	views: ReadonlyArray<EpicView>,
 	request: LaneRequest | undefined,
+	current_repo: string,
 ): Promise<number> {
 	note_external(views)
 	if (request !== undefined) return await report_single(views, request)
 
-	return report_aggregate(views)
+	return report_aggregate(views, current_repo)
 }
 
 // The checkout each repository's children would be run in comes from joshuafolkken/kit#869's map. A
@@ -353,17 +357,21 @@ async function report(
 // **Every epic is classified against the same reset**, not one reset each: `reset_reported` and
 // `reset_publish_cache` are per *invocation*, so clearing them between epics would let the same
 // blocker be warned about once per epic that tracks it.
-async function report_epics(views: ReadonlyArray<EpicView>, options: NextOptions): Promise<number> {
-	if (options.repo === undefined) return await report(views, undefined)
+async function report_epics(
+	views: ReadonlyArray<EpicView>,
+	options: NextOptions,
+	current_repo: string,
+): Promise<number> {
+	if (options.repo === undefined) return await report(views, undefined, current_repo)
 
 	const choice = lane_capacity.lane_limit()
 	if (choice.kind === 'problem') return refuse(choice.problem)
 
-	return await report(views, {
-		repo: options.repo,
-		limit: choice.limit,
-		is_all_lanes: options.is_all_lanes ?? false,
-	})
+	return await report(
+		views,
+		{ repo: options.repo, limit: choice.limit, is_all_lanes: options.is_all_lanes ?? false },
+		current_repo,
+	)
 }
 
 // One view per named epic, classified against one shared registry read. `running` is every named
@@ -409,7 +417,7 @@ async function run_epics(options: NextOptions): Promise<number> {
 	const result = await epic_next_read.read_snapshots(references, current_repo)
 	const stopped = refuse_reads(result)
 
-	return stopped ?? (await report_epics(views_of(result.reads), options))
+	return stopped ?? (await report_epics(views_of(result.reads), options, current_repo))
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

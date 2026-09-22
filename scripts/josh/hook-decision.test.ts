@@ -112,6 +112,34 @@ describe('hook_decision.is_switch_enabled', () => {
 	})
 })
 
+// joshuafolkken/kit#2370: the opt-in counterpart of `is_switch_enabled`. Where that one defaults on, this
+// one defaults off, so a switch that must stay disabled unless asked for reads through it.
+describe('hook_decision.is_switch_opt_in', () => {
+	it('is off when the variable is unset, so the switch stays disabled by default', () => {
+		process.env[SWITCH_KEY] = UNSET
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(false)
+	})
+
+	it.each([...hook_decision.ENABLED_VALUES])('is on for %s', (value) => {
+		process.env[SWITCH_KEY] = value
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(true)
+	})
+
+	it('is off for a spelling the list does not recognize, so a typo cannot enable it', () => {
+		process.env[SWITCH_KEY] = 'enable'
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(false)
+	})
+
+	it('trims and lower-cases before matching, so a padded value still reads as on', () => {
+		process.env[SWITCH_KEY] = '  ON  '
+
+		expect(hook_decision.is_switch_opt_in(SWITCH_KEY)).toBe(true)
+	})
+})
+
 describe('hook_decision.deny_envelope', () => {
 	// Only this shape stops a call, and only `permissionDecisionReason` reaches the model. Asserted as
 	// the exact object: an extra key is a shape Claude Code was not documented to accept.
@@ -239,7 +267,8 @@ function notify_guard(will_block: boolean, will_notify: boolean): TranscriptGuar
 			// not fired on this sequence, so the record the shell arms is what stops the second look.
 			should_notify: (_tail, _call, notified_at_ms) =>
 				will_notify && notified_at_ms === hook_decision.NEVER_MS,
-			text: NOTICE_TEXT,
+			// The text is chosen from the call (joshuafolkken/kit#2164); this guard's is constant.
+			text: () => NOTICE_TEXT,
 		},
 	})
 }

@@ -13,21 +13,26 @@ const mocked_execa_sync = vi.mocked(execaSync)
 
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
-function fake_sync_result(exit_code: number | undefined): ExecaSyncResult {
-	const result = { exitCode: exit_code }
+function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSyncResult {
+	const result = { exitCode: exit_code, stdout }
 
 	return result as unknown as ExecaSyncResult
 }
+
+const FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.6.0'
+const BELOW_FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.3.5'
 
 beforeEach(() => {
 	vi.clearAllMocks()
 })
 
 const OSV_SCANNER = 'osv-scanner'
+const MISSING_BINARY = 'missing-bin'
 const PNPM_LOCKFILE = 'pnpm-lock.yaml'
 const MANAGED_SCANNER_PATH = '/managed/osv-scanner'
 const EXECUTABLE_MODE = 0o755
 const READABLE_MODE = 0o644
+const PNPM_JOSH_AUDIT = 'pnpm josh audit'
 const RETIRED_AUDIT = 'pnpm audit'
 const RETIRED_AUDIT_RUN = `run: ${RETIRED_AUDIT}`
 const RETIRED_AUDIT_FRAGMENT = `${RETIRED_AUDIT} `
@@ -52,7 +57,7 @@ describe('security_audit.is_binary_available', () => {
 	it('returns false when the binary cannot be spawned (exitCode undefined)', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
 
-		expect(security_audit.is_binary_available('missing-bin')).toBe(false)
+		expect(security_audit.is_binary_available(MISSING_BINARY)).toBe(false)
 	})
 })
 
@@ -81,36 +86,105 @@ describe('security_audit.run_scanner', () => {
 	})
 })
 
-// joshuafolkken/kit#1563: PATH stays the preference, so a machine that installed the scanner itself
-// behaves exactly as it did; the provisioned directory only answers when PATH did not.
-describe('security_audit.resolve_scanner_path', () => {
-	const scratch = mkdtempSync(path.join(tmpdir(), 'kit-audit-resolve-'))
+function fresh_scratch(): string {
+	return mkdtempSync(path.join(tmpdir(), 'kit-audit-resolve-'))
+}
 
-	afterAll(() => {
-		rmSync(scratch, { recursive: true, force: true })
-	})
+function write_managed(scratch: string): string {
+	const managed_path = security_audit_logic.build_managed_binary_path(scratch, 'linux')
 
-	it('prefers the binary on PATH over the provisioned copy', () => {
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+	mkdirSync(path.dirname(managed_path), { recursive: true })
+	writeFileSync(managed_path, 'stub')
+	chmodSync(managed_path, EXECUTABLE_MODE)
 
-		expect(security_audit.resolve_scanner_path(scratch, 'linux')).toBe(OSV_SCANNER)
+	return managed_path
+}
+
+// The first arg is the binary name or path being spawned, so a mock can answer PATH and the managed
+// copy differently — the whole point of the floor is that the two are no longer interchangeable.
+function mock_versions(by_target: Record<string, ExecaSyncResult>): void {
+	mocked_execa_sync.mockImplementation(
+		(target) => by_target[String(target)] ?? fake_sync_result(undefined),
+	)
+}
+
+// joshuafolkken/kit#2200: PATH is preferred only when its scanner meets the floor. A below-floor PATH
+// build reads a fraction of the lockfile and calls it clean, so a floor-meeting provisioned copy is
+// preferred over it — reversing joshuafolkken/kit#1563's unconditional PATH preference.
+describe('security_audit.resolve_scanner', () => {
+	it('prefers the PATH binary when it meets the floor', () => {
+		const scratch = fresh_scratch()
+
+		mock_versions({ [OSV_SCANNER]: fake_sync_result(0, FLOOR_VERSION_OUTPUT) })
+
+		expect(security_audit.resolve_scanner(scratch, 'linux')).toEqual({
+			path: OSV_SCANNER,
+			is_below_floor: false,
+		})
 	})
 
 	it('returns undefined when neither PATH nor the provisioned directory has one', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
 
-		expect(security_audit.resolve_scanner_path(scratch, 'linux')).toBeUndefined()
+		expect(security_audit.resolve_scanner(fresh_scratch(), 'linux')).toBeUndefined()
 	})
 
 	it('falls back to the provisioned copy when PATH has none', () => {
+		const scratch = fresh_scratch()
+		const managed_path = write_managed(scratch)
+
+		mock_versions({ [managed_path]: fake_sync_result(0, FLOOR_VERSION_OUTPUT) })
+
+		expect(security_audit.resolve_scanner(scratch, 'linux')).toEqual({
+			path: managed_path,
+			is_below_floor: false,
+		})
+	})
+})
+
+describe('security_audit.resolve_scanner — floor preference', () => {
+	it('prefers a floor-meeting provisioned copy over a below-floor PATH binary', () => {
+		const scratch = fresh_scratch()
+		const managed_path = write_managed(scratch)
+
+		mock_versions({
+			[OSV_SCANNER]: fake_sync_result(0, BELOW_FLOOR_VERSION_OUTPUT),
+			[managed_path]: fake_sync_result(0, FLOOR_VERSION_OUTPUT),
+		})
+
+		expect(security_audit.resolve_scanner(scratch, 'linux')).toEqual({
+			path: managed_path,
+			is_below_floor: false,
+		})
+	})
+
+	it('returns a below-floor PATH binary flagged when nothing else is available', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, BELOW_FLOOR_VERSION_OUTPUT))
+
+		expect(security_audit.resolve_scanner(fresh_scratch(), 'linux')).toEqual({
+			path: OSV_SCANNER,
+			is_below_floor: true,
+		})
+	})
+})
+
+describe('security_audit.meets_floor', () => {
+	it('is true for a binary reporting a version at or above the floor', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, FLOOR_VERSION_OUTPUT))
+
+		expect(security_audit.meets_floor(OSV_SCANNER)).toBe(true)
+	})
+
+	it('is false for a binary reporting a version below the floor', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, BELOW_FLOOR_VERSION_OUTPUT))
+
+		expect(security_audit.meets_floor(OSV_SCANNER)).toBe(false)
+	})
+
+	it('is false when the binary cannot be spawned', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
-		const managed_path = security_audit_logic.build_managed_binary_path(scratch, 'linux')
 
-		mkdirSync(path.dirname(managed_path), { recursive: true })
-		writeFileSync(managed_path, 'stub')
-		chmodSync(managed_path, EXECUTABLE_MODE)
-
-		expect(security_audit.resolve_scanner_path(scratch, 'linux')).toBe(managed_path)
+		expect(security_audit.meets_floor(MISSING_BINARY)).toBe(false)
 	})
 })
 
@@ -249,7 +323,7 @@ describe('josh latest command audit wiring', () => {
 	it('invokes the audit via pnpm josh so it does not depend on a global josh install', () => {
 		// A bare `josh audit` fails with "command not found" when the global CLI
 		// is not installed (fresh checkout / CI); the chain must use `pnpm josh`.
-		expect(latest_command).toContain('pnpm josh audit')
+		expect(latest_command).toContain(PNPM_JOSH_AUDIT)
 		expect(latest_command).not.toMatch(/&&\s*josh audit/u)
 	})
 
@@ -264,7 +338,7 @@ describe('lefthook/base.yml pre-commit audit wiring', () => {
 	const lines = content.split('\n').map((line) => line.trim())
 
 	it('runs security audit via pnpm josh on pre-commit', () => {
-		expect(content).toContain('run: pnpm josh audit')
+		expect(content).toContain(PNPM_JOSH_AUDIT)
 	})
 
 	it('does not call the retired pnpm audit command from the pre-commit hook', () => {

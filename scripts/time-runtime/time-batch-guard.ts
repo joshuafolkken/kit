@@ -40,22 +40,25 @@ import { time_transcript_line } from './time-transcript-line'
 // had checked. That is the first call of the very behavior this exists to produce, punished with a
 // verdict nobody could see was empty.
 //
-// ## The refusal cannot repeat while the sequence is in view
+// ## The refusal cannot repeat on the call in hand, but it does repeat as the run keeps single-calling
 //
-// A refusal repeating on the call in hand would wedge a run, and that is made structurally impossible:
-// the caller records when it last refused, and a sequence qualifies only if it *began* after that
-// instant. A refused call extends the sequence rather than restarting it, and a sequence's start does
-// not move between two calls seconds apart — so the immediate re-refusal cannot happen, and a turn can
-// have at most one of its calls refused. The run has to batch (or issue a dependent or non-bundleable
-// call) before a new sequence starts and the guard has anything to say again.
+// A refusal repeating on the *same call* would wedge a run, and that is made structurally impossible in
+// two ways. The caller records when it last fired, and the immediate re-look never re-fires: a call the
+// run answered by re-issuing it unchanged is found on a refused span in the tail (`is_reissued_refusal`)
+// and let through, so a turn can have at most one of its calls refused.
 //
-// **What that argument does not cover is a sequence outliving the window the caller reads.** The start
-// compared here is the first span *in that window*, so an unbroken run of single-call turns longer than
-// it — 23–34 round trips, measured on these transcripts — presents a start that has moved forward, and
-// is refused a second time. **That is bounded rather than a loop**: one extra round trip per window of
-// unbroken single-calling, which is behavior worth having. Closing it exactly would cost the mechanism
-// its life — the only test that does so (refuse only where the recorded instant is itself inside the
-// window) silences the guard permanently once the window passes the last refusal.
+// **What used to follow from the record was silence for the rest of the run, and kit#2164 is what ends
+// that.** The old rule fired only where the open sequence *began* after the last firing — and a run that
+// ignored the refusal and kept single-calling never started a new sequence, so it was never spoken to
+// again. Measured across every run, that came to one refusal per run against thousands of turns. The
+// rule now fires the first time a run of single-call turns reaches the limit, and then **again every
+// `REFIRE_EVERY` further single-call turns** it keeps issuing: `is_sequence_at_limit` counts the closed
+// single-call turns since the last firing and re-fires once that count reaches the interval. A new
+// sequence — the run batched, then lapsed again — is a first firing of its own, exactly as before.
+//
+// **The re-fire cannot wedge**, for the same reason the first firing cannot: each re-fire refuses a
+// *different* call than the one already on a refused span, and a call the run re-issues unchanged after a
+// re-fire is let through by `is_reissued_refusal` just as the first refusal's re-issue is.
 //
 // **And the caller must fail toward allowing.** With no instant on record every sequence looks new, so
 // a caller that cannot record the refusal must not make it. `scripts/hooks/batch-guard.ts` states that half.
@@ -66,8 +69,37 @@ import { time_transcript_line } from './time-transcript-line'
 // turns left to save. Four or more gives most of them back; two would refuse the ordinary pair a
 // person would never call a defect.
 const CONSECUTIVE_LIMIT = 3
+
+// **How many further single-call turns pass between one firing and the next, once a run keeps
+// single-calling after being spoken to** (joshuafolkken/kit#2164). This is the `N` the acceptance
+// criteria name, and it lives here as a single constant. Before this the guard fired once per unbroken
+// run of single-call turns and then went silent — a run that ignored the first refusal and kept issuing
+// single calls was never spoken to again, so over thousands of turns the guard delivered one notice. The
+// re-fire turns that back into steady pressure: the same `CONSECUTIVE_LIMIT` cadence the first firing
+// used, applied again from the last firing, so the reminder recurs every three continued single-call
+// turns rather than once. It is deliberately not more frequent than the initial limit — a shorter
+// interval would refuse a run that is only two single calls past a reminder it just answered.
+const REFIRE_EVERY = CONSECUTIVE_LIMIT
 const ONE_TURN = 1
 const NONE = 0
+
+// **The notice's own re-fire interval, and the `N` joshuafolkken/kit#2276 measured as too long.** A
+// refusal that fired every single-call turn would refuse a run only one call past a reminder it just
+// answered, so `REFIRE_EVERY` holds the refusal at the initial limit. **A notice cannot wedge** — the
+// call proceeds either way — so nothing makes the notice pay that caution, and #2164 reusing the
+// refusal's three-turn cadence for it is why a lane child single-calling was nudged only once per three
+// mistakes. This is a single constant, the one the acceptance criteria name, kept apart from
+// `REFIRE_EVERY` so the refusal's cadence and the notice's cannot drift into one number that is wrong
+// for one of them.
+const NOTICE_REFIRE_EVERY = ONE_TURN
+
+// **How many of the most recent single-call turns the notice names** (joshuafolkken/kit#2276). #2164's
+// notice ended at "batch what follows" and named no call, and the density did not move; naming the
+// concrete calls the run just issued one-per-turn is the untried half of "why it did not work" — a
+// reader shown *these three reads had no dependency* has something to act on that "batch more" never
+// gave. Three, so the notice carries the sequence that tripped the limit without growing the per-turn
+// context it rides on.
+const NAMED_CANDIDATE_COUNT = 3
 
 // **The turns already closed, so the one being interrupted is not among them.** A span exists only
 // once its result has come back, and the call being judged has not run yet — so a sequence of
@@ -158,7 +190,25 @@ const NOTICE =
 	`call it is** — it never authorizes weakening a verification gate or a review: fewer turns, never ` +
 	`less work. The measured cost and the rejected mechanisms are in ` +
 	`\`prompts/collaboration-workflow/turn-batching.md\`. If this run was already batching, or the write ` +
-	`genuinely has nothing to go beside it, carry on: this fires once per run of single-call turns.`
+	`genuinely has nothing to go beside it, carry on: this recurs every ` +
+	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
+
+// The notice a *refusable* call earns instead of its refusal when the run is a dispatched lane child
+// (joshuafolkken/kit#2164). A headless `claude -p` child ends its turn on a denial, so the batching
+// guard cannot refuse there — but the guidance is exactly as useful, so it is delivered as a notice: the
+// call proceeds, and the model is told to batch what follows. It carries no ⛔, so a person watching
+// reads it as advice rather than a stop, and it says the reminder recurs so a child that keeps
+// single-calling knows the pressure is steady rather than spent.
+const LANE_NOTICE =
+	`💡 batching: the last ${String(SEQUENCE_BEFORE_LIMIT)} turns each issued a single tool call, so ` +
+	`this one makes ${String(CONSECUTIVE_LIMIT)} in a row. This is a notice, not a refusal — the call ` +
+	`proceeds, because a dispatched lane child ends its turn on a denial. Where the calls meant to follow ` +
+	`it do not need its result, issue them in one turn together. **The criterion is whether a call's ` +
+	`input needs another call's result, not what kind of call it is** — it never authorizes weakening a ` +
+	`verification gate or a review: fewer turns, never less work. The measured cost and the rejected ` +
+	`mechanisms are in \`prompts/collaboration-workflow/turn-batching.md\`. If this run was already ` +
+	`batching, or the call genuinely has nothing to go beside it, carry on: this recurs every ` +
+	`${String(NOTICE_REFIRE_EVERY)} further single-call turn(s).`
 
 // The one write that is never refused, because it is the one whose reissue is **unconditional**. Every
 // other refusable write is content-addressed and so fails loudly when its turn's siblings moved the
@@ -173,6 +223,11 @@ const NOTICE =
 // 164 of the 251 recoverable round trips against `Write`'s 37, read over 20 runs — is untouched, and
 // the matcher leaves `Write` out for the cost reason above rather than relying on this line alone.
 const WHOLE_FILE_WRITE_TOOL = 'Write'
+
+// The one tool the write-side fold names (joshuafolkken/kit#2366). A span's label is its tool name for
+// everything but Bash (`time-spans.ts`), so this is how a recent single-call turn is read as an edit
+// that `edit:files` could fold — distinct from `Write`, which this command cannot content-address.
+const EDIT_TOOL = 'Edit'
 
 // Whether this call is one the guard could ever refuse, asked before any transcript is read. **The
 // caller uses it to skip that read**: a quarter-megabyte read inside a hook that holds every call is
@@ -231,26 +286,41 @@ function depends_on_sequence(sequence: ReadonlyArray<Span>, facts: BundleFacts):
 }
 
 // The instant the open sequence began, as far as the window shows. An empty sequence answers `NONE`,
-// and `NONE` is never greater than a recorded refusal — so the length test below is what actually
-// admits a run, and this can only ever withhold.
+// and `NONE` is never greater than a recorded refusal — so the length test in `is_sequence_at_limit` is
+// what admits a run's first firing, and this decides only whether that firing is the sequence's first.
 //
 // **Both sides of that comparison are the same machine's wall clock**: the transcript's timestamps and
 // the instant the caller recorded. A clock that jumped backwards makes a record read as later than
-// every sequence, which withholds the refusal — the safe direction, and the one every other failure
-// here takes too.
+// every sequence, which withholds the firing — the safe direction, and the one every other failure here
+// takes too.
 function sequence_started_ms(sequence: ReadonlyArray<Span>): number {
 	return sequence[0]?.ended_ms ?? NONE
 }
 
+// How many of the open sequence's closed single-call turns ended after the last firing. For a run whose
+// last firing predates this sequence every turn counts; for one already spoken to inside this sequence
+// only the turns issued since count — which is what the re-fire interval is measured against.
+function turns_since(sequence: ReadonlyArray<Span>, last_fired_ms: number): number {
+	return sequence.filter((span) => span.ended_ms > last_fired_ms).length
+}
+
+// **The firing test, first-time and re-fire in one** (joshuafolkken/kit#2164). The length and dependency
+// gates are unchanged. What changed is the instant comparison: where a firing predates the open
+// sequence it is that sequence's first, so the length gate alone decides it; where the run has already
+// been spoken to inside this sequence, it re-fires only once `REFIRE_EVERY` further single-call turns
+// have closed since. The old rule kept only the first branch, which is why it fell silent for the rest
+// of a run that kept single-calling.
 function is_sequence_at_limit(
 	sequence: ReadonlyArray<Span>,
 	facts: BundleFacts,
-	refused_at_ms: number,
+	last_fired_ms: number,
+	refire_every: number,
 ): boolean {
-	if (sequence.length < SEQUENCE_BEFORE_LIMIT) return false
-	if (depends_on_sequence(sequence, facts)) return false
+	if (sequence.length < SEQUENCE_BEFORE_LIMIT || depends_on_sequence(sequence, facts)) return false
 
-	return sequence_started_ms(sequence) > refused_at_ms
+	if (last_fired_ms < sequence_started_ms(sequence)) return true
+
+	return turns_since(sequence, last_fired_ms) >= refire_every
 }
 
 // **Nothing here reads the turn the call belongs to**, because nothing can: see "What it cannot know"
@@ -265,11 +335,13 @@ function is_at_limit(
 	spans: ReadonlyArray<Span>,
 	call: GuardedCall,
 	last_fired_ms: number,
+	refire_every: number,
 ): boolean {
 	return is_sequence_at_limit(
 		time_bundles.open_sequence(spans),
 		time_bundle_call.call_facts(call.name, call.input),
 		last_fired_ms,
+		refire_every,
 	)
 }
 
@@ -303,14 +375,22 @@ function is_reissued_refusal(spans: ReadonlyArray<Span>, call: GuardedCall): boo
 	)
 }
 
-function should_block(text: string, call: GuardedCall, refused_at_ms: number): boolean {
+// `refire_every` defaults to the refusal's cadence so every existing caller reads unchanged; the
+// lane-child downgraded notice passes `NOTICE_REFIRE_EVERY` instead, so a refusable call turned into a
+// notice recurs on the notice's tighter cadence rather than the refusal's (joshuafolkken/kit#2276).
+function should_block(
+	text: string,
+	call: GuardedCall,
+	refused_at_ms: number,
+	refire_every: number = REFIRE_EVERY,
+): boolean {
 	if (!is_guarded_call(call)) return false
 
 	const { spans } = time_spans.parse_timeline(text)
 
 	if (is_reissued_refusal(spans, call)) return false
 
-	return is_at_limit(spans, call, refused_at_ms)
+	return is_at_limit(spans, call, refused_at_ms, refire_every)
 }
 
 // The notice's rule: the same sequence test, gated on the whole-file write rather than on a refusable
@@ -321,7 +401,97 @@ function should_block(text: string, call: GuardedCall, refused_at_ms: number): b
 function should_notify(text: string, call: GuardedCall, notified_at_ms: number): boolean {
 	if (!is_notice_call(call)) return false
 
-	return is_at_limit(time_spans.parse_timeline(text).spans, call, notified_at_ms)
+	const { spans } = time_spans.parse_timeline(text)
+
+	return is_at_limit(spans, call, notified_at_ms, NOTICE_REFIRE_EVERY)
+}
+
+// One recent single-call turn named the way a reader would recognize it: the tool, and the file it
+// touched where the label does not already carry it (joshuafolkken/kit#2276). `label` is the tool name
+// for a non-shell call and the command for a shell one, so the target is appended only where it adds
+// something the label has not already said.
+function describe_span(span: Span): string {
+	const target = span.targets[0] ?? ''
+	if (target === '' || span.label.includes(target)) return span.label
+
+	return `${span.label} ${target}`
+}
+
+// **The fewest reads that a composite call can fold** (joshuafolkken/kit#2311). One path is a single
+// call already, so nothing folds below two — the directive is withheld and the run keeps the guidance
+// alone, exactly as it does when the recent turns were not reads at all.
+const FOLD_MINIMUM = 2
+
+// **The recent single-call turns that were file reads, each named by the one path it read.** A fold
+// needs a *file* path, so three targets are dropped: one that named none (a bare `pwd`), a write (a run
+// of edits has nothing for `read:files` to do), and a directory (`ls scripts/` names `scripts/`, which
+// `read:files` cannot read — it would emit `Cannot read scripts/` and exit 1, so the paste-ready
+// command must never carry it). The directory test is `has_extension` reused from the target scanner,
+// not a second copy. Deduped, so a run that read one file twice folds it once and names it once.
+function read_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
+	const paths = sequence
+		.filter((span) => span.is_bundleable && !span.is_writing)
+		.map((span) => span.targets[0] ?? '')
+		.filter((path) => path !== '' && time_bundle_call.has_extension(path))
+
+	return [...new Set(paths)]
+}
+
+// **The composite-command half of the notice** (joshuafolkken/kit#2311): the single call that folds the
+// recent single-call reads, handed to the run ready to paste. Naming the concrete calls did not move the
+// density (#2276) — the notice still asked the model to *reissue them in one turn*, which is a request
+// for the parallel `tool_use` blocks the model structurally resists. The lever measured to move
+// round-trip density is a composite command that folds a routine section into one call (`read:files`,
+// kit#2202); so the guard now offers *that* command, the one the model can emit in a single turn,
+// rather than another way to say "batch". Below two reads there is nothing to fold, so it is empty and
+// the guidance stands alone.
+function read_fold_directive(sequence: ReadonlyArray<Span>): string {
+	const paths = read_targets(sequence)
+	if (paths.length < FOLD_MINIMUM) return ''
+
+	return ` Fold them into one call: \`pnpm josh read:files ${paths.join(' ')}\`.`
+}
+
+// **The write-side counterpart of the read fold** (joshuafolkken/kit#2366): the recent single-call
+// `Edit` turns, folded into one `edit:files` call. The read fold pastes a whole command because a read
+// is addressed by its path alone; an edit carries its own text, so the fold names the files and points
+// at the command that applies a plan of edits over them in one call — the composite command the model
+// can emit in a single turn where reissuing the edits as parallel `tool_use` blocks is the shape it
+// resists. Only `Edit` counts: a whole-file `Write` creates content this command cannot content-address,
+// and it earns its own notice already. Below two edits there is nothing to fold.
+function write_targets(sequence: ReadonlyArray<Span>): ReadonlyArray<string> {
+	const paths = sequence
+		.filter((span) => span.label === EDIT_TOOL)
+		.map((span) => span.targets[0] ?? '')
+		.filter((path) => path !== '' && time_bundle_call.has_extension(path))
+
+	return [...new Set(paths)]
+}
+
+function write_fold_directive(sequence: ReadonlyArray<Span>): string {
+	const paths = write_targets(sequence)
+	if (paths.length < FOLD_MINIMUM) return ''
+
+	return ` Fold them into one \`pnpm josh edit:files\` call with a plan over: ${paths.join(' ')}.`
+}
+
+// **The concrete half of the notice** (joshuafolkken/kit#2276): the most recent single-call turns,
+// named, so the model is shown the calls it should have batched rather than only told to batch — and,
+// since kit#2311, the one `read:files` call that folds them where they were reads. Parsed from the tail
+// here rather than threaded from `should_notify` because it runs only when a notice actually fires,
+// which is rare enough that the second parse costs less than carrying the spans through the hook's
+// notice contract. An empty sequence names nothing and the notice falls back to its guidance alone.
+function recent_candidates(tail: string): string {
+	const recent = time_bundles
+		.open_sequence(time_spans.parse_timeline(tail).spans)
+		.slice(-NAMED_CANDIDATE_COUNT)
+
+	if (recent.length === NONE) return ''
+
+	const named = recent.map((span) => describe_span(span)).join(', ')
+	const folds = `${read_fold_directive(recent)}${write_fold_directive(recent)}`
+
+	return ` Just issued one per turn, so at least these could have shared a turn: ${named}.${folds}`
 }
 
 // **This guard's own name for its once-per-run record.** It lives beside the rule rather than in
@@ -338,14 +508,19 @@ const NOTICE_STAMP_PREFIX = 'josh-batch-guard-notice-'
 const time_batch_guard = {
 	CONSECUTIVE_LIMIT,
 	GUARD_LABEL,
+	LANE_NOTICE,
+	NAMED_CANDIDATE_COUNT,
 	NOTICE,
+	NOTICE_REFIRE_EVERY,
 	NOTICE_STAMP_PREFIX,
 	REASON,
+	REFIRE_EVERY,
 	SEQUENCE_BEFORE_LIMIT,
 	STAMP_PREFIX,
 	is_guarded_call,
 	is_notice_call,
 	is_read_only_call,
+	recent_candidates,
 	should_block,
 	should_notify,
 }

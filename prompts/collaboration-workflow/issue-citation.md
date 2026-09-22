@@ -13,7 +13,9 @@
 
 - `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <その Issue が何をするものかの短い要約>`
 
-**日本語タイトルは全訳ではなく要約でよい。** 何をするものか分かれば足りる。長い訳を作ることが目的ではない。
+**この引用行は手で組み立てるものではなく、`pnpm josh issue:cite <N> [<N> ...]` が出す。** 番号を並べて渡すと、貼れる引用行を 1 呼び出しでまとめて出す（複数 Issue に 1 回、他リポジトリは `--repo <owner/repo>` あるいは `owner/repo#N` 表記）。正しい形にタイトル取得の往復が要るために裸の `#N` に落ちていたので、安い道と正しい道を同じコマンドにした。要約はその Issue のタイトルをそのまま用いる。詳細は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh issue:cite` を参照。
+
+**日本語タイトルは全訳ではなく要約でよい。** 何をするものか分かれば足りる。長い訳を作ることが目的ではない。`issue:cite` が出すタイトルを、必要ならセッション言語に言い換えて使う。
 
 **対応前の言及も対象である。** 「これから走らせる」「待機中」「対象外」を並べる場面こそ、読み手が内容を知らないまま番号を読むことになるため、事後の報告だけを対象にすると指摘の半分しか解決しない。
 
@@ -30,3 +32,7 @@
 ### なぜ CLAUDE.md に常駐させるか
 
 規則の発火点は「セッション向け出力で Issue 番号を書こうとした瞬間」であり、これはワークフローのスキルを読んでいないターンでも起こる。したがって発火点（引き金）と形式は `CLAUDE.md` の Communication 節に常駐させ、本文（この節）を話題ファイルに置く。常駐側は短く保ち、詳細はここから読む。
+
+### 停止時の担保（joshuafolkken/kit#2247）
+
+`Stop` フック `pnpm josh stop:guard` が返信の地の文に裸の `#N` を見つけると**停止をブロックし**、その番号と `pnpm josh issue:cite <N...>` の実行形をモデルへ差し戻す。`{"decision":"block"}` は `Stop` からモデルへ文字を届ける唯一の経路で、`stop_hook_active` がループを断つので誤検出でも空転は 1 ターンで止まる。検出が外す範囲（リンク形式・コード・引用行・PR 参照）は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard` を参照。

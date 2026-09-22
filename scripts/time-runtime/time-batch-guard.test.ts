@@ -1,46 +1,37 @@
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_batch_guard } from './time-batch-guard'
+import {
+	CHAINED_SED_CALL,
+	DELEGATION_TOOL,
+	EDIT_CALL,
+	EDIT_LABEL,
+	EDIT_TOOL,
+	FILE_READ_LABEL,
+	FRESH_CALL,
+	FRESH_PATH,
+	IN_PLACE_SED_CALL,
+	JOSH_CALL,
+	NEVER_REFUSED,
+	QUOTED_PATTERN,
+	REDIRECTION_CALL,
+	SED_LABEL,
+	SHELL_READ_CALL,
+	transcript,
+	WRITE_CALL,
+	WRITE_LABEL,
+	WRITE_TOOL,
+} from './time-batch-guard-fixtures'
 
 // The guard reads a transcript rather than a span list, because the run of single-call turns it asks
 // about is a shape only the raw lines carry: the turn in flight has issued no result yet, so it has no
 // span, and where a turn ends is written on the lines rather than derivable from the spans. The fixture
-// writes the lines Claude Code writes, so every case below is a transcript a run could have had.
+// writes the lines Claude Code writes, so every case below is a transcript a run could have had. The
+// calls, labels and `transcript` builder are in `time-batch-guard-fixtures.ts`.
 //
 // The minute grid is the fixture's: turn `n` issues on minute `2n + 1` and is answered on `2n + 2`.
 
 const { open_turn_lines, target_turn_lines, refused_turn_lines, ms } = time_transcript_fixture
-
-const NEVER_REFUSED = 0
-const FRESH_PATH = 'scripts/fresh.ts'
-// A path-shaped word that appears only inside quotes (joshuafolkken/kit#1611).
-const QUOTED_PATTERN = 'scripts/time'
-const FRESH_CALL = { name: 'Read', input: { file_path: FRESH_PATH } }
-// The two calls both tables below name, and their labels, so neither the fixture nor the wording is
-// written twice.
-const EDIT_LABEL = 'an edit'
-const SED_LABEL = 'an in-place sed'
-const FILE_READ_LABEL = 'a file read'
-const EDIT_TOOL = 'Edit'
-// Named the way this harness names it. Neither spelling of the delegation tool is in the bundleable
-// set, so the case below would read the same under `Task`.
-const DELEGATION_TOOL = 'Agent'
-const WRITE_TOOL = 'Write'
-const WRITE_LABEL = 'a whole-file write'
-const EDIT_CALL = { name: EDIT_TOOL, input: { file_path: FRESH_PATH } }
-const IN_PLACE_SED_CALL = { name: 'Bash', input: { command: `sed -i '' s/a/b/ ${FRESH_PATH}` } }
-const SHELL_READ_CALL = { name: 'Bash', input: { command: `cat ${FRESH_PATH}` } }
-const JOSH_CALL = { name: 'Bash', input: { command: 'pnpm josh gate' } }
-const CHAINED_SED_CALL = {
-	name: 'Bash',
-	input: { command: `cat notes.md && sed -i '' s/a/b/ ${FRESH_PATH}` },
-}
-const REDIRECTION_CALL = { name: 'Bash', input: { command: "jq '.x' a.json > b.json" } }
-const WRITE_CALL = { name: WRITE_TOOL, input: { file_path: FRESH_PATH } }
-
-function transcript(...groups: Array<Array<string>>): string {
-	return groups.flat().join('\n')
-}
 
 describe('time_batch_guard.should_block — the run of single-call turns', () => {
 	it('refuses the call that would make a third consecutive single-call turn', () => {
@@ -257,29 +248,67 @@ describe('time_batch_guard.is_notice_call — the whole-file write alone', () =>
 	})
 })
 
-describe('time_batch_guard.should_block — one refusal per sequence', () => {
-	// A refused call extends the sequence rather than restarting it, and a sequence's start does not
-	// move between two calls seconds apart — which is what makes the immediate re-refusal impossible
-	// and caps a turn at one refused call. (A sequence outliving the caller's window is the bounded
-	// exception the module states; it needs 23–34 unbroken round trips to reach.)
-	it('allows a sequence that began before the last refusal', () => {
+// joshuafolkken/kit#2164. The guard used to fire once per unbroken run of single-call turns and then go
+// silent — a run that ignored the refusal and kept single-calling was never spoken to again. It now
+// re-fires every `REFIRE_EVERY` further single-call turns the run keeps issuing, so the pressure is
+// steady rather than spent. The instant a case passes for `last_fired` is the one the guard recorded
+// when it first fired, which on the fixture grid is the minute the third turn's call went out.
+describe('time_batch_guard.should_block — the re-fire cadence', () => {
+	// The first firing lands during the third turn, so the instant the guard records is that turn's call
+	// minute. `turn n` issues on minute `2n + 1`, so the third turn (index 2) issues on minute 5.
+	const FIRED_AT_THIRD_TURN = ms(5)
+
+	// Fewer than `REFIRE_EVERY` single-call turns have closed since the last firing, so the run is not
+	// spoken to again yet — this is what stops the re-fire from landing on the very next call.
+	it('allows a call before REFIRE_EVERY further single-call turns have closed', () => {
 		const text = transcript(
 			target_turn_lines(0, ['a.ts']),
 			target_turn_lines(1, ['b.ts']),
 			target_turn_lines(2, ['c.ts']),
-			open_turn_lines(3, ['d.ts']),
+			target_turn_lines(3, ['d.ts']),
+			open_turn_lines(4, ['e.ts']),
 		)
-		const after_the_sequence_began = ms(3)
 
-		expect(time_batch_guard.should_block(text, FRESH_CALL, after_the_sequence_began)).toBe(false)
+		expect(time_batch_guard.should_block(text, FRESH_CALL, FIRED_AT_THIRD_TURN)).toBe(false)
 	})
 
-	// joshuafolkken/kit#1611. The dependency veto above is the one thing `targets` decides here, so
-	// narrowing what a line names moves it — and this is the direction that move takes. A quoted
-	// search pattern names nothing: `grep -rn "scripts/time" scripts/fresh.ts` looks for that text
-	// *inside* `scripts/fresh.ts` and does not need whatever earlier call read `scripts/time`. While
-	// `bash_facts` tokenized the quotes, the pair shared a word and the veto let this call through;
-	// now it is refused, which is the answer the sequence had all along.
+	// `REFIRE_EVERY` further single-call turns have now closed since the first firing, so the guard
+	// speaks again — the steady pressure that replaces the old one-refusal-per-run silence.
+	it('refuses again once REFIRE_EVERY further single-call turns have closed', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts']),
+			target_turn_lines(1, ['b.ts']),
+			target_turn_lines(2, ['c.ts']),
+			target_turn_lines(3, ['d.ts']),
+			target_turn_lines(4, ['e.ts']),
+			open_turn_lines(5, ['f.ts']),
+		)
+
+		expect(time_batch_guard.should_block(text, FRESH_CALL, FIRED_AT_THIRD_TURN)).toBe(true)
+	})
+
+	// A batched turn broke the run, so what follows is a new sequence that began after the last firing —
+	// its first firing is decided by the length gate alone, exactly as a run's very first one is.
+	it('refuses the first call of a new sequence that began after the last firing', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts']),
+			target_turn_lines(1, ['b.ts', 'e.ts']),
+			target_turn_lines(2, ['f.ts']),
+			target_turn_lines(3, ['g.ts']),
+			open_turn_lines(4, ['h.ts']),
+		)
+		const before_the_new_sequence = ms(3)
+
+		expect(time_batch_guard.should_block(text, FRESH_CALL, before_the_new_sequence)).toBe(true)
+	})
+})
+
+describe('time_batch_guard.should_block — the target veto with a quoted pattern', () => {
+	// joshuafolkken/kit#1611. The dependency veto is the one thing `targets` decides here, so narrowing
+	// what a line names moves it. A quoted search pattern names nothing: `grep -rn "scripts/time"
+	// scripts/fresh.ts` looks for that text *inside* `scripts/fresh.ts` and does not need whatever earlier
+	// call read `scripts/time`. While `bash_facts` tokenized the quotes, the pair shared a word and the
+	// veto let this call through; now it is refused, which is the answer the sequence had all along.
 	it('refuses a call whose only shared word was a quoted search pattern', () => {
 		const text = transcript(
 			target_turn_lines(0, ['a.ts']),
@@ -291,20 +320,6 @@ describe('time_batch_guard.should_block — one refusal per sequence', () => {
 		expect(
 			time_batch_guard.should_block(text, { name: 'Bash', input: { command } }, NEVER_REFUSED),
 		).toBe(true)
-	})
-
-	// Once a batched turn has broken the run, what follows is a new sequence and the guard speaks again.
-	it('refuses again once a new sequence has started', () => {
-		const text = transcript(
-			target_turn_lines(0, ['a.ts']),
-			target_turn_lines(1, ['b.ts', 'e.ts']),
-			target_turn_lines(2, ['f.ts']),
-			target_turn_lines(3, ['g.ts']),
-			open_turn_lines(4, ['h.ts']),
-		)
-		const before_the_new_sequence = ms(3)
-
-		expect(time_batch_guard.should_block(text, FRESH_CALL, before_the_new_sequence)).toBe(true)
 	})
 })
 
@@ -402,18 +417,25 @@ describe('time_batch_guard.should_notify — what it will not notify', () => {
 
 		expect(time_batch_guard.should_notify(text, call, NEVER_REFUSED)).toBe(false)
 	})
+})
 
-	// One notice per sequence: a run of single-call turns that began before the last notice is not
-	// notified again, exactly as a refusal is not repeated.
-	it('says nothing where the sequence began before the last notice', () => {
-		const text = transcript(
-			target_turn_lines(0, ['a.ts'], WRITE_TOOL),
-			target_turn_lines(1, ['b.ts'], WRITE_TOOL),
-			target_turn_lines(2, ['c.ts'], WRITE_TOOL),
-			open_turn_lines(3, ['d.ts'], WRITE_TOOL),
-		)
-		const after_the_sequence_began = ms(3)
+// **The notice has its own tighter cadence since joshuafolkken/kit#2276.** A notice cannot wedge a run
+// the way a refusal can, so it recurs every `NOTICE_REFIRE_EVERY` single-call turn rather than the
+// refusal's `REFIRE_EVERY` — the `N` #2276 measured as too long, kept apart as its own single constant.
+// On the fixture grid turn 2 is the last closed turn and ends on minute 6: a notice recorded then has no
+// further single-call turn behind it, while one recorded on minute 4 has turn 2 as the single one since.
+describe('time_batch_guard.should_notify — the notice cadence (kit#2276)', () => {
+	const write_run = transcript(
+		target_turn_lines(0, ['a.ts'], WRITE_TOOL),
+		target_turn_lines(1, ['b.ts'], WRITE_TOOL),
+		target_turn_lines(2, ['c.ts'], WRITE_TOOL),
+		open_turn_lines(3, ['d.ts'], WRITE_TOOL),
+	)
 
-		expect(time_batch_guard.should_notify(text, WRITE_CALL, after_the_sequence_began)).toBe(false)
+	it.each([
+		['no further turn has closed since', ms(6), false],
+		['one further turn has closed since', ms(4), true],
+	])('recurs correctly when %s the last notice', (_label, last_notified, expected) => {
+		expect(time_batch_guard.should_notify(write_run, WRITE_CALL, last_notified)).toBe(expected)
 	})
 })

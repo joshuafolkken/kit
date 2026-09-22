@@ -4,6 +4,7 @@ import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_cut, type CutResumeRequest, type RunCut } from './run-cut'
+import type { Handoff } from './run-cut-handoff'
 
 // joshuafolkken/kit#1839: the record exists so a lane child can end its process before the gate and a
 // fresh one resume from it. What these tests pin is what a rewrite would lose first — that only a
@@ -26,6 +27,15 @@ const WITHIN_BOUND = new Date('2026-09-12T07:59:00.000Z')
 const PAST_BOUND = new Date('2026-09-12T08:00:01.000Z')
 // The `classify_resume` verdict a successor's adoption leaves for a process woken after its own cut.
 const HANDED_OFF = 'handed-off'
+const CLAIMED_ERROR = 'the scratch record was claimed by something else'
+
+// The handoff a resume into implementation requires (joshuafolkken/kit#2354).
+const HANDOFF: Handoff = {
+	instruction: 'Add the field; leave the migration alone.',
+	completed: ['read the record'],
+	remaining: ['wire the CLI'],
+	untouched: ['the migration'],
+}
 
 function target(): string {
 	return run_cut.cut_path(REPOSITORY)
@@ -43,7 +53,23 @@ function begun(now: Date = START): RunCut {
 		now,
 	)
 
-	if (cut === undefined) throw new Error('the scratch record was claimed by something else')
+	if (cut === undefined) throw new Error(CLAIMED_ERROR)
+
+	return cut
+}
+
+// A declared implementation-phase cut, optionally carrying the handoff a resume into implementation
+// requires (joshuafolkken/kit#2354).
+function begun_impl(handoff?: Handoff): RunCut {
+	run_cut.end_cut(target())
+
+	const cut = run_cut.begin_cut(
+		target(),
+		{ issue: ISSUE, branch: BRANCH, phase: run_cut.IMPLEMENTATION_PHASE, handoff },
+		START,
+	)
+
+	if (cut === undefined) throw new Error(CLAIMED_ERROR)
 
 	return cut
 }
@@ -170,6 +196,49 @@ describe('a fresh process deciding whether to resume', () => {
 	})
 })
 
+// joshuafolkken/kit#2354: the record carries the run's instruction and work state so a fresh process
+// resumes on what it was told to do, and a resume into implementation is refused rather than run when
+// the instruction is missing — the failure the issue exists to stop.
+describe('the instruction a cut carries across the boundary', () => {
+	it('carries the handoff through the write and read', () => {
+		begun_impl(HANDOFF)
+		const read = run_cut.read_cut(target(), START)
+
+		expect(read.kind === 'carried' ? read.cut.handoff : undefined).toStrictEqual(HANDOFF)
+	})
+
+	it('resumes an implementation cut that carries an instruction', () => {
+		expect(run_cut.classify_resume(begun_impl(HANDOFF), resume_request())).toBe('resume')
+	})
+
+	it('refuses an implementation cut with no instruction rather than continuing blind', () => {
+		expect(run_cut.classify_resume(begun_impl(), resume_request())).toBe('incomplete')
+	})
+
+	it('resumes a pre-gate cut with no handoff, which resumes into the gate', () => {
+		expect(run_cut.classify_resume(begun(), resume_request())).toBe('resume')
+	})
+})
+
+// The backward-compatible legacy shape: a record written from the six scalar fields alone still
+// parses and reads as carried, so the existing six fields keep their meaning (joshuafolkken/kit#2354).
+describe('a legacy record without a handoff', () => {
+	it('reads as carried, with no handoff', () => {
+		const legacy = {
+			invocation: INVOCATION,
+			issue: ISSUE,
+			branch: BRANCH,
+			phase: run_cut.PRE_GATE_PHASE,
+			cut_at: START.toISOString(),
+			is_handed_off: true,
+		}
+		const read = run_cut.classify(JSON.stringify(legacy), START)
+
+		expect(read.kind).toBe('carried')
+		expect(read.kind === 'carried' ? read.cut.handoff : 'sentinel').toBeUndefined()
+	})
+})
+
 describe('the adoption that carries a cut', () => {
 	it('spends the hand-off', () => {
 		expect(run_cut.adopt_cut(target(), begun())).toMatchObject({ is_handed_off: false })
@@ -233,5 +302,76 @@ describe('the synchronous read the pre-gate guard makes', () => {
 		expect(run_cut.carried_cut_sync(WITHIN_BOUND)).toStrictEqual(
 			run_cut.carried_cut_sync(WITHIN_BOUND, derived),
 		)
+	})
+})
+
+describe('the resume grouping — which phase resumes into implementation', () => {
+	// The setup and implementation cuts both resume into more implementation; only the pre-gate cut
+	// resumes into the gate. The grouping is named once so `run-cut-cli.ts` cannot disagree with it.
+	it('groups setup and implementation together, apart from the pre-gate cut', () => {
+		expect(run_cut.resumes_into_implementation(run_cut.SETUP_PHASE)).toBe(true)
+		expect(run_cut.resumes_into_implementation(run_cut.IMPLEMENTATION_PHASE)).toBe(true)
+		expect(run_cut.resumes_into_implementation(run_cut.PRE_GATE_PHASE)).toBe(false)
+	})
+})
+
+describe('the hand-off record stays within its byte bound', () => {
+	// Every field is a short scalar, so a well-formed record is far under the cap — the mechanical check
+	// exists so a field that ever grew unbounded is refused at the write rather than silently carried.
+	it('accepts a well-formed record', () => {
+		const spec = { issue: ISSUE, branch: BRANCH, phase: run_cut.SETUP_PHASE }
+
+		expect(run_cut.within_handoff_bound(run_cut.fresh_cut(spec, START))).toBe(true)
+	})
+
+	it('rejects a record whose field grew past the bound', () => {
+		const bloated = {
+			...run_cut.fresh_cut({ issue: ISSUE, branch: BRANCH, phase: run_cut.SETUP_PHASE }, START),
+			branch: 'x'.repeat(run_cut.MAX_HANDOFF_BYTES + 1),
+		}
+
+		expect(run_cut.within_handoff_bound(bloated)).toBe(false)
+	})
+
+	it('refuses to write an oversized record rather than carrying it', () => {
+		run_cut.end_cut(target())
+
+		const written = run_cut.begin_cut(
+			target(),
+			{
+				issue: ISSUE,
+				branch: 'y'.repeat(run_cut.MAX_HANDOFF_BYTES + 1),
+				phase: run_cut.SETUP_PHASE,
+			},
+			START,
+		)
+
+		expect(written).toBeUndefined()
+		expect(run_cut.read_cut(target(), START).kind).toBe('none')
+	})
+})
+
+// joshuafolkken/kit#2354: a handoff that fits its own bound can still push the assembled record — with
+// the scalar fields — past the cap. `record_within_bound` catches that on the full record, so the caller
+// reports `bad-handoff` rather than falling through to `begin_cut`'s `busy`.
+describe('record_within_bound checks the assembled record, not the handoff alone', () => {
+	it('rejects a spec whose handoff fits alone but overflows the record with the scalars', () => {
+		const empty: Handoff = { instruction: '', completed: [], remaining: [], untouched: [] }
+		const wrapper_bytes = Buffer.byteLength(JSON.stringify(empty), 'utf8')
+		// An instruction that fills the handoff to exactly the cap, so the handoff alone is within bound
+		// but the record's scalar fields carry it over.
+		const near_cap: Handoff = {
+			...empty,
+			instruction: 'x'.repeat(run_cut.MAX_HANDOFF_BYTES - wrapper_bytes),
+		}
+		const spec = {
+			issue: ISSUE,
+			branch: BRANCH,
+			phase: run_cut.IMPLEMENTATION_PHASE,
+			handoff: near_cap,
+		}
+
+		expect(Buffer.byteLength(JSON.stringify(near_cap), 'utf8')).toBe(run_cut.MAX_HANDOFF_BYTES)
+		expect(run_cut.record_within_bound(spec, START)).toBe(false)
 	})
 })

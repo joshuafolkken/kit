@@ -206,7 +206,7 @@ describe('propagate_steps.STEP_COMMANDS', () => {
 	it('runs the whole gate, not only the type check', () => {
 		expect(propagate_steps.VERIFY_SCRIPT).toBe(`pnpm josh ${GATE_COMMAND}`)
 
-		expect(GATE_TARGETS).toEqual(['lint', 'check', 'cspell:dot', 'test:unit'])
+		expect(GATE_TARGETS).toEqual(['lint', 'check', 'cspell:dot', 'behavior', 'test:unit'])
 	})
 
 	// A step that failed the gate must never reach the pull request, so the verification has to be

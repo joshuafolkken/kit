@@ -157,8 +157,10 @@ left, which is most of them. "It might matter later" is branch 3.
    inputs and state. **Reaching is read exactly as the rubric's Severity test 1 reads it** — a runtime
    code path, a distributed artifact a consumer reads, or the verification that guards either — so in a
    repository whose product is its distributed documents, a defect in one of those is a branch-2 finding
-   like any other. **"It needs a decision" is no longer a branch-2 condition on its own**: a design
-   question with no defect under it takes branch 3.
+   like any other. **The reaching half is not a judgement**: `pnpm josh disposition <path>` answers
+   `runtime` / `non-runtime` from the finding's paths, sharing the same inert set the review level uses,
+   so only "is the defect confirmed" is left to decide. **"It needs a decision" is no longer a branch-2
+   condition on its own**: a design question with no defect under it takes branch 3.
 3. **Drop it with a one-line note in the PR body.** **This is the default, and it takes everything the
    other two branches did not**: a Low that does not reach the user, and every remaining finding that is
    neither closable in place nor a confirmed runtime defect — a design preference or an unproven
@@ -186,6 +188,11 @@ Only branch 2 files an Issue. What follows applies to that branch.
   `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
   pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
   delegated unit** — `pnpm josh delegate followup-filing` (joshuafolkken/kit#1892).
+- **When the round files a second follow-up, run `pnpm josh issue:fold` first.** Several findings from
+  one review fold into one Issue by default — the filing-time counterpart to the split assessment,
+  reading the same two questions (`.claude/skills/workflow-commands/split-assessment.md` → "The same
+  two questions decide the filing-time fold"). `pnpm josh rule:guard` refuses the second `gh api …
+issues` call until it is folded; the first filing asks nothing.
 
   1. File the follow-up Issue referencing the current one, tagged `route:review-cap`:
      `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:review-cap' -f 'labels[]=depth:<n>' -f body="<body referencing the current Issue>"`.

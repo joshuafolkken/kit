@@ -1,9 +1,13 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { api_outage } from '#scripts/agent/api-outage'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
-import { run_carry, type CarryOwner } from './run-carry'
+import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
+import { run_ending } from './run-ending'
+import { run_event_stream } from './run-event-stream'
+import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_issue_number } from './run-issue-number'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
@@ -26,7 +30,13 @@ const FIRST = 0
 const MIN_PID = 1
 const OVER_TOKEN = 'over'
 const HUMAN_REVIEW_TOKEN = 'human-review'
+// Matches the `busy` verdict `run:carry` emits for a refused count, so callers see one vocabulary.
+const BUSY_TOKEN = 'busy'
 const STOP_TOKEN = 'stop'
+// The consecutive-outage guard tripped: the environment is down, so the run stops rather than
+// re-dispatching into a dead API (joshuafolkken/kit#2240). Distinct from `stop` so the parent's report
+// can say the environment failed rather than the children.
+const ENVIRONMENT_TOKEN = 'environment'
 const RETRY_TOKEN = 'retry'
 const PARK_FAILURE_NOTE = 'The failed child could not be parked with needs-decision; stopping.'
 // The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
@@ -39,10 +49,11 @@ const DIGITS = /^\d+$/u
 // itself forbids (names cannot start with a hyphen) and which the taint analyzer keeps flagging.
 const REPO_PATTERN = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/u
 const USAGE =
-	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>]'
+	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>] [--output <path>]'
 
 const OPTIONS = {
 	epic: { type: 'string' },
+	output: { type: 'string' },
 	over: { type: 'string' },
 	owner: { type: 'string' },
 	repo: { type: 'string' },
@@ -50,7 +61,7 @@ const OPTIONS = {
 
 interface ParsedArguments {
 	positionals: ReadonlyArray<string>
-	values: Partial<Record<'epic' | 'over' | 'owner' | 'repo', string>>
+	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>>
 }
 
 function read_args(argv: ReadonlyArray<string>): ParsedArguments | undefined {
@@ -149,6 +160,7 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 		repo: valid_repo(parsed.values.repo),
 		over: CONTEXT_CUT_THRESHOLD,
 		owner,
+		output: parsed.values.output,
 	}
 }
 
@@ -164,14 +176,39 @@ function emit(token: string, code: number): number {
 	return code
 }
 
-function outcome_of(read: Awaited<ReturnType<typeof issue_state_cli.read_issue>>): ChildOutcome {
-	return read.kind === 'state' ? run_merge.classify_child(read.state) : 'unresolved'
+// Whether the child's exit record shows it could not reach the API — read only when `--output` named
+// the transcript, off otherwise (joshuafolkken/kit#2240). The path is validated inside
+// `run_ending.read_exit`, which returns `undefined` for an unreadable or missing record, so a missing
+// output is simply "not an outage".
+function read_is_outage(output: string | undefined): boolean {
+	if (output === undefined) return false
+
+	return api_outage.is_outage(run_ending.read_exit(output))
+}
+
+function outcome_of(
+	read: Awaited<ReturnType<typeof issue_state_cli.read_issue>>,
+	is_outage: boolean,
+): ChildOutcome {
+	return read.kind === 'state' ? run_merge.classify_child(read.state, is_outage) : 'unresolved'
+}
+
+// A refused count means this session is not the carry record's owner, so the whole operation is
+// rejected — the lane is not closed and no next child is offered (joshuafolkken/kit#2114).
+function report_count_refused(carry: RunCarry | undefined): number {
+	if (carry !== undefined) console.error(run_carry.count_refused_message(carry))
+
+	return emit(BUSY_TOKEN, FAILURE_EXIT_CODE)
 }
 
 // A merge is the only outcome that asks the hand-off check, because it is the only one that returned
 // the tree to a clean default branch. `over` stops the offer; `under` asks for the next child.
 async function on_merged(ctx: MergeContext): Promise<number> {
-	await run_merge_steps.do_merged(ctx)
+	const refused = await run_merge_steps.do_merged(ctx)
+
+	if (refused !== undefined) return report_count_refused(refused)
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, `#${ctx.child} merged`)
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) return emit(OVER_TOKEN, SUCCESS_EXIT_CODE)
 
@@ -181,14 +218,41 @@ async function on_merged(ctx: MergeContext): Promise<number> {
 async function on_failed(ctx: MergeContext): Promise<number> {
 	const result = await run_merge_steps.do_failed(ctx)
 
+	if (result.is_refused) return report_count_refused(result.carry)
+
 	if (!result.is_parked) {
 		console.error(PARK_FAILURE_NOTE)
 
 		return emit(STOP_TOKEN, FAILURE_EXIT_CODE)
 	}
 
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.PARK,
+		`#${ctx.child} parked (needs-decision)`,
+	)
+
 	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
 		return emit(STOP_TOKEN, SUCCESS_EXIT_CODE)
+	}
+
+	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
+}
+
+// An API-outage child: counted into its own streak and left re-dispatchable, not parked
+// (joshuafolkken/kit#2240). Below the outage guard it offers the next child — which may be this same
+// one again; at the guard it emits `environment` so the parent stops, the environment being down.
+async function on_outage(ctx: MergeContext): Promise<number> {
+	const result = await run_merge_steps.do_outage(ctx)
+
+	if (result.is_refused) return report_count_refused(result.carry)
+
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.OUTAGE,
+		`#${ctx.child} outage (re-dispatchable)`,
+	)
+
+	if (result.carry !== undefined && run_merge.is_outage_guard_tripped(result.carry.outages)) {
+		return emit(ENVIRONMENT_TOKEN, SUCCESS_EXIT_CODE)
 	}
 
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
@@ -213,6 +277,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<num
 	failed: on_failed,
 	'human-review': on_human_review,
 	merged: on_merged,
+	outage: on_outage,
 	parked: on_parked,
 	unresolved: on_unresolved,
 }
@@ -228,7 +293,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
 
-	return await HANDLERS[outcome_of(read)](ctx)
+	return await HANDLERS[outcome_of(read, read_is_outage(ctx.output))](ctx)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -236,6 +301,8 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_merge_cli = {
+	BUSY_TOKEN,
+	ENVIRONMENT_TOKEN,
 	HUMAN_REVIEW_TOKEN,
 	OVER_TOKEN,
 	RETRY_TOKEN,

@@ -190,6 +190,23 @@ describe('claiming a lane seat atomically', () => {
 		expect(existsSync(seat_lock_path(1))).toBe(false)
 	})
 
+	// The lock's window is the unreadable window and no longer: once the `.env` is on disk the lane is
+	// readable, so the lock is dropped before the multi-minute install runs. A lock outlasting that
+	// window would inflate the in-flight count and mask a genuinely broken lane (joshuafolkken/kit#2147).
+	it('releases the seat lock before the install runs, not after', async () => {
+		let is_lock_held_during_install = true
+
+		vi.mocked(lane_install.install_dependencies).mockImplementation(async () => {
+			is_lock_held_during_install = existsSync(seat_lock_path(1))
+
+			return { is_installed: true, output: '' }
+		})
+
+		await lane_open.open_lane(ISSUE)
+
+		expect(is_lock_held_during_install).toBe(false)
+	})
+
 	// The lock is what closes the gap between reading the free seats and writing the `.env`: a seat
 	// another open already holds cannot be claimed, so this open steps to the next free one.
 	it('steps past a seat whose lock another open already holds', async () => {
@@ -197,6 +214,19 @@ describe('claiming a lane seat atomically', () => {
 
 		await lane_open.open_lane(ISSUE)
 
+		expect(lane_environment_file(ISSUE)).toContain(SEAT_2_LINE)
+	})
+
+	// A lane git already lists but whose `.env` is not yet written is mid-open, not broken: it holds a
+	// seat lock across that window. Read as broken, a second concurrent open would throw instead of
+	// stepping past it (joshuafolkken/kit#2147).
+	it('opens past an unreadable lane that still holds its seat lock', async () => {
+		mkdirSync(seat_lock_path(1), { recursive: true })
+		lanes_are([live_lane(OTHER_ISSUE, undefined)])
+
+		const outcome = await lane_open.open_lane(ISSUE)
+
+		expect(outcome.kind).toBe('opened')
 		expect(lane_environment_file(ISSUE)).toContain(SEAT_2_LINE)
 	})
 })
@@ -273,6 +303,21 @@ describe('refusing to open a lane', () => {
 		install_answers(false, INSTALL_FAILURE)
 
 		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(new RegExp(INSTALL_FAILURE, 'u'))
+	})
+})
+
+// joshuafolkken/kit#2147: a concurrent open reads a lane whose `.env` is not yet on disk as
+// unreadable, but a lane still being created is not broken — it holds a seat lock across that window.
+// The guard tolerates as many unreadable lanes as there are locks held and stops on any beyond that.
+describe('the unreadable-lane guard against a lane still being opened', () => {
+	// A held lock accounts for one open in flight; an unreadable lane beyond that is genuinely broken
+	// and still stops the allocation, so the guard is not disarmed by any lock at all.
+	it('still refuses when more lanes are unreadable than there are seat locks held', async () => {
+		mkdirSync(seat_lock_path(1), { recursive: true })
+		lanes_are([live_lane(OTHER_ISSUE, undefined), live_lane('1492', undefined)])
+
+		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(/#1491/u)
+		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
 	})
 })
 

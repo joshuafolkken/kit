@@ -3,6 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
+import { run_carry_streak } from './run-carry-streak'
 import { run_invocation } from './run-invocation'
 
 // joshuafolkken/kit#1714: a `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour
@@ -44,6 +45,15 @@ const CARRY_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
 const CARRY_MAX_AGE_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
 const NO_INCREMENT = 0
 
+// The most session cuts one invocation may take (joshuafolkken/kit#2346). This bounds `cuts`, which
+// only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge (~one per
+// 50 minutes over the 8-hour whole-run budget), not the `run:cut` phase cuts a lane child takes. Each
+// cut drops the context it accumulated but pays a cold preamble to resume, so past a point the
+// re-establishment costs more than the accumulation it sheds; six sits well under the ~10 an 8-hour run
+// could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the
+// `--cut` count is refused at it rather than incrementing past it.
+const MAX_CUTS = 6
+
 const END_COMMAND = 'pnpm josh run:carry --end'
 const RESUME_COMMAND = 'pnpm josh run:carry --resume'
 const READ_COMMAND = 'pnpm josh run:carry --json'
@@ -68,6 +78,18 @@ interface RunCarry {
 	// in a row stop the run, and a child that merged in between breaks the streak. Read through
 	// `apply_change`, never bumped from outside, so the reset stays with the increment.
 	failures: number
+	// The consecutive-API-outage streak (joshuafolkken/kit#2240). It is kept apart from `failures`
+	// because a child that could not reach the API is not a child that failed: an outage is not counted
+	// against the consecutive-failure guard, and this streak is its own environment-broken guard — a run
+	// of outages stops the run rather than re-dispatching into a dead API forever. **A merge or a genuine
+	// child failure resets it**, because both prove the API was reachable; only a further outage adds to
+	// it. Defaulted to zero so a record written before this field existed still parses.
+	outages: number
+	// When the last *counted* outage was booked, so a burst of outages from one network event folds into
+	// a single streak step rather than several (joshuafolkken/kit#2317). Read by `run-carry-streak.ts`
+	// against its fold window; set only when an outage counts, cleared when the API proves reachable.
+	// Optional and `| undefined` for the same disk round-trip reason the owner fields carry.
+	last_outage_at?: string | undefined
 	// The process spending the budget, as the caller declared it with `--owner`. `run-hold.ts` records
 	// a pid it explicitly does not read back, because the process that claims a work tree is the
 	// short-lived `josh run:hold` itself; here the owner is the parent loop's own session, which
@@ -94,6 +116,13 @@ interface RunCarry {
 	// `merged` cannot serve: it is a count of merges rather than a set of issues, so a child that ended
 	// without one — `already-done`, or a park — would shift every remaining position by one.
 	done?: ReadonlyArray<number> | undefined
+	// Whether this invocation's end-of-run retrospective has already run (joshuafolkken/kit#2328). It
+	// is the state the two run-ending points hold so `run:step` prints the retrospective exactly once:
+	// the record is one per invocation and survives every session cut, so a run cannot repeat it after a
+	// resume, and `--end` removes the record so it cannot leak into the next invocation. Set by
+	// `--retrospective`, and carried across a hand-off like `done`. Optional and `| undefined` for the
+	// same disk round-trip reason the owner fields carry.
+	retrospective?: boolean | undefined
 }
 
 // The identity of a process, as `process-identity.ts` keeps it: the pid plus an opaque start-time
@@ -127,10 +156,17 @@ interface CarryChange {
 	// change as `merged` — a child either merged or it did not — and a change that carries `merged`
 	// resets the streak regardless of this field.
 	failures?: number
+	// One API-outage child to add to the outage streak (joshuafolkken/kit#2240). Never sent with
+	// `merged` or `failures` — a child either merged, failed, or could not reach the API — and both of
+	// those reset this streak.
+	outages?: number
 	// One issue number to add to `done`, not a count. It is the one field of a change that names a
 	// thing rather than an amount, because what a resumed named-issue run needs is *which* issues are
 	// finished.
 	done?: number
+	// Marks the end-of-run retrospective as run (joshuafolkken/kit#2328). It only ever sets the flag,
+	// never clears it: a retrospective that has run stays run for the rest of the invocation.
+	retrospective?: boolean
 }
 
 type CarryRead =
@@ -152,12 +188,18 @@ const run_carry_schema = z.object({
 	// Defaulted, so a record written before this field existed parses with a zero streak rather than
 	// failing to read — the same backward-compatibility the optional owner fields below carry.
 	failures: z.number().default(0),
+	// Defaulted for the same backward-compatibility as `failures` (joshuafolkken/kit#2240).
+	outages: z.number().default(0),
+	// Optional, so a record written before the outage fold existed still parses (joshuafolkken/kit#2317).
+	last_outage_at: z.string().optional(),
 	// Optional, so a record written by the previous shape still parses. Read as "no owner declared",
 	// which is the not-provably-live answer rather than a live one.
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
 	is_handed_off: z.boolean().optional(),
 	done: z.array(z.number()).optional(),
+	// Optional, so a record written before the retrospective existed still parses (joshuafolkken/kit#2328).
+	retrospective: z.boolean().optional(),
 })
 
 function carry_path(git_directory: string): string {
@@ -200,7 +242,7 @@ function classify(raw: string | undefined, now: Date): CarryRead {
 
 	if (carry === undefined) return UNREADABLE_READ
 
-	return is_expired(carry, now) ? { kind: 'expired', carry } : { kind: 'carried', carry }
+	return { kind: is_expired(carry, now) ? 'expired' : 'carried', carry }
 }
 
 function read_carry(target: string, now: Date = new Date()): CarryRead {
@@ -225,6 +267,7 @@ function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry
 		filed: NO_INCREMENT,
 		cuts: NO_INCREMENT,
 		failures: NO_INCREMENT,
+		outages: NO_INCREMENT,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 	}
@@ -272,18 +315,13 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
-	const { invocation, started_at, merged, filed, cuts, failures, done } = carry
-	// The recorded fields are named rather than spread from `carry`, so the previous owner cannot
-	// survive an adoption by a caller that declared none. **`done` is carried across**: the whole point
-	// of the resumption is that the successor does not re-run what the cut session finished.
+	// The run's own fields carry across untouched — the counters, the outage fold timestamp
+	// (joshuafolkken/kit#2317), `done` so the successor does not re-run what the cut session finished,
+	// and `retrospective` so a run resumed after a cut does not repeat its retrospective. Only the three
+	// ownership fields are overridden: the new owner replaces the old — a caller that declared none
+	// writes `undefined`, so the previous owner cannot survive — and the declared hand-off is spent.
 	const next: RunCarry = {
-		invocation,
-		started_at,
-		merged,
-		filed,
-		cuts,
-		failures,
-		done,
+		...carry,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 		is_handed_off: false,
@@ -305,25 +343,34 @@ function next_done(carry: RunCarry, done: number | undefined): ReadonlyArray<num
 	return current.includes(done) ? current : [...current, done]
 }
 
-// **A merge resets the streak; every other change adds to it.** The consecutive-failure guard trips
-// on children failing one after another, so a child that merged in between is what breaks the run —
-// the reset lives here, with the increment, rather than in a caller that could forget it
-// (joshuafolkken/kit#2024).
-function next_failures(carry: RunCarry, change: CarryChange): number {
-	if ((change.merged ?? NO_INCREMENT) > NO_INCREMENT) return NO_INCREMENT
-
-	return carry.failures + (change.failures ?? NO_INCREMENT)
+// Sticky: a retrospective that has run stays run, so a later count never clears the flag. Held apart
+// from `apply_change` so its one branch stays out of that function's complexity.
+function next_retrospective(carry: RunCarry, change: CarryChange): boolean | undefined {
+	return change.retrospective === true || carry.retrospective
 }
 
-function apply_change(target: string, carry: RunCarry, change: CarryChange): RunCarry {
+// The streak arithmetic — the two consecutive counters and the outage fold — is `run-carry-streak.ts`'s
+// (joshuafolkken/kit#2317), so the reset-with-the-increment rule lives with it rather than in a caller
+// that could forget it. `now` is threaded in so the fold window is measured against the record and
+// injectable in tests; it defaults to the wall clock like the other reads here.
+function apply_change(
+	target: string,
+	carry: RunCarry,
+	change: CarryChange,
+	now: Date = new Date(),
+): RunCarry {
 	const cuts = change.cuts ?? NO_INCREMENT
+	const streak = run_carry_streak.next_state(carry, change, now)
 	const next: RunCarry = {
 		...carry,
 		merged: carry.merged + (change.merged ?? NO_INCREMENT),
 		filed: carry.filed + (change.filed ?? NO_INCREMENT),
 		cuts: carry.cuts + cuts,
-		failures: next_failures(carry, change),
+		failures: streak.failures,
+		outages: streak.outages,
+		last_outage_at: streak.last_outage_at,
 		done: next_done(carry, change.done),
+		retrospective: next_retrospective(carry, change),
 		// A cut declares the hand-off; any other count is the run carrying on, which spends it.
 		is_handed_off: cuts > NO_INCREMENT,
 	}
@@ -392,8 +439,24 @@ function is_count_refused(carry: RunCarry, owner: CarryOwner): boolean {
 	return carry.is_handed_off === true || is_foreign_live_owner(carry, owner)
 }
 
+// Whether the invocation has already taken its maximum cuts (joshuafolkken/kit#2346). Read by the CLI
+// before a `--cut` count so a run that has begun to churn is refused another cut rather than paying a
+// cold preamble the accumulation it sheds no longer covers.
+function is_at_cut_cap(carry: RunCarry): boolean {
+	return carry.cuts >= MAX_CUTS
+}
+
 function end_carry(target: string): void {
 	stamp_file.remove_stamp(target)
+}
+
+// Whether the read record marks its retrospective as already run (joshuafolkken/kit#2328). A read with
+// no record — `none` or `unreadable` — is not a run whose retrospective has run, so it answers `false`;
+// `run:step` reads it to decide whether the stop position still owes a retrospective.
+function retrospective_done_of(read: CarryRead): boolean {
+	if (read.kind !== 'carried' && read.kind !== 'expired') return false
+
+	return read.carry.retrospective === true
 }
 
 // **What the resumed session has to be told, computed rather than stored.** A stored remainder would
@@ -423,7 +486,7 @@ function done_note(carry: RunCarry): string {
 }
 
 function describe_carry(carry: RunCarry): string {
-	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.failures)} failed in a row, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
+	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.failures)} failed in a row, ${String(carry.outages)} outage(s) in a row, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
 }
 
 function expired_message(carry: RunCarry): string {
@@ -491,6 +554,7 @@ const run_carry = {
 	CARRY_MAX_AGE_HOURS,
 	CARRY_MAX_AGE_MS,
 	END_COMMAND,
+	MAX_CUTS,
 	NO_OWNER,
 	RESUME_COMMAND,
 	adopt_carry,
@@ -501,6 +565,7 @@ const run_carry = {
 	classify,
 	classify_claim,
 	count_refused_message,
+	is_at_cut_cap,
 	describe_carry,
 	end_carry,
 	expired_message,
@@ -518,6 +583,7 @@ const run_carry = {
 	remaining_of,
 	replace_carry,
 	repository_directory,
+	retrospective_done_of,
 	standing_message,
 	unknown_message,
 	unreadable_message,

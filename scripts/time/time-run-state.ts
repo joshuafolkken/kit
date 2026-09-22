@@ -297,5 +297,5 @@ const time_run_state = {
 	run_state_lines,
 }
 
-export type { RunStateFacts, RunStateInput, RunStatus, WhiffSession, WhiffTotals }
+export type { RunStateFacts, RunStateInput, WhiffSession }
 export { time_run_state }

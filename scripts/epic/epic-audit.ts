@@ -201,10 +201,12 @@ function collect_blockers(
 	while (pending.length > 0) {
 		const current = pending.pop() ?? node
 
-		if (!seen.has(current)) {
-			seen.add(current)
-			pending.push(...epic_graph.blockers_of(index, current))
+		if (seen.has(current)) {
+			continue
 		}
+
+		seen.add(current)
+		pending.push(...epic_graph.blockers_of(index, current))
 	}
 
 	return seen

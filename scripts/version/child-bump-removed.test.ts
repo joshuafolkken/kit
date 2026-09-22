@@ -48,7 +48,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const { as_execa_implementation, fake_result } = gate_test_fixture
 
 const PASS = 0
-const CHECK_COUNT = 4
+const CHECK_COUNT = 5
 const BASE = 'a1b2c3d4'
 const GATE_SOURCE = 'scripts/gate/verification-gate.ts'
 const REVIEW_PROMPT = 'prompts/review.md'
@@ -87,7 +87,7 @@ async function run_gate(): Promise<number> {
 // work, and a tree that has moved since, with no `package.json` anywhere in it. Under the old rule
 // nothing ran and the gate exited non-zero. It is now a child's ordinary second gate.
 describe('the bump→gate ordering refusal is gone', () => {
-	it('runs all four checks over a moved tree that carries no version bump', async () => {
+	it('runs all five checks over a moved tree that carries no version bump', async () => {
 		review_stamps.gate_stamp.write(BEFORE_FIX, STAMP_PATH, BASE)
 
 		const code = await run_gate()

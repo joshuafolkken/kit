@@ -22,6 +22,7 @@ function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 		filed: 1,
 		cuts: 2,
 		failures: 0,
+		outages: 0,
 		...overrides,
 	}
 }
@@ -47,8 +48,11 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 		wakes,
 		ports: {
 			read_carry: () => remaining.shift() ?? ENDED,
-			// The ordinary case: `--cut` is the cutting session's last write and its process is gone.
-			is_owner_live: () => false,
+			// Liveness read from the record itself: a handed-off record's owner is the predecessor, whose
+			// process is gone once `--cut` is its last write; a carried record no cut handed off is one a
+			// live successor is spending. A test that needs a *dead* owner over a not-handed-off record —
+			// the crash joshuafolkken/kit#2336 recovers — overrides this port with `() => false`.
+			is_owner_live: (read) => read.kind === 'carried' && read.carry.is_handed_off !== true,
 			wake: (invocation) => {
 				wakes.push(invocation)
 
@@ -99,6 +103,30 @@ describe('run_wake_loop.run_loop — one wake per cut', () => {
 		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
 
 		expect(run_wake.read_wake(scratch.target)?.woke).toBe(2)
+	})
+})
+
+describe('run_wake_loop.run_loop — recovering a session that claimed and died', () => {
+	// joshuafolkken/kit#2336. A woken session claimed the record and then exited without cutting or
+	// ending, so the record reads carried, no cut handed off, owned by a dead process. Before this the
+	// loop waited on it until the whole-run bound and the run stopped in silence; now it re-wakes.
+	it('re-wakes when the record is carried but its owner has died', async () => {
+		const scripted = recorder([IN_FLIGHT, ENDED])
+		const ports = { ...scripted.ports, is_owner_live: () => false }
+
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(scripted.wakes).toStrictEqual([INVOCATION])
+	})
+
+	// The live successor is a session doing the run's work — the ordinary in-flight state — so the loop
+	// leaves it alone rather than waking a second session into one budget.
+	it('leaves a live in-flight owner alone rather than waking again', async () => {
+		const scripted = recorder([IN_FLIGHT, IN_FLIGHT, ENDED])
+
+		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(scripted.wakes).toStrictEqual([])
 	})
 })
 

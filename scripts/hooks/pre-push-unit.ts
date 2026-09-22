@@ -125,12 +125,12 @@ async function run_pre_push_unit(
 	return 0
 }
 
-// `process.argv` is [runner, script, ...arguments].
-const FIRST_ARGUMENT_INDEX = 2
-
 // `process.exitCode` rather than `process.exit()`: a non-zero code has to block the push, and exiting
 // outright truncates a piped stdout — which for a failing suite is the output that says why.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+	// `process.argv` is [runner, script, ...arguments].
+	const FIRST_ARGUMENT_INDEX = 2
+
 	process.exitCode = await run_pre_push_unit(process.argv.slice(FIRST_ARGUMENT_INDEX))
 }
 
@@ -143,5 +143,4 @@ const pre_push_unit = {
 	run_pre_push_unit,
 }
 
-export type { PushTree }
 export { pre_push_unit }

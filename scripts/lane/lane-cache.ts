@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_launch } from '#scripts/init/hook-launch'
 import {
 	GATE_CACHE_SPECS,
 	SHARED_CACHE_SPECS,
@@ -99,6 +100,28 @@ function seed_caches(source_root: string, destination: string): void {
 	for (const spec of GATE_CACHE_SPECS) copy_if_present(source_root, destination, spec)
 }
 
+/**
+ * Copy the pre-built hook bundles (`dist/hooks/`) from `source_root` into `destination`, so a fresh
+ * lane's child runs each Claude Code hook off `node dist/hooks/<name>.js` rather than the slower
+ * `pnpm josh …` fallback (joshuafolkken/kit#2160). The bundles are git-ignored, so a lane's work tree
+ * never carries them and every hook falls back without this seed.
+ *
+ * Best-effort, exactly like `seed_caches`: a source with no bundles (a checkout that never ran
+ * `pnpm build`) is skipped so the lane opens on the fallback path, and a copy that fails is swallowed
+ * rather than thrown — seeding is never the reason an open fails.
+ */
+function seed_hook_bundles(source_root: string, destination: string): void {
+	const source = path.join(source_root, hook_launch.HOOK_DIST_DIR)
+	if (!existsSync(source)) return
+
+	try {
+		cpSync(source, path.join(destination, hook_launch.HOOK_DIST_DIR), { recursive: true })
+	} catch {
+		// A source that vanished mid-copy or a destination that could not be written leaves the lane on
+		// the `pnpm josh` fallback, never a failed open.
+	}
+}
+
 function sync_cache(source_root: string, destination: string, cache_file: string): void {
 	const spec = SHARED_CACHE_SPECS.find((candidate) => candidate.cache_file === cache_file)
 
@@ -107,6 +130,6 @@ function sync_cache(source_root: string, destination: string, cache_file: string
 	copy_if_present(source_root, destination, spec)
 }
 
-const lane_cache = { seed_caches, sync_cache }
+const lane_cache = { seed_caches, seed_hook_bundles, sync_cache }
 
 export { lane_cache }

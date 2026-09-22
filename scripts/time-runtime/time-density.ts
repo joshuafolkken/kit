@@ -106,9 +106,13 @@ function read_window(text: string): DensityReading {
 // warning and this line have to fire on the same runs, or a run is told it is fine while the report
 // it gets afterwards says it was not.
 function is_due(reading: DensityReading, since_last_ms: number): boolean {
-	if (reading.round_trip_count < MIN_ROUND_TRIPS) return false
-	if (reading.turn_calls !== ONE_CALL) return false
-	if (!time_round_trips.is_below_floor(reading.density)) return false
+	if (
+		reading.round_trip_count < MIN_ROUND_TRIPS ||
+		reading.turn_calls !== ONE_CALL ||
+		!time_round_trips.is_below_floor(reading.density)
+	) {
+		return false
+	}
 
 	return since_last_ms >= NOTICE_INTERVAL_MS
 }

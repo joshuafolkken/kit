@@ -47,7 +47,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
 
 const PASS = 0
-const CHECK_COUNT = 4
+const CHECK_COUNT = 5
 const NOTHING_RAN = 0
 const CHANGED_FILE = 'scripts/gate/gate-skip.ts'
 const CHANGED_TREE: Record<string, string> = { [CHANGED_FILE]: 'digest-one' }
@@ -168,7 +168,7 @@ describe('run_verification_gate — a tree that is already green', () => {
 		record_green(CHANGED_TREE, BASE)
 	})
 
-	it('starts none of the four checks', async () => {
+	it('starts none of the five checks', async () => {
 		const [code] = await run_gate()
 
 		expect(code).toBe(0)
@@ -191,7 +191,7 @@ describe('run_verification_gate — a tree that is already green', () => {
 		expect(text).not.toContain('plan:')
 	})
 
-	it('runs all four checks when the caller forces them', async () => {
+	it('runs all five checks when the caller forces them', async () => {
 		const [code] = await run_gate(true)
 
 		expect(code).toBe(0)
@@ -202,7 +202,7 @@ describe('run_verification_gate — a tree that is already green', () => {
 describe('run_verification_gate — a tree the record cannot speak for', () => {
 	// A red gate writes no record at all, which is why the re-verification after a fix reaches this
 	// same branch: joshuafolkken/kit#1261's join before the commit must never be the one that skips.
-	it('runs all four checks when no record exists', async () => {
+	it('runs all five checks when no record exists', async () => {
 		const [, text] = await run_gate()
 
 		expect(check_count()).toBe(CHECK_COUNT)
@@ -212,7 +212,7 @@ describe('run_verification_gate — a tree the record cannot speak for', () => {
 	// Purely a question about the record: the digest moved, so it cannot be reused and the four checks
 	// run. Nothing else stands between the skip and them since joshuafolkken/kit#1486 removed the
 	// bump→gate refusal, whose own branch `child-bump-removed.test.ts` now pins as absent.
-	it('runs all four checks when a file has moved since the record', async () => {
+	it('runs all five checks when a file has moved since the record', async () => {
 		repository.tree = ADVANCED_TREE
 		record_green(MOVED_TREE, BASE)
 
@@ -221,7 +221,7 @@ describe('run_verification_gate — a tree the record cannot speak for', () => {
 		expect(check_count()).toBe(CHECK_COUNT)
 	})
 
-	it('runs all four checks when the default branch moved under the same map', async () => {
+	it('runs all five checks when the default branch moved under the same map', async () => {
 		record_green(CHANGED_TREE, ADVANCED_BASE)
 
 		await run_gate()
@@ -230,7 +230,7 @@ describe('run_verification_gate — a tree the record cannot speak for', () => {
 	})
 
 	// Straight after `git switch main && git pull`, both sides are empty and would compare equal.
-	it('runs all four checks when the pull left the changed map empty', async () => {
+	it('runs all five checks when the pull left the changed map empty', async () => {
 		repository.tree = EMPTY_TREE
 		record_green(EMPTY_TREE, BASE)
 

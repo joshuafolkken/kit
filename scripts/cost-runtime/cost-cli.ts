@@ -22,6 +22,11 @@ import { transcript_cwd } from './transcript-cwd'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh cost (--cut | --over <tokens-per-request>) [--path <dir>]'
+// The read-only verdict's third answer, beside `cost_verdict`'s over/under: a session that cannot be
+// priced at all. Kept here rather than in `cost_verdict`, which only ever decides over vs under.
+const UNMEASURABLE_VERDICT = 'unmeasurable'
+
+type CostVerdict = ReturnType<typeof cost_verdict.classify> | typeof UNMEASURABLE_VERDICT
 
 interface Options {
 	over?: number
@@ -129,8 +134,9 @@ function anthropic_measurement(target: string): OverMeasurement | undefined {
 	if (session === undefined) return undefined
 
 	return {
-		request_count: session.records.length,
-		billed_input_tokens: cost_usage.billed_input(cost_usage.sum_totals(session.records)),
+		billed_input_per_request: session.records.map((record) =>
+			cost_usage.billed_input(record.totals),
+		),
 	}
 }
 
@@ -147,14 +153,31 @@ function same_openai_project(target: string, cwd: string): boolean {
 }
 
 function reject_openai_cross_project(context: RunContext, target: string, cwd: string): boolean {
-	if (context.provider !== 'openai' || context.path === undefined) return false
-	if (same_openai_project(target, cwd)) return false
+	if (
+		context.provider !== 'openai' ||
+		context.path === undefined ||
+		same_openai_project(target, cwd)
+	) {
+		return false
+	}
 
 	console.error(
 		'OpenAI --path cannot select a thread from another project; run josh cost in that project.',
 	)
 
 	return true
+}
+
+// The active provider's own-session measurement, read the same way for `--over` and for the
+// read-only `session_verdict` below, so the two never drift on which session they price.
+function measure(
+	target: string,
+	provider: AgentProvider,
+	environment: Environment,
+): OverMeasurement | undefined {
+	return provider === 'openai'
+		? codex_usage.measurement(target, cost_transcript.home_directory(), environment)
+		: anthropic_measurement(target)
 }
 
 // `--over`: what the next turn of this session will cost, read from the latest own session alone.
@@ -164,13 +187,35 @@ function run_over(
 	provider: AgentProvider,
 	environment: Environment,
 ): number {
-	const measurement =
-		provider === 'openai'
-			? codex_usage.measurement(target, cost_transcript.home_directory(), environment)
-			: anthropic_measurement(target)
+	const measurement = measure(target, provider, environment)
 	if (measurement === undefined) return report_missing(target, provider)
 
 	return cost_verdict.report_over(measurement, limit)
+}
+
+// A measurement priced against the shared cut threshold, or `unmeasurable` for the empty session a
+// `report_over` would refuse. Split from `session_verdict` so neither carries more than one decision.
+function verdict_of(measurement: OverMeasurement | undefined): CostVerdict {
+	if (measurement === undefined || measurement.billed_input_per_request.length === 0) {
+		return UNMEASURABLE_VERDICT
+	}
+
+	return cost_verdict.classify(measurement, CONTEXT_CUT_THRESHOLD)
+}
+
+// The `--cut` verdict as a value, printing nothing (joshuafolkken/kit#2165). `run:status` bundles
+// this beside the issue state and the carry record, so it needs the token rather than the exit code
+// `run` returns. `unmeasurable` is the read-only counterpart of `report_missing` / the empty-session
+// error: a session with no provider, no transcript, or no request cannot be priced, and saying so is
+// not the same as `under`.
+function session_verdict(
+	cwd: string = process.cwd(),
+	environment: Environment = process.env,
+): CostVerdict {
+	const provider = provider_of(environment)
+	if (provider === undefined) return UNMEASURABLE_VERDICT
+
+	return verdict_of(measure(cwd, provider, environment))
 }
 
 function run_context(
@@ -185,10 +230,10 @@ function run_context(
 	return { over: options.over, path: options.path, provider }
 }
 
-// This process's own working directory, kept as-is: the transcript search covers both a lane's own
-// slug and the main checkout that slug resolves to (joshuafolkken/kit#1825), so pre-rewriting the cwd
-// here would drop the lane's own slug and hide a dispatched child's transcript
-// (joshuafolkken/kit#1749). `time-cli.ts` gives the same reason.
+// This process's own working directory, kept as-is: from a lane the transcript search covers the
+// lane's own slug alone (joshuafolkken/kit#2236), so pre-rewriting the cwd to the main checkout here
+// would drop the lane's own slug and hide a dispatched child's transcript (joshuafolkken/kit#1749).
+// `time-cli.ts` gives the same reason.
 function run(
 	argv: ReadonlyArray<string>,
 	cwd: string = process.cwd(),
@@ -214,16 +259,18 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 const cost_cli = {
+	UNMEASURABLE_VERDICT,
 	USAGE,
 	parse_options,
 	to_threshold,
 	load_corpus: cost_corpus.load_corpus,
 	attributed: cost_corpus.attributed,
 	run,
+	session_verdict,
 	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
-export type { Options }
+export type { CostVerdict, Options }
 export { cost_cli }

@@ -126,7 +126,7 @@ describe('issue_read_cli.run — a number that produced nothing', () => {
 
 describe('josh issue:read registration', () => {
 	it('is registered as a josh command', () => {
-		const source = readFileSync('scripts/josh/josh-commands-ai.ts', 'utf8')
+		const source = readFileSync('scripts/josh/josh-commands-issue.ts', 'utf8')
 
 		expect(source).toContain("'issue:read'")
 		expect(source).toContain('scripts/issue/issue-read-cli.ts')

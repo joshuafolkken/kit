@@ -236,8 +236,9 @@ function close_trip(walk: Walk): void {
 function is_same_turn(span: Span, pending: ReadonlyArray<Span>): boolean {
 	const [first] = pending
 
-	if (first === undefined || span.is_continuation) return false
-	if (span.message_id === time_spans.NO_MESSAGE_ID) return false
+	if (first === undefined || span.is_continuation || span.message_id === time_spans.NO_MESSAGE_ID) {
+		return false
+	}
 
 	return span.message_id === first.message_id
 }
@@ -532,5 +533,4 @@ const time_bundles = {
 	shares_target,
 }
 
-export type { BundleToolRow, BundleTotals, TargetFacts, TripPrice }
 export { time_bundles }

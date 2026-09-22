@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const execa_sync_mock = vi.hoisted(() => vi.fn().mockReturnValue({ exitCode: 0 }))
 const sync_mock = vi.hoisted(() => vi.fn())
 const write_mock = vi.hoisted(() => vi.fn())
+const build_update_command_mock = vi.hoisted(() =>
+	vi.fn().mockReturnValue(['pnpm', 'update', '--latest']),
+)
 
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 vi.mock('node:fs', () => ({
@@ -24,7 +27,7 @@ vi.mock('#scripts/overrides/overrides-logic', () => ({
 		describe_sources: vi.fn().mockReturnValue('no overrides found'),
 		format_diff_lines: vi.fn().mockReturnValue([]),
 		list_excluded_package_names: vi.fn().mockReturnValue([]),
-		build_update_command: vi.fn().mockReturnValue(['pnpm', 'update', '--latest']),
+		build_update_command: build_update_command_mock,
 	},
 }))
 
@@ -71,6 +74,56 @@ describe('latest_update.run — execaSync dispatch', () => {
 		execa_sync_mock.mockReturnValueOnce({})
 
 		expect(latest_update.run([PNPM, ...UPDATE_ARGS])).toBe(1)
+	})
+})
+
+describe('latest_update.build_update_commands', () => {
+	beforeEach(() => {
+		build_update_command_mock.mockReturnValue([PNPM, ...UPDATE_ARGS])
+	})
+
+	// The argument-less re-resolution stage is the one that reaches the indirect tiers a direct-only
+	// `--latest` leaves pinned (joshuafolkken/kit#2200); it must run after the `--latest` stage.
+	it('runs the all-tiers re-resolution stage after the --latest stage', () => {
+		expect(latest_update.build_update_commands()).toEqual([
+			[PNPM, ...UPDATE_ARGS],
+			[PNPM, 'update'],
+		])
+	})
+
+	it('still runs the re-resolution stage when every direct dep is overridden', () => {
+		build_update_command_mock.mockReturnValue(undefined)
+
+		expect(latest_update.build_update_commands()).toEqual([[PNPM, 'update']])
+	})
+})
+
+describe('latest_update.run_update_stages', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockReset()
+		execa_sync_mock.mockReturnValue({ exitCode: 0 })
+	})
+
+	it('runs every stage in order and returns 0 when all succeed', () => {
+		expect(
+			latest_update.run_update_stages([
+				[PNPM, ...UPDATE_ARGS],
+				[PNPM, 'update'],
+			]),
+		).toBe(0)
+		expect(execa_sync_mock).toHaveBeenCalledTimes(2)
+	})
+
+	it('stops at the first failing stage', () => {
+		execa_sync_mock.mockReturnValueOnce({ exitCode: 5 })
+
+		expect(
+			latest_update.run_update_stages([
+				[PNPM, ...UPDATE_ARGS],
+				[PNPM, 'update'],
+			]),
+		).toBe(5)
+		expect(execa_sync_mock).toHaveBeenCalledTimes(1)
 	})
 })
 

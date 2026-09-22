@@ -103,6 +103,7 @@ describe('a record written by one session and read by the next', () => {
 				filed: 0,
 				cuts: 0,
 				failures: 0,
+				outages: 0,
 			},
 		})
 	})
@@ -148,6 +149,18 @@ describe('the consecutive-failure streak', () => {
 	})
 })
 
+// joshuafolkken/kit#2240, #2317: the outage streak is its own counter — it rises with outages and never
+// touches the failure streak, a merge or a genuine child failure resets it, and `apply_change` threads
+// the clock through so a burst folds. The fold *arithmetic* is `run-carry-streak.test.ts`'s; this pins
+// the integration — the streak advances through the record and the fold timestamp is recorded on it.
+it('the consecutive-outage streak advances through the record and records its fold timestamp', () => {
+	const at = new Date('2026-09-22T00:00:00.000Z')
+	const one = run_carry.apply_change(target(), begun(), { outages: 1 }, at)
+
+	expect(one).toMatchObject({ outages: 1, failures: 0, last_outage_at: at.toISOString() })
+	expect(run_carry.apply_change(target(), one, { merged: 1 }, at).outages).toBe(0)
+})
+
 describe('the whole-run bound', () => {
 	it('is spent once the record is older than eight hours', () => {
 		begun()
@@ -163,6 +176,7 @@ describe('the whole-run bound', () => {
 			filed: 0,
 			cuts: 0,
 			failures: 0,
+			outages: 0,
 		}
 
 		expect(run_carry.is_expired(undated, START)).toBe(true)
@@ -299,16 +313,12 @@ describe('a cut declares the hand-off', () => {
 	it('is spent by the adoption that carries it', () => {
 		const cut = run_carry.apply_change(target(), begun(), { cuts: 1 })
 
-		// `undefined` is the exclusive create losing to another process, which cannot happen against a
-		// scratch path this suite owns — so it is asserted rather than narrowed away.
+		// Adoption carries every field of the cut record and changes exactly three: it takes the new
+		// owner and spends the hand-off. A strict spread of `cut` with those overrides asserts the whole
+		// object — nothing is narrowed away — while naming what adoption alone touches. `undefined` from
+		// `adopt_carry` is the exclusive create losing a race, impossible against this suite's own path.
 		expect(run_carry.adopt_carry(target(), cut, dead_owner())).toStrictEqual({
-			invocation: cut.invocation,
-			started_at: cut.started_at,
-			merged: cut.merged,
-			filed: cut.filed,
-			cuts: cut.cuts,
-			failures: cut.failures,
-			done: undefined,
+			...cut,
 			owner_pid: DEAD_PID,
 			owner_start: undefined,
 			is_handed_off: false,
@@ -428,5 +438,17 @@ describe('a --only invocation carried across a cut', () => {
 
 		expect(read.kind === 'carried' ? read.carry.invocation : '').toBe(NAMED_ONLY_INVOCATION)
 		expect(run_carry.remaining_of(started)).toStrictEqual([1762, 1749])
+	})
+})
+
+describe('the cut cap', () => {
+	// The one increment with a ceiling: a run that has begun to churn is refused another cut, so the
+	// re-establishment a cold preamble costs cannot outgrow the accumulation the cut sheds.
+	it('is not reached below the maximum', () => {
+		expect(run_carry.is_at_cut_cap({ ...begun(), cuts: run_carry.MAX_CUTS - 1 })).toBe(false)
+	})
+
+	it('is reached at the maximum', () => {
+		expect(run_carry.is_at_cut_cap({ ...begun(), cuts: run_carry.MAX_CUTS })).toBe(true)
 	})
 })

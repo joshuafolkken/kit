@@ -9,6 +9,7 @@ import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_pool } from './backlog-pool'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next (joshuafolkken/kit#1630).
@@ -121,7 +122,13 @@ function warn_gaps(context: PoolContext, has_answer: boolean): void {
 
 function report(result: EpicNextResult, context: PoolContext): number {
 	warn_gaps(context, result.verdict === 'run')
-	console.error(epic_report.format_result(result))
+	// The explanation names epics and children as `#N` (`tracked by epic #N`); linkified so the text a
+	// run reads carries clickable references rather than bare ones (joshuafolkken/kit#2329). The stdout
+	// tokens below are bare numbers by contract — a loop feeds them back to `--exclude` — so they are
+	// left untouched.
+	const explanation = epic_report.format_result(result, context.repo)
+
+	console.error(issue_citation.linkify(explanation, context.repo))
 
 	for (const token of tokens_of(result, context.repo)) console.info(token)
 
@@ -207,7 +214,7 @@ function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): Reado
 // is one answer and two renderings of it. `undefined` is the refusal — already reported.
 async function resolve(context: PoolContext): Promise<EpicNextResult | undefined> {
 	const references = backlog_pool
-		.opted_in_epics(context.opted_in.issues)
+		.opted_in_epics(context.opted_in.issues, context.tracking.index)
 		.map((number) => ({ number }))
 	const { reads, notices, refusal } = await epic_next_read.read_snapshots(references, context.repo)
 

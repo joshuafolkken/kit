@@ -30,7 +30,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 
 const PASS = 0
 const FAIL = 1
-const ALL_PASS: ReadonlyArray<number> = [PASS, PASS, PASS, PASS]
+const ALL_PASS: ReadonlyArray<number> = [PASS, PASS, PASS, PASS, PASS]
 const REFUSAL_MESSAGE = 'josh gate takes no extra arguments'
 
 const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
@@ -111,7 +111,7 @@ describe('run_verification_gate', () => {
 	)
 
 	// The serial gate reported one failure per round trip; reporting every failing check at once is
-	// the second half of what this command is for.
+	// the second half of what this command is for. The tail re-run summary is `gate-report.test.ts`'s.
 	it('names every failing check in one summary', async () => {
 		const [code, output] = await run_capturing([FAIL, PASS, FAIL, PASS])
 
@@ -192,12 +192,16 @@ describe('run_gate_command', () => {
 		}
 	})
 
+	// The scoped pre-check is `run_gate_command`'s alone and reads the real checkout's scoped record;
+	// this case is about argument handling, so it turns the enforcement off rather than plant a record
+	// for the surrounding tree. joshuafolkken/kit#2296 pins the pre-check itself in `gate-scoped-precheck.test.ts`.
 	it('runs the gate when no extra argument is given', async () => {
 		mock_steps(ALL_PASS)
 		const stdout = capture_stdout()
+		const bare = { ...RECORDS, is_scoped_enforced: false }
 
 		try {
-			expect(await verification_gate.run_gate_command([], RECORDS)).toBe(0)
+			expect(await verification_gate.run_gate_command([], bare)).toBe(0)
 		} finally {
 			stdout.restore()
 		}

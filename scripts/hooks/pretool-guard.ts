@@ -1,9 +1,11 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import { batch_outcome } from './batch-guard'
 
 // One PreToolUse process for the three guards that used to be three (joshuafolkken/kit#1930). A Bash
@@ -15,16 +17,17 @@ import { batch_outcome } from './batch-guard'
 //
 // **The verdict is identical to running the three in turn**, and that is the whole point. Each guard
 // self-gates on the tool name inside its own `is_candidate` / trigger, so running all three on the
-// union matcher (`Bash|Edit|Read|Write`) refuses exactly what the three separate entries did. A
+// union matcher (`Bash|Edit|Read|Write|AskUserQuestion`) refuses exactly what the three separate
+// entries did — `AskUserQuestion` is matched for the rule guard's lane-child interactive-ask row
+// (joshuafolkken/kit#2201), and the batching and investigation guards self-gate away from it. A
 // refusal from any guard wins first; only when none refuses is the batch guard's non-blocking notice
 // (the whole-file-write notice, joshuafolkken/kit#1848) emitted. Each guard still honours its own
 // switch (`JOSH_BATCH_GUARD` / `JOSH_INVESTIGATION_GUARD` / `JOSH_RULE_GUARD`) internally, so this
 // process needs no switch of its own.
 
-// Fold the three guards' verdicts into one. A refusal wins over everything else, and the batch
-// guard's reason is shown first to match the entry order the three separate hooks had. When nothing
-// refuses, whatever the batch guard reported (a notice, a fault, or nothing) passes through
-// untouched, since it is the only one of the three with a non-refusal disposition.
+// Fold the guards' verdicts into one. A refusal wins over everything else, and the batch guard's
+// reason is shown first to match the entry order the separate hooks had. When nothing refuses,
+// whatever the batch guard reported (a notice, a fault, or nothing) passes through untouched.
 function combine_outcomes(batch: GuardOutcome, extra_reason: string | undefined): GuardOutcome {
 	if (batch.reason !== undefined) return batch
 
@@ -35,22 +38,59 @@ function combine_outcomes(batch: GuardOutcome, extra_reason: string | undefined)
 	return batch
 }
 
-// All three run unconditionally, exactly as the three separate PreToolUse entries did: each records
-// its own once-per-run stamp, so short-circuiting on the first refusal would change which guard is
-// allowed to fire on a later call.
+function is_clear(outcome: GuardOutcome): boolean {
+	return outcome.reason === undefined && outcome.notice === undefined && outcome.fault === undefined
+}
+
+// The duplicate-read guard is `notice`-mode in a lane child, so it is the second guard that can raise a
+// non-refusal notice (joshuafolkken/kit#2298). Its notice is surfaced only where nothing else spoke —
+// a refusal from any guard, or the batch guard's own notice, wins first.
+function with_duplicate_notice(combined: GuardOutcome, notice: string | undefined): GuardOutcome {
+	if (notice === undefined || !is_clear(combined)) return combined
+
+	return { reason: undefined, notice, fault: undefined }
+}
+
+// All guards run unconditionally, exactly as the separate PreToolUse entries did: each records its own
+// once-per-run stamp, so short-circuiting on the first refusal would change which guard is allowed to
+// fire on a later call.
 function pretool_outcome(raw_payload: string): GuardOutcome {
 	const batch = batch_outcome(raw_payload)
 	const investigation = investigation_refusal(raw_payload)
+	const duplicate = duplicate_read_outcome(raw_payload)
 	const rule = delivered_rules.delivery(raw_payload)
+	const duplicate_refusal = duplicate.reason
+	const combined = combine_outcomes(batch, investigation ?? duplicate_refusal ?? rule)
 
-	return combine_outcomes(batch, investigation ?? rule)
+	return with_duplicate_notice(combined, duplicate.notice)
 }
 
-const pretool_guard = { combine_outcomes, pretool_outcome }
+// The watcher guard is the one composed rule that cannot answer synchronously — it reads the lane
+// registry and the watcher's life record off disk (joshuafolkken/kit#2353). So it is asked after the
+// synchronous guards and only where they stayed clear: a refusal from any of them wins first, exactly
+// as `combine_outcomes` orders them, and the watcher's refusal fills a clear verdict rather than
+// overriding one. It fires once per run itself (`run-watcher-hook.ts`), so a stale watcher refuses the
+// first call but not the `pnpm josh run:progress --wait` that fixes it.
+async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome> {
+	const base = pretool_outcome(raw_payload)
+
+	if (!is_clear(base)) return base
+
+	const reason = await run_watcher_hook.watcher_hook_reason(raw_payload)
+
+	return reason === undefined ? base : { reason, notice: undefined, fault: undefined }
+}
+
+const pretool_guard = { combine_outcomes, pretool_outcome, pretool_outcome_async }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	if (process.stdin.isTTY) hook_decision.report_no_payload('pretool:guard')
-	else hook_decision.write_outcome(await text(process.stdin), pretool_outcome)
+	else {
+		const raw_payload = await text(process.stdin)
+
+		hook_decision.load_environment_file()
+		hook_decision.emit_outcome(await pretool_outcome_async(raw_payload))
+	}
 }
 
-export { pretool_guard, pretool_outcome }
+export { pretool_guard, pretool_outcome, pretool_outcome_async }

@@ -158,7 +158,7 @@ and it was filed anyway, because **discarding it was the only alternative on off
 
 - **The destination is `docs/observations.md` in the repository the observation is about** — the same
   repository the Issue would have been filed into. **The count and the append are both run in that
-  repository's checkout**, resolved the way §2c resolves any cross-repository target, and the file is
+  repository's checkout**, resolved the way §2c (`target-repository.md`) resolves any cross-repository target, and the file is
   created on the first append where that repository has none. **The subject decides, never the
   working directory**: an observation about this package's own orchestration, seen while a run is
   inside a repository that consumes it, is recorded here rather than there — the append follows the
@@ -292,6 +292,15 @@ it is counted rather than judged:
 **A third and later sighting appends a line and files nothing more.** The Issue from the second one
 is already open, and `pnpm josh issue:scout` is what finds it; the extra lines are evidence for that
 Issue, not new ones.
+
+### A user-found bug is recorded by its kind of miss (user-found)
+
+**A user-reported bug is fixed or filed as always; this records the *kind of miss* alongside so the
+category never recurs as a first sighting** (joshuafolkken/kit#2246). The key is the **category of
+oversight** — `k:missed-case-worktree` — so a second bug of the same kind counts against the first.
+**Depth `d1`, never `d0`**: the *kind of miss* is what a run fails to enumerate, which the table puts
+at depth 1. Nothing else changes; the `<what>` field leads with `User-reported:`, and no second
+ledger, format or threshold is added.
 
 ### A delegated child does not take this route
 

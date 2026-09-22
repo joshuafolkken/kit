@@ -1,7 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { epic_busy } from '#scripts/epic/epic-busy'
+import { git_gh_command } from '#scripts/git/git-gh-command'
+import { run_carry } from '#scripts/run/run-carry'
+import { lane_await } from './lane-await'
 import { lane_close, type CloseOutcome, type SweepOutcome } from './lane-close'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
+import { lane_occupancy } from './lane-occupancy'
 import { lane_open, type OpenOutcome } from './lane-open'
 import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -32,6 +37,7 @@ const USAGE = [
 	'       josh lane:prune',
 	'       josh lane:output <issue-number> [<path>]',
 	'       josh lane:dispatch <issue-number>',
+	'       josh lane:await <issue-number> ...',
 ].join('\n')
 
 type Handler = (rest: ReadonlyArray<string>) => Promise<number>
@@ -40,6 +46,23 @@ function report_usage(): number {
 	console.error(USAGE)
 
 	return FAILURE_EXIT_CODE
+}
+
+// Read the carry record and refuse if this session has already handed off its budget via `--cut`.
+// A cut session must not open new lanes or dispatch new children — the successor owns the budget
+// (joshuafolkken/kit#2114).
+async function guard_cut_session(): Promise<string | undefined> {
+	const directory = await run_carry.repository_directory()
+
+	if (directory === undefined) return undefined
+
+	const read = run_carry.read_carry(run_carry.carry_path(directory))
+
+	if ((read.kind !== 'carried' && read.kind !== 'expired') || read.carry.is_handed_off !== true) {
+		return undefined
+	}
+
+	return run_carry.count_refused_message(read.carry)
 }
 
 function parse_lane_issue(value: string | undefined): string | undefined {
@@ -133,6 +156,14 @@ async function open_command(rest: ReadonlyArray<string>): Promise<number> {
 
 	if (issue === undefined) return report_usage()
 
+	const refused = await guard_cut_session()
+
+	if (refused !== undefined) {
+		console.error(refused)
+
+		return FAILURE_EXIT_CODE
+	}
+
 	return report_open(await lane_open.open_lane(issue))
 }
 
@@ -148,10 +179,64 @@ async function close_command(rest: ReadonlyArray<string>): Promise<number> {
 	return report_close(await lane_close.close_lane(issue))
 }
 
+const OCCUPANCY_UNREADABLE =
+	'Could not read the `in-progress` listing, so the lane/label difference was not checked — that is not "everything agrees"; check `gh auth status`.'
+
+// The `in-progress` issues this repository shows running, read the way `epic:next` reads lane
+// occupancy — never rebuilt (joshuafolkken/kit#2235). A read that could not see the whole listing is
+// `undefined`, so the difference is skipped rather than computed against a set known to be partial.
+async function to_holder_numbers(repo: string): Promise<ReadonlyArray<number> | undefined> {
+	const read = await epic_busy.read_repository(repo)
+	if (read.kind === 'idle') return []
+
+	return read.kind === 'busy' ? read.issues.map((issue) => issue.number) : undefined
+}
+
+async function read_in_progress(): Promise<ReadonlyArray<number> | undefined> {
+	try {
+		const repo = await git_gh_command.repo_get_name_with_owner()
+
+		return repo === undefined ? undefined : await to_holder_numbers(repo)
+	} catch {
+		return undefined
+	}
+}
+
+// A stranded lane's work tree is gone, so it holds no issue: it counts as no lane rather than a live
+// one, which is what turns its surviving `in-progress` label into a `stopped` anomaly.
+function live_lane_issues(lanes: ReadonlyArray<LaneInfo>): Array<number> {
+	return lanes.filter((lane) => !lane.is_stranded).map((lane) => Number(lane.issue))
+}
+
+// The lane/label difference, printed to standard error beside the listing. Wrapped so a GitHub read
+// that fails skips only this section — `lane:list`'s job is to list the lanes it already read.
+async function report_occupancy(lanes: ReadonlyArray<LaneInfo>): Promise<void> {
+	const in_progress = await read_in_progress()
+
+	if (in_progress === undefined) {
+		console.error(OCCUPANCY_UNREADABLE)
+
+		return
+	}
+
+	const report = lane_occupancy.classify(in_progress, {
+		kind: 'lanes',
+		issues: live_lane_issues(lanes),
+	})
+	const described = lane_occupancy.describe(report)
+
+	if (described !== undefined) console.error(described)
+}
+
 async function list_command(rest: ReadonlyArray<string>): Promise<number> {
 	if (rest.length > 0) return report_usage()
 
-	return report_lanes(await lane_registry.list_lanes())
+	const lanes = await lane_registry.list_lanes()
+	const code = report_lanes(lanes)
+
+	await report_occupancy(lanes)
+
+	return code
 }
 
 async function prune_command(rest: ReadonlyArray<string>): Promise<number> {
@@ -235,7 +320,37 @@ async function dispatch_command(rest: ReadonlyArray<string>): Promise<number> {
 
 	if (issue === undefined) return report_usage()
 
+	const refused = await guard_cut_session()
+
+	if (refused !== undefined) {
+		console.error(refused)
+
+		return FAILURE_EXIT_CODE
+	}
+
 	return await report_dispatch(await lane_dispatch.dispatch_child(issue), issue)
+}
+
+// Each valid argument is an issue number; any non-number stops parsing and triggers usage.
+function parse_issues(rest: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
+	if (rest.length === 0) return undefined
+	const issues = rest.filter((value) => lane_await.ISSUE_PATTERN.test(value))
+
+	return issues.length === rest.length ? issues : undefined
+}
+
+// The completed issue number goes to standard output so `N=$(pnpm josh lane:await ...)` captures
+// which child finished without parsing stderr.
+async function await_command(rest: ReadonlyArray<string>): Promise<number> {
+	const issues = parse_issues(rest)
+
+	if (issues === undefined) return report_usage()
+
+	const completed = await lane_await.wait_for_any(issues)
+
+	console.info(completed)
+
+	return SUCCESS_EXIT_CODE
 }
 
 const HANDLERS: Record<string, Handler> = {
@@ -245,6 +360,7 @@ const HANDLERS: Record<string, Handler> = {
 	prune: prune_command,
 	output: output_command,
 	dispatch: dispatch_command,
+	await: await_command,
 }
 
 async function dispatch(argv: ReadonlyArray<string>): Promise<number> {

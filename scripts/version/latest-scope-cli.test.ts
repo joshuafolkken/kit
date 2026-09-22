@@ -11,6 +11,10 @@ const RECENT = { ran_at: '2026-09-02T10:00:00.000Z' } satisfies LatestStamp
 const OLD = { ran_at: '2026-09-01T16:00:00.000Z' } satisfies LatestStamp
 const STAMP_PATH = '/var/records/josh-latest-stamp-test.json'
 const WINDOW_TEXT = '12.0h window'
+// The stamp-based tests read the primary-checkout path so they are deterministic wherever they run —
+// the suite itself runs from a lane during `pnpm josh gate` (joshuafolkken/kit#2135).
+const PRIMARY_CWD = '/Users/dev/kit'
+const LANE_CWD = '/Users/dev/.kit-lanes/2135'
 
 interface Captured {
 	stdout: Array<string>
@@ -36,6 +40,7 @@ function capture(): Captured {
 beforeEach(() => {
 	vi.useFakeTimers()
 	vi.setSystemTime(NOW)
+	vi.spyOn(process, 'cwd').mockReturnValue(PRIMARY_CWD)
 })
 
 afterEach(() => {
@@ -74,6 +79,26 @@ describe('latest_scope_cli.decide', () => {
 
 		expect(reason).toContain('2.0h ago')
 		expect(reason).toContain(WINDOW_TEXT)
+	})
+})
+
+// joshuafolkken/kit#2135: inside a lane the answer is `skip` whatever the stamp says, so a fresh lane
+// with no record is not dragged into a dependency update the primary checkout owns.
+describe('latest_scope_cli.scope_decision inside a lane', () => {
+	it('skips whatever the stamp would answer, and never reads it', () => {
+		vi.spyOn(process, 'cwd').mockReturnValue(LANE_CWD)
+		const read = vi.spyOn(latest_stamp, 'read_stamp').mockReturnValue(undefined)
+
+		const decision = latest_scope_cli.scope_decision()
+
+		expect(decision.scope).toBe(latest_scope_cli.SKIPPED_SCOPE)
+		expect(read).not.toHaveBeenCalled()
+	})
+
+	it('still requires the update in the primary checkout with no record', () => {
+		vi.spyOn(latest_stamp, 'read_stamp').mockReturnValue(undefined)
+
+		expect(latest_scope_cli.scope_decision().scope).toBe(latest_scope_cli.REQUIRED_SCOPE)
 	})
 })
 

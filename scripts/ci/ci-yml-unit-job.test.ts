@@ -25,6 +25,7 @@ import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fi
 const RUNTIME = ci_yml_fixture.RUNTIME_CI_YML
 const STATIC_JOB = 'static-checks'
 const UNIT_JOB = 'unit'
+const REUSE_JOB = 'reuse-pr-checks'
 const AGGREGATE_JOB = 'checks'
 const NOTIFY_JOB = 'notify-auto-tag'
 // The name the branch ruleset's required status check is matched against. It is a repository
@@ -69,7 +70,11 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 	})
 
 	it('answers for both halves of the gate', () => {
-		expect(ci_yml_fixture.job_needs(runtime_job(AGGREGATE_JOB))).toEqual([STATIC_JOB, UNIT_JOB])
+		expect(ci_yml_fixture.job_needs(runtime_job(AGGREGATE_JOB))).toEqual([
+			REUSE_JOB,
+			STATIC_JOB,
+			UNIT_JOB,
+		])
 	})
 
 	// Without this the job is skipped exactly when a dependency fails, and a skipped check passes.
@@ -86,11 +91,13 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 		expect(declared).toContain(`\${{ needs.${job_name}.result }}`)
 	})
 
-	// `success` is the only `needs.*.result` value that may pass. Asserted as the compared literal so
-	// a script rewritten to accept `skipped` — the value that made joshuafolkken/kit#991 a merge
-	// rather than a red run — fails here.
-	it('accepts no result but success, and exits non-zero otherwise', () => {
+	// A skipped half passes only beside the positive proof output. The explicit comparisons keep an
+	// unrelated skip — the shape that made joshuafolkken/kit#991 merge — from becoming success.
+	it('accepts fresh success or a proven reuse, and exits non-zero otherwise', () => {
 		expect(aggregate_script()).toContain("= 'success' ]")
+		expect(aggregate_script()).toContain("REUSE_RESULT}\" = 'true'")
+		expect(aggregate_script()).toContain("STATIC_RESULT}\" = 'skipped'")
+		expect(aggregate_script()).toContain("UNIT_RESULT}\" = 'skipped'")
 		expect(aggregate_script()).toContain('exit 1')
 	})
 

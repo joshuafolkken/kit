@@ -100,5 +100,5 @@ const git_notify = {
 	build_completion_comment_body,
 }
 
-export type { GitNotifyConfig, NotifyTarget }
+export type { GitNotifyConfig }
 export { git_notify }

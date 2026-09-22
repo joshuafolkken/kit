@@ -65,6 +65,17 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 			"the parent reads the filed Issue from GitHub with `pnpm josh issue:state <new>`, not the unit's summary; a follow-up reported filed but not created is still absent, the way `epic-child`'s reported-done-but-not-merged child is still open. The finding text came from the parent and `issue:scout` / `epic:bundle` are deterministic, so the unit's work is the mechanical execution `issue:state` confirms",
 	},
 	{
+		name: 'implementation-unit',
+		// The Step 0 change list already decided *what* to change — that design stays in the main line,
+		// which is why `design` is rejected below. What is delegated is the *writing* of one unit of that
+		// list, and only a unit whose files are disjoint from every other dispatched unit: two subagents
+		// editing one file in parallel race on it. `pnpm josh fanout` confirms that disjointness
+		// mechanically, so the split is read off the file sets rather than judged (joshuafolkken/kit#2345).
+		does: 'implement one file-disjoint unit of the Step 0 change list in an isolated subagent — the files it edits shared with no other dispatched unit, confirmed by `pnpm josh fanout` — and return the edited files, never a summary standing in for the diff; the main line keeps integration and the verification gate. Units that share a file, or an Issue that will not split, stay serial',
+		verifier:
+			"the parent runs the whole integrated change through `pnpm josh gate` and a `/code-review` subagent it would run anyway — a unit's mistake fails the same gate and review a serial edit passes through, so delegating writes nothing the backstop does not already catch, and the `pnpm josh fanout` disjointness removes the one failure parallelism adds, two units colliding on a file",
+	},
+	{
 		name: 'survey',
 		does: 'read across many files and report where something appears — every reference to a symbol, which documents carry a marker',
 		verifier:

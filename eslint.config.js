@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { create_base_config } from './eslint/base.js'
 import { code_quality_rules } from './eslint/rules/code-quality.js'
+import { english_only_prose_plugin } from './eslint/rules/english-only-prose.js'
 import {
 	CENTRALIZED_TESTS_DIRECTORY_ENTRY,
 	CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
@@ -73,5 +74,17 @@ export default [
 	{
 		files: CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
 		rules: extend_restricted_syntax(code_quality_rules, CENTRALIZED_TESTS_DIRECTORY_ENTRY),
+	},
+	// Issue #2124: enforce the English-only Content rule for comments and test titles. It is wired here
+	// rather than in the distributed base config because it is kit's own convention; the off block that
+	// follows is the CLAUDE.md exception for `eslint/rules/`, where a rule module may explain its
+	// rationale in Japanese. The off block comes last so nothing re-enables it for those files.
+	{
+		plugins: { kit: english_only_prose_plugin },
+		rules: { 'kit/english-only-prose': 'error' },
+	},
+	{
+		files: ['eslint/rules/**'],
+		rules: { 'kit/english-only-prose': 'off' },
 	},
 ]

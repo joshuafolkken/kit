@@ -20,7 +20,7 @@ backlogrun → which calls epic:next each round
 ```
 
 Front-loading every `needs-decision` in one pass is `backlogrun`'s job, not a command of this skill:
-`backlogrun.md` → "Resolve what the plan can resolve, before starting". A `backlogrun #E --only`'s
+`backlogrun-steps.md` → "Resolve what the plan can resolve, before starting". A `backlogrun #E --only`'s
 pre-check is `epic:audit`.
 
 ## Front-loading the decisions — now `backlogrun`'s
@@ -28,7 +28,7 @@ pre-check is `epic:audit`.
 `epic:plan` once printed every child as one JSON document so a person could answer every
 `needs-decision` in one batch before the run started. That front-loading is retired as a command of
 its own (joshuafolkken/kit#1965): **`backlogrun` does it at the start of every run**, and
-`backlogrun.md` → "Resolve what the plan can resolve, before starting" is its single source. A
+`backlogrun-steps.md` → "Resolve what the plan can resolve, before starting" is its single source. A
 `backlogrun #E --only`'s only pre-check is `epic:audit` below, run without being asked.
 
 **A decision is still recorded in two places, and one without the other loses half of it.** The epic's
@@ -41,7 +41,7 @@ the label-clearing rule itself is `backlogrun-park.md` → "park and continue".
 - **A decision about a child the epic already tracks** cannot use that flag: an insertion with nothing
   to add is refused outright. Until joshuafolkken/kit#1162 adds an entry point for already-tracked
   children, write the child comments with
-  `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` on each child the answer
+  `pnpm josh issue:comment <N> --body-file <path>` on each child the answer
   applies to, and **say in the report that the epic's `## Decisions` entry is still pending** — the
   entry going unwritten is how two of the four most recent placements in joshuafolkken/kit#1262 ended
   up with a child comment and nothing on the epic.

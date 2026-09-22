@@ -42,8 +42,7 @@ function add_entry(
 ): void {
 	if (origin_url === undefined) return
 	const identity = repo_origin.parse_origin_url(origin_url)
-	if (identity === undefined) return
-	if (!is_same_owner(identity, current_owner)) return
+	if (identity === undefined || !is_same_owner(identity, current_owner)) return
 
 	target.set(repo_origin.format_identity(identity), repository_path)
 }

@@ -22,6 +22,18 @@ const CONTEXT = {
 	owner: run_carry.NO_OWNER,
 }
 
+// A carry record whose budget has been handed off to a successor (joshuafolkken/kit#2114).
+const HANDED_OFF_CARRY = {
+	invocation: 'backlogrun #1 #2',
+	started_at: new Date().toISOString(),
+	merged: 0,
+	filed: 0,
+	cuts: 1,
+	failures: 0,
+	outages: 0,
+	is_handed_off: true as const,
+}
+
 beforeEach(() => {
 	add_label_mock.mockReset()
 	remove_label_mock.mockReset().mockResolvedValue(undefined)
@@ -35,6 +47,56 @@ describe('run_merge_steps.do_failed — parking is part of the result', () => {
 		expect(await run_merge_steps.do_failed(CONTEXT)).toStrictEqual({
 			carry: undefined,
 			is_parked: false,
+			is_refused: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#2240: an API-outage child is left re-dispatchable — its `in-progress` is dropped so
+// the next offer can hand it back, but it is never parked with `needs-decision`.
+describe('run_merge_steps.do_outage — re-dispatchable, never parked', () => {
+	it('drops in-progress but does not add needs-decision', async () => {
+		await run_merge_steps.do_outage(CONTEXT)
+
+		expect(remove_label_mock).toHaveBeenCalledTimes(1)
+		expect(add_label_mock).not.toHaveBeenCalled()
+	})
+
+	it('returns is_refused and skips label writes when the record is handed off', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
+
+		const result = await run_merge_steps.do_outage(CONTEXT)
+
+		expect(result.is_refused).toBe(true)
+		expect(remove_label_mock).not.toHaveBeenCalled()
+		expect(add_label_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () => {
+	beforeEach(() => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
+	})
+
+	it('do_merged: returns the carry and skips git ops when the record is handed off', async () => {
+		const result = await run_merge_steps.do_merged(CONTEXT)
+
+		expect(result).toStrictEqual(HANDED_OFF_CARRY)
+	})
+
+	it('do_failed: returns is_refused and skips label writes when the record is handed off', async () => {
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.is_refused).toBe(true)
+		expect(add_label_mock).not.toHaveBeenCalled()
+		expect(remove_label_mock).not.toHaveBeenCalled()
+	})
+
+	it('do_merged: refuses an expired record whose budget was handed off', async () => {
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'expired', carry: HANDED_OFF_CARRY })
+
+		expect(await run_merge_steps.do_merged(CONTEXT)).toStrictEqual(HANDED_OFF_CARRY)
 	})
 })

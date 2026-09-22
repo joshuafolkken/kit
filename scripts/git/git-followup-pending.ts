@@ -93,4 +93,3 @@ async function pending_release_line(options: PendingLineOptions): Promise<string
 const git_followup_pending = { MERGE_PENDING_NOTE, pending_release_line, read_pending }
 
 export { git_followup_pending }
-export type { PendingLineOptions, PendingReadOptions }

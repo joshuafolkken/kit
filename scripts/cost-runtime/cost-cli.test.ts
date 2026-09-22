@@ -140,8 +140,7 @@ describe('cost_cli.run --cut provider source', () => {
 		[CONTEXT_CUT_THRESHOLD + 1, 'over'],
 	])('uses Codex usage %i for the OpenAI cut boundary', (tokens, verdict) => {
 		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
-			request_count: 1,
-			billed_input_tokens: tokens,
+			billed_input_per_request: [tokens],
 		})
 		const claude = vi.spyOn(cost_corpus, 'load_corpus')
 
@@ -156,5 +155,39 @@ describe('cost_cli.run --cut provider source', () => {
 
 		expect(cost_cli.run(['--cut'], CWD, ANTHROPIC_ENV)).toBe(0)
 		expect(codex).not.toHaveBeenCalled()
+	})
+})
+
+// The read-only verdict `run:status` bundles: the same `--cut` decision as a value, printing nothing
+// (joshuafolkken/kit#2165). It shares `measure` and the shared threshold with `run --cut`, so the two
+// cannot drift on which session they price or where the boundary is.
+describe('cost_cli.session_verdict', () => {
+	it.each([
+		[CONTEXT_CUT_THRESHOLD - 1, 'under'],
+		[CONTEXT_CUT_THRESHOLD, 'under'],
+		[CONTEXT_CUT_THRESHOLD + 1, 'over'],
+	])('answers %i tokens as %s at the shared boundary', (tokens, verdict) => {
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
+			billed_input_per_request: [tokens],
+		})
+
+		expect(cost_cli.session_verdict(CWD, OPENAI_ENV)).toBe(verdict)
+		expect(stdout().trim()).toBe('')
+	})
+
+	it('answers unmeasurable when no transcript can be priced', () => {
+		expect(cost_cli.session_verdict(CWD, ANTHROPIC_ENV)).toBe(cost_cli.UNMEASURABLE_VERDICT)
+	})
+
+	it('answers unmeasurable when the session has no requests', () => {
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
+			billed_input_per_request: [],
+		})
+
+		expect(cost_cli.session_verdict(CWD, OPENAI_ENV)).toBe(cost_cli.UNMEASURABLE_VERDICT)
+	})
+
+	it('answers unmeasurable when no provider is resolved', () => {
+		expect(cost_cli.session_verdict(CWD, {})).toBe(cost_cli.UNMEASURABLE_VERDICT)
 	})
 })

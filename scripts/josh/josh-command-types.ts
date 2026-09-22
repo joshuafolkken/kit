@@ -15,11 +15,40 @@ const OPTIONAL_ENV_FILE_FLAGS: ReadonlyArray<string> = [`--env-file-if-exists=${
 type CommandCategory =
 	'Development' | 'Project' | 'Workflow' | 'Versioning' | 'Maintenance' | 'Git hooks' | 'AI tools'
 
+// The two vocabularies are runtime tuples the types are derived from, rather than bare unions. A
+// union exists only at compile time, so the completeness test and the generated reference
+// (joshuafolkken/kit#2064) would each have to restate the values to check or render them — two
+// copies that drift apart silently. Deriving the type from the tuple keeps one definition.
+const COMMAND_AUDIENCES = ['developer', 'maintainer', 'automation'] as const
+const COMMAND_SIDE_EFFECTS = [
+	'none',
+	'files',
+	'git',
+	'network',
+	'processes',
+	'notifications',
+	'release',
+] as const
+
+type CommandAudience = (typeof COMMAND_AUDIENCES)[number]
+type CommandSideEffect = (typeof COMMAND_SIDE_EFFECTS)[number]
+// The synopsis is a claim about the command's own parser, not a summary of its description, and
+// `josh-command-reference.test.ts` checks it against that parser. Three rules keep it honest: an
+// empty string means the command takes no arguments at all — never "it takes some we did not list";
+// a flag that only reformats output, `--json` among them, is named like any other; and a positional
+// appears only where the script actually reads one.
+type CommandReference = readonly [
+	arguments_synopsis: string,
+	audience: CommandAudience,
+	side_effects: ReadonlyArray<CommandSideEffect>,
+]
+
 interface CommandEntry {
 	script?: string
 	shell?: ReadonlyArray<string>
 	description: string
 	category: CommandCategory
+	reference: CommandReference
 	tsx_arguments?: ReadonlyArray<string>
 	default_script_arguments?: ReadonlyArray<string>
 	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this
@@ -176,6 +205,8 @@ export type { CommandCategory, CommandEntry, GateCacheSpec }
 // stays private; the scoped lint cache is exported because #2060 shares its completed file between
 // worktrees, but it still never overlaps the gate's distinct cache location.
 export {
+	COMMAND_AUDIENCES,
+	COMMAND_SIDE_EFFECTS,
 	CSPELL_CACHE_FILE,
 	CSPELL_CACHE_FLAGS,
 	ESLINT_CACHE_FILE,

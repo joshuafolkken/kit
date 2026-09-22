@@ -37,10 +37,12 @@ function get_cause_message(cause: unknown): string | undefined {
 function display_error_details(cause: unknown): void {
 	const cause_message = get_cause_message(cause)
 
-	if (cause_message !== undefined && cause_message.length > 0) {
-		console.error('')
-		console.error('💡 Details:', cause_message)
+	if (cause_message === undefined || cause_message.length === 0) {
+		return
 	}
+
+	console.error('')
+	console.error('💡 Details:', cause_message)
 }
 
 function handle(error: unknown): void {

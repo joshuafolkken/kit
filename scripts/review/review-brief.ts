@@ -428,5 +428,4 @@ const review_brief = {
 	whole_change_target,
 }
 
-export type { BriefInput, BriefStamps, RoundTwoScope }
 export { review_brief }

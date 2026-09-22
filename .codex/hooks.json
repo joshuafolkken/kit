@@ -2,7 +2,7 @@
 	"hooks": {
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion",
 				"hooks": [
 					{
 						"type": "command",
@@ -51,6 +51,18 @@
 						"type": "command",
 						"command": "if [ -f dist/hooks/session-lang.js ]; then node dist/hooks/session-lang.js; else pnpm josh session:lang; fi",
 						"timeout": 10
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "if [ -f dist/hooks/stop-guard.js ]; then node dist/hooks/stop-guard.js; else pnpm josh stop:guard; fi",
+						"timeout": 20
 					}
 				]
 			}

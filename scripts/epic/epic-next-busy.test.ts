@@ -100,7 +100,7 @@ async function answer_for(
 	limit: number = ONE_LANE,
 	is_all_lanes = false,
 ): Promise<number> {
-	return await epic_next.report(views_of(children), { repo: REPO, limit, is_all_lanes })
+	return await epic_next.report(views_of(children), { repo: REPO, limit, is_all_lanes }, REPO)
 }
 
 function listing(numbers: ReadonlyArray<number>): string {
@@ -240,14 +240,14 @@ describe('josh epic:next --repo — verdicts that start nothing', () => {
 // for a reader to discover.
 describe('josh epic:next without --repo', () => {
 	it('says the per-repository exclusion was not consulted', async () => {
-		await epic_next.report(views_of([child(FIRST_CHILD)]), undefined)
+		await epic_next.report(views_of([child(FIRST_CHILD)]), undefined, REPO)
 
 		expect(stderr()).toContain(epic_next.UNCHECKED_EXCLUSION)
 		expect(issue_list).not.toHaveBeenCalled()
 	})
 
 	it('says nothing of the kind when there is no runnable child', async () => {
-		await epic_next.report(views_of([child(FIRST_CHILD, [IN_PROGRESS_LABEL])]), undefined)
+		await epic_next.report(views_of([child(FIRST_CHILD, [IN_PROGRESS_LABEL])]), undefined, REPO)
 
 		expect(stderr()).not.toContain(epic_next.UNCHECKED_EXCLUSION)
 	})

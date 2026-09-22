@@ -1,16 +1,35 @@
-import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
+import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_shell } from '#scripts/time-runtime/time-shell'
+import { bash_triggers } from './bash-triggers'
 import { early_heartbeat } from './early-heartbeat'
+import { file_body } from './file-body'
+import { filing_cap } from './filing-cap'
+import { gh_api } from './gh-api'
+import { git_force } from './git-force'
+import { implementation_cut } from './implementation-cut'
+import { issue_fold } from './issue-fold'
+import { issue_scout } from './issue-scout'
+import { josh_git_bare } from './josh-git-bare'
+import { lane_carry_conflict } from './lane-carry-conflict'
+import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
+import { lane_switch_main } from './lane-switch-main'
+import { oracle_consulted } from './oracle-consulted'
 import { piped_verification } from './piped-verification'
+import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
+import { raw_field_body } from './raw-field-body'
+import { rule_body_guard } from './rule-body-guard'
 import { run_tail } from './run-tail'
+import { setup_cut } from './setup-cut'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
+import { test_declared_commit } from './test-declared-commit'
+import { third_party_write } from './third-party-write'
+import { worktree_guard } from './worktree-guard'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
@@ -110,36 +129,11 @@ type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 
 const STAMP_PREFIX = 'josh-rule-guard-'
 
-// `gh issue create`, in any of the spellings a run reaches for.
-const ISSUE_CREATE_COMMAND = /\bgh\s+(?:\S+\s+)*?issue\s+create\b/u
-// `gh api …/issues` — the path segment has to *end* there, so a comment endpoint
-// (`…/issues/1524/comments`) and a listing under it are both left alone.
-const ISSUES_ENDPOINT = /repos\/[^\s'"]*\/issues(?=$|["'\s])/u
-// A title field is what separates the POST that files from the GET that lists: `gh api …/issues`
-// with no field is a listing, and a listing files nothing. **All four spellings**, `-F` included —
-// it is `--field`'s short form and reads as a different flag to a pattern that only knows `-f`.
-// A body passed with `--input <file>` carries the title inside the file and is not visible here;
-// that limit is recorded beside the non-`gh` one in `prompts/collaboration-workflow/rule-delivery.md`.
-const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
-
-function is_issue_filing(command: string): boolean {
-	if (ISSUE_CREATE_COMMAND.test(command)) return true
-
-	return ISSUES_ENDPOINT.test(command) && TITLE_FIELD.test(command)
-}
-
-// **Only `Bash`, and the omission is deliberate** (joshuafolkken/kit#1390): Claude Code denies one
-// call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself
-// not. Every rule enumerated here is therefore one whose binding moment is a shell call — so the
-// tool-name guard belongs to the enumeration rather than to each row, and a row states only what it
-// looks for in the command.
-function on_bash_command(is_match: (command: string) => boolean): (call: GuardedCall) => boolean {
-	return function is_trigger(call: GuardedCall): boolean {
-		if (call.name !== cost_blocks.BASH_TOOL) return false
-
-		return is_match(time_shell.bash_command(call.input))
-	}
-}
+// **`is_issue_filing` and `on_bash_command` moved to `bash-triggers.ts`** (joshuafolkken/kit#2119):
+// three rows now share the filing trigger — the WIP cap, the scout gate and the per-run filing cap —
+// and the last two live in their own modules, which could not import the enumeration back to reach a
+// private function of it. `on_bash_command` went with it because those modules build their own rows.
+const { is_issue_filing, on_bash_command } = bash_triggers
 
 // The whole of the WIP cap, in the shape a refusal can carry: the count, the refusal, the two
 // exemptions and the three tests that decide the second one. The three tests are spelled out rather
@@ -159,33 +153,22 @@ const WIP_CAP_REASON =
 // Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
 // view <N> …"` is read as the write it is rather than as the read it quotes. The cut itself is
 // `shell-segments.ts`, shared with the triggers that need the same one.
-// Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped.
-const GH_FLAGS = String.raw`(?:-{1,2}[\w-]+(?:[= ][^\s]+)?\s+)*`
-const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}issue\s+view\s`, 'u')
-const GH_API_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}api\s`, 'u')
+// Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped —
+// the same optional-flag prefix `gh-api.ts` skips in front of `api`, shared from there.
+const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${gh_api.GH_FLAGS}issue\s+view\s`, 'u')
 // `…/issues/<N>` — **one** Issue's body. The number has to end the path, so the listing
 // (`…/issues`) and every sub-resource under it (`…/issues/1319/comments`) are left alone.
 const ISSUE_BODY_PATH = /repos\/[^\s'"]*\/issues\/\d+(?=$|["'\s])/u
-// **A write to that path is not a read of it.** `gh api` sends POST as soon as any field flag
-// appears, and `kickoff` PATCHes `…/issues/<N>` to normalize a title and to fill a blank body — so
-// without this the delivery would be spent refusing a write, and the genuine body read later in the
-// same run would never be guarded.
-const API_METHOD = /(?:^|\s)(?:--method|-X)[= ]([A-Za-z]+)/u
-const API_FIELD = /(?:^|\s)(?:--raw-field|--field|--input|-F|-f)(?:[= ]|$)/u
+// **A write to that path is not a read of it**, which is why the body read below asks `gh_api.is_read`:
+// `gh api` sends POST as soon as any field flag appears, and `kickoff` PATCHes `…/issues/<N>` to
+// normalize a title and to fill a blank body — so without the read check the delivery would be spent
+// refusing a write, and the genuine body read later in the same run would never be guarded.
 // A segment that fetches comments: the flag, a `comments` field in a `--json` projection, or the
 // comments endpoint. The short `-c` is deliberately absent — it belongs to `wc`, `grep` and `sort`
 // far more often than to `gh`, and reading it as "comments included" silenced the rule on any line
 // that ended in a pipe. A run that types it pays one round trip instead.
 const FETCHES_COMMENTS = /--comments\b|--json\s[\w,]*\bcomments\b|\/comments\b/u
 const ISSUES_PATH = /repos\/[^\s'"]*\/issues\//u
-
-function is_api_read(segment: string): boolean {
-	const method = API_METHOD.exec(segment)?.[1]
-
-	if (method !== undefined) return method.toUpperCase() === 'GET'
-
-	return !API_FIELD.test(segment)
-}
 
 // A field projection — `--jq` for `gh api`, `--json` for `gh issue view` — whose value never names the
 // body. `gh api …/issues/<N> --jq '{state, labels}'` fetches the Issue only to read its state or its
@@ -198,9 +181,7 @@ const NAMES_THE_BODY = /\bbody\b/u
 function projects_away_body(segment: string): boolean {
 	const projection = FIELD_PROJECTION.exec(segment)
 
-	if (projection === null) return false
-
-	return !NAMES_THE_BODY.test(projection[1] ?? '')
+	return projection !== null && !NAMES_THE_BODY.test(projection[1] ?? '')
 }
 
 function is_body_read_segment(segment: string): boolean {
@@ -208,7 +189,7 @@ function is_body_read_segment(segment: string): boolean {
 
 	if (ISSUE_VIEW_COMMAND.test(segment)) return true
 
-	return GH_API_COMMAND.test(segment) && ISSUE_BODY_PATH.test(segment) && is_api_read(segment)
+	return gh_api.is_gh_api(segment) && ISSUE_BODY_PATH.test(segment) && gh_api.is_read(segment)
 }
 
 // **An Issue's comments, not just any comments.** Batching pushes a run to fetch the body and the
@@ -219,7 +200,7 @@ function fetches_issue_comments(segment: string): boolean {
 	if (!FETCHES_COMMENTS.test(segment)) return false
 
 	return (
-		ISSUE_VIEW_COMMAND.test(segment) || (GH_API_COMMAND.test(segment) && ISSUES_PATH.test(segment))
+		ISSUE_VIEW_COMMAND.test(segment) || (gh_api.is_gh_api(segment) && ISSUES_PATH.test(segment))
 	)
 }
 
@@ -257,24 +238,10 @@ const ISSUE_COMMENTS_REASON =
 	'fires once per run and cannot repeat on the call in hand.'
 
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
-// the value — is `shell-body-trigger.ts`, beside its own cases. A row states its trigger and its
-// text; a model of zsh quoting is more than a row.
-const { carries_a_body, is_shell_evaluated_body, keeps_body_safe } = shell_body_trigger
-
-// The instruction in the shape a refusal can carry: what the shell is about to do, the safe
-// spellings, and the reissue sentence every delivery needs. The damage is named because it is the
-// half that reads as unbelievable — the substituted text is *executed*, not discarded.
-const SHELL_BODY_REASON =
-	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
-	'contains a backtick or a `$`. The shell evaluates both before the command runs, so the text is ' +
-	'executed rather than merely mangled — joshuafolkken/kit#1198 recorded a PR comment whose own ' +
-	"words ran as git commands and switched a lane's work tree onto main. Write the body to a file " +
-	'and pass it by path: `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` (a ' +
-	'PR comment is an issue comment), `pnpm josh followup --notify-message-file <path>`, `pnpm josh ' +
-	"notify --body-file <path>`, and `--body-file <path>` wherever a command offers it. `$'…'` " +
-	'quoting is the other safe form and is unchanged. The rule and what the trigger cannot see are in ' +
-	'`prompts/collaboration-workflow/shell-body.md`. Reissue this call once the body is in a file — ' +
-	'it fires once per run and cannot repeat on the call in hand.'
+// the value — is `shell-body-trigger.ts`, beside its own cases, as is the refusal text. A row states
+// its trigger and its text; a model of zsh quoting is more than a row.
+const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_safe } =
+	shell_body_trigger
 
 // **Keeping the WIP cap is counting the open Issues**, which is the one act the rule asks for before
 // a filing.
@@ -309,32 +276,41 @@ function reads_issue_comments(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => fetches_issue_comments(segment))
 }
 
-const ASKS_ABOUT_THE_CUT = on_bash_command(pre_gate_cut.asks_about_the_cut)
-const CLAIMS_THE_HOLD = on_bash_command(pre_gate_cut.claims_the_hold)
-
 // **The occasion the pre-gate cut governs, in the one shape that separates a cut run's two halves**
 // (joshuafolkken/kit#1867). Asking about the cut is what a lane child does whatever it goes on to do;
 // claiming the working tree is what only the process on the near side of the boundary does, because
 // the `resume` verdict tells its counterpart to skip that claim. A run doing both reached the
 // boundary; a run that asked without claiming is the session the cut produced, which had no cut of
-// its own to take and belongs in no denominator.
-function reaches_the_pre_gate_boundary(
-	call: GuardedCall,
-	_turn: ReadonlyArray<GuardedCall>,
-	run: ReadonlyArray<GuardedCall>,
-): boolean {
-	if (!ASKS_ABOUT_THE_CUT(call)) return false
-
-	return run.some((issued) => CLAIMS_THE_HOLD(issued))
-}
-
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
+	// **Listed first, ahead of the filing trigger it overlaps** (joshuafolkken/kit#2122). A `gh api`
+	// that files an Issue into a repository we do not own trips both this row and `wip-cap` /
+	// `issue-scout` / `filing-cap` — but the backlog count, the scout and the per-run cap are all about
+	// filing into *our own* backlog, so on a third-party target the right answer is to stop the write
+	// entirely rather than to count anything. Placing it first means a third-party write is refused
+	// before any of those speak; on a first-party filing it is silent (the owners match), so `wip-cap`
+	// still speaks first, exactly as before. It fires on every occurrence (`git-force.ts`).
+	third_party_write.ROW,
 	{
 		id: 'wip-cap',
 		is_trigger: on_bash_command(is_issue_filing),
 		reason: WIP_CAP_REASON,
 		keeps: on_bash_command(counts_open_issues),
 	},
+	// **Three rows share the filing trigger** (joshuafolkken/kit#2119), listed after `wip-cap` so the
+	// backlog count still speaks first: `issue-scout` refuses a filing the run has not scouted (once per
+	// run, stood down once the scout is on the tail), and `filing-cap` refuses every filing past the
+	// per-run ceiling. Each is a real instance of the admissible overlap the comment on `delivery`
+	// describes — the losing rule's delivery is still correct one reissue later — so a scout-less,
+	// over-cap filing is delivered `wip-cap`, then `issue-scout`, then `filing-cap` across its reissues.
+	issue_scout.ROW,
+	filing_cap.ROW,
+	// **`issue-fold` shares the same filing trigger** (joshuafolkken/kit#2213), listed after
+	// `filing-cap`: it refuses a *second* filing the run has not folded, once per run, stood down off
+	// the tail when the run has already folded or has filed nothing earlier. It is another instance of
+	// the admissible overlap — the losing rule's delivery is still correct one reissue later — so a
+	// scout-less, unfolded, over-cap second filing is delivered `wip-cap`, then `issue-scout`, then
+	// `filing-cap`, then `issue-fold` across its reissues.
+	issue_fold.ROW,
 	{
 		id: 'issue-comments',
 		is_trigger: on_bash_command(is_body_only_issue_read),
@@ -349,6 +325,13 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(keeps_body_safe),
 		reaches: on_bash_command(carries_a_body),
 	},
+	// **The sibling of `shell-body`, one call further along** (joshuafolkken/kit#2304). `shell-body`
+	// refuses a body passed inline so the shell evaluates it; this refuses a body passed by path with
+	// the raw field flag (`-f` / `--raw-field body=@<path>`), which posts the literal `@<path>`. It
+	// claims no command any row above does — `shell-body` triggers on a backtick or `$`, which the
+	// `@<path>` misfire carries neither, and `is_issue_filing` leaves the comment endpoint alone — so
+	// the exactly-one-rule invariant over its fixtures holds. It fires on every occurrence (`git-force.ts`).
+	raw_field_body.ROW,
 	{
 		id: 'piped-verification',
 		is_trigger: on_bash_command(piped_verification.is_masked_verification),
@@ -364,6 +347,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		keeps: on_bash_command(early_heartbeat.is_progress_watch),
 		reaches: on_bash_command(early_heartbeat.waits_for_progress),
 	},
+	// **Listed before `run-tail`, the one row it deliberately overlaps** (joshuafolkken/kit#2118). A
+	// foreground `pnpm josh git -y` with no test beside the change is claimed by both: `test-declared`
+	// decides whether the commit should happen at all, so it is listed first, exactly as `wip-cap`
+	// precedes `shell-body` for deciding whether an Issue should exist. Nothing is lost by `run-tail`
+	// losing the race — the stamps are keyed per `id`, so the reissued push is delivered `run-tail`,
+	// which is asserted rather than assumed. The overlap only arises in a real checkout where the
+	// verdict is `required`; in the hermetic non-repo suite the git read fails to `exempt`, so
+	// `test-declared` claims nothing and the "exactly one rule" invariant over `run-tail`'s fixture holds.
+	test_declared_commit.ROW,
 	// **The one row whose trigger reads a field of the input beside the command**, so it supplies its
 	// own tool-name check rather than going through `on_bash_command`: a push step already issued with
 	// `run_in_background` is the rule obeyed, and refusing it would charge a run for doing the right
@@ -412,7 +404,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate),
 		reason: pre_gate_cut.PRE_GATE_CUT_REASON,
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
-		reaches: reaches_the_pre_gate_boundary,
+		reaches: pre_gate_cut.reaches_the_pre_gate_boundary,
 	},
 	// **The second row whose trigger consults the world beside the command** (joshuafolkken/kit#2034):
 	// "is this a dispatched lane child" is the dispatch mark against this checkout's own issue, read
@@ -434,6 +426,111 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: lane_park.LANE_PARK_REASON,
 		keeps: on_bash_command(lane_park.records_the_park),
 	},
+	// **joshuafolkken/kit#2034's rule, one tool-call earlier** (joshuafolkken/kit#2201). `lane-park`
+	// fires on the `confirmation` notify a routed child reaches; a child that reaches for
+	// `AskUserQuestion` never gets there, because the harness ends its turn at the refused ask. This
+	// row's trigger is that ask, so the refusal becomes an instruction — park the question — instead of
+	// the child's death. Its trigger reads the input's tool name and consults the dispatch mark, like
+	// `lane-park`, and shares no command with any Bash row, so it claims no `gh` / `git` / `josh` call.
+	// It fires on every occurrence (`decide` returns true), the disposition `git-force.ts` takes: an
+	// interactive ask must never succeed in a child, and the route is always the park, never a reissue.
+	lane_interactive_ask.ROW,
+	// **The parent budget commands a lane child must never run** (joshuafolkken/kit#2267). A dispatched
+	// child that ran `pnpm josh run:merge` read its `busy` as a competing session and parked its Issue
+	// unimplemented — but the live carry record is the parent that launched it, never a competitor. This
+	// row refuses `run:merge` / `run:carry` in a lane child and hands back the mechanical branch: the
+	// record is the parent's, so continue implementing rather than park or ask. Its trigger claims a
+	// `josh` subcommand no other row does (the filing rows are `gh`, `run-tail` is `git push`), so it
+	// overlaps nothing. It fires on every occurrence (`decide` returns true): a child must never run
+	// these, and the route is always "continue", never a reissue (`git-force.ts`).
+	lane_carry_conflict.ROW,
+	// **The `git switch main` a lane child can never succeed at** (joshuafolkken/kit#2313), the fifth of
+	// the "always fails" misfires joshuafolkken/kit#2297 catalogued. A lane is a linked work tree and the
+	// primary checkout holds the default branch, so a child's `git switch main` fails structurally
+	// (`already used by worktree`); this refuses it before it fails and hands back the next command —
+	// skip the step, `pnpm josh main:merge` brings the default in during the gate. Its trigger reads the
+	// dispatch mark and the lane branch like `lane-carry-conflict`, and claims a `git switch` no row
+	// above matches — `git-force` is `git push` / `git branch`, `worktree-mutation` is `git checkout --`
+	// / `restore` / `stash` — so no two rows claim one command. It fires on every occurrence (`decide`
+	// returns true): a child must never run this, and the route is always "continue" (`git-force.ts`).
+	lane_switch_main.ROW,
+	// **A `pnpm josh git` with no `-y` cannot succeed from an agent** (joshuafolkken/kit#2297). It
+	// prompts to confirm the staging, the no-TTY prompt cancels, and the run reissues with `-y` after
+	// throwing away the time it took to fail. This row refuses the bare call and hands back the `-y`
+	// form. It is disjoint from `run-tail` by the flag — that row requires `-y`, this refuses its
+	// absence — so no two rows claim one command. It fires on every occurrence (`decide` returns true):
+	// a bare call wastes the same time each time, so the route is always the `-y` reissue
+	// (`git-force.ts`).
+	josh_git_bare.ROW,
+	// **The three Bash-string gaps the deny glob cannot express** (joshuafolkken/kit#2120), each reading
+	// the command's argv rather than a literal a glob keys on. They share no trigger with any row above —
+	// force/delete is `git push` / `git branch`, the worktree change is `git checkout` / `restore` /
+	// `stash`, and the file body is a heredoc / `node -e` / `perl -i` — so no two rows claim one command,
+	// which `delivered-rules-bash.test.ts` pins. Each declares `decide` returning true: a destructive or
+	// billed act is refused on every occurrence, never once per run (`git-force.ts`).
+	git_force.ROW,
+	worktree_guard.ROW,
+	file_body.ROW,
+	// **The hand-written wait loop a lane child improvises over a backgrounded command's output**
+	// (joshuafolkken/kit#2371). `early-heartbeat` refuses a bare `sleep` and stands down on any loop
+	// keyword; this is the loop it left — a `while`/`until` that sleeps between probes of an output
+	// file. Its trigger claims a command no row above matches: the loop-plus-`sleep` shape carries no
+	// `gh` / `git` / `josh` subcommand any other trigger keys on, and a poll loop is never a bare
+	// `sleep` (the loop keyword makes `early-heartbeat.is_wait_timer` false), so the Bash
+	// `rules_claiming` invariant holds. It fires on every occurrence (`decide` returns true): a poll
+	// loop wastes the same round trips each time, so the route is always "background it and end the
+	// turn", never a reissue (`git-force.ts`).
+	poll_loop.ROW,
+	// **The second row whose trigger is an `Edit` / `Write` rather than a shell call**
+	// (joshuafolkken/kit#2310), and the third that consults the world beside the call: "is this a lane
+	// child whose recent-context cost has crossed the threshold" reads the dispatch mark, the cut record
+	// on disk and the synchronous `pnpm josh cost --cut` verdict — the same measurement the parent
+	// hand-off uses, never a second one (joshuafolkken/kit#1933). The `Edit` / `Write` name match runs
+	// first, then the lane read, then the transcript-priced verdict, so a run that is not a dispatched
+	// child in an uncut lane pays nothing for it. It self-gates on the tool name, so it claims no `Bash`
+	// command any row above matches — the Bash `rules_claiming` invariant is untouched.
+	//
+	// **Listed before `rule-body`, the one row it can overlap.** Both trigger on an `Edit` / `Write`; a
+	// rule-document edit made in a lane child that is already over threshold trips both. The cut is the
+	// right thing to do first — end the process and drop the accumulated context — and on the reissue in
+	// the fresh, under-threshold process this row is silent and `rule-body` delivers, the "losing rule's
+	// delivery still correct one reissue later" reading any admissible overlap needs. It carries no
+	// `decide`, so it is silent only **between a cut and its resume**: the implementation resume clears
+	// the record (joshuafolkken/kit#2310, `run-cut-cli.ts`), so the carried-record check stops silencing
+	// the guard, and the fresh session's own transcript reads under threshold — the row re-arms per
+	// resume rather than per edit, instead of a lingering record silencing it for the rest of the run.
+	//
+	// **No `reaches`, because the occasion is live-only.** `pre-gate-cut` gives a `reaches` because both
+	// its halves leave a command-string trace (`run:cut --resume` at entry); this row's occasion —
+	// crossing the threshold mid-implementation — is the working directory, the cut record and the cost
+	// verdict, none of which a transcript records. `pnpm josh rule:value` therefore reads it as no runs
+	// rather than as 0% kept (`keeps` stays, so the compliance act is named for a future measurement
+	// redesign), the same honest-unmeasured stance the batching and investigation rows take for the same
+	// reason: a trigger no transcript can reconstruct. The row itself lives in `implementation-cut.ts`.
+	implementation_cut.ROW,
+	// **The setup-phase cut, one boundary earlier than the implementation cut** (joshuafolkken/kit#2346).
+	// Its trigger is the first `Edit` / `Write` a dispatched lane child makes with the plan event newest
+	// on the run stream — the setup-then-implement boundary. Like `implementation_cut.ROW` its occasion
+	// rests on the working directory, the dispatch mark and the event stream, none of which a transcript
+	// records, so `pnpm josh rule:value` reads it as no runs rather than 0% kept; `keeps` names the
+	// compliance act for a future measurement. The row itself lives in `setup-cut.ts`.
+	setup_cut.ROW,
+	// **The first row whose trigger is an `Edit` / `Write` rather than a shell call**
+	// (joshuafolkken/kit#2272). It delivers the residency questions at the edit that writes a rule into
+	// prose, and self-gates on the tool name and the file path, so it claims no `Bash` command any row
+	// above matches — the `rules_claiming` invariant over Bash fixtures is untouched. It carries no
+	// `decide`, so it is once per run and takes the batching stand-aside `is_first_delivery` gives every
+	// default row: the batching guard treats an `Edit` as a candidate, exactly as it treats an Issue
+	// read, so this row stands aside on a batched turn and delivers on the reissue.
+	rule_body_guard.ROW,
+	// **The generic oracle-consulted rows, one per oracle that declared a firing point**
+	// (joshuafolkken/kit#2324). Each refuses the action the oracle governs when the run has not run that
+	// oracle's command first, stood down once it has — `issue-scout`'s shape read from the registry
+	// rather than hand-written. Listed last so an oracle whose firing point overlaps a filing
+	// (`issue:lint`) delivers on the reissue, after `wip-cap` / `issue-scout` / `filing-cap` /
+	// `issue-fold` have each had their turn. The non-overlapping firing point (`pkg:scout` on a package
+	// add) claims a command no row above matches.
+	...oracle_consulted.ROWS,
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that
@@ -555,6 +652,14 @@ const BATCH_REFUSAL_WINDOW_MS = 10_000
 // lost for the run with nothing recorded to say so. That is the silent deletion the stand-aside
 // exists to prevent, arrived at from the other side.
 function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
+	// In a dispatched lane child the batching guard no longer refuses (joshuafolkken/kit#2138,
+	// joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276): its mode is `notice`, so it
+	// speaks but never denies. It will *refuse* nothing there, and the stand-aside must agree — or a lone
+	// rule trigger (`shell-body`) would be stepped aside from for a batching refusal that can no longer
+	// come and lost for the run. The test is therefore "will it refuse", i.e. mode `refuse`, not "is it
+	// notice or off".
+	if (lane_guard_policy.mode_here('batching') !== 'refuse') return false
+
 	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
 
 	if (run.now_ms - refused_at_ms < BATCH_REFUSAL_WINDOW_MS) return true
@@ -568,9 +673,7 @@ function is_first_delivery(
 	delivered_at_ms: number,
 	run: GuardRun,
 ): boolean {
-	if (delivered_at_ms !== hook_decision.NEVER_MS) return false
-
-	return !will_batch_guard_refuse(tail, call, run)
+	return delivered_at_ms === hook_decision.NEVER_MS && !will_batch_guard_refuse(tail, call, run)
 }
 
 // **For a row that decides for itself, the stand-aside changes what it protects.** For a once-per-run
@@ -621,24 +724,23 @@ const GUARDS = new Map(DELIVERED_RULES.map((rule) => [rule.id, guard_of(rule)]))
 // records land in the shared temp directory rather than under any directory a test owns, and a record
 // left behind would silence the next case exactly as it silences the next call.
 function delivery_path(rule_id: string, transcript_path: string): string {
-	const guard = GUARDS.get(rule_id)
-
-	return guard === undefined ? '' : guard.refusal_path(transcript_path)
+	return GUARDS.get(rule_id)?.refusal_path(transcript_path) ?? ''
 }
 
 // **The first entry whose delivery actually fires wins — not the first whose trigger matches.** Only
 // one refusal can leave a `PreToolUse` hook, so a rule that matched but has already been delivered
-// this run falls through and a later rule may speak on the same call. **A rule added here therefore
-// has to be one whose trigger no other row also matches**, and the enumeration's own suite asserts
-// that over every row's fixtures.
+// this run falls through and a later rule may speak on the same call. **A rule added here whose
+// trigger another row also matches is admissible only when the overlap is safe** — the losing rule's
+// delivery still correct one reissue later — and the enumeration's own suite asserts, per fixture,
+// that every command is claimed by exactly the rows meant to overlap on it.
 //
-// **`shell-body` carries the one deliberate exception, and the order is what makes it safe**
-// (joshuafolkken/kit#1198). A filing whose body happens to contain a backtick —
-// `gh api …/issues -f title="…" -f body="… \`x\` …"` — is claimed by `wip-cap` as well. It is listed
-// first because it decides whether the Issue should exist at all, and rewriting a body into a file
-// for an Issue that must not be filed is wasted work. Nothing is lost by losing the race: the stamps
-// are keyed per `id`, so the reissued call is delivered the second rule. An overlap is admissible
-// only when that reading holds — that the losing rule's delivery is still correct one call later.
+// **The filing trigger is shared by three rows, and the order is what makes the overlap safe**
+// (joshuafolkken/kit#2119). `wip-cap`, `issue-scout` and `filing-cap` all match a filing; a
+// scout-less, over-cap filing is delivered `wip-cap`, then `issue-scout`, then `filing-cap` across its
+// reissues, each still the right thing to say when it is reached. `wip-cap` is listed first because it
+// decides whether the backlog has room at all — the same reason it precedes `shell-body`, which claims
+// a filing whose body carries a backtick (joshuafolkken/kit#1198). Nothing is lost by losing a race:
+// the stamps are keyed per `id`, so the reissued call is delivered the next rule.
 function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
 	for (const guard of GUARDS.values()) {
 		const reason = guard.refusal(raw_payload, now_ms)
@@ -656,22 +758,30 @@ function is_enabled(): boolean {
 const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
+	FILE_BODY_REASON: file_body.FILE_BODY_REASON,
+	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
+	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON,
+	ISSUE_FOLD_REASON: issue_fold.ISSUE_FOLD_REASON,
+	ISSUE_SCOUT_REASON: issue_scout.ISSUE_SCOUT_REASON,
+	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
+	POLL_LOOP_REASON: poll_loop.POLL_LOOP_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
+	RAW_FIELD_BODY_REASON: raw_field_body.RAW_FIELD_BODY_REASON,
 	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
+	THIRD_PARTY_WRITE_REASON: third_party_write.THIRD_PARTY_WRITE_REASON,
 	WIP_CAP_REASON,
+	WORKTREE_MUTATION_REASON: worktree_guard.WORKTREE_MUTATION_REASON,
 	delivery,
 	delivery_path,
 	is_body_only_issue_read,
 	is_enabled,
 	is_issue_filing,
-	is_masked_verification: piped_verification.is_masked_verification,
-	is_wait_timer: early_heartbeat.is_wait_timer,
 }
 
 export type { DeliveredRule, MeasuredRule }

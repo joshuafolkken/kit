@@ -40,6 +40,7 @@ function audit_input(children: ReadonlyArray<AuditChild>): AuditInput {
 		order_pairs: [],
 		decisions: '',
 		order_comments: new Map(),
+		is_epic_closed: false,
 	}
 }
 

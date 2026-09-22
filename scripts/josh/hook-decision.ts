@@ -54,6 +54,18 @@ function is_switch_enabled(key: string): boolean {
 	return !DISABLED_VALUES.includes((process.env[key] ?? '').trim().toLowerCase())
 }
 
+// The opt-in counterpart of `DISABLED_VALUES`: an unset variable stays off, and only one of these
+// spellings turns the switch on. A switch that must default off cannot be read with `is_switch_enabled`
+// — that one defaults on — so the value list is spelled out here rather than inverted at the call site,
+// keeping a typo from silently enabling what was meant to stay disabled (joshuafolkken/kit#2370).
+const ENABLED_VALUES: ReadonlyArray<string> = ['on', '1', 'true', 'yes']
+
+// Read at call time for the same reason as `is_switch_enabled`, so a suite that switches the variable
+// between cases is not answered from a module-load cache.
+function is_switch_opt_in(key: string): boolean {
+	return ENABLED_VALUES.includes((process.env[key] ?? '').trim().toLowerCase())
+}
+
 function parse_hook_payload(raw_payload: string): HookPayload | undefined {
 	const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
 
@@ -198,8 +210,13 @@ interface NotifySpec {
 	// The same shape as `should_block`, asked of the tail for a notify-only call. `notified_at_ms` is
 	// this disposition's own last-fired instant, never the refusal's.
 	should_notify: (tail: string, call: GuardedCall, notified_at_ms: number, run: GuardRun) => boolean
-	// The non-blocking text handed to `notice_envelope`.
-	text: string
+	// The non-blocking text handed to `notice_envelope`, chosen from the call and the tail
+	// (joshuafolkken/kit#2164, joshuafolkken/kit#2276). A guard now notifies about more than one kind of
+	// call — the whole-file write it cannot refuse, and, in a lane child, a refusable call whose refusal
+	// is downgraded to a notice — and the two want different wording, so the text is a function of the
+	// call. It is handed the tail as well so a notice can name the concrete calls the run just issued
+	// one-per-turn (#2276); a guard whose wording is fixed is free to ignore it.
+	text: (call: GuardedCall, tail: string) => string
 }
 
 interface TranscriptGuardSpec {
@@ -315,7 +332,7 @@ function notify_outcome(context: GuardContext): GuardOutcome {
 		spec.switch_key,
 	)
 
-	if (result.fired) return { reason: undefined, notice: notify.text, fault: undefined }
+	if (result.fired) return { reason: undefined, notice: notify.text(call, tail), fault: undefined }
 
 	return { reason: undefined, notice: undefined, fault: result.fault }
 }
@@ -396,16 +413,24 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	return { is_enabled, outcome, refusal, refusal_path }
 }
 
-// Nothing at all reaches stdout on the ordinary call, so what the harness parses stays empty unless
-// the call is being refused.
-function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutcome): void {
-	load_environment_file()
-
-	const { reason, notice, fault } = outcome(raw_payload)
+// Write one already-resolved outcome, so a caller that has to await its rule (the watcher guard reads
+// the lane registry and the life record) can compute the outcome first and hand it here
+// (joshuafolkken/kit#2353). Nothing reaches stdout on the ordinary call, so what the harness parses
+// stays empty unless the call is being refused.
+function emit_outcome(outcome: GuardOutcome): void {
+	const { reason, notice, fault } = outcome
 
 	if (reason !== undefined) process.stdout.write(`${deny_envelope(reason)}\n`)
 	else if (notice !== undefined) process.stdout.write(`${notice_envelope(notice)}\n`)
 	else if (fault !== undefined) process.stdout.write(`${notice_envelope(fault)}\n`)
+}
+
+// The synchronous path: load `.env`, run the rule, emit. A wrapper around `emit_outcome` so both paths
+// write the same envelopes.
+function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutcome): void {
+	load_environment_file()
+
+	emit_outcome(outcome(raw_payload))
 }
 
 // The refusal-only shape, kept so the guards not yet moved across keep working unchanged. It is a
@@ -426,18 +451,21 @@ function write_decision(raw_payload: string, refusal: (raw: string) => string | 
 // Run from a terminal there is no payload coming, and waiting for one looks like a hang.
 function report_no_payload(command: string): void {
 	process.stderr.write(
-		`${command} reads a Claude Code PreToolUse payload on stdin; it is not run by hand.\n`,
+		`${command} reads a Claude Code hook payload on stdin; it is not run by hand.\n`,
 	)
 }
 
 const hook_decision = {
 	DISABLED_VALUES,
+	ENABLED_VALUES,
 	NEVER_MS,
 	create_refusal_stamp,
 	create_transcript_guard,
 	deny_envelope,
+	emit_outcome,
 	fault_notice,
 	is_switch_enabled,
+	is_switch_opt_in,
 	load_environment_file,
 	notice_envelope,
 	parse_hook_payload,
@@ -447,13 +475,5 @@ const hook_decision = {
 	write_outcome,
 }
 
-export type {
-	GuardOutcome,
-	GuardRun,
-	HookPayload,
-	NotifySpec,
-	RefusalStamp,
-	TranscriptGuard,
-	TranscriptGuardSpec,
-}
+export type { GuardOutcome, GuardRun, TranscriptGuard, TranscriptGuardSpec }
 export { hook_decision }

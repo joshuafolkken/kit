@@ -72,7 +72,7 @@
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion",
 				"hooks": [
 					{
 						"type": "command",
@@ -90,6 +90,18 @@
 						"type": "command",
 						"command": "if [ -f dist/hooks/format-edited.js ]; then node dist/hooks/format-edited.js; else pnpm josh format:edited; fi",
 						"timeout": 90
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "if [ -f dist/hooks/stop-guard.js ]; then node dist/hooks/stop-guard.js; else pnpm josh stop:guard; fi",
+						"timeout": 20
 					}
 				]
 			}

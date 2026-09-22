@@ -120,4 +120,4 @@ const publishable_range = {
 }
 
 export { publishable_range }
-export type { ProbeResult, PublishedRange, RangePartition, RangeProbe }
+export type { ProbeResult, PublishedRange, RangeProbe }

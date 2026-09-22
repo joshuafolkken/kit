@@ -99,5 +99,5 @@ const git_stash = {
 	select,
 }
 
-export type { Selection, StashEntry }
+export type { Selection }
 export { git_stash }

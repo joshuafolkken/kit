@@ -6,6 +6,7 @@ import { process_identity_fixture } from '#scripts/josh/process-identity-fixture
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
+import { run_event_stream } from './run-event-stream'
 
 // joshuafolkken/kit#1714. Two things are pinned here that prose alone would let a rewrite lose:
 // standard output is one token on every path, and `--begin` never starts a second budget over a
@@ -32,6 +33,8 @@ const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
 const OTHER_INVOCATION = 'backlogrun --max 10 --idle 30'
+const RETROSPECTIVE = '--retrospective'
+const SUMMARY = '--summary'
 const LONG_AGO = new Date(Date.now() - run_carry.CARRY_MAX_AGE_MS * 2)
 const START = new Date('2026-09-11T00:00:00.000Z')
 // The opening list, pinned: it is what a named-issue `backlogrun` writes to `--begin` at every cut,
@@ -53,6 +56,12 @@ function target(): string {
 	return run_carry.carry_path(REPOSITORY)
 }
 
+// The event stream `run_event_stream_emit.emit` resolves for this mocked repository — the retrospective
+// close appends its result here (joshuafolkken/kit#2342).
+function event_target(): string {
+	return run_event_stream.target_of(REPOSITORY)
+}
+
 function last_json(): CarryJson {
 	return JSON.parse(out.at(-1) ?? '{}') as CarryJson
 }
@@ -68,11 +77,13 @@ beforeEach(() => {
 	})
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])
 	run_carry.end_carry(target())
+	rmSync(event_target(), { force: true })
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(target(), { force: true })
+	rmSync(event_target(), { force: true })
 })
 
 afterAll(() => {
@@ -225,6 +236,15 @@ describe('counting into a carried run', () => {
 		})
 	})
 
+	it('marks the retrospective as run (joshuafolkken/kit#2328)', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		await run_carry_cli.run([RETROSPECTIVE, SUMMARY, 'filed #101; dropped #99 already merged'])
+
+		const read = run_carry.read_carry(target())
+
+		expect(read.kind === 'carried' ? read.carry.retrospective : undefined).toBe(true)
+	})
+
 	it('refuses a count with no record to count into', async () => {
 		expect(await run_carry_cli.run(['--merged', '1'])).toBe(1)
 		expect(out).toStrictEqual([run_carry_cli.NONE_VERDICT])
@@ -317,6 +337,9 @@ describe('an invocation the command cannot act on', () => {
 		['a begin and a resume at once', ['--begin', INVOCATION, '--resume', INVOCATION]],
 		['an owner that is not a pid', ['--begin', INVOCATION, '--owner', 'me']],
 		['an owner that is a process group', ['--begin', INVOCATION, '--owner', '0']],
+		['a retrospective with no summary to record', [RETROSPECTIVE]],
+		['a retrospective with an empty summary', [RETROSPECTIVE, SUMMARY, '']],
+		['a summary with no retrospective to record it', [SUMMARY, 'orphaned result']],
 	])('refuses %s', async (_name, argv) => {
 		expect(await run_carry_cli.run(argv)).toBe(1)
 		expect(errors).toContain(run_carry_cli.USAGE)

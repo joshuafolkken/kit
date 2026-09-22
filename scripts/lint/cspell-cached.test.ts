@@ -40,6 +40,12 @@ test('keeps the cspell cache flags on the subprocess', () => {
 	expect(CSPELL_ARGS.join(' ')).toContain(CSPELL_CACHE_FLAGS.join(' '))
 })
 
+// joshuafolkken/kit#2296: the per-file progress line is what filled the tool's 8,000-character cap
+// ahead of the actual failures, so it is turned off by default.
+test('turns off cspell progress lines', () => {
+	expect(CSPELL_ARGS).toContain('--no-progress')
+})
+
 test('forwards additional command arguments to cspell', async () => {
 	await cspell_cached.run(['--verbose'])
 

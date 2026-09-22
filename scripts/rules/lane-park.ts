@@ -51,6 +51,21 @@ function is_confirmation_notify(command: string): boolean {
 		)
 }
 
+// The josh notify invocation in either spelling, anywhere in a blob of text. The stop guard
+// (joshuafolkken/kit#2121) asks whether a confirmation notify was issued *this turn* by scanning the
+// transcript tail rather than one command, so the "is it a stop notification" judgement stays here —
+// the same `CONFIRMATION_TASK_TYPE` regex, never a second copy of it.
+const NOTIFY_INVOCATION = /josh\s+(?:notify|nf)\b/u
+
+// **A blob, not a single command, so it cannot be segmented.** The tail is raw transcript text with a
+// notify command embedded in a JSONL string, so the two halves are tested against the whole: a josh
+// notify appears and a `--task-type confirmation` appears. That is looser than `is_confirmation_notify`
+// on purpose — the guard's safe direction is to read a real stop notification as present, so a run
+// that sent one is never told it did not.
+function mentions_confirmation_notify(text: string): boolean {
+	return NOTIFY_INVOCATION.test(text) && CONFIRMATION_TASK_TYPE.test(text)
+}
+
 // **The command test comes first and the world is consulted second**, so the `is_child_of` read — the
 // dispatch mark against this checkout's own issue — runs only on the handful of calls that are a
 // confirmation stop, not on every `Bash` call in the run. `is_child_of` is the same mechanical
@@ -90,7 +105,7 @@ const LANE_PARK_REASON =
 	'the parent to guess from a log. Before you notify and stop: apply `needs-decision` and post a ' +
 	'comment carrying the question, the options, and whether work was stashed — ' +
 	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'` then " +
-	'`gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>`. If this stop is a ' +
+	'`pnpm josh issue:comment <N> --body-file <path>`. If this stop is a ' +
 	'`needs-human-review` or `already-done` one, that label is already on the Issue and there is nothing ' +
 	'to add. Then reissue this notify — it fires once per run and cannot repeat on the call in hand. The ' +
 	'procedure is `.claude/skills/workflow-commands/pre-gate-cut.md` → "A lane child records its park ' +
@@ -100,6 +115,7 @@ const lane_park = {
 	LANE_PARK_REASON,
 	is_confirmation_notify,
 	is_unparked_stop,
+	mentions_confirmation_notify,
 	records_the_park,
 }
 

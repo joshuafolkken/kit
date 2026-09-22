@@ -133,14 +133,19 @@ async function attempt(
 	}
 }
 
-// PATH first, so a machine that installed the scanner itself keeps running exactly that binary.
-// `is_executable_file` rather than a bare existence test: a zero-byte or non-executable file at the
-// managed path would be reported here as an installed scanner for ever, while `josh audit` spawned
-// it and failed with something that looks nothing like a missing binary.
+// PATH first, but only when its scanner meets the floor: a below-floor PATH build (or a leftover
+// managed copy from an earlier pinned version) reads a fraction of the lockfile and calls it clean
+// (joshuafolkken/kit#2200), so it must not be reported as "already available" — doing so is what
+// suppresses the fetch of a floor-meeting build. `is_executable_file` still guards the managed path
+// so a zero-byte or non-executable leftover is never spawned just to read its version.
 function existing_scanner(target_path: string): string | undefined {
-	if (security_audit.is_binary_available(security_audit_logic.BINARY_NAME)) return PATH_LOCATION
+	const { BINARY_NAME } = security_audit_logic
+	if (security_audit.meets_floor(BINARY_NAME)) return PATH_LOCATION
 
-	return security_audit.is_executable_file(target_path) ? target_path : undefined
+	const is_managed_usable =
+		security_audit.is_executable_file(target_path) && security_audit.meets_floor(target_path)
+
+	return is_managed_usable ? target_path : undefined
 }
 
 async function report(

@@ -16,7 +16,12 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { bash_output_cap_reader } from './bash-output-cap'
 import { document_section, type Section } from './document-section'
+import { read_set_point_of_use } from './read-set-point-of-use'
+
+const { POINT_OF_USE_FILES, POINT_OF_USE_BY_ENTRY, is_point_of_use, point_of_use_files } =
+	read_set_point_of_use
 
 const SKILL_DIRECTORY = path.join('.claude', 'skills', 'workflow-commands')
 const SKILL_FILE = 'SKILL.md'
@@ -24,46 +29,12 @@ const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
 const ONE_LINE = 1
 
-// **Four documents leave the entry read because their first use is a named command, not the entry**
-// (joshuafolkken/kit#1797, joshuafolkken/kit#1856, joshuafolkken/kit#1873). `latest-gate.md` is read
-// when `pnpm josh latest:scope` answers `required`, `followup.md` in the turn that issues
-// `pnpm josh followup`, `chain-rule.md` before the `/code-review` step it governs, and
-// `background-commands.md` before the first backgroundable command (`pnpm josh gate`). **They are
-// not deferred or summarized** — the named operational section is fetched in the same turn; only
-// `latest-gate.md` remains whole because its result branches across that document.
-// Measured on `fullrun #1783`, `followup.md` rode 55 requests before its first use. **`chain-rule.md`
-// is joshuafolkken/kit#1856's addition**: it governs the `/code-review` → `followup` chain, which in
-// `fullrun` / `queue` / `epicrun` / `backlogrun` runs *after* the first edit, so its 7,396 tokens
-// were resident from the entry for no run that had yet reached a review.
-// **`background-commands.md` is joshuafolkken/kit#1873's**: it was §2h's resident body, governing the
-// background execution of the gate, the push and the merge tail — all after the first edit — so it
-// left `SKILL.md` for the point-of-use list. `SKILL.md` → §1, "Four documents are read at the point
-// of use", is the single source.
-// **`backlogrun`'s own per-child phase documents are point-of-use too** (joshuafolkken/kit#2010):
-// `backlogrun.md` was split so the entry read carries only what binds before the first child, and the
-// four phase documents below are read from it at the step each names — dispatching a child, opening a
-// lane, the progress watcher and the hand-off, a child that cannot finish — never at the entry. Kept
-// out of the count here, exactly as the four above are. `SKILL.md` → §1 is the human source.
-const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
-	'latest-gate.md',
-	'followup.md',
-	'chain-rule.md',
-	'background-commands.md',
-	'backlogrun-child.md',
-	'backlogrun-lanes.md',
-	'backlogrun-progress.md',
-	'backlogrun-park.md',
-])
+// The point-of-use classification — which documents an entry names but reads only at a later step —
+// is its own concern, split into `read-set-point-of-use.ts` in joshuafolkken/kit#2289. This file
+// reads that classification to drop those files from the entry read and to cost them separately.
 
-// **The fetch cap is read from the settings file rather than restated here.** Every document in the
-// set is larger than it, so a `cat` of one hands back a middle-truncated preview and the file is
-// then read a second time — the two wasted requests joshuafolkken/kit#1797 measured. A number copied
-// into this file would be a second declaration of the cap, and would drift the first time the
-// settings changed; the harness's own default stands in only where the file declares nothing.
-const SETTINGS_FILE = path.join('.claude', 'settings.json')
-const HARNESS_DEFAULT_CAP_CHARS = 30_000
-const ENV_KEY = 'env'
-const CAP_KEY = 'BASH_MAX_OUTPUT_LENGTH'
+// The fetch cap a `cat` truncates at, and the harness default it falls back to, are read from
+// `bash-output-cap.ts` — split out in joshuafolkken/kit#2161 to keep this file under its line ceiling.
 // `section()` hands back a `##` heading's `###` children with it, so the table parse has to say
 // where it stops — see `table_rows`.
 const SUBSECTION_PREFIX = '### '
@@ -238,38 +209,14 @@ function table_rows(root: string): Map<string, ReadonlyArray<string>> {
 	return rows
 }
 
-function property_of(value: unknown, key: string): unknown {
-	if (typeof value !== 'object' || value === null) return undefined
-
-	return Reflect.get(value, key)
-}
-
-// **Parsed as JSON rather than matched in the raw text.** A regular expression takes the first
-// occurrence anywhere in the file, so a hook command string naming the variable would win over the
-// `env` block — and the report would then mark a file `cat`-able that a `cat` truncates, which is
-// the one drift reading the settings dynamically was meant to remove. A file that is missing or does
-// not parse answers `undefined` and falls through to the harness default below.
-function declared_cap(text: string): unknown {
-	try {
-		return property_of(property_of(JSON.parse(text), ENV_KEY), CAP_KEY)
-	} catch {
-		return undefined
-	}
-}
-
-function bash_output_cap(root: string): number {
-	const text = document_section.read_optional(path.join(root, SETTINGS_FILE)) ?? ''
-	const chars = Number(declared_cap(text))
-
-	return Number.isSafeInteger(chars) && chars > NOTHING ? chars : HARNESS_DEFAULT_CAP_CHARS
-}
-
 // **A point-of-use document is dropped from the set wherever a table row still names it**, so the
-// entry cost cannot be reported as including a file the entry does not read.
+// entry cost cannot be reported as including a file the entry does not read. The drop is per entry:
+// `backlogrun` lists `fullrun.md` and `split-assessment.md` in its row to document that a child reads
+// them, and the per-entry map takes them back out of the parent's entry cost.
 function files_for(root: string, entry: string): ReadonlyArray<string> {
 	const declared = table_rows(root).get(entry) ?? []
 
-	return unique([SKILL_FILE, ...declared]).filter((file) => !POINT_OF_USE_FILES.has(file))
+	return unique([SKILL_FILE, ...declared]).filter((file) => !is_point_of_use(entry, file))
 }
 
 // A reference that wrapped across a source line carries the newline and the next line's indent
@@ -294,10 +241,11 @@ function is_sibling_document(root: string, name: string): boolean {
 // at that moment, which is a cost of that step rather than of the entry.
 function is_counted(
 	root: string,
+	entry: string,
 	reference: SectionReference,
 	files: ReadonlyArray<string>,
 ): boolean {
-	if (POINT_OF_USE_FILES.has(reference.file)) return false
+	if (is_point_of_use(entry, reference.file)) return false
 
 	return !files.includes(reference.file) && is_sibling_document(root, reference.file)
 }
@@ -308,12 +256,13 @@ function to_reference(match: RegExpExecArray): SectionReference {
 
 function references_from(
 	root: string,
+	entry: string,
 	text: string,
 	files: ReadonlyArray<string>,
 ): Array<SectionReference> {
 	return all_matches(text, SECTION_REFERENCE)
 		.map((match) => to_reference(match))
-		.filter((reference) => is_counted(root, reference, files))
+		.filter((reference) => is_counted(root, entry, reference, files))
 }
 
 function sort_key(reference: SectionReference): string {
@@ -334,10 +283,14 @@ function dedupe(references: ReadonlyArray<SectionReference>): Array<SectionRefer
 // the run already holds — and several of them are `epicrun.md` sections a `kickoff` or a `queue`
 // never reaches at all. A command file's references are the other kind: `fullrun.md` says outright
 // that the procedure "is not repeated here", so the section it names is reading this entry owes.
-function sections_for(root: string, files: ReadonlyArray<string>): Array<SectionReference> {
+function sections_for(
+	root: string,
+	entry: string,
+	files: ReadonlyArray<string>,
+): Array<SectionReference> {
 	const found = files
 		.filter((file) => file !== SKILL_FILE)
-		.flatMap((file) => references_from(root, read_document(root, file), files))
+		.flatMap((file) => references_from(root, entry, read_document(root, file), files))
 
 	return dedupe(found).toSorted((left, right) => sort_key(left).localeCompare(sort_key(right)))
 }
@@ -345,7 +298,7 @@ function sections_for(root: string, files: ReadonlyArray<string>): Array<Section
 function read_set(root: string, entry: string): ReadSet {
 	const files = files_for(root, entry)
 
-	return { entry, files, sections: sections_for(root, files) }
+	return { entry, files, sections: sections_for(root, entry, files) }
 }
 
 function cost_of(text: string): Cost {
@@ -471,13 +424,13 @@ function point_of_use_cost(
 	return { file, heading: '', cost: cost_of(read_document(root, file)), is_resolved: true }
 }
 
-function point_of_use_costs(root: string): Array<SectionCost> {
+function point_of_use_costs(root: string, entry: string): Array<SectionCost> {
 	const found = document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)
 	const references = all_matches(found?.text ?? '', SECTION_REFERENCE).map((match) =>
 		to_reference(match),
 	)
 
-	return [...POINT_OF_USE_FILES].map((file) => point_of_use_cost(root, file, references))
+	return point_of_use_files(entry).map((file) => point_of_use_cost(root, file, references))
 }
 
 function costed(root: string, entry: string): ReadSetCost {
@@ -490,8 +443,8 @@ function costed(root: string, entry: string): ReadSetCost {
 		entry,
 		files: own_costs,
 		sections: section_costs,
-		point_of_use: point_of_use_costs(root),
-		bash_output_cap: bash_output_cap(root),
+		point_of_use: point_of_use_costs(root, entry),
+		bash_output_cap: bash_output_cap_reader.bash_output_cap(root),
 		whole: total([own, referenced_cost(root, sections)]),
 		scoped: total([own, scoped_cost(root, sections)]),
 	}
@@ -502,13 +455,14 @@ function entries(root: string): Array<string> {
 }
 
 const entry_read_set = {
-	HARNESS_DEFAULT_CAP_CHARS,
+	HARNESS_DEFAULT_CAP_CHARS: bash_output_cap_reader.HARNESS_DEFAULT_CAP_CHARS,
+	POINT_OF_USE_BY_ENTRY,
 	POINT_OF_USE_FILES,
 	SECTION_REFERENCE,
 	SKILL_DIRECTORY,
 	SKILL_FILE,
 	TABLE_SECTION,
-	bash_output_cap,
+	bash_output_cap: bash_output_cap_reader.bash_output_cap,
 	cost_of,
 	costed,
 	document_path,

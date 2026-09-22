@@ -539,7 +539,7 @@ const time_spans = {
 	parse_timeline,
 }
 
-export type { ResultFacts, Span, SpanCategory, SpanOutcome, Timeline }
+export type { Span, SpanOutcome }
 export { time_spans }
 
 export { type Block, type TranscriptLine } from './time-transcript-line'

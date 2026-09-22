@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
 import type { CommandEntry } from './josh-command-types'
 import { FAILURE_EXIT_CODE, josh_in_process } from './josh-in-process'
+import { read_script } from './josh-script-reader'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const JOSH_DIR = path.join(PACKAGE_DIR, 'scripts', 'josh')
@@ -21,6 +22,7 @@ const SCRIPT_ENTRY: CommandEntry = {
 	script: 'scripts/lint/lint-related.ts',
 	description: 'Lint the changed files',
 	category: 'Development',
+	reference: ['', 'developer', ['processes']],
 }
 
 const ORIGINAL_ARGV = process.argv
@@ -55,6 +57,7 @@ describe('josh_in_process.can_run_in_process', () => {
 			shell: ['pnpm', 'exec', 'prettier', '--check', '.'],
 			description: 'Check formatting',
 			category: 'Development',
+			reference: ['', 'developer', ['processes']],
 		}
 
 		expect(josh_in_process.can_run_in_process(entry, TYPESCRIPT_DISPATCHER_URL)).toBe(false)
@@ -111,10 +114,6 @@ const UNCONDITIONAL_SCRIPTS: ReadonlyArray<string> = [
 const GUARDED_SCRIPTS = IN_PROCESS_SCRIPTS.filter(
 	(script) => !UNCONDITIONAL_SCRIPTS.includes(script),
 )
-
-function read_script(script: string): string {
-	return readFileSync(path.join(PACKAGE_DIR, script), 'utf8')
-}
 
 // On a line of its own, not merely somewhere in the file: this very file quotes the guard in prose,
 // and a script that documented it without executing it would otherwise pass while never running.

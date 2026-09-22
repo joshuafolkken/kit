@@ -1,5 +1,5 @@
 import type { Classification } from './epic-classify'
-import type { EpicChild, GraphAnomaly } from './epic-graph'
+import { epic_graph, type EpicChild, type GraphAnomaly } from './epic-graph'
 
 // Turning a classification into the answer a caller acts on.
 //
@@ -137,14 +137,22 @@ function format_bundle_heading(bundle: RepoCandidates): string {
 	return `  ${bundle.repo}  ${bundle.path ?? '(no local checkout)'}`
 }
 
-function format_child(child: EpicChild): string {
-	return `    #${String(child.number)}`
+// A child in another repository is written `owner/repo#N`, not a bare `#N` — a bare number resolves
+// against the reader's own repository and would linkify to the wrong issue there
+// (joshuafolkken/kit#2329). This reuses the one spelling `epic_graph.format_reference` already gives
+// every other read of a child, rather than a second one here.
+function format_child(child: EpicChild, current_repo: string): string {
+	return `    ${epic_graph.format_reference(child, current_repo)}`
 }
 
-function format_group(label: string, children: ReadonlyArray<EpicChild>): Array<string> {
+function format_group(
+	label: string,
+	children: ReadonlyArray<EpicChild>,
+	current_repo: string,
+): Array<string> {
 	if (children.length === 0) return []
 
-	return [label, ...children.map((child) => format_child(child))]
+	return [label, ...children.map((child) => format_child(child, current_repo))]
 }
 
 const VERDICT_LINES: Readonly<Record<EpicVerdict, string>> = {
@@ -156,7 +164,7 @@ const VERDICT_LINES: Readonly<Record<EpicVerdict, string>> = {
 }
 
 // The report. Every open child appears exactly once, so a caller can see that nothing was dropped.
-function format_result(result: EpicNextResult): string {
+function format_result(result: EpicNextResult, current_repo: string): string {
 	if (result.verdict === 'error') {
 		return [VERDICT_LINES.error, ...result.anomalies.map((anomaly) => anomaly.message)].join('\n')
 	}
@@ -166,13 +174,13 @@ function format_result(result: EpicNextResult): string {
 	for (const bundle of result.candidates) {
 		lines.push(
 			format_bundle_heading(bundle),
-			...bundle.children.map((child) => format_child(child)),
+			...bundle.children.map((child) => format_child(child, current_repo)),
 		)
 	}
 
 	lines.push(
-		...format_group('  Waiting on time:', result.waiting),
-		...format_group('  Waiting on a person:', result.blocked_on_people),
+		...format_group('  Waiting on time:', result.waiting, current_repo),
+		...format_group('  Waiting on a person:', result.blocked_on_people, current_repo),
 	)
 
 	return lines.join('\n')

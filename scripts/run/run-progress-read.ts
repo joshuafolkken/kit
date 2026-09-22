@@ -58,6 +58,12 @@ async function stamp_target(): Promise<string> {
 	return run_progress_clock.stamp_target_of(await worktree_git_directory())
 }
 
+// The ambient log's path, a sibling of the report clock — the surface `josh run:progress --path` names
+// so a person can keep it open across a session cut (joshuafolkken/kit#2156).
+async function log_target(): Promise<string> {
+	return run_progress_clock.log_path_of(await stamp_target())
+}
+
 // The watcher's liveness record, resolved through the same resolver as `stamp_target`, so the file the
 // watcher begins is the file `josh followup` removes at the merge (joshuafolkken/kit#1821).
 async function live_target(): Promise<string> {
@@ -178,6 +184,7 @@ const run_progress_read = {
 	PROGRESS_PREFIX,
 	has_run_started,
 	live_target,
+	log_target,
 	mark,
 	parse_stamp,
 	read_children,
@@ -188,5 +195,5 @@ const run_progress_read = {
 	stamp_target,
 }
 
-export type { ObservationRead, ObservationRequest }
+export type { ObservationRead }
 export { run_progress_read }

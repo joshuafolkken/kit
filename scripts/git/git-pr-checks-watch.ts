@@ -96,8 +96,13 @@ function is_awaited_check(check: RollupCheck): boolean {
 function evaluate_checks_settled(snapshot: PrStateSnapshot): PrEvaluation {
 	const awaited = snapshot.rollup.filter((check) => is_awaited_check(check))
 	const considered = awaited.length === 0 ? snapshot.rollup : awaited
-	if (considered.length === 0) return 'pending'
-	if (considered.some((check) => check.status === CHECK_STATUS_PENDING)) return 'pending'
+
+	if (
+		considered.length === 0 ||
+		considered.some((check) => check.status === CHECK_STATUS_PENDING)
+	) {
+		return 'pending'
+	}
 
 	return snapshot.rollup.some((check) => check.status === CHECK_STATUS_FAIL) ? 'failure' : 'success'
 }

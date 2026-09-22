@@ -9,7 +9,10 @@ const TARGET = '/projects/kit'
 const INHERITED_INPUT = 10_000
 const FIRST_INPUT = 100
 const TOTAL_INPUT = 350
-const REQUEST_COUNT = 2
+const SECOND_INPUT = TOTAL_INPUT - FIRST_INPUT
+// The billed input each request paid, oldest first — the `last_token_usage` deltas, with the
+// inherited context excluded because it never enters a request's own `last_token_usage`.
+const BILLED_PER_REQUEST = [FIRST_INPUT, SECOND_INPUT]
 const HOME_PREFIX = 'codex-usage-'
 const PREVIOUS_THREAD_ID = 'previous-generation'
 
@@ -44,7 +47,7 @@ function write_rollout_for(
 		[
 			JSON.stringify({ type: 'session_meta', payload: { id: metadata_thread_id, cwd } }),
 			token_count(INHERITED_INPUT + FIRST_INPUT, FIRST_INPUT),
-			token_count(INHERITED_INPUT + TOTAL_INPUT, TOTAL_INPUT - FIRST_INPUT),
+			token_count(INHERITED_INPUT + TOTAL_INPUT, SECOND_INPUT),
 		].join('\n'),
 	)
 }
@@ -61,8 +64,7 @@ describe('codex_usage.measurement — active rollout', () => {
 		write_rollout(codex_home, TARGET)
 
 		expect(codex_usage.measurement(TARGET, home, environment())).toStrictEqual({
-			request_count: REQUEST_COUNT,
-			billed_input_tokens: TOTAL_INPUT,
+			billed_input_per_request: BILLED_PER_REQUEST,
 		})
 	})
 
@@ -74,8 +76,7 @@ describe('codex_usage.measurement — active rollout', () => {
 		write_rollout(codex_home, TARGET)
 
 		expect(codex_usage.measurement(TARGET, home, environment())).toStrictEqual({
-			request_count: REQUEST_COUNT,
-			billed_input_tokens: TOTAL_INPUT,
+			billed_input_per_request: BILLED_PER_REQUEST,
 		})
 	})
 
@@ -109,6 +110,6 @@ describe('codex_usage.measurement — rollout matching', () => {
 				...environment(),
 				CODEX_HOME: home,
 			}),
-		).toMatchObject({ billed_input_tokens: TOTAL_INPUT })
+		).toMatchObject({ billed_input_per_request: BILLED_PER_REQUEST })
 	})
 })

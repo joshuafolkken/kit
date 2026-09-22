@@ -329,6 +329,5 @@ export type {
 	VersionOutputExtras,
 	UpstreamReport,
 	UpstreamEffective,
-	EffectiveUpgradeHint,
 }
 export { version_check_logic }

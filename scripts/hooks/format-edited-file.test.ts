@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
@@ -17,81 +17,24 @@ import {
 	relative_to_root,
 	resolve_invocations,
 	select_invocation,
-	type CommandRunner,
-	type FormatCommand,
 } from './format-edited-file'
+import {
+	ESLINT,
+	eslint_failing_runner,
+	failing_runner,
+	make_directory_helpers,
+	payload_for,
+	PRETTIER,
+	recording_runner,
+	shell_payload,
+} from './format-edited-file-fixtures'
 
 // Under the OS temp directory for the reason yaml-config-fixture.test.ts gives: several suites here
 // assert on the repository's own file listing, so a fixture left at the package root would break
 // them rather than merely leave litter. mkdtempSync rather than a fixed name so a watch-mode run
 // and a lefthook-triggered run cannot delete each other's directory.
 const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'format-edited-'))
-const PRETTIER = 'prettier'
-const ESLINT = 'eslint'
-
-function write_fixture(...segments: ReadonlyArray<string>): string {
-	const file_path = path.join(TEST_DIRECTORY, ...segments)
-
-	mkdirSync(path.dirname(file_path), { recursive: true })
-	writeFileSync(file_path, '\n', 'utf8')
-
-	return file_path
-}
-
-function plan_commands_in(file_path: string): ReadonlyArray<FormatCommand> {
-	return plan_commands(file_path, TEST_DIRECTORY)
-}
-
-function payload_for(file_path: string): string {
-	return JSON.stringify({
-		hook_event_name: 'PostToolUse',
-		tool_input: { file_path },
-		tool_name: 'Edit',
-	})
-}
-
-// What a formatter that ran and had nothing to say returns, so a test runner reads as "this route
-// worked" and no fallback is attempted.
-const RAN_CLEANLY = { exit_code: 0, did_write_stdout: false }
-
-function eslint_failing_runner(runs: Array<string>): CommandRunner {
-	return async (command) => {
-		await Promise.resolve()
-
-		if (command.bin === ESLINT) throw new Error('spawn ENOENT')
-
-		runs.push(command.bin)
-
-		return RAN_CLEANLY
-	}
-}
-
-const failing_runner: CommandRunner = async () => {
-	await Promise.resolve()
-	throw new Error('the formatter failed to start')
-}
-
-function recording_runner(runs: Array<string>): CommandRunner {
-	return async (command) => {
-		runs.push(command.bin)
-
-		await Promise.resolve()
-
-		return RAN_CLEANLY
-	}
-}
-
-// What Claude Code hands this hook after a shell call, which the matcher covers since
-// joshuafolkken/kit#1337: a command, and no edited path anywhere in the payload. The command edits a
-// file on purpose — an agent working through `sed` is the mode the widening was measured against,
-// and nothing here may start formatting a path it had to guess at.
-function shell_payload(transcript_path?: string): string {
-	return JSON.stringify({
-		tool_name: 'Bash',
-		tool_input: { command: `sed -i '' s/a/b/ app.ts` },
-		transcript_path,
-	})
-}
+const { write_fixture, plan_commands_in } = make_directory_helpers(TEST_DIRECTORY)
 
 // The density hook's throttle records, which live in the shared temp directory rather than under
 // `TEST_DIRECTORY` — so removing that directory does not take them with it.
@@ -254,14 +197,14 @@ describe('resolve_invocations — the fallback behind the daemon', () => {
 	})
 
 	it.each([
-		['a formatter reporting problems it could not fix', { exit_code: 1, did_write_stdout: true }],
-		['a formatter that had nothing to say', { exit_code: 0, did_write_stdout: false }],
+		['a formatter reporting problems it could not fix', { exit_code: 1, stdout: 'app.ts error' }],
+		['a formatter that had nothing to say', { exit_code: 0, stdout: '' }],
 	])('does not read %s as a start failure', (_label, outcome) => {
 		expect(is_start_failure(outcome)).toBe(false)
 	})
 
 	it('reads a non-zero exit with no output as a start failure', () => {
-		expect(is_start_failure({ exit_code: 1, did_write_stdout: false })).toBe(true)
+		expect(is_start_failure({ exit_code: 1, stdout: '' })).toBe(true)
 	})
 })
 

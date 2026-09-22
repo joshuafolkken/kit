@@ -29,6 +29,7 @@ function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 		filed: 0,
 		cuts: 1,
 		failures: 0,
+		outages: 0,
 		...overrides,
 	}
 }

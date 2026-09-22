@@ -54,4 +54,3 @@ function classify_status(status: number | undefined): GhReachability {
 const gh_reachability = { classify_status }
 
 export { gh_reachability }
-export type { GhReachability }

@@ -71,8 +71,7 @@ function has_human_label(child: EpicChild): boolean {
 // is `epic-nested.ts`, which the audit asks the same way.
 function local_category(child: EpicChild): ChildCategory | undefined {
 	if (child.state === CLOSED) return 'done'
-	if (epic_nested.is_nested_epic(child)) return 'human'
-	if (has_human_label(child)) return 'human'
+	if (epic_nested.is_nested_epic(child) || has_human_label(child)) return 'human'
 	if (has_label(child, IN_PROGRESS_LABEL)) return 'time'
 
 	return undefined

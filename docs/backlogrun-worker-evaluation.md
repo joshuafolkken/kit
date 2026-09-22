@@ -4,7 +4,7 @@ Use completed ordinary-task transcripts from before a worker default changes as 
 Do not replay old tasks, add a comparison review, or spend AI calls only to build the comparison.
 Ordinary Claude Code work uses the balanced default; difficult Claude Code work may explicitly set
 `JOSH_WORKER_MODEL=opus JOSH_WORKER_EFFORT=high`. Dispatch never promotes itself or adds a
-lightweight/Haiku role, and scheduler/reviewer gates remain `opus/high`.
+lightweight/Haiku role, and scheduler/reviewer gates remain `opus/medium` and `opus/high`.
 
 For each baseline or canary Issue, keep one row with:
 

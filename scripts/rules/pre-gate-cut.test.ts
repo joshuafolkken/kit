@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/run-cut'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
@@ -41,6 +42,12 @@ const ENTRY_DIRECTORY = process.cwd()
 const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
 const LANE_DIRECTORY = path.join(LANE_ROOT, ISSUE)
 const WRITTEN_TRANSCRIPTS = new Set<string>()
+// The recent-window context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
+// tokens widen to `string` through their namespace objects, so a typed literal is what the state
+// factory's `CostVerdict` field accepts.
+const CONTEXT_OVER: CostVerdict = 'over'
+const CONTEXT_UNDER: CostVerdict = 'under'
+const CONTEXT_UNMEASURABLE: CostVerdict = 'unmeasurable'
 
 function cut_of(issue: string): RunCut {
 	return {
@@ -53,13 +60,23 @@ function cut_of(issue: string): RunCut {
 	}
 }
 
-// The dispatched-child case the refusal exists for: the mark names this lane's own issue.
-function state_of(directory: string, cut?: RunCut): LaneCutState {
+// The dispatched-child case the refusal exists for: the mark names this lane's own issue. The context
+// verdict defaults to `over`, so a state built without one is the oversized lane the cut exists for and
+// the cases that predate the joshuafolkken/kit#2312 condition fire exactly as they did.
+function state_of(
+	directory: string,
+	cut?: RunCut,
+	verdict: CostVerdict = CONTEXT_OVER,
+): LaneCutState {
 	function carried(): RunCut | undefined {
 		return cut
 	}
 
-	return { directory, carried, marked_issue: ISSUE }
+	function context_verdict(): CostVerdict {
+		return verdict
+	}
+
+	return { directory, carried, marked_issue: ISSUE, context_verdict }
 }
 
 // A lane checkout whose mark is absent (a person working there) or names another issue (a leak from
@@ -279,6 +296,22 @@ describe('is_uncut_gate', () => {
 	it('says nothing about the cut itself, issued in the same lane', () => {
 		expect(pre_gate_cut.is_uncut_gate(TAKE_THE_CUT, state_of(LANE_DIRECTORY))).toBe(false)
 	})
+
+	// **joshuafolkken/kit#2312: the cut is conditional on the recent-window context.** Below the shared
+	// threshold a short lane has no accumulation worth a resume, so the guard stays silent and the gate
+	// runs uncut.
+	it('says nothing about an uncut lane gate whose recent context is under the threshold', () => {
+		const state = state_of(LANE_DIRECTORY, undefined, CONTEXT_UNDER)
+
+		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(false)
+	})
+
+	// An unmeasurable session keeps the old unconditional cut as the safety net.
+	it('fires on an uncut lane gate when the recent context cannot be measured', () => {
+		const state = state_of(LANE_DIRECTORY, undefined, CONTEXT_UNMEASURABLE)
+
+		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(true)
+	})
 })
 
 describe('rule_delivery — the pre-gate cut at the call that runs the gate', () => {
@@ -378,6 +411,24 @@ describe('rule_value.measure — the pre-gate cut row', () => {
 		const resumed = run_of(RESUME_CHECK, GATE)
 
 		expect(rule_value.unaided_rate(pre_gate_row([cut, resumed]))).toBe(100)
+	})
+})
+
+// **kit#2177: the ordered cut removes the collateral cancel from the default path.** The wasted round
+// trip #2160 measured came from reaching an uncut gate, being refused, and losing the `review:brief`
+// batched with it. Ordering the cut first avoids that in two structural ways this suite pins: the cut
+// is issued on its own (so nothing is batched with the refused call), and the gate then runs in the
+// fresh process where the carried cut keeps the guard silent (so a batched gate survives).
+describe('the ordered cut avoids the collateral cancel', () => {
+	// The near-side process issues the cut on its own and is not refused for it, so it batches nothing a
+	// refusal could collateral; the fresh process then runs the gate with the cut carried, where the
+	// guard is silent — so a gate batched there with `review:brief` is not refused and neither call is
+	// cancelled. Both halves are what the ordered step relies on to keep the #2160 collateral off the path.
+	it('refuses neither the lone cut nor the resumed gate, so no batched sibling is cancelled', () => {
+		const resumed = state_of(LANE_DIRECTORY, cut_of(ISSUE))
+
+		expect(pre_gate_cut.is_uncut_gate(TAKE_THE_CUT, state_of(LANE_DIRECTORY))).toBe(false)
+		expect(pre_gate_cut.is_uncut_gate(GATE, resumed)).toBe(false)
 	})
 })
 

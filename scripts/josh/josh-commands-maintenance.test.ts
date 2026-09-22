@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { MAINTENANCE_COMMANDS } from './josh-commands-maintenance'
 
 const LATEST_UPDATE_COMMAND = 'latest:update'
+const LATEST_COREPACK_COMMAND = 'latest:corepack'
+const LATEST_GUARD_COMMAND = 'latest:guard'
 const LATEST_UPDATE_NOT_DEFINED = 'latest:update command not defined'
 const LATEST_NOT_DEFINED = 'latest command not defined'
 const LATEST_COREPACK_NOT_DEFINED = 'latest:corepack command not defined'
@@ -62,7 +64,18 @@ describe('MAINTENANCE_COMMANDS latest', () => {
 	it('delegates the pnpm corepack bump to josh latest:corepack', () => {
 		if (!cmd) throw new Error(LATEST_NOT_DEFINED)
 
-		expect(cmd.shell?.join(' ') ?? '').toContain('latest:corepack')
+		expect(cmd.shell?.join(' ') ?? '').toContain(LATEST_COREPACK_COMMAND)
+	})
+
+	// The lane refusal has to run before corepack, the first step that mutates package.json
+	// (joshuafolkken/kit#2135) — otherwise a lane's corepack bump lands before the guard is reached.
+	it('fronts the chain with the lane guard, ahead of corepack', () => {
+		if (!cmd) throw new Error(LATEST_NOT_DEFINED)
+
+		const shell = cmd.shell?.join(' ') ?? ''
+
+		expect(shell).toContain(LATEST_GUARD_COMMAND)
+		expect(shell.indexOf(LATEST_GUARD_COMMAND)).toBeLessThan(shell.indexOf(LATEST_COREPACK_COMMAND))
 	})
 
 	// This is the run that rewrites the ranges, on a developer machine where safe-chain's shims are

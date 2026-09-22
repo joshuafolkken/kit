@@ -27,17 +27,19 @@ interface HookBundle {
 	out: string
 }
 
-// The three settings.json hooks, the Codex input adapter, and the two guards `pretool-guard`
-// composes: `batch-guard` and `investigation-guard` each self-invoke, so they must be their own
-// entries to keep their `import.meta.url` out of `pretool-guard`'s file. `delivered-rules` (the third
-// guard) has no self-invoke, so it stays inlined.
+// The three settings.json hooks, the Codex input adapter, and the three guards `pretool-guard`
+// composes: `batch-guard`, `investigation-guard` and `duplicate-read-guard` each self-invoke, so they
+// must be their own entries to keep their `import.meta.url` out of `pretool-guard`'s file.
+// `delivered-rules` (the fourth guard) has no self-invoke, so it stays inlined.
 const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/hooks/codex-hook-adapter.ts', out: 'codex-hook-adapter' },
 	{ source: 'scripts/hooks/pretool-guard.ts', out: 'pretool-guard' },
+	{ source: 'scripts/hooks/stop-guard.ts', out: 'stop-guard' },
 	{ source: 'scripts/hooks/format-edited-file.ts', out: 'format-edited' },
 	{ source: 'scripts/josh/session-language-cli.ts', out: 'session-lang' },
 	{ source: 'scripts/hooks/batch-guard.ts', out: 'batch-guard' },
 	{ source: 'scripts/delegation/investigation-guard.ts', out: 'investigation-guard' },
+	{ source: 'scripts/delegation/duplicate-read-guard.ts', out: 'duplicate-read-guard' },
 ]
 
 function entry_point(bundle: HookBundle): { in: string; out: string } {

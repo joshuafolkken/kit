@@ -1,7 +1,7 @@
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
@@ -14,23 +14,39 @@ import {
 	COMMENTED_READ_COMMAND,
 	FILING_API_COMMAND,
 	FILING_COMMAND,
+	scouted_tail,
 	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
+import { delivered_rules_harness } from './delivered-rules-harness'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#1524: a rule that left residency has to *fire*, or the relocation deleted it. The
 // whole point of the Issue is that prose which is never read is indistinguishable from an absent
 // rule — so this suite asserts the delivery on the call that binds it, and the silence on every call
 // that does not.
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'rule-guard-'))
+const harness = delivered_rules_harness.create_harness()
+const { payload_for, payload_of, transcript_for } = harness
+const WORK_DIRECTORY = harness.work
 // The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
 // working directory to the non-lane WORK_DIRECTORY per test to stay hermetic wherever it was launched: rule_delivery
 // and rules_claiming invoke each rule's real trigger, and the pre-gate-cut trigger reads the live
 // process.cwd() to decide whether a checkout is a lane, so a run started inside a lane worktree would
 // otherwise see the gate cases fire that rule and the silence assertions break (joshuafolkken/kit#1884).
 const ENTRY_DIRECTORY = process.cwd()
+// A lane checkout under WORK_DIRECTORY, for the one block that runs as a dispatched lane child
+// (joshuafolkken/kit#2138). Every other block stays in the non-lane WORK_DIRECTORY.
+const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
+const LANE_ISSUE = '2138'
+const LANE_DIRECTORY = path.join(LANE_ROOT, LANE_ISSUE)
 const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
+const ISSUE_SCOUT = 'issue-scout'
+const FILING_CAP_ID = 'filing-cap'
+// A filing is claimed by five filing rows — the WIP cap, the scout gate, the per-run cap, the fold
+// gate (joshuafolkken/kit#2119, joshuafolkken/kit#2213) and the `issue:lint` oracle-consulted row
+// (joshuafolkken/kit#2324); a filing whose body also carries a backtick adds `shell-body`.
+const FILING_RULE_COUNT = 5
+const FILING_WITH_BODY_RULE_COUNT = 6
 const NOW_MS = 1_700_000_000_000
 // Later than any turn the transcript fixture can carry, so the batching guard's recorded refusal
 // covers the whole open sequence whatever wall clock the fixture used — the state where it has
@@ -57,20 +73,7 @@ const SHELL_BODY = 'shell-body'
 // comment rather than a filing, so exactly one row claims it.
 const EVALUATED_BODY_COMMAND =
 	'gh api repos/joshuafolkken/kit/issues/1198/comments -f body="see `pnpm josh ms`"'
-const WRITTEN_TRANSCRIPTS = new Set<string>()
-const { open_turn_lines, target_turn_lines } = time_transcript_fixture
-
-// The trigger reads the call, never the history, so an empty transcript is the honest fixture for
-// every case but the collision one: it proves the decision came from the command rather than from
-// anything behind it.
-function transcript_for(name: string, text = ''): string {
-	const target = path.join(WORK_DIRECTORY, `${name}.jsonl`)
-
-	writeFileSync(target, text)
-	WRITTEN_TRANSCRIPTS.add(target)
-
-	return target
-}
+const { BRANCH, josh_call_line, open_turn_lines, target_turn_lines } = time_transcript_fixture
 
 // Three consecutive single-call turns with the third still open — the one shape `batch:guard`
 // refuses, and therefore the one shape this guard has to stay quiet on.
@@ -101,21 +104,6 @@ function rules_claiming(command: string): number {
 	).length
 }
 
-function payload_for(transcript: string, command: string, tool_name = 'Bash'): string {
-	return JSON.stringify({
-		hook_event_name: 'PreToolUse',
-		transcript_path: transcript,
-		tool_name,
-		tool_input: { command },
-	})
-}
-
-// `history` is the transcript behind the call. It is empty for every case but the collision ones,
-// which is the honest fixture: the trigger reads the call and never the history.
-function payload_of(name: string, command: string, tool_name = 'Bash', history = ''): string {
-	return payload_for(transcript_for(name, history), command, tool_name)
-}
-
 // The batching guard's own record, written the way that guard writes it — so a case can put a run
 // into the state where `batch:guard` has already spoken and will not speak again.
 const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
@@ -124,6 +112,9 @@ const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PR
 // the disabled list recognizes, so the guard reads as on exactly as it does on a fresh machine.
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
+	// The lane-child block sets `JOSH_LANE_CHILD`; clearing it here, beside the cwd reset, keeps it from
+	// leaking into any case that runs after — the same reset-before-every-case discipline as the cwd.
+	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
 })
 
@@ -133,15 +124,9 @@ beforeEach(() => {
 afterAll(() => {
 	process.chdir(ENTRY_DIRECTORY)
 
-	for (const transcript of WRITTEN_TRANSCRIPTS) {
-		for (const rule of delivered_rules.DELIVERED_RULES) {
-			rmSync(delivered_rules.delivery_path(rule.id, transcript), { force: true })
-		}
+	for (const transcript of harness.written) rmSync(BATCH_STAMP.path(transcript), { force: true })
 
-		rmSync(BATCH_STAMP.path(transcript), { force: true })
-	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
+	harness.cleanup()
 })
 
 describe('cwd isolation', () => {
@@ -260,8 +245,12 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call once you have counted')
 	})
 
+	// The tail carries a scout and an `issue:lint`, so the second call is claimed by neither
+	// `issue-scout` nor the `issue:lint` oracle-consulted row — this block is about the WIP cap alone
+	// (joshuafolkken/kit#2119, joshuafolkken/kit#2324).
 	it(ONCE_PER_RUN, () => {
-		const payload = payload_of('repeat', FILING_COMMAND)
+		const lint_call = josh_call_line(1, BRANCH, 'pnpm josh issue:lint x.md')
+		const payload = payload_of('repeat', FILING_COMMAND, 'Bash', `${scouted_tail()}\n${lint_call}`)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
@@ -425,13 +414,25 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it.each([WIP_CAP, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION, RUN_TAIL])('names %j', (id) => {
+	it.each([
+		WIP_CAP,
+		ISSUE_SCOUT,
+		FILING_CAP_ID,
+		ISSUE_COMMENTS,
+		SHELL_BODY,
+		PIPED_VERIFICATION,
+		RUN_TAIL,
+	])('names %j', (id) => {
 		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
 	})
 
+	it('is on by default', () => {
+		expect(delivered_rules.is_enabled()).toBe(true)
+	})
+})
+
+describe('DELIVERED_RULES — trigger overlap', () => {
 	it.each([
-		FILING_COMMAND,
-		FILING_API_COMMAND,
 		BODY_READ_COMMAND,
 		BODY_READ_API_COMMAND,
 		EVALUATED_BODY_COMMAND,
@@ -441,21 +442,62 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(rules_claiming(command)).toBe(1)
 	})
 
-	// **The one overlap the enumeration allows, and the order that makes it safe**
-	// (joshuafolkken/kit#1198). A filing whose body happens to carry a backtick is claimed by both
-	// `wip-cap` and `shell-body`; `wip-cap` is listed first because it decides whether the Issue
-	// should exist at all. Nothing is lost by losing the race — the stamps are keyed per `id`, so the
-	// reissued call is delivered the second rule, which is asserted here rather than assumed.
+	// **A filing is the deliberate overlap: five rows claim it** (joshuafolkken/kit#2119,
+	// joshuafolkken/kit#2213, joshuafolkken/kit#2324) — the WIP cap, the scout gate, the per-run cap, the
+	// fold gate and the `issue:lint` oracle-consulted row — resolved by the reissue chain rather than by
+	// a single winner, so the claim count is asserted rather than the exactly-one invariant above.
+	it.each([FILING_COMMAND, FILING_API_COMMAND])(
+		'is claimed by the five filing rules: %j',
+		(command) => {
+			expect(rules_claiming(command)).toBe(FILING_RULE_COUNT)
+		},
+	)
+
+	// **The overlap order, asserted rather than assumed** (joshuafolkken/kit#1198,
+	// joshuafolkken/kit#2119, joshuafolkken/kit#2324). A filing whose body carries a backtick is claimed
+	// by six rows; with the run already scouted the scout gate and the cap stand down, and the fold gate
+	// stands down on a first filing, so `wip-cap` is delivered first and `shell-body` on the reissue —
+	// the `issue:lint` oracle row is last and would deliver only on a further reissue. The stamps are
+	// keyed per `id`, so nothing is lost by losing the race.
 	it('delivers the second rule on the reissue when a filing also carries an evaluated body', () => {
 		const command = 'gh api repos/o/r/issues -f title="x" -f body="see `pnpm josh ms`"'
-		const payload = payload_of('overlap', command)
+		const payload = payload_of('overlap', command, 'Bash', scouted_tail())
 
-		expect(rules_claiming(command)).toBe(2)
+		expect(rules_claiming(command)).toBe(FILING_WITH_BODY_RULE_COUNT)
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.SHELL_BODY_REASON)
 	})
+})
 
-	it('is on by default', () => {
-		expect(delivered_rules.is_enabled()).toBe(true)
+describe('rule_delivery — a dispatched lane child keeps the rule guard', () => {
+	// joshuafolkken/kit#2138: the rule guard fires in a lane child — it carries the lane-only rules a
+	// child depends on and the safety rules it must still obey — so this block sets the mark and stays in
+	// a lane checkout, unlike every other block here, which runs from the non-lane WORK_DIRECTORY.
+	// The outer `beforeEach` chdirs back to the non-lane WORK_DIRECTORY and clears the mark before every
+	// case, so this block needs no teardown of its own; `afterAll` restores the entry directory.
+	beforeEach(() => {
+		mkdirSync(LANE_DIRECTORY, { recursive: true })
+		process.chdir(LANE_DIRECTORY)
+		process.env[lane_child_marker.KEY] = LANE_ISSUE
+	})
+
+	// The rule guard fires in a child (the enumeration's `rule: true`, pinned in
+	// `lane-guard-policy.test.ts`) — a safety rule still delivers here.
+	it('still delivers a rule in a lane child', () => {
+		expect(rule_delivery(payload_of('lane-shell-body', EVALUATED_BODY_COMMAND), NOW_MS)).toBe(
+			delivered_rules.SHELL_BODY_REASON,
+		)
+	})
+
+	// **The batching stand-aside is disabled in a lane child.** The batching guard is suppressed there
+	// (joshuafolkken/kit#2138), so on the very history it would otherwise refuse, a lone rule trigger is
+	// delivered at once rather than stood aside for a refusal that can no longer come — the non-lane
+	// version of this transcript stands aside first (see "stands aside while the batching guard may
+	// speak").
+	it('delivers a body read without standing aside on a batched history', () => {
+		const transcript = transcript_for('lane-body-collision', unbatched_text())
+		const call = payload_for(transcript, BODY_READ_COMMAND)
+
+		expect(rule_delivery(call, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 })

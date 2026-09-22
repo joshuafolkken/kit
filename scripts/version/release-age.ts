@@ -41,8 +41,14 @@ function is_eligible(
 	major: string | undefined,
 	cutoff_ms: number,
 ): boolean {
-	if (semver.valid(version) === null || semver.prerelease(version) !== null) return false
-	if (!is_on_major(version, major)) return false
+	if (
+		semver.valid(version) === null ||
+		semver.prerelease(version) !== null ||
+		!is_on_major(version, major)
+	) {
+		return false
+	}
+
 	const published_ms = Date.parse(published_at)
 
 	return Number.isFinite(published_ms) && published_ms <= cutoff_ms

@@ -240,9 +240,10 @@ function classify_manifest_failure(repo: string): ManifestAnswer {
 		timeout: GH_TIMEOUT_MS,
 	})
 
-	return git_gh_exec.parse_status_line(probe.stdout) === NOT_FOUND_STATUS
-		? { kind: 'absent' }
-		: { kind: 'unreadable' }
+	return {
+		kind:
+			git_gh_exec.parse_status_line(probe.stdout) === NOT_FOUND_STATUS ? 'absent' : 'unreadable',
+	}
 }
 
 function fetch_manifest(repo: string): ManifestAnswer {

@@ -1,20 +1,39 @@
-// The byte ceiling for every document an agent reads in full — in one place, as a ratchet.
+// The byte ceiling for every agent-read document NO entry reads — the fallback budget, a ratchet.
 //
-// Agent-read documents (`CLAUDE.md`, `.claude/skills/**/*.md`, `prompts/**/*.md` and
-// `docs/josh-commands.md`) have been shrunk by reduction epics (joshuafolkken/kit#1929,
-// joshuafolkken/kit#1924) only to swell again, because nothing held the reduced size — a PR that
-// adds a few lines at a time goes unseen until the next reduction epic. This list is that hold:
-// `document-byte-budget.test.ts` fails `pnpm josh gate` when a document grows past its recorded
-// size plus a small slack, when the list names a file that no longer exists, or when a file in
-// scope has no entry here.
+// **This is now the secondary budget** (joshuafolkken/kit#2257). The primary one is the entry total
+// (`entry-read-budget.ts`): a document a workflow entry reads is held by that entry's total and
+// carries no ceiling here, so neither budget holds it twice. What is left for this list is the
+// documents no entry reads — the reference documents a human browses, drawn by
+// `document-reachability.ts` from `read:set`'s output rather than by a hand-written table.
 //
-// HOW TO RAISE (or LOWER) A CEILING — this file is the only place, on purpose. Each entry's `bytes`
-// is the document's recorded byte size; the effective ceiling is that value plus `SLACK_BYTES`. A
-// change that grows a document past its ceiling must raise that document's recorded size here, in
-// the same PR, so the reason for the growth is visible in the diff a reviewer reads. A reduction
-// epic that shrinks a document lowers its recorded size here the same way. Do NOT widen
-// `SLACK_BYTES` to dodge a bump — that loosens every ceiling at once, which is the opposite of the
-// ratchet's purpose.
+// Agent-read documents (`.claude/skills/**/*.md`, `prompts/**/*.md` and `docs/josh-commands.md`) have
+// been shrunk by reduction epics (joshuafolkken/kit#1929, joshuafolkken/kit#1924) only to swell
+// again, because nothing held the reduced size — a PR that adds a few lines at a time goes unseen
+// until the next reduction epic. This list is that hold for the unreached ones:
+// `document-byte-budget.test.ts` fails `pnpm josh gate` when such a document grows past its recorded
+// ceiling, when the list names a file that no longer exists, or when an unreached file has no entry
+// here.
+//
+// THE RECORDED CEILING IS BLOCK-QUANTIZED — this is what stops parallel command-adding lanes from
+// serializing on this file (joshuafolkken/kit#2231). Each entry's `bytes` is not the document's exact
+// size but the smallest multiple of `BLOCK_BYTES` at or above it, and that value IS the ceiling. A
+// document that grows within its current block needs no edit here, so most command-adding PRs leave
+// this file untouched rather than bumping a shared line; a document that crosses a block boundary
+// bumps to the next multiple — the same value from every lane, an identical change git auto-merges,
+// not a hand-picked slack unit two branches fight over. Growth is still bounded: the block is the
+// whole of a document's headroom, so it cannot swell without a visible, deterministic bump in the
+// diff. This replaced the earlier exact-size-plus-512-slack ratchet, whose tight slack forced
+// `docs/josh-commands.md` — pinned at its ceiling — to bump on every command addition, the
+// serialization point #2231 removed. It also retired the bespoke `JOSH_COMMANDS_CEILING_BYTES` hard
+// cap and its per-bump changelog comment: the uniform block ratchet now holds that document like any
+// other, so the second cap was a second line to bump for no added hold.
+//
+// HOW TO RAISE (or LOWER) A CEILING — this file is the only place, on purpose. When the gate reports a
+// document over its ceiling, copy the exact value the message names (the next block multiple) into
+// that document's entry, in the same PR, so the reason for the growth is visible in the diff a
+// reviewer reads. A reduction epic that shrinks a document below a block lowers its entry the same
+// way, to the multiple the stale-ratchet message names. Do NOT widen `BLOCK_BYTES` to dodge a bump —
+// that loosens every ceiling at once, which is the opposite of the ratchet's purpose.
 //
 // It is a list of records rather than a path-keyed object because file paths are not valid object
 // property names under the naming-convention lint rule.
@@ -24,119 +43,139 @@ interface DocumentBudget {
 	bytes: number
 }
 
-// The small margin every recorded size is allowed to grow by before the gate fires. Kept tight so a
-// meaningful addition to a document has to be recorded here rather than slipping through.
-const SLACK_BYTES = 512
+// The quantization block. A recorded ceiling is a multiple of this, so a document growing within a
+// block needs no edit and one crossing a boundary bumps to the same next multiple from every lane —
+// the property that keeps parallel lanes from conflicting on this file. Kept small enough that the
+// ratchet still holds growth tightly: the block is the entire headroom a document has before its next
+// deterministic bump. Widening it to dodge a bump is the workaround the ratchet exists to forbid, so
+// its value is pinned by a test.
+const BLOCK_BYTES = 4096
 
-// `docs/josh-commands.md` is held near 80 KB — the target joshuafolkken/kit#1929 set but never
-// enforced. Its recorded size plus `SLACK_BYTES` must stay at or below this, pinned by a dedicated
-// test so a careless bump cannot push it over silently. joshuafolkken/kit#1988 raised it one slack
-// unit (80,000 → 80,512) for the kit-only annotation on `josh eval`, the mandated doc update landing
-// against a document #1978 had already filled to the 80,000 mark. joshuafolkken/kit#2002 raised it a
-// further slack unit (80,512 → 81,024) for the mandated `josh lane:dispatch` update documenting the
-// dispatch-time `in-progress` apply, again landing against a document already at its mark.
-// joshuafolkken/kit#2024 raised it two slack units (81,024 → 82,048) for the mandated `josh
-// run:merge` section: the section landed against a document already at its mark, and the branch's own
-// merge with `main` layered a concurrent doc addition on top, so the merged tree the CI gate measures
-// needed the second unit that the branch tree alone did not. joshuafolkken/kit#2050 raised it four
-// slack units (82,048 → 84,096) for the mandated `josh stash:pop` section — its command reference and
-// the `conflicted` verdict — landing against a document already at its mark.
-const JOSH_COMMANDS_CEILING_BYTES = 84_096
-
-// Recorded byte size of each agent-read document. Must name exactly the set `agent_read_documents()`
-// enumerates — the test fails on a stale entry (a file that no longer exists) and on an un-budgeted
-// file (one in scope with no entry), so the definition cannot rot as documents are added or removed.
-const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
-	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 5064 },
-	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 32_596 },
-	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 5320 },
-	{ path: '.claude/skills/workflow-commands/SKILL.md', bytes: 62_819 },
-	{ path: '.claude/skills/workflow-commands/background-commands.md', bytes: 8180 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-child.md', bytes: 24_829 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-lanes.md', bytes: 25_746 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-park.md', bytes: 11_889 },
-	{ path: '.claude/skills/workflow-commands/backlogrun-progress.md', bytes: 39_678 },
-	{ path: '.claude/skills/workflow-commands/backlogrun.md', bytes: 49_821 },
-	{ path: '.claude/skills/workflow-commands/chain-rule.md', bytes: 18_031 },
-	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 13_066 },
-	{ path: '.claude/skills/workflow-commands/followup.md', bytes: 12_667 },
-	{ path: '.claude/skills/workflow-commands/fullrun.md', bytes: 16_702 },
-	{ path: '.claude/skills/workflow-commands/halfrun.md', bytes: 11_117 },
-	{ path: '.claude/skills/workflow-commands/kickoff.md', bytes: 7528 },
-	{ path: '.claude/skills/workflow-commands/latest-gate.md', bytes: 5124 },
-	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 23_931 },
-	{ path: '.claude/skills/workflow-commands/pre-gate-cut.md', bytes: 25_508 },
-	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 18_914 },
-	{ path: '.claude/skills/workflow-commands/split-assessment.md', bytes: 6558 },
-	{ path: 'CLAUDE.md', bytes: 26_355 },
-	{ path: 'docs/josh-commands.md', bytes: 83_206 },
-	{ path: 'prompts/agent-rules.md', bytes: 3472 },
-	{ path: 'prompts/coding-standards.md', bytes: 15_805 },
-	{ path: 'prompts/collaboration-workflow.md', bytes: 7353 },
-	{ path: 'prompts/collaboration-workflow/consultation-vs-execution.md', bytes: 1108 },
-	{ path: 'prompts/collaboration-workflow/cross-repo-epic.md', bytes: 5541 },
-	{ path: 'prompts/collaboration-workflow/distributed-docs.md', bytes: 854 },
-	{ path: 'prompts/collaboration-workflow/durable-rules.md', bytes: 2451 },
-	{ path: 'prompts/collaboration-workflow/epic-audit.md', bytes: 8383 },
-	{ path: 'prompts/collaboration-workflow/epic-bundle.md', bytes: 23_605 },
-	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_147 },
-	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4494 },
-	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 3103 },
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 19_064 },
-	{ path: 'prompts/collaboration-workflow/latest-first.md', bytes: 2625 },
-	{ path: 'prompts/collaboration-workflow/no-clones.md', bytes: 1614 },
-	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 22_272 },
-	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 12_942 },
-	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4518 },
-	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 16_801 },
-	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 488 },
-	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 18_438 },
-	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 17_102 },
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 24_393 },
-	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 8133 },
-	{ path: 'prompts/collaboration-workflow/single-source-rules.md', bytes: 1764 },
-	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 18_726 },
-	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 11_252 },
-	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 17_057 },
-	{ path: 'prompts/refactoring.md', bytes: 8372 },
-	{ path: 'prompts/review-rubric.md', bytes: 18_268 },
-	{ path: 'prompts/review.md', bytes: 17_103 },
-	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 4660 },
-	{ path: 'prompts/testing-guide.md', bytes: 19_774 },
-]
-
-// The effective ceiling: the recorded size plus the shared slack.
-function ceiling_for(recorded_bytes: number): number {
-	return recorded_bytes + SLACK_BYTES
+// The smallest multiple of `BLOCK_BYTES` at or above `size` — the recorded ceiling for a document of
+// that size. Two lanes that grow the same document into the same block compute the same ceiling, so
+// the edit they both make is identical and merges cleanly; a document growing within its block
+// computes the ceiling it already has, so it needs no edit at all.
+function block_ceiling(size: number): number {
+	return Math.ceil(size / BLOCK_BYTES) * BLOCK_BYTES
 }
 
-// The recorded size for one path, or undefined when it carries no budget entry.
+// Recorded byte ceiling of each unreached document — the block multiple at or above its size. Must
+// name exactly the documents `document_reachability.unreached_documents()` derives: the test fails on
+// a stale entry (a file that no longer exists or that an entry now reads) and on an un-budgeted
+// unreached file, so the definition cannot rot as documents move on or off the execution path.
+const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
+	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 8192 },
+	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 32_768 },
+	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/followup-reference.md', bytes: 16_384 },
+	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
+	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 24_576 },
+	// `pre-gate-cut.md` left this per-document budget in joshuafolkken/kit#2289: it became a point-of-use
+	// document, so its bytes are now held by every entry's total read (`entry-read-budget.ts`) and the
+	// two budgets must not hold it twice — the reachability line moved it from `unreached` to
+	// `point-of-use`.
+	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 24_576 },
+	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
+	{ path: 'docs/josh-commands.md', bytes: 147_456 },
+	{ path: 'prompts/agent-rules.md', bytes: 4096 },
+	{ path: 'prompts/coding-standards.md', bytes: 16_384 },
+	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/consultation-vs-execution.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/cross-repo-epic.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/distributed-docs.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/durable-rules.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/epic-audit.md', bytes: 12_288 },
+	{ path: 'prompts/collaboration-workflow/epic-bundle.md', bytes: 24_576 },
+	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },
+	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 24_576 },
+	{ path: 'prompts/collaboration-workflow/latest-first.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/no-clones.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 24_576 },
+	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 16_384 },
+	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 20_480 },
+	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 24_576 },
+	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 20_480 },
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 53_248 },
+	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 12_288 },
+	{ path: 'prompts/collaboration-workflow/simplicity-first.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/single-source-rules.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/turn-batching.md', bytes: 24_576 },
+	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', bytes: 12_288 },
+	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 20_480 },
+	{ path: 'prompts/refactoring.md', bytes: 8192 },
+	{ path: 'prompts/review-rubric.md', bytes: 20_480 },
+	{ path: 'prompts/review.md', bytes: 20_480 },
+	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
+	{ path: 'prompts/testing-guide.md', bytes: 20_480 },
+]
+
+// The recorded ceiling for one path, or undefined when it carries no budget entry.
 function recorded_bytes_for(relative_path: string): number | undefined {
 	return DOCUMENT_BYTE_BUDGET.find((entry) => entry.path === relative_path)?.bytes
 }
 
-// The failure message the size test raises — names the file, its current byte size, its ceiling, and
-// where to raise the ceiling (this file), per the acceptance criteria.
+// The bytes an entry has left before its ceiling — the recorded ceiling minus the document's current
+// size. Negative when the document is already over. `josh bytes` prints it as the headroom before an
+// edit, the same number `josh lines` prints for code lines (joshuafolkken/kit#2176).
+function remaining_bytes(recorded_bytes: number, current_bytes: number): number {
+	return recorded_bytes - current_bytes
+}
+
+// The failure message the size test raises — names the file, its current byte size, its recorded
+// ceiling, and where to raise it (this file), per the acceptance criteria.
+//
+// **It names the exact value to record**: the recorded ceiling is the block multiple at or above the
+// document's size, so the number to write is `block_ceiling(current)` — a reader raising the ceiling
+// copies it rather than computing it by hand. Two lanes that both cross into the same block copy the
+// same value, so the edit they make merges without conflict.
 function over_budget_message(
 	relative_path: string,
 	current_bytes: number,
 	recorded_bytes: number,
 ): string {
-	const ceiling = ceiling_for(recorded_bytes).toString()
+	const ceiling = recorded_bytes.toString()
 	const current = current_bytes.toString()
-	const recorded = `${recorded_bytes.toString()} + ${SLACK_BYTES.toString()} slack`
-	const raise_hint = `raise its recorded size in scripts/document/document-byte-budget.ts so the reason shows in the PR diff`
+	const next = block_ceiling(current_bytes).toString()
+	const raise_hint = `raise its recorded size to ${next} in scripts/document/document-byte-budget.ts so the reason shows in the PR diff`
 
-	return `${relative_path} is ${current} bytes, over its ${ceiling}-byte ceiling (recorded ${recorded}). Shrink the document, or ${raise_hint}.`
+	return `${relative_path} is ${current} bytes, over its ${ceiling}-byte ceiling. Shrink the document, or ${raise_hint}.`
+}
+
+// The failure message the staleness test raises. A recorded ceiling more than a block above the
+// document's actual size is a stale-loose ratchet: the document shrank across a block boundary and
+// its record was never lowered, so the ceiling no longer holds the reduction (the drift
+// joshuafolkken/kit#2125 swept). It names the file, its recorded ceiling, its actual size, and the
+// block multiple to lower the record to.
+function stale_budget_message(
+	relative_path: string,
+	recorded_bytes: number,
+	current_bytes: number,
+): string {
+	const recorded = recorded_bytes.toString()
+	const current = current_bytes.toString()
+	const next = block_ceiling(current_bytes).toString()
+	const lower_hint = `lower its recorded size to ${next} in scripts/document/document-byte-budget.ts so the ratchet holds the reduction`
+
+	return `${relative_path} records ${recorded} bytes but is ${current}, more than a block above actual. ${lower_hint}.`
 }
 
 const document_byte_budget = {
 	DOCUMENT_BYTE_BUDGET,
-	JOSH_COMMANDS_CEILING_BYTES,
-	SLACK_BYTES,
-	ceiling_for,
+	BLOCK_BYTES,
+	block_ceiling,
 	over_budget_message,
 	recorded_bytes_for,
+	remaining_bytes,
+	stale_budget_message,
 }
 
 export type { DocumentBudget }
