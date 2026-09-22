@@ -67,6 +67,11 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// `backlogrun-steps.md` left the child's point-of-use set: the child never opened the scheduler's step
 	// list, so its ~48KB read crossed a block downward and the recorded ceiling drops to the block multiple
 	// the stale-ratchet message named. The other entries still read it, so their rows hold.
+	// joshuafolkken/kit#2345 added the `implementation-unit` delegation row (full fan-out procedure in
+	// `docs/josh-commands.md` → "`josh fanout`"); `SKILL.md` §2b gained only a one-clause mention and a
+	// pointer, folded into the existing enumeration and offset by tightening §2b prose, so every entry
+	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
+	// multiple, which the downward ratchet holds shut).
 	{ entry: 'kickoff', bytes: 266_240 },
 	{ entry: 'fullrun', bytes: 266_240 },
 	{ entry: 'halfrun', bytes: 266_240 },

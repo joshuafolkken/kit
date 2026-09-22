@@ -165,6 +165,13 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<step> | --list', 'automation', ['none']],
 	},
+	fanout: {
+		script: 'scripts/delegation/fanout-cli.ts',
+		description:
+			'Say whether proposed implementation units are file-disjoint, so they may run in parallel',
+		category: 'AI tools',
+		reference: ['<unit-files> <unit-files> [<unit-files> …]', 'automation', ['none']],
+	},
 	'run:hold': {
 		script: RUN_HOLD_SCRIPT,
 		description: 'Claim this working tree for a run, or say which run already holds it',

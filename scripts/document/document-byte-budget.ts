@@ -81,7 +81,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/rule-residency.md', bytes: 24_576 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
-	{ path: 'docs/josh-commands.md', bytes: 135_168 },
+	{ path: 'docs/josh-commands.md', bytes: 139_264 },
 	{ path: 'prompts/agent-rules.md', bytes: 4096 },
 	{ path: 'prompts/coding-standards.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
