@@ -16,21 +16,24 @@ const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 // work is a composite command that folds the reads into one call, so the notice now hands the model
 // that call ready to paste — but only over reads, and only where two or more could fold.
 const FOLD_COMMAND = 'pnpm josh read:files'
+// The write-side counterpart the guard hands a run of single-call edits (joshuafolkken/kit#2366).
+const EDIT_FOLD_COMMAND = 'pnpm josh edit:files'
 
-// The runs that name their candidates but earn no fold command: a lone read is a single call already,
-// `read:files` folds reads (never edits), and a directory (`ls scripts/` names a directory `read:files`
-// cannot read) must never reach the paste-ready command. Lifted out of the suite so its callback stays
-// under the test line limit.
+// A run of single-call edits, the shape the edit fold names. Reused by the read suite (it earns no
+// `read:files` command) and the edit suite (it earns the `edit:files` one).
+const EDIT_RUN: Array<Array<string>> = [
+	target_turn_lines(0, ['a.ts'], EDIT_TOOL),
+	target_turn_lines(1, ['b.ts'], EDIT_TOOL),
+	open_turn_lines(2, ['c.ts'], EDIT_TOOL),
+]
+
+// The runs that name their candidates but earn no read fold command: a lone read is a single call
+// already, `read:files` folds reads (never edits, which fold via `edit:files` instead), and a directory
+// (`ls scripts/` names a directory `read:files` cannot read) must never reach the paste-ready command.
+// Lifted out of the suite so its callback stays under the test line limit.
 const NO_FOLD_CASES: Array<[string, Array<Array<string>>]> = [
 	['a lone read', [target_turn_lines(0, ['a.ts']), open_turn_lines(1, ['c.ts'])]],
-	[
-		'a run of edits',
-		[
-			target_turn_lines(0, ['a.ts'], EDIT_TOOL),
-			target_turn_lines(1, ['b.ts'], EDIT_TOOL),
-			open_turn_lines(2, ['c.ts'], EDIT_TOOL),
-		],
-	],
+	['a run of edits', EDIT_RUN],
 	[
 		'a run of directory reads',
 		[
@@ -54,7 +57,7 @@ describe('time_batch_guard.recent_candidates', () => {
 		expect(time_batch_guard.recent_candidates('')).toBe('')
 	})
 
-	it.each(NO_FOLD_CASES)('offers no fold command over %s', (_label, groups) => {
+	it.each(NO_FOLD_CASES)('offers no read fold command over %s', (_label, groups) => {
 		expect(time_batch_guard.recent_candidates(transcript(...groups))).not.toContain(FOLD_COMMAND)
 	})
 
@@ -70,5 +73,28 @@ describe('time_batch_guard.recent_candidates', () => {
 		)
 
 		expect(time_batch_guard.recent_candidates(text)).toContain(`${FOLD_COMMAND} a.ts b.ts`)
+	})
+})
+
+// The write-side fold (joshuafolkken/kit#2366): a run of single-call edits names the edits and hands the
+// `edit:files` call over their files, the counterpart of the read fold. A single edit folds nothing, and
+// a run of edits never reaches for the read command.
+describe('time_batch_guard.recent_candidates — the write-side fold', () => {
+	it('names the recent single-call edits and offers the edit:files fold over them', () => {
+		const tail = time_batch_guard.recent_candidates(transcript(...EDIT_RUN))
+
+		expect(tail).toContain('Edit a.ts')
+		expect(tail).toContain(EDIT_FOLD_COMMAND)
+		expect(tail).toContain('a.ts b.ts')
+		expect(tail).not.toContain(FOLD_COMMAND)
+	})
+
+	it('offers no edit fold over a lone edit', () => {
+		const lone = [
+			target_turn_lines(0, ['a.ts'], EDIT_TOOL),
+			open_turn_lines(1, ['c.ts'], EDIT_TOOL),
+		]
+
+		expect(time_batch_guard.recent_candidates(transcript(...lone))).not.toContain(EDIT_FOLD_COMMAND)
 	})
 })

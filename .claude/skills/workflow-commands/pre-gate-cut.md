@@ -138,16 +138,14 @@ than gating, so a cut that lost its work, or one two processes reached at once, 
 --resume` reads the record the cut left, so it learns *where to resume from* at its entry. **Skip the
 entry it has already done**: do not re-read the workflow skill, repeat the split assessment or
 re-normalize the title; the plan and decisions are read back from the issue. This removes the
-reconstruction a stopped child used to redo on every resume (2.6 minutes / ~150K tokens on
-joshuafolkken/kit#1876).
+reconstruction a stopped child redid on every resume (2.6 minutes / ~150K tokens, joshuafolkken/kit#1876).
 
 ## What is carried, and what is not
 
 - **The working tree is not in the record, because it never left the disk.** The record carries only
   what a fresh process cannot recover — the issue, the branch, the invocation, and that a **declared
-  cut** put it here.
-- **The conversation is not carried** (joshuafolkken/kit#1567 found compaction does not reduce
-  billing); the fresh process reads the plan and auto-decisions back off GitHub.
+  cut** put it here. **The conversation is not carried** (joshuafolkken/kit#1567 found compaction does
+  not reduce billing); the fresh process reads the plan and auto-decisions back off GitHub.
 - **The hold is kept, not released** — the uncommitted work is what a second run would trample, so the
   resumed process adopts the `run:hold` record and `pnpm josh followup` releases it at the merge.
 - **The dispatch mark is re-applied, not inherited** (joshuafolkken/kit#1904): the relaunch strips the
@@ -157,7 +155,7 @@ joshuafolkken/kit#1876).
 
 - **The resume verifies the tree against the record**: the branch matches, the tree is dirty, the
   issue matches, and the tree is still under the cutting run's hold. Any mismatch is `stale`.
-- **No owner is recorded on the cut.** OpenAI keeps a separate per-worktree supervisor owner record and
+- **No owner is recorded on the cut.** OpenAI keeps a separate per-worktree supervisor owner and
   generation state; the cut is the stage hand-off alone.
 - **The cut is exclusive** — `run:cut` writes the record with an exclusive create, so a second cut on
   the same tree is refused `busy`.
@@ -173,52 +171,45 @@ accumulated _during_ implementation** (joshuafolkken/kit#1933). A lane child re-
 conversation on every request, so a long implementation is billed like a long `backlogrun` parent (the
 2026-09-13 `backlogrun` measured **208k–386k** median context per request), and the pre-gate boundary
 fires only once implementation is done. The **implementation-phase cut** caps that growth — the child
-ends its process mid-implementation and a fresh one resumes the same lane **back into implementation**.
+ends mid-implementation and a fresh one resumes the same lane **back into implementation**.
 
 ### The measurement is the parent hand-off's, never a second one
 
-The guard below decides whether to refuse with the same measurement the parent uses between children —
+The guard below refuses on the same measurement the parent uses between children —
 `cost_verdict.per_request_cost`, read through `cost_cli.session_verdict` (the read-only form of
 `pnpm josh cost --cut`, the verdict the conditional pre-gate cut reads too, joshuafolkken/kit#2312),
-whose single source is `backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
-`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` both use the shared **200_000** constant
-(`CONTEXT_CUT_THRESHOLD`, aliased so the procedure, scheduler and worker tests cannot drift). No
-separate measurement or threshold is built for the lane child.
+single-sourced at `backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
+`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` share the **200_000** `CONTEXT_CUT_THRESHOLD` (aliased so
+procedure, scheduler and worker tests cannot drift). No separate measurement is built for the lane child.
 
 ### It is a guard, fired at the edit that crosses the threshold (joshuafolkken/kit#2310)
 
 **This step was carried as prose and fired exactly never** — the fate the pre-gate cut met before
 joshuafolkken/kit#1864. joshuafolkken/kit#1933 reasoned it *could not* be a guard, because the
 per-request cost was read **asynchronously**; but `cost_cli.session_verdict` is synchronous and is the
-exact verdict `pnpm josh cost --cut` prints — the same statistic against the same `CONTEXT_CUT_THRESHOLD`,
-no second measurement. joshuafolkken/kit#2310 measured the cost of leaving the check to the child:
-across five lanes (#2304 #2294 #2297 #2296 #2298) the verdict was read once each at session entry, where
-the context has not yet grown, so the cut fired **0 times** while 33.9% of their requests ran past
-200,000 tokens.
+exact verdict `pnpm josh cost --cut` prints — same statistic, same `CONTEXT_CUT_THRESHOLD`, no second
+measurement. joshuafolkken/kit#2310 measured the child-side check across five lanes (#2304 #2294 #2297
+#2296 #2298): the verdict was read once each at session entry, before the context grew, so the cut fired
+**0 times** while 33.9% of their requests ran past 200,000 tokens.
 
 So `pnpm josh rule:guard` **refuses an `Edit` / `Write`** while this checkout is a dispatched lane child
 whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N>` — a
-`PreToolUse` refusal lands *before* the edit does, so the tree is at the consistent state the previous
-edit left it, never mid-edit. Issue it: `cut` ends the turn, the rest leave this process implementing;
-a fresh process's `pnpm josh run:cut --resume <N>` then answers **`resume-impl`**, so it **skips the
-title, plan, hold claim and split assessment** and **continues implementation** rather than gating.
-Unlike the pre-gate cut, **the implementation resume clears the record** rather than marking it handed
-off (joshuafolkken/kit#2310): the pre-gate cut fires once per lane, so its record must survive to
-answer a second resume `handed-off` (joshuafolkken/kit#1935), but this one may fire again on a long
-implementation, so its record is removed on resume. A double cut is still impossible — `begin_cut`'s
-exclusive create is what prevents it — so a lane crosses this boundary several times, each with exactly
-one successor.
+`PreToolUse` refusal lands *before* the edit, so the tree is at the state the previous edit left it,
+never mid-edit. `cut` ends the turn, the rest leave this process implementing; a fresh process's
+`pnpm josh run:cut --resume <N>` then answers **`resume-impl`**, so it **skips the title, plan, hold
+claim and split assessment** and **continues implementation** rather than gating. Unlike the pre-gate
+cut, **the implementation resume clears the record** (joshuafolkken/kit#2310): the pre-gate cut fires
+once per lane so its record must survive to answer a second resume `handed-off` (joshuafolkken/kit#1935),
+but this one may fire again, so its record is removed on resume. A double cut stays impossible —
+`begin_cut`'s exclusive create prevents it — so a lane crosses this boundary several times, each with
+exactly one successor.
 
-- **It fires for a marked child and nowhere else** — the dispatch mark against this lane's own issue,
-  as the pre-gate cut reads it, so a person editing in a lane sees no refusal.
+- **It fires for a marked child and nowhere else** — the dispatch mark against this lane's own issue, so
+  a person editing in a lane sees no refusal.
 - **It re-arms per resume, not per edit** — the resume clears the record, so both this guard and the
-  pre-gate guard (which read the same record through `carried_cut_sync`) stop being silenced by it, and
-  the fresh transcript then reads under threshold until the context grows again. A lingering record
-  would silence both for the rest of the run — the "fired 0 times" state joshuafolkken/kit#2310 removed.
-  The verdicts that leave this process implementing each need the reissued edit to go through, so
-  refusing every time would wedge them.
-- **It is silent between a cut and its resume** — a carried record naming this issue keeps it quiet
-  until the resume clears it.
+  pre-gate guard (which read it through `carried_cut_sync`) stop being silenced; a lingering record would
+  silence both for the rest of the run, the "fired 0 times" state #2310 removed.
+- **It is silent between a cut and its resume** — a carried record naming this issue keeps it quiet.
 
 `scripts/rules/implementation-cut.ts` implements the trigger, `scripts/rules/implementation-cut.test.ts`
 pins it, and the row joins `prompts/collaboration-workflow/rule-delivery.md`. **A child that ended
@@ -230,36 +221,44 @@ edits, not after each one** — every check is a request too (joshuafolkken/kit#
 
 **The 200_000 `CONTEXT_CUT_THRESHOLD` is unchanged; what joshuafolkken/kit#2295 changed is the
 statistic — `cost_verdict.per_request_cost` now averages the most recent `RECENT_REQUEST_WINDOW` (10)
-requests rather than the whole session.** The measurement is still *one* both read; only its definition
-changed. This supersedes joshuafolkken/kit#2282, which had kept the whole-session average and rejected
-this recent-context option on the batch it measured — short-lived lane children that never contained a
-parent session (joshuafolkken/kit#2295), for which the two averages nearly coincide.
+requests rather than the whole session.** It is still *one* measurement both read; only its definition
+changed. This supersedes joshuafolkken/kit#2282, which kept the whole-session average and rejected this
+recent-context option on the batch it measured — short-lived lane children with no parent session, for
+which the two averages nearly coincide.
 
 - **The safety net now fires.** The implementation-phase cut was built (joshuafolkken/kit#1933) for a
   pathological regime a typical lane never enters, and 200_000 sits below the 208k floor of that regime,
-  so a genuinely runaway implementation still trips it — and joshuafolkken/kit#2310 made the guard trip
-  it actively at the edit that crosses the threshold, closing the "it never fired" gap the net had been
-  waiting on.
+  so a runaway implementation still trips it — and joshuafolkken/kit#2310 made the guard trip it actively
+  at the edit that crosses the threshold, closing the "it never fired" gap.
 - **The recent window catches the long parent the whole-session average missed.** The 2026-09-21
-  parent session `567f8eac` (186 requests, 7 hours) first crossed 200k at request 65, but its
-  whole-session average did not cross until request 150 — **85 requests (~4 hours) later**, ~$7.88
-  keeping an oversized parent supervising past the point a cut was due. The recent-10 average removes
-  that lag.
+  parent `567f8eac` (186 requests, 7 hours) first crossed 200k at request 65, but its whole-session
+  average did not until request 150 — **85 requests (~4 hours) later**, ~$7.88 supervising an oversized
+  parent past the point a cut was due. The recent-10 average removes that lag.
 - **It is not the forbidden second measurement.** joshuafolkken/kit#1933 forbids the child pricing its
-  cut on a statistic the parent does not share; #2295 keeps one statistic both read and redefines it.
-  On a short session the recent-10 average tracks the whole-session average, so a lane child cuts where
-  it always did; only the long parent hands off earlier.
+  cut on a statistic the parent does not share; #2295 keeps one statistic both read and redefines it. On
+  a short session the two averages track, so a lane child cuts where it always did; only the long parent
+  hands off earlier.
+
+### Why 200_000 stands, though the measured optimum is lower (joshuafolkken/kit#2366)
+
+**The value is kept at 200_000 on scope, not on the measurement.** #2366 re-ran the cost simulation —
+pricing each cut with the 20,000-token hand-off and the ~5-request resume ramp — and the per-request
+cost bottoms out near **100_000** (70_000 is worse: the resume outweighs the smaller drop), so 200_000
+is about twice the optimum **for a lane cut**. But this constant is one number for
+four uses — lane cut, pre-gate cut, parent hand-off and `cost --cut` session boundary — and #2366
+simulated only the lane; halving it moves the unsimulated parent hand-off too. And
+[#2354](https://github.com/joshuafolkken/kit/issues/2354) (carry across a cut) just merged, so more cuts
+want validation first. So the value holds; lowering to ~100_000 is a scoped follow-up.
 
 ### The cut is conditional, and the resume side is why (joshuafolkken/kit#2312)
 
 **Until joshuafolkken/kit#2312 the pre-gate cut was _unconditional_, and the case for it recorded only
-the gain** — the context reduction it carries single-handed (~130k → ~60k per request). **The resume
-side was never priced.** A cut relaunches a fresh process that re-reads the plan and the recorded
-decisions off GitHub before the gate — a fixed re-launch ramp of ~12 requests per session. That ramp was
-**$81.01 of $435.09 (19%)** across the 32 lanes of 2026-09-21, falling hardest on the short lanes with
-the least to drop: #2282 spent **58%** of its billing on it at a 60k median context, #2295 **39%** at
-74k, #2289 **37%** at 81k — each with **0%** of its requests over 200k, billed for a resume against an
-accumulation that was never there.
+the gain** — the context reduction it carries (~130k → ~60k per request). **The resume
+side was never priced.** A cut relaunches a fresh process that re-reads the plan and recorded decisions
+off GitHub before the gate — a fixed ramp of ~12 requests per session. That ramp was **$81.01 of $435.09
+(19%)** across the 32 lanes of 2026-09-21, falling hardest on the short lanes with the least to drop:
+#2282 spent **58%** of its billing on it at a 60k median context, #2295 **39%** at 74k, #2289 **37%** at
+81k — each with **0%** of its requests over 200k, billed for a resume against an accumulation never there.
 
 **So the cut is now taken only when the recent-window per-request cost is over `CONTEXT_CUT_THRESHOLD`**
 — the same statistic and threshold the implementation-phase cut reads, so **no second threshold is
@@ -272,22 +271,20 @@ left uncut.
 ## Consistency with the chain rule
 
 `chain-rule.md` and `background-commands.md` forbid ending a turn at the push, where the review and
-commit are behind you and CI is in flight with nothing set to resume. **The pre-gate cut is the
-opposite case and a sanctioned boundary**: it ends the turn *before* the gate and relaunches a fresh
-process in the same act, so the run continues rather than stalling — and the resumed process runs gate
-→ review → commit → push → merge **without ending**, so "the turn never ends at the push" holds for it.
-The implementation-phase cut is the same pattern one boundary earlier still (joshuafolkken/kit#1933):
-it adds turn boundaries and removes no prohibition.
+commit are behind you and CI is in flight with nothing set to resume. **The pre-gate cut is the opposite
+case and a sanctioned boundary**: it ends the turn *before* the gate and relaunches a fresh process in
+the same act, so the run continues — and the resumed process runs gate → review → commit → push → merge
+**without ending**, so "the turn never ends at the push" holds. The implementation-phase cut is the same
+pattern one boundary earlier (joshuafolkken/kit#1933): it adds turn boundaries and removes no prohibition.
 
 ## A lane child records its park before it stops
 
 **A dispatched lane child records its park on the Issue before it stops for a decision**
 (joshuafolkken/kit#2034). A headless child's only route to ask a person anything is to park the Issue —
-`needs-decision` and a comment carrying the question. Measured twice on 2026-09-14: **#2012**'s child
-had its `AskUserQuestion` refused and **#2011** wrote a Tier B decision, both to their final message,
-and neither left a label or comment — so the parent found an OPEN Issue with `in-progress` and no
-question. The child is the only process that knows the question, so it records the park itself rather
-than leaving the parent to reconstruct it from a log.
+`needs-decision` and a comment carrying the question. Measured twice on 2026-09-14: **#2012**'s child had
+its `AskUserQuestion` refused and **#2011** wrote a Tier B decision, both only to their final message, so
+the parent found an OPEN Issue with `in-progress` and no question. The child is the only process that
+knows the question, so it records the park itself rather than leaving the parent to reconstruct it.
 
 **The record, before the Telegram, is the park procedure exactly** — `needs-decision` plus a comment
 carrying the question, the options, and whether work was stashed. Its single source is
@@ -309,11 +306,10 @@ back the park commands.
 - **It fires for a marked child and nowhere else.** A person's own `fullrun` carries no mark and sends
   its stop notify untouched.
 - **It fires once per run.** The child records the park and reissues the same notify; a
-  `needs-human-review` or `already-done` stop reissues after the one delivery, since its label is
-  already on the Issue.
+  `needs-human-review` or `already-done` stop reissues after the one delivery, its label already on the
+  Issue.
 - **The park state is not readable synchronously.** A `PreToolUse` guard makes no network call and the
-  park is a GitHub label, so the delivery is a checklist rather than an accusation — one wasted reissue
-  on the compliant path is safe.
+  park is a GitHub label, so the delivery is a checklist — one wasted reissue on the compliant path is safe.
 
 This section is the single source of the lane-child park rule; `scripts/rules/lane-park.ts` implements
 the trigger, `scripts/rules/lane-park.test.ts` pins it, and the row joins the enumeration in

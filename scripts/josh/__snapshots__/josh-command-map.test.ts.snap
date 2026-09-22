@@ -29,6 +29,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ea": "epic:audit",
     "eb": "epic:bundle",
     "ec": "epic:check",
+    "ef": "edit:files",
     "en": "epic:next",
     "ep": "epic",
     "er": "e2e:retry-check",
@@ -308,6 +309,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "e2e:retry-check": [
       "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "edit:files": [
+      "<plan-path>",
       "automation",
       [
         "none",

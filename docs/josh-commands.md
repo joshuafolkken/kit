@@ -1870,6 +1870,31 @@ pnpm josh read:files a.ts big.ts      # over the cap: prints a directive to Read
 
 **Output / exit codes:** any missing path exits non-zero; an over-cap batch prints its directive and exits zero.
 
+### `josh edit:files`
+
+Apply several content-addressed edits from a plan in one call — the write-side counterpart of `read:files` (joshuafolkken/kit#2366).
+
+```bash
+pnpm josh edit:files plan.txt   # applies every block in the plan, one line per edit reporting the outcome
+```
+
+- **Why a command at all.** kit#2202 folded the pre-edit _reads_ and left the edits to native multiple `Edit` blocks, on the ground that presupposing a multi-edit tool would leave the rule unfired where the harness lacks one. kit#2366 measured that bet across six lanes — **230 of 230 edit turns issued a single `Edit`**, a per-turn density of exactly 1.000 — so native multiple edits never happened. A `pnpm josh` command runs on every harness, and a composite command is the only lever measured to move round-trip density (kit#2165 / kit#2162 / kit#2202), never advice.
+- **The plan is a `=====`-fenced path header then a git-conflict-marker pair**, so a model authors it without escaping code into JSON. Several blocks may name one file:
+
+  ```
+  ===== scripts/a.ts =====
+  <<<<<<< OLD
+  const a = 1
+  =======
+  const a = 9
+  >>>>>>> NEW
+  ```
+
+- **Each edit is content-addressed**: its `old` text must match exactly once — zero matches is `no match`, more than one is `ambiguous (N)` — so a false fold surfaces rather than corrupts, the same guarantee the `Edit` tool gives. A file is written **only when every one of its edits applied**, so a partial plan leaves the file untouched.
+- **The batching guard hands it out.** On a run of single-call `Edit` turns the notice names the edits and offers `pnpm josh edit:files` over their files (`turn-batching.md` → "ガード発火時にも合成コマンドを手渡す"), the write-side of the read fold.
+
+**Output / exit codes:** one line per edit (`applied` / `no match` / `ambiguous (N)` / `missing`); any non-`applied` edit, an unreadable plan, or a plan with no blocks exits non-zero.
+
 ### `josh time`
 
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `scripts/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
