@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 // `prompts/collaboration-workflow/report-format.md` is the single source of where the answer goes —
 // the second tier of the case-based test declaration ("if it breaks").
 
-type Boundary = 'network' | 'process' | 'fs'
+type Boundary = 'network' | 'process' | 'fs' | 'time'
 const NONE = 'none'
 
 interface BoundaryDefinition {
@@ -45,6 +45,18 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 		pattern:
 			/\b(?:node:fs|fs\/promises|readFileSync|writeFileSync)\b|\b(?:readFile|writeFile|mkdir|unlink|readdir|rm)\s*\(/u,
 		cases: ['ファイル不在', '権限エラー', '空ファイル', '不正な内容', '並行書き込み'],
+	},
+	{
+		boundary: 'time',
+		// The absence boundary: a change that coordinates over time — timers, schedules, retries,
+		// heartbeats — owes the cases where the awaited thing never happens, which no diff of an I/O
+		// call can surface (joshuafolkken/kit#2356). Same over-firing discipline as process and fs: the
+		// verbs (`setInterval`, `schedule`, `retry`) require a call paren so prose like "schedule the
+		// release" no longer fires, while the domain nouns (`cron`, `heartbeat`, `watchdog`, `liveness`)
+		// are unambiguous enough in source to match bare.
+		pattern:
+			/\b(?:setInterval|setTimeout|setImmediate|schedule|reschedule|retry)\s*\(|\b(?:cron|crontab|heartbeat|watchdog|liveness)\b/u,
+		cases: ['期待した事象が到来しない', '期限超過', '重複発火', '再試行が尽きる'],
 	},
 ]
 

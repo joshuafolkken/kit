@@ -21,6 +21,7 @@ function fixture(name: string, content: string): string {
 const NETWORK_PATH = fixture('net.ts', 'const r = await fetch(url)\n')
 const PROCESS_PATH = fixture('proc.ts', "import { spawn } from 'node:child_process'\n")
 const FS_PATH = fixture('io.ts', "import { readFileSync } from 'node:fs'\n")
+const TIME_PATH = fixture('timer.ts', 'setInterval(tick, ms)\n')
 const INERT_PATH = fixture(
 	'pure.ts',
 	'export function add(a: number, b: number) { return a + b }\n',
@@ -42,6 +43,16 @@ describe('cases.boundaries_in', () => {
 
 	it('answers fs for a filesystem import', () => {
 		expect(cases.boundaries_in([FS_PATH])).toEqual(['fs'])
+	})
+
+	it('answers time for a scheduling change', () => {
+		expect(cases.boundaries_in([TIME_PATH])).toEqual(['time'])
+	})
+
+	it('answers time for a heartbeat identifier', () => {
+		const heartbeat_path = fixture('beat.ts', 'const heartbeat = start()\n')
+
+		expect(cases.boundaries_in([heartbeat_path])).toEqual(['time'])
 	})
 
 	it('answers no boundary for a change that crosses none', () => {
@@ -74,6 +85,12 @@ describe('cases.boundaries_in — prose and call forms', () => {
 		expect(cases.boundaries_in([prose_path])).toEqual([])
 	})
 
+	it('does not read a bare schedule verb in prose as a time boundary', () => {
+		const prose_path = fixture('plan.md', 'schedule the release and retry later\n')
+
+		expect(cases.boundaries_in([prose_path])).toEqual([])
+	})
+
 	it('answers process for a spawn call and fs for a readdir call', () => {
 		const call_path = fixture('calls.ts', 'spawn(cmd)\nreaddir(dir)\n')
 
@@ -87,13 +104,19 @@ describe('cases.cases_for', () => {
 		expect(cases.cases_for(['network'])).toContain('非200')
 	})
 
+	it('names the absence cases of the time boundary', () => {
+		expect(cases.cases_for(['time'])).toContain('期待した事象が到来しない')
+		expect(cases.cases_for(['time'])).toContain('期限超過')
+		expect(cases.cases_for(['time'])).toContain('重複発火')
+	})
+
 	it('returns nothing for no boundaries', () => {
 		expect(cases.cases_for([])).toEqual([])
 	})
 })
 
 describe('cases.VOCABULARY', () => {
-	it('is exactly the three boundaries plus none', () => {
-		expect(cases.VOCABULARY).toEqual(['network', 'process', 'fs', cases.NONE])
+	it('is exactly the four boundaries plus none', () => {
+		expect(cases.VOCABULARY).toEqual(['network', 'process', 'fs', 'time', cases.NONE])
 	})
 })
