@@ -54,10 +54,14 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// conditional cut is built on; the other entries stayed within their block. `backlogrun` rose one
 	// block in joshuafolkken/kit#2317 when `backlogrun-child.md`'s outage section recorded the
 	// session-resume re-dispatch and the outage-fold window.
-	{ entry: 'kickoff', bytes: 258_048 },
-	{ entry: 'fullrun', bytes: 258_048 },
-	{ entry: 'halfrun', bytes: 258_048 },
-	{ entry: 'backlogrun', bytes: 262_144 },
+	// Raised in joshuafolkken/kit#2328 when `retrospective.md` joined the point-of-use set and `SKILL.md`
+	// grew by §2j: every entry that reads `SKILL.md` discovers the retrospective document, so its ~5KB
+	// and the new section crossed a block for each. The lane child is exempt — it never runs the
+	// retrospective (`run:step` answers `stop` for a child at the stop position), so it skips both.
+	{ entry: 'kickoff', bytes: 266_240 },
+	{ entry: 'fullrun', bytes: 266_240 },
+	{ entry: 'halfrun', bytes: 266_240 },
+	{ entry: 'backlogrun', bytes: 270_336 },
 	{ entry: LANE_CHILD, bytes: 131_072 },
 ]
 

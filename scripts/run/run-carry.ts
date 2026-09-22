@@ -107,6 +107,13 @@ interface RunCarry {
 	// `merged` cannot serve: it is a count of merges rather than a set of issues, so a child that ended
 	// without one — `already-done`, or a park — would shift every remaining position by one.
 	done?: ReadonlyArray<number> | undefined
+	// Whether this invocation's end-of-run retrospective has already run (joshuafolkken/kit#2328). It
+	// is the state the two run-ending points hold so `run:step` prints the retrospective exactly once:
+	// the record is one per invocation and survives every session cut, so a run cannot repeat it after a
+	// resume, and `--end` removes the record so it cannot leak into the next invocation. Set by
+	// `--retrospective`, and carried across a hand-off like `done`. Optional and `| undefined` for the
+	// same disk round-trip reason the owner fields carry.
+	retrospective?: boolean | undefined
 }
 
 // The identity of a process, as `process-identity.ts` keeps it: the pid plus an opaque start-time
@@ -148,6 +155,9 @@ interface CarryChange {
 	// thing rather than an amount, because what a resumed named-issue run needs is *which* issues are
 	// finished.
 	done?: number
+	// Marks the end-of-run retrospective as run (joshuafolkken/kit#2328). It only ever sets the flag,
+	// never clears it: a retrospective that has run stays run for the rest of the invocation.
+	retrospective?: boolean
 }
 
 type CarryRead =
@@ -179,6 +189,8 @@ const run_carry_schema = z.object({
 	owner_start: z.string().optional(),
 	is_handed_off: z.boolean().optional(),
 	done: z.array(z.number()).optional(),
+	// Optional, so a record written before the retrospective existed still parses (joshuafolkken/kit#2328).
+	retrospective: z.boolean().optional(),
 })
 
 function carry_path(git_directory: string): string {
@@ -294,22 +306,13 @@ function adopt_carry(
 	carry: RunCarry,
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
-	const { invocation, started_at, merged, filed, cuts } = carry
-	const { failures, outages, last_outage_at, done } = carry
-	// The recorded fields are named rather than spread from `carry`, so the previous owner cannot
-	// survive an adoption by a caller that declared none. **`done` is carried across**: the whole point
-	// of the resumption is that the successor does not re-run what the cut session finished. The outage
-	// fold timestamp carries too, so a burst spanning the hand-off still folds (joshuafolkken/kit#2317).
+	// The run's own fields carry across untouched — the counters, the outage fold timestamp
+	// (joshuafolkken/kit#2317), `done` so the successor does not re-run what the cut session finished,
+	// and `retrospective` so a run resumed after a cut does not repeat its retrospective. Only the three
+	// ownership fields are overridden: the new owner replaces the old — a caller that declared none
+	// writes `undefined`, so the previous owner cannot survive — and the declared hand-off is spent.
 	const next: RunCarry = {
-		invocation,
-		started_at,
-		merged,
-		filed,
-		cuts,
-		failures,
-		outages,
-		last_outage_at,
-		done,
+		...carry,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 		is_handed_off: false,
@@ -329,6 +332,12 @@ function next_done(carry: RunCarry, done: number | undefined): ReadonlyArray<num
 	const current = carry.done ?? []
 
 	return current.includes(done) ? current : [...current, done]
+}
+
+// Sticky: a retrospective that has run stays run, so a later count never clears the flag. Held apart
+// from `apply_change` so its one branch stays out of that function's complexity.
+function next_retrospective(carry: RunCarry, change: CarryChange): boolean | undefined {
+	return change.retrospective === true || carry.retrospective
 }
 
 // The streak arithmetic — the two consecutive counters and the outage fold — is `run-carry-streak.ts`'s
@@ -352,6 +361,7 @@ function apply_change(
 		outages: streak.outages,
 		last_outage_at: streak.last_outage_at,
 		done: next_done(carry, change.done),
+		retrospective: next_retrospective(carry, change),
 		// A cut declares the hand-off; any other count is the run carrying on, which spends it.
 		is_handed_off: cuts > NO_INCREMENT,
 	}
@@ -422,6 +432,15 @@ function is_count_refused(carry: RunCarry, owner: CarryOwner): boolean {
 
 function end_carry(target: string): void {
 	stamp_file.remove_stamp(target)
+}
+
+// Whether the read record marks its retrospective as already run (joshuafolkken/kit#2328). A read with
+// no record — `none` or `unreadable` — is not a run whose retrospective has run, so it answers `false`;
+// `run:step` reads it to decide whether the stop position still owes a retrospective.
+function retrospective_done_of(read: CarryRead): boolean {
+	if (read.kind !== 'carried' && read.kind !== 'expired') return false
+
+	return read.carry.retrospective === true
 }
 
 // **What the resumed session has to be told, computed rather than stored.** A stored remainder would
@@ -546,6 +565,7 @@ const run_carry = {
 	remaining_of,
 	replace_carry,
 	repository_directory,
+	retrospective_done_of,
 	standing_message,
 	unknown_message,
 	unreadable_message,

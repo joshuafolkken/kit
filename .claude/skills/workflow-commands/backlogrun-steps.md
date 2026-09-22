@@ -34,6 +34,17 @@ once, the run.** **What a run does move is the pool's contents**: an issue it fi
 already opted-in epic is offered from the next ask onwards, and the brake below bounds that quantity
 rather than the membership.
 
+**The end-of-run retrospective is the one carve-out, revised here rather than worked around**
+(joshuafolkken/kit#2328). When a run drains its backlog, the retrospective files the improvements worth
+carrying into the next run and applies `auto-ok` to them, so the next run can pick them up without
+waiting for a person — the single path on which a run labels its own input. This is not the
+self-widening the rule guards against, because the brakes in "The brake that replaces the promise"
+below bound it with no exception: a retrospective's filings are counted against the ten-per-invocation
+ceiling, the WIP cap of 30, `--max`, the 200,000-token session budget and the 8-hour whole-run bound
+exactly as any other filing is. And a retrospective that judges nothing worth carrying files nothing,
+so the "file → drain → file again" loop converges the moment improvements run out. Every other filing
+route is unchanged: `auto-ok` stays a person's to apply.
+
 A Tier C action inside a child still stops that child, exactly as it does for any batch child.
 
 **A named issue is approved by the keyword and its number, not by `auto-ok`** (joshuafolkken/kit#1984).

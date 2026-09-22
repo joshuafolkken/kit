@@ -31,6 +31,7 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 	'2c. The `owner/repo#` prefix — which repository the run acts on',
 	'2e. Before filing a new Issue — `pnpm josh issue:scout`',
 	'2i. An observation worth filing is filed without asking',
+	'2j. The end-of-run retrospective — read when `run:step` prints it',
 	'3. What stays resident, and what is read from here',
 ]
 
@@ -41,11 +42,15 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // answers `skip` in a lane via the lane guard), so the child never opens `latest-gate.md`. The gate documents
 // (`chain-rule.md`, `background-commands.md`), `followup.md` and `backlogrun-park.md` stay — a child
 // runs the gate, opens its PR, and may park on a decision, so it does reach every one of those.
+// **`retrospective.md` is the parent's too** (joshuafolkken/kit#2328): the end-of-run retrospective
+// runs once at the batch's own end, never in a leaf child, so `run:step` answers `stop` for a child at
+// the stop position and the child never opens it.
 const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'backlogrun-child.md',
 	'backlogrun-lanes.md',
 	'backlogrun-progress.md',
 	'latest-gate.md',
+	'retrospective.md',
 ])
 
 function costed(root: string): ReadSetCost {

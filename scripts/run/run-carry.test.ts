@@ -313,18 +313,12 @@ describe('a cut declares the hand-off', () => {
 	it('is spent by the adoption that carries it', () => {
 		const cut = run_carry.apply_change(target(), begun(), { cuts: 1 })
 
-		// `undefined` is the exclusive create losing to another process, which cannot happen against a
-		// scratch path this suite owns — so it is asserted rather than narrowed away.
+		// Adoption carries every field of the cut record and changes exactly three: it takes the new
+		// owner and spends the hand-off. A strict spread of `cut` with those overrides asserts the whole
+		// object — nothing is narrowed away — while naming what adoption alone touches. `undefined` from
+		// `adopt_carry` is the exclusive create losing a race, impossible against this suite's own path.
 		expect(run_carry.adopt_carry(target(), cut, dead_owner())).toStrictEqual({
-			invocation: cut.invocation,
-			started_at: cut.started_at,
-			merged: cut.merged,
-			filed: cut.filed,
-			cuts: cut.cuts,
-			failures: cut.failures,
-			outages: cut.outages,
-			last_outage_at: cut.last_outage_at,
-			done: undefined,
+			...cut,
 			owner_pid: DEAD_PID,
 			owner_start: undefined,
 			is_handed_off: false,

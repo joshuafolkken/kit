@@ -21,6 +21,8 @@ vi.mock('./run-carry', () => ({
 		repository_directory: repo_directory_mock,
 		read_carry: read_carry_mock,
 		carry_path: (directory: string) => `${directory}/carry`,
+		retrospective_done_of: (read: { carry?: { retrospective?: boolean } }) =>
+			read.carry?.retrospective === true,
 	},
 }))
 
