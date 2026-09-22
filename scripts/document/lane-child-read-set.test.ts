@@ -18,10 +18,11 @@ const MAX_INITIAL_TOKENS = 24_000
 // per-run filing cap) to `rule-delivery.md`, which the child reads whole. Raised again to 40k in
 // joshuafolkken/kit#2289: `pre-gate-cut.md` joined the point-of-use set, so the ~9.8k tokens a lane
 // child *already* read at the pre-gate cut but the count omitted now appear in this total. The
-// increase is a correction of an under-count, not new reading. The #2021 acceptance criterion the
-// trim exists for is the 35KB saving vs `fullrun`, which is pinned above and unaffected — both sides
-// gained the same document.
-const MAX_TOTAL_TOKENS = 40_000
+// increase is a correction of an under-count, not new reading. Lowered to 22k in joshuafolkken/kit#2357
+// when `backlogrun-steps.md` left the child's point-of-use set: the child never opened the scheduler's
+// step list, so its ~16k tokens were an over-count the total no longer carries. The #2021 acceptance
+// criterion the trim exists for is the 35KB saving vs `fullrun`, which is pinned above and only widens.
+const MAX_TOTAL_TOKENS = 22_000
 const NOTHING = 0
 
 function total_read_bytes(report: ReturnType<typeof entry_read_set.costed>): number {
@@ -93,7 +94,7 @@ describe('lane_child_read_set.costed — the whole reduction', () => {
 		expect(lane_child_read_set.costed(ROOT).scoped.tokens).toBeLessThanOrEqual(MAX_INITIAL_TOKENS)
 	})
 
-	it('keeps the total read at or below 31k tokens', () => {
+	it('keeps the total read at or below 22k tokens', () => {
 		const tokens = total_read_tokens(lane_child_read_set.costed(ROOT))
 
 		expect(tokens).toBeLessThanOrEqual(MAX_TOTAL_TOKENS)

@@ -63,11 +63,15 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// every entry stayed within its block rather than climbing back to a pre-#2294 ceiling the downward
 	// ratchet holds shut. joshuafolkken/kit#2342 added the `--summary` close to `retrospective.md` in a
 	// single sentence, kept short so every entry that reads it stays within its block.
+	// Lowered for the lane child in joshuafolkken/kit#2357 — a downward move on this ratchet — when
+	// `backlogrun-steps.md` left the child's point-of-use set: the child never opened the scheduler's step
+	// list, so its ~48KB read crossed a block downward and the recorded ceiling drops to the block multiple
+	// the stale-ratchet message named. The other entries still read it, so their rows hold.
 	{ entry: 'kickoff', bytes: 266_240 },
 	{ entry: 'fullrun', bytes: 266_240 },
 	{ entry: 'halfrun', bytes: 266_240 },
 	{ entry: 'backlogrun', bytes: 270_336 },
-	{ entry: LANE_CHILD, bytes: 131_072 },
+	{ entry: LANE_CHILD, bytes: 86_016 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
