@@ -4,6 +4,9 @@ import { behavior_change_lint } from './behavior-change-lint'
 const FIRING_POINT = '`AskUserQuestion`'
 const BASELINE_ENTRY = '- `pnpm josh run:wake` → 1.00'
 const BASELINE_HEADING = '## ベースライン'
+const REPRODUCTION_HEADING = '## 再現'
+const REPRODUCTION_COMMAND = '- `grep -c run:watcher:guard .claude/settings.json`'
+const REPRODUCTION_OUTPUT = ['~~~', '0', '~~~'].join('\n')
 
 const TARGET_BODY = [
 	'## 背景',
@@ -19,6 +22,12 @@ const TARGET_BODY = [
 	BASELINE_HEADING,
 	'',
 	BASELINE_ENTRY,
+	'',
+	REPRODUCTION_HEADING,
+	'',
+	REPRODUCTION_COMMAND,
+	'',
+	REPRODUCTION_OUTPUT,
 ].join('\n')
 
 const CODE_ONLY_BODY = ['## 背景', '', '- 種別: コードのみ', '', 'なぜ必要か'].join('\n')
@@ -58,6 +67,27 @@ describe('behavior_change_lint.problems', () => {
 		)
 	})
 
+	it('reports a missing reproduction heading on a target Issue', () => {
+		const without_reproduction = TARGET_BODY.split(REPRODUCTION_HEADING, 1)[0] ?? ''
+
+		expect(behavior_change_lint.problems(without_reproduction)).toContain(
+			'missing heading: ## 再現',
+		)
+	})
+
+	it('rejects a reproduction written in prose', () => {
+		const prose = TARGET_BODY.replace(REPRODUCTION_COMMAND, '確認した').replace(
+			REPRODUCTION_OUTPUT,
+			'だいたい 0 のままだった',
+		)
+
+		expect(behavior_change_lint.problems(prose)).toContain(
+			'reproduction must be a command and its actual output (a fenced block), not prose ("確認した" is not re-runnable)',
+		)
+	})
+})
+
+describe('behavior_change_lint.problems — firing point', () => {
 	it('flags a firing point that no hook can deliver', () => {
 		const undeliverable = TARGET_BODY.replace(FIRING_POINT, '`WebFetch`')
 

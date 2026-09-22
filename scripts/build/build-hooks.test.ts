@@ -23,7 +23,12 @@ async function run(
 ): Promise<RunResult> {
 	const { stdout, exitCode: exit_code } = await execa(command, [...args], {
 		input,
-		env: { JOSH_SESSION_LANG: 'fr' },
+		// `JOSH_WATCHER_GUARD` is off so the composed watcher guard (joshuafolkken/kit#2353) does not read
+		// this machine's live lane registry: it fires on ambient state, not the payload, and records a
+		// once-per-run stamp — so source-then-bundle on a machine with lanes in-flight would fire once and
+		// dedupe the second run, a mismatch that has nothing to do with the bundle. Its own behavior is
+		// pinned in `run-watcher-hook.test.ts` and the composition in `pretool-guard.test.ts`.
+		env: { JOSH_SESSION_LANG: 'fr', JOSH_WATCHER_GUARD: 'off' },
 		reject: false,
 	})
 

@@ -401,16 +401,24 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	return { is_enabled, outcome, refusal, refusal_path }
 }
 
-// Nothing at all reaches stdout on the ordinary call, so what the harness parses stays empty unless
-// the call is being refused.
-function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutcome): void {
-	load_environment_file()
-
-	const { reason, notice, fault } = outcome(raw_payload)
+// Write one already-resolved outcome, so a caller that has to await its rule (the watcher guard reads
+// the lane registry and the life record) can compute the outcome first and hand it here
+// (joshuafolkken/kit#2353). Nothing reaches stdout on the ordinary call, so what the harness parses
+// stays empty unless the call is being refused.
+function emit_outcome(outcome: GuardOutcome): void {
+	const { reason, notice, fault } = outcome
 
 	if (reason !== undefined) process.stdout.write(`${deny_envelope(reason)}\n`)
 	else if (notice !== undefined) process.stdout.write(`${notice_envelope(notice)}\n`)
 	else if (fault !== undefined) process.stdout.write(`${notice_envelope(fault)}\n`)
+}
+
+// The synchronous path: load `.env`, run the rule, emit. A wrapper around `emit_outcome` so both paths
+// write the same envelopes.
+function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutcome): void {
+	load_environment_file()
+
+	emit_outcome(outcome(raw_payload))
 }
 
 // The refusal-only shape, kept so the guards not yet moved across keep working unchanged. It is a
@@ -441,6 +449,7 @@ const hook_decision = {
 	create_refusal_stamp,
 	create_transcript_guard,
 	deny_envelope,
+	emit_outcome,
 	fault_notice,
 	is_switch_enabled,
 	load_environment_file,

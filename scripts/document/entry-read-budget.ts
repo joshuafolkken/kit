@@ -72,6 +72,9 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// pointer, folded into the existing enumeration and offset by tightening §2b prose, so every entry
 	// stayed within its block (kickoff has no block of headroom — its pre-#2294 ceiling is the next
 	// multiple, which the downward ratchet holds shut).
+	// joshuafolkken/kit#2353 wired the watcher-guard note into `backlogrun-progress.md` (read by the three
+	// planning entries): kickoff has no headroom, so the addition was offset by tightening that file's
+	// heartbeat prose, keeping every entry within its existing block.
 	{ entry: 'kickoff', bytes: 266_240 },
 	{ entry: 'fullrun', bytes: 266_240 },
 	{ entry: 'halfrun', bytes: 266_240 },

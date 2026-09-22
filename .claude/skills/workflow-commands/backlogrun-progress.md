@@ -25,10 +25,11 @@ moves and no fourth:**
    next report time itself.
 3. **In that same turn, start the next one.** The interval is measured from the last report.
 
-**`pnpm josh run:watcher:guard` detects a missed restart** (joshuafolkken/kit#2113): it exits
-non-zero when lane children are in-flight but the watcher's life record has not been refreshed
-within the staleness threshold. Wire it as a PreToolUse hook or call it before step 1 of each
-loop iteration.
+**`pnpm josh run:watcher:guard` detects a missed restart** (joshuafolkken/kit#2113): it refuses when
+lane children are in-flight but the watcher's life record has gone stale. **It is wired into
+`pretool-guard`, the one `PreToolUse` hook** (joshuafolkken/kit#2353), so the next tool call is refused
+until the watcher is restarted — once per run, so the `pnpm josh run:progress --wait` that fixes it is
+not blocked.
 
 **`run:progress` prints the five labelled lines itself now (joshuafolkken/kit#2026); present them
 as-is.** It emits the observation instant (`at`, local first and UTC beside it), the elapsed figures
@@ -41,29 +42,28 @@ tests. **A value said that way is still an observation, never a state**: `record
 running*; and the `next` line is a schedule — the time *if the silence continues*, superseded when a
 real report resets the clock through `--mark`.
 
-**It exits only when it has a line to hand over**, or when `--hours` runs out having never gone quiet for
-a whole interval (that exit says so on standard error). **Nothing in flight keeps it waiting**, or step
-3 would make it a poll. **It starts by itself** — a run that has to be asked has not removed the polling.
+**It exits only when it has a line to hand over**, or when `--hours` runs out having never gone quiet
+for a whole interval (that exit says so on standard error). **Nothing in flight keeps it waiting**, or
+step 3 would make it a poll.
 
 **`--mark` at every real report.** Whenever this loop reports something of its own — a child merged,
 parked, a stop — run `pnpm josh run:progress --mark` in the same turn to restart the silence clock, so a
 heartbeat does not land immediately behind a real report. The clock is silence, never a timer
 (`docs/josh-commands.md` → "`josh run:progress`").
 
-**Do not keep a progress clock of your own, and the hook refuses an arm rather than asking you not to.**
-A `Bash` call that only sleeps adds a second clock nobody reconciles, so the refusal is in front of the
-**arm** — a report is prose no hook can see coming. `scripts/rules/early-heartbeat.ts` → `decide`
-refuses a `Bash` call whose every segment is a `sleep` on three tests — a timer it already allowed is
-still live, the report that timer would produce would land before the interval is up, or the wait runs
-longer than the interval — so **a single correctly-spaced arm is allowed**. **The allowance is still not
-the way to report**; the step above prints without arming anything, and `--wait` is not a wait timer.
+**Do not keep a progress clock of your own** — the hook refuses the arm rather than asking. A `Bash`
+call that only sleeps adds a second clock nobody reconciles, so `scripts/rules/early-heartbeat.ts` →
+`decide` refuses a sleep-only `Bash` call on three tests — a timer it already allowed is still live, the
+report it would produce would land before the interval is up, or the wait runs longer than the interval
+— so **a single correctly-spaced arm is allowed**. It is still not the way to report; the step above
+prints without arming anything, and `--wait` is not a wait timer.
 
 **The default interval is twenty minutes, overridable — by the person, not the run.**
-`JOSH_PROGRESS_INTERVAL_MINUTES` moves both sides (the guard reads it through the same reader the watcher
-does); `josh` → `progress_interval_minutes` in `package.json` is read one step below the variable, so a
-cadence set once holds on every machine and cloud session. **`--interval` moves the watcher alone** — a
-hook has no command line — so it can only make the watcher quieter than the floor, never the guard
-stricter. Twenty rather than ten because a child measures 20–46 minutes.
+`JOSH_PROGRESS_INTERVAL_MINUTES` moves both sides (the guard reads it through the watcher's reader);
+`josh` → `progress_interval_minutes` in `package.json` sits one step below the variable, so a cadence
+set once holds on every machine and cloud session. **`--interval` moves the watcher alone** — a hook
+has no command line — so it makes the watcher quieter than the floor, never the guard stricter. Twenty
+rather than ten because a child measures 20–46 minutes.
 
 **An explicit ask is not a heartbeat, and it is exempt by construction** — what is refused is arming a
 *timer*, and a person asking "how is it going" arrives with no timer in front of it.
@@ -83,14 +83,13 @@ sessions). **It is added, never substituted for the elapsed figure**, and **the 
 stamp computed for it** — the command prints the `at` stamp and the `next` field.
 
 **The line carries observations, never "still running", and nothing in it is a verification result** —
-no gate, no CI, no check rollup, because the command reads none of them.
+no gate, CI or check rollup, because the command reads none of them.
 
 **The invariant is a tier, not a mechanism** (joshuafolkken/kit#2156, joshuafolkken/kit#2207). Three
-tiers say how much of a person's attention a signal takes: **interrupt** reaches for it now (a Telegram —
-`confirmation`, `completion`, `warning`), **ambient** is seen without being asked for (a line that is
-simply there), and **requested** is read only once a person thinks to type for it. **The heartbeat sits
-at the ambient tier, and stays there across a `backlogrun` session cut — never promoted to interrupt,
-never demoted to requested.**
+tiers say how much of a person's attention a signal takes: **interrupt** reaches for it now (a Telegram),
+**ambient** is seen without being asked for, and **requested** is read only when a person types for it.
+**The heartbeat sits at the ambient tier, and stays there across a `backlogrun` session cut — never
+promoted to interrupt, never demoted to requested.**
 
 **The report surface belongs to the run, not to the session** (joshuafolkken/kit#2207). The run's
 session-facing events — a plan posted, a child launched, a PR opened, a review round, a park, a cut, a
@@ -105,12 +104,12 @@ ambient as a *mechanism* ("a pull, not a push") is what let the surface vanish a
 still reading as kept; anchoring it to the run's stream is what keeps it.
 
 **Interrupt is withheld on purpose**: no Telegram, because `confirmation` and `completion` are what
-interrupt a person, and a line every fifteen minutes on a phone is the fatigue that stops them being
-read. **`pnpm josh run:wake --list` is the requested tier** — the degenerate last-event read of the same
-stream the follow reads, for a person who types for one line rather than following. **`tail -F` on the
+interrupt a person, and a line every fifteen minutes is the fatigue that stops them being
+read. **`pnpm josh run:wake --list` is the requested tier** — the last-event read of the stream the
+follow reads, for a person who types for one line rather than following. **`tail -F` on the
 raw stream file is a recovery path, not the ambient surface** — the follow is how progress is seen
-without asking, and the raw `tail` is what a person falls back to when the relay has stopped. It is
-named for that role in `--list`'s own output, beside the follow it is the fallback for.
+without asking, and the raw `tail` is the fallback when the relay has stopped, named for that role in
+`--list`'s own output.
 
 **A stop is an interrupt, and only a stop** (joshuafolkken/kit#2136). The heartbeat says a run is still
 going; a run that has _stopped_ — every remaining child blocked behind a parked one, the backlog drained
@@ -461,6 +460,10 @@ and same two-`undetermined`-in-a-row rule). **The `--process` argument is the on
 a fresh session did not start those processes, so it reports `none` unless it has looked itself.
 **`pnpm josh lane:open <N>` re-attaches to a lane whose branch is already pushed**, which a handed-over
 lane needs when its child has to be finished by hand.
+
+**Restart the progress watcher by name** — `pnpm josh run:progress --wait --output <handed-over paths>`
+in the background, in the same turn as that first `lane:list`. The cut session's watcher exited with it,
+and the wired `run:watcher:guard` stops a resume that skips this (joshuafolkken/kit#2353).
 
 ### A carried-over merge does not stand in front of the next lane
 
