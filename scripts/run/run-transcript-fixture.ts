@@ -47,9 +47,9 @@ interface Scenario {
 const START: Frame = { label: 'start', at: {} }
 const PLANNED: Frame = { label: 'planned', at: { last_event: KIND.PLAN } }
 
-// The five scenarios the acceptance criteria name — a child completing, a park, a cut and its resume,
-// lanes full, and the consecutive-failure stop — followed by the terminal answers the driver reads
-// before position matters.
+// The scenarios the acceptance criteria name — a child completing, a park, a cut and its resume, lanes
+// full, the consecutive-failure stop, and the drain that fires the retrospective before the idle watch
+// (joshuafolkken/kit#2335) — followed by the terminal answers the driver reads before position matters.
 const SCENARIOS: ReadonlyArray<Scenario> = [
 	{
 		name: 'child-completion',
@@ -94,6 +94,16 @@ const SCENARIOS: ReadonlyArray<Scenario> = [
 			START,
 			{ label: 'outage', at: { last_event: KIND.OUTAGE } },
 			{ label: 'guard stops', at: { last_event: KIND.STOP } },
+		],
+	},
+	{
+		name: 'drain-retrospective',
+		summary: 'the backlog drains, so the retrospective runs before the idle watch',
+		base: {},
+		frames: [
+			START,
+			{ label: 'backlog drained', at: { last_event: KIND.DRAIN } },
+			{ label: 'retrospective done', at: { last_event: KIND.DRAIN, is_retrospective_done: true } },
 		],
 	},
 	{

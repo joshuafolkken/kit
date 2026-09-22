@@ -29,6 +29,12 @@ the failure guard stops the run
   outage             command  pnpm josh run:merge 2250
   guard stops        command  pnpm josh retrospective
 
+## drain-retrospective
+the backlog drains, so the retrospective runs before the idle watch
+  start              verdict  implement
+  backlog drained    command  pnpm josh retrospective
+  retrospective done verdict  wait
+
 ## expired-budget
 the whole-run budget is spent — a person decides
   start              decide   decide: whole-run budget spent — resume with `pnpm josh run:carry --resume` | discard with `pnpm josh run:carry --end`

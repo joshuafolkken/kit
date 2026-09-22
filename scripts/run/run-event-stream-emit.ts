@@ -48,6 +48,25 @@ async function emit(kind: string, text: string): Promise<void> {
 	}
 }
 
-const run_event_stream_emit = { emit, stream_target }
+/**
+ * Append one event unless the newest event on the stream already carries this kind — so a marker a loop
+ * re-checks every poll is written once per episode rather than once per poll (joshuafolkken/kit#2335).
+ * The drain marker is the caller: `backlog:offer` runs every iteration of a watching loop, and one drain
+ * event per drain is what `run:step` reads to fire the retrospective a single time. Best-effort like
+ * `emit`: a failed resolve or read is swallowed rather than raised into the loop's work.
+ */
+async function emit_once(kind: string, text: string): Promise<void> {
+	try {
+		const target = await stream_target()
+
+		if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return
+
+		run_event_stream.append(target, kind, text, now_iso())
+	} catch {
+		// Best-effort: a failed append is dropped rather than raised into the caller's work.
+	}
+}
+
+const run_event_stream_emit = { emit, emit_once, stream_target }
 
 export { run_event_stream_emit }

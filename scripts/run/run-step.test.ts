@@ -133,6 +133,36 @@ describe('run_step.next_action — the end-of-run retrospective at the stop posi
 	})
 })
 
+// joshuafolkken/kit#2335: the retrospective fires at the drain — the moment the backlog empties —
+// rather than after the idle watch, so the improvement issues it files are what the watch picks up. When
+// it is not owed the drain is a `WAIT`, not a `STOP`: the backlog is empty but the run watches on.
+describe('run_step.next_action — the retrospective at the drain, before the idle watch', () => {
+	it('dispatches the retrospective at a drain that has not run one', () => {
+		expect(run_step.next_action(input({ last_event: KIND.DRAIN }))).toEqual({
+			kind: 'command',
+			line: run_step.RETROSPECTIVE_COMMAND,
+		})
+	})
+
+	it('waits through the idle watch once the retrospective has run', () => {
+		expect(
+			run_step.next_action(input({ last_event: KIND.DRAIN, is_retrospective_done: true })).line,
+		).toBe(run_step.WAIT)
+	})
+
+	it('never runs a retrospective at a lane child’s drain', () => {
+		expect(run_step.next_action(input({ last_event: KIND.DRAIN, is_lane_child: true })).line).toBe(
+			run_step.WAIT,
+		)
+	})
+
+	it('never runs the kit-only retrospective at a consumer’s drain', () => {
+		expect(run_step.next_action(input({ last_event: KIND.DRAIN, is_consumer: true })).line).toBe(
+			run_step.WAIT,
+		)
+	})
+})
+
 // joshuafolkken/kit#2297: a dispatched lane child is never handed `run:merge` — the parent's budget
 // command, which returns `busy` in a child (joshuafolkken/kit#2267). It stops at a parent-only
 // position instead, so the child is never pointed at a command the runtime guard would refuse.

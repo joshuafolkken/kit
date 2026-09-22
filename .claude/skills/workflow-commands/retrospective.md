@@ -8,11 +8,14 @@ rationed, the exclusions, and the `auto-ok` carve-out that lets the next run pic
 because none of it binds until a run has actually drained its backlog. A run that never empties its pool
 never reads it; the one that does reads it in full, in the same turn, before it files.
 
-**When it fires is not this file's, and not a judgement.** The run driver prints the step at the stop
-position: the rule that decides *when* a run acts lives in `run:step`'s state transitions rather than in
-prose here, which is `CLAUDE.md`'s run-driver rule. This file is reached only once the step is already
-owed. It is kit-only — `run:step` prints the step only in the kit repository — so a consumer run never
-reaches this procedure.
+**When it fires is not this file's, and not a judgement.** The run driver prints the step the moment the
+backlog drains — `backlog:offer` marks that drain on the event stream and `run:step` fires the
+retrospective at it, *before* the idle watch, so the improvement issues it files are what the watch then
+picks up (joshuafolkken/kit#2335); a run that stops without draining — the failure guard, `--idle 0` —
+still prints it at the stop position. Either way the rule that decides *when* a run acts lives in
+`run:step`'s state transitions rather than in prose here, which is `CLAUDE.md`'s run-driver rule. This
+file is reached only once the step is already owed. It is kit-only — `run:step` prints the step only in
+the kit repository — so a consumer run never reaches this procedure.
 
 ## The digest is read, not skimmed
 

@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const rule_value_emit_mock = vi.hoisted(() => vi.fn())
+const emit_once_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/rules/rule-value-cli', () => ({
 	rule_value_cli: { emit: rule_value_emit_mock },
+}))
+vi.mock('#scripts/run/run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit_once: emit_once_mock },
 }))
 
 const { backlog_offer_cli } = await import('./backlog-offer-cli')
@@ -32,6 +36,7 @@ const info_lines: Array<string> = []
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	rule_value_emit_mock.mockReset()
+	emit_once_mock.mockReset()
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -117,6 +122,38 @@ describe('backlog_offer_cli.run — the output the loop reads', () => {
 		const code = await backlog_offer_cli.run(BASE)
 
 		expect(code).toBe(FAILED)
+	})
+})
+
+// joshuafolkken/kit#2335: the loop head marks the stream at the drain — the backlog empty (`exhausted`)
+// and nothing of the run's own in flight — so `run:step` fires the end-of-run retrospective before the
+// idle watch. Every other verdict, and a watch that opened while children were still merging, leaves the
+// stream untouched.
+const DRAIN_KIND = 'drain'
+
+describe('backlog_offer_cli.run — the drain marks the stream before the idle watch', () => {
+	it('marks the stream once when the backlog drains with nothing in flight', async () => {
+		await answer_for({ code: OK, out: 'none' }, 'watch')
+
+		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String))
+	})
+
+	it('does not mark the stream on a watch that opened while children were still merging', async () => {
+		await answer_for({ code: OK, out: 'none' }, 'watch', RUNNING)
+
+		expect(emit_once_mock).not.toHaveBeenCalled()
+	})
+
+	it('does not mark the stream on a blocked watch', async () => {
+		await answer_for({ code: OK, out: 'wait' }, 'watch', RUNNING)
+
+		expect(emit_once_mock).not.toHaveBeenCalled()
+	})
+
+	it('does not mark the stream when there is work to start', async () => {
+		await answer_for({ code: OK, out: '12\n13' }, 'run')
+
+		expect(emit_once_mock).not.toHaveBeenCalled()
 	})
 })
 

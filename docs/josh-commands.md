@@ -1201,6 +1201,8 @@ pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --re
 
 `--exclude` / `--repo` forward to `backlog:next`; `--started` / `--active` / `--merged` / `--running` / `--max` / `--idle` forward to `backlog:budget` (`--answer` is computed here). `--running` also decides `wait` (→ `blocked` with children in flight, else `exhausted`) and `--retries` decides `retry` (→ `blocked` below three, `unreadable` at the third). stdout is the verdict, then — on `run` — the issue numbers one per line; the new retry count is the last stderr line (`retries: <n>`) and in `--json`. Exit 1 from `backlog:next` maps to `unreadable`, never `none`.
 
+At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the run's event stream (once per drain, best-effort), so the next `run:step` fires the end-of-run retrospective before the idle watch rather than after it (joshuafolkken/kit#2335). A watch that opened while children were still merging is not this drain and is left unmarked.
+
 ### `needs-human-review` — the opposite label
 
 The inverse of `auto-ok`: implemented and taken through the verification gate as usual, then nothing is committed, pushed, opened as a PR or merged — the working tree is left uncommitted, a `confirmation` notification carries the resume command, and the run stops. For work no test can judge. Only a person applies or removes it.
