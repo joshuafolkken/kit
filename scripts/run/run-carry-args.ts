@@ -22,7 +22,7 @@ const MIN_PID = 1
 // cannot advance a budget that is no longer its own. `--end` alone accepts it and ignores it, and a
 // usage line that offered it there would be promising an ownership check nothing performs.
 const USAGE =
-	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue>) [--owner <pid>] | --end [--stopped <reason>]'
+	'Usage: josh run:carry [--json] | --begin <invocation> [--owner <pid>] | --resume <invocation> [--owner <pid>] | (--cut | --merged <count> | --filed <count> | --done <issue> | --retrospective) [--owner <pid>] | --end [--stopped <reason>]'
 
 const OPTIONS = {
 	begin: { type: 'string' },
@@ -33,6 +33,10 @@ const OPTIONS = {
 	json: { type: 'boolean' },
 	merged: { type: 'string' },
 	owner: { type: 'string' },
+	// A boolean like `--cut`: it marks the end-of-run retrospective as run rather than counting an
+	// amount (joshuafolkken/kit#2328). It joins the counting group, so it carries `--owner` and is
+	// refused from a session that no longer owns the record, exactly as a merge count is.
+	retrospective: { type: 'boolean' },
 	resume: { type: 'string' },
 	// **`--stopped <reason>` rides on `--end`, so it is a modifier rather than a fifth group.** A run
 	// that halts needing a person ends its record exactly as a clean one does; the reason is what turns
@@ -104,6 +108,15 @@ function to_done(value: OptionValue): Pick<CarryChange, 'done'> | undefined {
 	return Number.isSafeInteger(issue) ? { done: issue } : undefined
 }
 
+// The two boolean marks in the counting group — `--cut` and `--retrospective` — as the partial the
+// change spreads. Kept apart from `to_change` so its own decision count stays under the limit.
+function to_marks(values: ParsedValues): Pick<CarryChange, 'cuts' | 'retrospective'> {
+	const cuts = values.cut === true ? ONE_CUT : NO_INCREMENT
+	const retrospective = values.retrospective === true ? { retrospective: true } : {}
+
+	return { cuts, ...retrospective }
+}
+
 function to_change(values: ParsedValues): CarryChange | undefined {
 	const merged = to_count(values.merged)
 	const filed = to_count(values.filed)
@@ -111,7 +124,7 @@ function to_change(values: ParsedValues): CarryChange | undefined {
 
 	if (merged === undefined || filed === undefined || done === undefined) return undefined
 
-	return { merged, filed, cuts: values.cut === true ? ONE_CUT : NO_INCREMENT, ...done }
+	return { merged, filed, ...to_marks(values), ...done }
 }
 
 // **A counting flag is what makes a count, never the sum of one.** `--merged 0` is a run reporting
@@ -120,6 +133,7 @@ function to_change(values: ParsedValues): CarryChange | undefined {
 function has_count(values: ParsedValues): boolean {
 	return (
 		values.cut === true ||
+		values.retrospective === true ||
 		values.merged !== undefined ||
 		values.filed !== undefined ||
 		values.done !== undefined

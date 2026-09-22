@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { find_package_directory } from '#scripts/josh/josh-logic'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
@@ -20,18 +22,25 @@ const USAGE = 'Usage: josh run:step <issue-number>'
 
 interface RunReads {
 	carry_kind: CarryRead['kind']
+	is_retrospective_done: boolean
 	last_event: string | undefined
 }
 
 // The run-level reads, keyed on the common git directory both the carry and the event stream share. A
 // directory that cannot be read leaves the position unknowable, which `next_action` answers `unknown`.
 function read_run(directory: string | undefined): RunReads {
-	if (directory === undefined) return { carry_kind: 'unreadable', last_event: undefined }
+	if (directory === undefined) {
+		return { carry_kind: 'unreadable', is_retrospective_done: false, last_event: undefined }
+	}
 
 	const carry = run_carry.read_carry(run_carry.carry_path(directory))
 	const last = run_event_stream.read_last(run_event_stream.target_of(directory))
 
-	return { carry_kind: carry.kind, last_event: last?.kind }
+	return {
+		carry_kind: carry.kind,
+		is_retrospective_done: run_carry.retrospective_done_of(carry),
+		last_event: last?.kind,
+	}
 }
 
 async function gather(issue_number: string): Promise<StepInput> {
@@ -46,7 +55,9 @@ async function gather(issue_number: string): Promise<StepInput> {
 		latest_scope: parts.latest_scope,
 		last_event: run_reads.last_event,
 		carry_kind: run_reads.carry_kind,
+		is_retrospective_done: run_reads.is_retrospective_done,
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
+		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
 	}
 }
 

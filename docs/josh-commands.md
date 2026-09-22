@@ -1833,6 +1833,20 @@ pnpm josh time --path <dir>     # read another project's transcripts from this c
 
 **Output / exit codes:** an absent or untimed transcript exits non-zero and says where it looked.
 
+### `josh retrospective`
+
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. It reads kit's own development run — the transcript store, the review-finding ledger and the run event stream — so it means nothing in a consumer project.
+
+Aggregate a finished run's four existing measurements into one digest, so the end-of-run retrospective has one place to read the run it just closed. It adds no new measurement.
+
+```bash
+pnpm josh retrospective          # the digest for the run this checkout carries
+```
+
+The run driver prints this at the stop position (`josh run:step`), once per invocation, when a run drains its backlog; a dispatched lane child never runs it. **What to file from the digest is `retrospective.md`'s** — this command only reads and shapes.
+
+**Output:** four sections — the run tree's cost and time by role (flagging a role whose time share runs ahead of its cost share), the recurring review findings with their zero-finding denominator, the count of observation-ledger entries held, and the run's friction events (parks, outages, cuts, review rounds) — closed by a pointer to weigh them against `retrospective.md`.
+
 ### `josh eval`
 
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository.

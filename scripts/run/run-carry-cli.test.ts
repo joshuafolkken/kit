@@ -225,6 +225,15 @@ describe('counting into a carried run', () => {
 		})
 	})
 
+	it('marks the retrospective as run (joshuafolkken/kit#2328)', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		await run_carry_cli.run(['--retrospective'])
+
+		const read = run_carry.read_carry(target())
+
+		expect(read.kind === 'carried' ? read.carry.retrospective : undefined).toBe(true)
+	})
+
 	it('refuses a count with no record to count into', async () => {
 		expect(await run_carry_cli.run(['--merged', '1'])).toBe(1)
 		expect(out).toStrictEqual([run_carry_cli.NONE_VERDICT])

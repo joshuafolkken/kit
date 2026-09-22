@@ -27,7 +27,7 @@ every lane holds a child, so the parent waits
 the failure guard stops the run
   start              verdict  implement
   outage             command  pnpm josh run:merge 2250
-  guard stops        verdict  stop
+  guard stops        command  pnpm josh retrospective
 
 ## expired-budget
 the whole-run budget is spent — a person decides

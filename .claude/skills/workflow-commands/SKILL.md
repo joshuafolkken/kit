@@ -133,6 +133,7 @@ procedure.
 | Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
 | Another Issue here must land first | A prerequisite is a dependency, not a park (the third of four mid-run discoveries) | §2d → `prerequisite.md` |
 | Something worth filing, none of the three | File it without asking (Tier A, first-party) and carry on; a delegated child returns it to the parent instead | §2i → `observation-filing.md` |
+| `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | §2j → `retrospective.md` |
 | The pre-implementation reading reaches 3 unedited files | Delegate it; a file this run will edit is read in the main line | §2b → "The pre-implementation reading" |
 | Before implementing (every `#N` entry) | Read the Issue's comments — the later of a body and a comment wins | §2g → `issue-comments.md` |
 | Immediately before implementation | Present the two-layer work summary (once per Issue); `kickoff` posts a plan instead | `prompts/collaboration-workflow/report-format.md` |
@@ -420,6 +421,25 @@ table, the depth labels and their provisioning commands, the depth-0 share, the 
 grammar and its commit path, the promotion on a second sighting, and what a delegated child does
 instead. The four things above are the rule; that file is how each one is carried out, and it is the
 single source of every one of them.
+
+## 2j. The end-of-run retrospective — read when `run:step` prints it
+
+**Trigger:** `pnpm josh run:step` prints the retrospective step, which it does at the stop position of a
+run that drained its backlog and is not a dispatched lane child (a batch runs one at its own end, never
+a child's — the `release:scope` precedent). It is kit-only: `run:step` prints it only in the kit
+repository, so a consumer run never reaches this step. It fires once per invocation: the carry record
+holds whether it has run, so a run resumed after a session cut does not repeat it, and `run:carry --end`
+removes the record so it cannot leak into the next invocation. **When it fires is the run driver's, not
+this skill's** — the rule lives in `run:step`'s state transitions, so nothing here decides ordering.
+
+**Then:** run the command `run:step` prints for the digest, weigh it, file the improvements worth
+carrying into the next run — at most two, each through `pnpm josh issue:scout` then
+`pnpm josh epic:bundle` like any other filing — stack the rest in the observation ledger, and close with
+`pnpm josh run:carry --retrospective --owner "$PPID"` so the step is not printed again. **The procedure
+is `retrospective.md`, read in full at that trigger** — it carries what the digest's four sections mean,
+how the top two are selected rather than rationed, the `auto-ok` carve-out that lets the next run pick
+them up (`backlogrun-steps.md` is that rule's single source), and why a retrospective that finds nothing
+worth carrying files nothing.
 
 ## 3. What stays resident, and what is read from here
 

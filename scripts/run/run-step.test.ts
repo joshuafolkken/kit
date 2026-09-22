@@ -15,7 +15,9 @@ function input(overrides: Partial<StepInput>): StepInput {
 		latest_scope: 'skip',
 		last_event: undefined,
 		carry_kind: 'none',
+		is_retrospective_done: false,
 		is_lane_child: false,
+		is_consumer: false,
 		...overrides,
 	}
 }
@@ -96,11 +98,38 @@ describe('run_step.next_action — event-driven position', () => {
 		expect(run_step.next_action(input({ last_event }))).toEqual({ kind: 'command', line })
 	})
 
-	it.each([
-		[KIND.CHILD_LAUNCH, run_step.WAIT],
-		[KIND.STOP, run_step.STOP],
-	])('answers a verdict after %s', (last_event, line) => {
-		expect(run_step.next_action(input({ last_event })).line).toBe(line)
+	it('answers a wait verdict after a child launch', () => {
+		expect(run_step.next_action(input({ last_event: KIND.CHILD_LAUNCH })).line).toBe(run_step.WAIT)
+	})
+})
+
+// joshuafolkken/kit#2328: a run that drained its backlog owes an end-of-run retrospective before it
+// ends. `run:step` prints it at the stop position — once, gated by the carry flag — and never for a
+// dispatched lane child, which runs one at the batch's own end (the `release:scope` precedent).
+describe('run_step.next_action — the end-of-run retrospective at the stop position', () => {
+	it('dispatches the retrospective at a stop that has not run one', () => {
+		expect(run_step.next_action(input({ last_event: KIND.STOP }))).toEqual({
+			kind: 'command',
+			line: run_step.RETROSPECTIVE_COMMAND,
+		})
+	})
+
+	it('stops rather than repeating a retrospective already run this invocation', () => {
+		expect(
+			run_step.next_action(input({ last_event: KIND.STOP, is_retrospective_done: true })).line,
+		).toBe(run_step.STOP)
+	})
+
+	it('never runs a retrospective in a dispatched lane child', () => {
+		expect(run_step.next_action(input({ last_event: KIND.STOP, is_lane_child: true })).line).toBe(
+			run_step.STOP,
+		)
+	})
+
+	it('never runs the kit-only retrospective in a consumer checkout', () => {
+		expect(run_step.next_action(input({ last_event: KIND.STOP, is_consumer: true })).line).toBe(
+			run_step.STOP,
+		)
 	})
 })
 

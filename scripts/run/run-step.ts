@@ -46,6 +46,12 @@ const VOCABULARY: ReadonlyArray<string> = [
 const EXPIRED_DECISION =
 	'decide: whole-run budget spent — resume with `pnpm josh run:carry --resume` | discard with `pnpm josh run:carry --end`'
 
+// The one step a stopped run still owes before it ends: the end-of-run retrospective
+// (joshuafolkken/kit#2328). It reads the run's own measurements and files the improvements worth
+// carrying into the next run; the command is kit-only, so it means nothing — and is never printed — in a
+// consumer project.
+const RETROSPECTIVE_COMMAND = 'pnpm josh retrospective'
+
 // The pre-implementation verdict `run:next` degenerates to: the position of a run that has emitted no
 // event yet. `run-next.ts` maps each of these to its prose sentence, so this is the single copy of the
 // state → step mapping and there is no second implementation (joshuafolkken/kit#2248).
@@ -75,6 +81,14 @@ interface StepInput extends PreInput {
 	// event is read: the position is where the run *is*, not how it got there.
 	last_event: string | undefined
 	carry_kind: CarryRead['kind']
+	// Whether this invocation's end-of-run retrospective has already run, read off the carry record
+	// (joshuafolkken/kit#2328). At the stop position it is what tells a run that still owes a
+	// retrospective from one that has run it, so the step is printed exactly once.
+	is_retrospective_done: boolean
+	// Whether this checkout is a kit consumer rather than kit itself (joshuafolkken/kit#2328). The
+	// retrospective command is kit-only — refused in a consumer — so the step is never printed there; the
+	// consumer determination is the existing `doctor-consumer.ts` one, never a new judgement.
+	is_consumer: boolean
 	issue_number: string
 	// Whether this run is a dispatched lane child, read by the CLI from the dispatch mark
 	// (`lane-child-marker.ts`). A child must never be handed `run:merge` — that is the parent's own
@@ -96,9 +110,10 @@ function command(line: string): StepAction {
 }
 
 // The action for each event a run can be positioned at, keyed on the newest one. Each dispatches to the
-// command that owns that phase; `child-launch` and `stop` are the two positions with no command to run
-// — the parent waits for its child, or the run has already stopped. A merge and an outage share a next
-// step: `run:merge` classifies both, including the outage's stop condition.
+// command that owns that phase; `child-launch` is the one position with no command to run — the parent
+// waits for its child. `stop` is handled apart in `stop_action`, because whether it still owes a
+// retrospective needs more than the issue number. A merge and an outage share a next step: `run:merge`
+// classifies both, including the outage's stop condition.
 const KIND = run_event_stream.EVENT_KIND
 const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.PR_OPENED]: () => command('pnpm josh followup'),
@@ -108,7 +123,6 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.PARK]: () => command('pnpm josh backlog:next'),
 	[KIND.CUT]: (issue_number) => command(`pnpm josh run:cut --resume ${issue_number}`),
 	[KIND.CHILD_LAUNCH]: () => verdict(WAIT),
-	[KIND.STOP]: () => verdict(STOP),
 }
 
 // The parent-only positions a dispatched lane child must never act on. `run:merge` is the parent's
@@ -118,9 +132,21 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 // (joshuafolkken/kit#2297).
 const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
 
+// A stopped run's last owed step is the end-of-run retrospective (joshuafolkken/kit#2328) — unless this
+// run is a dispatched lane child, where the batch runs one at its own end and never a child's (the
+// `release:scope` precedent), the retrospective has already run this invocation, or this is a consumer
+// checkout, where the kit-only command is refused. All three stop with no command to run, which is what
+// the position meant before the retrospective existed.
+function stop_action(input: StepInput): StepAction {
+	if (input.is_lane_child || input.is_retrospective_done || input.is_consumer) return verdict(STOP)
+
+	return command(RETROSPECTIVE_COMMAND)
+}
+
 // An event the table does not name leaves the position unknown rather than guessing a next step. A
 // lane child at a parent-only position stops instead — the runtime refusal `lane-carry-conflict.ts`
-// delivers is the same rule one call later, so this keeps a child from ever being pointed at it.
+// delivers is the same rule one call later, so this keeps a child from ever being pointed at it. The
+// stop position is dispatched by `next_action`, so it is not among the events this handles.
 function event_action(event: string, issue_number: string, is_lane_child: boolean): StepAction {
 	if (is_lane_child && PARENT_ONLY_EVENTS.has(event)) return verdict(STOP)
 
@@ -154,7 +180,11 @@ function next_action(input: StepInput): StepAction {
 	if (terminal !== undefined) return terminal
 	if (is_pre_implementation(input.last_event)) return verdict(pre_verdict(input))
 
-	return event_action(input.last_event ?? '', input.issue_number, input.is_lane_child)
+	const event = input.last_event ?? ''
+
+	if (event === KIND.STOP) return stop_action(input)
+
+	return event_action(event, input.issue_number, input.is_lane_child)
 }
 
 const run_step = {
@@ -162,6 +192,7 @@ const run_step = {
 	EXPIRED_DECISION,
 	HUMAN_REVIEW,
 	IMPLEMENT,
+	RETROSPECTIVE_COMMAND,
 	STOP,
 	UNKNOWN,
 	UPDATE_DEPS,

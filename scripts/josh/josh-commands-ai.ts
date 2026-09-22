@@ -129,6 +129,17 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// distributed under `scripts/time-runtime/`.
 		is_kit_only: true,
 	},
+	retrospective: {
+		script: 'scripts/retrospective/retrospective-cli.ts',
+		description:
+			"Aggregate a finished run's cost, review findings, observation ledger and events into one digest",
+		category: 'AI tools',
+		reference: ['', 'maintainer', ['none']],
+		// Kit-only: it reads kit's own development run — the transcript store, the review ledger and the
+		// run event stream — so it means nothing in a consumer project and is dropped from a consumer's
+		// help (joshuafolkken/kit#2328), through the same declaration `josh time` uses for the same reason.
+		is_kit_only: true,
+	},
 	'review:brief': {
 		script: 'scripts/review/review-brief-cli.ts',
 		description:

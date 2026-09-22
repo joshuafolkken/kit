@@ -44,6 +44,10 @@ const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'backlogrun-progress.md',
 	'backlogrun-park.md',
 	'backlogrun-steps.md',
+	// Read only when `run:step` prints `pnpm josh retrospective` at a run's stop position — the very
+	// end of a run, never the entry (joshuafolkken/kit#2328). Kept out of every entry's read for the
+	// same reason the phase documents above are: no run that never drains its backlog reaches it.
+	'retrospective.md',
 ])
 
 // **A file an entry names but reads only later — point-of-use for that entry, an entry read for

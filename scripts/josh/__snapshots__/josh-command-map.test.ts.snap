@@ -103,6 +103,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rsp": "run:step",
     "rst": "run:status",
     "rt": "reconcile-templates",
+    "rtr": "retrospective",
     "rug": "rule:guard",
     "ruv": "rule:value",
     "rv": "run:liveness",
@@ -749,6 +750,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "report:lint": [
       "(reads stdin)",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "retrospective": [
+      "",
+      "maintainer",
       [
         "none",
       ],

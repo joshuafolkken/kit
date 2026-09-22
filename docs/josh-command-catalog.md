@@ -1005,6 +1005,16 @@ Check a two-layer work summary on stdin against its mechanical format rules
 
 ---
 
+### `josh retrospective` · `josh rtr`
+
+> **Audience:** maintainer · **Side effects:** none · **kit only**
+
+_No arguments._
+
+Aggregate a finished run's cost, review findings, observation ledger and events into one digest
+
+---
+
 ### `josh review:attest` · `josh ra`
 
 > **Audience:** automation · **Side effects:** files
