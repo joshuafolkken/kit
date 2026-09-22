@@ -65,7 +65,7 @@ after any filing.
 input, so the next run picks the improvements up without waiting for a person. **`backlogrun-steps.md` →
 "What one invocation approves" is that carve-out's single source**; it is written there, beside the
 brakes that bound it, rather than restated here. Every brake still counts a retrospective's filings: the
-ten-per-invocation ceiling, the WIP cap of 30, `--max`, the 200,000-token session budget and the 8-hour
+ten-per-invocation ceiling, the WIP cap of 30, `--max`, the 150,000-token session budget and the 8-hour
 whole-run bound.
 
 **Close with `pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID"`.** It marks the

@@ -348,10 +348,10 @@ It prints `over` or `under` on standard output and the measured figure on standa
 the next turn of this session costs more than the threshold in billed input, and the number is passed
 explicitly so a run cannot drift it by remembering it wrong.
 
-**200,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
+**150,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
 The value is `CONTEXT_CUT_THRESHOLD` in `scripts/cost-runtime/context-cut-threshold.ts`; `cost --cut`,
 `run:merge` and `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` all read it rather than carrying separate
-numbers. The 150,000 output ceiling and the 150,000 entry-read character figure are separate systems.
+numbers. The output ceiling and the entry-read figure coincide at 150,000 but are separate systems.
 
 ### The check is asked at every merge, and delegation does not excuse it
 
@@ -378,7 +378,7 @@ on the default branch, and the epic's state on GitHub is complete.
 **The same `pnpm josh cost --over` measurement bounds a lane child's context _during_ implementation, not
 only the parent's between children** — the pre-gate cut fires only once implementation is done, so it
 never caps the thinking a child accumulates while implementing. The child measures its own per-request
-context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 200_000, and cuts with
+context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 150_000, and cuts with
 `pnpm josh run:cut --impl <N>`. **The measurement and threshold are single-sourced**:
 `cost_verdict.per_request_cost` is what both seams compare, and `cost --cut` selects the same constant
 for the parent and child. The boundary and the resume are `pre-gate-cut.md` → "The

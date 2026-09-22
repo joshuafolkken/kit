@@ -179,7 +179,7 @@ The guard below refuses on the same measurement the parent uses between children
 `cost_verdict.per_request_cost`, read through `cost_cli.session_verdict` (the read-only form of
 `pnpm josh cost --cut`, the verdict the conditional pre-gate cut reads too, joshuafolkken/kit#2312),
 single-sourced at `backlogrun-progress.md` → "The hand-off". The parent's seam and the child's
-`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` share the **200_000** `CONTEXT_CUT_THRESHOLD` (aliased so
+`run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` share the **150_000** `CONTEXT_CUT_THRESHOLD` (aliased so
 procedure, scheduler and worker tests cannot drift). No separate measurement is built for the lane child.
 
 ### It is a guard, fired at the edit that crosses the threshold (joshuafolkken/kit#2310)
@@ -219,7 +219,7 @@ edits, not after each one** — every check is a request too (joshuafolkken/kit#
 
 ## The threshold, and the statistic it is measured against
 
-**The 200_000 `CONTEXT_CUT_THRESHOLD` is unchanged; what joshuafolkken/kit#2295 changed is the
+**The `CONTEXT_CUT_THRESHOLD` (150_000) is one value; what joshuafolkken/kit#2295 changed is the
 statistic — `cost_verdict.per_request_cost` now averages the most recent `RECENT_REQUEST_WINDOW` (10)
 requests rather than the whole session.** It is still *one* measurement both read; only its definition
 changed. This supersedes joshuafolkken/kit#2282, which kept the whole-session average and rejected this
@@ -227,7 +227,7 @@ recent-context option on the batch it measured — short-lived lane children wit
 which the two averages nearly coincide.
 
 - **The safety net now fires.** The implementation-phase cut was built (joshuafolkken/kit#1933) for a
-  pathological regime a typical lane never enters, and 200_000 sits below the 208k floor of that regime,
+  pathological regime a typical lane never enters, and 150_000 sits below the 208k floor of that regime,
   so a runaway implementation still trips it — and joshuafolkken/kit#2310 made the guard trip it actively
   at the edit that crosses the threshold, closing the "it never fired" gap.
 - **The recent window catches the long parent the whole-session average missed.** The 2026-09-21
@@ -239,16 +239,16 @@ which the two averages nearly coincide.
   a short session the two averages track, so a lane child cuts where it always did; only the long parent
   hands off earlier.
 
-### Why 200_000 stands, though the measured optimum is lower (joshuafolkken/kit#2366)
+### Why 150_000, not the lane optimum of ~100_000 (joshuafolkken/kit#2374)
 
-**The value is kept at 200_000 on scope, not on the measurement.** #2366 re-ran the cost simulation —
-pricing each cut with the 20,000-token hand-off and the ~5-request resume ramp — and the per-request
-cost bottoms out near **100_000** (70_000 is worse: the resume outweighs the smaller drop), so 200_000
-is about twice the optimum **for a lane cut**. But this constant is one number for
-four uses — lane cut, pre-gate cut, parent hand-off and `cost --cut` session boundary — and #2366
-simulated only the lane; halving it moves the unsimulated parent hand-off too. And
-[#2354](https://github.com/joshuafolkken/kit/issues/2354) (carry across a cut) just merged, so more cuts
-want validation first. So the value holds; lowering to ~100_000 is a scoped follow-up.
+**The value was lowered from 200_000 to 150_000 once all four shared uses were simulated.** #2366 priced
+only the lane cut, whose per-request cost bottoms out near **100_000**, so it held the value and split
+the reduction to [#2374](https://github.com/joshuafolkken/kit/issues/2374), which simulated the other
+three (hand-off, pre-gate, boundary). **100_000 is rejected**: it fires the pre-gate cut on 100–150k
+lanes, raising their ~12-request resume cost. **150_000 Pareto-improves 200_000 across all four** — near
+the pre-gate optimum, and the other three (each optimal at ~100k or below) all move closer to theirs;
+none regresses. 120–130k (frequency-weighted) rests on unmeasured frequencies, so weaker. The
+simulation and #2354 carry validation are in the #2374 PR body.
 
 ### The cut is conditional, and the resume side is why (joshuafolkken/kit#2312)
 
