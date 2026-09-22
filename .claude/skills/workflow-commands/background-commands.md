@@ -16,6 +16,29 @@
 
 Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
 
+## How the wait ends — the task's exit, never a regex over its output
+
+**Background it from the first, then end the turn.** A command issued with `run_in_background` set
+re-invokes the run when it exits, and that completion notification is what ends the wait — on the
+task's *exit*, not on a regex match and not on the harness block limit. So the moment you background
+a long command there is nothing to wait *on*: end the turn, and the wake-up brings you back with the
+command finished.
+
+**Never hand-write a `while`/`until` … `sleep` loop over the output file.** The loop does not know
+when the command finished: a regex that never matches waits to the block limit, and one that matches
+a mid-run line exits too early — either way a full-context round trip is spent for nothing. Six lanes
+lost about 45 minutes, 13% of their wall clock, to exactly this (joshuafolkken/kit#2371), and in the
+worst case a lane grepped a merged PR's output file for 30 minutes after the merge had already
+landed. `pnpm josh rule:guard` refuses the poll loop and hands back this route, so the guarantee is a
+mechanism rather than prose to remember (`prompts/collaboration-workflow/rule-delivery.md`).
+
+**To glance at interim output, `Read` the output file once** — the notification names its path — and
+never in a sleep loop. If what you are waiting on is CI, `pnpm josh followup` waits on it for you in
+the foreground; a bare `sleep` that arms a progress heartbeat is `run:progress --wait`'s job, refused
+in front of a hand-armed timer by `early-heartbeat` (joshuafolkken/kit#1570). This loop is the case
+that rule leaves alone by design, because a loop ends on a condition rather than a clock — and here
+the condition it ends on is the wrong one.
+
 ## Decision record
 
 This document is read at its point of use, not at the entry: it binds only after the first edit —

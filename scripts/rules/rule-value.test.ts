@@ -271,6 +271,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			'git-force',
 			'worktree-mutation',
 			'file-body',
+			'poll-loop',
 			INVESTIGATION,
 		])
 	})

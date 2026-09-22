@@ -18,6 +18,7 @@ import { lane_park } from './lane-park'
 import { lane_switch_main } from './lane-switch-main'
 import { oracle_consulted } from './oracle-consulted'
 import { piped_verification } from './piped-verification'
+import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { prior_comment_read } from './prior-comment-read'
 import { raw_field_body } from './raw-field-body'
@@ -470,6 +471,16 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	git_force.ROW,
 	worktree_guard.ROW,
 	file_body.ROW,
+	// **The hand-written wait loop a lane child improvises over a backgrounded command's output**
+	// (joshuafolkken/kit#2371). `early-heartbeat` refuses a bare `sleep` and stands down on any loop
+	// keyword; this is the loop it left — a `while`/`until` that sleeps between probes of an output
+	// file. Its trigger claims a command no row above matches: the loop-plus-`sleep` shape carries no
+	// `gh` / `git` / `josh` subcommand any other trigger keys on, and a poll loop is never a bare
+	// `sleep` (the loop keyword makes `early-heartbeat.is_wait_timer` false), so the Bash
+	// `rules_claiming` invariant holds. It fires on every occurrence (`decide` returns true): a poll
+	// loop wastes the same round trips each time, so the route is always "background it and end the
+	// turn", never a reissue (`git-force.ts`).
+	poll_loop.ROW,
 	// **The second row whose trigger is an `Edit` / `Write` rather than a shell call**
 	// (joshuafolkken/kit#2310), and the third that consults the world beside the call: "is this a lane
 	// child whose recent-context cost has crossed the threshold" reads the dispatch mark, the cut record
@@ -757,6 +768,7 @@ const delivered_rules = {
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
+	POLL_LOOP_REASON: poll_loop.POLL_LOOP_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
 	RAW_FIELD_BODY_REASON: raw_field_body.RAW_FIELD_BODY_REASON,
 	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
