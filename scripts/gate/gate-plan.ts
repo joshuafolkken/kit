@@ -40,6 +40,7 @@ interface GateCheck {
 const LINT_LABEL = 'lint'
 const TYPE_CHECK_LABEL = 'check'
 const UNIT_LABEL = 'test:unit'
+const BEHAVIOR_LABEL = 'behavior'
 
 // The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
 // (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
@@ -49,17 +50,26 @@ const UNIT_LABEL = 'test:unit'
 // narrows the withholding path down to (joshuafolkken/kit#2318).
 const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LABEL]
 
-// The three checks that read the tree without running it, in the order their output is printed.
-// They are named apart from the unit suite because CI runs them on their own runner
-// (joshuafolkken/kit#1226): the unit suite is the only check that fans out across every core, so on
-// a 4-core GitHub runner it and the other three spent the whole job taking cores off each other.
+// The checks that do not fan out across every core, in the order their output is printed. They are
+// named apart from the unit suite because CI runs them on their own runner (joshuafolkken/kit#1226):
+// the unit suite is the only check that fans out across every core, so on a 4-core GitHub runner it
+// and the others spent the whole job taking cores off each other.
+//
+// **The behavior check belongs here, and it reserves no core** (joshuafolkken/kit#2365). It reads one
+// recorded transcript rather than the tree, so it is I/O-bound and a zero reservation leaves
+// `RESERVED_CORES` and the unit worker cap exactly where the other three were measured. Being a static
+// check rather than one appended after the unit suite is what keeps the plan's shape intact: the
+// `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
+// transcripts — runs it as a trivial green rather than skipping it.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	{ label: LINT_LABEL, target: 'lint', reserved_cores: 2 },
 	{ label: TYPE_CHECK_LABEL, target: 'check', reserved_cores: 1 },
 	{ label: 'cspell', target: 'cspell:dot', reserved_cores: 1 },
+	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
 ]
 
-// The four checks, in the order their output is printed.
+// The checks, in the order their output is printed — the static set, then the unit suite last (the
+// one check that fans out across every core, and the one the `--no-unit` split drops).
 const GATE_CHECKS: ReadonlyArray<GateCheck> = [
 	...STATIC_CHECKS,
 	{ label: UNIT_LABEL, target: UNIT_LABEL, reserved_cores: 0 },
@@ -321,6 +331,7 @@ function format_gate_plan(
 }
 
 const gate_plan = {
+	BEHAVIOR_LABEL,
 	GATE_CHECKS,
 	LINT_LABEL,
 	MEASURED_CORES,

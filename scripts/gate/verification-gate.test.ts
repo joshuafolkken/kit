@@ -30,7 +30,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 
 const PASS = 0
 const FAIL = 1
-const ALL_PASS: ReadonlyArray<number> = [PASS, PASS, PASS, PASS]
+const ALL_PASS: ReadonlyArray<number> = [PASS, PASS, PASS, PASS, PASS]
 const REFUSAL_MESSAGE = 'josh gate takes no extra arguments'
 
 const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture

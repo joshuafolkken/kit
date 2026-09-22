@@ -225,6 +225,20 @@ pnpm josh cspell:dot      # includes dotfiles
 
 - Runs with `--no-progress`, so it prints only the unknown-word lines and the summary — not the per-file `N/1607 <path> cached` progress that once filled the whole output past the tool's truncation cap (joshuafolkken/kit#2296).
 
+### `josh behavior`
+
+Check the current run's recorded transcript against the behavior assertions and report where any broke — with **no live Claude session and no model call** (joshuafolkken/kit#2365). It is one of `pnpm josh gate`'s checks, so behavior regressions are caught every run rather than only by eye.
+
+```bash
+pnpm josh behavior
+```
+
+- **The data is what every run already writes.** Claude Code files each session's transcript under `~/.claude/projects/**/*.jsonl`; an assertion read off a recorded transcript is deterministic, re-runnable and never calls a model — which is exactly what joshuafolkken/kit#1922 removed the slow five-live-session `josh eval` path for lacking.
+- **The scope is the current run, not the whole corpus.** The store holds thousands of transcripts and over a gigabyte; walking all of it every gate would cost minutes. Each gate checks its own run — the newest session transcript, resolved exactly as `josh cost` resolves "the run that just finished" — so across runs the whole corpus is covered a run at a time. The engine stays general, so a broad scan of past runs (how a new assertion is verified green before it is added) is the same walk over a different set of files.
+- **A run with no transcript passes** without the skip marker, so a CI runner — which has none — never withholds the gate's green record.
+- **The seed set is one assertion**, green across the recorded corpus today: `no-direct-git-index-mutation` — `git add` / `git commit` / `git rm --cached` / `git restore --staged` must go through `pnpm josh git` (dry runs excluded). New assertions are added one at a time, each verified green against past real runs first. A break prints which run and which point it broke at.
+- **The manual `josh eval` is untouched**: this restores behavior verification without reviving the live-session path it removed.
+
 ### `josh test:unit`
 
 Run unit tests with vitest. **Skips gracefully (exit 0)** when `vitest` is not installed. Once `vitest` and at least one test file are present, runs `vitest run`.

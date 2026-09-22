@@ -41,6 +41,7 @@ const ALIASES: Record<string, string> = {
 	fd: 'format:edited',
 	bg: 'batch:guard',
 	sd: 'cspell:dot',
+	bh: 'behavior',
 	t: 'test',
 	tu: 'test:unit',
 	tr: 'test:related',

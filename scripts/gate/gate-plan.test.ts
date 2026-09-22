@@ -223,7 +223,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 4 of 4 checks at once, test:unit at 7 workers (11 cores)',
+			'plan: 5 of 5 checks at once, test:unit at 7 workers (11 cores)',
 		)
 	})
 
@@ -246,7 +246,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
-			'plan: 1 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
+			'plan: 1 of 5 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
 		)
 	})
 
@@ -284,7 +284,7 @@ describe('gate_plan without the unit suite', () => {
 
 		expect(plan.unit_worker_cap).toBeUndefined()
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 3 of 3 checks at once, test:unit elsewhere (11 cores)',
+			'plan: 4 of 4 checks at once, test:unit elsewhere (11 cores)',
 		)
 	})
 

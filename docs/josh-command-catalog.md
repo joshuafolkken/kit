@@ -15,6 +15,16 @@ Claude Code hook: refuse a third consecutive single-call turn (reads the tool ca
 
 ---
 
+### `josh behavior` · `josh bh`
+
+> **Audience:** developer · **Side effects:** files
+
+_No arguments._
+
+Check the current run's recorded transcript against the behavior assertions (no model call)
+
+---
+
 ### `josh bytes` · `josh by`
 
 > **Audience:** developer · **Side effects:** none

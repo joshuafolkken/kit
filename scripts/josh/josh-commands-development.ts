@@ -128,6 +128,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 	},
+	behavior: {
+		script: 'scripts/behavior/behavior-cli.ts',
+		description:
+			"Check the current run's recorded transcript against the behavior assertions (no model call)",
+		category: 'Development',
+		reference: ['', 'developer', ['files']],
+	},
 	'test:unit': {
 		script: 'scripts/test/test-unit-guard.ts',
 		description:
