@@ -24,6 +24,12 @@ const STOPPED_REASON: WakeStopReason = 'stopped'
 const FAILED_REASON: WakeStopReason = 'failed'
 const NO_ATTEMPTS = 0
 const STOPPED_BY_PERSON: LoopStop = { reason: STOPPED_REASON, note: undefined }
+// **The back-off after repeated whiffs, and its ceiling** (joshuafolkken/kit#2417). While a launch is
+// deferred for want of work, each wait is as long as the idle stretch so far — so the polling interval
+// doubles pass by pass — capped at this multiple of the configured one. Eight times the one-minute
+// default is eight minutes: far fewer backlog reads over a long empty stretch, and still well inside
+// the idle ceiling, so work that appears is picked up within one capped wait.
+const MAX_BACKOFF_FACTOR = 8
 
 interface LoopPorts {
 	// The carry record, re-read every pass rather than cached: it is written by the parent loop of a
@@ -33,6 +39,9 @@ interface LoopPorts {
 	// `--cut` and then exits, so the two moments are not the same one and the supervisor has to wait
 	// out the second — `run-wake.ts` → `WakeDecisionInput.is_owner_live`.
 	is_owner_live: (read: CarryRead) => boolean
+	// Whether a woken session would find work — `run-wake-work.ts` in production. Asked only on a pass
+	// that would otherwise launch, because its last read is a network call (joshuafolkken/kit#2417).
+	has_work: (read: CarryRead) => Promise<boolean | undefined>
 	// **The forced transcript id is generated here and handed to `wake`** (joshuafolkken/kit#2407), so
 	// the loop stays deterministic under test — a fixture returns a known id — while production draws a
 	// fresh UUID. The same id is recorded on the wake record, which is how `josh time --run` later knows
@@ -90,6 +99,10 @@ function continue_step(wake: RunWake, decision: WakeDecision, ports: LoopPorts):
 		return { kind: 'continue', wake: run_wake.mark_wait(wake, ports.now()) }
 	}
 
+	if (decision.kind === 'idle') {
+		return { kind: 'continue', wake: run_wake.mark_idle(wake, ports.now()) }
+	}
+
 	return { kind: 'continue', wake }
 }
 
@@ -101,6 +114,8 @@ function step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): StepOutc
 	return continue_step(wake, decision, ports)
 }
 
+// `has_work` starts as "cannot tell", which never defers anything — so this first input decides every
+// branch except whether a launch has work to go to.
 function decision_input(wake: RunWake, ports: LoopPorts): WakeDecisionInput {
 	const read = ports.read_carry()
 
@@ -110,15 +125,45 @@ function decision_input(wake: RunWake, ports: LoopPorts): WakeDecisionInput {
 		attempts: wake.attempts ?? NO_ATTEMPTS,
 		is_owner_live: ports.is_owner_live(read),
 		held_at: wake.held_at,
+		has_work: undefined,
+		idle_since: wake.idle_since,
 		now: ports.now(),
 	}
+}
+
+// **Work is asked about only where the answer could change the decision** (joshuafolkken/kit#2417):
+// on a pass the record alone would launch from. Every other pass — the in-flight wait, the pending
+// grace window, the hold — decides from the record as before and costs no backlog read.
+async function decide_pass(wake: RunWake, ports: LoopPorts): Promise<WakeDecision> {
+	const input = decision_input(wake, ports)
+	const decision = run_wake.decide(input)
+
+	if (decision.kind !== 'wake') return decision
+
+	return run_wake.decide({ ...input, has_work: await ports.has_work(input.read) })
+}
+
+// The wait before the next pass: the configured interval, stretched while a launch is being deferred
+// to the length of the idle stretch so far and capped at `MAX_BACKOFF_FACTOR` times the interval.
+function next_interval(wake: RunWake | undefined, interval_ms: number, now: Date): number {
+	const idle_since = wake?.idle_since === undefined ? NaN : Date.parse(wake.idle_since)
+
+	if (Number.isNaN(idle_since)) return interval_ms
+
+	const stretched = Math.max(interval_ms, now.getTime() - idle_since)
+
+	return Math.min(stretched, interval_ms * MAX_BACKOFF_FACTOR)
 }
 
 // The record is re-read at the top of every pass rather than carried in a variable, so a `--stop` that
 // removed it ends the loop at the next interval and a `--list` reads what the loop actually wrote.
 // One pass: decide, act, write the result back. `undefined` means carry on to the next interval.
-function run_pass(target: string, wake: RunWake, ports: LoopPorts): LoopStop | undefined {
-	const outcome = step(wake, run_wake.decide(decision_input(wake, ports)), ports)
+async function run_pass(
+	target: string,
+	wake: RunWake,
+	ports: LoopPorts,
+): Promise<LoopStop | undefined> {
+	const outcome = step(wake, await decide_pass(wake, ports), ports)
 
 	if (outcome.kind === 'stop') return outcome.stop
 
@@ -138,11 +183,11 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 	let wake = run_wake.read_own_wake(target)
 
 	while (wake !== undefined) {
-		const stop = run_pass(target, wake, ports)
+		const stop = await run_pass(target, wake, ports)
 
 		if (stop !== undefined) return stop
 
-		await ports.sleep(interval_ms)
+		await ports.sleep(next_interval(run_wake.read_own_wake(target), interval_ms, ports.now()))
 		wake = run_wake.read_own_wake(target)
 	}
 
@@ -151,7 +196,9 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 
 const run_wake_loop = {
 	FAILED_REASON,
+	MAX_BACKOFF_FACTOR,
 	STOPPED_REASON,
+	next_interval,
 	run_loop,
 	step,
 }

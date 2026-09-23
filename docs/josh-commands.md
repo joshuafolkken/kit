@@ -1499,6 +1499,14 @@ pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 `scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local
 `sqlite_home` and `--ephemeral`, retaining native auth/config. Unclaimed wakes try thrice.
 
+**A launch goes out only where a woken session would find work** (joshuafolkken/kit#2417). Before
+every launch — first wake, dead-owner recovery and retry alike — the supervisor asks, cheap first:
+named issues left on the carry record (or a finished `--only` list) are work; otherwise a free lane
+and a ready issue from `backlog:next` are. With no work it launches nothing and polls again, each wait
+as long as the idle stretch so far, capped at eight times `--interval`. A failed `backlog:next` read
+counts as work, and a stretch past the `backlogrun` idle-watch default (30 minutes) wakes one session
+anyway, so the run is still finished by a session rather than left to expire.
+
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
 ### `josh run:cut`
