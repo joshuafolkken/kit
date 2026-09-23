@@ -7,6 +7,7 @@ import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledge
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { run_carry } from '#scripts/run/run-carry'
+import { run_event_scope, type EventScope } from '#scripts/run/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
@@ -44,23 +45,38 @@ function ledger_entries(content: string): Array<string> {
 	return content.split('\n').filter((line) => observation_ledger_line.is_ledger_entry_line(line))
 }
 
-async function read_events(): Promise<ReadonlyArray<RunEvent>> {
+interface RunRead {
+	events: ReadonlyArray<RunEvent>
+	scope: EventScope
+}
+
+// The stream and the scope that bounds it, read from the one directory the carry record and the event stream
+// share (joshuafolkken/kit#2395). The whole stream is read — `scoped_events` filters it to this invocation —
+// and an unresolvable directory has no record to scope with, which is the undetermined answer an absent
+// record gives.
+async function read_run(): Promise<RunRead> {
 	const directory = await run_carry.repository_directory()
 
-	if (directory === undefined) return []
+	if (directory === undefined) return { events: [], scope: run_event_scope.UNKNOWN_EVENT_SCOPE }
 
-	return run_event_stream.read_from(run_event_stream.target_of(directory), STREAM_START).events
+	const target = run_event_stream.target_of(directory)
+	const { events } = run_event_stream.read_from(target, STREAM_START)
+	const scope = run_event_scope.scope_of(run_carry.read_carry(run_carry.carry_path(directory)))
+
+	return { events, scope }
 }
 
 async function gather(cwd: string): Promise<RetrospectiveInputs> {
 	const ledger = await read_ledger()
+	const run_read = await read_run()
 
 	return {
 		cost: read_cost(cwd),
 		findings: review_finding_ledger.category_counts(ledger),
 		zero_rounds: review_finding_ledger.zero_round_count(ledger),
 		observations: ledger_entries(ledger),
-		events: await read_events(),
+		events: run_read.events,
+		scope: run_read.scope,
 	}
 }
 

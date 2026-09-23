@@ -1,8 +1,8 @@
 import { release_scope_cli } from '#scripts/release/release-scope-cli'
 import { describe, expect, it } from 'vitest'
-import { run_carry } from './run-carry'
+import { run_event_scope, type EventScope } from './run-event-scope'
 import { run_event_stream, type RunEvent } from './run-event-stream'
-import { run_report, type ReportScope } from './run-report'
+import { run_report } from './run-report'
 
 // joshuafolkken/kit#2249: the report generated from the run's event stream. The generator is pure — it
 // takes the events and the release verdict and returns a string — so the tests hand it fixed inputs and
@@ -19,7 +19,7 @@ const AT = '2026-09-21T00:00:00.000Z'
 const PARK_TEXT = '#8 parked (needs-decision)'
 const NOT_A_TIME = 'not-a-time'
 
-function since(started_at: string): ReportScope {
+function since(started_at: string): EventScope {
 	return { kind: 'since', started_at }
 }
 
@@ -151,7 +151,7 @@ describe('run_report.build_report — an undetermined scope', () => {
 		const report = run_report.build_report({
 			events: MIXED,
 			release: SKIP,
-			scope: run_report.UNKNOWN_REPORT_SCOPE,
+			scope: run_event_scope.UNKNOWN_EVENT_SCOPE,
 		})
 
 		expect(report).toContain(run_report.UNKNOWN_SCOPE_NOTICE)
@@ -171,22 +171,9 @@ describe('run_report.build_report — an undetermined scope', () => {
 	})
 })
 
-describe('run_report.scope_of', () => {
-	const CARRY = run_carry.fresh_carry('backlogrun', {}, new Date(AT))
-
-	it('takes the start time from a carried record', () => {
-		expect(run_report.scope_of({ kind: 'carried', carry: CARRY })).toEqual(since(AT))
-	})
-
-	it('takes it from an expired record too, since expiry is a budget verdict not a missing start', () => {
-		expect(run_report.scope_of({ kind: 'expired', carry: CARRY })).toEqual(since(AT))
-	})
-
-	it('leaves the scope undetermined when no record is there or it cannot be read', () => {
-		expect(run_report.scope_of({ kind: 'none' })).toEqual(run_report.UNKNOWN_REPORT_SCOPE)
-		expect(run_report.scope_of({ kind: 'unreadable' })).toEqual(run_report.UNKNOWN_REPORT_SCOPE)
-	})
-})
+// The scope derivation itself (`scope_of`) and its undetermined answers are pinned in
+// `run-event-scope.test.ts`, its single-source home (joshuafolkken/kit#2395); this file pins how the report
+// renders a scope, not how the scope is derived.
 
 // The harm the scope removes: the observed body was 138 events and 11,689 bytes, and Telegram rejected it for
 // length. The fixture is that stream — 138 events of which 40 are this invocation's — so the byte count

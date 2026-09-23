@@ -3,9 +3,10 @@ import { fileURLToPath } from 'node:url'
 import { git_followup_pending } from '#scripts/git/git-followup-pending'
 import { release_scope_cli } from '#scripts/release/release-scope-cli'
 import { run_carry } from './run-carry'
+import { run_event_scope, type EventScope } from './run-event-scope'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
-import { run_report, type ReportScope } from './run-report'
+import { run_report } from './run-report'
 
 // `josh run:report` — the session-facing report, generated from the run's event stream rather than
 // composed by hand (joshuafolkken/kit#2249). It reads the events the run appended, asks `release:scope`
@@ -33,12 +34,12 @@ async function read_stream(): Promise<ReadonlyArray<RunEvent>> {
 // The invocation this report covers, taken from the run record that already holds the start time
 // (joshuafolkken/kit#2393). A checkout whose git directory cannot be resolved has no record to read, which is
 // the same undetermined answer an absent record gives — and neither one falls back to the whole stream.
-async function read_scope(): Promise<ReportScope> {
+async function read_scope(): Promise<EventScope> {
 	const directory = await run_carry.repository_directory()
 
-	if (directory === undefined) return run_report.UNKNOWN_REPORT_SCOPE
+	if (directory === undefined) return run_event_scope.UNKNOWN_EVENT_SCOPE
 
-	return run_report.scope_of(run_carry.read_carry(run_carry.carry_path(directory)))
+	return run_event_scope.scope_of(run_carry.read_carry(run_carry.carry_path(directory)))
 }
 
 // The three reads are independent, so they are issued together rather than one after another — the stream, the
