@@ -95,3 +95,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-steps.md | 2026-09-23 | #2393
 - rf:project-conventions | low | docs/josh-commands.md | 2026-09-23 | #2393
 - rf:comments | low | .claude/skills/workflow-commands/backlogrun-steps.md | 2026-09-23 | #2393
+- rf:project-conventions | low | scripts/run/run-ship-cli.ts | 2026-09-23 | #2398
