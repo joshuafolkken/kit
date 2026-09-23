@@ -225,7 +225,7 @@ single non-numeric line as the verdict.
 
    **`run:liveness` stays the fallback for a lane no `lane:await` is watching** — a handed-over lane a
    resumed session polls ("Picking the lanes up in the fresh session"). Ask
-   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "fullrun #<N>$"` found>` where
+   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "(fullrun|run-ship-cli\.ts .*) #<N>$"` found>` where
    that file has been unchanged for the silent-unit window; on `stopped` its own advice routes the child
    through the same `run:merge --output` classification. **The flag is what you saw, never what kind of
    child it is.**
@@ -402,7 +402,7 @@ unit_output=$(pnpm josh lane:output <N>) &&
 ```
 
 **`--process` carries what `pgrep` found, and with a dispatched child that is the whole answer.** Run
-`pgrep -laf "fullrun #<N>$"` first and pass `alive` where it found the child and `none` where it did not
+`pgrep -laf "(fullrun|run-ship-cli\.ts .*) #<N>$"` first and pass `alive` where it found the child and `none` where it did not
 — **never `alive` because the child was dispatched.** The child's command line holds no path, so a
 `pgrep` on the lane's directory never matches a live child; the trace is the deciding input, because a
 log that has stopped moving is a session thinking rather than one that died.

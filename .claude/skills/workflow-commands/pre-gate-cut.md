@@ -20,6 +20,8 @@ joshuafolkken/kit#1837 puts the `origin/main` merge at: implementation complete,
 the gate not started. Everything before it produced the thinking to be dropped; everything after it
 (gate → review → commit → push → merge) is verification the fresh process runs on the tree.
 
+**A lane child first hands it to a detached supervisor** (`chain-rule.md` step 0); the cut is the fallback.
+
 ## It applies to a dispatched lane child, and to nothing else
 
 The cut is for a **detached** `fullrun` a lane dispatched. A person's interactive `fullrun` must not
@@ -271,12 +273,10 @@ same verdict and stays silent. A lane like #2298 (31% of requests over 200k) sti
 
 ## Consistency with the chain rule
 
-`chain-rule.md` and `background-commands.md` forbid ending a turn at the push, where the review and
-commit are behind you and CI is in flight with nothing set to resume. **The pre-gate cut is the opposite
-case and a sanctioned boundary**: it ends the turn *before* the gate and relaunches a fresh process in
-the same act, so the run continues — and the resumed process runs gate → review → commit → push → merge
-**without ending**, so "the turn never ends at the push" holds. The implementation-phase cut is the same
-pattern one boundary earlier (joshuafolkken/kit#1933): it adds turn boundaries and removes no prohibition.
+The chain forbids ending a turn at the push, with CI in flight and nothing set to resume. **The pre-gate
+cut and the detached hand-off end it _before_ the gate** and start what carries the run on in the same
+act — a fresh process, or the supervisor — so the push is never a turn boundary. The implementation-phase
+cut is the same pattern one boundary earlier (joshuafolkken/kit#1933).
 
 ## A lane child records its park before it stops
 

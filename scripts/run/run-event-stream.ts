@@ -75,14 +75,23 @@ const EVENT_KIND = {
 	// the stall: a stalled run still has a driver that could dispatch, a stranded one has none.
 	STRANDED: 'stranded',
 	// One `josh ship` stage starting, succeeding or failing (joshuafolkken/kit#2426). It is a trace of the
-	// composite's progress rather than a position the run is at — the position a ship leaves behind is the
-	// `merge` its `followup` stage emits — so it is one of the `TRACE_KINDS` the last-event read skips.
+	// composite's progress rather than a position the run is at — the positions a ship leaves behind are
+	// the closed issue its `followup` merges, or a detached supervisor's `SHIP_LAUNCH` / `SHIP_STOP` below
+	// — so it is one of the `TRACE_KINDS` the last-event read skips.
 	SHIP_STAGE: 'ship-stage',
 	// One progress watcher line — the `at … / next …` heartbeat `run:progress` prints
 	// (joshuafolkken/kit#2437). Printed only to the watcher's own output, a headless successor's heartbeat
 	// was buried in its log after a cut; on the stream it reaches the attached session's relay. It says
 	// the run is alive rather than where it is, so it is a trace kind like `SHIP_STAGE`.
 	HEARTBEAT: 'heartbeat',
+	// The post-implementation region handed to a detached `josh ship --detach` supervisor
+	// (joshuafolkken/kit#2428). Unlike a stage trace it is a position: the agent has ended and the
+	// supervisor carries the run, so `run:step` answers `wait` until it stops or the issue closes.
+	SHIP_LAUNCH: 'ship-launch',
+	// The supervisor stopped at a failed stage — a red gate, a High/Medium review, a failed push, red CI
+	// (joshuafolkken/kit#2428). The position that hands control back: `run:step` prints the command that
+	// shows the stopped report, so the agent fixes it and relaunches rather than rebuilding the context.
+	SHIP_STOP: 'ship-stop',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]

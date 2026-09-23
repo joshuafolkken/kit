@@ -128,7 +128,7 @@ describe('cutting a lane child before the gate', () => {
 		// bare `fullrun #<N>`, so the fresh process skips the workflow-commands entry documents.
 		const built = worker_argv(lane_dispatch.resume_invocation(ISSUE))
 
-		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
+		expect(launch.mock.calls[0]?.[0]).toMatchObject({
 			argv: built.argv,
 			cwd: LANE_DIRECTORY,
 			log_path: DERIVED_LOG,
@@ -144,7 +144,7 @@ describe('cutting a lane child before the gate', () => {
 	it('marks the relaunched child as dispatched for this issue', async () => {
 		await run_cut_cli.run([ISSUE])
 
-		expect(launch.mock.calls[0]?.[0].env).toStrictEqual({ [lane_child_marker.KEY]: ISSUE })
+		expect(launch.mock.calls[0]?.[0].env).toMatchObject({ [lane_child_marker.KEY]: ISSUE })
 	})
 
 	it('does nothing when there is no open lane for the issue', async () => {

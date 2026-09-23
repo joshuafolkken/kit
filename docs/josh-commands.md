@@ -1695,8 +1695,7 @@ merge and the push above it stay their own calls.
 
 ### `josh ship`
 
-Ships a finished change in one call, folding the four-round-trip commit-to-report region a run spent a
-dozen turns on (joshuafolkken/kit#2398): the gate, the commit/push/PR (`git -y`), the CI-wait merge
+Ships a finished change in one call (joshuafolkken/kit#2398): the gate, the commit/push/PR (`git -y`), the CI-wait merge
 (`followup`, kept in the foreground) and the report bookkeeping (`run:tail`), run in order and joined
 under one header per step. It extends `run:tail`'s post-merge fold into the body of the region.
 Unlike `run:tail` it stops at the first failed step — a red gate never reaches the commit — and closes
@@ -1712,6 +1711,8 @@ state (committed, pushed, merged) corroborates it, passes over finished stages; 
 as a `ship-stage` trace event.
 
 `--review` (#2427) runs review round 1 beside the gate; High/Medium or a refusal stops it.
+
+`--detach` (#2428): a detached supervisor; a stop emits `ship-stop` (`run:step` → `--log <N>`).
 
 ### `josh run:report`
 
