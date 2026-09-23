@@ -10,14 +10,20 @@ import { execa } from 'execa'
 // step's explanation (a refusal, a candidate elsewhere, a reason) belongs on the caller's stderr where
 // a person sees it, so a composite streams it through; `run:merge` keeps it piped, because it composes
 // its own report from the captured values instead.
+//
+// **Forwarded stderr is captured as well** (joshuafolkken/kit#2462): a composite that writes a report
+// of its own — `run:tail` — puts a failed step's reason in that report, where a detached run's log
+// otherwise showed only pnpm's `ELIFECYCLE` line.
 
 const PNPM = 'pnpm'
 const JOSH = 'josh'
 const NONZERO_EXIT = 1
+const FORWARDED_STDERR = ['pipe', 'inherit'] as const
 
 interface JoshResult {
 	code: number
 	out: string
+	err?: string
 }
 
 async function josh_run(
@@ -26,10 +32,14 @@ async function josh_run(
 ): Promise<JoshResult> {
 	const result = await execa(PNPM, [JOSH, ...args], {
 		reject: false,
-		stderr: should_forward_stderr ? 'inherit' : 'pipe',
+		stderr: should_forward_stderr ? FORWARDED_STDERR : 'pipe',
 	})
 
-	return { code: result.exitCode ?? NONZERO_EXIT, out: result.stdout.trim() }
+	return {
+		code: result.exitCode ?? NONZERO_EXIT,
+		out: result.stdout.trim(),
+		err: result.stderr.trim(),
+	}
 }
 
 const josh_command = { josh_run }

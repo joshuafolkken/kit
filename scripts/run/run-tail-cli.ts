@@ -45,7 +45,11 @@ function parse_issues(argv: ReadonlyArray<string>): ReadonlyArray<string> | unde
 async function run_step(step: Step, issues: ReadonlyArray<string>): Promise<TailSection> {
 	const result = await josh_command.josh_run(step.argv(issues), should_forward_stderr)
 
-	return { header: step.header, body: result.out, code: result.code }
+	return {
+		header: step.header,
+		body: run_tail.section_body(result.out, result.err, result.code),
+		code: result.code,
+	}
 }
 
 // Run the three in order, not concurrently: the ledger commit must land on main before the release scope

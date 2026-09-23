@@ -69,6 +69,22 @@ describe('run_tail_cli.run — a failed step fails the whole close', () => {
 		expect(await run_tail_cli.run([ISSUE])).toBe(FAILED)
 	})
 
+	// joshuafolkken/kit#2462: a detached run's log keeps only the report, so the reason has to be in it.
+	it("puts a failed step's stderr in its section body, and a passing step's stays out", async () => {
+		const reason = 'main is behind origin/main'
+
+		josh_run_mock
+			.mockResolvedValueOnce({ code: FAILED, out: '[ELIFECYCLE] failed', err: reason })
+			.mockResolvedValueOnce({ code: OK, out: 'cited', err: 'a note' })
+			.mockResolvedValueOnce({ code: OK, out: 'skip' })
+
+		await run_tail_cli.run([ISSUE])
+
+		expect(info_lines[0]).toBe(
+			`=== observations ===\n[ELIFECYCLE] failed\n${reason}\n\n=== citations ===\ncited\n\n=== release ===\nskip`,
+		)
+	})
+
 	it('refuses a non-number argument rather than forwarding it to the wrong step', async () => {
 		expect(await run_tail_cli.run(['--force'])).toBe(FAILED)
 		expect(josh_run_mock).not.toHaveBeenCalled()

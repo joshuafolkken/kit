@@ -292,6 +292,13 @@ async function merge_fast_forward(branch_name: string): Promise<string> {
 	return await git_spawn.read(['merge', '--ff-only', `origin/${branch_name}`])
 }
 
+// The same fast-forward for a branch that is *not* checked out, so no file in the working tree moves
+// (joshuafolkken/kit#2462). A plain refspec refuses a non-fast-forward update, and git refuses it
+// outright for a branch checked out in any work tree — both are failures, never a rewrite.
+async function fast_forward_local(branch_name: string): Promise<string> {
+	return await git_spawn.read(['fetch', 'origin', `${branch_name}:${branch_name}`])
+}
+
 // The merge `josh main:merge` runs, and the deliberate opposite of the one above: **no `--ff-only`**,
 // because the branch it is called on has diverged whenever the command is worth typing at all
 // (joshuafolkken/kit#1659). Naming the strategy here is the whole fix — `git pull` decides it from
@@ -556,6 +563,7 @@ const git_command = {
 	default_branch_reference,
 	fetch_branch,
 	merge_fast_forward,
+	fast_forward_local,
 	merge_branch,
 	checkout_b,
 	checkout,
