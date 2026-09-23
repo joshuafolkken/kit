@@ -134,6 +134,7 @@ const ALIASES: Record<string, string> = {
 	rp: 'run:prep',
 	ren: 'run:entry',
 	rtl: 'run:tail',
+	shp: 'ship',
 	rst: 'run:status',
 	rn: 'run:next',
 	rsp: 'run:step',

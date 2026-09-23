@@ -1315,6 +1315,16 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 ---
 
+### `josh ship` · `josh shp`
+
+> **Audience:** automation · **Side effects:** git, network
+
+`"<title> #<N>" [<follow-up-N> ...] [--notify-message <text> | --notify-message-file <path>]`
+
+Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step
+
+---
+
 ### `josh split:assess` · `josh sa`
 
 > **Audience:** automation · **Side effects:** none

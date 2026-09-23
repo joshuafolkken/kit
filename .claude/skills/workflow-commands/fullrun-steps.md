@@ -23,9 +23,12 @@ the setup-cut guard refuses the first implementation edit until the cut is taken
 in outline: refactor → `pnpm josh main:merge` → `pnpm josh run:cut <N>` (the pre-gate cut, before the
 gate; a no-op outside a lane) → start `pnpm josh gate` and a subagent `/code-review`
 with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,
-iterate to no high/medium findings, at most two reviews → open the PR between the rounds with `pnpm
-josh git -y "<title> #<N>"` → the follow-up filing and `pnpm josh epic:bundle` inside the CI wait →
-`pnpm josh followup`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`,
+iterate to no high/medium findings, at most two reviews → **the clean path folds the ship region into
+one call**, `pnpm josh ship "<title> #<N>"` (gate → commit/push/PR → the CI-wait `followup` → the
+`run:tail` report bookkeeping, stopping at the first failed step; joshuafolkken/kit#2398), with any
+branch-2 filing and `pnpm josh epic:bundle` run before it → **when a second round is due `ship` does not
+fit**: open the PR between the rounds with `pnpm josh git -y "<title> #<N>"`, run round 2 beside CI, then
+`pnpm josh followup` and `pnpm josh run:tail <N>`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`,
 default `ja`). Before implementing, run `git switch main && git pull`, then `pnpm josh latest:scope`
 and update dependencies only on `required` — `latest-gate.md` is its single source, and on `required`
 load the `dependency-update` skill afterwards. **A dispatched lane child skips the `git switch main &&
@@ -61,9 +64,13 @@ started, re-run `pnpm josh gate` and join it. (11) `pnpm josh git -y "<title> #<
 opens here, between the two rounds. (11a) Run the **second round** now beside the CI, where (9a)
 answered `required` (brief `pnpm josh review:brief --round 2`); a finding it fixes in place is pushed
 before its gate. (12) File whatever the review round cap routed to branch 2, run `pnpm josh epic:bundle
-<new>` on each, and where (9a) answered `skip` record the skip on the Issue. (13) `pnpm josh followup
-"<title> #<N>" --notify-message "..."`. (14) **After the merge, run `pnpm josh ms`.** (15) **Ask `pnpm
-josh release:scope` and close the completion summary with what it answered** (`followup-reference.md` →
+<new>` on each, and where (9a) answered `skip` record the skip on the Issue. (13) **Where no second
+round was due** (9a `skip`), fold steps (10)–(13) and the release bookkeeping into one call — `pnpm josh
+ship "<title> #<N>" --notify-message "..."` (gate → commit/push/PR → the CI-wait `followup` → `run:tail`,
+stopping at the first failed step; joshuafolkken/kit#2398); **where a second round ran**, the PR opened
+at (11) and the region stays separate — `pnpm josh followup "<title> #<N>" --notify-message "..."` then
+`pnpm josh run:tail <N>`. (14) **After the merge, run `pnpm josh ms`.** (15) **Ask `pnpm josh
+release:scope` and close the completion summary with what it answered** (`followup-reference.md` →
 "When `pnpm josh release` runs").
 
 ## The release ask — the last step of either form
@@ -71,7 +78,9 @@ josh release:scope` and close the completion summary with what it answered** (`f
 **One call folds the post-merge bookkeeping** (joshuafolkken/kit#2372): after the merge, `pnpm josh
 run:tail <N>` commits the observation ledger (`observations:flush`), reads the completion citations
 (`issue:cite`, given the closed issue and any follow-ups filed this run) and decides the release scope
-(`release:scope`) in one round trip, joining each under its own header. It folds only bookkeeping — the
+(`release:scope`) in one round trip, joining each under its own header. **On the clean path `run:tail`
+runs inside `pnpm josh ship`** as its report step (joshuafolkken/kit#2398), so it is a standalone call
+only where a second round kept the ship region separate. It folds only bookkeeping — the
 release ask below stays the single source of what `required` means and the Tier-C publish boundary; a
 `backlogrun` child still leaves `observations:flush`, `issue:cite` and the release ask to the batch's
 own end.

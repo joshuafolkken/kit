@@ -2,17 +2,16 @@
 
 ## Background the gate and push
 
+- **The clean path folds the region into one backgrounded `pnpm josh ship`** (gate → `git -y` →
+  foreground `followup` → `run:tail`; joshuafolkken/kit#2398). The calls below serve a due second round.
 - Background `pnpm josh gate` beside the review; join it before commit.
-- Issue `pnpm josh git -y` in the background. Its completion event resumes the run; the turn never
-  ends at the push.
-- Keep `pnpm josh followup` in the foreground. Nearly every following step reads its result, so
-  detaching it creates no overlap.
-- Overlap only tree-readers: review beside the gate; report writing and finding disposition beside
-  `git -y`; round 2, branch-2 filing and `epic:bundle` beside CI.
-- Compose merge-independent tail data before `followup`. Keep `josh ms`, state checks, next-child
-  selection, lane closing and the session-cost check after it.
-- A dispatched lane child's pre-gate cut is the sole allowed turn boundary before the push; it
-  relaunches the child through `pre-gate-cut.md`.
+- Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
+  at the push.
+- Keep `pnpm josh followup` in the foreground — nearly every following step reads its result.
+- Overlap only tree-readers, and compose merge-independent tail data before `followup` (the table
+  below is the full mapping); keep `josh ms`, state checks, next-child selection, lane closing and the
+  session-cost check after the merge.
+- A dispatched lane child's pre-gate cut is the sole turn boundary before the push (`pre-gate-cut.md`).
 
 Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
 
