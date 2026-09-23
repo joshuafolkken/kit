@@ -1,5 +1,6 @@
 import { run_cut } from '#scripts/run/run-cut'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { context_cut_payback } from './context-cut-payback'
 import { CONTEXT_CUT_THRESHOLD, RECENT_REQUEST_WINDOW } from './context-cut-threshold'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 import { cost_verdict, type OverMeasurement } from './cost-verdict'
@@ -150,12 +151,15 @@ describe('cost_verdict.classify', () => {
 // child cuts, at or below it it keeps implementing, and the shared threshold is single-sourced so
 // the scheduler and worker cannot drift.
 describe("cost_verdict.report_over at the lane child's implementation threshold", () => {
-	// joshuafolkken/kit#2374 lowered the shared threshold from 200_000 to 150_000.
-	const EXPECTED_CONTEXT_CUT_THRESHOLD = 150_000
+	// joshuafolkken/kit#2406 replaced the hand-picked ceiling with the break-even context: at
+	// POST_CUT_CONTEXT 60_000 and a 10-request horizon that is 135_000, and it is derived from the
+	// payback model rather than restated, so this pins the derivation, not a second literal.
+	const EXPECTED_CONTEXT_CUT_THRESHOLD = 135_000
 	const threshold = CONTEXT_CUT_THRESHOLD
 
-	it('uses the shared 150k threshold', () => {
+	it('uses the break-even context as the shared threshold', () => {
 		expect(CONTEXT_CUT_THRESHOLD).toBe(EXPECTED_CONTEXT_CUT_THRESHOLD)
+		expect(CONTEXT_CUT_THRESHOLD).toBe(context_cut_payback.break_even_context())
 		expect(run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD).toBe(CONTEXT_CUT_THRESHOLD)
 	})
 
