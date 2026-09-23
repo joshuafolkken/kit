@@ -15,14 +15,14 @@ const JOSH = 'josh'
 const DISPATCH = 'lane:dispatch'
 const BUDGET = 'backlog:budget'
 const PIPED = { reject: false, stderr: 'pipe' }
-const INHERITED = { reject: false, stderr: 'inherit' }
+const FORWARDED = { reject: false, stderr: ['pipe', 'inherit'] }
 
-function fake_result(exit_code: number | undefined, stdout: string): ExecaResult {
-	return { exitCode: exit_code, stdout } as unknown as ExecaResult
+function fake_result(exit_code: number | undefined, stdout: string, stderr = ''): ExecaResult {
+	return { exitCode: exit_code, stdout, stderr } as unknown as ExecaResult
 }
 
-function stub(exit_code: number | undefined, stdout: string): void {
-	mocked_execa.mockResolvedValue(fake_result(exit_code, stdout))
+function stub(exit_code: number | undefined, stdout: string, stderr = ''): void {
+	mocked_execa.mockResolvedValue(fake_result(exit_code, stdout, stderr))
 }
 
 beforeEach(() => {
@@ -35,7 +35,7 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 
 		const result = await josh_command.josh_run([DISPATCH, '17'])
 
-		expect(result).toStrictEqual({ code: OK, out: '17' })
+		expect(result).toStrictEqual({ code: OK, out: '17', err: '' })
 		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, DISPATCH, '17'], PIPED)
 	})
 
@@ -47,11 +47,14 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 		expect(result.code).toBe(FALLBACK_EXIT)
 	})
 
-	it('inherits the child stderr when told to forward it', async () => {
-		stub(OK, 'watch')
+	it('forwards the child stderr and captures it too when told to forward it', async () => {
+		const reason = 'refused: behind origin/main'
 
-		await josh_command.josh_run([BUDGET], true)
+		stub(FALLBACK_EXIT, '', ` ${reason} \n`)
 
-		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], INHERITED)
+		const result = await josh_command.josh_run([BUDGET], true)
+
+		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], FORWARDED)
+		expect(result.err).toBe(reason)
 	})
 })

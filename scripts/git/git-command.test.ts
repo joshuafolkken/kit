@@ -269,6 +269,15 @@ describe('git_command.fetch_branch', () => {
 			`+refs/heads/${PR_HEAD_BRANCH}:refs/remotes/origin/${PR_HEAD_BRANCH}`,
 		])
 	})
+
+	// joshuafolkken/kit#2462: no `+`, so a local branch that diverged is refused rather than rewritten.
+	it('fast-forwards a branch that is not checked out without a forced update', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.fast_forward_local('main')
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['fetch', 'origin', 'main:main'])
+	})
 })
 
 // joshuafolkken/kit#1659: `josh main:merge` needs the opposite of `merge_fast_forward`. `--ff-only`
