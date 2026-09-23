@@ -1022,6 +1022,21 @@ Prints `ok` (exit 0) when every heading is present, or each missing heading name
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現` (joshuafolkken/kit#2212, joshuafolkken/kit#2353). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun) re-runs the baseline.
 
+### `josh defect:rate`
+
+Print the defect rate of merged work over a window — the number that says whether to add a new mechanism or stabilize (joshuafolkken/kit#2449).
+
+```bash
+pnpm josh defect:rate            # the last 14 days
+pnpm josh defect:rate --days 30
+```
+
+**Options:**
+
+- `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
+
+**Behavior:** the numerator is the issues filed in the window that declare `- 種別: 不具合` or carry `route:interrupt`; the denominator is the issues closed as completed in the window that declare `- 種別: 振る舞い変更`. The defect declaration is not yet in the issue template and no filing lint enforces it, so a defect filed without it counts only through `route:interrupt`. A window with no completed behavior change prints `n/a` rather than a number. The search API serves at most 1000 results; when a window exceeds it the counts are printed as lower bounds, and an unreadable search exits 1 without a rate.
+
 ### `josh issue:backlinks`
 
 Classify an origin issue's upstream backlinks into one fixed word. The backlink headings (`## Origin` / `## Upstream issues` / `## Upstream candidate`, single-sourced in `prompts/collaboration-workflow/issue-template.md`) were fixed so a grep could find them; this is that grep. It reads issue N, then the bodies of every upstream it lists, and checks the pair points both ways.
