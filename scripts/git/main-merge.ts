@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { extract_issue_number } from '#scripts/hooks/check-commit-message'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { git_command } from './git-command'
 
@@ -29,13 +30,26 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const COMMAND_NAME = 'main:merge'
 
+// git's default merge message carries no `#N`, so on an issue branch the `commit-msg` hook refuses
+// it and leaves the index mid-merge (joshuafolkken/kit#2439). The number is read with the hook's
+// own parser, so the message this writes is exactly the one that hook accepts; a branch without a
+// number keeps git's default.
+function merge_message(default_branch: string, current_branch: string): string | undefined {
+	const issue_number = extract_issue_number(current_branch)
+
+	if (issue_number === undefined) return undefined
+
+	return `Merge ${default_branch} into ${current_branch} #${issue_number}`
+}
+
 // The fetch is what makes `origin/<default>` current before the merge reads it. `git pull` did the
 // two together, which is the only thing it was doing here that is worth keeping.
 async function merge_default_branch(): Promise<number> {
 	const default_branch = await git_command.get_default_branch()
+	const current_branch = await git_command.branch()
 
 	await git_command.fetch_branch(default_branch)
-	await git_command.merge_branch(default_branch)
+	await git_command.merge_branch(default_branch, merge_message(default_branch, current_branch))
 	console.info(default_branch)
 
 	return SUCCESS_EXIT_CODE
