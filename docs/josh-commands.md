@@ -1677,7 +1677,9 @@ request and the command on `required`, `unknown` printed as `unknown`, silent on
 invocation, so the scope comes from the run record's start time: events from before it are left out, and
 because that field survives a `--cut` the events either side of a cut stay in one report. **A scope it
 cannot determine — no record, or one it cannot read — prints a notice and no events**, never a fallback
-to everything; that is why `pnpm josh run:carry --end` runs _after_ the report rather than beside it.
+to everything. That is why the report is generated before `pnpm josh run:carry --end` removes the record:
+`.claude/skills/workflow-commands/backlogrun-steps.md` → "End the record when the run ends" is that
+ordering rule's single source.
 
 The printed
 body is the Telegram body too: `josh notify --body-file` sends exactly this output, so a session's

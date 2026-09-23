@@ -611,7 +611,7 @@ Per-child completion notifications are unchanged: `pnpm josh followup` sends one
 **start** notification when the run begins, and an epic **completion** summary at the end. **Do not
 compose that summary by hand — `pnpm josh run:report` generates it from this invocation's events**
 (joshuafolkken/kit#2249, scoped in #2393): it renders what merged, what parked and why, and what was cut,
-reusing `format_event`, and closes with the release tail below. Its output is the Telegram body too — pass it to
+reusing `format_event`, closing with the release tail below. Its output is the Telegram body too — pass it to
 `pnpm josh notify --body-file` so the summary a session shows and the message off-screen are one text
 from one generator.
 

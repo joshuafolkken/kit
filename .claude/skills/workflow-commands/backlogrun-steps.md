@@ -217,19 +217,20 @@ as `--active` and the watch begins again at its full budget, bounded by the 8 ho
 else is: "The cost check is not asked during a watch" below.
 
 **How many cuts the run crossed is named in the completion report**, read from the record's `cuts`. A
-run reporting only what it merged would hide that it had spanned four sessions.
+run reporting only what it merged would hide that it spanned four sessions.
 
-**End the record when the run ends** — `pnpm josh run:carry --end`, in the same turn as the final report
-but **after** it (`run:report` scopes by the record it removes, joshuafolkken/kit#2393) — so the next
-`backlogrun` begins a budget of its own rather than resuming a spent one. **Where the run ends
-by _stopping_ rather than finishing** — `backlog:budget` or `epic:next` answered `stop` (a
-parked backlog, an unreadable listing, the maximum, the whole-run bound), or the consecutive-failure
+**End the record when the run ends** — `pnpm josh run:carry --end`, **after the final report and never
+batched with it**: `run:report` scopes by the record `--end` removes (joshuafolkken/kit#2393). The next
+`backlogrun` then begins its own budget rather than resuming a spent one. **Where the run ends by _stopping_ rather than finishing** — `backlog:budget` or `epic:next`
+answered `stop` (a parked backlog, an unreadable listing, the maximum, the whole-run bound), or the
+consecutive-failure
 guard tripped — **end it with `pnpm josh run:carry --end --stopped "<one-line reason>"` instead**. That
 pushes one ⏸️ confirmation as it clears the record, so a person learns the run halted even when the
-session was cut and this parent is headless (joshuafolkken/kit#2136); the reason is the stop verdict's, in
+session was cut and this parent headless (joshuafolkken/kit#2136); the reason is the stop verdict's, in
 the session language. A clean completion takes the bare `--end` and stays silent, having its own report;
-a parked _child_ is already pushed by the child that parked it (`backlogrun-park.md`). Because `--end`
-removes the record, a re-run's second finds nothing and never re-sends it — `backlogrun-progress.md` →
+a parked _child_ is pushed by the child that parked it (`backlogrun-park.md`). Because `--end` removes
+the record, a re-run's second `--end` finds nothing and never re-sends that confirmation —
+`backlogrun-progress.md` →
 "Progress while the run is quiet" is the single source of the pull-versus-push split.
 
 **The record widens nothing.** It carries a budget and nothing else: `auto-ok` is still applied only
