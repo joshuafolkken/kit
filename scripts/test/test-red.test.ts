@@ -26,6 +26,7 @@ const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
 const PORCELAIN = '--porcelain'
 const VITEST_CONFIG_FILE = 'vitest.config.js'
 const EXCLUDING_CONFIG = `export default { test: { exclude: ['**/${TEST_FILE}'] } }\n`
+const OUTPUT_FILE_CONFIG = `export default { test: { outputFile: 'results.json' } }\n`
 
 const WHOLE_OUTPUT_TEST = `${TEST_IMPORTS}it('reports only the invocation', () => {
 	const events = [{ name: 'old', invocation: 1 }, { name: 'new', invocation: 2 }]
@@ -94,6 +95,16 @@ describe('test_red.run', () => {
 		'is red when the regression test checks the whole output the user saw',
 		async () => {
 			await build_fix_branch(WHOLE_OUTPUT_TEST)
+
+			expect(await test_red.run()).toEqual({ verdict: 'red', files: [TEST_FILE] })
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'is still red when the merge-base config names its own outputFile',
+		async () => {
+			await build_fix_branch(WHOLE_OUTPUT_TEST, OUTPUT_FILE_CONFIG)
 
 			expect(await test_red.run()).toEqual({ verdict: 'red', files: [TEST_FILE] })
 		},

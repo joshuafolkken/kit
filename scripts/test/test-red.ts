@@ -56,7 +56,9 @@ async function prepare(tree: string, base: string, files: ReadonlyArray<string>)
 }
 
 function reporter_arguments(report: string): Array<string> {
-	return ['--reporter=json', `--outputFile.json=${report}`]
+	// The plain `--outputFile`, not `--outputFile.json`: a config that sets `test.outputFile` as a string
+	// wins over the keyed form, which would send the report into the tree and read every run `no-test`.
+	return ['--reporter=json', `--outputFile=${report}`]
 }
 
 async function read_report(report: string): Promise<string> {
