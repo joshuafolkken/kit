@@ -78,19 +78,26 @@ async function read_state(): Promise<ShipState> {
 	}
 }
 
-// The record's path for this issue, or `undefined` outside a repository — there is nothing to key on,
-// and a ship without a record still resumes from the state alone.
-async function record_target(issue: string): Promise<string | undefined> {
+// The common git directory every lane of the repository shares — what the stage record, the detached
+// supervisor's log and its pid are keyed on (joshuafolkken/kit#2428) — or `undefined` outside one.
+async function repository_directory(): Promise<string | undefined> {
 	try {
 		const directories = await git_command.git_directories()
-		const repository = directories[REPOSITORY_DIRECTORY_INDEX]
 
-		return repository === undefined ? undefined : run_ship_stage.record_path(repository, issue)
+		return directories[REPOSITORY_DIRECTORY_INDEX]
 	} catch {
 		return undefined
 	}
 }
 
-const run_ship_probe = { read_state, record_target }
+// The record's path for this issue, or `undefined` outside a repository — there is nothing to key on,
+// and a ship without a record still resumes from the state alone.
+async function record_target(issue: string): Promise<string | undefined> {
+	const repository = await repository_directory()
+
+	return repository === undefined ? undefined : run_ship_stage.record_path(repository, issue)
+}
+
+const run_ship_probe = { read_state, record_target, repository_directory }
 
 export { run_ship_probe }

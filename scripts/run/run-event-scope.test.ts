@@ -99,3 +99,42 @@ describe('run_event_scope.last_scoped_event', () => {
 		).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#2428: a detached ship supervisor's positions name their issue, and the stream is
+// shared by every lane — so one issue's run reads its own supervisor and never another lane's.
+const ISSUE = '2428'
+
+function ship(pos: number, kind: string, issue: string): RunEvent {
+	return { pos, at: AFTER, kind, text: `#${issue} gate failed` }
+}
+
+describe('run_event_scope.last_issue_event', () => {
+	it('reads its own supervisor’s stop as the position', () => {
+		const own = ship(3, KIND.SHIP_STOP, ISSUE)
+
+		expect(run_event_scope.last_issue_event([...MIXED, own], since(START), ISSUE)).toEqual(own)
+	})
+
+	it('leaves another lane’s supervisor out of this run’s position', () => {
+		const foreign = ship(3, KIND.SHIP_LAUNCH, '24280')
+
+		expect(run_event_scope.last_issue_event([...MIXED, foreign], since(START), ISSUE)).toEqual(
+			LATER,
+		)
+	})
+
+	it('reads its own supervisor without a carry scope, as an interactive fullrun has none', () => {
+		const own = ship(3, KIND.SHIP_LAUNCH, ISSUE)
+		const events = [...MIXED, own, ship(4, KIND.SHIP_STOP, '99')]
+
+		expect(
+			run_event_scope.last_issue_event(events, run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE),
+		).toEqual(own)
+	})
+
+	it('reads nothing without a scope when no supervisor of its own is on the stream', () => {
+		expect(
+			run_event_scope.last_issue_event(MIXED, run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE),
+		).toBeUndefined()
+	})
+})

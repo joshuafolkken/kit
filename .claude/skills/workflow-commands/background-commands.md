@@ -11,7 +11,7 @@
 - Overlap only tree-readers, and compose merge-independent tail data before `followup` (the table
   below is the full mapping); keep `josh ms`, state checks, next-child selection, lane closing and the
   session-cost check after the merge.
-- A dispatched lane child's pre-gate cut is the sole turn boundary before the push (`pre-gate-cut.md`).
+- A lane child's hand-off or pre-gate cut is the sole turn boundary before the push (`chain-rule.md`).
 
 Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
 

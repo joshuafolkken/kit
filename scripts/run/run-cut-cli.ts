@@ -1,15 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { agent_argv } from '#scripts/agent/agent-argv'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
-import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
-import { detached_launch } from './detached-launch'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_handoff } from './run-cut-handoff'
@@ -188,27 +185,11 @@ function relaunch(target: string, lane: LaneInfo, phase: string): number {
 	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
 	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
 	const invocation = lane_child_invocation.resume_invocation(lane.issue)
-	const built = agent_argv.resume_argv(invocation, lane.profile, phase, lane.directory)
+	const result = lane_relaunch.relaunch(lane, invocation, phase, (note) => {
+		notes.push(note)
+	})
 
-	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
-
-	const result = detached_launch.launch(
-		{
-			argv: built.argv,
-			cwd: lane.directory,
-			log_path: lane_dispatch_log.default_log_path(lane),
-			profile: built.profile,
-			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
-			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
-			// since the parent-session strip runs on the way in.
-			env: lane_child_marker.env_for(lane.issue),
-		},
-		(note) => {
-			notes.push(note)
-		},
-	)
-
-	if (result.kind === 'failed') return report_relaunch_failure(target, result.note)
+	if (result.kind !== 'launched') return report_relaunch_failure(target, result.note)
 
 	if (notes.length > 0) console.error(notes.join('\n'))
 

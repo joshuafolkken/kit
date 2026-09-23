@@ -5,11 +5,12 @@
 This is the execution contract for `fullrun` and `backlogrun`; the record below is reference only.
 Review results and successful pushes are never turn boundaries.
 
-1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` before the scoped pair and the
-   gate** — the pre-gate cut, ordered here so a lane child takes it before the gate rather than after a
-   refusal (joshuafolkken/kit#2177). It is a no-op outside a lane and cuts inside one; issued on its own
-   it never batches with a call a refusal could collateral, and `pre-gate-cut.md`'s refusal stays as
-   insurance. Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
+0. **A lane child** (#2428): `pnpm josh main:merge`, the scoped pair, `pnpm josh ship --detach --review
+   "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. A stop relaunches a child
+   whose `run:step` names `ship --log <N>`: fix, re-detach (`--review` only if review never passed;
+   High/Medium → round 2). `failed` → step 1.
+1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
+   the gate** — the pre-gate cut (a no-op outside a lane, joshuafolkken/kit#2177). Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
    `pnpm josh gate` in the background and prints the `/code-review` brief in one call, so the two overlap
    rather than the review waiting on the gate (joshuafolkken/kit#2179). Launch the `/code-review`
    subagent as the `general-purpose` agent type with that brief — it carries every tool, so it loads the
@@ -40,8 +41,7 @@ Review results and successful pushes are never turn boundaries.
    between the rounds — background `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then
    `pnpm josh followup`.
 
-A dispatched lane child may end once at the pre-gate cut in `pre-gate-cut.md`; it never ends at the
-push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
+A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
 `pnpm josh ms` returned to the default branch, or when user judgment is required by an unverifiable
 CodeRabbit/Claude Review finding or a CI failure. In a lane, `josh ms` refusing is expected and the
 parent closes the lane. Managed config claims are reported by `followup` and do not stop the merge.

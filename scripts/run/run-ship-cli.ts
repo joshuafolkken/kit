@@ -5,7 +5,9 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
+import { run_ship_detach } from './run-ship-detach'
 import { run_ship_probe } from './run-ship-probe'
+import { run_ship_return } from './run-ship-return'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 
@@ -30,6 +32,10 @@ import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-sh
 // gate launches the same-strength reviewer beside it and joins, attests and records the round without
 // an agent turn (`run-ship-review-steps.ts`); a High or Medium finding, or any failed join, stops there.
 //
+// **`--detach` hands the whole region to a supervisor that outlives the agent** (joshuafolkken/kit#2428):
+// the agent ends at the hand-off instead of relaunching itself for the gate, a supervised ship that stops
+// hands the stage back (`run-ship-return.ts`), and `--log <N>` prints the report it stopped on.
+//
 // The first positional is the `"<title> #<N>"` string `git -y` and `followup` already take; the issue
 // number is read off its tail for `run:tail`. Any further positionals are follow-up citations filed
 // this run (`fullrun-steps.md` routes branch-2 filing before `ship`), forwarded to `run:tail` after the
@@ -53,7 +59,8 @@ const CITE_PATTERN = /^[1-9]\d*$/u
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
 const USAGE =
-	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--review] [--notify-message <text> | --notify-message-file <path>]'
+	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
+const NO_LOG_NOTE = 'no detached ship supervisor log for this issue'
 const should_forward_stderr = true
 
 type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
@@ -62,6 +69,12 @@ const OPTIONS = {
 	[NOTIFY_OPTIONS[0]]: { type: 'string' },
 	[NOTIFY_OPTIONS[1]]: { type: 'string' },
 	review: { type: 'boolean' },
+	// joshuafolkken/kit#2428: hand the region to a detached supervisor (`run-ship-detach.ts`), print the
+	// report a stopped supervisor left, and carry follow-up citations as options so the supervisor's
+	// command line still ends with its title.
+	detach: { type: 'boolean' },
+	log: { type: 'string' },
+	cite: { type: 'string', multiple: true },
 } as const
 
 interface ShipArguments {
@@ -70,7 +83,10 @@ interface ShipArguments {
 	notify: ReadonlyArray<string>
 	cites: ReadonlyArray<string>
 	is_review: boolean
+	is_detach: boolean
 }
+
+type ShipCommand = { kind: 'ship'; args: ShipArguments } | { kind: 'log'; number: string }
 
 interface Step {
 	stage: Stage
@@ -141,33 +157,60 @@ function issue_number(title: string): string | undefined {
 	return TRAILING_ISSUE_PATTERN.exec(title)?.[NUMBER_GROUP]
 }
 
-function read_args(argv: ReadonlyArray<string>): ShipArguments | undefined {
-	const args = [...argv]
-	const parsed = parseArgs({ args, options: OPTIONS, allowPositionals: true, strict: true })
-	const title = parsed.positionals[FIRST]
+interface ParsedValues extends NotifyValues {
+	review?: boolean
+	detach?: boolean
+	log?: string
+	cite?: Array<string>
+}
 
-	if (title === undefined) return undefined
+function parse_values(argv: ReadonlyArray<string>): {
+	values: ParsedValues
+	positionals: Array<string>
+} {
+	return parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true, strict: true })
+}
 
+function ship_args(
+	title: string,
+	rest: ReadonlyArray<string>,
+	values: ParsedValues,
+): ShipArguments | undefined {
 	const number = issue_number(title)
+	const cites = [...rest, ...(values.cite ?? [])]
 
-	if (number === undefined) return undefined
-
-	const cites = parsed.positionals.slice(EXTRA_CITE_START)
-
-	if (cites.some((token) => !CITE_PATTERN.test(token))) return undefined
+	if (number === undefined || cites.some((token) => !CITE_PATTERN.test(token))) return undefined
 
 	return {
 		title,
 		number,
-		notify: notify_arguments(parsed.values),
+		notify: notify_arguments(values),
 		cites,
-		is_review: parsed.values.review === true,
+		is_review: values.review === true,
+		is_detach: values.detach === true,
 	}
+}
+
+// `--log <N>` stands alone: a bare issue number and nothing to ship.
+function log_command(number: string, positionals: ReadonlyArray<string>): ShipCommand | undefined {
+	return CITE_PATTERN.test(number) && positionals.length === 0 ? { kind: 'log', number } : undefined
+}
+
+function read_args(argv: ReadonlyArray<string>): ShipCommand | undefined {
+	const { values, positionals } = parse_values(argv)
+
+	if (values.log !== undefined) return log_command(values.log, positionals)
+
+	const title = positionals[FIRST]
+	const args =
+		title === undefined ? undefined : ship_args(title, positionals.slice(EXTRA_CITE_START), values)
+
+	return args === undefined ? undefined : { kind: 'ship', args }
 }
 
 // Numbers-only tail and a strict parse, so a title with no `#<N>` or a stray flag is refused rather
 // than shipped past the wrong step.
-function parse(argv: ReadonlyArray<string>): ShipArguments | undefined {
+function parse(argv: ReadonlyArray<string>): ShipCommand | undefined {
 	try {
 		return read_args(argv)
 	} catch {
@@ -247,6 +290,18 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 	return { target, done, state }
 }
 
+// A detached supervisor hands the stopped stage back (`run-ship-return.ts`, joshuafolkken/kit#2428); a
+// ship in an agent's own turn has its report in front of that agent already.
+async function stopped(
+	sections: ReadonlyArray<ShipSection>,
+	args: ShipArguments,
+	stage: Stage,
+): Promise<ReadonlyArray<ShipSection>> {
+	if (run_ship_detach.is_supervised()) await run_ship_return.return_control(args.number, stage)
+
+	return sections
+}
+
 // Run the four in order, stopping at the first that failed: a red gate never reaches the commit, so
 // the returned sections end at the failure the report names. A ship that reached the end clears its
 // record, so the next ship of the same issue starts from the gate.
@@ -259,7 +314,7 @@ async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 
 		sections.push(section)
 
-		if (section.code !== SUCCESS_EXIT_CODE) return sections
+		if (section.code !== SUCCESS_EXIT_CODE) return await stopped(sections, args, step.stage)
 	}
 
 	record(context.target, (path) => {
@@ -269,20 +324,61 @@ async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	return sections
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const args = parse(argv)
+async function print_log(number: string): Promise<number> {
+	const repository = await run_ship_probe.repository_directory()
+	const log = repository === undefined ? undefined : run_ship_detach.read_log(repository, number)
 
-	if (args === undefined) {
-		console.error(USAGE)
+	if (log === undefined) {
+		console.error(NO_LOG_NOTE)
 
 		return FAILURE_EXIT_CODE
 	}
+
+	console.info(log)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// The one-token contract `run:cut` keeps: the verdict on stdout, the explanation on stderr.
+async function detach(args: ShipArguments): Promise<number> {
+	const repository = await run_ship_probe.repository_directory()
+
+	if (repository === undefined) {
+		console.info(run_ship_detach.FAILED)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const result = await run_ship_detach.detach({ ...args, repository, cwd: process.cwd() })
+
+	console.error(result.note)
+	console.info(result.verdict)
+
+	return result.verdict === run_ship_detach.LAUNCHED ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+}
+
+async function run_ship_command(args: ShipArguments): Promise<number> {
+	if (args.is_detach) return await detach(args)
 
 	const sections = await ship(args)
 
 	console.info(run_ship.format_report(sections))
 
 	return run_ship.exit_code(sections)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const command = parse(argv)
+
+	if (command === undefined) {
+		console.error(USAGE)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return command.kind === 'log'
+		? await print_log(command.number)
+		: await run_ship_command(command.args)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

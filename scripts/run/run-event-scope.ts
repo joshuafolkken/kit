@@ -83,8 +83,38 @@ function last_scoped_event(
 	)
 }
 
+// The positions a detached `josh ship` supervisor leaves (joshuafolkken/kit#2428). Each names its issue
+// (`#<N> …`), so they are self-scoping where the carry scope is not: the stream is shared by every lane,
+// and another lane's supervisor must never be read as this run's position.
+const SHIP_POSITION_KINDS: ReadonlySet<string> = new Set([
+	run_event_stream.EVENT_KIND.SHIP_LAUNCH,
+	run_event_stream.EVENT_KIND.SHIP_STOP,
+])
+
+function is_foreign_ship_event(event: RunEvent, issue: string): boolean {
+	return SHIP_POSITION_KINDS.has(event.kind) && !event.text.startsWith(`#${issue} `)
+}
+
+function is_own_ship_event(event: RunEvent, issue: string): boolean {
+	return SHIP_POSITION_KINDS.has(event.kind) && !is_foreign_ship_event(event, issue)
+}
+
+// The newest position for one issue's run: the scoped last event with other issues' ship positions left
+// out, and — where no scope applies, as in an interactive `fullrun` with no carry record — the issue's own
+// newest ship position, which its issue number already scopes.
+function last_issue_event(
+	events: ReadonlyArray<RunEvent>,
+	scope: EventScope,
+	issue: string,
+): RunEvent | undefined {
+	const own = events.filter((event) => !is_foreign_ship_event(event, issue))
+
+	return last_scoped_event(own, scope) ?? own.findLast((event) => is_own_ship_event(event, issue))
+}
+
 const run_event_scope = {
 	UNKNOWN_EVENT_SCOPE,
+	last_issue_event,
 	last_scoped_event,
 	scope_of,
 	scoped_events,

@@ -10,6 +10,7 @@ import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
@@ -378,7 +379,7 @@ describe('lane_dispatch.describe — what a reader is told to do next', () => {
 	it('matches the child’s command line, not the lane directory its argv omits', async () => {
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
-		expect(message).toContain(`pgrep -laf "fullrun #${ISSUE}$"`)
+		expect(message).toContain(`pgrep -laf "${lane_child_invocation.process_pattern(ISSUE)}"`)
 		expect(message).not.toContain(`pgrep -laf ${LANE_DIRECTORY}`)
 		expect(message).toContain(ALIVE_PROCESS)
 	})

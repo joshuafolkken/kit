@@ -136,12 +136,30 @@ describe('run_step.next_action — event-driven position', () => {
 		[KIND.OUTAGE, MERGE_COMMAND],
 		[KIND.PARK, 'pnpm josh backlog:next'],
 		[KIND.CUT, `pnpm josh run:cut --resume ${ISSUE}`],
+		[KIND.SHIP_STOP, `pnpm josh ship --log ${ISSUE}`],
 	])('dispatches to a command after %s', (last_event, line) => {
 		expect(run_step.next_action(input({ last_event }))).toEqual({ kind: 'command', line })
 	})
 
 	it('answers a wait verdict after a child launch', () => {
 		expect(run_step.next_action(input({ last_event: KIND.CHILD_LAUNCH })).line).toBe(run_step.WAIT)
+	})
+
+	// joshuafolkken/kit#2428: the detached supervisor carries the run, so the agent has nothing to do
+	// until it stops — and a lane child waits too, rather than being pointed at a parent-only step.
+	it.each([false, true])(
+		'waits while a detached ship supervisor carries the run (lane: %s)',
+		(is_lane_child) => {
+			const action = run_step.next_action(input({ last_event: KIND.SHIP_LAUNCH, is_lane_child }))
+
+			expect(action).toEqual({ kind: 'verdict', line: run_step.WAIT })
+		},
+	)
+
+	it('answers already-done once the supervisor merged and the issue closed', () => {
+		const action = run_step.next_action(input({ last_event: KIND.SHIP_LAUNCH, state: 'CLOSED' }))
+
+		expect(action.line).toBe(run_step.ALREADY_DONE)
 	})
 })
 
