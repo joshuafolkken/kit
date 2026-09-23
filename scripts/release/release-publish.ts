@@ -6,6 +6,7 @@ import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
 import type { ReleasePlan } from './release-plan'
 import { release_tag } from './release-tag'
+import { release_worktree } from './release-worktree'
 
 // The write half of `pnpm josh release`: the branch, the commit, the pull request, the merge and the
 // wait for the tag (joshuafolkken/kit#1169).
@@ -85,11 +86,12 @@ async function refuse_existing_branch(branch_name: string): Promise<void> {
 	throw new Error(existing_branch_message(branch_name))
 }
 
-async function open_pull_request(plan: ReleasePlan): Promise<string> {
-	const branch_name = branch_name_for(plan.next_version)
-
-	await refuse_existing_branch(branch_name)
-	await git_command.checkout_b(branch_name)
+// **No `checkout -b` and no branch guard here** (joshuafolkken/kit#2411). The work tree is already
+// sitting on the release branch — `release_worktree.create` cut it that way — and the guard ran
+// before that creation, because `worktree_add` makes the branch local and `branch_exists` would then
+// report every release as already taken. This runs after `process.chdir` into the work tree, so the
+// version write and the git commands all act on it rather than on the root.
+async function commit_release(plan: ReleasePlan): Promise<void> {
 	write_version(plan.next_version)
 	await git_command.add_path(PACKAGE_JSON)
 	await git_command.commit(commit_message(plan.next_version))
@@ -97,8 +99,6 @@ async function open_pull_request(plan: ReleasePlan): Promise<string> {
 	console.info(
 		await git_gh_command.pr_create(commit_message(plan.next_version), pull_request_body(plan)),
 	)
-
-	return branch_name
 }
 
 async function merge_and_tag(plan: ReleasePlan, branch_name: string): Promise<number> {
@@ -112,22 +112,26 @@ async function merge_and_tag(plan: ReleasePlan, branch_name: string): Promise<nu
 	return is_tagged ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
-async function return_to_default_branch(): Promise<void> {
-	const default_branch = await git_command.get_default_branch()
-
-	await git_command.checkout(default_branch)
-	await git_command.pull_fast_forward()
-}
-
-// The checkout goes back to the default branch whichever way the wait ended, so a failed tag watch
-// leaves the tree where the next command expects it rather than parked on the release branch.
+// The whole release happens inside a work tree cut for it, so the root checkout is never touched: the
+// branch guard runs before the tree exists, `process.chdir` points the version write and the git
+// commands at the tree, and the `finally` returns to the root and removes the tree — whichever way
+// the wait ended, so a failed tag watch cleans up rather than leaving debris behind.
 async function publish(plan: ReleasePlan): Promise<number> {
-	const branch_name = await open_pull_request(plan)
+	const branch_name = branch_name_for(plan.next_version)
+
+	await refuse_existing_branch(branch_name)
+
+	const directory = await release_worktree.create(branch_name)
+	const previous_cwd = process.cwd()
 
 	try {
+		process.chdir(directory)
+		await commit_release(plan)
+
 		return await merge_and_tag(plan, branch_name)
 	} finally {
-		await return_to_default_branch()
+		process.chdir(previous_cwd)
+		await release_worktree.remove(directory, branch_name)
 	}
 }
 

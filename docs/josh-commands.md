@@ -608,7 +608,7 @@ Checkout the default branch and pull the latest changes with `git pull --ff-only
 pnpm josh main:sync
 ```
 
-**Behavior:** refuses inside a linked work tree (a lane) and exits non-zero — run it in the primary checkout instead; a lane's terminal step is `pnpm josh lane:close <issue-number>`. A default branch that has diverged fails loudly under `--ff-only` rather than growing a merge commit — the deliberate opposite of [`josh main:merge`](#josh-mainmerge). The same `--ff-only` pull is used by [`josh git`](#josh-git), `josh pr` and [`josh release`](#josh-release) when they start from the default branch.
+**Behavior:** refuses inside a linked work tree (a lane) and exits non-zero — run it in the primary checkout instead; a lane's terminal step is `pnpm josh lane:close <issue-number>`. A default branch that has diverged fails loudly under `--ff-only` rather than growing a merge commit — the deliberate opposite of [`josh main:merge`](#josh-mainmerge). The same `--ff-only` pull is used by [`josh git`](#josh-git) and `josh pr` when they start from the default branch.
 
 ### `josh main:merge`
 
@@ -638,19 +638,21 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 
 ### `josh release`
 
-Release everything main has taken since the version last changed — one command, run by a person. It counts merges on main's first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag.
+Release everything main has taken since the version last changed — one command, run by a person. It counts merges on `origin/<default>`'s first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag.
 
 ```bash
 pnpm josh release
 pnpm josh release --dry-run   # count and report, write nothing
 ```
 
+**Runs in its own work tree, never the root checkout.** The count is read from `origin/<default>`, and the version bump, commit and push happen in a dedicated linked work tree cut from `origin/<default>` as the `release/v<version>` branch (placed under the same `.<repo>-lanes/` sibling directory the lanes use, named `release` so it collides with no lane). The tree is removed whether the run succeeds or fails, and its local release branch with it. Because the root is never touched, a release can run beside a [`backlogrun`](#backlogrun) and can start even when the root is dirty or sitting on another branch. The commit goes through lefthook's pre-commit, so the work tree gets its own dependency install (the hook is never disabled to skip it).
+
 **Options:**
 
-- `--dry-run` — count and report only; does not pull (a pull is a write).
+- `--dry-run` — count and report only; writes nothing, fetches nothing, and creates no work tree.
 - `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (env) — tag-watch budget, default 30 minutes.
 
-**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if the working tree is dirty, the checkout is not on the default branch, no version base can be found, or the `v<version>` tag never appears.
+**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base can be found, the `release/v<version>` branch is already taken (locally or on origin), or the `v<version>` tag never appears.
 
 ### `josh release:scope`
 
