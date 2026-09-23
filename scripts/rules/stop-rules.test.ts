@@ -12,6 +12,7 @@ const BASE: StopContext = {
 	session_owner: 'joshuafolkken',
 	headless_waiting: false,
 	headless_refusals: 0,
+	owes_offer: false,
 	lane_child: false,
 }
 
@@ -282,6 +283,31 @@ describe('stop_rules.stop_outcome — lane index permission', () => {
 		const repeated = context({ lane_child: true, message: INDEX_REQUEST, stop_hook_active: true })
 
 		expect(stop_rules.stop_outcome(repeated).reason).toBeUndefined()
+	})
+})
+
+describe('stop_rules.stop_outcome — backlog pick-up (joshuafolkken/kit#2452)', () => {
+	it('refuses a parent turn that owes the pick-up ask', () => {
+		const { reason } = stop_rules.stop_outcome(context({ owes_offer: true }))
+
+		expect(reason).toBe(stop_rules.PICKUP_REASON)
+		expect(reason).toContain(NO_REPRINT)
+	})
+
+	it('lets a turn that owes nothing stop', () => {
+		expect(stop_rules.stop_outcome(context({ owes_offer: false })).reason).toBeUndefined()
+	})
+
+	it('reports the stop notification ahead of the pick-up', () => {
+		const held = context({ owes_offer: true, hold_present: true })
+
+		expect(stop_rules.stop_outcome(held).reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	})
+
+	it('stands down on the loop-breaker', () => {
+		const looped = context({ owes_offer: true, stop_hook_active: true })
+
+		expect(stop_rules.stop_outcome(looped).reason).toBeUndefined()
 	})
 })
 

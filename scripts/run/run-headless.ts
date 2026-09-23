@@ -55,6 +55,23 @@ async function must_keep_waiting(source: EnvironmentSource = process.env): Promi
 	return is_driving(await read_carry_here())
 }
 
-const run_headless = { HEADLESS_ENV_KEY, environment, is_headless, must_keep_waiting }
+/**
+ * Whether this session is the driving `backlogrun` parent, attached or headless: not a lane child, and
+ * holding a live, un-handed-off carry record — the record only a `backlogrun` writes
+ * (joshuafolkken/kit#2452).
+ */
+async function is_backlog_parent(source: EnvironmentSource = process.env): Promise<boolean> {
+	if (lane_child_marker.marked_issue(source) !== undefined) return false
+
+	return is_driving(await read_carry_here())
+}
+
+const run_headless = {
+	HEADLESS_ENV_KEY,
+	environment,
+	is_backlog_parent,
+	is_headless,
+	must_keep_waiting,
+}
 
 export { run_headless }

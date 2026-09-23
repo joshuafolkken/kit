@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
@@ -9,6 +10,8 @@ import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
+import { run_event_stream } from '#scripts/run/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_hold } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
@@ -51,6 +54,17 @@ function was_filed(tail: string): boolean {
 	return filing_cap.turn_filing_count(tail) > 0
 }
 
+// The pick-up check is read for the driving `backlogrun` parent alone — the carry record is local, so an
+// ordinary session pays one file read and never the stream's.
+async function owes_offer(tail: string): Promise<boolean> {
+	if (!(await run_headless.is_backlog_parent())) return false
+
+	const target = await run_event_stream_emit.stream_target()
+	const events = target === undefined ? [] : run_event_stream.read_events(target)
+
+	return backlog_ready.owes_offer(filing_cap.current_turn(tail), events)
+}
+
 async function build_context(
 	transcript_path: string,
 	payload_tail: {
@@ -71,6 +85,7 @@ async function build_context(
 		session_owner: repo_party.current_owner(),
 		headless_waiting: await run_headless.must_keep_waiting(),
 		headless_refusals: stop_rules.count_headless_refusals(tail),
+		owes_offer: await owes_offer(tail),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
 	}
 }

@@ -2,6 +2,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream_emit } from './run-event-stream-emit'
@@ -22,7 +23,8 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 //
 // **Standard output carries the progress line and nothing else**, the way `run:liveness` keeps its
 // verdict there: a relaying parent should never have to tell a report apart from an explanation.
-// Notices go to standard error.
+// Notices go to standard error. The one other stdout line is a `--wait` exit's pick-up reading for a
+// `backlogrun` parent — `ready #N · free lanes N` — which is itself something the parent acts on.
 //
 // **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
 // `scripts/git/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
@@ -347,6 +349,8 @@ async function drive(options: WatchOptions, should_stop_on_report: boolean): Pro
 	const exit = await run_ticks(options, target, life, should_stop_on_report)
 
 	if (exit === 'bound' && should_stop_on_report) console.error(WAIT_EXPIRED_NOTICE)
+	// Every `--wait` exit is a wake, so it carries the pick-up reading with it (joshuafolkken/kit#2452).
+	if (should_stop_on_report) await backlog_ready.print_ready_line()
 
 	return SUCCESS_EXIT_CODE
 }
