@@ -13,12 +13,12 @@ Review results and successful pushes are never turn boundaries.
    the gate** — the pre-gate cut (a no-op outside a lane, joshuafolkken/kit#2177). Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
    `pnpm josh gate` in the background and prints the `/code-review` brief in one call, so the two overlap
    rather than the review waiting on the gate (joshuafolkken/kit#2179). Launch the `/code-review`
-   subagent as the `general-purpose` agent type with that brief — it carries every tool, so it loads the
-   review skill and applies findings with `--fix`; a guessed type name fails (joshuafolkken/kit#2297).
+   subagent as the `general-purpose` agent type with that brief (every tool, so `--fix` applies; a
+   guessed type name fails, joshuafolkken/kit#2297).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
-   and gate. Do not version-bump a child; `pnpm josh release` decides the version from main's history.
+   and gate. Never version-bump a child (`pnpm josh release` decides).
 3. Before acting on any review round, run `pnpm josh review:attest --check`. `missing` or `mismatch`
    discards it without counting; rerun against the brief's checkout. A review error receives a
    `confirmation` Telegram and stops.
@@ -33,18 +33,16 @@ Review results and successful pushes are never turn boundaries.
    Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
    [<category>:<severity>:<file> ...]` — a clean round records one zero-finding line.
    **`pnpm josh followup` refuses the merge until the round is recorded**
-   (`pnpm josh review:record --check --issue <N>` answers `ok` / `missing`), so this is a gate, not a
-   request (joshuafolkken/kit#2343); `pnpm josh review:findings` reads the category tally back.
+   (`pnpm josh review:record --check --issue <N>`, joshuafolkken/kit#2343).
 5. **The clean path ships in one call** — with no second round due, background
-   `pnpm josh ship "<title> #<N>"`: gate → `git -y` → foreground `followup` → `run:tail`, stopping at the
-   first failed step (joshuafolkken/kit#2398). `--review` = round 1. **A due second round does not fit `ship`**: the PR opens
+   `pnpm josh ship "<title> #<N>" --body-file <evidence.md>`: gate → `git -y` → foreground `followup` → `run:tail`, stopping at the
+   first failure (joshuafolkken/kit#2398). `--review` = round 1. **A due second round does not fit `ship`**: the PR opens
    between the rounds — background `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then
    `pnpm josh followup`.
 
 A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
 `pnpm josh ms` returned to the default branch, or when user judgment is required by an unverifiable
-CodeRabbit/Claude Review finding or a CI failure. In a lane, `josh ms` refusing is expected and the
-parent closes the lane. Managed config claims are reported by `followup` and do not stop the merge.
+CodeRabbit/Claude Review finding or a CI failure. In a lane `josh ms` refuses; the parent closes it. Managed config claims are reported by `followup` and do not stop the merge.
 
 Recommendations are informational; severity decides. A CodeRabbit rate-limit warning is not a finding.
 

@@ -126,6 +126,7 @@ Run the full verification set **in order**; do not skip, reorder, or report comp
 3. **Self-review** — a subagent runs `/code-review` per `prompts/review.md` (never a main-line `Skill` load); level from the changed paths, at most two rounds, high/medium findings resolved. `prompts/review.md` → "Review round cap".
 4. **IDE feedback**: zero errors on every changed file.
 5. **E2E** — the CI E2E job when a PR is open (`pnpm josh followup` blocks the merge on it), `pnpm josh test:e2e` run by you when there is none; a printed skip is the answer for a project with no suite. `prompts/testing-guide.md` → "Closing the E2E gate without a human run".
+6. **Live-execution evidence** — a runtime change's PR body carries a `## 実機証跡` section (command + actual fenced output), or `pnpm josh followup` refuses the merge. `prompts/collaboration-workflow/report-format.md`.
 
 **UI verification (screenshot):** any change to the rendered UI is **not** done until you have looked at the result — capture the affected screen with the `/verify-ui` skill and confirm it matches the intent. If none can be produced, ask the user to verify visually.
 

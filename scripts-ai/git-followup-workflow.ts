@@ -5,6 +5,7 @@ import { git_error } from '../scripts/git/git-error'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 import { cli_body } from '../scripts/josh/cli-body'
+import { live_evidence } from '../scripts/review/live-evidence'
 import { review_attest } from '../scripts/review/review-attest'
 import { review_record } from '../scripts/review/review-record'
 import { load_optional_environment } from './environment-loader'
@@ -177,6 +178,30 @@ async function assert_review_recorded(
 	throw new Error(review_record.refusal_message(issue))
 }
 
+// joshuafolkken/kit#2446: a runtime change merges only with its acceptance criteria run for real and
+// recorded in the pull request body — `live_evidence` carries the why. `exempt` (no runtime path
+// changed) merges as before, and a `--no-merge` run has not reached the gate at all.
+async function assert_live_evidence(should_merge: boolean, branch_name: string): Promise<void> {
+	if (!should_merge) return
+
+	const verdict = await live_evidence.check(branch_name)
+
+	if (verdict !== 'required') return
+
+	throw new Error(live_evidence.refusal_message())
+}
+
+// Every pre-merge refusal, in order — each one throws, so nothing merges past the first that fails.
+async function assert_merge_gates(
+	should_merge: boolean,
+	issue_number: string | undefined,
+	branch_name: string,
+): Promise<void> {
+	await assert_review_attested(should_merge)
+	await assert_review_recorded(should_merge, issue_number)
+	await assert_live_evidence(should_merge, branch_name)
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -189,14 +214,14 @@ async function main(): Promise<void> {
 	const issue_number =
 		cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined)
 	const should_merge = is_merge_resolved(cli.values)
+	const branch_name = await resolve_branch_name(cli.values.branch)
 
-	await assert_review_attested(should_merge)
-	await assert_review_recorded(should_merge, issue_number)
+	await assert_merge_gates(should_merge, issue_number, branch_name)
 	// **The number the run reports on is the one it used**, which is the number the pull request
 	// closes where the invocation named none (joshuafolkken/kit#1539). Recovered inside `run`, so the
 	// tail records a run the command line could not identify rather than silently skipping it.
 	const used_issue_number = await git_pr_followup.run({
-		branch_name: await resolve_branch_name(cli.values.branch),
+		branch_name,
 		issue_number,
 		notify_config: build_notify_config(cli.values),
 		coderabbit_ignore_reason: cli.values['coderabbit-ignore-reason'],
@@ -216,6 +241,7 @@ try {
 }
 
 const git_followup_workflow = {
+	assert_live_evidence,
 	assert_review_attested,
 	assert_review_recorded,
 	parse_issue_number_from_text,

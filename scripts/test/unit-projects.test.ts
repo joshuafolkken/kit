@@ -1,4 +1,6 @@
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { run_ship_detach } from '#scripts/run/run-ship-detach'
 import { describe, expect, it } from 'vitest'
 import { PILOT_FILES } from './pilot-files'
 import { unit_projects, type UnitProject } from './unit-projects'
@@ -72,6 +74,15 @@ describe('each project carries the per-run environment and timeout', () => {
 
 		for (const key of agent_session_environment.PROXY_KEYS) expect(env[key]).toBe('')
 		expect(env[agent_session_environment.PROXY_CERTIFICATE_KEY]).toBe('')
+	})
+
+	// joshuafolkken/kit#2456: the pre-push run inside a detached ship supervisor would otherwise send a
+	// ship fixture down the supervised stop path.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the ship supervisor marks for %s', (name) => {
+		const { env } = project(name)
+
+		expect(env[run_ship_detach.SUPERVISED_KEY]).toBe('')
+		expect(env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('')
 	})
 })
 

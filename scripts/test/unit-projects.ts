@@ -32,6 +32,10 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // wrapper writes its loopback proxy and CA into everything `pnpm` spawns, so a suite asserting what a
 // `gh` spawn receives would pass in CI and fail on a machine with the wrapper. A suite about proxies
 // declares the one it is testing in its own `beforeEach`.
+//
+// **The detached ship supervisor's marks are blanked too** (joshuafolkken/kit#2456): the pre-push unit
+// run inherits `JOSH_SHIP_SUPERVISED` and `JOSH_AGENT_PROVIDER` from the supervisor that pushes, so a
+// ship fixture would take the supervised stop path — and try to relaunch a real lane child — only there.
 const PROXY_ENV: Record<string, string> = Object.fromEntries(
 	[...agent_session_environment.PROXY_KEYS, agent_session_environment.PROXY_CERTIFICATE_KEY].map(
 		(key) => [key, ''],
@@ -42,7 +46,9 @@ const ENV: Record<string, string> = {
 	...PROXY_ENV,
 	CLAUDE_CODE_SESSION_ID: 'vitest-session',
 	CODEX_THREAD_ID: '',
+	JOSH_AGENT_PROVIDER: '',
 	JOSH_LANE_CHILD: '',
+	JOSH_SHIP_SUPERVISED: '',
 }
 
 const PURE_PROJECT = 'pure'

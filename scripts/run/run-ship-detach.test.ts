@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const launch_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
@@ -33,6 +34,7 @@ function request(
 		title: TITLE,
 		number: NUMBER,
 		notify: [],
+		body: [],
 		cites: [],
 		is_review: true,
 		repository: `/tmp/josh-ship-detach-test-${randomUUID()}`,
@@ -65,6 +67,13 @@ describe('run_ship_detach.supervisor_argv', () => {
 		expect(argv.args).not.toContain(INLINE_FLAG)
 		expect(stamp_file.read_stamp_text(body_path)).toBe(BODY)
 		expect(argv.args.at(-1)).toBe(TITLE)
+	})
+
+	it('passes the PR body file through, ahead of the title', () => {
+		const body = ['--body-file', 'pr.md']
+		const argv = run_ship_detach.supervisor_argv(request({ body }))
+
+		expect(argv.args).toEqual(['josh', 'ship', '--review', ...body, TITLE])
 	})
 
 	it('passes a notify file through unchanged', () => {
@@ -112,6 +121,23 @@ describe('run_ship_detach.detach', () => {
 
 		expect(result).toEqual({ verdict: run_ship_detach.FAILED, note: START_NOTE })
 		expect(emit_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2456: the launch strips the session keys `ship --review` detects the provider by.
+describe('run_ship_detach.detach provider hand-off', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('hands the supervisor the resolved provider without the parent-session keys', async () => {
+		vi.stubEnv('CODEX_THREAD_ID', '')
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'claude-session')
+		await run_ship_detach.detach(request())
+		const launched = launch_mock.mock.calls[0]?.[0] as { env: Record<string, string> }
+
+		expect(launched.env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('anthropic')
+		expect(launched.env).not.toHaveProperty('CLAUDE_CODE_SESSION_ID')
 	})
 })
 
