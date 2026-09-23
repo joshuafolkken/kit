@@ -173,7 +173,7 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 //
 // **Narrowing is not skipping.** Every one of the four checks still runs, over the same files, and
 // the gate still reports every failure in one pass — `bounded_pool` queues what it does not start,
-// and no check ever rejects (see `run_marked_gate_steps`). What changes is how many are in flight at
+// and no check ever rejects (see `run_gate_steps`). What changes is how many are in flight at
 // once, which is scheduling and never coverage.
 function resolve_concurrency(
 	available_cores: number,

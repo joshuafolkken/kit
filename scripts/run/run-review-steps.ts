@@ -62,10 +62,15 @@ function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
 // Green wins over the marker: a gate that has recorded a green result on this tree is done however its
 // in-flight marker reads. `reusable_green_gate` is the gate's own reuse test rather than a second copy
 // of it, so the join calls a gate green on exactly the trees the gate would skip.
+//
+// **The marker is read before the green record, never after** (joshuafolkken/kit#2434). The gate writes
+// its green record and only then clears the marker, so a marker read as gone means any green record is
+// already on disk for the read that follows. Read the other way round, a gate that recorded green and
+// cleared its marker between the two reads was seen as neither — and the join answered RED.
 async function read_gate_state(): Promise<GateState> {
+	const is_running = file_map_stamp.is_writer_running(review_stamps.in_flight_stamp.read())
 	const tree = await gate_tree.read_gate_tree()
 	const is_green = gate_skip.reusable_green_gate(tree.files, tree.base) !== undefined
-	const is_running = file_map_stamp.is_writer_running(review_stamps.in_flight_stamp.read())
 
 	return run_review.gate_state(is_green, is_running)
 }

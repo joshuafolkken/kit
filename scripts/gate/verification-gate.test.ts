@@ -446,8 +446,7 @@ describe('the gate follows the plan', () => {
 	it('runs every check even at the narrowest plan, and even after one fails', async () => {
 		mock_steps([FAIL, PASS, PASS, PASS])
 
-		const { marker_path } = RECORDS
-		const results = await verification_gate.run_marked_gate_steps({}, SERIAL_PLAN, marker_path)
+		const results = await verification_gate.run_gate_steps(SERIAL_PLAN)
 
 		expect(results.map((result) => result.label)).toEqual(GATE_STEPS.map((step) => step.label))
 	})
