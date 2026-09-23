@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { execa, execaSync } from 'execa'
 import { has_timed_out } from './git-execa-error'
 import { check_gh_installed } from './git-gh-check'
@@ -30,13 +31,11 @@ const BODY_FROM_STDIN = '-'
 // guarantees is that no single request holds it forever.
 //
 // **What a timed-out read costs its caller is decided by that caller, and two are worth naming.**
-// In the merge gate's poll loop (`wait_for_pr_success`) it ends the wait — but so does every other
-// failed read there already, since `attempt_pr_success_poll` has no per-attempt catch: a 403, a
-// rate limit and a dropped connection all reject out of the loop today. A timeout joins that set
-// rather than creating it, the run fails loudly instead of hanging, and re-running `followup`
-// resumes the wait. Turning any of them into a retry is a separate judgement
-// (joshuafolkken/kit#1065 → "out of scope"). In `followup`'s look-ahead it costs a log line:
-// `handle_watch_failure` absorbs the error and falls through to the polling.
+// In the merge gate's poll loop (`wait_for_pr_success`) it is one unreadable poll: the loop retries
+// on its next interval and gives up on the third consecutive failure (joshuafolkken/kit#1077), so a
+// timeout, a 403, a rate limit and a dropped connection all end the wait loudly rather than hanging
+// or reading as a verdict, and re-running `followup` resumes it. In `followup`'s look-ahead it costs
+// a log line: `handle_watch_failure` absorbs the error and falls through to the polling.
 //
 // **A timed-out *write* is not proof the write did not land.** The request may have reached GitHub
 // before the spawn was killed, so a caller that retries one can duplicate it — `josh propagate`'s
@@ -57,6 +56,36 @@ const GH_REQUEST_TIMEOUT_MS = 60_000
 // convention out there for them to keep consistent with.
 function to_timeout_option(timeout_ms?: number): { timeout: number } {
 	return { timeout: timeout_ms ?? GH_REQUEST_TIMEOUT_MS }
+}
+
+// **`gh` dials GitHub directly, never through a proxy this machine stood up on loopback**
+// (joshuafolkken/kit#2436). A package-manager wrapper writes one into the environment of everything
+// its invocation spawns, and it exists to inspect package downloads — api.github.com crosses it
+// without inspection, so the hop buys nothing and can fail on its own: measured on
+// joshuafolkken/kit#2422, one 30-second stall made the wrapper refuse every later GitHub connection
+// of that `followup`, and the retries in the poll loop could only ever fail. The loopback test and
+// the list of spellings are the agent-session launcher's (joshuafolkken/kit#1760), shared rather than
+// restated. Only the scanner's proxy goes — recognized by its CA — because any other loopback proxy
+// may be this machine's only route out; a proxy naming a real host is somebody's network and stays.
+// Nothing is spread when there is nothing to remove, so a spawn outside such a wrapper keeps its
+// options exactly as they were.
+//
+// **It is exported because this file is not the only place `gh` is spawned.** The synchronous
+// readers that spell their own `gh api` (`gh-spawn.ts`, `repo-setting.ts`, `epic-cross-repo.ts`,
+// `version-remote.ts`, `propagate-publish.ts`) spread it too, and `git-gh-exec-proxy.test.ts` refuses
+// a new `gh api` spawn anywhere under `scripts/` that does not.
+interface DirectEnvironment {
+	env?: Record<string, undefined>
+}
+
+function direct_environment(): DirectEnvironment {
+	const removed = agent_session_environment.removed_proxy_environment()
+
+	return Object.keys(removed).length > 0 ? { env: removed } : {}
+}
+
+function to_spawn_options(timeout_ms?: number): { timeout: number } & DirectEnvironment {
+	return { ...to_timeout_option(timeout_ms), ...direct_environment() }
 }
 
 // What a request that ran out of time is labelled with, ahead of whatever gh managed to write.
@@ -118,7 +147,7 @@ async function exec_gh_command(arguments_: Array<string>, timeout_ms?: number): 
 	await check_gh_installed()
 
 	try {
-		const { stdout } = await execa('gh', arguments_, to_timeout_option(timeout_ms)) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+		const { stdout } = await execa('gh', arguments_, to_spawn_options(timeout_ms)) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return stdout.trimEnd()
 	} catch (error) {
@@ -137,7 +166,7 @@ async function exec_gh_command_with_stdin(input: {
 
 	// Built ahead of the call so the spawn itself stays on one line: `// NOSONAR` suppresses the rule
 	// only on the line it sits on, and a wrapped call moves that line away from the reported one.
-	const options = { input: input.stdin_body, ...to_timeout_option(input.timeout_ms) }
+	const options = { input: input.stdin_body, ...to_spawn_options(input.timeout_ms) }
 
 	try {
 		const { stdout } = await execa('gh', input.args, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -178,7 +207,7 @@ async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<nu
 	// `gh-subcommand-guard.ts` resolves the subcommand from it, and hoisting that into a `const`
 	// makes the scan report `<dynamic>` instead of `api`, leaving a future edit to
 	// `['issue', 'view', …]` uncaught (joshuafolkken/kit#1063).
-	const options = to_timeout_option(timeout_ms)
+	const options = to_spawn_options(timeout_ms)
 
 	try {
 		await check_gh_installed()
@@ -289,7 +318,7 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 // replaced already did.
 function exec_gh_api_sync(request: GhApiRequest): string {
 	const body_option = request.body === undefined ? {} : { input: request.body }
-	const options = { ...body_option, ...to_timeout_option(request.timeout_ms) }
+	const options = { ...body_option, ...to_spawn_options(request.timeout_ms) }
 
 	try {
 		const { stdout } = execaSync('gh', to_gh_api_args(request), options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -301,6 +330,7 @@ function exec_gh_api_sync(request: GhApiRequest): string {
 }
 
 const git_gh_exec = {
+	direct_environment,
 	exec_gh_command,
 	exec_gh_command_with_stdin,
 	exec_gh_api,

@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PILOT_FILES } from './pilot-files'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
@@ -26,7 +27,19 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // read a delivery fixture as a real lane-child call and fire on it. A suite that wants to test
 // lane-child behavior sets the mark itself in its own `beforeEach`, exactly as it always has; blank is
 // the "no dispatch mark" a person's session carries, which `marked_issue` reads as absent.
+//
+// **The proxy spellings are blanked for the same reason** (joshuafolkken/kit#2436): a package-manager
+// wrapper writes its loopback proxy and CA into everything `pnpm` spawns, so a suite asserting what a
+// `gh` spawn receives would pass in CI and fail on a machine with the wrapper. A suite about proxies
+// declares the one it is testing in its own `beforeEach`.
+const PROXY_ENV: Record<string, string> = Object.fromEntries(
+	[...agent_session_environment.PROXY_KEYS, agent_session_environment.PROXY_CERTIFICATE_KEY].map(
+		(key) => [key, ''],
+	),
+)
+
 const ENV: Record<string, string> = {
+	...PROXY_ENV,
 	CLAUDE_CODE_SESSION_ID: 'vitest-session',
 	CODEX_THREAD_ID: '',
 	JOSH_LANE_CHILD: '',
