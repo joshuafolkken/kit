@@ -276,7 +276,7 @@ async function run_stage(
 	args: ShipArguments,
 	context: ShipContext,
 ): Promise<ShipSection> {
-	if (run_ship_stage.is_done(step.stage, context.done, context.state)) {
+	if (run_ship_stage.is_done(step.stage, context.done, context.state, args.body.length > 0)) {
 		await emit_phase(args, step.stage, PHASE.SKIPPED)
 
 		return { header: step.header, body: run_ship.SKIPPED_BODY, code: SUCCESS_EXIT_CODE }
