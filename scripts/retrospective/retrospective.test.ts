@@ -2,12 +2,21 @@ import type { RunRole } from '#scripts/cost/cost-run-nodes'
 import type { RunCostReport } from '#scripts/cost/cost-run-report'
 import type { RoleTotals } from '#scripts/cost/cost-run-roles'
 import type { CategoryCount } from '#scripts/review/review-finding-ledger'
+import { run_event_scope, type EventScope } from '#scripts/run/run-event-scope'
 import type { RunEvent } from '#scripts/run/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
 const MINUTES = 12
 const MS_PER_MINUTE = 60_000
+// The invocation this digest covers begins here; the fixture's own events all carry this `at`, and the
+// scope tests below add earlier ones to prove they are not counted (joshuafolkken/kit#2395).
+const RUN_START = '2026-09-22T00:00:00.000Z'
+const BEFORE_RUN = '2026-09-19T18:00:00.000Z'
+
+function since(started_at: string): EventScope {
+	return { kind: 'since', started_at }
+}
 
 const EMPTY_COMPOSITION = {
 	input_usd: 0,
@@ -51,8 +60,8 @@ function cost_report(roles: ReadonlyArray<RoleTotals>): RunCostReport {
 	}
 }
 
-function event(kind: string): RunEvent {
-	return { pos: 1, at: '2026-09-22T00:00:00.000Z', kind, text: kind }
+function event(kind: string, at: string = RUN_START): RunEvent {
+	return { pos: 1, at, kind, text: kind }
 }
 
 const FINDINGS: ReadonlyArray<CategoryCount> = [
@@ -67,6 +76,7 @@ function inputs(overrides: Partial<RetrospectiveInputs>): RetrospectiveInputs {
 		zero_rounds: 4,
 		observations: ['- k:one | d1 | 2026-09-22 | where | what'],
 		events: [event('park'), event('park'), event('outage')],
+		scope: since(RUN_START),
 		...overrides,
 	}
 }
@@ -128,5 +138,32 @@ describe('retrospective.compose — the signals it computes', () => {
 		const digest = retrospective.compose(inputs({ findings: [], zero_rounds: 7 }))
 
 		expect(digest).toContain('Review findings: none recorded (7 zero-finding round(s))')
+	})
+})
+
+// joshuafolkken/kit#2395: the friction count covers this invocation only. The stream is the repository's
+// event log, so a digest handed the whole of it would report a previous run's cut and park as this one's
+// friction — the numbers the retrospective weighs to file improvement issues.
+describe('retrospective.compose — the invocation scope of the friction count', () => {
+	it('does not count a cut, park, outage or review-round from before the run began', () => {
+		const events = [
+			event('park', BEFORE_RUN),
+			event('cut', BEFORE_RUN),
+			event('outage', BEFORE_RUN),
+			event('review-round', BEFORE_RUN),
+			event('park'),
+		]
+		const digest = retrospective.compose(inputs({ events }))
+
+		expect(digest).toContain('Run events: park 1, outage 0, cut 0, review-round 0')
+	})
+
+	it('counts nothing rather than the whole stream when the scope cannot be determined', () => {
+		const events = [event('park', BEFORE_RUN), event('park'), event('outage')]
+		const digest = retrospective.compose(
+			inputs({ events, scope: run_event_scope.UNKNOWN_EVENT_SCOPE }),
+		)
+
+		expect(digest).toContain('Run events: park 0, outage 0, cut 0, review-round 0')
 	})
 })

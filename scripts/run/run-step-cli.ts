@@ -5,6 +5,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { find_package_directory } from '#scripts/josh/josh-logic'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry, type CarryRead } from './run-carry'
+import { run_event_scope } from './run-event-scope'
 import { run_event_stream } from './run-event-stream'
 import { run_prep_cli } from './run-prep-cli'
 import { run_step, type StepInput } from './run-step'
@@ -39,7 +40,12 @@ function read_run(directory: string | undefined): RunReads {
 	}
 
 	const carry = run_carry.read_carry(run_carry.carry_path(directory))
-	const last = run_event_stream.read_last(run_event_stream.target_of(directory))
+	const events = run_event_stream.read_events(run_event_stream.target_of(directory))
+	// The last event *within this invocation's scope*, not the raw newest one: a stale event a previous
+	// invocation left on the stream must not be read as this run's position (joshuafolkken/kit#2395). The
+	// observed defect was a `run:step` that printed `wait` on a fresh run because an old `child-launch` was
+	// still the stream's tail.
+	const last = run_event_scope.last_scoped_event(events, run_event_scope.scope_of(carry))
 
 	return {
 		carry_kind: carry.kind,

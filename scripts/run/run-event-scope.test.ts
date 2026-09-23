@@ -1,0 +1,95 @@
+import { describe, expect, it } from 'vitest'
+import { run_carry } from './run-carry'
+import { run_event_scope, type EventScope } from './run-event-scope'
+import { run_event_stream, type RunEvent } from './run-event-stream'
+
+// joshuafolkken/kit#2395: the scoped event read, published once so `run:report`, the retrospective digest
+// and `run:step` share one time filter rather than each writing it again. The mechanism came from #2393
+// (the carry record's `started_at` as the lower bound, filtered by each event's own time); these tests pin
+// it at its new single-source home — including that an undetermined scope never rounds back to the whole
+// stream, which is the rounding #2308 and #2393 named.
+
+const KIND = run_event_stream.EVENT_KIND
+const START = '2026-09-21T00:00:00.000Z'
+const BEFORE = '2026-09-19T18:00:14.732Z'
+const AFTER = '2026-09-21T06:00:00.000Z'
+const NOT_A_TIME = 'not-a-time'
+
+function since(started_at: string): EventScope {
+	return { kind: 'since', started_at }
+}
+
+function event(pos: number, kind: string, at: string): RunEvent {
+	return { pos, at, kind, text: kind }
+}
+
+const EARLIER = event(0, KIND.MERGE, BEFORE)
+const AT_START = event(1, KIND.PARK, START)
+const LATER = event(2, KIND.CUT, AFTER)
+const MIXED: ReadonlyArray<RunEvent> = [EARLIER, AT_START, LATER]
+
+describe('run_event_scope.scope_of', () => {
+	const CARRY = run_carry.fresh_carry('backlogrun', {}, new Date(START))
+
+	it('takes the start time from a carried record', () => {
+		expect(run_event_scope.scope_of({ kind: 'carried', carry: CARRY })).toEqual(since(START))
+	})
+
+	it('takes it from an expired record too, since expiry is a budget verdict not a missing start', () => {
+		expect(run_event_scope.scope_of({ kind: 'expired', carry: CARRY })).toEqual(since(START))
+	})
+
+	it('leaves the scope undetermined when no record is there or it cannot be read', () => {
+		expect(run_event_scope.scope_of({ kind: 'none' })).toEqual(run_event_scope.UNKNOWN_EVENT_SCOPE)
+		expect(run_event_scope.scope_of({ kind: 'unreadable' })).toEqual(
+			run_event_scope.UNKNOWN_EVENT_SCOPE,
+		)
+	})
+})
+
+describe('run_event_scope.scoped_events', () => {
+	it('keeps only events at or after the start, dropping a previous invocation’s', () => {
+		const scoped = run_event_scope.scoped_events(MIXED, since(START))
+
+		expect(scoped).toEqual([AT_START, LATER])
+	})
+
+	it('drops an event whose own timestamp cannot be read', () => {
+		const corrupt = event(3, KIND.MERGE, NOT_A_TIME)
+
+		expect(run_event_scope.scoped_events([...MIXED, corrupt], since(START))).toEqual([
+			AT_START,
+			LATER,
+		])
+	})
+
+	it('answers undefined for an unknown scope, never the whole stream', () => {
+		const scoped = run_event_scope.scoped_events(MIXED, run_event_scope.UNKNOWN_EVENT_SCOPE)
+
+		expect(scoped).toBeUndefined()
+	})
+
+	it('answers undefined when the start time is not a time, never the whole stream', () => {
+		expect(run_event_scope.scoped_events(MIXED, since(NOT_A_TIME))).toBeUndefined()
+	})
+
+	it('is an empty list, not undefined, for an invocation that has done nothing yet', () => {
+		expect(run_event_scope.scoped_events([EARLIER], since(START))).toEqual([])
+	})
+})
+
+describe('run_event_scope.last_scoped_event', () => {
+	it('returns the newest event within scope', () => {
+		expect(run_event_scope.last_scoped_event(MIXED, since(START))).toEqual(LATER)
+	})
+
+	it('returns undefined when only a previous invocation’s events are on the stream', () => {
+		expect(run_event_scope.last_scoped_event([EARLIER], since(START))).toBeUndefined()
+	})
+
+	it('returns undefined for an undetermined scope, never a stale event', () => {
+		expect(
+			run_event_scope.last_scoped_event(MIXED, run_event_scope.UNKNOWN_EVENT_SCOPE),
+		).toBeUndefined()
+	})
+})
