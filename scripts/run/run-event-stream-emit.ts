@@ -1,5 +1,6 @@
-import { git_command } from '#scripts/git/git-command'
-import { run_event_stream } from './run-event-stream'
+import { run_carry } from './run-carry'
+import { run_event_scope } from './run-event-scope'
+import { run_event_stream, type RunEvent } from './run-event-stream'
 
 // The write side of the run's event stream (joshuafolkken/kit#2205). It resolves the run's identity and
 // appends, and it is where the "reporting must not break the work it reports on" contract is kept: every
@@ -11,11 +12,6 @@ import { run_event_stream } from './run-event-stream'
 // session, a cut successor and every lane child are one run and append to one stream — so it keys on the
 // common git directory the carry record uses, which every lane of one repository shares.
 
-// The common git directory: `.git` in the main work tree and the same `.git` from inside a lane, the
-// second of the two paths `git_directories` prints. `run-carry.ts` reads exactly this index for exactly
-// this reason.
-const REPOSITORY_DIRECTORY_INDEX = 1
-
 function now_iso(): string {
 	return new Date().toISOString()
 }
@@ -25,8 +21,7 @@ function now_iso(): string {
  * repository to key on — outside one there is no run identity, and no stream.
  */
 async function stream_target(): Promise<string | undefined> {
-	const directories = await git_command.git_directories()
-	const repository = directories[REPOSITORY_DIRECTORY_INDEX]
+	const repository = await run_carry.repository_directory()
 
 	return repository === undefined ? undefined : run_event_stream.target_of(repository)
 }
@@ -73,11 +68,47 @@ async function emit_once(kind: string, text: string): Promise<boolean> {
 	}
 }
 
+// The events of the invocation now running: the stream outlives every invocation, so a marker a previous
+// run left — a stall that ended with no dispatch after it — must not hold back this run's first one. An
+// undetermined scope (no carry record) keeps the whole stream, the side that under-notifies rather than
+// re-sends.
+function invocation_events(repository: string, target: string): ReadonlyArray<RunEvent> {
+	const events = run_event_stream.read_events(target)
+	const scope = run_event_scope.scope_of(run_carry.read_carry(run_carry.carry_path(repository)))
+
+	return run_event_scope.scoped_events(events, scope) ?? events
+}
+
+/**
+ * Append one event unless this kind is already on the stream since the newest `reset_kind` — the
+ * episode marker for a condition that holds across other events (joshuafolkken/kit#2464). `emit_once`'s
+ * newest-event test re-fired the stall notification each time a parallel lane appended a merge or a
+ * park; this ends the episode only at `reset_kind`. Returns whether it appended, as `emit_once` does.
+ */
+async function emit_once_since(kind: string, text: string, reset_kind: string): Promise<boolean> {
+	try {
+		const repository = await run_carry.repository_directory()
+
+		if (repository === undefined) return false
+
+		const target = run_event_stream.target_of(repository)
+
+		if (run_event_stream.has_since(invocation_events(repository, target), kind, reset_kind)) {
+			return false
+		}
+
+		return run_event_stream.append(target, kind, text, now_iso()).appended
+	} catch {
+		// Best-effort: a failed append is dropped rather than raised into the caller's work.
+		return false
+	}
+}
+
 // One progress heartbeat line onto the stream, so a relay reaches it across a cut (joshuafolkken/kit#2437).
 async function emit_heartbeat(line: string): Promise<void> {
 	await emit(run_event_stream.EVENT_KIND.HEARTBEAT, line)
 }
 
-const run_event_stream_emit = { emit, emit_heartbeat, emit_once, stream_target }
+const run_event_stream_emit = { emit, emit_heartbeat, emit_once, emit_once_since, stream_target }
 
 export { run_event_stream_emit }

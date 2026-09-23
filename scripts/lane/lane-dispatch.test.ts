@@ -8,6 +8,7 @@ import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_invocation } from './lane-child-invocation'
@@ -46,6 +47,9 @@ const active_supervisor = vi.spyOn(openai_lane_supervisor, 'active')
 const wait_for_supervisor = vi.spyOn(openai_lane_supervisor, 'wait_for_active')
 const approve_supervisor = vi.spyOn(openai_lane_supervisor, 'approve')
 const cancel_supervisor = vi.spyOn(openai_lane_supervisor, 'cancel')
+
+// The launch record is `lane-dispatch-launch-event.test.ts`'s; here it stays off the real stream.
+vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
 
 function lane(output: string | undefined): LaneInfo {
 	return {

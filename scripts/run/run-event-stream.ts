@@ -64,7 +64,8 @@ const EVENT_KIND = {
 	RETROSPECTIVE: 'retrospective',
 	// Ready backlog work is sitting undispatched while a lane is free and nothing has dispatched for a
 	// while (joshuafolkken/kit#2359). Emitted once per stall episode by the stop-time detector, it is
-	// both the dedup marker — `emit_once` refuses a second while it is the newest event — and the line a
+	// both the dedup marker — `emit_once_since` refuses a second until a `CHILD_LAUNCH` intervenes
+	// (joshuafolkken/kit#2464) — and the line a
 	// terminal reader following the stream sees. `run:step` reads it as `backlog:next`, so a run that
 	// stalled is pointed straight at dispatching the work rather than left waiting.
 	STALL: 'stall',
@@ -215,6 +216,16 @@ function read_last(target: string): RunEvent | undefined {
 	return read_events(target).findLast((event) => !TRACE_KINDS.has(event.kind))
 }
 
+// Whether `kind` is already on the stream after the newest `reset_kind` — or anywhere, before the first
+// one. The episode test for a marker whose episode ends only when something specific happens rather than
+// when any other event lands (joshuafolkken/kit#2464): a stall ends at a dispatch, and the merges, parks
+// and heartbeats every parallel lane appends in between must not read as a fresh stall.
+function has_since(events: ReadonlyArray<RunEvent>, kind: string, reset_kind: string): boolean {
+	const reset_at = events.findLastIndex((event) => event.kind === reset_kind)
+
+	return events.slice(reset_at + POSITION_INCREMENT).some((event) => event.kind === kind)
+}
+
 // One event as the line a reader relays (joshuafolkken/kit#2207). The follow reader and the degenerate
 // `run:wake --list` both present events to a person, so the "what an event reads as" lives here, beside
 // the enumeration it names, rather than being spelled twice at the two call sites. `at`, `kind` and
@@ -234,6 +245,7 @@ const run_event_stream = {
 	TRACE_KINDS,
 	append,
 	format_event,
+	has_since,
 	is_event_kind,
 	read_events,
 	read_from,
