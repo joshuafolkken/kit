@@ -222,8 +222,9 @@ describe('IMPLEMENTATION_CUT_REASON', () => {
 		// The pointer every delivery names.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		// **The threshold is the shared value, assembled from the constant** (joshuafolkken/kit#2385):
-		// joshuafolkken/kit#2374 lowered it and the old literal told agents the wrong number.
-		['150,000-token'],
+		// joshuafolkken/kit#2406 derives it from the break-even model, so the old literal would tell
+		// agents the wrong number — this reads the constant's current formatting.
+		['135,000-token'],
 		// **The reissue sentence, now the per-crossing form** (joshuafolkken/kit#2385): a reissue right
 		// after a refusal passes so `busy` / `failed` cannot wedge the run, and the row fires again on the
 		// next crossing rather than once per run.
