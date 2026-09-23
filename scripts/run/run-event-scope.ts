@@ -1,5 +1,5 @@
 import type { CarryRead } from './run-carry'
-import type { RunEvent } from './run-event-stream'
+import { run_event_stream, type RunEvent } from './run-event-stream'
 
 // The one place a stream consumer scopes the event stream to a single invocation (joshuafolkken/kit#2395).
 // The stream is the repository's event log, not this run's — it outlives every invocation by design — so a
@@ -16,8 +16,6 @@ import type { RunEvent } from './run-event-stream'
 
 const SINCE_SCOPE = 'since'
 const UNKNOWN_SCOPE = 'unknown'
-
-const LAST_INDEX_OFFSET = 1
 
 // Which invocation a stream read covers. `since` carries the start time the carry record holds — and because
 // that field survives a `--cut` unchanged, the events either side of a cut fall inside one scope without a
@@ -78,9 +76,11 @@ function last_scoped_event(
 	events: ReadonlyArray<RunEvent>,
 	scope: EventScope,
 ): RunEvent | undefined {
-	const scoped = scoped_events(events, scope)
-
-	return scoped?.[scoped.length - LAST_INDEX_OFFSET]
+	// Trace events (a `josh ship` stage line, joshuafolkken/kit#2426) are skipped, as `read_last` skips
+	// them, so `run:step` reads the run's position rather than an unknown `ship-stage`.
+	return scoped_events(events, scope)?.findLast(
+		(event) => !run_event_stream.TRACE_KINDS.has(event.kind),
+	)
 }
 
 const run_event_scope = {

@@ -44,11 +44,12 @@ vi.mock('./run-event-stream', () => ({
 		},
 		target_of: (directory: string) => `${directory}/events`,
 		read_events: read_events_mock,
+		TRACE_KINDS: new Set(['ship-stage']),
 	},
 }))
 
-// `run-event-scope.ts` is left real — it is a pure function of the carry read and the events, importing
-// only types from the mocked modules (joshuafolkken/kit#2395), so the CLI scopes the mocked stream exactly
+// `run-event-scope.ts` is left real — it is a pure function of the carry read and the events, reading
+// only types and the trace-kind set from the mocked modules (joshuafolkken/kit#2395), so the CLI scopes the mocked stream exactly
 // as it would a live one.
 
 const { run_step_cli } = await import('./run-step-cli')

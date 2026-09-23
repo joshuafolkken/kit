@@ -2,7 +2,11 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { josh_command } from '#scripts/josh/josh-run'
+import { run_event_stream } from './run-event-stream'
+import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
+import { run_ship_probe } from './run-ship-probe'
+import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on
 // (joshuafolkken/kit#2398). The loop used to spend a round trip each on `gate`, `git -y`, `followup`
@@ -13,6 +17,13 @@ import { run_ship, type ShipSection } from './run-ship'
 //
 // It stops at the first failed step: the gate must be green before the commit, the commit before the
 // merge. The report ends at the failure and names the stopped step, so the run reads only that one.
+//
+// **Re-running it resumes rather than restarts** (joshuafolkken/kit#2426). Each stage's completion is
+// kept in a per-issue record, and the repository's actual state — committed, pushed, merged — is read
+// before the first stage, so a ship that died mid-way passes over what already happened and never
+// commits, pushes or merges twice. Each stage's start, success, failure or skip goes onto the run's
+// event stream. `run-ship-stage.ts` carries which stage may be passed over, and why the gate never is
+// on the record's word alone.
 //
 // The first positional is the `"<title> #<N>"` string `git -y` and `followup` already take; the issue
 // number is read off its tail for `run:tail`. Any further positionals are follow-up citations filed
@@ -55,8 +66,17 @@ interface ShipArguments {
 }
 
 interface Step {
+	stage: Stage
 	header: string
-	argv: (args: ShipArguments) => ReadonlyArray<string>
+	argv: (args: ShipArguments, state: ShipState) => ReadonlyArray<string>
+}
+
+// What a resumed ship knows before its first stage: the record's path (absent outside a repository),
+// the stages it says completed, and the repository's actual state (`run-ship-stage.ts` decides from it).
+interface ShipContext {
+	target: string | undefined
+	done: ReadonlySet<string>
+	state: ShipState
 }
 
 // The notify tail `followup` takes — whichever body form the caller composed, forwarded unchanged so a
@@ -69,16 +89,28 @@ function notify_arguments(values: NotifyValues): ReadonlyArray<string> {
 	})
 }
 
+const { STAGE, PHASE } = run_ship_stage
+
 // The four steps in the order a change ships: the gate before the commit, the commit/push/PR before
-// the merge, the merge before the report bookkeeping.
+// the merge, the merge before the report bookkeeping. The commit step carries the `--skip-*` flags a
+// resumed ship needs, so an existing commit or push is never made twice.
 const STEPS: ReadonlyArray<Step> = [
-	{ header: run_ship.GATE_HEADER, argv: () => ['gate'] },
-	{ header: run_ship.COMMIT_HEADER, argv: (args) => ['git', '-y', args.title] },
+	{ stage: STAGE.GATE, header: run_ship.GATE_HEADER, argv: () => ['gate'] },
 	{
+		stage: STAGE.COMMIT,
+		header: run_ship.COMMIT_HEADER,
+		argv: (args, state) => ['git', '-y', ...run_ship_stage.commit_flags(state), args.title],
+	},
+	{
+		stage: STAGE.FOLLOWUP,
 		header: run_ship.FOLLOWUP_HEADER,
 		argv: (args) => ['followup', args.title, ...args.notify],
 	},
-	{ header: run_ship.REPORT_HEADER, argv: (args) => ['run:tail', args.number, ...args.cites] },
+	{
+		stage: STAGE.REPORT,
+		header: run_ship.REPORT_HEADER,
+		argv: (args) => ['run:tail', args.number, ...args.cites],
+	},
 ]
 
 function issue_number(title: string): string | undefined {
@@ -113,24 +145,96 @@ function parse(argv: ReadonlyArray<string>): ShipArguments | undefined {
 	}
 }
 
-async function run_step(step: Step, args: ShipArguments): Promise<ShipSection> {
-	const result = await josh_command.josh_run(step.argv(args), should_forward_stderr)
+async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
+	const result = await josh_command.josh_run(step.argv(args, state), should_forward_stderr)
 
 	return { header: step.header, body: result.out, code: result.code }
 }
 
+async function emit_phase(args: ShipArguments, stage: Stage, phase: Phase): Promise<void> {
+	const text = run_ship_stage.event_text(args.number, stage, phase)
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SHIP_STAGE, text)
+}
+
+// The record is written best-effort, as the event stream is: a record that could not be written costs
+// a resumed ship only the state re-read, never the stage that just succeeded.
+function record(target: string | undefined, write: (path: string) => void): void {
+	if (target === undefined) return
+
+	try {
+		write(target)
+	} catch {
+		// Best-effort: the actual state is re-read on a resume, so a lost record repeats nothing.
+	}
+}
+
+async function settle(
+	step: Step,
+	args: ShipArguments,
+	context: ShipContext,
+	code: number,
+): Promise<void> {
+	const is_green = code === SUCCESS_EXIT_CODE
+
+	await emit_phase(args, step.stage, is_green ? PHASE.DONE : PHASE.FAILED)
+
+	if (!is_green) return
+
+	record(context.target, (path) => {
+		run_ship_stage.mark_done(path, step.stage)
+	})
+}
+
+// One stage: passed over when the record and the state say it is done, run and recorded otherwise.
+async function run_stage(
+	step: Step,
+	args: ShipArguments,
+	context: ShipContext,
+): Promise<ShipSection> {
+	if (run_ship_stage.is_done(step.stage, context.done, context.state)) {
+		await emit_phase(args, step.stage, PHASE.SKIPPED)
+
+		return { header: step.header, body: run_ship.SKIPPED_BODY, code: SUCCESS_EXIT_CODE }
+	}
+
+	await emit_phase(args, step.stage, PHASE.START)
+	const section = await run_step(step, args, context.state)
+
+	await settle(step, args, context, section.code)
+
+	return section
+}
+
+async function open_context(args: ShipArguments): Promise<ShipContext> {
+	const [target, state] = await Promise.all([
+		run_ship_probe.record_target(args.number),
+		run_ship_probe.read_state(),
+	])
+
+	const done = target === undefined ? new Set<string>() : run_ship_stage.read_done(target)
+
+	return { target, done, state }
+}
+
 // Run the four in order, stopping at the first that failed: a red gate never reaches the commit, so
-// the returned sections end at the failure the report names.
+// the returned sections end at the failure the report names. A ship that reached the end clears its
+// record, so the next ship of the same issue starts from the gate.
 async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
+	const context = await open_context(args)
 	const sections: Array<ShipSection> = []
 
 	for (const step of STEPS) {
-		const section = await run_step(step, args)
+		const section = await run_stage(step, args, context)
 
 		sections.push(section)
 
-		if (section.code !== SUCCESS_EXIT_CODE) break
+		if (section.code !== SUCCESS_EXIT_CODE) return sections
 	}
+
+	record(context.target, (path) => {
+		run_ship_stage.clear(path)
+	})
 
 	return sections
 }

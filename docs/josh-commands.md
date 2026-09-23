@@ -1707,6 +1707,16 @@ follow-up citations filed this run — branch-2 filing runs before `ship` — fo
 the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
 review finding — stays in front of this command.
 
+Re-running it resumes rather than restarts (joshuafolkken/kit#2426). Each stage's completion is kept in
+a per-issue record in the temp directory, and the repository's actual state is read before the first
+stage: a clean tree ahead of the default branch is committed (`git -y` then runs with `--skip-commit`),
+origin's branch tip equal to `HEAD` is pushed (`--skip-push`), and a `MERGED` pull request passes over
+`followup`. The record counts only where that state corroborates it, so a lost record repeats nothing
+and a stale one skips no new work. The gate is passed over only once a commit exists. Passed-over
+stages print `skipped — already done`, the record is cleared once the report completes, and each
+stage's start, success, failure or skip lands in the event stream as a `ship-stage` event — a trace
+kind the last-event read skips.
+
 ### `josh run:report`
 
 Generates the session-facing report _from_ the run's event stream, rather than composing the wording by
