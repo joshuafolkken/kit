@@ -1,3 +1,4 @@
+import type { RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
@@ -94,39 +95,94 @@ describe('backlog_ready.print_ready_line', () => {
 })
 
 describe('backlog_ready.owes_offer', () => {
-	it('owes the ask when the turn holds a ready line and no dispatch', () => {
-		expect(backlog_ready.owes_offer(`watcher said ${READY_LINE}`, [])).toBe(true)
+	it('owes the ask when the turn holds a ready line and no dispatch', async () => {
+		expect(await backlog_ready.owes_offer(`watcher said ${READY_LINE}`, [], ports())).toBe(true)
 	})
 
-	it('owes the ask when a stall is newer than the last launch', () => {
-		expect(backlog_ready.owes_offer('', [LAUNCH, STALL])).toBe(true)
+	it('owes the ask when a stall is newer than the last launch and work is still ready', async () => {
+		expect(await backlog_ready.owes_offer('', [LAUNCH, STALL], ports())).toBe(true)
 	})
 
-	it('owes nothing once any later step follows the stall', () => {
+	it('owes nothing once any later step follows the stall', async () => {
 		const drain = event(run_event_stream.EVENT_KIND.DRAIN, LATE)
 
-		expect(backlog_ready.owes_offer('', [STALL, drain])).toBe(false)
+		expect(await backlog_ready.owes_offer('', [STALL, drain], ports())).toBe(false)
 	})
 
-	it('owes nothing once a launch follows the stall', () => {
-		expect(backlog_ready.owes_offer('', [STALL, event(LAUNCH.kind, LATE)])).toBe(false)
+	it('owes nothing once a launch follows the stall', async () => {
+		expect(await backlog_ready.owes_offer('', [STALL, event(LAUNCH.kind, LATE)], ports())).toBe(
+			false,
+		)
 	})
 
-	it('owes nothing when the turn asked, whatever the answer', () => {
-		expect(backlog_ready.owes_offer(`${READY_LINE}\n${OFFER_CALL}\nwatch`, [STALL])).toBe(false)
-		expect(backlog_ready.owes_offer(`${READY_LINE}\n${OFFER_CALL}\nwait`, [STALL])).toBe(false)
+	it('owes nothing when the turn asked, whatever the answer', async () => {
+		const watch = `${READY_LINE}\n${OFFER_CALL}\nwatch`
+		const wait = `${READY_LINE}\n${OFFER_CALL}\nwait`
+
+		expect(await backlog_ready.owes_offer(watch, [STALL], ports())).toBe(false)
+		expect(await backlog_ready.owes_offer(wait, [STALL], ports())).toBe(false)
 	})
 
-	it('owes nothing when the turn launched', () => {
-		expect(backlog_ready.owes_offer(`${READY_LINE}\n${LAUNCH_CALL}`, [])).toBe(false)
+	it('owes nothing when the turn launched', async () => {
+		expect(await backlog_ready.owes_offer(`${READY_LINE}\n${LAUNCH_CALL}`, [], ports())).toBe(false)
 	})
 
-	it('does not count prose that only names the commands', () => {
-		expect(backlog_ready.owes_offer(`${READY_LINE} ${backlog_ready.OFFER_HINT}`, [])).toBe(true)
+	it('does not count prose that only names the commands', async () => {
+		const prose = `${READY_LINE} ${backlog_ready.OFFER_HINT}`
+
+		expect(await backlog_ready.owes_offer(prose, [], ports())).toBe(true)
 	})
 
-	it('owes nothing without a signal', () => {
-		expect(backlog_ready.owes_offer('relayed a progress line', [LAUNCH])).toBe(false)
+	it('owes nothing without a signal', async () => {
+		expect(await backlog_ready.owes_offer('relayed a progress line', [LAUNCH], ports())).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#2472: a stall recorded while ready work existed kept blocking after that work
+// left the pool, because the pending stall alone was read as the signal.
+describe('backlog_ready.owes_offer — a stale stall', () => {
+	it('owes nothing once the stalled work is no longer ready', async () => {
+		const empty = ports({ ready_issues: async () => [] })
+
+		expect(await backlog_ready.owes_offer('', [STALL], empty)).toBe(false)
+	})
+
+	it('owes nothing once no lane is free for it', async () => {
+		const full = ports({ free_lane_count: async () => 0 })
+
+		expect(await backlog_ready.owes_offer('', [STALL], full)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#2472: a `--only` run's work is its named list, so the pool is never its pick-up.
+function record(invocation: string): RunCarry {
+	return { invocation, started_at: EARLY, merged: 0, filed: 0, cuts: 0, failures: 0, outages: 0 }
+}
+
+describe('backlog_ready.drains_pool', () => {
+	it('drains the pool without a record, or under a run that is not --only', () => {
+		expect(backlog_ready.drains_pool(undefined)).toBe(true)
+		expect(backlog_ready.drains_pool(record('backlogrun #2447 --max 5'))).toBe(true)
+	})
+
+	it('never drains the pool under a --only run, over issues or an epic', () => {
+		expect(backlog_ready.drains_pool(record('backlogrun #2447 #2462 --only'))).toBe(false)
+		expect(backlog_ready.drains_pool(record('backlogrun #2400 --only'))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#2472: the Stop hook's stall check and pick-up check read the backlog once between them.
+describe('backlog_ready.shared_ports', () => {
+	it('reads each port once however many checks ask', async () => {
+		const free_lane_count = vi.fn(async () => FREE)
+		const ready_issues = vi.fn(async () => ['2445'])
+		const shared = backlog_ready.shared_ports(ports({ free_lane_count, ready_issues }))
+
+		await backlog_ready.read_ready(shared)
+		expect(await backlog_ready.owes_offer('', [STALL], shared)).toBe(true)
+
+		expect(free_lane_count).toHaveBeenCalledTimes(1)
+		expect(ready_issues).toHaveBeenCalledTimes(1)
 	})
 })
 

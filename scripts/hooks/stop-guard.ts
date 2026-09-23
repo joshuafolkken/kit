@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
-import { backlog_ready } from '#scripts/backlog/backlog-ready'
+import { backlog_ready, type ReadyPorts } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
@@ -56,13 +56,13 @@ function was_filed(tail: string): boolean {
 
 // The pick-up check is read for the driving `backlogrun` parent alone — the carry record is local, so an
 // ordinary session pays one file read and never the stream's.
-async function owes_offer(tail: string): Promise<boolean> {
+async function owes_offer(tail: string, ready: ReadyPorts): Promise<boolean> {
 	if (!(await run_headless.is_backlog_parent())) return false
 
 	const target = await run_event_stream_emit.stream_target()
 	const events = target === undefined ? [] : run_event_stream.read_events(target)
 
-	return backlog_ready.owes_offer(filing_cap.current_turn(tail), events)
+	return await backlog_ready.owes_offer(filing_cap.current_turn(tail), events, ready)
 }
 
 async function build_context(
@@ -71,6 +71,7 @@ async function build_context(
 		stop_hook_active: boolean
 		message: string
 	},
+	ready: ReadyPorts,
 ): Promise<StopContext> {
 	const tail = transcript_tail(transcript_path)
 
@@ -85,27 +86,37 @@ async function build_context(
 		session_owner: repo_party.current_owner(),
 		headless_waiting: await run_headless.must_keep_waiting(),
 		headless_refusals: stop_rules.count_headless_refusals(tail),
-		owes_offer: await owes_offer(tail),
+		owes_offer: await owes_offer(tail, ready),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
 	}
 }
 
-async function stop_outcome_for_payload(raw_payload: string): Promise<StopOutcome> {
+async function stop_outcome_for_payload(
+	raw_payload: string,
+	ready: ReadyPorts,
+): Promise<StopOutcome> {
 	const payload = stop_rules.parse_stop_payload(raw_payload)
 
 	if (payload === undefined || !stop_rules.is_enabled()) return stop_rules.NO_OUTCOME
 
-	const context = await build_context(payload.transcript_path, {
-		stop_hook_active: payload.stop_hook_active ?? false,
-		message: payload.last_assistant_message ?? '',
-	})
+	const context = await build_context(
+		payload.transcript_path,
+		{
+			stop_hook_active: payload.stop_hook_active ?? false,
+			message: payload.last_assistant_message ?? '',
+		},
+		ready,
+	)
 
 	return stop_rules.stop_outcome(context)
 }
 
-async function outcome_of(raw_payload: string): Promise<StopOutcome> {
+async function outcome_of(
+	raw_payload: string,
+	ready: ReadyPorts = backlog_ready.DEFAULT_PORTS,
+): Promise<StopOutcome> {
 	try {
-		return await stop_outcome_for_payload(raw_payload)
+		return await stop_outcome_for_payload(raw_payload, ready)
 	} catch {
 		return stop_rules.NO_OUTCOME
 	}
@@ -116,11 +127,14 @@ async function outcome_of(raw_payload: string): Promise<StopOutcome> {
 async function write_stop_decision(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
 
+	// One backlog reading serves the stall check and the pick-up check below (joshuafolkken/kit#2472).
+	const ready = backlog_ready.shared_ports()
+
 	// The stall check rides the Stop hook because the stop *is* the loop boundary: a run alive but not
 	// advancing ends turns without dispatching (joshuafolkken/kit#2359). It only reports — leaves a
 	// marker, sends a notification — and swallows its own failures, so it can never change the decision
 	// below or hold the stop.
-	await backlog_stalled_detect.run_stall_check()
+	await backlog_stalled_detect.run_stall_check(ready)
 
 	// The strand check rides the same boundary for the same reason, and is the step before the stall
 	// (joshuafolkken/kit#2375): the stall detector needs a live driver that could dispatch, and this one
@@ -128,7 +142,7 @@ async function write_stop_decision(raw_payload: string): Promise<void> {
 	// too only reports and swallows its own failures, so it never touches the stop decision below.
 	await run_stranded_detect.run_stranded_check()
 
-	const { reason } = await outcome_of(raw_payload)
+	const { reason } = await outcome_of(raw_payload, ready)
 
 	if (reason !== undefined) process.stdout.write(`${stop_rules.block_envelope(reason)}\n`)
 }

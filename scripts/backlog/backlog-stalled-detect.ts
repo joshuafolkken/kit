@@ -1,7 +1,7 @@
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
-import { backlog_ready } from './backlog-ready'
+import { backlog_ready, type ReadyPorts } from './backlog-ready'
 import { backlog_stalled, type StallReading, type StallVerdict } from './backlog-stalled'
 
 // The I/O half of the stall detector (joshuafolkken/kit#2359): it gathers the three counts the pure
@@ -37,11 +37,14 @@ interface DetectPorts {
 }
 
 // The free-lane and runnable-issue reads are `backlog-ready.ts`'s — the watcher's ready line reads the
-// same two, so they live once there (joshuafolkken/kit#2452).
-async function real_ready_count(): Promise<number> {
-	const issues = await backlog_ready.ready_issues()
+// same two, so they live once there (joshuafolkken/kit#2452) — and a caller that reads them again after
+// this check hands its own ports in, so the two share one reading (joshuafolkken/kit#2472).
+function ready_count_of(ready: ReadyPorts): () => Promise<number> {
+	return async function (): Promise<number> {
+		const issues = await ready.ready_issues()
 
-	return issues.length
+		return issues.length
+	}
 }
 
 // One stall per episode, and the episode ends at a dispatch rather than at whatever event lands next
@@ -56,15 +59,19 @@ async function real_notify_stalled(body: string): Promise<boolean> {
 	return await telegram_notify.stalled({ body, recovery: STALL_RECOVERY })
 }
 
-const DEFAULT_PORTS: DetectPorts = {
-	resolve_target: run_event_stream_emit.stream_target,
-	read_events: run_event_stream.read_events,
-	now_ms: () => Date.now(),
-	free_lane_count: backlog_ready.free_lane_count,
-	ready_count: real_ready_count,
-	emit_stall: real_emit_stall,
-	notify_stalled: real_notify_stalled,
+function ports_over(ready: ReadyPorts): DetectPorts {
+	return {
+		resolve_target: run_event_stream_emit.stream_target,
+		read_events: run_event_stream.read_events,
+		now_ms: () => Date.now(),
+		free_lane_count: ready.free_lane_count,
+		ready_count: ready_count_of(ready),
+		emit_stall: real_emit_stall,
+		notify_stalled: real_notify_stalled,
+	}
 }
+
+const DEFAULT_PORTS: DetectPorts = ports_over(backlog_ready.DEFAULT_PORTS)
 
 function ok_reading(dispatch_age_ms: number): StallReading {
 	return { ready_count: NO_READY, free_lanes: NO_FREE, dispatch_age_ms }
@@ -122,9 +129,9 @@ async function detect_and_report(
 
 // Best-effort for the Stop hook: the detector is a report, so a failure to gather or notify is dropped
 // rather than raised into the stop decision it rides alongside.
-async function run_stall_check(): Promise<void> {
+async function run_stall_check(ready: ReadyPorts = backlog_ready.DEFAULT_PORTS): Promise<void> {
 	try {
-		await detect_and_report()
+		await detect_and_report(ports_over(ready))
 	} catch {
 		// Reporting is best-effort: a stall we could not read or send is dropped, never a blocked stop.
 	}

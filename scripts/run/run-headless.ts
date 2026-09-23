@@ -1,5 +1,6 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { run_carry, type CarryRead } from './run-carry'
+import { lane_reap } from '#scripts/lane/lane-reap'
+import { run_carry, type CarryRead, type RunCarry } from './run-carry'
 import { run_watcher_guard } from './run-watcher-guard'
 
 // The headless `backlogrun` parent (joshuafolkken/kit#2437). `run:wake` starts a cut's successor as
@@ -55,19 +56,46 @@ async function must_keep_waiting(source: EnvironmentSource = process.env): Promi
 	return is_driving(await read_carry_here())
 }
 
+// The live record itself, whoever owns it — the run's scope (`--only`, the named list) is the run's,
+// not the session's, so the readers that narrow the pool to it need no ownership test.
+async function current_carry(): Promise<RunCarry | undefined> {
+	const read = await read_carry_here()
+
+	return read?.kind === 'carried' ? read.carry : undefined
+}
+
+// **A live record binds only the session that declared it** (joshuafolkken/kit#2472). A cut's
+// successor adopts the record and rewrites its owner, and every session in this checkout reads that
+// same file — so without this test the session that cut, still attached, read as a second parent. The
+// owner is `--owner "$PPID"`, the session process, which is an ancestor of every hook it runs; a
+// record that declared no owner proves no one is its parent.
+function is_owned_here(carry: RunCarry, ancestry: () => ReadonlySet<number>): boolean {
+	return carry.owner_pid !== undefined && ancestry().has(carry.owner_pid)
+}
+
+function is_driven_here(read: CarryRead | undefined, ancestry: () => ReadonlySet<number>): boolean {
+	if (read?.kind !== 'carried' || !is_driving(read)) return false
+
+	return is_owned_here(read.carry, ancestry)
+}
+
 /**
  * Whether this session is the driving `backlogrun` parent, attached or headless: not a lane child, and
- * holding a live, un-handed-off carry record — the record only a `backlogrun` writes
- * (joshuafolkken/kit#2452).
+ * the declared owner of a live, un-handed-off carry record — the record only a `backlogrun` writes
+ * (joshuafolkken/kit#2452, joshuafolkken/kit#2472).
  */
-async function is_backlog_parent(source: EnvironmentSource = process.env): Promise<boolean> {
+async function is_backlog_parent(
+	source: EnvironmentSource = process.env,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
+): Promise<boolean> {
 	if (lane_child_marker.marked_issue(source) !== undefined) return false
 
-	return is_driving(await read_carry_here())
+	return is_driven_here(await read_carry_here(), ancestry)
 }
 
 const run_headless = {
 	HEADLESS_ENV_KEY,
+	current_carry,
 	environment,
 	is_backlog_parent,
 	is_headless,
