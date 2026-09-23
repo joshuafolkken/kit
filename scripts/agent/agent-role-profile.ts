@@ -41,13 +41,28 @@ const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
 const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
 const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
 const OPENAI_PROVIDER: AgentProvider = 'openai'
-const OPENAI_MODEL = 'gpt-5.6-sol'
+// **Pinned model ids, never a floating alias** (joshuafolkken/kit#2415). An alias such as `opus` moves
+// whenever the CLI moves it, so a run log could not say which model produced it and a model migration
+// could not be measured apart from everything else. A new lane records the id it resolved; a lane
+// created before a migration keeps the model it recorded (`with_phase_effort` leaves it untouched).
+const OPENAI_MODEL = 'gpt-6-sol'
+const ANTHROPIC_MODEL = 'claude-opus-5-5'
 const CODEX_SESSION_KEY = 'CODEX_THREAD_ID'
 
 const DEFAULT_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
-	scheduler: { provider: ANTHROPIC_PROVIDER, role: SCHEDULER, model: 'opus', effort: 'medium' },
-	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: 'opus', effort: 'medium' },
-	reviewer: { provider: ANTHROPIC_PROVIDER, role: REVIEWER, model: 'opus', effort: 'high' },
+	scheduler: {
+		provider: ANTHROPIC_PROVIDER,
+		role: SCHEDULER,
+		model: ANTHROPIC_MODEL,
+		effort: 'medium',
+	},
+	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: ANTHROPIC_MODEL, effort: 'medium' },
+	reviewer: {
+		provider: ANTHROPIC_PROVIDER,
+		role: REVIEWER,
+		model: ANTHROPIC_MODEL,
+		effort: 'high',
+	},
 }
 
 const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {

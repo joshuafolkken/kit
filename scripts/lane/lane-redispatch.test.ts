@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
@@ -27,6 +28,9 @@ const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${RELEASED_CHI
 const PID = 909
 
 const launch = vi.spyOn(detached_launch, 'launch')
+
+// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
+vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
 const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
