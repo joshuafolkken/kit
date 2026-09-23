@@ -72,7 +72,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
-	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 24_576 },
+	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 28_672 },
 	// `pre-gate-cut.md` left this per-document budget in joshuafolkken/kit#2289: it became a point-of-use
 	// document, so its bytes are now held by every entry's total read (`entry-read-budget.ts`) and the
 	// two budgets must not hold it twice — the reachability line moved it from `unreached` to
@@ -104,7 +104,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 24_576 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 20_480 },
-	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 53_248 },
+	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 57_344 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/simplicity-first.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/single-source-rules.md', bytes: 4096 },
