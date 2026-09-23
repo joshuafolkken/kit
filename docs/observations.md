@@ -166,3 +166,14 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | low | scripts/backlog/backlog-stalled.test.ts:81 | 2026-09-23 | #2464
 - rf:comments | low | scripts/run/run-event-stream.ts:68 | 2026-09-23 | #2464
 - rf:tests | low | scripts/run/run-event-stream-emit.test.ts:159 | 2026-09-23 | #2464
+- rf:bug-risks | medium | scripts/backlog/backlog-ready.ts | 2026-09-23 | #2472
+- rf:performance | medium | scripts/hooks/stop-guard.ts | 2026-09-23 | #2472
+- rf:none | none | - | 2026-09-23 | #2472
+- rf:bug-risks | medium | scripts/run/run-relay-seat.ts | 2026-09-23 | #2480
+- rf:performance | low | scripts/hooks/stop-guard.ts | 2026-09-23 | #2480
+- rf:tests | low | scripts/run/run-carry-cli.ts | 2026-09-23 | #2480
+- rf:comments | low | scripts/hooks/stop-guard.ts | 2026-09-23 | #2480
+- rf:tests | low | scripts/run/run-watcher-guard.test.ts | 2026-09-23 | #2480
+- rf:assumptions | low | scripts/run/run-relay-seat.ts | 2026-09-23 | #2480
+- rf:assumptions | low | scripts/hooks/stop-guard.ts | 2026-09-23 | #2480
+- k:run-report-heartbeat-flood | d1 | 2026-09-24 | pnpm josh run:report | The completion summary rendered 221 heartbeat events (1139 lines, many at the same instant), too long to be the Telegram body
