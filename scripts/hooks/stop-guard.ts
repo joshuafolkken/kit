@@ -6,6 +6,7 @@ import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_reap } from '#scripts/lane/lane-reap'
 import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
@@ -15,6 +16,7 @@ import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_hold } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
+import { run_watcher_guard } from '#scripts/run/run-watcher-guard'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 
@@ -65,6 +67,19 @@ async function owes_offer(tail: string, ready: ReadyPorts): Promise<boolean> {
 	return await backlog_ready.owes_offer(filing_cap.current_turn(tail), events, ready)
 }
 
+// The stream position to restart a relay from, when this attached session owes one that is not
+// running (joshuafolkken/kit#2480). A headless session reaches nobody and a lane child relays nothing,
+// so neither is asked; the ancestry is read only once a run is known to be going.
+async function relay_position(): Promise<number | undefined> {
+	if (run_headless.is_headless() || lane_child_marker.marked_issue() !== undefined) return undefined
+
+	if (!(await run_watcher_guard.owes_relay_here(lane_reap.own_ancestry))) return undefined
+
+	const target = await run_event_stream_emit.stream_target()
+
+	return target === undefined ? undefined : run_event_stream.read_from(target, 0).next_position
+}
+
 async function build_context(
 	transcript_path: string,
 	payload_tail: {
@@ -88,6 +103,7 @@ async function build_context(
 		headless_refusals: stop_rules.count_headless_refusals(tail),
 		owes_offer: await owes_offer(tail, ready),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
+		relay_position: await relay_position(),
 	}
 }
 

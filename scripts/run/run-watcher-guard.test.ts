@@ -5,7 +5,7 @@ import type { LaneInfo } from '#scripts/lane/lane-registry'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CarryRead } from './run-carry'
 import { run_progress_clock } from './run-progress-clock'
-import { run_watcher_guard } from './run-watcher-guard'
+import { run_watcher_guard, type RelayInputs } from './run-watcher-guard'
 
 // joshuafolkken/kit#2113. The guard detects "in-flight lanes, stale watcher" and refuses — the
 // same contract `batch:guard` and `rule:guard` hold. Behavior is pinned here so a refactor that
@@ -151,5 +151,54 @@ describe('check_relay — the relay after a cut', () => {
 		writeFileSync(RELAY_TARGET, JSON.stringify({ alive: true, pinged_at: old }))
 
 		expect(run_watcher_guard.check_relay(RELAY_TARGET, carry_read(1)).kind).toBe('stale')
+	})
+})
+
+// joshuafolkken/kit#2480. The stop-time half asks which session relays: the seated session owes it
+// before and after a cut, and nobody owes it once the run has ended.
+const SEAT_RELAY_TARGET = path.join(TEMPORARY, 'seat-relay.json')
+const SEATED_PID = 4242
+const SEAT_STARTED_AT = '2026-09-23T10:00:00.000Z'
+
+function seated_read(cuts: number): CarryRead {
+	const carry = { invocation: 'backlogrun', started_at: SEAT_STARTED_AT, cuts }
+
+	return { kind: 'carried', carry: { ...carry, merged: 0, filed: 0, failures: 0, outages: 0 } }
+}
+
+function seated_ancestry(): ReadonlySet<number> {
+	return new Set([SEATED_PID])
+}
+
+const BEFORE_CUT: RelayInputs = {
+	target: SEAT_RELAY_TARGET,
+	read: seated_read(0),
+	seat: { pid: SEATED_PID, started_at: SEAT_STARTED_AT },
+}
+const AFTER_CUT: RelayInputs = { ...BEFORE_CUT, read: seated_read(1) }
+const ENDED: RelayInputs = { ...BEFORE_CUT, read: { kind: 'none' } }
+
+describe('owes_relay — the seated session', () => {
+	afterEach(() => {
+		rmSync(SEAT_RELAY_TARGET, { force: true })
+	})
+
+	it('owes the relay while the run is going and nothing follows', () => {
+		expect(run_watcher_guard.owes_relay(BEFORE_CUT, seated_ancestry)).toBe(true)
+		expect(run_watcher_guard.owes_relay(AFTER_CUT, seated_ancestry)).toBe(true)
+	})
+
+	it('owes nothing while the follow keeps its life fresh', () => {
+		run_progress_clock.ping_life(SEAT_RELAY_TARGET)
+
+		expect(run_watcher_guard.owes_relay(AFTER_CUT, seated_ancestry)).toBe(false)
+	})
+
+	it('owes nothing once the run has ended', () => {
+		expect(run_watcher_guard.owes_relay(ENDED, seated_ancestry)).toBe(false)
+	})
+
+	it('owes nothing in a session that holds no seat', () => {
+		expect(run_watcher_guard.owes_relay(AFTER_CUT, () => new Set([1]))).toBe(false)
 	})
 })

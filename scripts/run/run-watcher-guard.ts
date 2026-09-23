@@ -3,6 +3,7 @@ import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_follow } from './run-event-follow'
 import { run_progress_clock } from './run-progress-clock'
+import { run_relay_seat, type RelaySeat } from './run-relay-seat'
 
 // A watcher that stopped while children are still in-flight leaves the parent blind to completions
 // for up to the full heartbeat interval. This guard detects that state so a hook can refuse the
@@ -71,10 +72,12 @@ function has_cut(read: CarryRead): boolean {
 	return read.carry.cuts > NO_CUTS
 }
 
-function check_relay(relay_target: string, read: CarryRead): GuardResult {
-	if (!has_cut(read)) return OK_RESULT
+function is_relay_fresh(relay_target: string): boolean {
+	return run_progress_clock.is_life_fresh(relay_target, RELAY_STALE_THRESHOLD_MS)
+}
 
-	if (run_progress_clock.is_life_fresh(relay_target, RELAY_STALE_THRESHOLD_MS)) return OK_RESULT
+function check_relay(relay_target: string, read: CarryRead): GuardResult {
+	if (!has_cut(read) || is_relay_fresh(relay_target)) return OK_RESULT
 
 	return { kind: 'stale', note: RELAY_STALE_NOTE }
 }
@@ -85,14 +88,23 @@ function relay_target_of(repository: string): string {
 	return stamp_file.stamp_path(RELAY_LIFE_PREFIX, repository)
 }
 
-async function relay_inputs(): Promise<{ target: string; read: CarryRead } | undefined> {
+interface RelayInputs {
+	target: string
+	read: CarryRead
+	seat: RelaySeat | undefined
+}
+
+async function relay_inputs(): Promise<RelayInputs | undefined> {
 	const repository = await run_carry.repository_directory()
 
 	if (repository === undefined) return undefined
 
+	const carry_target = run_carry.carry_path(repository)
+
 	return {
 		target: relay_target_of(repository),
-		read: run_carry.read_carry(run_carry.carry_path(repository)),
+		read: run_carry.read_carry(carry_target),
+		seat: run_relay_seat.read_seat(carry_target),
 	}
 }
 
@@ -101,6 +113,22 @@ async function check_relay_here(): Promise<GuardResult> {
 	const inputs = await relay_inputs()
 
 	return inputs === undefined ? OK_RESULT : check_relay(inputs.target, inputs.read)
+}
+
+// The stop-time half (joshuafolkken/kit#2480): the run is still going, this session holds the relay
+// seat, and its relay has gone stale — before a cut as well as after it, since the reader is the same
+// session on both sides. Unlike `check_relay` it asks *which* session relays, so a stop in some other
+// session of this checkout is never held for a run it has no part in.
+function owes_relay(inputs: RelayInputs, ancestry: () => ReadonlySet<number>): boolean {
+	if (!run_relay_seat.is_seated(inputs.read, inputs.seat, ancestry)) return false
+
+	return !is_relay_fresh(inputs.target)
+}
+
+async function owes_relay_here(ancestry: () => ReadonlySet<number>): Promise<boolean> {
+	const inputs = await relay_inputs()
+
+	return inputs !== undefined && owes_relay(inputs, ancestry)
 }
 
 // Best-effort by the reporting contract: a relay that cannot write its life record still relays.
@@ -123,9 +151,11 @@ const run_watcher_guard = {
 	check_relay,
 	check_relay_here,
 	has_lanes_in_flight,
+	owes_relay,
+	owes_relay_here,
 	ping_relay,
 	relay_target_of,
 }
 
-export type { GuardResult }
+export type { GuardResult, RelayInputs }
 export { run_watcher_guard }

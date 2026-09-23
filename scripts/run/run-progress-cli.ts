@@ -62,8 +62,10 @@ const MS_PER_HOUR = 3_600_000
 const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
 const DISABLED_VALUE = '0'
 
+// joshuafolkken/kit#2480: a malformed `--wait` exits at once, and read as "started" it left a person
+// without progress until someone looked at the exit — so the refusal says the relay is down.
 const USAGE =
-	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark | josh run:progress --path'
+	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark | josh run:progress --path\nThe progress watcher did not start, so nothing is relaying progress to this session — fix the arguments (one flag and one value per argument) and start it again.'
 const DISABLED_NOTICE = `\`${ENVIRONMENT_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
 const MARKED_NOTICE =
 	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
