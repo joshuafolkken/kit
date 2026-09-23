@@ -10,6 +10,8 @@ const BASE: StopContext = {
 	cut_pending: false,
 	filed: false,
 	session_owner: 'joshuafolkken',
+	headless_waiting: false,
+	headless_refusals: 0,
 }
 
 function context(overrides: Partial<StopContext>): StopContext {
@@ -187,6 +189,51 @@ describe('stop_rules reasons — the correction is a diff, not a reprint', () =>
 		['filing offer', stop_rules.FILING_OFFER_REASON],
 	])('%s does not ask for a reprint', (_name, reason) => {
 		expect(reason).toContain(NO_REPRINT)
+	})
+})
+
+// joshuafolkken/kit#2437: a headless parent's turn-end kills its background waits with the process.
+describe('stop_rules.stop_outcome — headless parent', () => {
+	it('refuses a headless parent that would end its turn with lanes in flight', () => {
+		const { reason } = stop_rules.stop_outcome(context({ headless_waiting: true }))
+
+		expect(reason).toBe(stop_rules.HEADLESS_WAIT_REASON)
+		expect(reason).toContain('lane:await')
+	})
+
+	it('is not stood down by the loop-breaker or a pending cut', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({ headless_waiting: true, stop_hook_active: true, cut_pending: true }),
+		)
+
+		expect(outcome.reason).toBe(stop_rules.HEADLESS_WAIT_REASON)
+	})
+
+	it('lets a spinning parent stop once the refusal cap is reached', () => {
+		const spinning = context({
+			headless_waiting: true,
+			stop_hook_active: true,
+			headless_refusals: stop_rules.HEADLESS_REFUSAL_CAP,
+		})
+
+		expect(stop_rules.stop_outcome(spinning).reason).toBeUndefined()
+	})
+
+	it('counts the refusals on a transcript tail', () => {
+		const tail = `a ${stop_rules.HEADLESS_WAIT_REASON} b ${stop_rules.HEADLESS_WAIT_REASON}`
+
+		expect(stop_rules.count_headless_refusals(tail)).toBe(2)
+	})
+
+	it('resets the count at a foreground wait', () => {
+		const refusal = stop_rules.HEADLESS_WAIT_REASON
+		const tail = `${refusal} ${refusal} {"command":"pnpm josh lane:await 12"} ${refusal}`
+
+		expect(stop_rules.count_headless_refusals(tail)).toBe(1)
+	})
+
+	it('lets a parent with nothing to wait on stop', () => {
+		expect(stop_rules.stop_outcome(context({ headless_waiting: false })).reason).toBeUndefined()
 	})
 })
 

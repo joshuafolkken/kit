@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { run_event_follow, type FollowPorts } from './run-event-follow'
 import { run_event_stream, type StreamRead } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
+import { run_watcher_guard } from './run-watcher-guard'
 
 // `josh run:event` — the command a run's step calls to append to, or read back, the append-only event
 // stream (joshuafolkken/kit#2205). The in-process seams (`run:merge`) append directly; the steps with no
@@ -29,14 +30,6 @@ const FLAG_INDEX = 0
 const KIND_INDEX = 1
 const POSITION_INDEX = 1
 const TEXT_INDEX = 2
-// The follow's quiet-tick cadence and how promptly it notices an arrival. The interval only bounds a
-// wait that found nothing — an arrival returns within a tick of landing — so it can be as long as the
-// heartbeat without making the relay late, and the tick is a cheap `stat` of one file.
-const MS_PER_SECOND = 1000
-const SECONDS_PER_MINUTE = 60
-const FOLLOW_INTERVAL_MINUTES = 20
-const FOLLOW_INTERVAL_MS = FOLLOW_INTERVAL_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND
-const FOLLOW_TICK_MS = MS_PER_SECOND
 const USAGE =
 	'Usage: josh run:event --append <kind> <text> | --from <position> | --follow <position> | --last'
 
@@ -109,12 +102,17 @@ async function run_follow(position_text: string | undefined): Promise<number> {
 		return report_usage()
 	}
 
+	// The relay's life is pinged as the pass begins and again as it returns, so a relay the session keeps
+	// restarting stays fresh and one it stopped restarting goes stale for the relay guard
+	// (`run-watcher-guard.ts` → `check_relay`, joshuafolkken/kit#2437).
+	await run_watcher_guard.ping_relay()
 	relay(
 		await run_event_follow.follow(follow_ports(target), position, {
-			interval_ms: FOLLOW_INTERVAL_MS,
-			tick_ms: FOLLOW_TICK_MS,
+			interval_ms: run_event_follow.FOLLOW_INTERVAL_MS,
+			tick_ms: run_event_follow.FOLLOW_TICK_MS,
 		}),
 	)
+	await run_watcher_guard.ping_relay()
 
 	return SUCCESS_EXIT_CODE
 }

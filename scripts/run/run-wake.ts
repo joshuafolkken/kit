@@ -22,8 +22,9 @@ import type { CarryRead } from './run-carry'
 // already calls spent.
 //
 // **A hand-off is what separates a cut from a session that is simply working.** `is_handed_off` is set
-// by `run:carry --cut` and by nothing else, so a live session's record never reads as waiting to be
-// woken, and a crash — which never reaches `--cut` — is left to the person exactly as before.
+// by `run:carry --cut`, and by this supervisor only when it recovers a record whose owner has *died*
+// (`run-wake-handoff.ts`, joshuafolkken/kit#2437) — so a live session's record never reads as waiting to
+// be woken, and a crash is carried on as if the dead session had cut rather than left standing.
 //
 // **The supervisor never declares itself the record's owner, and that is the load-bearing decision.**
 // joshuafolkken/kit#1722's hand-over note asks a machine-driven caller to always pass the owner

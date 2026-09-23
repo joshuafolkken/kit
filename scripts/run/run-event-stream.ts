@@ -78,6 +78,11 @@ const EVENT_KIND = {
 	// composite's progress rather than a position the run is at — the position a ship leaves behind is the
 	// `merge` its `followup` stage emits — so it is one of the `TRACE_KINDS` the last-event read skips.
 	SHIP_STAGE: 'ship-stage',
+	// One progress watcher line — the `at … / next …` heartbeat `run:progress` prints
+	// (joshuafolkken/kit#2437). Printed only to the watcher's own output, a headless successor's heartbeat
+	// was buried in its log after a cut; on the stream it reaches the attached session's relay. It says
+	// the run is alive rather than where it is, so it is a trace kind like `SHIP_STAGE`.
+	HEARTBEAT: 'heartbeat',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -87,7 +92,7 @@ const EVENT_KINDS: ReadonlyArray<string> = Object.values(EVENT_KIND)
 // The kinds that trace progress inside a step rather than mark where the run is. Every last-event reader
 // — `run:step`'s position, the setup-cut hook, `emit_once`'s dedup — asks "where is the run", and a
 // ship's four stage lines after its `merge` would otherwise read as an unknown position.
-const TRACE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE])
+const TRACE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE, EVENT_KIND.HEARTBEAT])
 
 const event_schema = z.object({
 	pos: z.number(),

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { LaneInfo } from '#scripts/lane/lane-registry'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CarryRead } from './run-carry'
 import { run_progress_clock } from './run-progress-clock'
 import { run_watcher_guard } from './run-watcher-guard'
 
@@ -108,5 +109,47 @@ describe('check — lanes in-flight, watcher stale', () => {
 		if (result.kind !== 'stale') throw new Error('expected stale')
 
 		expect(result.note).toBe(run_watcher_guard.STALE_NOTE)
+	})
+})
+
+function carry_read(cuts: number): CarryRead {
+	const carry = { invocation: 'backlogrun', started_at: new Date().toISOString(), cuts }
+
+	return { kind: 'carried', carry: { ...carry, merged: 0, filed: 0, failures: 0, outages: 0 } }
+}
+
+// joshuafolkken/kit#2437. After a cut the attached session relays the run's stream; a relay it stopped
+// restarting goes stale and is refused, while a run that never cut asks for no relay at all.
+describe('check_relay — the relay after a cut', () => {
+	const RELAY_TARGET = path.join(TEMPORARY, 'relay.json')
+
+	afterEach(() => {
+		rmSync(RELAY_TARGET, { force: true })
+	})
+
+	it('asks for no relay before the run has cut', () => {
+		expect(run_watcher_guard.check_relay(RELAY_TARGET, carry_read(0)).kind).toBe('ok')
+	})
+
+	it('refuses a cut run whose relay never pinged', () => {
+		const result = run_watcher_guard.check_relay(RELAY_TARGET, carry_read(1))
+
+		expect(result).toStrictEqual({ kind: 'stale', note: run_watcher_guard.RELAY_STALE_NOTE })
+	})
+
+	it('passes a cut run whose relay pinged recently', () => {
+		run_progress_clock.ping_life(RELAY_TARGET)
+
+		expect(run_watcher_guard.check_relay(RELAY_TARGET, carry_read(1)).kind).toBe('ok')
+	})
+
+	it('refuses a relay last pinged beyond one follow interval and its slack', () => {
+		const old = new Date(
+			Date.now() - run_watcher_guard.RELAY_STALE_THRESHOLD_MS - 1000,
+		).toISOString()
+
+		writeFileSync(RELAY_TARGET, JSON.stringify({ alive: true, pinged_at: old }))
+
+		expect(run_watcher_guard.check_relay(RELAY_TARGET, carry_read(1)).kind).toBe('stale')
 	})
 })

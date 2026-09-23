@@ -176,7 +176,7 @@ is `docs/josh-commands.md` → "`josh run:carry`"; what this loop does with each
 | `began`      | Nothing was carried. This is the invocation's first session: report the plan and run the decision pass as written below                                                                                                     |
 | `resumed`    | **This session is continuing a run that was cut** — a `--cut` handed the record off, or a `--resume` adopted it. Read the record with `--json` and take the budget figures from it, never from this session's own zero. Report the plan again — the pool has moved — and skip nothing else |
 | `busy`       | The record's **owner process is still running and no cut handed it off**: another parent is spending this budget right now. **Stop; do not open a lane.** Counting into it would put two parents on one record. (A record a `--cut` _did_ hand off answers `resumed` here even with its owner still alive — joshuafolkken/kit#1935.) Nothing here is yours to end — either that run finishes and ends its own record, or a person decides it is over |
-| `standing`   | A record is here that **no cut handed off** — the crashed run, and the same command retyped over it. **Stop; do not open a lane**, and do not guess: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. The `--owner` belongs to the resume as much as to the begin: adopt without it and the record declares no owner, so `busy` degrades to `standing` for every parent after |
+| `standing`   | A record is here that **no cut or supervisor handed off** — an unwatched crash, and the same command retyped over it. **Stop; do not open a lane**, and do not guess: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. The `--owner` belongs to the resume as much as to the begin: adopt without it and the record declares no owner, so `busy` degrades to `standing` for every parent after |
 | `mismatch`   | A record is here for a **different** invocation — a run that never reached `--end`. **Stop; do not open a lane.** Resuming into it would spend that run's `--max` and its hours. End it deliberately, with `pnpm josh run:carry --end`, once you know that run is over |
 | `expired`    | The 8-hour whole-run bound is spent. **Where a `--cut` handed the record off it is this run's own bound**, so this is the verdict on standard output and the run ends: report it and stop, and clear the record with `pnpm josh run:carry --end` once it is genuinely over. Where nothing handed it off it is printed on standard error ahead of a `began` instead — a person typing the keyword again over a spent record is starting a new run, and the record is replaced. A `--resume` over a spent record answers `expired` and adopts nothing |
 | `unreadable` | Report what it printed and **stop before opening a lane**. A budget that cannot be carried is a run that restarts it at the next cut, which is the whole defect                                                             |
@@ -196,12 +196,9 @@ sending a total would be sending arithmetic done in its head. **`--owner "$PPID"
 count**: a count that does not name the record's owning process is refused, so a session whose record a
 successor took over cannot advance a budget that is no longer its own.
 
-**`--cut` is also what hands the record off, and it is the only thing that does.** A crash never
-reaches it, which is why a declared cut is the one standing record the next session carries without
-anybody deciding: `--cut`, then the next `--begin` naming the same invocation answers `resumed` —
-**even while the cutting process is still running**, so a cut is handed to exactly one successor rather
-than stalling every resume with `busy`. Skip the `--cut` and the resumed session is answered `standing`
-and stops for the person.
+**`--cut` hands the record off, and so does `run:wake` for a dead owner** (joshuafolkken/kit#2437): the
+next `--begin` naming the same invocation answers `resumed` — **even while the cutting process is still
+running**, so a cut is handed to exactly one successor rather than stalling every resume with `busy`.
 
 **So `--cut` is the session's last write to the record**: count everything the session has, then cut.
 A `--merged` or `--filed` issued after the `--cut` is **refused**, so the hand-off is protected rather
@@ -251,8 +248,7 @@ pnpm josh run:wake --stop    # in the same turn as `run:carry --end`
 ```
 
 **It reads the same record this section already keeps, and decides from nothing else.** It wakes on
-`carried` **and** handed off — which is to say on a cut this run declared with `--cut` — and stops on
-`none`, `expired` and `unreadable`. So the 8-hour whole-run bound binds the waking for free: it is the
+`carried` handed off, or with a dead owner it hands off first (#2437). It stops on `none`, `expired` and `unreadable`. So the 8-hour whole-run bound binds the waking for free: it is the
 record's own expiry, and a spent budget reads `expired` and wakes nothing. **A new authorization is
 still a person's**, which is decision B's boundary exactly: the supervisor spends the budget that was
 declared and never declares another.

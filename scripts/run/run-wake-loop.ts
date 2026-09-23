@@ -47,6 +47,9 @@ interface LoopPorts {
 	// fresh UUID. The same id is recorded on the wake record, which is how `josh time --run` later knows
 	// the session was one this supervisor started.
 	new_session_id: () => string
+	// Marks the carry record handed off before a launch, so a recovery from a dead owner reads to the
+	// woken session exactly as a declared cut does — `run-wake-handoff.ts` (joshuafolkken/kit#2437).
+	hand_off: () => void
 	wake: (invocation: string, session_id: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
@@ -76,8 +79,13 @@ function wake_failure_note(wake: RunWake): string {
 	return `woke a session for "${wake.invocation}" ${attempts} time(s) and none of them claimed the carry record; the last one was ${last}, which may still be running`
 }
 
+// The hand-off is written before the launch, never after: a successor that boots fast enough to run
+// `--begin` before a post-launch write would read the record un-handed-off and be answered `standing`.
 function wake_step(wake: RunWake, ports: LoopPorts): StepOutcome {
 	const session_id = ports.new_session_id()
+
+	ports.hand_off()
+
 	const result = ports.wake(wake.invocation, session_id)
 
 	if (result.kind === 'failed') return stopped(FAILED_REASON, result.note)

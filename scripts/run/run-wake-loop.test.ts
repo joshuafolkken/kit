@@ -37,7 +37,11 @@ interface Recorder {
 	ports: LoopPorts
 	wakes: Array<string>
 	session_ids: Array<string>
+	order: Array<string>
 }
+
+const HAND_OFF_CALL = 'hand_off'
+const WAKE_CALL = 'wake'
 
 // A scripted sequence of carry reads, one per pass, so a whole run of the supervisor is expressed as
 // what the record said over time. Running past the end reads as the run having ended.
@@ -46,11 +50,15 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 	// The forced ids handed to `wake`, one per launch, deterministic so a test can assert exactly which
 	// sessions the supervisor started (joshuafolkken/kit#2407).
 	const session_ids: Array<string> = []
+	// Every hand-off and launch in call order, so a test can pin that the hand-off lands first
+	// (joshuafolkken/kit#2437).
+	const order: Array<string> = []
 	const remaining = [...reads]
 
 	return {
 		wakes,
 		session_ids,
+		order,
 		ports: {
 			read_carry: () => remaining.shift() ?? ENDED,
 			// Liveness read from the record itself: a handed-off record's owner is the predecessor, whose
@@ -62,7 +70,11 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 			// the record-only decision; the idle tests override this port.
 			has_work: async () => true,
 			new_session_id: () => `sid-${String(session_ids.length + 1)}`,
+			hand_off: () => {
+				order.push(HAND_OFF_CALL)
+			},
 			wake: (invocation, session_id) => {
+				order.push(WAKE_CALL)
 				wakes.push(invocation)
 				session_ids.push(session_id)
 
@@ -139,6 +151,18 @@ describe('run_wake_loop.run_loop — recovering a session that claimed and died'
 		await run_wake_loop.run_loop(scratch.target, ports, 0)
 
 		expect(scripted.wakes).toStrictEqual([INVOCATION])
+	})
+
+	// joshuafolkken/kit#2437. The recovery's successor ran `--begin` over a record no cut handed off and
+	// was answered `standing`, so the record is handed off first — before the launch, or a fast boot could
+	// still read it un-handed-off.
+	it('hands the record off before launching a recovery', async () => {
+		const scripted = recorder([IN_FLIGHT, ENDED])
+		const ports = { ...scripted.ports, is_owner_live: () => false }
+
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(scripted.order).toStrictEqual([HAND_OFF_CALL, WAKE_CALL])
 	})
 
 	// The live successor is a session doing the run's work — the ordinary in-flight state — so the loop

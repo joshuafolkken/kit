@@ -425,8 +425,9 @@ ever.
   everything the session has, then run `pnpm josh run:carry --cut --owner "$PPID"`. **Unless it answers
   `capped`** (below), `pnpm josh run:wake` then starts the next session, which polls the still-running
   lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
-  records**. `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of
-  the carry; this reading is only where the cut is *taken*.
+  records**, and relay `run:event --follow <pos>` in the background, restarting on exit (#2437).
+  `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
+  carry; this reading is only where the cut is *taken*.
 - **`capped`** — the invocation has taken its `MAX_CUTS` cuts (joshuafolkken/kit#2346), so `--cut`
   refused and left the record un-handed-off. **Do not `run:wake` or hand off**: a wake over it recovers
   as a crashed owner into a fresh cold session — the churn the cap prevents. Carry **this** session on
@@ -546,6 +547,9 @@ the transcript parsing is what run measurement must avoid, and the re-measuremen
 turn is the one the **watcher's exit delivers** — a background command's completion is what re-invokes
 the session (`background-commands.md`). **A `Bash` call that only sleeps is the spelling this forbids**,
 and so is a turn whose whole content is asking `epic:next` again to see whether anything has changed.
+
+**A headless (`claude -p`) parent waits in the foreground** (a turn-end kills it) and stops
+only after `--cut` or `--end`; the `Stop` hook enforces it (#2437).
 
 **The wake is used for both halves at once.** The turn that relays the line is the turn that acts on what
 the line says: a free lane is the ask for the next child, and every lane still busy is not an ask at all.

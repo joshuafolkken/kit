@@ -60,6 +60,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, work: ReadonlyArray<boolean>)
 			return answers.shift() ?? false
 		},
 		new_session_id: () => 'sid',
+		hand_off: () => undefined,
 		wake: (invocation) => {
 			wakes.push(invocation)
 			wake_times.push(clock.now)

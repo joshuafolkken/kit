@@ -8,6 +8,7 @@ import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
+import { run_headless } from '#scripts/run/run-headless'
 import { run_hold } from '#scripts/run/run-hold'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
@@ -67,6 +68,8 @@ async function build_context(
 		cut_pending: run_cut.carried_cut_sync() !== undefined,
 		filed: was_filed(tail),
 		session_owner: repo_party.current_owner(),
+		headless_waiting: await run_headless.must_keep_waiting(),
+		headless_refusals: stop_rules.count_headless_refusals(tail),
 	}
 }
 

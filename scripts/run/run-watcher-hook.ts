@@ -1,6 +1,7 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { z } from 'zod'
+import { run_headless } from './run-headless'
 import { run_progress_read } from './run-progress-read'
 import { run_watcher_guard } from './run-watcher-guard'
 
@@ -20,6 +21,7 @@ import { run_watcher_guard } from './run-watcher-guard'
 
 const SWITCH_ENV_KEY = 'JOSH_WATCHER_GUARD'
 const STAMP_PREFIX = 'josh-watcher-guard-'
+const RELAY_STAMP_PREFIX = 'josh-relay-guard-'
 
 const payload_schema = z.object({ transcript_path: z.string().min(1) })
 
@@ -35,9 +37,10 @@ function transcript_of(raw_payload: string): string | undefined {
 
 // The once-per-run arm: refuse only when nothing has been recorded yet, and record before returning so
 // the refusal cannot repeat on the call in hand. A record that cannot be written allows the call — the
-// fail-open direction the transcript guards take for the same reason.
-function fires_once(transcript: string, now_ms: number): boolean {
-	const stamp = hook_decision.create_refusal_stamp(STAMP_PREFIX)
+// fail-open direction the transcript guards take for the same reason. The relay keeps a stamp of its
+// own, so a watcher refusal spent earlier in the run does not silence the relay's (joshuafolkken/kit#2437).
+function fires_once(transcript: string, now_ms: number, prefix: string = STAMP_PREFIX): boolean {
+	const stamp = hook_decision.create_refusal_stamp(prefix)
 	const target = stamp.path(transcript)
 
 	if (stamp.last_ms(target) !== hook_decision.NEVER_MS) return false
@@ -54,12 +57,25 @@ function is_active(): boolean {
 	)
 }
 
+// The relay half (joshuafolkken/kit#2437): after a cut, the session that is not the headless driver
+// relays the run's stream. A headless session is the driver — it has no person to relay to — so it is
+// never asked to.
+async function relay_reason(transcript: string, now_ms: number): Promise<string | undefined> {
+	if (run_headless.is_headless()) return undefined
+
+	const result = await run_watcher_guard.check_relay_here()
+
+	if (result.kind === 'ok') return undefined
+
+	return fires_once(transcript, now_ms, RELAY_STAMP_PREFIX) ? result.note : undefined
+}
+
 // The guard's note when the watcher is stale and this call is the once-per-run one that refuses, or
 // `undefined` when the watcher is fresh (or the refusal was already spent this run).
 async function stale_reason(transcript: string, now_ms: number): Promise<string | undefined> {
 	const result = await run_watcher_guard.check(await run_progress_read.live_target())
 
-	if (result.kind === 'ok') return undefined
+	if (result.kind === 'ok') return await relay_reason(transcript, now_ms)
 
 	return fires_once(transcript, now_ms) ? result.note : undefined
 }
@@ -80,6 +96,6 @@ async function watcher_hook_reason(
 	return await stale_reason(transcript, now_ms)
 }
 
-const run_watcher_hook = { SWITCH_ENV_KEY, STAMP_PREFIX, watcher_hook_reason }
+const run_watcher_hook = { RELAY_STAMP_PREFIX, SWITCH_ENV_KEY, STAMP_PREFIX, watcher_hook_reason }
 
 export { run_watcher_hook }
