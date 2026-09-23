@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger } from './review-finding-ledger'
 
 // The gate that refuses a merge until the `/code-review` round was recorded (joshuafolkken/kit#2343).
@@ -39,9 +39,12 @@ async function read_ledger(ledger_path: string): Promise<string | undefined> {
 	}
 }
 
+// The default is the primary checkout's ledger, the one `review:record` writes from a lane
+// (joshuafolkken/kit#2419) — a cwd-relative default read the lane's copy, so the followup gate refused
+// every round recorded from a lane (joshuafolkken/kit#2431).
 async function check(
 	issue: number,
-	ledger_path: string = OBSERVATION_LEDGER_PATH,
+	ledger_path: string = observation_ledger_home.ledger_path(),
 ): Promise<RecordVerdict> {
 	const content = await read_ledger(ledger_path)
 
