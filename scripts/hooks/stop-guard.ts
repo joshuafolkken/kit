@@ -5,6 +5,7 @@ import { backlog_ready, type ReadyPorts } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { filing_cap } from '#scripts/rules/filing-cap'
@@ -80,12 +81,14 @@ async function relay_position(): Promise<number | undefined> {
 	return target === undefined ? undefined : run_event_stream.read_from(target, 0).next_position
 }
 
+// The session language the refusal is written for — `write_stop_decision` has already loaded the `.env`.
+function session_lang(): string {
+	return session_language.resolve_session_lang().lang
+}
+
 async function build_context(
 	transcript_path: string,
-	payload_tail: {
-		stop_hook_active: boolean
-		message: string
-	},
+	payload_tail: { stop_hook_active: boolean; message: string },
 	ready: ReadyPorts,
 ): Promise<StopContext> {
 	const tail = transcript_tail(transcript_path)
@@ -104,6 +107,7 @@ async function build_context(
 		owes_offer: await owes_offer(tail, ready),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
 		relay_position: await relay_position(),
+		session_lang: session_lang(),
 	}
 }
 
@@ -160,7 +164,9 @@ async function write_stop_decision(raw_payload: string): Promise<void> {
 
 	const { reason } = await outcome_of(raw_payload, ready)
 
-	if (reason !== undefined) process.stdout.write(`${stop_rules.block_envelope(reason)}\n`)
+	if (reason === undefined) return
+
+	process.stdout.write(`${stop_rules.block_envelope(reason, session_lang())}\n`)
 }
 
 const stop_guard = { outcome_of, stop_outcome_for_payload }

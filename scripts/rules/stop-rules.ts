@@ -2,6 +2,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { z } from 'zod'
 import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
+import { reply_language } from './reply-language'
 
 // The stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2422,
 // joshuafolkken/kit#2445).
@@ -71,6 +72,8 @@ interface StopContext {
 	// The run's stream position when this attached session owes a `backlogrun` its relay and nothing
 	// is relaying — `run_watcher_guard.owes_relay_here` (joshuafolkken/kit#2480); `undefined` otherwise.
 	relay_position: number | undefined
+	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
+	session_lang: string
 }
 
 interface StopOutcome {
@@ -220,6 +223,33 @@ function relay_reason(context: StopContext): string | undefined {
 		: build_relay_reason(context.relay_position)
 }
 
+// **A refusal is the turn's only input, so it names the language the answer is written in**
+// (joshuafolkken/kit#2470). The session-language line reaches a turn only through `UserPromptSubmit`;
+// a turn this hook continues has no prompt, and an English refusal read alone was answered in English.
+function language_note(lang: string): string {
+	return (
+		`Write your reply in the session language (JOSH_SESSION_LANG: ${lang}); code, commands and ` +
+		'identifiers stay as they are.'
+	)
+}
+
+// **A reply that drifted out of the session language is sent back once to be rewritten**
+// (joshuafolkken/kit#2470). The drift persists — each turn matches the language of the one before — so
+// the rewrite has to happen on the turn it starts; `stop_hook_active` bounds it to one.
+function build_language_reason(lang: string): string {
+	return (
+		`⛔ session language: your reply is not written in the session language (JOSH_SESSION_LANG: ` +
+		`${lang}). Rewrite it in that language and keep writing in it on the turns that follow, whatever ` +
+		'language a notification, tool output or hook message was in (`CLAUDE.md` → "Output language").'
+	)
+}
+
+function language_reason(context: StopContext): string | undefined {
+	if (!reply_language.is_mismatch(context.message, context.session_lang)) return undefined
+
+	return build_language_reason(context.session_lang)
+}
+
 function needs_filing(context: StopContext): boolean {
 	if (context.filed || !filing_offer.offers_filing(context.message)) return false
 
@@ -241,11 +271,13 @@ function citation_reason(message: string): string | undefined {
 	return build_citation_reason(references)
 }
 
-// The two rules that read the reply itself, filing offer first.
+// The three rules that read the reply itself, filing offer first and the language last. A drifted reply
+// refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
+// session-language note to every refusal, so the turn it continues is written in the session language.
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
 
-	return citation_reason(context.message)
+	return citation_reason(context.message) ?? language_reason(context)
 }
 
 // The headless wait holds past the loop-breaker until the spin bound is reached.
@@ -303,9 +335,10 @@ function stop_outcome(context: StopContext): StopOutcome {
 }
 
 // The documented shape a `Stop` hook blocks with: `reason` is fed back to Claude, which then continues
-// instead of stopping. Plain stdout is not it — only this envelope holds the stop.
-function block_envelope(reason: string): string {
-	return JSON.stringify({ decision: BLOCK_DECISION, reason })
+// instead of stopping. Plain stdout is not it — only this envelope holds the stop. Every reason leaves
+// with the session-language note, so no rule can hand the model an English-only turn.
+function block_envelope(reason: string, lang: string): string {
+	return JSON.stringify({ decision: BLOCK_DECISION, reason: `${reason} ${language_note(lang)}` })
 }
 
 function parse_stop_payload(raw_payload: string): StopPayload | undefined {
@@ -331,6 +364,7 @@ const stop_rules = {
 	SWITCH_ENV_KEY,
 	block_envelope,
 	block_reason,
+	build_language_reason,
 	build_relay_reason,
 	count_headless_refusals,
 	is_enabled,

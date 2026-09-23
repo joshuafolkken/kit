@@ -2,6 +2,14 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # ISO 15924 script codes `Intl.Locale#maximize` returns and Unicode regex scripts name — the
+  # session-language check judges a reply by script (joshuafolkken/kit#2470).
+  - Jpan
+  - Hira
+  - Hani
+  - Kore
+  - Hang
+  - Hant
   # A Claude Code built-in agent type, `statusline-setup` — enumerated in the known-agent-types set the
   # review-subagent document rule checks against (joshuafolkken/kit#2297).
   - statusline
