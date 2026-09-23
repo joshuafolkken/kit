@@ -1,8 +1,13 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { review_record_cli } from './review-record-cli'
+
+vi.mock('#scripts/observations/observation-ledger-home', () => ({
+	observation_ledger_home: { ledger_path: vi.fn() },
+}))
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
@@ -135,5 +140,22 @@ describe('review_record_cli.run --check', () => {
 
 		error.mockRestore()
 		expect(code).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#2419: inside a lane the lane's own ledger never reached the default branch, so
+// both halves default to the ledger the primary checkout keeps.
+describe('review_record_cli.run — default ledger', () => {
+	it('appends to the primary checkout ledger and checks the same file', async () => {
+		const file = ledger_path('primary-ledger.md')
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		vi.mocked(observation_ledger_home.ledger_path).mockReturnValue(file)
+		await review_record_cli.run(['--issue', '2419'], NOW)
+		const code = await review_record_cli.run(['--check', '--issue', '2419'], NOW)
+
+		info.mockRestore()
+		expect(readFileSync(file, 'utf8')).toBe('- rf:none | none | - | 2026-09-22 | #2419\n')
+		expect(code).toBe(0)
 	})
 })

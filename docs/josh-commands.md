@@ -573,7 +573,7 @@ Commit the observation ledger (`docs/observations.md`) as a docs-only pull reque
 pnpm josh observations:flush
 ```
 
-**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand.
+**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand. **Run from a lane it acts on the primary checkout**, where the ledger lives (joshuafolkken/kit#2419): it moves there first, and each refusal names that checkout. `followup` skips its own flush step inside a lane, so there the commit path is this command — the first step of `pnpm josh run:tail`.
 
 Related: [`josh followup`](#josh-followup).
 
@@ -599,7 +599,7 @@ pnpm josh review:record --issue 2325          # a zero-finding round — records
 pnpm josh review:record --check --issue 2325  # the merge gate: was it recorded?
 ```
 
-**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
+**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. Both the append and `--check` use the primary checkout's ledger, even when run in a lane (joshuafolkken/kit#2419) — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs (joshuafolkken/kit#2343): a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 

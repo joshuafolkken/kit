@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { cost_run_report, type RunCostReport } from '#scripts/cost/cost-run-report'
 import { cost_run_tree } from '#scripts/cost/cost-run-tree'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { run_carry } from '#scripts/run/run-carry'
@@ -35,7 +35,7 @@ function read_cost(cwd: string): RunCostReport | undefined {
 
 async function read_ledger(): Promise<string> {
 	try {
-		return await readFile(OBSERVATION_LEDGER_PATH, 'utf8')
+		return await readFile(observation_ledger_home.ledger_path(), 'utf8')
 	} catch {
 		return ''
 	}

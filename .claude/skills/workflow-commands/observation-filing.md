@@ -247,15 +247,15 @@ joshuafolkken/kit#1728 created the ledger to end.
 - **`pnpm josh followup` runs the flush itself, so no run has to remember to** (joshuafolkken/kit#1810).
   The flush is the ledger's only commit path, and until it was wired into `followup` nothing called
   it — an appended line stayed in the working tree until a person ran the command by hand, the same
-  "a run that had to remember is the run that forgets" defect the staging exclusion above was built to
-  avoid, left standing on the commit side. After the merge and before it releases the working-tree
+  defect the staging exclusion above was built to avoid. After the merge and before it releases the working-tree
   hold, `followup` reads the tree, and **only when the ledger holds a pending append** returns the
   checkout to the default branch (`pnpm josh ms`) and flushes. A run that appended nothing pays
-  nothing, and a lane/worktree child never appends (below), so its checkout is always clean and the
-  step is an immediate no-op there. A flush that fails is reported and does not take the merge, the
+  nothing, and a lane skips it (next bullet). A flush that fails is reported and does not take the merge, the
   epic close or the hold release down with it. **A side effect: on a run that did flush, `followup`
-  ends on the default branch** — the procedure's own `pnpm josh ms` is idempotent, so nothing
-  downstream changes.
+  ends on the default branch.**
+- **A lane's writers use the primary checkout's ledger** (joshuafolkken/kit#2419): a lane refuses
+  `pnpm josh ms`, so its own copy had no way out. `pnpm josh observations:flush` (in `run:tail`) acts
+  on the primary checkout from a lane.
 - **Mixing the lines into a child's pull request was considered and is refused.** That is the
   contamination the exclusion above exists to end, and adopting it would turn the defect into the
   specification: a ledger line in an unrelated diff is a line no reviewer of that diff has a reason
