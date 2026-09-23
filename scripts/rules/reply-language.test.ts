@@ -34,7 +34,20 @@ describe('reply_language.is_mismatch — a reply in the session language', () =>
 		expect(reply_language.is_mismatch(message, lang)).toBe(false)
 	})
 
-	it('weighs by letters, so short English headings do not outvote the prose', () => {
+	it('passes a Japanese reply beside one plain English result line', () => {
+		const message =
+			'ゲートは通りました。\nAll 4 checks passed: lint, types, spelling and unit tests.'
+
+		expect(reply_language.is_mismatch(message, 'ja')).toBe(false)
+	})
+
+	it('ignores bare paths printed outside backticks', () => {
+		const message = `${JAPANESE}\n/Users/someone/Development/kit/scripts/rules/reply-language.ts\n/Users/someone/Development/kit/scripts/rules/stop-rules.ts`
+
+		expect(reply_language.is_mismatch(message, 'ja')).toBe(false)
+	})
+
+	it('gives short English headings no vote against the prose', () => {
 		const message = `**Cause**\n${JAPANESE}\n**Fix**\n${JAPANESE}\n**Result**\n## Details`
 
 		expect(reply_language.is_mismatch(message, 'ja')).toBe(false)

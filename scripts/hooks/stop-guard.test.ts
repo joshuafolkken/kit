@@ -2,6 +2,7 @@ import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { session_language } from '#scripts/josh/session-language'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
 import { run_headless } from '#scripts/run/run-headless'
@@ -12,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stop_guard, write_stop_decision } from './stop-guard'
 
 const SWITCH_KEY = stop_rules.SWITCH_ENV_KEY
-const LANG_KEY = 'JOSH_SESSION_LANG'
+const LANG_KEY = session_language.ENV_KEY
 const UNREAD_TRANSCRIPT = 'transcript-not-read'
 
 afterEach(() => {

@@ -24,9 +24,12 @@ const COMPOUND_SCRIPTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 // Below this many letters of prose the reply is a command, a path or a one-word acknowledgement, and
 // carries no language to judge.
 const MIN_PROSE_LETTERS = 20
-// The share of prose letters that must sit on lines in the session language. Weighed by letters, not
-// lines, so a report's short English headings (`**Cause**`, `## Details`) do not outvote its prose.
+// The share of voting lines that must be in the session language. Lines, not letters: one kana or
+// kanji carries what several Latin letters do, so counting letters would shortchange a Japanese reply.
 const MATCH_SHARE_FLOOR = 0.5
+// Below this many letters a line is a heading or a label (`**Cause**`, `## Details`) and casts no vote,
+// unless no line of the reply is longer.
+const MIN_VOTING_LETTERS = 8
 
 const CODE_PATTERNS: ReadonlyArray<RegExp> = [
 	/```[\s\S]*?(?:```|$)/gu,
@@ -34,6 +37,8 @@ const CODE_PATTERNS: ReadonlyArray<RegExp> = [
 	/\]\([^)\s]*\)/gu,
 	/https?:\/\/\S+/gu,
 ]
+// A run of printable ASCII; one holding a slash is a bare path the reply printed outside backticks.
+const ASCII_RUN_PATTERN = /[!-~]+/gu
 const LETTER_PATTERN = /\p{L}/gu
 // A letter of another script — `Common` and `Inherited` letters (`µ`) belong to no language of their own.
 const NON_LATIN_LETTER_PATTERN = /(?![\p{Script=Latn}\p{Script=Common}\p{Script=Inherited}])\p{L}/u
@@ -63,7 +68,7 @@ function prose_of(message: string): string {
 
 	for (const pattern of CODE_PATTERNS) text = text.replaceAll(pattern, ' ')
 
-	return text
+	return text.replaceAll(ASCII_RUN_PATTERN, (run) => (run.includes('/') ? ' ' : run))
 }
 
 function letter_count(text: string): number {
@@ -76,10 +81,18 @@ function is_line_in_script(line: string, script: string, pattern: RegExp): boole
 	return pattern.test(line)
 }
 
-function matches_share(prose: string, script: string, pattern: RegExp): number {
-	const matched = prose.split('\n').filter((line) => is_line_in_script(line, script, pattern))
+function voting_lines(prose: string): Array<string> {
+	const lines = prose.split('\n').filter((line) => letter_count(line) > 0)
+	const voting = lines.filter((line) => letter_count(line) >= MIN_VOTING_LETTERS)
 
-	return letter_count(matched.join('\n')) / letter_count(prose)
+	return voting.length > 0 ? voting : lines
+}
+
+function matches_share(prose: string, script: string, pattern: RegExp): number {
+	const lines = voting_lines(prose)
+	const matched = lines.filter((line) => is_line_in_script(line, script, pattern))
+
+	return matched.length / lines.length
 }
 
 // `true` only when the reply has prose enough to judge and most of it is in another script. Every
