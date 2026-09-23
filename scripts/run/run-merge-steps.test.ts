@@ -12,6 +12,12 @@ vi.mock('#scripts/git/git-gh-issue-write', () => ({
 	},
 }))
 
+const reap_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lane/lane-reap', () => ({
+	lane_reap: { reap_child: reap_mock },
+}))
+
 const { run_merge_steps } = await import('./run-merge-steps')
 
 const CONTEXT = {
@@ -37,7 +43,33 @@ const HANDED_OFF_CARRY = {
 beforeEach(() => {
 	add_label_mock.mockReset()
 	remove_label_mock.mockReset().mockResolvedValue(undefined)
+	reap_mock.mockReset().mockReturnValue([])
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#2421: the branches that judge a child finished are where its lingering process is
+// ended — a hung child left running answers the pgrep liveness check `alive` for its number forever.
+describe('run_merge_steps — ending the child process where the child is judged finished', () => {
+	it('do_failed terminates the abandoned child', async () => {
+		await run_merge_steps.do_failed(CONTEXT)
+
+		expect(reap_mock).toHaveBeenCalledWith(CONTEXT.child)
+	})
+
+	it('do_outage terminates the old child before the re-dispatch launches another', async () => {
+		await run_merge_steps.do_outage(CONTEXT)
+
+		expect(reap_mock).toHaveBeenCalledWith(CONTEXT.child)
+	})
+
+	it('touches no process when the carry record refused the count', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: HANDED_OFF_CARRY })
+
+		await run_merge_steps.do_failed(CONTEXT)
+
+		expect(reap_mock).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_merge_steps.do_failed — parking is part of the result', () => {

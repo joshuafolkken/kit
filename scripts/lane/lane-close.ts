@@ -2,6 +2,7 @@ import { existsSync, rmSync } from 'node:fs'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_paths } from './lane-paths'
+import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
 // Closing a lane: no work tree, no branch, no directory (joshuafolkken/kit#1490).
@@ -23,6 +24,8 @@ interface CloseOutcome {
 	issue: string
 	kind: CloseKind
 	left_behind: Array<string>
+	// The lane child's processes this close terminated — empty for a child that ended by itself.
+	reaped: Array<number>
 }
 
 interface SweepOutcome {
@@ -113,12 +116,16 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	const existing = lane_registry.find_lane(lanes, issue)
 	const targets = lane_targets(root, issue, existing)
 	const did_exist = existing !== undefined || existsSync(targets.directory)
+	// Before the removal, not after: a child still running in the tree would keep writing into a
+	// directory being deleted, and a process outliving its lane is the half-discarded state
+	// joshuafolkken/kit#2421 found — the work tree gone, the child still answering `alive`.
+	const reaped = lane_reap.reap_child(issue)
 
 	await remove_lane(targets)
 
 	const left_behind = await residue(targets)
 
-	return { issue, kind: close_kind(did_exist, left_behind), left_behind }
+	return { issue, kind: close_kind(did_exist, left_behind), left_behind, reaped }
 }
 
 // A lane that could not be closed is recorded rather than thrown: a sweep has to attempt every lane,

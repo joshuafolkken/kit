@@ -112,6 +112,12 @@ function report_issues(issues: ReadonlyArray<string>): number {
 // send the caller to the next `lane:open`, which then fails on git's own message about a branch that
 // still exists.
 function report_close(outcome: CloseOutcome): number {
+	if (outcome.reaped.length > 0) {
+		console.error(
+			`Terminated the lane child for #${outcome.issue} that had not ended by itself: process ${outcome.reaped.join(', ')}.`,
+		)
+	}
+
 	if (outcome.kind !== 'incomplete') {
 		return report_issues(outcome.kind === 'closed' ? [outcome.issue] : [])
 	}

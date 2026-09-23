@@ -30,7 +30,12 @@ vi.mock('./lane-registry', () => ({
 	},
 }))
 
+vi.mock('./lane-reap', () => ({
+	lane_reap: { reap_child: vi.fn() },
+}))
+
 const { git_command } = await import('#scripts/git/git-command')
+const { lane_reap } = await import('./lane-reap')
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_registry } = await import('./lane-registry')
 const { lane_close } = await import('./lane-close')
@@ -86,6 +91,7 @@ beforeEach(() => {
 	vi.mocked(git_worktree.worktree_prune).mockResolvedValue('')
 	vi.mocked(git_worktree.branch_delete).mockResolvedValue('')
 	vi.mocked(git_command.branch_exists).mockResolvedValue(false)
+	vi.mocked(lane_reap.reap_child).mockReset().mockReturnValue([])
 	// What `git worktree remove --force` does: unregisters and deletes, uncommitted work and all.
 	vi.mocked(git_worktree.worktree_remove).mockImplementation(async (directory: string) => {
 		rmSync(directory, { force: true, recursive: true })
@@ -134,6 +140,27 @@ describe('closing a lane', () => {
 		const outcome = await lane_close.close_lane('9999')
 
 		expect(outcome.kind).toBe('none')
+	})
+})
+
+// joshuafolkken/kit#2421: removing the work tree and leaving the child running is a half-discarded
+// state — the pgrep liveness check keeps answering `alive` for the issue number.
+describe('ending the lane child with its lane', () => {
+	it('terminates the lane child before removing its work tree, and reports what it ended', async () => {
+		const lane = open_on_disk(ISSUE, SEED)
+		const hung_child = 48_848
+
+		lanes_are([lane])
+		vi.mocked(lane_reap.reap_child).mockImplementation(() => {
+			expect(existsSync(lane.directory)).toBe(true)
+
+			return [hung_child]
+		})
+
+		const outcome = await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_reap.reap_child)).toHaveBeenCalledWith(ISSUE)
+		expect(outcome.reaped).toStrictEqual([hung_child])
 	})
 })
 

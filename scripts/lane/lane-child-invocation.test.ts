@@ -12,6 +12,12 @@ describe('the lane child invocation prompts', () => {
 		expect(lane_child_invocation.child_invocation(ISSUE)).toBe(`fullrun #${ISSUE}`)
 	})
 
+	// joshuafolkken/kit#2421: the one pattern both the liveness wait and the reaper search with — anchored
+	// at the end so `#2317` never matches the child of `#23170`.
+	it('anchors the process pattern at the end of the bare invocation', () => {
+		expect(lane_child_invocation.process_pattern(ISSUE)).toBe(`fullrun #${ISSUE}$`)
+	})
+
 	it('ends the outage-resume prompt with the bare invocation so the poll still matches', () => {
 		expect(
 			lane_child_invocation.outage_resume_invocation(ISSUE).endsWith(`fullrun #${ISSUE}`),
