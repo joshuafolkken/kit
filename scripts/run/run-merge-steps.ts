@@ -1,6 +1,7 @@
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { lane_reap } from '#scripts/lane/lane-reap'
 import { run_carry, type CarryChange, type CarryOwner, type RunCarry } from './run-carry'
 import { run_merge } from './run-merge'
 
@@ -130,9 +131,11 @@ async function remove_in_progress(child: string): Promise<void> {
 	}
 }
 
-// A failed child: count the failure, drop the stale `in-progress`, and park it with `needs-decision`
-// so the next offer does not hand the same child straight back. Returns the record so the caller can
-// read the streak against the guard. Returns `is_refused: true` without touching labels when the
+// A failed child: count the failure, end whatever of its process is still running (a child judged
+// abandoned that hung on a wait loop would otherwise answer the pgrep liveness check `alive` for its
+// issue number forever, joshuafolkken/kit#2421), drop the stale `in-progress`, and park it with
+// `needs-decision` so the next offer does not hand the same child straight back. Returns the record
+// so the caller can read the streak against the guard. Returns `is_refused: true` without touching labels when the
 // carry record rejected the count (joshuafolkken/kit#2114).
 async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 	const result = await apply_carry(ctx, run_merge.change_of('failed'))
@@ -141,6 +144,7 @@ async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
+	lane_reap.reap_child(ctx.child)
 	await remove_in_progress(ctx.child)
 	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
 
@@ -154,8 +158,9 @@ interface OutageResult {
 	is_refused: boolean
 }
 
-// An API-outage child: count the outage into its own streak and drop the stale `in-progress` so the
-// child is offerable again, but **do not** park it with `needs-decision` — the environment failed, not
+// An API-outage child: count the outage into its own streak, end any process it left — before the
+// re-dispatch launches a second one matching the same pattern (joshuafolkken/kit#2421) — and drop the
+// stale `in-progress` so the child is offerable again, but **do not** park it with `needs-decision` — the environment failed, not
 // the child, so it is re-dispatchable in the same run (joshuafolkken/kit#2240). Returns the record so
 // the caller can read the outage streak against its guard. Returns `is_refused: true` without touching
 // labels when the carry record rejected the count (joshuafolkken/kit#2114).
@@ -164,6 +169,7 @@ async function do_outage(ctx: MergeContext): Promise<OutageResult> {
 
 	if (result.kind === 'refused') return { carry: result.carry, is_refused: true }
 
+	lane_reap.reap_child(ctx.child)
 	await remove_in_progress(ctx.child)
 
 	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }

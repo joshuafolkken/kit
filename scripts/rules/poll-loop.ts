@@ -34,6 +34,30 @@ const LOOP_KEYWORD = /\b(?:while|until)\s/u
 // as a literal one is — a poll with a configurable interval is still a poll (joshuafolkken/kit#2371,
 // review round 1).
 const SLEEP_COMMAND = /\bsleep\s+\S/u
+// **A loop with no `sleep` is still a poll — a worse one** (joshuafolkken/kit#2421). A lane child ran
+// `until [ -f /tmp/gate-done ]; do if ! kill -0 %1 …; then break; fi; done` for hours: a busy-wait
+// that spun a core on a marker nobody wrote, and slipped through because the rule required the
+// `sleep`. Two headers make a loop a poll with or without one. An `until` header waits for a state to
+// appear by definition — the keyword has no stream-reading or counting use. A `while` header whose
+// condition *probes* a state — a file test, a process probe, a quiet `grep` — is the same wait
+// spelled negatively. A `while` that counts or reads (`while [ "$i" -lt 5 ]`, `while read`) is not.
+// Both are read at a command position only — the start of the line, after a separator, or after a
+// keyword that opens a command list — because without `sleep` there is nothing else to tell a loop
+// header from the word in an argument: `git log --until yesterday` is not a loop (review round 1).
+const COMMAND_POSITION = String.raw`(?:^|[;&|({\n]|\b(?:do|then|else)\s)\s*`
+const UNTIL_HEADER = new RegExp(String.raw`${COMMAND_POSITION}until\s`, 'u')
+const WHILE_HEADER = String.raw`${COMMAND_POSITION}while\s+(?:!\s*)?`
+const PROBE_HEADERS: ReadonlyArray<RegExp> = [
+	String.raw`\[\[?\s+(?:!\s*)?-[defs]\s`,
+	String.raw`test\s+(?:!\s*)?-[defs]\s`,
+	String.raw`(?:kill\s+-0|pgrep)\b`,
+	String.raw`grep\s+-[A-Za-z]*q`,
+].map((probe) => new RegExp(`${WHILE_HEADER}${probe}`, 'u'))
+
+function is_state_wait(plain: string): boolean {
+	return UNTIL_HEADER.test(plain) || PROBE_HEADERS.some((header) => header.test(plain))
+}
+
 // **A `while read … done < file` is a stream reader, not a poll**, even when its body sleeps to
 // throttle processing (joshuafolkken/kit#2371, review round 1). Its condition consumes input rather
 // than probing for a state — a poll never reads its condition, it *tests* it (grep, wc, a file check)
@@ -56,6 +80,7 @@ function is_poll_loop(command: string): boolean {
 	const plain = time_shell.unquoted(command)
 
 	if (is_stream_reader(plain)) return false
+	if (is_state_wait(plain)) return true
 
 	return LOOP_KEYWORD.test(plain) && SLEEP_COMMAND.test(plain)
 }
@@ -64,8 +89,9 @@ function is_poll_loop(command: string): boolean {
 // exit is the thing to wait on, and the one route that delivers that exit. The measurement is named
 // because it is what makes the rule believable — six lanes, about 45 minutes, 13% of their wall clock.
 const POLL_LOOP_REASON =
-	"⛔ output poll loop: this hand-writes a `while`/`until` … `sleep` loop over a command's output " +
-	'file, and the loop does not know when the command finished. A regex that never matches waits to ' +
+	"⛔ output poll loop: this hand-writes a `while`/`until` wait loop over a command's output, a " +
+	'marker file or a process — with a `sleep` or, worse, without one — and the loop does not know ' +
+	'when the command finished. A regex that never matches waits to ' +
 	'the harness block limit; one that matches a mid-run line exits too early — either way the ' +
 	'command exit is not what ends the wait, and each pass spends a full-context round trip ' +
 	'(joshuafolkken/kit#2371 measured about 45 minutes, 13% of six lanes, lost to exactly this). Do ' +

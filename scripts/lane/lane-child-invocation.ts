@@ -9,6 +9,13 @@ function child_invocation(issue: string): string {
 	return `${CHILD_INVOCATION} #${issue}`
 }
 
+// The `pgrep -f` pattern that finds a running child: the invocation is always the last argument of
+// its command line — the resume prompts below end with it on purpose — so the anchor matches every
+// launch of `#<N>` and never `#<N>0` (joshuafolkken/kit#2421).
+function process_pattern(issue: string): string {
+	return `${child_invocation(issue)}$`
+}
+
 function resume_invocation(issue: string): string {
 	const preamble = `Resuming the lane child for issue #${issue} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:cut --resume ${issue}\` before anything else and follow the matching verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Only on \`fresh\` proceed as an ordinary`
 
@@ -33,6 +40,7 @@ const lane_child_invocation = {
 	CHILD_INVOCATION,
 	child_invocation,
 	outage_resume_invocation,
+	process_pattern,
 	resume_invocation,
 }
 

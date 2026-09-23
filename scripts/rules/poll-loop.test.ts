@@ -24,6 +24,13 @@ describe('poll_loop.is_poll_loop — refuses the output-file wait loop', () => {
 		// A configurable interval is still a poll — the argument is a variable, not a literal
 		// (joshuafolkken/kit#2371, review round 1).
 		'until grep -q done out.txt; do sleep "$INTERVAL"; done',
+		// joshuafolkken/kit#2421: the two loops lane children hung on for hours. The first is a busy-wait
+		// with no `sleep` at all; the second polls a backgrounded task's output file.
+		'until [ -f /tmp/gate-done ]; do if ! kill -0 %1 2>/dev/null; then break; fi; done',
+		"while ! grep -qE 'ELIFECYCLE|Done in|push|fatal|error' /tmp/tasks/b1.output; do sleep 2; done",
+		// The same busy-wait spelled as a `while` over a process or file probe.
+		'while kill -0 4242 2>/dev/null; do :; done',
+		'while [ ! -f /tmp/gate-done ]; do :; done',
 	])('refuses %j', (command) => {
 		expect(poll_loop.is_poll_loop(command)).toBe(true)
 	})
@@ -39,6 +46,12 @@ describe('poll_loop.is_poll_loop — refuses the output-file wait loop', () => {
 		'while read line; do grep until out.txt; sleep 1; done < in.txt',
 		'sleep 30',
 		'for i in $(seq 1 5); do build; done',
+		// A `while` that counts rather than probes is ordinary work, not a wait (joshuafolkken/kit#2421).
+		'i=0; while [ "$i" -lt 5 ]; do build; i=$((i+1)); done',
+		// The word in an argument is not a loop header — only a command position is (review round 1).
+		'git log --since=1.week --until yesterday',
+		'gh run list --until today',
+		'echo until done',
 		'cat until.txt',
 		'gh issue comment 1 --body "until grep -q done out.txt; do sleep 30; done"',
 	])('is silent on %j', (command) => {
