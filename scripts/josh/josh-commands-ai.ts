@@ -253,7 +253,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'run:report': {
 		script: 'scripts/run/run-report-cli.ts',
 		description:
-			'Generate the session-facing report from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
+			'Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
 		category: 'AI tools',
 		reference: ['', 'automation', ['files', 'network']],
 	},

@@ -67,7 +67,9 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
    session, not once per issue": the per-repository preflight, `josh latest` on `required`, the
    progress watcher, the carry/wake pair, and the release ask.
 8. **End the record when the run ends** — `pnpm josh run:carry --end` (or `--end --stopped
-   "<reason>"`) and `pnpm josh run:wake --stop`, in the same turn as the final report.
+   "<reason>"`) and `pnpm josh run:wake --stop`, in the same turn as the final report and **after** it:
+   the report reads its invocation scope off the record `--end` removes, so the two are ordered rather
+   than batched (`backlogrun-steps.md` → "End the record when the run ends" is the single source).
 
 ## Running a child — read the phase document at its point of use
 
