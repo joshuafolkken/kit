@@ -1,9 +1,7 @@
 import { telegram_notify } from '#scripts/git/telegram-notify'
-import { josh_command } from '#scripts/josh/josh-run'
-import { lane_capacity } from '#scripts/lane/lane-capacity'
-import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
+import { backlog_ready } from './backlog-ready'
 import { backlog_stalled, type StallReading, type StallVerdict } from './backlog-stalled'
 
 // The I/O half of the stall detector (joshuafolkken/kit#2359): it gathers the three counts the pure
@@ -38,33 +36,12 @@ interface DetectPorts {
 	notify_stalled: (body: string) => Promise<boolean>
 }
 
-// Free lanes right now: the limit less the live lanes. An unreadable limit reads as no free lane — the
-// safe direction, since a stall needs a free lane and reporting one that is not there is the false
-// positive this detector must not raise.
-//
-// **Occupancy is the local worktree count, not the dispatch budget's busy read.** `epic-lane-offer`
-// measures occupancy with `epic_busy.occupied_lanes`, a network read of in-progress issue labels; this
-// detector counts live worktrees instead, deliberately — it runs on the cheap-first path where the
-// costly reads (`backlog:next`, and this local `git worktree list`) are gated behind the free-and-idle
-// condition, so a network read here would defeat that design. The two can diverge, but only toward
-// over-counting live lanes → fewer free lanes → fewer stalls, which is the safe direction.
-async function real_free_lane_count(): Promise<number> {
-	const limit = lane_capacity.lane_limit()
-
-	if (limit.kind !== 'limit') return NO_FREE
-
-	const lanes = await lane_registry.list_lanes()
-	const live = lanes.filter((lane) => !lane.is_stranded).length
-
-	return lane_capacity.free_lanes(limit.limit, live)
-}
-
-// The runnable issue count for this checkout, read the way a loop reads it: `backlog:next` prints a
-// bare number per runnable issue, so the numeric lines are the count.
+// The free-lane and runnable-issue reads are `backlog-ready.ts`'s — the watcher's ready line reads the
+// same two, so they live once there (joshuafolkken/kit#2452).
 async function real_ready_count(): Promise<number> {
-	const result = await josh_command.josh_run(['backlog:next'], true)
+	const issues = await backlog_ready.ready_issues()
 
-	return backlog_stalled.count_ready_tokens(result.out)
+	return issues.length
 }
 
 async function real_emit_stall(text: string): Promise<boolean> {
@@ -79,7 +56,7 @@ const DEFAULT_PORTS: DetectPorts = {
 	resolve_target: run_event_stream_emit.stream_target,
 	read_events: run_event_stream.read_events,
 	now_ms: () => Date.now(),
-	free_lane_count: real_free_lane_count,
+	free_lane_count: backlog_ready.free_lane_count,
 	ready_count: real_ready_count,
 	emit_stall: real_emit_stall,
 	notify_stalled: real_notify_stalled,

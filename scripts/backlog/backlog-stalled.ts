@@ -87,14 +87,18 @@ function describe(reading: StallReading): string {
 
 const NUMERIC_TOKEN = /^\d+$/u
 
-// How many runnable issue numbers `backlog:next` printed: one token per line, a bare number per
-// runnable issue and a verdict word (`wait`, `stop`, …) when there is none — so the numeric lines are
-// the ready count.
-function count_ready_tokens(out: string): number {
+// The runnable issue numbers `backlog:next` printed: one token per line, a bare number per runnable
+// issue and a verdict word (`wait`, `stop`, …) when there is none — so the numeric lines are the ready
+// issues.
+function ready_tokens(out: string): ReadonlyArray<string> {
 	return out
 		.split('\n')
 		.map((token) => token.trim())
-		.filter((token) => NUMERIC_TOKEN.test(token)).length
+		.filter((token) => NUMERIC_TOKEN.test(token))
+}
+
+function count_ready_tokens(out: string): number {
+	return ready_tokens(out).length
 }
 
 const backlog_stalled = {
@@ -107,6 +111,7 @@ const backlog_stalled = {
 	describe,
 	dispatch_age_ms,
 	is_stalled,
+	ready_tokens,
 }
 
 export { backlog_stalled }

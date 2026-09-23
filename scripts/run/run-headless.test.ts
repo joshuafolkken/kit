@@ -90,3 +90,22 @@ describe('run_headless.must_keep_waiting', () => {
 		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#2452: the pick-up rules bind the driving `backlogrun` parent, attached or headless.
+describe('run_headless.is_backlog_parent', () => {
+	it('reads an attached session with a live record as the parent', async () => {
+		expect(await run_headless.is_backlog_parent(ATTACHED)).toBe(true)
+	})
+
+	it('never reads a lane child as the parent', async () => {
+		expect(await run_headless.is_backlog_parent(HEADLESS_CHILD)).toBe(false)
+	})
+
+	it('does not read a handed-off or absent record as the parent', async () => {
+		read_carry.mockReturnValue(HANDED_OFF)
+		expect(await run_headless.is_backlog_parent(ATTACHED)).toBe(false)
+
+		read_carry.mockReturnValue({ kind: 'none' })
+		expect(await run_headless.is_backlog_parent(ATTACHED)).toBe(false)
+	})
+})

@@ -33,6 +33,13 @@ vi.mock('./run-progress-clock', () => ({
 	},
 }))
 
+// The pick-up reading is mocked so a wait never reads the carry record or the backlog for real; the
+// reading itself is exercised in `backlog-ready.test.ts`.
+vi.mock('#scripts/backlog/backlog-ready', () => ({
+	backlog_ready: { print_ready_line: vi.fn() },
+}))
+
+const { backlog_ready } = await import('#scripts/backlog/backlog-ready')
 const { run_progress_read } = await import('./run-progress-read')
 const { run_progress_clock } = await import('./run-progress-clock')
 const { run_progress_cli } = await import('./run-progress-cli')
@@ -130,6 +137,14 @@ describe('--wait — one interval, one line, and then it exits', () => {
 	it('records the report it made', async () => {
 		await expect(run_progress_cli.wait_once(options_of())).resolves.toBe(SUCCESS)
 		expect(mark).toHaveBeenCalledTimes(ONE_LINE)
+	})
+
+	// joshuafolkken/kit#2452: every wake carries the pick-up reading, whether it reported or ran out.
+	it('prints the pick-up reading on every exit', async () => {
+		await run_progress_cli.wait_once(options_of())
+		await wait_bounded()
+
+		expect(backlog_ready.print_ready_line).toHaveBeenCalledTimes(2)
 	})
 
 	it('measures the silence from the last report on record', async () => {
