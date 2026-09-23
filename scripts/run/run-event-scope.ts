@@ -101,7 +101,8 @@ function is_own_ship_event(event: RunEvent, issue: string): boolean {
 
 // The newest position for one issue's run: the scoped last event with other issues' ship positions left
 // out, and — where no scope applies, as in an interactive `fullrun` with no carry record — the issue's own
-// newest ship position, which its issue number already scopes.
+// newest ship position, which its issue number already scopes. A determined scope with nothing in it yet
+// reads nothing: an earlier invocation's stop for the same issue is not this invocation's position.
 function last_issue_event(
 	events: ReadonlyArray<RunEvent>,
 	scope: EventScope,
@@ -109,7 +110,9 @@ function last_issue_event(
 ): RunEvent | undefined {
 	const own = events.filter((event) => !is_foreign_ship_event(event, issue))
 
-	return last_scoped_event(own, scope) ?? own.findLast((event) => is_own_ship_event(event, issue))
+	if (scope.kind === SINCE_SCOPE) return last_scoped_event(own, scope)
+
+	return own.findLast((event) => is_own_ship_event(event, issue))
 }
 
 const run_event_scope = {

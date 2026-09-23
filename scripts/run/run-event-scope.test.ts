@@ -132,6 +132,12 @@ describe('run_event_scope.last_issue_event', () => {
 		).toEqual(own)
 	})
 
+	it('does not read an earlier invocation’s stop when this invocation’s scope is still empty', () => {
+		const stale = { ...ship(3, KIND.SHIP_STOP, ISSUE), at: BEFORE }
+
+		expect(run_event_scope.last_issue_event([EARLIER, stale], since(START), ISSUE)).toBeUndefined()
+	})
+
 	it('reads nothing without a scope when no supervisor of its own is on the stream', () => {
 		expect(
 			run_event_scope.last_issue_event(MIXED, run_event_scope.UNKNOWN_EVENT_SCOPE, ISSUE),
