@@ -177,3 +177,29 @@ dropping either side destroys exactly what it exists to record.
 - rf:assumptions | low | scripts/run/run-relay-seat.ts | 2026-09-23 | #2480
 - rf:assumptions | low | scripts/hooks/stop-guard.ts | 2026-09-23 | #2480
 - k:run-report-heartbeat-flood | d1 | 2026-09-24 | pnpm josh run:report | The completion summary rendered 221 heartbeat events (1139 lines, many at the same instant), too long to be the Telegram body
+- rf:bug-risks | medium | scripts/rules/reply-language.ts:77 | 2026-09-23 | #2470
+- rf:bug-risks | medium | scripts/rules/reply-language.ts:72 | 2026-09-23 | #2470
+- rf:bug-risks | medium | scripts/rules/stop-rules.ts:274 | 2026-09-23 | #2470
+- rf:tests | medium | scripts/hooks/stop-guard.test.ts:79 | 2026-09-23 | #2470
+- rf:project-conventions | low | scripts/rules/stop-rules-fixtures.ts | 2026-09-23 | #2470
+- rf:comments | low | scripts/hooks/stop-guard.ts:84 | 2026-09-23 | #2470
+- rf:bug-risks | medium | scripts/run/run-entry-cli.ts | 2026-09-23 | #2476
+- rf:bug-risks | medium | scripts/run/run-merge-steps.ts | 2026-09-23 | #2476
+- rf:bug-risks | medium | scripts/run/run-step-cli.ts | 2026-09-23 | #2476
+- rf:project-conventions | low | scripts/run/run-step.ts | 2026-09-23 | #2476
+- rf:comments | low | scripts/git/git-stash.ts | 2026-09-23 | #2476
+- rf:comments | low | scripts/run/run-merge-steps.ts | 2026-09-23 | #2476
+- k:lane-child-ends-turn-with-command-backgrounded | d1 | 2026-09-24 | pnpm josh gate | The #2476 lane child reported waiting on a backgrounded gate and ended its turn, so the gate died with it and nothing was committed
+- rf:bug-risks | low | scripts/run/run-merge-steps.ts:185 | 2026-09-23 | #2476
+- rf:bug-risks | low | scripts/run/run-merge-steps.ts:175 | 2026-09-23 | #2476
+- rf:bug-risks | low | scripts/git/git-stash.ts:17 | 2026-09-23 | #2476
+- rf:project-conventions | low | scripts/run/run-next.ts:231 | 2026-09-23 | #2476
+- rf:project-conventions | low | scripts/run/run-merge-steps.ts:218 | 2026-09-23 | #2476
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-lanes.md:291 | 2026-09-23 | #2476
+- rf:comments | low | docs/josh-commands.md:1625 | 2026-09-23 | #2476
+- rf:comments | low | scripts/rules/decision-oracle.ts:103 | 2026-09-23 | #2476
+- rf:comments | low | scripts/run/run-merge-steps.ts:209 | 2026-09-23 | #2476
+- rf:tests | low | scripts/run/run-merge-steps.test.ts:37 | 2026-09-23 | #2476
+- rf:bug-risks | medium | scripts/rules/reply-language.ts:79 | 2026-09-23 | #2470
+- rf:bug-risks | low | scripts/rules/reply-language.ts:74 | 2026-09-23 | #2470
+- rf:tests | low | scripts/hooks/stop-guard.test.ts:17 | 2026-09-23 | #2470
