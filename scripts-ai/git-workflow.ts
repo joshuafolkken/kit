@@ -9,6 +9,7 @@ import { git_prompt, type WorkflowConfirmations } from '../scripts/git/git-promp
 import { git_push } from '../scripts/git/git-push'
 import { git_staging } from '../scripts/git/git-staging'
 import { cli_body } from '../scripts/josh/cli-body'
+import { test_red_commit } from '../scripts/test/test-red-commit'
 
 const SKIP_MESSAGES = {
 	commit: '💡 Commit skipped.',
@@ -85,6 +86,7 @@ async function run_workflow_steps(
 ): Promise<void> {
 	const commit_message = commit_message_override ?? issue_info.commit_message
 
+	if (confirmations.commit) await test_red_commit.assert_reproduces(issue_info.number)
 	await execute_commit_step(commit_message, confirmations)
 	await execute_push_step(confirmations)
 	await execute_pr_step(issue_info, confirmations, extra_body)

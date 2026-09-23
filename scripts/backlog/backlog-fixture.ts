@@ -7,6 +7,8 @@ import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import type { IssueRead } from '#scripts/git/git-gh-issue-read'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
+import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
+import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { vi } from 'vitest'
 
 // One description of a backlog, stubbed across every read `josh backlog:next` makes.
@@ -30,6 +32,8 @@ interface ChildInput {
 	state?: string
 	labels?: ReadonlyArray<string>
 	blocked_by?: ReadonlyArray<number>
+	// The body the defect priority classifies the child by (joshuafolkken/kit#2455).
+	body?: string
 }
 
 interface EpicInput {
@@ -48,6 +52,19 @@ interface BacklogInput {
 	epics?: ReadonlyArray<EpicInput>
 	// The children a fetch can read. One left out is a child that could not be read.
 	children?: ReadonlyArray<ChildInput>
+	// The measured defect rate. Left out, the rate is at the baseline, so the order is the graph's own
+	// (joshuafolkken/kit#2455).
+	defect_rate?: DefectRate
+	// A measurement that could not be read at all.
+	is_rate_unreadable?: boolean
+}
+
+const AT_BASELINE: DefectRate = {
+	days: defect_rate.DEFAULT_WINDOW_DAYS,
+	since: '2026-09-09',
+	defects: 21,
+	behavior_changes: 50,
+	is_capped: false,
 }
 
 // The shape a `number,state,labels,blockedBy` read answers with — `blockedBy` is a connection rather
@@ -107,6 +124,18 @@ function stub_environment(): void {
 	vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(REACHABLE_STATUS)
 }
 
+// The two reads the defect priority adds: the rate, and each candidate's body.
+function stub_defect_priority(input: BacklogInput): void {
+	const bodies = new Map((input.children ?? []).map((child) => [String(child.number), child.body]))
+	const measured =
+		input.is_rate_unreadable === true ? undefined : (input.defect_rate ?? AT_BASELINE)
+
+	vi.spyOn(defect_rate_cli, 'measure_window').mockResolvedValue(measured)
+	vi.spyOn(git_gh_command, 'issue_get_body').mockImplementation(async (number) =>
+		bodies.get(number),
+	)
+}
+
 function stub_backlog(input: BacklogInput): void {
 	const epics = input.epics ?? []
 	const bodies = epic_bodies(epics)
@@ -130,9 +159,11 @@ function stub_backlog(input: BacklogInput): void {
 		async (number) => to_child_read(children.get(number)),
 	)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	stub_defect_priority(input)
 }
 
 const backlog_fixture = {
+	AT_BASELINE,
 	CHECKOUT_PATH,
 	REACHABLE_STATUS,
 	REPO,

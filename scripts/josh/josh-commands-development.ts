@@ -155,6 +155,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [MATCH_ARGUMENTS, 'developer', ['processes']],
 	},
+	'test:red': {
+		script: 'scripts/test/test-red.ts',
+		description:
+			'Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test',
+		category: 'Development',
+		reference: ['', 'developer', ['git', 'processes']],
+	},
 	disposition: {
 		script: 'scripts/review/disposition-cli.ts',
 		description:

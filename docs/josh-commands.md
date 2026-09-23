@@ -296,6 +296,10 @@ An unknown flag is refused with the usage rather than ignored (joshuafolkken/kit
 
 `--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
 
+### `josh test:red`
+
+Run the changed `*.test.ts` files on a temporary merge-base worktree (the pre-fix tree; the working tree and index are untouched) and print `red`, `green` or `no-test`. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green` (joshuafolkken/kit#2448).
+
 ### `josh test:e2e`
 
 Run E2E tests with Playwright. **Skips gracefully (exit 0)** when `@playwright/test` is not installed or no `*.e2e.{ts,js}` files exist. Once both are present, runs `playwright test`.
@@ -1037,7 +1041,7 @@ pnpm josh defect:rate --days 30
 
 - `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
 
-**Behavior:** the numerator is the issues filed in the window that declare `- 種別: 不具合` or carry `route:interrupt`; the denominator is the issues closed as completed in the window that declare `- 種別: 振る舞い変更`. The defect declaration is not yet in the issue template and no filing lint enforces it, so a defect filed without it counts only through `route:interrupt`. A window with no completed behavior change prints `n/a` rather than a number. The search API serves at most 1000 results; when a window exceeds it the counts are printed as lower bounds, and an unreadable search exits 1 without a rate.
+**Behavior:** the numerator is the issues filed in the window that declare `- 種別: 不具合` or carry `route:interrupt`; the denominator is the issues closed as completed in the window that declare `- 種別: 振る舞い変更`. The defect declaration is not yet in the issue template and no filing lint enforces it, so a defect filed without it counts only through `route:interrupt`. A window with no completed behavior change prints `n/a` rather than a number. The search API serves at most 1000 results; when a window exceeds it the counts are printed as lower bounds, and an unreadable search exits 1 without a rate. `backlog:next` reads the same measurement to decide whether to offer defects first (joshuafolkken/kit#2455).
 
 ### `josh issue:backlinks`
 
@@ -1227,6 +1231,8 @@ pnpm josh backlog:next --exclude 1630  # skip the issue just merged
 - `--exclude <N>` — drop issues from every bucket; comma-separated, repeatable.
 
 stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
+
+**Defect priority** (joshuafolkken/kit#2455): on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline recorded on joshuafolkken/kit#2449 (0.42), the runnable numbers are re-ordered — defects (`- 種別: 不具合` or `route:interrupt`) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
 
 ### `josh backlog:plan`
 
@@ -1729,7 +1735,7 @@ as a `ship-stage` trace event.
 
 `--review` (#2427) runs review round 1 beside the gate; High/Medium or a refusal stops it.
 
-`--detach` (#2428): a detached supervisor; a stop emits `ship-stop` (`run:step` → `--log <N>`).
+`--detach` (#2428; implied in a lane child, #2457): a supervisor; a stop emits `ship-stop` (`--log <N>`).
 
 ### `josh run:report`
 
