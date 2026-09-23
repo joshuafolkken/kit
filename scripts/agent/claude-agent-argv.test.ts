@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { agent_role_profile } from './agent-role-profile'
 import { claude_agent_argv } from './claude-agent-argv'
@@ -97,5 +100,59 @@ describe('Claude forced-session argv construction', () => {
 		const argv = claude_agent_argv.build(INVOCATION, agent_role_profile.DEFAULT_PROFILES.worker)
 
 		expect(argv.args).not.toContain(SESSION_ID_FLAG)
+	})
+})
+
+const MCP_CONFIG_FILE = '.mcp.json'
+
+function project_directory(has_mcp_config: boolean): string {
+	const directory = mkdtempSync(path.join(tmpdir(), 'kit-agent-argv-'))
+
+	if (has_mcp_config) writeFileSync(path.join(directory, MCP_CONFIG_FILE), '{"mcpServers":{}}\n')
+
+	return directory
+}
+
+// **A launched child carries only the tools a lane uses, and only the project's MCP servers**
+// (joshuafolkken/kit#2435), so the user's connectors and the unused tool definitions leave every
+// request's preamble.
+describe('Claude launched-tool argv construction', () => {
+	const TOOLS_FLAG = '--tools'
+	const STRICT_FLAG = '--strict-mcp-config'
+	const MCP_CONFIG_FLAG = '--mcp-config'
+	const WORKER = agent_role_profile.DEFAULT_PROFILES.worker
+
+	it('names the launched tool list from the one constant', () => {
+		const argv = claude_agent_argv.build(INVOCATION, WORKER, undefined, project_directory(false))
+		const at = argv.args.indexOf(TOOLS_FLAG)
+
+		expect(argv.args[at + 1]).toBe(claude_agent_argv.LAUNCHED_TOOLS.join(','))
+		expect(claude_agent_argv.LAUNCHED_TOOLS).not.toContain('AskUserQuestion')
+		expect(argv.args.at(-1)).toBe(INVOCATION)
+	})
+
+	it('loads the project MCP config by absolute path when the project has one', () => {
+		const directory = project_directory(true)
+		const argv = claude_agent_argv.build(INVOCATION, WORKER, undefined, directory)
+		const at = argv.args.indexOf(MCP_CONFIG_FLAG)
+
+		expect(argv.args).toContain(STRICT_FLAG)
+		expect(argv.args[at + 1]).toBe(path.join(directory, MCP_CONFIG_FILE))
+		expect(at).toBeLessThan(argv.args.indexOf('--model'))
+	})
+
+	it('drops every MCP server when the project declares none', () => {
+		const argv = claude_agent_argv.build(INVOCATION, WORKER, undefined, project_directory(false))
+
+		expect(argv.args).toContain(STRICT_FLAG)
+		expect(argv.args).not.toContain(MCP_CONFIG_FLAG)
+	})
+
+	it('narrows a resumed session the same way', () => {
+		const directory = project_directory(true)
+		const argv = claude_agent_argv.build_resume(INVOCATION, WORKER, 'session', directory)
+
+		expect(argv.args).toContain(TOOLS_FLAG)
+		expect(argv.args).toContain(path.join(directory, MCP_CONFIG_FILE))
 	})
 })

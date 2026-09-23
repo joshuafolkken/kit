@@ -67,6 +67,8 @@ describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', (
 		const built = claude_agent_argv.build(
 			`fullrun #${RELEASED_CHILD}`,
 			agent_role_profile.DEFAULT_PROFILES.worker,
+			undefined,
+			LANE_DIRECTORY,
 		)
 
 		expect(outcome.kind).toBe('dispatched')
@@ -121,6 +123,7 @@ describe('re-dispatching an outage child by resuming its session', () => {
 			lane_child_invocation.outage_resume_invocation(RELEASED_CHILD),
 			agent_role_profile.DEFAULT_PROFILES.worker,
 			SESSION,
+			LANE_DIRECTORY,
 		)
 
 		expect(launch.mock.calls[0]?.[0].argv).toStrictEqual(resumed)
