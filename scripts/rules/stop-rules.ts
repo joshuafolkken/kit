@@ -1,8 +1,9 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { z } from 'zod'
+import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
 
-// The three stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121).
+// The four stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2422).
 //
 // **It exists because `.claude/settings.json` wired no `Stop` event.** The four events it did wire
 // (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse`) can catch the moment a call is
@@ -16,11 +17,11 @@ import { issue_citation } from './issue-citation'
 // permission envelope. The stop guard is a second *entry* on the one foundation, exactly as
 // `pretool-guard` is one — not a second copy of the plumbing.
 //
-// **All three rules refuse** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
+// **All four rules refuse** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
 // on a clean tree costs a person a silent wait or a trampled tree; a bare `#N` in the reply reaches
 // the person watching but not the model that could fix it, so it too blocks — `{"decision":"block"}`
 // is the one channel a `Stop` hook has to the model, and `stop_hook_active` caps a false positive at a
-// single wasted turn. The detection is tightened to match (`issue-citation.ts`).
+// single wasted turn. The detection is tightened to match (`issue-citation.ts`, `filing-offer.ts`).
 
 const SWITCH_ENV_KEY = 'JOSH_STOP_GUARD'
 const BLOCK_DECISION = 'block'
@@ -52,6 +53,10 @@ interface StopContext {
 	// the cut holding the tree by design and hands off to a fresh process (`pre-gate-cut.md`), so that
 	// turn-end is an automatic continuation, not the person-waiting pause the block rules are for.
 	cut_pending: boolean
+	// An Issue filing no guard refused is on this run's transcript tail — `filing_cap`'s count.
+	filed: boolean
+	// The owner of the repository the session runs in, or `undefined` when it cannot be read.
+	session_owner: string | undefined
 }
 
 interface StopOutcome {
@@ -106,6 +111,23 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 	)
 }
 
+// **An offer to file is a Tier A filing deferred to the user** (joshuafolkken/kit#2422). The judgement
+// is already made, so the reason hands over the filing chain rather than a question; the rule itself
+// is resident in `SKILL.md` → §2i and only pointed at.
+const FILING_OFFER_REASON =
+	'⛔ filing offer: your reply offers to file an Issue instead of filing it. Filing into a ' +
+	'first-party repository is Tier A — the trigger is the judgement that it is worth filing, not the ' +
+	"run's progress (`.claude/skills/workflow-commands/SKILL.md` → §2i, `observation-filing.md`). Run " +
+	'`pnpm josh issue:scout "<title>"`, file it, run `pnpm josh epic:bundle <new>`, then end with the ' +
+	'one-line citation of what was filed — do not repeat your previous reply. If it is not worth filing ' +
+	'after all, say so in one line instead.'
+
+function needs_filing(context: StopContext): boolean {
+	if (context.filed || !filing_offer.offers_filing(context.message)) return false
+
+	return filing_offer.is_first_party_target(context.message, context.session_owner)
+}
+
 function needs_notify(context: StopContext): boolean {
 	return context.hold_present && !context.notified
 }
@@ -121,17 +143,25 @@ function citation_reason(message: string): string | undefined {
 	return build_citation_reason(references)
 }
 
-// First-wins across all three rules. Two things stand every rule down: `stop_hook_active` (the
+// The two rules that read the reply itself, filing offer first.
+function reply_reason(context: StopContext): string | undefined {
+	if (needs_filing(context)) return FILING_OFFER_REASON
+
+	return citation_reason(context.message)
+}
+
+// First-wins across all four rules. Two things stand every rule down: `stop_hook_active` (the
 // loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
-// flight (a lane child's automatic turn-end, not a person-waiting pause). The two existing rules keep
-// their order ahead of the citation rule, so a stop that both still owes its notify and holds a bare
-// `#N` still reports the notify first.
+// flight (a lane child's automatic turn-end, not a person-waiting pause). The two hold rules keep their
+// order ahead of the reply rules, so a stop that both still owes its notify and holds a bare `#N` still
+// reports the notify first; the filing offer goes ahead of the citation, since the filing it forces
+// produces the citation the reply then needs.
 function block_reason(context: StopContext): string | undefined {
 	if (context.stop_hook_active || context.cut_pending) return undefined
 	if (needs_notify(context)) return STOP_NOTIFY_REASON
 	if (needs_release(context)) return HOLD_RELEASE_REASON
 
-	return citation_reason(context.message)
+	return reply_reason(context)
 }
 
 function stop_outcome(context: StopContext): StopOutcome {
@@ -155,6 +185,7 @@ function is_enabled(): boolean {
 }
 
 const stop_rules = {
+	FILING_OFFER_REASON,
 	HOLD_RELEASE_REASON,
 	ISSUE_CITATION_REASON,
 	NO_OUTCOME,

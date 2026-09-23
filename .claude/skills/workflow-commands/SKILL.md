@@ -388,7 +388,8 @@ untouched, and what the run holds is a finding it would be a loss to forget. Han
 twice: filing into a first-party repository is **Tier A** and already settled, and stopping for an
 answer under `backlogrun` parks the run without saying so.
 
-- **File it, without asking, the moment you judge it worth filing.** A **first-party** target — its
+- **File it, without asking, the moment you judge it worth filing.** **The trigger is the judgement,
+  not the run's progress**; the `Stop` hook sends back an offer to file. A **first-party** target — its
   owner equal to this session's repository owner, decided by `pnpm josh repo:party` rather than by
   judgement — is Tier A. **A third-party target is Tier C and is never
   filed** (`CLAUDE.md` → "Third-party repositories are Tier C").
@@ -399,18 +400,15 @@ answer under `backlogrun` parks the run without saying so.
   does the backlog **WIP cap** — an observation that does not block the run is *discretionary*, so with
   more than 30 open Issues in the target repository, close one first, and nothing honestly closable
   means do not file (`prompts/collaboration-workflow/wip-cap.md`).
-- **Run `pnpm josh issue:scout "<title>"` before the `gh api … issues` call**, as before any other
-  filing (§2e).
+- **Run `pnpm josh issue:scout "<title>"` before the `gh api … issues` call** (§2e).
 - **When this is the run's second filing, run `pnpm josh issue:fold` first.** Several findings from one
   session fold into one Issue by default — the filing-time counterpart to the split assessment, reading
   the same two questions (`split-assessment.md` → "The same two questions decide the filing-time fold").
   `pnpm josh rule:guard` refuses the second `gh api … issues` call until it is folded; the first filing
   asks nothing.
-- **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
-  tracks is one `epic:next` never offers. **Where that epic's root carries `auto-ok` the filing joins
+- **Run `pnpm josh epic:bundle <new>` on what was filed.** An Issue no epic tracks is one `epic:next` never offers. **Where that epic's root carries `auto-ok` the filing joins
   the backlog's pool** (`backlogrun-steps.md` → "What one invocation approves").
-- **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent, and the Issue in
-  hand is implemented as it was. Name what was filed in the completion report.
+- **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent. Name what was filed in the completion report.
 
 **What stays a judgement is whether it is worth filing, not whether to ask.** An observation nobody
 would act on is not filed at all — dropping it costs nothing, and the WIP cap makes dropping the
