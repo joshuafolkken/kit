@@ -90,6 +90,7 @@ const ALIASES: Record<string, string> = {
 	ist: 'issue:state',
 	isc: 'issue:scout',
 	isf: 'issue:fold',
+	dfr: 'defect:rate',
 	ici: 'issue:cite',
 	icm: 'issue:comment',
 	pks: 'pkg:scout',

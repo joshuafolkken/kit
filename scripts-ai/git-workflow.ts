@@ -8,6 +8,7 @@ import { git_pr } from '../scripts/git/git-pr'
 import { git_prompt, type WorkflowConfirmations } from '../scripts/git/git-prompt'
 import { git_push } from '../scripts/git/git-push'
 import { git_staging } from '../scripts/git/git-staging'
+import { cli_body } from '../scripts/josh/cli-body'
 import { test_red_commit } from '../scripts/test/test-red-commit'
 
 const SKIP_MESSAGES = {
@@ -34,6 +35,7 @@ Options:
   --skip-push       Skip the push step.
   --skip-pr         Skip the PR creation step.
   --body <text>     Extra text appended after "closes #N" in the PR body.
+  --body-file <p>   Read that text from a file (\`-\` = stdin); use it when it holds a backtick or \`$\`.
   -y, --yes         Run non-interactively: skip confirmations and, when no issue
                     argument is given, derive the issue info from the current branch.
   -h, --help        Display this help message.
@@ -99,6 +101,7 @@ interface CliArguments {
 		yes?: boolean
 		help?: boolean
 		body?: string
+		'body-file'?: string
 	}
 	positionals: Array<string>
 }
@@ -113,6 +116,7 @@ function parse_cli_arguments(): CliArguments {
 			yes: { type: 'boolean', short: 'y' },
 			help: { type: 'boolean', short: 'h' },
 			body: { type: 'string' },
+			'body-file': { type: 'string' },
 		},
 		allowPositionals: true,
 	})
@@ -183,6 +187,18 @@ function build_commit_message(
 	return `${issue_info.commit_message} ${commit_suffix}`
 }
 
+// The file form exists because the PR body now carries a live-execution evidence section of commands
+// and their output (joshuafolkken/kit#2446) — text an inline double-quoted `--body` would have the shell
+// evaluate first. Resolved through `cli_body`, the shared reader every `*-file` flag uses.
+function resolve_pr_body(values: CliArguments['values']): string | undefined {
+	return cli_body.resolve({
+		inline: values.body,
+		file_path: values['body-file'],
+		inline_flag: '--body',
+		file_flag: '--body-file',
+	})
+}
+
 async function execute_workflow(
 	values: CliArguments['values'],
 	positionals: Array<string>,
@@ -196,7 +212,7 @@ async function execute_workflow(
 	const confirmations = await get_workflow_confirmations(is_non_interactive, values)
 	const commit_message = build_commit_message(issue_info, commit_suffix)
 
-	await run_workflow_steps(issue_info, confirmations, commit_message, values.body)
+	await run_workflow_steps(issue_info, confirmations, commit_message, resolve_pr_body(values))
 }
 
 async function main(): Promise<void> {
@@ -223,6 +239,7 @@ const git_workflow = {
 	get_workflow_confirmations,
 	prepare_issue_info,
 	is_non_interactive_mode,
+	resolve_pr_body,
 }
 
 export type { CliArguments }

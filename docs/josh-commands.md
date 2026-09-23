@@ -543,6 +543,8 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 - `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
 
+**Live-execution evidence (joshuafolkken/kit#2446):** a merge is refused when the branch changes a runtime path (`josh test:declared`'s classification) and the PR body lacks a `## 実機証跡` section of a backticked command plus its fenced output (`issue:lint`'s `## 再現` parser). Pass it with `josh git -y --body-file <path>`.
+
 **Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
@@ -1025,6 +1027,21 @@ pnpm josh issue:lint /tmp/issue-body.md
 Prints `ok` (exit 0) when every heading is present, or each missing heading name (exit 1). A heading has to be a line of its own — one mentioned inside a sentence is not the section heading. The judgement half (is the prose specific enough?) is out of scope; this is the mechanical half alone (joshuafolkken/kit#2123).
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現` (joshuafolkken/kit#2212, joshuafolkken/kit#2353). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun) re-runs the baseline.
+
+### `josh defect:rate`
+
+Print the defect rate of merged work over a window — the number that says whether to add a new mechanism or stabilize (joshuafolkken/kit#2449).
+
+```bash
+pnpm josh defect:rate            # the last 14 days
+pnpm josh defect:rate --days 30
+```
+
+**Options:**
+
+- `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
+
+**Behavior:** the numerator is the issues filed in the window that declare `- 種別: 不具合` or carry `route:interrupt`; the denominator is the issues closed as completed in the window that declare `- 種別: 振る舞い変更`. The defect declaration is not yet in the issue template and no filing lint enforces it, so a defect filed without it counts only through `route:interrupt`. A window with no completed behavior change prints `n/a` rather than a number. The search API serves at most 1000 results; when a window exceeds it the counts are printed as lower bounds, and an unreadable search exits 1 without a rate.
 
 ### `josh issue:backlinks`
 
@@ -1705,7 +1722,7 @@ under one header per step. It extends `run:tail`'s post-merge fold into the body
 Unlike `run:tail` it stops at the first failed step — a red gate never reaches the commit — and closes
 the report with the name of the stopped step, so the run reads only that one. The first positional is
 the `"<title> #<N>"` string `git -y` and `followup` already take; the issue number is read off its tail
-for `run:tail`, and `--notify-message` is forwarded to `followup` alone. Any further positionals are
+for `run:tail`, `--notify-message` is forwarded to `followup` alone, and `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on — to `git -y` alone. Any further positionals are
 follow-up citations filed this run — branch-2 filing runs before `ship` — forwarded to `run:tail` after
 the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
 review finding — stays in front of this command.

@@ -33,6 +33,7 @@ function request(
 		title: TITLE,
 		number: NUMBER,
 		notify: [],
+		body: [],
 		cites: [],
 		is_review: true,
 		repository: `/tmp/josh-ship-detach-test-${randomUUID()}`,
@@ -65,6 +66,13 @@ describe('run_ship_detach.supervisor_argv', () => {
 		expect(argv.args).not.toContain(INLINE_FLAG)
 		expect(stamp_file.read_stamp_text(body_path)).toBe(BODY)
 		expect(argv.args.at(-1)).toBe(TITLE)
+	})
+
+	it('passes the PR body file through, ahead of the title', () => {
+		const body = ['--body-file', 'pr.md']
+		const argv = run_ship_detach.supervisor_argv(request({ body }))
+
+		expect(argv.args).toEqual(['josh', 'ship', '--review', ...body, TITLE])
 	})
 
 	it('passes a notify file through unchanged', () => {

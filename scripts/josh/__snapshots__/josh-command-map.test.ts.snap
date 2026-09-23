@@ -22,6 +22,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "co": "cost",
     "cs": "clone:scan",
     "dcr": "doc:read",
+    "dfr": "defect:rate",
     "dg": "delegate",
     "dp": "disposition",
     "dr": "doctor",
@@ -277,6 +278,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "processes",
+      ],
+    ],
+    "defect:rate": [
+      "[--days <n>]",
+      "automation",
+      [
+        "network",
       ],
     ],
     "delegate": [

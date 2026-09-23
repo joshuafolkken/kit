@@ -37,16 +37,18 @@ function has_output_block(lines: ReadonlyArray<string>): boolean {
 	return lines.filter((line) => FENCE_LINE.test(line)).length >= FENCE_PAIR
 }
 
-function parse_reproduction(body: string): Reproduction {
-	const lines = markdown_section.section_lines(body, REPRODUCTION_HEADING)
+// The heading is a parameter so every `command + actual output` section is read by this one parser —
+// a pull request's live-execution evidence section is the same shape (joshuafolkken/kit#2446).
+function parse_reproduction(body: string, heading: string = REPRODUCTION_HEADING): Reproduction {
+	const lines = markdown_section.section_lines(body, heading)
 
 	return { has_command: has_command_line(lines), has_output: has_output_block(lines) }
 }
 
 // A body carries a re-runnable reproduction when its section holds both a backticked command and a
 // fenced output block.
-function has_command_output(body: string): boolean {
-	const reproduction = parse_reproduction(body)
+function has_command_output(body: string, heading: string = REPRODUCTION_HEADING): boolean {
+	const reproduction = parse_reproduction(body, heading)
 
 	return reproduction.has_command && reproduction.has_output
 }

@@ -705,6 +705,16 @@ Report a run's token and credit cost from Claude Code's session transcripts
 
 ---
 
+### `josh defect:rate` · `josh dfr`
+
+> **Audience:** automation · **Side effects:** network
+
+`[--days <n>]`
+
+Print the defect rate of merged work: defects filed per behavior change completed
+
+---
+
 ### `josh delegate` · `josh dg`
 
 > **Audience:** automation · **Side effects:** none

@@ -102,7 +102,17 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	[STAGE.REPORT]: (done) => done.has(STAGE.REPORT),
 }
 
-function is_done(stage: Stage, done: ReadonlySet<string>, state: ShipState): boolean {
+// A supplied PR body is work only the commit stage delivers (joshuafolkken/kit#2446): a rerun carrying
+// the live-execution evidence a refused `followup` asked for reruns `git -y`, whose skip flags leave the
+// commit and push alone while the body reaches the already-open pull request.
+function is_done(
+	stage: Stage,
+	done: ReadonlySet<string>,
+	state: ShipState,
+	has_body = false,
+): boolean {
+	if (has_body && stage === STAGE.COMMIT && !state.is_merged) return false
+
 	return DONE_BY[stage](done, state)
 }
 
