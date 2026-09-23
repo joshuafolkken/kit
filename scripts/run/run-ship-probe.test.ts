@@ -71,11 +71,17 @@ describe('run_ship_probe.read_state — pushed and merged', () => {
 		expect(await run_ship_probe.read_state()).toMatchObject({ is_pushed: false })
 	})
 
-	it('reads a merged pull request as merged, and an open one as not', async () => {
+	it('reads a merged pull request the default branch holds as merged, and an open one as not', async () => {
+		git.commit_count_beyond.mockResolvedValue(0)
+
 		expect(await run_ship_probe.read_state()).toMatchObject({ is_merged: true })
 
 		read_pr_state.mockResolvedValue('open')
 
+		expect(await run_ship_probe.read_state()).toMatchObject({ is_merged: false })
+	})
+
+	it('reads a merged pull request under commits the default branch lacks as not merged', async () => {
 		expect(await run_ship_probe.read_state()).toMatchObject({ is_merged: false })
 	})
 })

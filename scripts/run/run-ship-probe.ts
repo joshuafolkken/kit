@@ -45,8 +45,16 @@ async function read_pushed(branch_name: string): Promise<boolean> {
 	return remote.split(REMOTE_FIELD_SEPARATOR)[REMOTE_SHA_INDEX] === head
 }
 
+// The branch's pull request is merged **and** the default branch already holds `HEAD`. A branch whose
+// earlier pull request merged and which has since gained commits still reads `MERGED` from GitHub, and
+// taking that alone would skip the gate, the commit and the merge of the new work. A stale default
+// branch reads as not merged, so `followup` runs and reads the pull request itself.
 async function read_merged(branch_name: string): Promise<boolean> {
-	return (await run_preflight.read_pr_state(branch_name)) === run_preflight.MERGED_PR
+	if ((await run_preflight.read_pr_state(branch_name)) !== run_preflight.MERGED_PR) return false
+
+	const base = await git_command.default_branch_reference()
+
+	return (await git_command.commit_count_beyond(base, HEAD_REFERENCE)) === 0
 }
 
 const NOTHING_DONE: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
