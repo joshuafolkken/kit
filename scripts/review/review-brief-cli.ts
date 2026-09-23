@@ -1,10 +1,12 @@
 #!/usr/bin/env tsx
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { find_package_directory } from '#scripts/josh/josh-logic'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
@@ -26,6 +28,17 @@ import { review_tree } from './review-tree'
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
+
+// The rubric's absolute path, resolved against the kit package rather than the review checkout root
+// (joshuafolkken/kit#2402). The rubric ships inside the package, so a consumer that keeps no
+// `prompts/` of its own still receives it at `node_modules/@joshuafolkken/kit/prompts/`.
+// `find_package_directory` ascends to the nearest package.json, so this resolves from both the tsx
+// source and the bundled `dist/josh.js`.
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
+const RUBRIC_PATH = path.join(
+	find_package_directory(MODULE_DIRECTORY),
+	review_brief.RUBRIC_RELATIVE_PATH,
+)
 const ROUND_FLAG = '--round'
 // `review:level` folded in here (joshuafolkken/kit#1927): it was a second command deciding the same
 // thing `review:brief` already prints on its first line, so it is now a mode of this one. `--level-only`
@@ -158,6 +171,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		// (joshuafolkken/kit#1527). One reading is shared with the record written below, so the commit
 		// the map is stored against is the same one the brief printed (joshuafolkken/kit#1537).
 		base,
+		rubric_path: RUBRIC_PATH,
 		...(await open_contract()),
 	})
 }

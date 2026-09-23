@@ -80,6 +80,10 @@ const CHECKOUT: ReviewCheckout = {
 	head: '0123456789abcdef0123456789abcdef01234567',
 }
 const NONCE = 'deadbeefcafef00d'
+// An absolute rubric path under a kit package, deliberately outside the checkout root above, so a
+// brief that resolved the rubric from the checkout could not produce it (joshuafolkken/kit#2402). The
+// package-vs-checkout distinction itself is asserted in `review-rubric.test.ts`.
+const RUBRIC_PATH = '/pkg/node_modules/@joshuafolkken/kit/prompts/review-rubric.md'
 
 function compose(input: {
 	round: number
@@ -98,6 +102,7 @@ function compose(input: {
 		checkout: input.checkout ?? CHECKOUT,
 		nonce: NONCE,
 		base: BASE,
+		rubric_path: RUBRIC_PATH,
 	})
 }
 
@@ -294,9 +299,9 @@ describe('review_brief — round 2 is scoped by comparison, not by recall', () =
 	})
 
 	it("asks the verification question rather than the first round's", () => {
-		expect(compose({ round: 2, tree: after, round_one: stamp_of(before) })).toContain(
-			review_brief.ROUND_TWO_QUESTION,
-		)
+		const brief = compose({ round: 2, tree: after, round_one: stamp_of(before) })
+
+		expect(brief).toContain(review_brief.ROUND_TWO_QUESTION)
 	})
 
 	// A missing record must widen the review, never narrow it: a brief that silently reviewed nothing
@@ -419,9 +424,9 @@ describe('review_brief_cli.format_reason', () => {
 	})
 
 	it('explains an empty diff rather than naming nothing', () => {
-		expect(review_brief_cli.format_reason([], review_level.DEFAULT_LEVEL)).toContain(
-			'no changed paths',
-		)
+		const reason = review_brief_cli.format_reason([], review_level.DEFAULT_LEVEL)
+
+		expect(reason).toContain('no changed paths')
 	})
 })
 
