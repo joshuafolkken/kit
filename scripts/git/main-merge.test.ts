@@ -13,11 +13,20 @@ vi.mock('./git-command', () => ({
 		get_default_branch: vi.fn(),
 		merge_branch: vi.fn(),
 		merge_fast_forward: vi.fn(),
+		status: vi.fn(),
 	},
 }))
 
+// The guard's one git read — the paths the default branch would bring in.
+vi.mock('./git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
+
 const { git_command } = await import('./git-command')
 const { main_merge } = await import('./main-merge')
+const { main_merge_guard } = await import('./main-merge-guard')
+const { git_spawn } = await import('./git-spawn')
+
+const CHANGED_FILE = 'scripts/a.ts'
+const MODIFIED_STATUS = ` M ${CHANGED_FILE}`
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -44,6 +53,8 @@ beforeEach(() => {
 	vi.mocked(git_command.branch).mockResolvedValue(PLAIN_BRANCH)
 	fetch_branch.mockResolvedValue('')
 	merge_branch.mockResolvedValue()
+	vi.mocked(git_command.status).mockResolvedValue('')
+	vi.mocked(git_spawn.read).mockResolvedValue('')
 })
 
 describe('merging the default branch into the current branch', () => {
@@ -74,6 +85,42 @@ describe('merging the default branch into the current branch', () => {
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(MERGE_FAILURE.message)
+	})
+
+	it('tells a conflicted merge how to finish through the commit flow', async () => {
+		merge_branch.mockRejectedValue(MERGE_FAILURE)
+
+		await main_merge.run(NO_ARGUMENTS)
+
+		expect(console.error).toHaveBeenCalledWith(main_merge_guard.CONFLICT_HINT)
+	})
+})
+
+// joshuafolkken/kit#2445: merging over uncommitted work the default branch also touched, or over an
+// index still holding unresolved paths, is refused before git is asked to merge.
+describe('refusing a merge the tree cannot take', () => {
+	it('refuses uncommitted changes the default branch also changed, and merges nothing', async () => {
+		vi.mocked(git_command.status).mockResolvedValue(MODIFIED_STATUS)
+		vi.mocked(git_spawn.read).mockResolvedValue(CHANGED_FILE)
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(FAILURE_EXIT_CODE)
+		expect(merge_branch).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('pnpm josh git -y'))
+	})
+
+	it('refuses an index with unresolved paths', async () => {
+		vi.mocked(git_command.status).mockResolvedValue(`UU ${CHANGED_FILE}`)
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(FAILURE_EXIT_CODE)
+		expect(merge_branch).not.toHaveBeenCalled()
+	})
+
+	it('still merges over uncommitted changes the merge does not touch', async () => {
+		vi.mocked(git_command.status).mockResolvedValue(MODIFIED_STATUS)
+		vi.mocked(git_spawn.read).mockResolvedValue('scripts/b.ts')
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
+		expect(merge_branch).toHaveBeenCalledOnce()
 	})
 })
 

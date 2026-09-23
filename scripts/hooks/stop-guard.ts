@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
@@ -70,6 +71,7 @@ async function build_context(
 		session_owner: repo_party.current_owner(),
 		headless_waiting: await run_headless.must_keep_waiting(),
 		headless_refusals: stop_rules.count_headless_refusals(tail),
+		lane_child: lane_child_marker.is_child_of(process.cwd()),
 	}
 }
 

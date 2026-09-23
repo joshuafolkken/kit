@@ -63,7 +63,14 @@ once here; the measurements that motivated each one live in the linked Issues.
   the branch before the gate and the review start, so the gate verifies the tree that will actually
   merge rather than one that never existed (joshuafolkken/kit#1837). It is the last edit, so the scoped
   pair and the gate run once over it. A conflict here fires `backlogrun-lanes.md` → "Conflicts are not predicted"
-  early.
+  early. **This is the one place a conflicted merge's procedure is written** (joshuafolkken/kit#2445):
+  `main:merge` refuses before merging when uncommitted changes touch a path the default branch also
+  changed, or when the index still holds unresolved or staged paths — commit the work first with
+  `pnpm josh git -y`, then rerun it, and **never stash around the merge** (a stash reapplied over it
+  leaves `UU` in the index). A merge that stops on a conflict is finished the same way: remove the
+  markers, then `pnpm josh git -y` stages the resolution and records the merge commit. That commit is
+  the sanctioned flow, so it is **Tier A** — a lane child never stops to ask a person for `git add`, and
+  the `Stop` hook sends back a reply that does.
 - **A single check answers once per tree** — while implementing, re-run a single check by name
   (`pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's type
   check) after every edit; a repeat of the same command with the same arguments over a tree nothing has

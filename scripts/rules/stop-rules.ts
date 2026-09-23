@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
 
-// The four stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2422).
+// The stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2422,
+// joshuafolkken/kit#2445).
 //
 // **It exists because `.claude/settings.json` wired no `Stop` event.** The four events it did wire
 // (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse`) can catch the moment a call is
@@ -17,7 +18,7 @@ import { issue_citation } from './issue-citation'
 // permission envelope. The stop guard is a second *entry* on the one foundation, exactly as
 // `pretool-guard` is one — not a second copy of the plumbing.
 //
-// **All four rules refuse** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
+// **Every rule refuses** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
 // on a clean tree costs a person a silent wait or a trampled tree; a bare `#N` in the reply reaches
 // the person watching but not the model that could fix it, so it too blocks — `{"decision":"block"}`
 // is the one channel a `Stop` hook has to the model, and `stop_hook_active` caps a false positive at a
@@ -62,6 +63,8 @@ interface StopContext {
 	headless_waiting: boolean
 	// How many headless-wait refusals sit on this run's transcript tail — the spin bound below.
 	headless_refusals: number
+	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
+	lane_child: boolean
 }
 
 interface StopOutcome {
@@ -154,6 +157,30 @@ const HEADLESS_WAIT_BODY =
 
 const HEADLESS_WAIT_REASON = `${HEADLESS_WAIT_MARKER}${HEADLESS_WAIT_BODY}`
 
+// **A lane child never asks a person for the index** (joshuafolkken/kit#2445). The index rule protects
+// a person's own staging, and a lane is a per-run work tree with none to protect; the sanctioned commit
+// flow is already authorized, so the reason hands it over instead of letting the run wait on a person.
+// Both halves must appear — an index command and a request for permission — so a report that merely
+// names `git add` is not refused.
+const INDEX_COMMAND_PATTERN = /git (?:add|stage|rm --cached|restore --staged|restore -S)\b/u
+const PERMISSION_PATTERN = /許可|承認|permission|approve|approval|authorization/iu
+
+const LANE_INDEX_REASON =
+	'⛔ lane index permission: this is a dispatched lane child (`JOSH_LANE_CHILD`) and your reply asks ' +
+	"a person for permission to change the git index. A lane is a per-run work tree with no person's " +
+	'staging to protect, and the sanctioned commit flow is already authorized: remove any conflict ' +
+	'markers, then run `pnpm josh git -y`, which stages and commits them — a conflicted merge included. ' +
+	'This is Tier A (`.claude/skills/workflow-commands/chain-rule.md` → "origin/main is merged in before ' +
+	'the gate"). Do it and continue the run — do not repeat your previous reply.'
+
+function asks_index_permission(message: string): boolean {
+	return INDEX_COMMAND_PATTERN.test(message) && PERMISSION_PATTERN.test(message)
+}
+
+function needs_index_route(context: StopContext): boolean {
+	return context.lane_child && asks_index_permission(context.message)
+}
+
 function needs_filing(context: StopContext): boolean {
 	if (context.filed || !filing_offer.offers_filing(context.message)) return false
 
@@ -197,15 +224,17 @@ function count_headless_refusals(tail: string): number {
 	return tail.slice(Math.max(last_wait, 0)).split(HEADLESS_WAIT_MARKER).length - 1
 }
 
-// The two hold rules, notify ahead of release.
+// The two hold rules, notify ahead of release — behind the lane index route (joshuafolkken/kit#2445),
+// since the notify they would ask for announces a pause the run has no reason to take.
 function hold_reason(context: StopContext): string | undefined {
+	if (needs_index_route(context)) return LANE_INDEX_REASON
 	if (needs_notify(context)) return STOP_NOTIFY_REASON
 	if (needs_release(context)) return HOLD_RELEASE_REASON
 
 	return undefined
 }
 
-// First-wins across all four rules. Two things stand every rule down: `stop_hook_active` (the
+// First-wins across every rule. Two things stand every rule down: `stop_hook_active` (the
 // loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
 // flight (a lane child's automatic turn-end, not a person-waiting pause). The two hold rules keep their
 // order ahead of the reply rules, so a stop that both still owes its notify and holds a bare `#N` still
@@ -250,6 +279,7 @@ const stop_rules = {
 	HEADLESS_WAIT_REASON,
 	HOLD_RELEASE_REASON,
 	ISSUE_CITATION_REASON,
+	LANE_INDEX_REASON,
 	NO_OUTCOME,
 	STOP_NOTIFY_REASON,
 	SWITCH_ENV_KEY,
