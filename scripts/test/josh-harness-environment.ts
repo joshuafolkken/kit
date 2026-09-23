@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	symlinkSync,
@@ -56,6 +57,29 @@ function json_file(value: unknown): string {
 	return `${JSON.stringify(value, undefined, JSON_INDENT)}\n`
 }
 
+// A command josh runs inside the environment — the gate's `pnpm josh lint` and the rest — must reach
+// this checkout's source, as the kit's own `josh` script and a consumer's installed bin do. Without the
+// script it fell through to whatever `josh` was on PATH: a global install locally, nothing at all in CI.
+// The kit's `packageManager` goes with it, so Corepack runs the pinned pnpm rather than fetching the latest.
+function launch_command(launcher: JoshLauncher): string {
+	return [launcher.executable, ...launcher.leading_arguments]
+		.map((part) => JSON.stringify(part))
+		.join(' ')
+}
+
+function kit_package_manager(): string {
+	const manifest = readFileSync(path.join(josh_cli_fixture.REPO_ROOT, PACKAGE_JSON), 'utf8')
+
+	return (JSON.parse(manifest) as { packageManager: string }).packageManager
+}
+
+const PROJECT_FIELDS = {
+	private: true,
+	type: 'module',
+	packageManager: kit_package_manager(),
+	scripts: { josh: launch_command(josh_cli_fixture.SOURCE_JOSH) },
+}
+
 // A file the fixture writes: its path relative to the project root, and its content.
 type FixtureFile = readonly [string, string]
 
@@ -65,7 +89,8 @@ const TOOLCHAIN_FILES: ReadonlyArray<FixtureFile> = [
 	['.prettierrc', json_file({ semi: false, singleQuote: true, useTabs: true })],
 	[
 		'cspell.config.yaml',
-		'words:\n  - joshuafolkken\nignorePaths:\n  - .git\n  - node_modules\n  - .tsbuildinfo\n  - .*cache\n',
+		// `package.json` is skipped because its `josh` script carries this checkout's absolute paths.
+		'words:\n  - joshuafolkken\nignorePaths:\n  - .git\n  - node_modules\n  - .tsbuildinfo\n  - .*cache\n  - package.json\n',
 	],
 	['eslint.config.js', 'export default [{}]\n'],
 	[
@@ -85,10 +110,7 @@ const TOOLCHAIN_FILES: ReadonlyArray<FixtureFile> = [
 // consumer, and the `docs/` and `prompts/` directories only the kit carries.
 const KIT_FILES: ReadonlyArray<FixtureFile> = [
 	...TOOLCHAIN_FILES,
-	[
-		PACKAGE_JSON,
-		json_file({ name: PACKAGE_NAME, version: '0.0.0', private: true, type: 'module' }),
-	],
+	[PACKAGE_JSON, json_file({ name: PACKAGE_NAME, version: '0.0.0', ...PROJECT_FIELDS })],
 	['docs/README.md', '# Docs\n'],
 	['prompts/README.md', '# Prompts\n'],
 ]
@@ -102,8 +124,7 @@ const CONSUMER_FILES: ReadonlyArray<FixtureFile> = [
 		json_file({
 			name: 'kit-consumer',
 			version: '0.0.0',
-			private: true,
-			type: 'module',
+			...PROJECT_FIELDS,
 			devDependencies: { [PACKAGE_NAME]: '*' },
 		}),
 	],

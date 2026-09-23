@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { execaSync } from 'execa'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { josh_harness, type EnvironmentKind, type JoshEnvironment } from './josh-harness'
 
@@ -16,6 +17,9 @@ const LEDGER = path.join('docs', 'observations.md')
 const GATE_GREEN = 'Gate green'
 const RECORD = 'review:record'
 const SETUP_FAILED = 'setup failed'
+const DECOY_DIRECTORY = 'decoy-bin'
+const DECOY_EXIT_CODE = 97
+const EXECUTABLE_MODE = 0o755
 // The race runs in a kit environment of its own, so the ledger lines the other scenarios wrote are not
 // part of the tree its gate checks.
 const RACE = 'race'
@@ -28,6 +32,18 @@ function environment(kind: string): JoshEnvironment {
 	if (found === undefined) throw new Error(`no ${kind} environment was opened`)
 
 	return found
+}
+
+// Inside the workspace, so closing the environment removes it.
+function decoy_bin(workspace: string): string {
+	const directory = path.join(workspace, DECOY_DIRECTORY)
+
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(path.join(directory, 'josh'), `#!/bin/sh\nexit ${String(DECOY_EXIT_CODE)}\n`, {
+		mode: EXECUTABLE_MODE,
+	})
+
+	return directory
 }
 
 function ledger_text(directory: string): string {
@@ -51,6 +67,25 @@ describe.each(KINDS)('josh harness — the %s environment', (kind) => {
 			expect(josh_harness.run(opened, [RECORD, '--issue', '101']).exit_code).toBe(0)
 			expect(josh_harness.run(opened, [RECORD, '--check', '--issue', '101']).exit_code).toBe(0)
 			expect(ledger_text(opened.primary)).toContain('#101')
+		},
+		SCENARIO_TIMEOUT_MS,
+	)
+
+	// The gate runs its checks as `pnpm josh <check>` in the environment; a `josh` that resolved to a
+	// global install passed locally and was missing in CI. A decoy `josh` first on PATH that always
+	// fails stands in for both, so only the environment's own script can answer.
+	it(
+		'runs `pnpm josh` through its own script, not a `josh` on PATH',
+		() => {
+			const opened = environment(kind)
+			const decoy_path = decoy_bin(opened.workspace)
+			const result = execaSync('pnpm', ['josh', 'help'], {
+				cwd: opened.root,
+				env: { PATH: `${decoy_path}${path.delimiter}${process.env['PATH'] ?? ''}` },
+				reject: false,
+			})
+
+			expect(result.exitCode, result.stderr).toBe(0)
 		},
 		SCENARIO_TIMEOUT_MS,
 	)
