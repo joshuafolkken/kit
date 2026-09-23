@@ -10,6 +10,7 @@ import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epi
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
+import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_pool } from './backlog-pool'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next (joshuafolkken/kit#1630).
@@ -226,7 +227,12 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		return undefined
 	}
 
-	return combine(views_from(reads, context), context)
+	// The defect priority is applied here rather than when printing, so `backlog:plan` shows the order
+	// the run takes (joshuafolkken/kit#2455).
+	return await backlog_defect_priority.prioritize(
+		combine(views_from(reads, context), context),
+		context.repo,
+	)
 }
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.

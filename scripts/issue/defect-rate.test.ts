@@ -8,6 +8,7 @@ const NOW_MS = Date.parse('2026-09-23T14:00:00Z')
 const DAYS = 14
 const SINCE = '2026-09-09'
 const LOWER_BOUNDS = 'lower bounds'
+const INTERRUPT = 'route:interrupt'
 
 function issue(body: string, labels: ReadonlyArray<string> = []): RateIssue {
 	return { body, labels }
@@ -58,7 +59,7 @@ describe('defect_rate.measure', () => {
 		const measured = defect_rate.measure({
 			days: DAYS,
 			since: SINCE,
-			filed: [issue(DEFECT_BODY), issue(CODE_ONLY_BODY, ['route:interrupt']), issue(BEHAVIOR_BODY)],
+			filed: [issue(DEFECT_BODY), issue(CODE_ONLY_BODY, [INTERRUPT]), issue(BEHAVIOR_BODY)],
 			completed: [issue(BEHAVIOR_BODY), issue(BEHAVIOR_BODY), issue(CODE_ONLY_BODY), issue('')],
 			is_capped: false,
 		})
@@ -69,6 +70,30 @@ describe('defect_rate.measure', () => {
 
 	it('has no rate when no behavior change completed', () => {
 		expect(defect_rate.rate_of(result(3, 0))).toBeUndefined()
+	})
+})
+
+describe('defect_rate.kind_of', () => {
+	it.each([
+		['a defect declaration', issue(DEFECT_BODY), 'defect'],
+		['a behavior change under route:interrupt', issue(BEHAVIOR_BODY, [INTERRUPT]), 'defect'],
+		['a behavior change', issue(BEHAVIOR_BODY), 'mechanism'],
+		['a code-only change', issue(CODE_ONLY_BODY), 'other'],
+		['an undeclared body', issue(''), 'other'],
+	])('classifies %s', (_label, input, expected) => {
+		expect(defect_rate.kind_of(input)).toBe(expected)
+	})
+})
+
+describe('defect_rate.is_above_baseline', () => {
+	it('is true only strictly above the baseline', () => {
+		expect(defect_rate.is_above_baseline(result(22, 50))).toBe(true)
+		expect(defect_rate.is_above_baseline(result(21, 50))).toBe(false)
+		expect(defect_rate.is_above_baseline(result(1, 50))).toBe(false)
+	})
+
+	it('is false when there is no rate', () => {
+		expect(defect_rate.is_above_baseline(result(5, 0))).toBe(false)
 	})
 })
 
