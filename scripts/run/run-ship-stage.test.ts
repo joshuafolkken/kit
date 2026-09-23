@@ -57,6 +57,17 @@ describe('run_ship_stage.is_done — the commit/push/PR stage', () => {
 	it('is passed over once merged, record or not', () => {
 		expect(run_ship_stage.is_done(STAGE.COMMIT, NONE, MERGED)).toBe(true)
 	})
+
+	// joshuafolkken/kit#2446: the evidence body a refused followup asked for reaches the open PR only
+	// through `git -y`, so a rerun carrying one reruns this stage.
+	it('reruns a recorded stage when a PR body is supplied', () => {
+		expect(run_ship_stage.is_done(STAGE.COMMIT, ALL, SHIPPED, true)).toBe(false)
+		expect(run_ship_stage.is_done(STAGE.GATE, ALL, SHIPPED, true)).toBe(true)
+	})
+
+	it('still passes over a merged stage when a PR body is supplied', () => {
+		expect(run_ship_stage.is_done(STAGE.COMMIT, ALL, MERGED, true)).toBe(true)
+	})
 })
 
 describe('run_ship_stage.is_done — followup and report', () => {

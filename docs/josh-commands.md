@@ -539,6 +539,8 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 - `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
 
+**Live-execution evidence (joshuafolkken/kit#2446):** a merge is refused when the branch changes a runtime path (`josh test:declared`'s classification) and the PR body lacks a `## 実機証跡` section of a backticked command plus its fenced output (`issue:lint`'s `## 再現` parser). Pass it with `josh git -y --body-file <path>`.
+
 **Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
@@ -1716,7 +1718,7 @@ under one header per step. It extends `run:tail`'s post-merge fold into the body
 Unlike `run:tail` it stops at the first failed step — a red gate never reaches the commit — and closes
 the report with the name of the stopped step, so the run reads only that one. The first positional is
 the `"<title> #<N>"` string `git -y` and `followup` already take; the issue number is read off its tail
-for `run:tail`, and `--notify-message` is forwarded to `followup` alone. Any further positionals are
+for `run:tail`, `--notify-message` is forwarded to `followup` alone, and `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on — to `git -y` alone. Any further positionals are
 follow-up citations filed this run — branch-2 filing runs before `ship` — forwarded to `run:tail` after
 the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
 review finding — stays in front of this command.
