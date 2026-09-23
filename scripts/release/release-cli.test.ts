@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { git_command } from '#scripts/git/git-command'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { release_cli } from './release-cli'
+import { release_history } from './release-history'
 import type { ReleasePlan } from './release-plan'
 import { release_publish } from './release-publish'
 
@@ -73,5 +75,46 @@ describe('the release pull request', () => {
 		expect(text).toContain(RELEASE_BRANCH)
 		expect(text).toContain('previous release attempt')
 		expect(text).toContain('pnpm josh release')
+	})
+})
+
+function arrange_run(pending: number): void {
+	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	vi.spyOn(git_command, 'get_default_branch').mockResolvedValue('main')
+	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
+	vi.spyOn(git_command, 'status').mockResolvedValue('')
+	vi.spyOn(git_command, 'branch').mockResolvedValue('feature')
+	vi.spyOn(release_history, 'read_current_version').mockResolvedValue(PLAN.current_version)
+	vi.spyOn(release_history, 'read_release_plan').mockResolvedValue({ ...PLAN, pending })
+	vi.spyOn(release_publish, 'publish').mockResolvedValue(release_publish.SUCCESS_EXIT_CODE)
+}
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
+describe('release_cli.run', () => {
+	// The count is read from `origin/<default>`, so the root's branch and cleanliness are never
+	// consulted — a release can start with the root dirty or on another branch (joshuafolkken/kit#2411).
+	it('reads from origin without inspecting the root checkout', async () => {
+		arrange_run(THREE)
+
+		await release_cli.run(false)
+
+		expect(git_command.fetch_branch).toHaveBeenCalledWith('main')
+		expect(git_command.status).not.toHaveBeenCalled()
+		expect(git_command.branch).not.toHaveBeenCalled()
+		expect(release_publish.publish).toHaveBeenCalledTimes(1)
+	})
+
+	// A dry run writes nothing: it does not fetch, does not create a work tree, and does not publish.
+	it('neither fetches nor publishes under --dry-run', async () => {
+		arrange_run(THREE)
+
+		const code = await release_cli.run(true)
+
+		expect(code).toBe(release_publish.SUCCESS_EXIT_CODE)
+		expect(git_command.fetch_branch).not.toHaveBeenCalled()
+		expect(release_publish.publish).not.toHaveBeenCalled()
 	})
 })

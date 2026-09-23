@@ -259,7 +259,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/refactor/refactor-lint.test.ts',
 	'scripts/refactor/refactor-scan.test.ts',
 	'scripts/refactor/refactor-targets.test.ts',
-	'scripts/release/release-cli.test.ts',
 	'scripts/release/release-history.test.ts',
 	'scripts/release/release-plan.test.ts',
 	'scripts/release/release-tag.test.ts',

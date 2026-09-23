@@ -88,6 +88,16 @@ async function read_base(
 	return release_plan.find_version_base(commits, oldest_parent_version)
 }
 
+// The version `package.json` carries at a git revision. `josh release` reads it from
+// `origin/<default>` rather than from the checkout's own `package.json`, so the number it raises is
+// main's latest even when the run happens in a work tree cut for the release (joshuafolkken/kit#2411).
+async function read_current_version(
+	tip: string = DEFAULT_TIP,
+	reader: HistoryReader = git_reader,
+): Promise<string | undefined> {
+	return await read_version_at(reader, tip)
+}
+
 // **Undefined means the base could not be found**, never "there is nothing to release" — the two have
 // to stay distinguishable, because one is a report and the other is a failure.
 async function read_release_plan(
@@ -112,6 +122,7 @@ async function read_release_plan(
 const release_history = {
 	parse_version,
 	read_base,
+	read_current_version,
 	read_release_plan,
 	BASE_SEARCH_LIMIT,
 	DEFAULT_TIP,
