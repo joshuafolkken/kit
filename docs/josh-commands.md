@@ -1711,6 +1711,8 @@ A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored onl
 state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged
 as a `ship-stage` trace event.
 
+`--review` (#2427) runs review round 1 beside the gate; High/Medium or a refusal stops it.
+
 ### `josh run:report`
 
 Generates the session-facing report _from_ the run's event stream, rather than composing the wording by

@@ -17,6 +17,7 @@ import { z } from 'zod'
 // re-run on an unchanged tree a reuse rather than a second execution. No quality gate is folded away.
 
 const STAGE = {
+	REVIEW: 'review',
 	GATE: 'gate',
 	COMMIT: 'commit',
 	FOLLOWUP: 'followup',
@@ -88,6 +89,10 @@ function is_shipped(state: ShipState): boolean {
 }
 
 const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => boolean> = {
+	// The `--review` round (joshuafolkken/kit#2427) precedes the commit, so a commit is its output as it
+	// is the gate's. A record alone is not honored: before a commit the tree may have been edited since
+	// the recorded round, and only a commit pins the tree that round read.
+	[STAGE.REVIEW]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
 	// A recorded followup still needs the shipped state: a record left by a merged ship whose report

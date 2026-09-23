@@ -36,7 +36,7 @@ Review results and successful pushes are never turn boundaries.
    request (joshuafolkken/kit#2343); `pnpm josh review:findings` reads the category tally back.
 5. **The clean path ships in one call** — with no second round due, background
    `pnpm josh ship "<title> #<N>"`: gate → `git -y` → foreground `followup` → `run:tail`, stopping at the
-   first failed step (joshuafolkken/kit#2398). **A due second round does not fit `ship`**: the PR opens
+   first failed step (joshuafolkken/kit#2398). `--review` = round 1. **A due second round does not fit `ship`**: the PR opens
    between the rounds — background `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then
    `pnpm josh followup`.
 
