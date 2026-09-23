@@ -116,6 +116,18 @@ describe('run_event_stream.read_last — the degenerate read', () => {
 		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.MERGE)
 	})
 
+	// joshuafolkken/kit#2437: the heartbeat reaches a relay through the stream but is not a position.
+	it('appends a heartbeat and skips it for the last position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.MERGE, '#7 merged', AT)
+		const heartbeat = run_event_stream.append(target, KIND.HEARTBEAT, 'at 10:00 · next 10:15', AT)
+
+		expect(heartbeat.appended).toBe(true)
+		expect(run_event_stream.read_from(target, 1).events[0]?.kind).toBe(KIND.HEARTBEAT)
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.MERGE)
+	})
+
 	it('returns undefined for a stream holding only trace events', () => {
 		const target = fresh_target()
 

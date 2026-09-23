@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_clock } from './run-progress-clock'
 import { run_progress_config } from './run-progress-config'
@@ -235,6 +236,7 @@ async function attempt(
 	if (result.kind !== 'observed') return decline(loop, now_ms, DECLINE_NOTICES[result.kind])
 
 	run_progress_read.mark(target, now_ms, result.line)
+	await run_event_stream_emit.emit_heartbeat(result.line)
 
 	return { ...FRESH_LOOP, last_ms: now_ms, state: result.state }
 }

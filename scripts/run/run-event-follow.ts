@@ -23,6 +23,18 @@ import type { StreamRead } from './run-event-stream'
 // The shapes rhyme, but the data source and the exit condition are different, so folding them together
 // would couple two unrelated readers rather than remove a duplicate.
 
+// The follow's quiet-tick cadence and how promptly it notices an arrival. The interval only bounds a
+// wait that found nothing — an arrival returns within a tick of landing — so it can be as long as the
+// heartbeat without making the relay late, and the tick is a cheap `stat` of one file. They live here
+// rather than in the CLI because the relay guard (`run-watcher-guard.ts`) measures a relay's staleness
+// against the same interval, so the two cannot disagree about how long one pass may be quiet
+// (joshuafolkken/kit#2437).
+const MS_PER_SECOND = 1000
+const SECONDS_PER_MINUTE = 60
+const FOLLOW_INTERVAL_MINUTES = 20
+const FOLLOW_INTERVAL_MS = FOLLOW_INTERVAL_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND
+const FOLLOW_TICK_MS = MS_PER_SECOND
+
 interface FollowPorts {
 	read: (position: number) => StreamRead
 	now: () => number
@@ -52,7 +64,7 @@ async function follow(
 	return read
 }
 
-const run_event_follow = { follow }
+const run_event_follow = { FOLLOW_INTERVAL_MS, FOLLOW_TICK_MS, follow }
 
 export type { FollowOptions, FollowPorts }
 export { run_event_follow }

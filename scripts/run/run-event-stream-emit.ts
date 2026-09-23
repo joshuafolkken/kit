@@ -73,6 +73,11 @@ async function emit_once(kind: string, text: string): Promise<boolean> {
 	}
 }
 
-const run_event_stream_emit = { emit, emit_once, stream_target }
+// One progress heartbeat line onto the stream, so a relay reaches it across a cut (joshuafolkken/kit#2437).
+async function emit_heartbeat(line: string): Promise<void> {
+	await emit(run_event_stream.EVENT_KIND.HEARTBEAT, line)
+}
+
+const run_event_stream_emit = { emit, emit_heartbeat, emit_once, stream_target }
 
 export { run_event_stream_emit }
