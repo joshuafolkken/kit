@@ -603,17 +603,17 @@ release to publish, there is no runnable child, nothing carries `in-progress` an
 ## Who sends the summary, and who propagates
 
 With several sessions on one epic, **exactly one does the end-of-epic work: the session standing in the
-repository that owns the epic.** It sends the epic completion summary and runs `josh propagate` — which
-itself refuses to run outside the supplier repository. Every other session finishes quietly when its own
+repository that owns the epic.** It sends the epic completion summary and runs `josh propagate`, which
+itself refuses to run outside the supplier repository. Every other session finishes quietly once its own
 repository has no children left.
 
 Per-child completion notifications are unchanged: `pnpm josh followup` sends one each. Send an epic
 **start** notification when the run begins, and an epic **completion** summary at the end. **Do not
-compose that summary by hand — `pnpm josh run:report` generates it from the run's event stream**
-(joshuafolkken/kit#2249): it renders what merged, what parked and why, and what was cut, reusing
-`format_event`, and closes with the release tail below. Its output is the Telegram body too — pass it to
+compose that summary by hand — `pnpm josh run:report` generates it from this invocation's events**
+(joshuafolkken/kit#2249, scoped in #2393): it renders what merged, what parked and why, and what was cut,
+reusing `format_event`, closing with the release tail below. Its output is the Telegram body too — pass it to
 `pnpm josh notify --body-file` so the summary a session shows and the message off-screen are one text
-from one generator, never a second wording of the same facts.
+from one generator.
 
 **That same session asks `pnpm josh release:scope` once, after the last child has merged** — in the
 primary checkout, after the last lane is closed, and never once per child. `followup-reference.md` →

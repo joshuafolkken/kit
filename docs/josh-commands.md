@@ -1671,7 +1671,17 @@ merge and the push above it stay their own calls.
 Generates the session-facing report _from_ the run's event stream, rather than composing the wording by
 hand each run (joshuafolkken/kit#2249). It reuses `run:event`'s `format_event` for every
 line — merges, parks with their reason, cuts — and appends the release tail `release:scope` decides (the
-request and the command on `required`, `unknown` printed as `unknown`, silent on `skip`). The printed
+request and the command on `required`, `unknown` printed as `unknown`, silent on `skip`).
+
+**It renders one invocation, not the whole stream** (joshuafolkken/kit#2393). The stream outlives an
+invocation, so the scope comes from the run record's start time: events from before it are left out, and
+because that field survives a `--cut` the events either side of a cut stay in one report. **A scope it
+cannot determine — no record, or one it cannot read — prints a notice and no events**, never a fallback
+to everything. That is why the report is generated before `pnpm josh run:carry --end` removes the record:
+`.claude/skills/workflow-commands/backlogrun-steps.md` → "End the record when the run ends" is that
+ordering rule's single source.
+
+The printed
 body is the Telegram body too: `josh notify --body-file` sends exactly this output, so a session's
 summary and the off-screen message are one string from one generator, and the AI writes only Step 0's
 three lines.
