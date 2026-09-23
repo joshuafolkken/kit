@@ -20,7 +20,6 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
 const { run_ship_stage } = await import('./run-ship-stage')
-const { run_ship_detach } = await import('./run-ship-detach')
 
 // joshuafolkken/kit#2426: a ship re-run after it died resumes rather than restarts. The stage record is
 // the real file module writing to a temp path, so each restart reads what the previous call left; the
@@ -47,8 +46,6 @@ function events(): ReadonlyArray<string> {
 }
 
 beforeEach(() => {
-	// Outside a supervisor, so a gate the detached supervisor runs never reads these ships as supervised.
-	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '')
 	current.target = path.join(TEMPORARY, `${randomUUID()}.json`)
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	emit_mock.mockReset()
