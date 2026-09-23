@@ -38,6 +38,11 @@ vi.mock('./run-progress-clock', () => ({
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn() },
 }))
+// The `--wait` exit's pick-up reading is `backlog-ready.test.ts`'s; mocked so no wait here reads the
+// backlog for real.
+vi.mock('#scripts/backlog/backlog-ready', () => ({
+	backlog_ready: { print_ready_line: vi.fn() },
+}))
 
 const { gh_spawn } = await import('#scripts/gh/gh-spawn')
 const { lane_child_marker } = await import('#scripts/lane/lane-child-marker')

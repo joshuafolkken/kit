@@ -124,6 +124,7 @@ const filing_cap = {
 	FILING_CAP,
 	FILING_CAP_REASON,
 	ROW,
+	current_turn,
 	decide,
 	prior_filing_count,
 	turn_filing_count,
