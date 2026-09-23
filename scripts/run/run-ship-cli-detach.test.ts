@@ -6,6 +6,7 @@ const read_log_mock = vi.hoisted(() => vi.fn())
 const is_supervised_mock = vi.hoisted(() => vi.fn())
 const return_mock = vi.hoisted(() => vi.fn())
 const repository_mock = vi.hoisted(() => vi.fn())
+const is_lane_child_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
@@ -30,6 +31,9 @@ vi.mock('./run-ship-detach', () => ({
 	},
 }))
 vi.mock('./run-ship-return', () => ({ run_ship_return: { return_control: return_mock } }))
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: is_lane_child_mock },
+}))
 
 const { run_ship_cli } = await import('./run-ship-cli')
 
@@ -53,6 +57,7 @@ beforeEach(() => {
 	is_supervised_mock.mockReset().mockReturnValue(false)
 	return_mock.mockReset().mockResolvedValue('recorded')
 	repository_mock.mockReset().mockResolvedValue(REPOSITORY)
+	is_lane_child_mock.mockReset().mockReturnValue(false)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -80,6 +85,35 @@ describe('run_ship_cli.run — --detach hands the region to a supervisor', () =>
 		detach_mock.mockResolvedValue({ verdict: 'busy', note: 'already running' })
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
+	})
+})
+
+// joshuafolkken/kit#2457: a headless lane child's turn ending killed a ship it ran in its own process.
+describe('run_ship_cli.run — a lane child always ships through the supervisor', () => {
+	it('detaches without the flag inside a lane child and runs no step itself', async () => {
+		is_lane_child_mock.mockReturnValue(true)
+
+		expect(await run_ship_cli.run([TITLE])).toBe(OK)
+		expect(detach_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ title: TITLE, number: NUMBER }),
+		)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+		expect(info_lines).toEqual(['launched'])
+	})
+
+	it('runs the stages itself when it is the supervisor, lane mark inherited', async () => {
+		is_lane_child_mock.mockReturnValue(true)
+		is_supervised_mock.mockReturnValue(true)
+
+		expect(await run_ship_cli.run([TITLE])).toBe(OK)
+		expect(detach_mock).not.toHaveBeenCalled()
+		expect(josh_run_mock).toHaveBeenCalled()
+	})
+
+	it('leaves a ship typed outside a lane in the foreground', async () => {
+		expect(await run_ship_cli.run([TITLE])).toBe(OK)
+		expect(detach_mock).not.toHaveBeenCalled()
+		expect(josh_run_mock).toHaveBeenCalled()
 	})
 })
 

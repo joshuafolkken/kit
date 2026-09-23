@@ -18,8 +18,13 @@ vi.mock('./run-ship-probe', () => ({
 }))
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
 vi.mock('./run-ship-review-steps', () => ({ run_ship_review_steps: { review_stage: review_mock } }))
+// Outside a lane, so a gate run inside a lane child never hands these ships to a real supervisor.
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
+}))
 
 const { run_ship_cli } = await import('./run-ship-cli')
+const { run_ship_detach } = await import('./run-ship-detach')
 
 const OK = 0
 const FAILED = 1
@@ -42,6 +47,8 @@ function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
 }
 
 beforeEach(() => {
+	// Outside a supervisor, so a gate the detached supervisor runs never reads these ships as supervised.
+	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '')
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	review_mock.mockReset().mockResolvedValue({ code: OK, out: 'review clean' })
 	info_lines.length = 0

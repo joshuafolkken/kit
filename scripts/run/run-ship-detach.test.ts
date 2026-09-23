@@ -23,6 +23,7 @@ const INLINE_FLAG = '--notify-message'
 const FILE_FLAG = '--notify-message-file'
 const BODY = 'Cause: x\nFix: y'
 const START_NOTE = 'pnpm not found'
+const PARENT_SESSION_ID = 'parent-session-id'
 const GATE_HEADER = '=== gate ==='
 const NEWEST_HEADER = '=== 2026-09-23T02:00:00Z · started by process 2 · pnpm ==='
 
@@ -84,6 +85,16 @@ describe('run_ship_detach.detach', () => {
 		expect(emit_mock).toHaveBeenCalledWith('ship-launch', `#${NUMBER} ship supervisor launched`)
 	})
 
+	it('launches the supervisor carrying the parent session id', async () => {
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', PARENT_SESSION_ID)
+
+		await run_ship_detach.detach(request())
+		vi.unstubAllEnvs()
+		const launched = launch_mock.mock.calls[0]?.[0] as { env: Record<string, string> }
+
+		expect(launched.env['CLAUDE_CODE_SESSION_ID']).toBe(PARENT_SESSION_ID)
+	})
+
 	it('refuses a second supervisor while the recorded one is alive', async () => {
 		const target = request()
 
@@ -112,6 +123,29 @@ describe('run_ship_detach.detach', () => {
 
 		expect(result).toEqual({ verdict: run_ship_detach.FAILED, note: START_NOTE })
 		expect(emit_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2457: a supervisor launched with every parent session key stripped could not resolve
+// the review stage's provider and stopped at `no Codex or Claude Code session was detected`.
+describe('run_ship_detach.supervisor_environment', () => {
+	it('carries the parent session id so the review stage resolves its provider', () => {
+		const environment = run_ship_detach.supervisor_environment({
+			CLAUDE_CODE_SESSION_ID: PARENT_SESSION_ID,
+			CLAUDE_CODE_MESSAGING_SOCKET: 'parent.sock',
+			CLAUDE_CODE_MESSAGING_TOKEN: 'token',
+		})
+
+		expect(environment).toEqual({
+			[run_ship_detach.SUPERVISED_KEY]: '1',
+			CLAUDE_CODE_SESSION_ID: PARENT_SESSION_ID,
+		})
+	})
+
+	it('leaves the session id unset outside a Claude Code session', () => {
+		const environment = run_ship_detach.supervisor_environment({})
+
+		expect(environment['CLAUDE_CODE_SESSION_ID']).toBeUndefined()
 	})
 })
 

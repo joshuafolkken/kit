@@ -1712,7 +1712,7 @@ as a `ship-stage` trace event.
 
 `--review` (#2427) runs review round 1 beside the gate; High/Medium or a refusal stops it.
 
-`--detach` (#2428): a detached supervisor; a stop emits `ship-stop` (`run:step` → `--log <N>`).
+`--detach` (#2428; implied in a lane child, #2457): a supervisor; a stop emits `ship-stop` (`--log <N>`).
 
 ### `josh run:report`
 

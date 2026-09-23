@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
@@ -61,6 +62,8 @@ const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
 const USAGE =
 	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
 const NO_LOG_NOTE = 'no detached ship supervisor log for this issue'
+const LANE_CHILD_DETACH_NOTE =
+	'lane child: shipping through the detached supervisor (--detach implied), so the end of this turn cannot kill it'
 const should_forward_stderr = true
 
 type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
@@ -357,8 +360,21 @@ async function detach(args: ShipArguments): Promise<number> {
 	return result.verdict === run_ship_detach.LAUNCHED ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+// joshuafolkken/kit#2457: a headless lane child's turn ending kills a ship it left in its own process,
+// so inside a lane child the region always goes to the supervisor, flag or not. The supervisor itself
+// inherits the lane mark, and is the one ship that must run the stages here.
+function should_detach(args: ShipArguments): boolean {
+	if (args.is_detach) return true
+
+	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
+}
+
 async function run_ship_command(args: ShipArguments): Promise<number> {
-	if (args.is_detach) return await detach(args)
+	if (should_detach(args)) {
+		if (!args.is_detach) console.error(LANE_CHILD_DETACH_NOTE)
+
+		return await detach(args)
+	}
 
 	const sections = await ship(args)
 
