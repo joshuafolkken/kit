@@ -77,6 +77,10 @@ describe('main_merge_guard.refusal', () => {
 		expect(refusal).toContain(COMMIT_COMMAND)
 	})
 
+	it('lets staged changes through when the default branch brings nothing in', () => {
+		expect(main_merge_guard.refusal(`M  ${UNTOUCHED_FILE}`, [], 'main')).toBeUndefined()
+	})
+
 	it('lets a dirty tree the merge does not touch through', () => {
 		expect(main_merge_guard.refusal(DIRTY, [UNTOUCHED_FILE], 'main')).toBeUndefined()
 	})

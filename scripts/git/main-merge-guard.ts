@@ -97,6 +97,8 @@ function refusal(
 	const unmerged = unmerged_paths(status)
 
 	if (unmerged.length > 0) return unmerged_message(unmerged)
+	// Nothing incoming means git answers "Already up to date" whatever the index holds.
+	if (incoming.length === 0) return undefined
 
 	const staged = staged_paths(status)
 
@@ -108,8 +110,14 @@ function refusal(
 }
 
 // The paths the default branch changed since this branch left it — what the merge would bring in.
+// `--no-renames` lists both sides of a rename, so an edit to the old name still counts as an overlap.
 async function incoming_paths(default_branch: string): Promise<Array<string>> {
-	const output = await git_spawn.read(['diff', '--name-only', `HEAD...origin/${default_branch}`])
+	const output = await git_spawn.read([
+		'diff',
+		'--name-only',
+		'--no-renames',
+		`HEAD...origin/${default_branch}`,
+	])
 
 	return output.split('\n').filter((line) => line !== '')
 }
