@@ -13,6 +13,7 @@ const BASE: StopContext = {
 	headless_waiting: false,
 	headless_refusals: 0,
 	owes_offer: false,
+	lane_child: false,
 }
 
 function context(overrides: Partial<StopContext>): StopContext {
@@ -235,6 +236,53 @@ describe('stop_rules.stop_outcome — headless parent', () => {
 
 	it('lets a parent with nothing to wait on stop', () => {
 		expect(stop_rules.stop_outcome(context({ headless_waiting: false })).reason).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#2445: a lane child stopped to ask a person for `git add` on a tree the
+// sanctioned commit flow could already finish.
+const INDEX_REQUEST =
+	'The conflict is resolved; please grant permission to run `git add` on the file.'
+
+describe('stop_rules.stop_outcome — lane index permission', () => {
+	it('refuses a lane child that stops asking for index permission', () => {
+		const { reason } = stop_rules.stop_outcome(
+			context({ lane_child: true, message: INDEX_REQUEST }),
+		)
+
+		expect(reason).toBe(stop_rules.LANE_INDEX_REASON)
+		expect(reason).toContain('pnpm josh git -y')
+		expect(reason).toContain(NO_REPRINT)
+	})
+
+	it('goes ahead of the stop notification a held lane would owe', () => {
+		const held = context({ lane_child: true, hold_present: true, message: INDEX_REQUEST })
+
+		expect(stop_rules.stop_outcome(held).reason).toBe(stop_rules.LANE_INDEX_REASON)
+	})
+
+	it('asks the same in Japanese', () => {
+		const message = '`git add` の許可をください'
+
+		expect(stop_rules.stop_outcome(context({ lane_child: true, message })).reason).toBe(
+			stop_rules.LANE_INDEX_REASON,
+		)
+	})
+
+	it('stays silent outside a lane child', () => {
+		expect(stop_rules.stop_outcome(context({ message: INDEX_REQUEST })).reason).toBeUndefined()
+	})
+
+	it('stays silent on a report that only names the command', () => {
+		const message = 'Committed through `pnpm josh git -y`, which ran `git add` itself.'
+
+		expect(stop_rules.stop_outcome(context({ lane_child: true, message })).reason).toBeUndefined()
+	})
+
+	it('honours the loop-breaker', () => {
+		const repeated = context({ lane_child: true, message: INDEX_REQUEST, stop_hook_active: true })
+
+		expect(stop_rules.stop_outcome(repeated).reason).toBeUndefined()
 	})
 })
 
