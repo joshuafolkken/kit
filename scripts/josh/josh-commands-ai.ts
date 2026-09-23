@@ -243,6 +243,21 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[<issue> ...]', 'automation', ['git', 'network']],
 	},
+	// The commit-to-report region a run ships a change on, folded into one call (joshuafolkken/kit#2398):
+	// the gate, the commit/push/PR (`git -y`), the CI-wait merge (`followup`) and the report bookkeeping
+	// (`run:tail`) were four round trips re-billing the run's full context each. It stops at the first
+	// failed step and names it, so the run reads only the step to fix.
+	ship: {
+		script: 'scripts/run/run-ship-cli.ts',
+		description:
+			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
+		category: 'AI tools',
+		reference: [
+			'"<title> #<N>" [--notify-message <text> | --notify-message-file <path>]',
+			'automation',
+			['git', 'network'],
+		],
+	},
 	'run:event': {
 		script: 'scripts/run/run-event-cli.ts',
 		description:

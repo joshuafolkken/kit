@@ -7,15 +7,14 @@ Review results and successful pushes are never turn boundaries.
 
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` before the scoped pair and the
    gate** — the pre-gate cut, ordered here so a lane child takes it before the gate rather than after a
-   refusal (joshuafolkken/kit#2177). It is a no-op outside a lane and cuts inside one; on `cut` the turn
-   ends and a fresh process resumes at the gate, and because the cut is issued on its own it never
-   batches with a call a refusal could collateral. The `pre-gate-cut.md` refusal stays as insurance.
-   Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts `pnpm josh gate` in
-   the background and prints the whole `/code-review` brief in one call, so the gate and the review
-   overlap rather than the review waiting on the gate (joshuafolkken/kit#2179). Launch the
-   `/code-review` subagent as the `general-purpose` agent type with that brief — it carries every tool,
-   so it can load the review skill and, with `--fix`, apply findings; a guessed type name fails with
-   `Agent type not found` (joshuafolkken/kit#2297). Never load the review skill in the main line.
+   refusal (joshuafolkken/kit#2177). It is a no-op outside a lane and cuts inside one; issued on its own
+   it never batches with a call a refusal could collateral, and `pre-gate-cut.md`'s refusal stays as
+   insurance. Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
+   `pnpm josh gate` in the background and prints the `/code-review` brief in one call, so the two overlap
+   rather than the review waiting on the gate (joshuafolkken/kit#2179). Launch the `/code-review`
+   subagent as the `general-purpose` agent type with that brief — it carries every tool, so it loads the
+   review skill and applies findings with `--fix`; a guessed type name fails (joshuafolkken/kit#2297).
+   Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
    and gate. Do not version-bump a child; `pnpm josh release` decides the version from main's history.
@@ -31,13 +30,15 @@ Review results and successful pushes are never turn boundaries.
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
    Any round-1 fix runs its affected scoped check and the gate before `git -y`.
    Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
-   [<category>:<severity>:<file> ...]` — a clean round is a call with no findings, which records one
-   zero-finding line. **`pnpm josh followup` refuses the merge until the round is recorded**
+   [<category>:<severity>:<file> ...]` — a clean round records one zero-finding line.
+   **`pnpm josh followup` refuses the merge until the round is recorded**
    (`pnpm josh review:record --check --issue <N>` answers `ok` / `missing`), so this is a gate, not a
    request (joshuafolkken/kit#2343); `pnpm josh review:findings` reads the category tally back.
-5. After a green joined gate, background `pnpm josh git -y "<title> #<N>"`. Its completion resumes the
-   same turn through branch-2 filing, `epic:bundle`, and `pnpm josh followup`. A clean round 2 merges;
-   a round-2 fix is pushed before its gate, which is joined before `followup`.
+5. **The clean path ships in one call** — with no second round due, background
+   `pnpm josh ship "<title> #<N>"`: gate → `git -y` → foreground `followup` → `run:tail`, stopping at the
+   first failed step (joshuafolkken/kit#2398). **A due second round does not fit `ship`**: the PR opens
+   between the rounds — background `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then
+   `pnpm josh followup`.
 
 A dispatched lane child may end once at the pre-gate cut in `pre-gate-cut.md`; it never ends at the
 push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and

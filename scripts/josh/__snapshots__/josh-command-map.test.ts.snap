@@ -122,6 +122,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "sa": "split:assess",
     "sd": "cspell:dot",
     "sg": "stop:guard",
+    "shp": "ship",
     "shs": "sonar:hotspots",
     "sl": "session:lang",
     "sp": "stash:pop",
@@ -1014,6 +1015,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "ship": [
+      ""<title> #<N>" [--notify-message <text> | --notify-message-file <path>]",
+      "automation",
+      [
+        "git",
+        "network",
       ],
     ],
     "sonar:hotspots": [

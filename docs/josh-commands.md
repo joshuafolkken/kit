@@ -1666,6 +1666,18 @@ Closes a run in one call, folding the three-round-trip post-merge sequence (josh
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
 merge and the push above it stay their own calls.
 
+### `josh ship`
+
+Ships a finished change in one call, folding the four-round-trip commit-to-report region a run spent a
+dozen turns on (joshuafolkken/kit#2398): the gate, the commit/push/PR (`git -y`), the CI-wait merge
+(`followup`, kept in the foreground) and the report bookkeeping (`run:tail`), run in order and joined
+under one header per step. It extends `run:tail`'s post-merge fold into the body of the region.
+Unlike `run:tail` it stops at the first failed step — a red gate never reaches the commit — and closes
+the report with the name of the stopped step, so the run reads only that one. The single positional is
+the `"<title> #<N>"` string `git -y` and `followup` already take; the issue number is read off its tail
+for `run:tail`, and `--notify-message` is forwarded to `followup` alone. The one decision the region
+carried — disposing of a review finding — stays in front of this command.
+
 ### `josh run:report`
 
 Generates the session-facing report _from_ the run's event stream, rather than composing the wording by
