@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger, type CategoryCount } from './review-finding-ledger'
 
 // `josh review:findings` — the reader over the review-finding ledger (joshuafolkken/kit#2325). It
@@ -37,7 +37,7 @@ async function read_ledger(ledger_path: string): Promise<string> {
 	}
 }
 
-async function run(ledger_path: string = OBSERVATION_LEDGER_PATH): Promise<number> {
+async function run(ledger_path: string = observation_ledger_home.ledger_path()): Promise<number> {
 	const content = await read_ledger(ledger_path)
 	const counts = review_finding_ledger.category_counts(content)
 

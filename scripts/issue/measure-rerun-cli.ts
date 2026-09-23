@@ -2,7 +2,7 @@
 import { execSync } from 'node:child_process'
 import { appendFile, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { baseline_measure, type Baseline } from './baseline-measure'
 
 // `josh measure:rerun <path>` — read a behavior-change Issue body after merge, re-run each baseline
@@ -43,8 +43,12 @@ function rerun_one(baseline: Baseline, date: string): Outcome {
 async function append_ledger(lines: ReadonlyArray<string>): Promise<void> {
 	if (lines.length === 0) return
 
-	await appendFile(OBSERVATION_LEDGER_PATH, `${lines.join('\n')}\n`, 'utf8')
-	console.info(`Recorded ${String(lines.length)} refuted premise(s) in ${OBSERVATION_LEDGER_PATH}.`)
+	// The primary checkout's ledger even inside a lane, whose own copy never reaches the default branch
+	// (joshuafolkken/kit#2419).
+	const ledger_path = observation_ledger_home.ledger_path()
+
+	await appendFile(ledger_path, `${lines.join('\n')}\n`, 'utf8')
+	console.info(`Recorded ${String(lines.length)} refuted premise(s) in ${ledger_path}.`)
 }
 
 function today(now: Date): string {
