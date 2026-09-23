@@ -77,6 +77,7 @@ const LOOPBACK_PREFIX = '127.'
 const NO_HOST = ''
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
+type RemovedEnvironment = Record<string, undefined>
 
 function parsed_host(value: string): string {
 	try {
@@ -124,10 +125,22 @@ function loopback_proxy_keys(source: EnvironmentSource): ReadonlyArray<string> {
 // reads it. Node's spawn omits an environment key whose value is `undefined`, which is the only way
 // to hand the child an environment that does not have the variable at all — and both callers spread
 // this over an inherited environment, so anything less than absent leaves the variable set.
-function removed_environment(source: EnvironmentSource = process.env): Record<string, undefined> {
-	const keys = [...PARENT_SESSION_KEYS, ...loopback_proxy_keys(source)]
-
+function to_removed(keys: ReadonlyArray<string>): RemovedEnvironment {
 	return Object.fromEntries(keys.map((key) => [key, undefined]))
+}
+
+function removed_environment(source: EnvironmentSource = process.env): RemovedEnvironment {
+	return to_removed([...PARENT_SESSION_KEYS, ...loopback_proxy_keys(source)])
+}
+
+// **The proxy half alone, for a spawn that is not a session** (joshuafolkken/kit#2436). kit's `gh`
+// requests inherited the same loopback proxy, and the scanner behind it tunnels api.github.com
+// without inspecting it — so routing GitHub through it protected nothing and added a failure point:
+// the scanner release installed here marked a host it had once timed out on as dead for the rest of
+// the invocation, and every later `followup` read of that run failed at once with `Bad Gateway`.
+// The session keys stay out: a `gh` spawn has no parent session to be confused with.
+function removed_proxy_environment(source: EnvironmentSource = process.env): RemovedEnvironment {
+	return to_removed(loopback_proxy_keys(source))
 }
 
 const agent_session_environment = {
@@ -137,6 +150,7 @@ const agent_session_environment = {
 	PROXY_KEYS,
 	SESSION_ID_KEY,
 	removed_environment,
+	removed_proxy_environment,
 }
 
 export { agent_session_environment }

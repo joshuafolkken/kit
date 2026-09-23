@@ -127,6 +127,25 @@ describe('agent_session_environment.removed_environment — what it must not tak
 	})
 })
 
+// joshuafolkken/kit#2436: kit's `gh` spawns take the proxy half alone — they have no parent session.
+describe('agent_session_environment.removed_proxy_environment — the proxy half alone', () => {
+	it('removes a loopback proxy and its certificate, and no parent-session variable', () => {
+		const removed = agent_session_environment.removed_proxy_environment({
+			HTTPS_PROXY: LOOPBACK_PROXY,
+			NODE_EXTRA_CA_CERTS: CERTIFICATE_PATH,
+			CLAUDE_CODE_MESSAGING_SOCKET: 'messaging-socket',
+		})
+
+		expect(Object.keys(removed)).toStrictEqual(['HTTPS_PROXY', 'NODE_EXTRA_CA_CERTS'])
+	})
+
+	it('removes nothing when no loopback proxy is declared', () => {
+		const removed = agent_session_environment.removed_proxy_environment({ HTTPS_PROXY: HOST_PROXY })
+
+		expect(removed).toStrictEqual({})
+	})
+})
+
 describe('agent_session_environment.removed_environment — the spellings it has to reach', () => {
 	it('reads a value that is not a URL as no proxy at all, rather than throwing', () => {
 		const removed = agent_session_environment.removed_environment({ HTTPS_PROXY: 'not a url' })
