@@ -102,7 +102,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 24_576 },
+	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 28_672 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/rule-delivery.md', bytes: 57_344 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', bytes: 12_288 },

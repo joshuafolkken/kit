@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShipState } from './run-ship-stage'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -20,6 +20,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
 const { run_ship_stage } = await import('./run-ship-stage')
+const { run_ship_detach } = await import('./run-ship-detach')
 
 // joshuafolkken/kit#2426: a ship re-run after it died resumes rather than restarts. The stage record is
 // the real file module writing to a temp path, so each restart reads what the previous call left; the
@@ -54,6 +55,12 @@ beforeEach(() => {
 	probe.record_target.mockResolvedValue(current.target)
 	probe.read_state.mockResolvedValue(NOTHING)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	// A gate run by a detached ship supervisor inherits its mark; left set, `run` would hand control back.
+	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, undefined)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 afterAll(() => {
