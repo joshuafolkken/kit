@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
@@ -11,7 +12,7 @@ import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
-import { run_cut, type CutState } from './run-cut'
+import { run_cut } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
@@ -31,7 +32,6 @@ const DEFAULT_BRANCH = 'main'
 const LANE_DIRECTORY = '/lanes/1839'
 const DERIVED_LOG = path.join(scratch, 'lane-1839.log')
 const LAUNCHED_PID = 4242
-const READY: CutState = { branch: BRANCH, is_dirty: true, is_held: true }
 // The recent-window context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
 // tokens widen to `string` through their namespace objects, so a typed literal is what the spied
 // `session_verdict` return accepts.
@@ -57,12 +57,14 @@ function lane(): LaneInfo {
 	}
 }
 
-const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const state = vi.spyOn(run_cut, 'current_state')
 const default_branch = vi.spyOn(git_command, 'get_default_branch')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const log_path = vi.spyOn(lane_dispatch_log, 'default_log_path')
 const launch = vi.spyOn(detached_launch, 'launch')
+
+// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
+vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 // joshuafolkken/kit#2312: the pre-gate cut is conditional on the recent-window context, so the suite
 // pins the verdict rather than reading the live session. `over` is the beforeEach default so the cases
 // that predate the condition still cut exactly as they did.
@@ -101,8 +103,8 @@ function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
 beforeEach(() => {
 	vi.clearAllMocks()
 	run_cut.end_cut(target())
-	worktree.mockResolvedValue(REPOSITORY)
-	state.mockResolvedValue(READY)
+	vi.spyOn(run_cut, 'worktree_directory').mockResolvedValue(REPOSITORY)
+	state.mockResolvedValue({ branch: BRANCH, is_dirty: true, is_held: true })
 	default_branch.mockResolvedValue(DEFAULT_BRANCH)
 	find_open_lane.mockResolvedValue(lane())
 	log_path.mockReturnValue(DERIVED_LOG)

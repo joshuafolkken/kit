@@ -5,7 +5,7 @@ import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 import { codex_agent_argv } from './codex-agent-argv'
 
 const INVOCATION = 'fullrun #2071'
-const MODEL = 'gpt-5.6-sol'
+const MODEL = 'gpt-6-sol'
 const SANDBOX = 'workspace-write'
 const EPHEMERAL_FLAG = '--ephemeral'
 const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'

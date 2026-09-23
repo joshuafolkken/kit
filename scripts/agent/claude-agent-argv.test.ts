@@ -4,6 +4,7 @@ import { claude_agent_argv } from './claude-agent-argv'
 
 const INVOCATION = 'fullrun #2070'
 const CLAUDE_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
+const WORKER_MODEL = 'claude-opus-5-5'
 
 describe('Claude argv construction', () => {
 	it('puts an already-resolved profile and the invocation on the command line', () => {
@@ -30,9 +31,9 @@ describe('Claude argv construction', () => {
 
 		expect(result).toMatchObject({
 			kind: 'argv',
-			profile: { provider: 'anthropic', role: 'worker', model: 'opus', effort: 'medium' },
+			profile: { provider: 'anthropic', role: 'worker', model: WORKER_MODEL, effort: 'medium' },
 		})
-		if (result.kind === 'argv') expect(result.argv.args).toContain('opus')
+		if (result.kind === 'argv') expect(result.argv.args).toContain(WORKER_MODEL)
 	})
 
 	it('passes no permission-bypass flag', () => {

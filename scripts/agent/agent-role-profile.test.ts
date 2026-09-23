@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
 const { REVIEWER, SCHEDULER, WORKER } = agent_role_profile
-const OPENAI_MODEL = 'gpt-5.6-sol'
+const OPENAI_MODEL = 'gpt-6-sol'
+const ANTHROPIC_MODEL = 'claude-opus-5-5'
 const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: 'claude-session' }
 const OPENAI_ENV = { CODEX_THREAD_ID: 'codex-thread' }
 
@@ -22,17 +23,17 @@ describe('the role policy defaults', () => {
 		expect(profile(SCHEDULER, ANTHROPIC_ENV)).toStrictEqual({
 			provider: 'anthropic',
 			role: SCHEDULER,
-			model: 'opus',
+			model: ANTHROPIC_MODEL,
 			effort: 'medium',
 		})
 		expect(profile(WORKER, ANTHROPIC_ENV)).toMatchObject({
 			provider: 'anthropic',
-			model: 'opus',
+			model: ANTHROPIC_MODEL,
 			effort: 'medium',
 		})
 		expect(profile(REVIEWER, ANTHROPIC_ENV)).toMatchObject({
 			provider: 'anthropic',
-			model: 'opus',
+			model: ANTHROPIC_MODEL,
 			effort: 'high',
 		})
 	})
@@ -46,6 +47,13 @@ describe('the role policy defaults', () => {
 		})
 		expect(profile(WORKER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
 		expect(profile(REVIEWER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'high' })
+	})
+
+	// joshuafolkken/kit#2415: a floating alias cannot say which model a logged run used.
+	it('pins every Anthropic default to a model id rather than the opus alias', () => {
+		const models = Object.values(agent_role_profile.DEFAULT_PROFILES).map((entry) => entry.model)
+
+		expect(models).toStrictEqual([ANTHROPIC_MODEL, ANTHROPIC_MODEL, ANTHROPIC_MODEL])
 	})
 })
 

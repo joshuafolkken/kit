@@ -1,5 +1,6 @@
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_session } from './run-wake-session'
 
@@ -7,6 +8,9 @@ import { run_wake_session } from './run-wake-session'
 // and records it, so `josh time --run` can attribute a whiff to a session it actually started rather
 // than to any transcript that moved while it was alive. These pin the two ends of that thread — the id
 // reaching the launched argv, and the id being recorded on the wake record.
+
+// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
+vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 
 const NOW = new Date('2026-09-10T12:00:00.000Z')
 const INVOCATION = 'backlogrun --max 5 --idle 30'

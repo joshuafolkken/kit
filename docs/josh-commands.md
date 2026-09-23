@@ -1841,13 +1841,25 @@ put. The printed PID is the supervisor's.
 
 **Options:**
 
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `opus`, `opus`, and `opus`. Codex keeps its provider-specific model.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `claude-opus-5-5`, `claude-opus-5-5`, and `claude-opus-5-5`. Codex keeps its provider-specific model.
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.
 
 Blank means unset. The inherited agent session identifier selects the provider; a missing or
 conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
 refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
-defaults to `gpt-5.6-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`. Legacy
+defaults to `gpt-6-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
+drops to `low` only in the pre-gate phase, on either provider.
+
+The defaults are pinned model ids rather than an alias such as `opus`, so a run log names the exact
+model and a model migration can be measured at unchanged effort. Before launch the selected CLI's
+version is checked against the model it will run: `claude-opus-5-5` needs Claude Code 2.1.280 or later
+(`claude update`), and `gpt-6-sol` needs Codex CLI 0.155.0 or later
+(`npm install -g @openai/codex@latest`). A CLI below the floor, or one whose version cannot be read,
+refuses launch with that update named — never a quiet switch to an older model. A lane keeps the
+profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on
+its recorded model (a model the floor table does not name is not version-checked), and only a newly
+dispatched lane takes the new default. `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
+only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
 evaluation procedure](./backlogrun-worker-evaluation.md).
 
