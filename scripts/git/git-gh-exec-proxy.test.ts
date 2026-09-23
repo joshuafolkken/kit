@@ -158,6 +158,15 @@ describe('git_gh_exec — what the bypass must leave alone', () => {
 		)
 	})
 
+	it('keeps a loopback proxy that is not the scanner, which may be the only way out', async () => {
+		vi.stubEnv(HTTPS_PROXY_KEY, LOOPBACK_PROXY)
+		mocked_execa.mockResolvedValueOnce(fake_result(EMPTY_OBJECT))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH })
+
+		expect(spawn_options()).not.toHaveProperty('env')
+	})
+
 	it('adds no environment at all when no loopback proxy is declared', async () => {
 		vi.stubEnv(HTTPS_PROXY_KEY, HOST_PROXY)
 		mocked_execa.mockResolvedValueOnce(fake_result(EMPTY_OBJECT))

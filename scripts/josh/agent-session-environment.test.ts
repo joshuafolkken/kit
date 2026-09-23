@@ -144,6 +144,44 @@ describe('agent_session_environment.removed_proxy_environment — the proxy half
 
 		expect(removed).toStrictEqual({})
 	})
+
+	it('recognizes the scanner certificate under a Windows path', () => {
+		const removed = agent_session_environment.removed_proxy_environment({
+			HTTPS_PROXY: LOOPBACK_PROXY,
+			NODE_EXTRA_CA_CERTS: String.raw`C:\Users\somebody\.safe-chain\certs\ca-cert.pem`,
+		})
+
+		expect(Object.keys(removed)).toStrictEqual(['HTTPS_PROXY', 'NODE_EXTRA_CA_CERTS'])
+	})
+})
+
+describe('agent_session_environment.removed_proxy_environment — the loopback proxies it keeps', () => {
+	it('keeps a loopback proxy that is not the scanner, such as a sandbox egress proxy', () => {
+		const removed = agent_session_environment.removed_proxy_environment({
+			HTTPS_PROXY: LOOPBACK_PROXY,
+			NODE_EXTRA_CA_CERTS: '/etc/ssl/corporate-ca.pem',
+		})
+
+		expect(removed).toStrictEqual({})
+	})
+
+	it('keeps a loopback proxy declared with no certificate at all', () => {
+		const removed = agent_session_environment.removed_proxy_environment({
+			HTTPS_PROXY: LOOPBACK_PROXY,
+		})
+
+		expect(removed).toStrictEqual({})
+	})
+
+	it('keeps a loopback proxy at another address beside the scanner, such as a sandbox egress proxy', () => {
+		const removed = agent_session_environment.removed_proxy_environment({
+			HTTPS_PROXY: LOOPBACK_PROXY,
+			ALL_PROXY: 'http://127.0.0.1:3128',
+			NODE_EXTRA_CA_CERTS: CERTIFICATE_PATH,
+		})
+
+		expect(Object.keys(removed)).toStrictEqual(['HTTPS_PROXY'])
+	})
 })
 
 describe('agent_session_environment.removed_environment — the spellings it has to reach', () => {

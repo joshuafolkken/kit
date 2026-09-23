@@ -65,8 +65,10 @@ function to_timeout_option(timeout_ms?: number): { timeout: number } {
 // joshuafolkken/kit#2422, one 30-second stall made the wrapper refuse every later GitHub connection
 // of that `followup`, and the retries in the poll loop could only ever fail. The loopback test and
 // the list of spellings are the agent-session launcher's (joshuafolkken/kit#1760), shared rather than
-// restated; a proxy naming a real host is somebody's network and stays. Nothing is spread when there
-// is nothing to remove, so a spawn outside such a wrapper keeps its options exactly as they were.
+// restated. Only the scanner's proxy goes — recognized by its CA — because any other loopback proxy
+// may be this machine's only route out; a proxy naming a real host is somebody's network and stays.
+// Nothing is spread when there is nothing to remove, so a spawn outside such a wrapper keeps its
+// options exactly as they were.
 //
 // **It is exported because this file is not the only place `gh` is spawned.** The synchronous
 // readers that spell their own `gh api` (`gh-spawn.ts`, `repo-setting.ts`, `epic-cross-repo.ts`,
