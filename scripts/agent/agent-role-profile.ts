@@ -171,13 +171,45 @@ function session_rejection(is_conflicting: boolean): Rejected {
 	return { kind: 'rejected', note }
 }
 
-function resolve_provider(environment: AgentEnvironment = process.env): ProviderResult {
+// The provider a detached launcher hands a process that is not itself an agent session
+// (joshuafolkken/kit#2456). `detached_launch` strips the parent-session keys — the very keys the
+// detection below reads — so a `josh ship --detach --review` supervisor could never resolve its reviewer.
+// **It is a fallback, read only when no session is detected**: the mark is inherited by everything the
+// supervisor starts, and a real session's own keys must keep deciding for that session.
+const HANDED_PROVIDER_KEY = 'JOSH_AGENT_PROVIDER'
+
+function handed_provider(environment: AgentEnvironment): ProviderResult {
+	const value = trimmed(environment[HANDED_PROVIDER_KEY])
+	if (value === undefined) return session_rejection(false)
+	const parsed = PROVIDER_SCHEMA.safeParse(value)
+
+	return parsed.success
+		? { kind: 'provider', provider: parsed.data }
+		: rejection(HANDED_PROVIDER_KEY, value, 'is not an allowed provider')
+}
+
+// The session this process runs in, read from its own keys: `undefined` when none is detected.
+function detected_provider(environment: AgentEnvironment): ProviderResult | undefined {
 	const has_codex = has_session(environment, [CODEX_SESSION_KEY])
 	const has_claude = has_session(environment, agent_session_environment.PARENT_SESSION_KEYS)
 
-	if (has_codex === has_claude) return session_rejection(has_codex)
+	if (has_codex === has_claude) return has_codex ? session_rejection(true) : undefined
 
 	return { kind: 'provider', provider: has_codex ? OPENAI_PROVIDER : ANTHROPIC_PROVIDER }
+}
+
+function resolve_provider(environment: AgentEnvironment = process.env): ProviderResult {
+	return detected_provider(environment) ?? handed_provider(environment)
+}
+
+// The mark a detached launch sets on its child: the provider this session resolved, or nothing when it
+// resolved none — the child then fails the same way this session would have.
+function handoff_environment(
+	environment: AgentEnvironment = process.env,
+): Readonly<Record<string, string>> {
+	const selected = resolve_provider(environment)
+
+	return selected.kind === 'provider' ? { [HANDED_PROVIDER_KEY]: selected.provider } : {}
 }
 
 function validate(profile: AgentProfile, model_key: string): ProfileResult {
@@ -263,6 +295,7 @@ const agent_role_profile = {
 	DEFAULT_PROFILES,
 	EFFORT_SCHEMA,
 	ENV_KEYS,
+	HANDED_PROVIDER_KEY,
 	IMPLEMENTATION_PHASE,
 	LEGACY_WORKER_KEYS,
 	MAX_VALUE_LENGTH,
@@ -277,6 +310,7 @@ const agent_role_profile = {
 	SETUP_PHASE,
 	WORKER,
 	describe,
+	handoff_environment,
 	is_safe_value,
 	parse,
 	phase_effort,
