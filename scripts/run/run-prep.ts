@@ -35,6 +35,9 @@ interface PrepParts {
 	state_failure: string
 	latest_scope: string
 	latest_reason: string
+	// Whether a lane child's tree holds uncommitted work — read for the verdict, not printed in the
+	// report (joshuafolkken/kit#2476).
+	has_changes: boolean
 }
 
 function human_review_value(state: IssueState | undefined): string {

@@ -1,6 +1,10 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
+import { git_stash } from '#scripts/git/git-stash'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { lane_close } from '#scripts/lane/lane-close'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { run_carry, type CarryChange, type CarryOwner, type RunCarry } from './run-carry'
 import { run_merge } from './run-merge'
@@ -25,6 +29,8 @@ type ApplyCarryResult =
 const OVER = 'over'
 const LANES = '--lanes'
 const REPO_FLAG = '--repo'
+const LANE_CLOSE_OCCASION = 'lane close'
+const GIT_ENTRY = '.git'
 
 // One returned child's context, gathered from the command line by the CLI.
 interface MergeContext {
@@ -97,6 +103,43 @@ async function close_lane(child: string): Promise<void> {
 	await josh(['lane:close', child])
 }
 
+function preserved_comment(message: string): string {
+	return [
+		'The lane held uncommitted work when `run:merge` closed it, so it was stashed before the close:',
+		`- recover with \`pnpm josh stash:pop "${message}"\``,
+	].join('\n')
+}
+
+async function stash_work(child: string, directory: string): Promise<void> {
+	const message = git_stash.work_message(child, LANE_CLOSE_OCCASION)
+
+	await git_stash.push(message, directory)
+	await git_gh_issue_write.issue_try_comment(child, preserved_comment(message))
+}
+
+// Stash whatever the lane still holds uncommitted before its tree is removed (joshuafolkken/kit#2476):
+// `lane:close` deletes by force, and a merged child that had popped its parked work and then read
+// `already-done` left that work nowhere else. The stash stack outlives the tree, so the push is the copy.
+// Returns whether closing is safe — `false` when the tree could not be read or pushed, so it is left
+// rather than lost. A directory with no `.git` is no work tree — the remnant of an interrupted close —
+// and holds nothing git could keep, so it is closed rather than stranded behind a status that fails.
+async function preserve_uncommitted(child: string): Promise<boolean> {
+	const lane = await lane_close.resolve_lane(child)
+	const { directory } = lane.targets
+
+	if (!existsSync(path.join(directory, GIT_ENTRY))) return true
+
+	try {
+		if (await git_stash.has_changes(directory)) await stash_work(child, directory)
+
+		return true
+	} catch {
+		console.error(`#${child}: uncommitted work could not be stashed — lane left at ${directory}`)
+
+		return false
+	}
+}
+
 // The progress comment is a human-readable mirror of the carry record, so it is best-effort and only
 // where a named epic has a body to carry it — a pure backlog run keeps the record alone.
 async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Promise<void> {
@@ -106,7 +149,7 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 }
 
 // A merged child: count the merge (which resets the failure streak), return to the default branch,
-// close the lane, and mirror the counters onto the epic. Returns the carry when the ownership check
+// stash any uncommitted work the lane still holds and close it, and mirror the counters onto the epic. Returns the carry when the ownership check
 // fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child
 // (joshuafolkken/kit#2114). Returns `undefined` on success.
 async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
@@ -115,7 +158,7 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	if (result.kind === 'refused') return result.carry
 
 	await sync_main()
-	await close_lane(ctx.child)
+	if (await preserve_uncommitted(ctx.child)) await close_lane(ctx.child)
 	await post_counters(ctx, result.kind === 'applied' ? result.carry : undefined)
 
 	return undefined

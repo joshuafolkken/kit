@@ -18,6 +18,14 @@ interface LaneTargets {
 	branch: string
 }
 
+// The lane an issue number names: its registration, when there is one, and the paths a close acts on.
+// Resolved once here so a caller that has to look inside the tree before closing it reads the same
+// directory the close removes (joshuafolkken/kit#2476).
+interface ResolvedLane {
+	existing: LaneInfo | undefined
+	targets: LaneTargets
+}
+
 type CloseKind = 'closed' | 'incomplete' | 'none'
 
 interface CloseOutcome {
@@ -110,11 +118,15 @@ async function lane_root_directory(): Promise<string> {
  * cleaning up after an interruption cannot know whether the lane was ever opened. `incomplete` means
  * something survived the removal, and `left_behind` names it.
  */
-async function close_lane(issue: string): Promise<CloseOutcome> {
+async function resolve_lane(issue: string): Promise<ResolvedLane> {
 	const root = await lane_root_directory()
-	const lanes = await lane_registry.list_lanes()
-	const existing = lane_registry.find_lane(lanes, issue)
-	const targets = lane_targets(root, issue, existing)
+	const existing = lane_registry.find_lane(await lane_registry.list_lanes(), issue)
+
+	return { existing, targets: lane_targets(root, issue, existing) }
+}
+
+async function close_lane(issue: string): Promise<CloseOutcome> {
+	const { existing, targets } = await resolve_lane(issue)
 	const did_exist = existing !== undefined || existsSync(targets.directory)
 	// Before the removal, not after: a child still running in the tree would keep writing into a
 	// directory being deleted, and a process outliving its lane is the half-discarded state
@@ -178,7 +190,8 @@ const lane_close = {
 	lane_targets,
 	prune_lanes,
 	remove_lane,
+	resolve_lane,
 }
 
-export type { CloseKind, CloseOutcome, SweepOutcome }
+export type { CloseKind, CloseOutcome, ResolvedLane, SweepOutcome }
 export { lane_close }

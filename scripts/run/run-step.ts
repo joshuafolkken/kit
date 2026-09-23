@@ -1,3 +1,4 @@
+import { git_stash } from '#scripts/git/git-stash'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import type { CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
@@ -27,6 +28,9 @@ const IMPLEMENT = 'implement'
 const HUMAN_REVIEW = 'human-review'
 const UPDATE_DEPS = 'update-deps'
 const ALREADY_DONE = 'already-done'
+// A closed issue whose lane tree still holds uncommitted work (joshuafolkken/kit#2476) — `run:step`
+// itself prints the `decide:` line naming the stash, and this is the token `run:entry` reports.
+const KEEP_WORK = 'keep-work'
 const WAIT = 'wait'
 const STOP = 'stop'
 const UNKNOWN = 'unknown'
@@ -36,6 +40,7 @@ const VOCABULARY: ReadonlyArray<string> = [
 	HUMAN_REVIEW,
 	UPDATE_DEPS,
 	ALREADY_DONE,
+	KEEP_WORK,
 	WAIT,
 	STOP,
 	UNKNOWN,
@@ -56,12 +61,26 @@ const RETROSPECTIVE_COMMAND = 'pnpm josh retrospective'
 // event yet. `run-next.ts` maps each of these to its prose sentence, so this is the single copy of the
 // state → step mapping and there is no second implementation (joshuafolkken/kit#2248).
 type PreVerdict =
-	typeof IMPLEMENT | typeof HUMAN_REVIEW | typeof UPDATE_DEPS | typeof ALREADY_DONE | typeof UNKNOWN
+	| typeof IMPLEMENT
+	| typeof HUMAN_REVIEW
+	| typeof UPDATE_DEPS
+	| typeof ALREADY_DONE
+	| typeof KEEP_WORK
+	| typeof UNKNOWN
 
 interface PreInput {
 	state: string | undefined
 	is_human_review: boolean
 	latest_scope: string
+	// Whether a lane child's tree holds uncommitted work, read by `run:prep`'s gather
+	// (joshuafolkken/kit#2476). A closed issue over such a tree is not "nothing to do": the work was
+	// popped back from a park and is lost with the lane unless it is kept, so `already-done` gives way to
+	// `keep-work`.
+	has_changes: boolean
+}
+
+function closed_verdict(input: PreInput): typeof ALREADY_DONE | typeof KEEP_WORK {
+	return input.has_changes ? KEEP_WORK : ALREADY_DONE
 }
 
 // The three facts the run branches on before its first edit, ordered because they are not independent:
@@ -69,7 +88,7 @@ interface PreInput {
 // action, and `needs-human-review` changes where the run ends so it precedes the ordinary implement.
 function pre_verdict(input: PreInput): PreVerdict {
 	if (input.state === undefined) return UNKNOWN
-	if (input.state === CLOSED) return ALREADY_DONE
+	if (input.state === CLOSED) return closed_verdict(input)
 	if (input.latest_scope === latest_scope_cli.REQUIRED_SCOPE) return UPDATE_DEPS
 	if (input.is_human_review) return HUMAN_REVIEW
 
@@ -227,6 +246,20 @@ function pre_implementation_action(input: StepInput): StepAction {
 	return verdict(token)
 }
 
+// A closed issue ends the run, but a tree still holding uncommitted work is surfaced rather than
+// answered `already-done` — the answer a child read as "nothing to do" before its lane was removed
+// with the work in it (joshuafolkken/kit#2476).
+function closed_action(input: StepInput): StepAction {
+	if (closed_verdict(input) === ALREADY_DONE) return verdict(ALREADY_DONE)
+
+	const message = git_stash.work_message(input.issue_number, ALREADY_DONE)
+
+	return {
+		kind: 'decide',
+		line: `decide: #${input.issue_number} is closed but this tree holds uncommitted work — keep it with \`git stash push -u -m "${message}"\` | carry it into a new issue`,
+	}
+}
+
 // The terminal answers read before the run's position matters: an unreadable carry record leaves the
 // position unknowable, a spent budget is the person's call, and the issue's own state can end the run
 // whatever the events say. `undefined` when none applies and the position decides.
@@ -234,7 +267,7 @@ function terminal_action(input: StepInput): StepAction | undefined {
 	if (input.carry_kind === 'unreadable') return verdict(UNKNOWN)
 	if (input.carry_kind === 'expired') return { kind: 'decide', line: EXPIRED_DECISION }
 	if (input.state === undefined) return verdict(UNKNOWN)
-	if (input.state === CLOSED) return verdict(ALREADY_DONE)
+	if (input.state === CLOSED) return closed_action(input)
 
 	return undefined
 }
@@ -261,6 +294,7 @@ const run_step = {
 	EXPIRED_DECISION,
 	HUMAN_REVIEW,
 	IMPLEMENT,
+	KEEP_WORK,
 	RETROSPECTIVE_COMMAND,
 	STOP,
 	UNKNOWN,

@@ -13,7 +13,13 @@ const REVIEW_STATE: IssueState = {
 const CLOSED_STATE: IssueState = { state: 'CLOSED', labels: [], is_human_review: false }
 
 function input(overrides: Partial<NextInput>): NextInput {
-	return { state: 'OPEN', is_human_review: false, latest_scope: 'skip', ...overrides }
+	return {
+		state: 'OPEN',
+		is_human_review: false,
+		latest_scope: 'skip',
+		has_changes: false,
+		...overrides,
+	}
 }
 
 function parts(overrides: Partial<PrepParts>): PrepParts {
@@ -24,6 +30,7 @@ function parts(overrides: Partial<PrepParts>): PrepParts {
 		state_failure: '',
 		latest_scope: 'skip',
 		latest_reason: 'window is 12h',
+		has_changes: false,
 		...overrides,
 	}
 }
@@ -61,6 +68,7 @@ describe('run_next is the degenerate form of run:step', () => {
 		[run_step.ALREADY_DONE]: run_next.ALREADY_DONE_STEP,
 		[run_step.HUMAN_REVIEW]: run_next.HUMAN_REVIEW_STEP,
 		[run_step.IMPLEMENT]: run_next.IMPLEMENT_STEP,
+		[run_step.KEEP_WORK]: run_next.KEEP_WORK_STEP,
 		[run_step.UNKNOWN]: run_next.UNKNOWN_STEP,
 		[run_step.UPDATE_DEPS]: run_next.LATEST_STEP,
 	}
@@ -68,6 +76,7 @@ describe('run_next is the degenerate form of run:step', () => {
 	it.each([
 		input({}),
 		input({ state: 'CLOSED' }),
+		input({ state: 'CLOSED', has_changes: true }),
 		input({ state: undefined }),
 		input({ latest_scope: 'required' }),
 		input({ is_human_review: true }),

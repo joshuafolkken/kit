@@ -1,14 +1,22 @@
+import { mkdirSync, mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_stash } from '#scripts/git/git-stash'
+import { josh_command } from '#scripts/josh/josh-run'
+import { lane_close } from '#scripts/lane/lane-close'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { run_carry } from './run-carry'
 
 const add_label_mock = vi.hoisted(() => vi.fn())
 const remove_label_mock = vi.hoisted(() => vi.fn())
+const comment_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/git/git-gh-issue-write', () => ({
 	git_gh_issue_write: {
 		issue_add_label: add_label_mock,
 		issue_remove_label: remove_label_mock,
+		issue_try_comment: comment_mock,
 	},
 }))
 
@@ -130,5 +138,93 @@ describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () =>
 		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'expired', carry: HANDED_OFF_CARRY })
 
 		expect(await run_merge_steps.do_merged(CONTEXT)).toStrictEqual(HANDED_OFF_CARRY)
+	})
+})
+
+// joshuafolkken/kit#2476: the merged path removed a lane by force while it still held work the child had
+// popped back from a park, so the close now stashes that work first.
+// A real directory with a `.git` entry, so the merged path reads it as a work tree.
+const LANE_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-'))
+
+mkdirSync(path.join(LANE_DIRECTORY, '.git'))
+const LANE_CLOSE_MESSAGE = `${CONTEXT.child}: uncommitted work at lane close`
+
+interface LaneCloseSpies {
+	josh_run: MockInstance<typeof josh_command.josh_run>
+	push: MockInstance<typeof git_stash.push>
+}
+
+// The merged path's side effects stubbed at their seams: the `josh` subprocesses (`main:sync`,
+// `lane:close`), the stash push, and the lane directory the close would remove.
+function stub_lane_close(): LaneCloseSpies {
+	comment_mock.mockReset().mockResolvedValue(true)
+	vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
+		existing: undefined,
+		targets: { directory: LANE_DIRECTORY, branch: `${CONTEXT.child}-lane` },
+	})
+
+	return {
+		josh_run: vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '' }),
+		push: vi.spyOn(git_stash, 'push').mockResolvedValue(),
+	}
+}
+
+function did_close(spies: LaneCloseSpies): boolean {
+	return spies.josh_run.mock.calls.some(([args]) => args[0] === 'lane:close')
+}
+
+describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
+	const MESSAGE = LANE_CLOSE_MESSAGE
+	let spies: LaneCloseSpies
+
+	beforeEach(() => {
+		spies = stub_lane_close()
+	})
+
+	it('stashes the work, records it on the issue, then closes the lane', async () => {
+		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(true)
+
+		await run_merge_steps.do_merged(CONTEXT)
+
+		expect(spies.push).toHaveBeenCalledWith(MESSAGE, LANE_DIRECTORY)
+		expect(comment_mock).toHaveBeenCalledWith(CONTEXT.child, expect.stringContaining(MESSAGE))
+		expect(did_close(spies)).toBe(true)
+	})
+
+	it('closes a clean lane as before, with nothing stashed', async () => {
+		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+
+		await run_merge_steps.do_merged(CONTEXT)
+
+		expect(spies.push).not.toHaveBeenCalled()
+		expect(comment_mock).not.toHaveBeenCalled()
+		expect(did_close(spies)).toBe(true)
+	})
+
+	it('leaves the lane on disk when the stash push fails', async () => {
+		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(true)
+		spies.push.mockRejectedValue(new Error('stash failed'))
+		vi.spyOn(console, 'error').mockReturnValue()
+
+		await run_merge_steps.do_merged(CONTEXT)
+
+		expect(did_close(spies)).toBe(false)
+	})
+})
+
+describe('run_merge_steps.do_merged — a lane directory that is no work tree', () => {
+	it('closes the remnant of an interrupted close without reading its status', async () => {
+		const spies = stub_lane_close()
+		const status_read = vi.spyOn(git_stash, 'has_changes')
+
+		vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
+			existing: undefined,
+			targets: { directory: tmpdir(), branch: `${CONTEXT.child}-lane` },
+		})
+
+		await run_merge_steps.do_merged(CONTEXT)
+
+		expect(status_read).not.toHaveBeenCalled()
+		expect(did_close(spies)).toBe(true)
 	})
 })
