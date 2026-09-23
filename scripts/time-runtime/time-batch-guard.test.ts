@@ -439,3 +439,26 @@ describe('time_batch_guard.should_notify — the notice cadence (kit#2276)', () 
 		expect(time_batch_guard.should_notify(write_run, WRITE_CALL, last_notified)).toBe(expected)
 	})
 })
+
+// **The fire and re-fire conditions are constants in one module, pinned here (joshuafolkken/kit#2405,
+// acceptance condition: the fire/deny condition reads as a single constant fixed by a unit test).** The
+// limit, the closed-turns-before-it and the refusal's re-fire are all derived from the one
+// `CONSECUTIVE_LIMIT` and read from `time-batch-guard.ts` alone; the notice's re-fire is its own tighter
+// constant, kept apart so the two cadences cannot drift into one number wrong for one of them. Pinning the
+// derivation here is what stops a future reader re-deriving one of them at a call site.
+const EXPECTED_LIMIT = 3
+const ONE = 1
+
+describe('time_batch_guard — the firing conditions are a single source (kit#2405)', () => {
+	it('derives the closed-turns-before-limit and the refusal re-fire from the one limit', () => {
+		const limit = time_batch_guard.CONSECUTIVE_LIMIT
+
+		expect(limit).toBe(EXPECTED_LIMIT)
+		expect(time_batch_guard.SEQUENCE_BEFORE_LIMIT).toBe(limit - ONE)
+		expect(time_batch_guard.REFIRE_EVERY).toBe(limit)
+	})
+
+	it('keeps the notice re-fire as its own tighter constant', () => {
+		expect(time_batch_guard.NOTICE_REFIRE_EVERY).toBe(ONE)
+	})
+})

@@ -114,6 +114,7 @@ const ALIASES: Record<string, string> = {
 	ef: 'edit:files',
 	rfs: 'refactor:scan',
 	tm: 'time',
+	tmd: 'time:density',
 	rtr: 'retrospective',
 	rb: 'review:brief',
 	r2: 'review:round2',

@@ -1352,3 +1352,13 @@ Pop the stash matching this message, not whichever a shared stack has on top
 `[options]`
 
 Report where a run's wall clock went: model wait, tool execution, human wait
+
+---
+
+### `josh time:density` · `josh tmd`
+
+> **Audience:** maintainer · **Side effects:** none · **kit only**
+
+`[--lanes <n>] [--path <dir>]`
+
+Report tool calls per round trip across the recent lane sessions
