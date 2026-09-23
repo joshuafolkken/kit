@@ -8,6 +8,8 @@ const BASE: StopContext = {
 	message: '',
 	stop_hook_active: false,
 	cut_pending: false,
+	filed: false,
+	session_owner: 'joshuafolkken',
 }
 
 function context(overrides: Partial<StopContext>): StopContext {
@@ -118,12 +120,71 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 	})
 })
 
+// joshuafolkken/kit#2422: an offer to file is a Tier A filing deferred to the user, so it blocks.
+const OFFER_MESSAGE = '起票するのが妥当だと考えます。起票してよければ言ってください。'
+
+describe('stop_rules.stop_outcome — filing offer', () => {
+	it('blocks a reply that offers to file on a turn that filed nothing', () => {
+		const { reason } = stop_rules.stop_outcome(context({ message: OFFER_MESSAGE }))
+
+		expect(reason).toBe(stop_rules.FILING_OFFER_REASON)
+	})
+
+	it('is silent on a reply reporting a filing already made', () => {
+		const message = '起票しました: [#9](https://github.com/joshuafolkken/kit/issues/9) — 所見'
+
+		expect(stop_rules.stop_outcome(context({ message, filed: true })).reason).toBeUndefined()
+	})
+
+	it('is silent when a filing is on the tail even if the reply still reads as an offer', () => {
+		const outcome = stop_rules.stop_outcome(context({ message: OFFER_MESSAGE, filed: true }))
+
+		expect(outcome.reason).toBeUndefined()
+	})
+
+	it('is silent when the offer targets a third-party repository', () => {
+		const message = `https://github.com/sveltejs/kit に${OFFER_MESSAGE}`
+
+		expect(stop_rules.stop_outcome(context({ message })).reason).toBeUndefined()
+	})
+
+	it('is silent when the session owner cannot be read', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({ message: OFFER_MESSAGE, session_owner: undefined }),
+		)
+
+		expect(outcome.reason).toBeUndefined()
+	})
+})
+
+describe('stop_rules.stop_outcome — filing offer stands down and ordering', () => {
+	it('does not block once stop_hook_active is set', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({ message: OFFER_MESSAGE, stop_hook_active: true }),
+		)
+
+		expect(outcome.reason).toBeUndefined()
+	})
+
+	it('goes ahead of the citation rule and behind the hold rules', () => {
+		const offer_with_bare = `${OFFER_MESSAGE} #7`
+
+		expect(stop_rules.stop_outcome(context({ message: offer_with_bare })).reason).toBe(
+			stop_rules.FILING_OFFER_REASON,
+		)
+		expect(
+			stop_rules.stop_outcome(context({ hold_present: true, message: offer_with_bare })).reason,
+		).toBe(stop_rules.STOP_NOTIFY_REASON)
+	})
+})
+
 // joshuafolkken/kit#2329: all three stop reasons end on "do not repeat your previous reply" so a
 // correction never reprints the reply already on screen.
 describe('stop_rules reasons — the correction is a diff, not a reprint', () => {
 	it.each([
 		['stop notification', stop_rules.STOP_NOTIFY_REASON],
 		['hold release', stop_rules.HOLD_RELEASE_REASON],
+		['filing offer', stop_rules.FILING_OFFER_REASON],
 	])('%s does not ask for a reprint', (_name, reason) => {
 		expect(reason).toContain(NO_REPRINT)
 	})

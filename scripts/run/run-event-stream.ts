@@ -74,11 +74,20 @@ const EVENT_KIND = {
 	// than once, and a terminal reader following the stream sees the line. The strand is the step before
 	// the stall: a stalled run still has a driver that could dispatch, a stranded one has none.
 	STRANDED: 'stranded',
+	// One `josh ship` stage starting, succeeding or failing (joshuafolkken/kit#2426). It is a trace of the
+	// composite's progress rather than a position the run is at — the position a ship leaves behind is the
+	// `merge` its `followup` stage emits — so it is one of the `TRACE_KINDS` the last-event read skips.
+	SHIP_STAGE: 'ship-stage',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
 
 const EVENT_KINDS: ReadonlyArray<string> = Object.values(EVENT_KIND)
+
+// The kinds that trace progress inside a step rather than mark where the run is. Every last-event reader
+// — `run:step`'s position, the setup-cut hook, `emit_once`'s dedup — asks "where is the run", and a
+// ship's four stage lines after its `merge` would otherwise read as an unknown position.
+const TRACE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE])
 
 const event_schema = z.object({
 	pos: z.number(),
@@ -186,11 +195,10 @@ function read_from(target: string, position: number): StreamRead {
 }
 
 // The degenerate single-event read the "last line" consumers keep working as (joshuafolkken/kit#2205):
-// the newest event, or `undefined` for an empty stream.
+// the newest positional event, or `undefined` for a stream with none. Trace events are skipped
+// (joshuafolkken/kit#2426), so the answer stays the run's position however many stage lines follow it.
 function read_last(target: string): RunEvent | undefined {
-	const events = read_events(target)
-
-	return events[events.length - POSITION_INCREMENT]
+	return read_events(target).findLast((event) => !TRACE_KINDS.has(event.kind))
 }
 
 // One event as the line a reader relays (joshuafolkken/kit#2207). The follow reader and the degenerate
@@ -209,6 +217,7 @@ const run_event_stream = {
 	EVENT_KINDS,
 	EVENT_PREFIX,
 	EVENT_SUFFIX,
+	TRACE_KINDS,
 	append,
 	format_event,
 	is_event_kind,

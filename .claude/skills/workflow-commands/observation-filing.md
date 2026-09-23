@@ -8,6 +8,9 @@ a second sighting, and what a delegated child does instead — is here, because 
 a run has actually found something worth filing. A `fullrun` that never finds one never reads it, and
 the one that does reads it in full, in the same turn, before it files.
 
+**The trigger is the judgement, not the run's progress** — an ended run, a `kickoff` and a mid-talk
+turn all file; an offer to file is sent back by the `Stop` hook (joshuafolkken/kit#2422).
+
 **Nothing was deferred and nothing was summarized to buy that.** The text below is §2i's, sentence
 for sentence, and every marker suite that pinned one of these sentences now pins it here.
 

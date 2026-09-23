@@ -1,11 +1,16 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { review_record } from './review-record'
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-check-'))
 const ISSUE = 2343
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
 afterAll(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
@@ -42,6 +47,14 @@ describe('review_record.check', () => {
 		const missing = path.join(TEST_DIR, 'does-not-exist.md')
 
 		expect(await review_record.check(ISSUE, missing)).toEqual({ status: 'not-required' })
+	})
+
+	it('reads the primary checkout ledger by default, the one a lane records into', async () => {
+		const file = ledger_with('primary.md', '- rf:none | none | - | 2026-09-23 | #2343\n')
+		const spy = vi.spyOn(observation_ledger_home, 'ledger_path').mockReturnValue(file)
+
+		expect(await review_record.check(ISSUE)).toEqual({ status: 'ok', issue: ISSUE })
+		expect(spy).toHaveBeenCalled()
 	})
 })
 

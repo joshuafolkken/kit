@@ -2,7 +2,9 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
+import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
@@ -35,11 +37,16 @@ async function is_hold_present(): Promise<boolean> {
 
 // A `confirmation` notify sits on this run's transcript tail. The tail is derived exactly as the
 // PreToolUse guards derive it, and the judgement is `lane-park`'s, reused rather than re-spelled.
-function was_notified(transcript_path: string): boolean {
+function transcript_tail(transcript_path: string): string {
 	const transcript = time_hook_transcript.transcript_of(transcript_path, undefined)
-	const tail = time_density_hook.read_tail(transcript)
 
-	return lane_park.mentions_confirmation_notify(tail)
+	return time_density_hook.read_tail(transcript)
+}
+
+// An Issue was filed on this turn — the tail from the last prompt on. The count is `filing_cap`'s, so a
+// filing a guard refused is not counted, and one an earlier turn made does not stand this turn down.
+function was_filed(tail: string): boolean {
+	return filing_cap.turn_filing_count(tail) > 0
 }
 
 async function build_context(
@@ -49,13 +56,17 @@ async function build_context(
 		message: string
 	},
 ): Promise<StopContext> {
+	const tail = transcript_tail(transcript_path)
+
 	return {
 		hold_present: await is_hold_present(),
 		tree_clean: !(await run_hold.is_tree_dirty()),
-		notified: was_notified(transcript_path),
+		notified: lane_park.mentions_confirmation_notify(tail),
 		message: payload_tail.message,
 		stop_hook_active: payload_tail.stop_hook_active,
 		cut_pending: run_cut.carried_cut_sync() !== undefined,
+		filed: was_filed(tail),
+		session_owner: repo_party.current_owner(),
 	}
 }
 

@@ -324,10 +324,12 @@ const run_preflight = {
 	RECLAIM_VERDICT,
 	RESUME_ADVICE,
 	RESUME_VERDICT,
+	MERGED_PR,
 	STASH_LABEL_PREFIX,
 	check,
 	decide,
 	read_child_state,
+	read_pr_state,
 	to_pr_state,
 }
 

@@ -15,6 +15,9 @@ const FOLLOWUP_HEADER = '=== followup ==='
 const REPORT_HEADER = '=== report ==='
 const SECTION_SEPARATOR = '\n\n'
 const STOPPED_PREFIX = 'stopped at: '
+// The body of a stage a resumed ship passed over (joshuafolkken/kit#2426) — a success, so the report
+// still shows every stage under its header and the reader sees which ones this call did not repeat.
+const SKIPPED_BODY = 'skipped — already done'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -59,6 +62,7 @@ const run_ship = {
 	FOLLOWUP_HEADER,
 	GATE_HEADER,
 	REPORT_HEADER,
+	SKIPPED_BODY,
 	STOPPED_PREFIX,
 	SUCCESS_EXIT_CODE,
 	exit_code,

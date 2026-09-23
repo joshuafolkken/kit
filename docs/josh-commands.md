@@ -221,7 +221,7 @@ The `PreToolUse` dispatcher that routes each pending tool call to the delivered-
 
 ### `josh stop:guard`
 
-The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247): one process delivering the three stop-time rules — stop-notification, hold-release and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247, joshuafolkken/kit#2422): one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to run `pnpm josh issue:scout` through the filing, because a first-party filing is Tier A (`SKILL.md` → §2i); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
 ### `josh session:lang`
 
@@ -1706,6 +1706,10 @@ for `run:tail`, and `--notify-message` is forwarded to `followup` alone. Any fur
 follow-up citations filed this run — branch-2 filing runs before `ship` — forwarded to `run:tail` after
 the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
 review finding — stays in front of this command.
+
+A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored only where the actual
+state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged
+as a `ship-stage` trace event.
 
 ### `josh run:report`
 

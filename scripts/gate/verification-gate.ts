@@ -258,15 +258,6 @@ async function run_gate_steps(
 	)
 }
 
-async function run_marked_gate_steps(
-	before: Record<string, string>,
-	plan: GatePlan,
-	marker_path?: string,
-	budget: BudgetContext = default_budget(),
-): Promise<ReadonlyArray<GateStepResult>> {
-	return await with_gate_marker(before, async () => await run_gate_steps(plan, budget), marker_path)
-}
-
 // **Both markers are claims about the unit suite, so a gate that is not running it makes neither**
 // (joshuafolkken/kit#1226). The in-flight marker tells the next `josh review:brief` that a gate is
 // covering this tree right now, which is what stops a review agent re-running the suite; the
@@ -274,16 +265,22 @@ async function run_marked_gate_steps(
 // lane divide its own workers. A `--no-unit` gate that wrote either would be answering for a check
 // it never started — the first by telling a review the tests are covered when they are running in a
 // different CI job, the second by throttling a lane on its behalf.
-async function run_planned_gate_steps(
+//
+// **The work the markers cover ends at the green record, not at the last check** (joshuafolkken/kit#2434).
+// Cleared before `record_green_gate` wrote, the in-flight marker left a gap of tens of milliseconds in
+// which `run:review --join` read neither a running gate nor a green one — and answered RED for a gate
+// that was about to record green. Cleared after it, a reader that sees no marker is reading a gate
+// whose green record, if it has one, is already on disk.
+async function run_marked_gate<T>(
 	before: Record<string, string>,
 	plan: GatePlan,
+	work: () => Promise<T>,
 	marker_path?: string,
-	budget: BudgetContext = default_budget(),
-): Promise<ReadonlyArray<GateStepResult>> {
-	if (!gate_plan.has_unit_check(plan.checks)) return await run_gate_steps(plan, budget)
+): Promise<T> {
+	if (!gate_plan.has_unit_check(plan.checks)) return await work()
 
 	return await unit_worker_share.with_run_marker(
-		async () => await run_marked_gate_steps(before, plan, marker_path, budget),
+		async () => await with_gate_marker(before, work, marker_path),
 	)
 }
 
@@ -363,6 +360,28 @@ async function record_whole_gate(
 	await record_green_gate(results, tree.files, options.stamp_path, tree.base)
 }
 
+// Reports the checks and records a green result — inside the markers, so the in-flight one outlives
+// the record it announces (joshuafolkken/kit#2434).
+async function settle_gate(
+	plan: GatePlan,
+	results: ReadonlyArray<GateStepResult>,
+	tree: GateTree,
+	options: GateOptions & { started_at: number },
+): Promise<number> {
+	const failed_labels = gate_report.report_gate_steps(results, {
+		is_verbose: options.is_verbose ?? false,
+		log_path: options.log_path,
+		elapsed_ms: performance.now() - options.started_at,
+		step_count: String(plan.checks.length),
+	})
+
+	if (failed_labels.length > 0) return FAIL_EXIT_CODE
+
+	await record_whole_gate(plan, results, tree, options)
+
+	return 0
+}
+
 // The plan line is printed by the checked path alone. A run that announced a four-way fan-out and
 // then skipped would be describing something that never happened, and the skip's own line already
 // says everything there is to say about a gate that started no process. The reporting itself is
@@ -377,25 +396,20 @@ async function run_checked_gate(
 	// unit suite reads the flag as set and reserves nothing (joshuafolkken/kit#2351).
 	const budget = default_budget()
 	const plan = announce_gate_plan(is_unit_included, budget.available_cores)
+
 	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
 	// would write it is a subprocess started a second or so after the count above, so two lanes launched
 	// together — the shape `epicrun` produces — would both read "nothing else is running" and both take
 	// the whole machine. Claimed here, after the count and before any check, it is already there when
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run (joshuafolkken/kit#1515).
-	const results = await run_planned_gate_steps(tree.files, plan, options.marker_path, budget)
-	const failed_labels = gate_report.report_gate_steps(results, {
-		is_verbose: options.is_verbose ?? false,
-		log_path: options.log_path,
-		elapsed_ms: performance.now() - started_at,
-		step_count: String(plan.checks.length),
-	})
+	async function run_and_settle(): Promise<number> {
+		const results = await run_gate_steps(plan, budget)
 
-	if (failed_labels.length > 0) return FAIL_EXIT_CODE
+		return await settle_gate(plan, results, tree, { ...options, started_at })
+	}
 
-	await record_whole_gate(plan, results, tree, options)
-
-	return 0
+	return await run_marked_gate(tree.files, plan, run_and_settle, options.marker_path)
 }
 
 // `--force` is answered here rather than inside `gate_skip`, so the module stays about what the
@@ -502,8 +516,8 @@ const verification_gate = {
 	clear_gate_running,
 	mark_gate_running,
 	record_green_gate,
-	run_marked_gate_steps,
-	run_planned_gate_steps,
+	run_gate_steps,
+	run_marked_gate,
 	scoped_precheck_refusal,
 	with_gate_marker,
 	run_checked_gate,
