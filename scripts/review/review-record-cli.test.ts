@@ -91,6 +91,21 @@ describe('review_record_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#2402: a consumer that keeps no observation ledger has no `docs/` at its root, so
+// appending without creating the parent first fails with ENOENT and leaves the merge gate
+// unsatisfiable. The write path creates the directory it needs.
+describe('review_record_cli.run — missing parent directory', () => {
+	it('creates the parent directory before appending', async () => {
+		const file = path.join(TEST_DIR, 'missing-dir', 'observations.md')
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const code = await review_record_cli.run(['--issue', '2402', 'security:low:c.ts'], NOW, file)
+
+		info.mockRestore()
+		expect(code).toBe(0)
+		expect(readFileSync(file, 'utf8')).toBe('- rf:security | low | c.ts | 2026-09-22 | #2402\n')
+	})
+})
+
 describe('review_record_cli.run --check', () => {
 	it('exits 0 when the round is recorded', async () => {
 		const file = recorded_ledger('check-ok.md')

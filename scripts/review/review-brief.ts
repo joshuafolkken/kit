@@ -47,10 +47,16 @@ function attest_line(nonce: string): string {
 // `pnpm josh review:attest`), so the brief names the rubric's absolute path and requires it be read
 // and applied before anything is reported. Absolute because a forked agent resolves a relative path
 // against the tree it was spawned in, which is the wrong one during a lane run.
+//
+// **The path is the kit package's, not the review checkout's** (joshuafolkken/kit#2402). The rubric
+// ships inside the kit package (`node_modules/@joshuafolkken/kit/prompts/`), not in a consumer's own
+// tree — so deriving it from the review checkout root pointed at a `prompts/` a `docs/`-less consumer
+// never receives, and the review ran without the scoring rules. The caller resolves it against the
+// package directory instead and hands the absolute path in.
 const RUBRIC_RELATIVE_PATH = 'prompts/review-rubric.md'
 
-function rubric_line(root: string): string {
-	return `Rubric: read \`${root}/${RUBRIC_RELATIVE_PATH}\` first and apply it — it is the severity tests, the round output format, the nine categories and the stop conditions this review is scored against. You do not carry them otherwise, so a review that skips it is scored on the wrong rules.`
+function rubric_line(rubric_path: string): string {
+	return `Rubric: read \`${rubric_path}\` first and apply it — it is the severity tests, the round output format, the nine categories and the stop conditions this review is scored against. You do not carry them otherwise, so a review that skips it is scored on the wrong rules.`
 }
 
 function checkout_block(checkout: ReviewCheckout, nonce: string): string {
@@ -368,6 +374,9 @@ interface BriefInput {
 	// The commit the change is measured against, resolved by the caller so the printed target carries
 	// a value rather than a subshell that can fail open (joshuafolkken/kit#1527).
 	base: string
+	// The rubric's absolute path, resolved by the caller against the kit package rather than the review
+	// checkout, so it resolves in a consumer that ships no `prompts/` of its own (joshuafolkken/kit#2402).
+	rubric_path: string
 }
 
 const SECOND_ROUND = 2
@@ -388,7 +397,7 @@ function compose(input: BriefInput): string {
 		'',
 		`Agent profile: ${agent_role_profile.describe(profile)}`,
 		'',
-		rubric_line(input.checkout.root),
+		rubric_line(input.rubric_path),
 		'',
 		checkout_block(input.checkout, input.nonce),
 		'',

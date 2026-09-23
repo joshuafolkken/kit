@@ -54,13 +54,23 @@ describe('the rubric file carries every category the review must check', () => {
 
 describe('the brief points the reviewer at the rubric file', () => {
 	const ROOT = '/lanes/1927'
+	// joshuafolkken/kit#2402: the rubric ships inside the kit package, so the caller resolves it there
+	// and hands the absolute path in — deliberately outside the checkout root, which in a `docs`-less
+	// consumer has no `prompts/` at all.
+	const RUBRIC_PATH = `/pkg/node_modules/@joshuafolkken/kit/${review_brief.RUBRIC_RELATIVE_PATH}`
 
-	it('names the rubric under the briefed checkout root', () => {
-		expect(review_brief.rubric_line(ROOT)).toContain(`${ROOT}/${review_brief.RUBRIC_RELATIVE_PATH}`)
+	it('names the rubric at the path it was handed', () => {
+		expect(review_brief.rubric_line(RUBRIC_PATH)).toContain(RUBRIC_PATH)
+	})
+
+	it('does not derive the rubric path from the checkout root', () => {
+		expect(review_brief.rubric_line(RUBRIC_PATH)).not.toContain(
+			`${ROOT}/${review_brief.RUBRIC_RELATIVE_PATH}`,
+		)
 	})
 
 	it('tells the reviewer to read and apply it', () => {
-		const line = review_brief.rubric_line(ROOT)
+		const line = review_brief.rubric_line(RUBRIC_PATH)
 
 		expect(line).toContain('read')
 		expect(line).toContain('apply')
@@ -78,8 +88,9 @@ describe('the brief points the reviewer at the rubric file', () => {
 			checkout: { root: ROOT, branch: '1927-lane', head: '0'.repeat(40) },
 			nonce: 'deadbeefcafef00d',
 			base: 'f'.repeat(40),
+			rubric_path: RUBRIC_PATH,
 		})
 
-		expect(brief).toContain(review_brief.rubric_line(ROOT))
+		expect(brief).toContain(review_brief.rubric_line(RUBRIC_PATH))
 	})
 })
