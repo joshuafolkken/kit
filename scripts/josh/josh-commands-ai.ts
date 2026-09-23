@@ -81,6 +81,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// distributed under `scripts/time-runtime/`.
 		is_kit_only: true,
 	},
+	// The tool-calls-per-round-trip density the batching guard is measured on, aggregated across the
+	// recent lane sessions (joshuafolkken/kit#2405). Kit-only for the same reason `time` is: it reads
+	// kit's own lane transcripts and means nothing in a consumer project.
+	'time:density': {
+		script: 'scripts/time/time-density-cli.ts',
+		description: 'Report tool calls per round trip across the recent lane sessions',
+		category: 'AI tools',
+		reference: ['[--lanes <n>] [--path <dir>]', 'maintainer', ['none']],
+		is_kit_only: true,
+	},
 	retrospective: {
 		script: 'scripts/retrospective/retrospective-cli.ts',
 		description:

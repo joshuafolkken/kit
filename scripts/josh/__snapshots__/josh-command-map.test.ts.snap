@@ -133,6 +133,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "td": "test:declared",
     "te": "test:e2e",
     "tm": "time",
+    "tmd": "time:density",
     "tr": "test:related",
     "tu": "test:unit",
     "u": "latest",
@@ -1104,6 +1105,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "time": [
       "[options]",
+      "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "time:density": [
+      "[--lanes <n>] [--path <dir>]",
       "maintainer",
       [
         "none",

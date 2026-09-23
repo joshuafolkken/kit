@@ -126,21 +126,38 @@ Format the single file an agent just edited. Not run by hand: `.claude/settings.
 
 ### `josh batch:guard`
 
-Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. Wired to `PreToolUse` via `.claude/settings.json`, fed the pending call as JSON on stdin.
+Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. It is **not wired standalone**: it is one of the three `PreToolUse` guards consolidated into `josh pretool:guard` (with `investigation:guard` and the rule guard), so `.claude/settings.json` names the union of their matchers and runs the one process, fed the pending call as JSON on stdin.
 
 ```json
 "PreToolUse": [
 	{
-		"matcher": "Bash|Edit|Read|Write",
-		"hooks": [{ "type": "command", "command": "pnpm josh batch:guard", "timeout": 20 }]
+		"matcher": "Bash|Edit|Read|Write|AskUserQuestion",
+		"hooks": [
+			{
+				"type": "command",
+				"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi",
+				"timeout": 20
+			}
+		]
 	}
 ]
 ```
 
-- `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
-- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), so the guard downgrades to a non-blocking notice — the call proceeds with the guidance attached. kit#2178 took kit#2164's notice `off` after it did not move the density; with it `off` it fired **zero** times across the 2026-09-21 backlogrun measured next, so the 1.147 read there is the rate with no guidance. kit#2276 re-enables it with the two things #2164's lacked — it **names the concrete recent calls** and **recurs every single-call turn** — to be re-measured, redesigned rather than kept if it misses the target. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`.
-- **Fires more than once per run.** The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the **refusal** every `REFIRE_EVERY` further turns (the initial limit), the **notice** every `NOTICE_REFIRE_EVERY` (joshuafolkken/kit#2276, tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence — replacing the old one-firing-per-run behavior that fell silent for the rest of a run that ignored it.
+- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's, not this one's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
+- **Silent in a dispatched lane child since kit#2405** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), so kit#2164 downgraded it to a notice; kit#2178 took that notice `off` after it did not move the density, kit#2276 restored it naming the concrete recent calls and recurring every turn — to be redesigned rather than kept if the next backlogrun still missed 1.40. kit#2405 is that re-measurement: `josh time:density` read **1.13** calls per round trip over the ten most recent lanes (1.04 in the Issue's per-message frame), short of 1.40 as every advisory attempt before it. The cause is structural — a `PreToolUse` hook cannot see the turn it is in — so the notice is **cut off (`off`)** rather than rewritten a seventh time; the lever that moves the density is a composite command the model emits in one call (`read:files` / `edit:files`). Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`.
+- **Fires more than once per run** (main line). The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the **refusal** every `REFIRE_EVERY` further turns (the initial limit), the **notice** every `NOTICE_REFIRE_EVERY` (joshuafolkken/kit#2276, tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence — replacing the old one-firing-per-run behavior that fell silent for the rest of a run that ignored it.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
+
+### `josh time:density`
+
+Report tool calls per round trip across the recent lane sessions — the density the batching guard is measured on, as a command rather than a hand-counted `node -e` (joshuafolkken/kit#2405). Kit-only (it reads kit's own lane transcripts). Aggregates the ten most recent lane sessions holding at least thirty round trips, dividing summed calls by summed round trips through the same `time-round-trips.ts` the guard and the live density line read, so the three cannot disagree about what a round trip is.
+
+```
+lanes=10 round_trips=634 tools/turn=1.13 batched=63/634
+```
+
+- `--lanes <n>` averages over a different count of recent qualifying lanes (default 10); `--path <dir>` reads another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.
+- `tools/turn` is the canonical calls-per-round-trip density (floor 1.5), so it runs a little above the Issue's per-assistant-message frame (1.04), whose denominator also counts text-only turns. Use it as a behavior-change Issue's baseline so `josh measure:rerun` carries a before/after without a paste.
 
 ### `josh investigation:guard`
 
@@ -200,7 +217,7 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Most rows deli
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `duplicate-read:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
-**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276, joshuafolkken/kit#2298, joshuafolkken/kit#2382). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it was `off` until kit#2382 measured six lane children reading 4–17 unedited files each, so the reading was there to send out; it now names the concrete unedited files rather than refusing), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences, kit#2298), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276, joshuafolkken/kit#2298, joshuafolkken/kit#2382). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it was `off` until kit#2382 measured six lane children reading 4–17 unedited files each, so the reading was there to send out; it now names the concrete unedited files rather than refusing), `batching` is `off` (kit#2178 took kit#2164's notice `off`; kit#2276 restored it naming concrete recent calls and recurring every single-call turn, but kit#2405's re-measurement read 1.13 calls/round trip — below the 1.40 target and under the pre-restore baseline — so the notice was cut off for good, the notification being structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences, kit#2298), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh stop:guard`
 
