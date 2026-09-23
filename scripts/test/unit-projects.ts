@@ -18,7 +18,7 @@ import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 const TEST_TIMEOUT_MS = 10_000
 
 // Smoke test packs and installs the real tarball — too slow (~60 s setup) for the unit gate. Run
-// before release with: pnpm vitest run scripts/build/packed-consumer.test.ts
+// before release with: pnpm vitest run --config vitest.harness.config.ts
 const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test.ts']
 
 // **`JOSH_LANE_CHILD` is blanked so the unit suite never inherits the lane it happens to run in**
