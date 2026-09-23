@@ -23,12 +23,13 @@ describe('rule-delivery.md — the Stop hook is a second entry on the one founda
 		expect(text).toContain('stop:guard')
 	})
 
-	it('lists a row for each of the three stop-time rules', () => {
+	it('lists a row for each of the four stop-time rules', () => {
 		const text = rule_delivery_text()
 
 		expect(text).toContain('停止時の通知')
 		expect(text).toContain('hold の解放')
 		expect(text).toContain('Issue 引用')
+		expect(text).toContain('起票の申し出')
 	})
 })
 
@@ -40,6 +41,11 @@ describe('stop_rules — each delivered text names its single source', () => {
 
 	it('the hold release reason points at SKILL.md §2f', () => {
 		expect(stop_rules.HOLD_RELEASE_REASON).toContain('§2f')
+	})
+
+	it('the filing offer reason points at SKILL.md §2i', () => {
+		expect(stop_rules.FILING_OFFER_REASON).toContain('§2i')
+		expect(stop_rules.FILING_OFFER_REASON).toContain('observation-filing.md')
 	})
 
 	it('the issue citation reason points at issue-citation.md', () => {
