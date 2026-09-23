@@ -296,6 +296,10 @@ An unknown flag is refused with the usage rather than ignored (joshuafolkken/kit
 
 `--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
 
+### `josh test:red`
+
+Run the changed `*.test.ts` files on a temporary merge-base worktree (the pre-fix tree; the working tree and index are untouched) and print `red`, `green` or `no-test`. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green` (joshuafolkken/kit#2448).
+
 ### `josh test:e2e`
 
 Run E2E tests with Playwright. **Skips gracefully (exit 0)** when `@playwright/test` is not installed or no `*.e2e.{ts,js}` files exist. Once both are present, runs `playwright test`.

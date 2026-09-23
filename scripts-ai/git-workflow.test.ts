@@ -40,12 +40,42 @@ vi.mock('../scripts/git/git-prompt', () => ({
 	},
 }))
 
-vi.mock('../scripts/git/git-commit', () => ({ git_commit: { commit: vi.fn() } }))
+// The order the import-time run reached the pre-fix check and the commit (joshuafolkken/kit#2448).
+const CALL_ORDER = vi.hoisted((): Array<string> => [])
+
+// The import-time run commits only on the non-interactive path, so pin it rather than inherit the
+// runner's stdin — an interactive run would otherwise skip the commit and leave the order empty.
+vi.hoisted(() => {
+	process.stdin.isTTY = false
+})
+
+vi.mock('../scripts/test/test-red-commit', () => ({
+	test_red_commit: {
+		assert_reproduces: vi.fn(async (issue_number: string) => {
+			CALL_ORDER.push(`test:red #${issue_number}`)
+		}),
+	},
+}))
+
+vi.mock('../scripts/git/git-commit', () => ({
+	git_commit: {
+		commit: vi.fn(async () => {
+			CALL_ORDER.push('commit')
+		}),
+	},
+}))
 vi.mock('../scripts/git/git-push', () => ({ git_push: { push: vi.fn() } }))
 vi.mock('../scripts/git/git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
 vi.mock('../scripts/git/git-error', () => ({ git_error: { handle: vi.fn() } }))
 
 const { git_workflow } = await import('./git-workflow')
+const IMPORT_TIME_ORDER = [...CALL_ORDER]
+
+describe('pre-fix check before the commit', () => {
+	it('asks test:red for the resolved Issue before committing', () => {
+		expect(IMPORT_TIME_ORDER).toStrictEqual(['test:red #42', 'commit'])
+	})
+})
 
 beforeEach(() => {
 	vi.clearAllMocks()

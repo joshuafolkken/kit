@@ -205,6 +205,16 @@ Run E2E tests with Playwright (skips when absent or no e2e files)
 
 ---
 
+### `josh test:red` · `josh trd`
+
+> **Audience:** developer · **Side effects:** git, processes
+
+_No arguments._
+
+Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test
+
+---
+
 ### `josh test:related` · `josh tr`
 
 > **Audience:** developer · **Side effects:** processes
