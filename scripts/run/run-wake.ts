@@ -1,4 +1,5 @@
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
@@ -70,6 +71,14 @@ const WAKE_GRACE_MS = 600_000
 // half an hour of trying, which outlasts every transient cause worth surviving; past that the cause
 // is not transient and a person has to see it.
 const MAX_WAKE_ATTEMPTS = 3
+// **How long a launch may be deferred for want of work before one is woken anyway**
+// (joshuafolkken/kit#2417). A run whose backlog stays empty still needs one session to finish it — the
+// drain, the retrospective and `run:carry --end` are a session's to do, not this process's — so a
+// deferral without a ceiling would leave the record carried until its 8-hour expiry and end on a
+// warning instead of a report. The ceiling is the `backlogrun` idle watch's own default, imported
+// rather than restated: the supervisor watches the empty backlog for exactly as long as a woken session
+// would have, only without paying a session to do it.
+const IDLE_CEILING_MS = backlog_budget.DEFAULT_IDLE_MS
 const NO_WAKES = 0
 const ONE_WAKE = 1
 
@@ -136,6 +145,11 @@ interface RunWake {
 	// once per launch, retries included, since each retry is a real session that woke and may have done
 	// nothing, and carried across a supervisor restart exactly like the counters beside it.
 	spawned?: ReadonlyArray<string> | undefined
+	// When the supervisor first deferred a launch because there was no work (joshuafolkken/kit#2417).
+	// Marked once and cleared by the next launch or claim, so it measures one unbroken idle stretch: it
+	// bounds the deferral at `IDLE_CEILING_MS`, and `run-wake-loop.ts` stretches the polling interval
+	// by it, which is the back-off after repeated whiffs.
+	idle_since?: string | undefined
 }
 
 type WakeStopReason = 'ended' | 'expired' | 'unreadable' | 'failed' | 'stopped'
@@ -147,9 +161,11 @@ type WakeTidyResult = 'absent' | 'removed' | 'superseded'
 
 // `wait` and `pending` are two states rather than one because the wake mark is cleared in the first
 // and must survive the second — collapsed into one answer, a supervisor inside its grace window would
-// forget it had already woken and wake again every interval.
+// forget it had already woken and wake again every interval. `idle` is a launch the record called for
+// and the work did not: nothing is started, and the stretch is marked so it can be bounded.
 type WakeDecision =
 	| { kind: 'wake' }
+	| { kind: 'idle' }
 	| { kind: 'wait' }
 	| { kind: 'pending' }
 	| { kind: 'hold' }
@@ -170,10 +186,20 @@ interface WakeDecisionInput {
 	// When the wait on that predecessor began, so the wait can be bounded without spending the mark
 	// that measures a launch.
 	held_at: string | undefined
+	// **Whether a woken session would find anything to do** (joshuafolkken/kit#2417). Before this the
+	// decision read the carry record alone, so a session was launched whether or not the backlog held a
+	// runnable issue or a lane was free — and a session that found nothing ended without touching
+	// anything, which is the whiff. `undefined` is "cannot tell", and it wakes: a failed read is not an
+	// empty backlog, and the error that costs a whiff is cheaper than the one that stalls the run.
+	// Optional for that reason: an input that does not say reads exactly as the record-only decision did.
+	has_work?: boolean | undefined
+	// When the current idle stretch began, so the deferral can be bounded.
+	idle_since?: string | undefined
 	now: Date
 }
 
 const WAKE_DECISION: WakeDecision = { kind: 'wake' }
+const IDLE_DECISION: WakeDecision = { kind: 'idle' }
 const WAIT_DECISION: WakeDecision = { kind: 'wait' }
 const PENDING_DECISION: WakeDecision = { kind: 'pending' }
 const HOLD_DECISION: WakeDecision = { kind: 'hold' }
@@ -202,17 +228,29 @@ const run_wake_schema = z.object({
 	woke_pid: z.number().optional(),
 	held_at: z.string().optional(),
 	spawned: z.array(z.string()).optional(),
+	idle_since: z.string().optional(),
 	profile: agent_role_profile.PROFILE_SCHEMA.optional(),
 })
 
 // An unparsable stamp reads as overdue rather than as fresh: a mark whose time cannot be established
 // is one that cannot be confirmed to have worked, and the safe direction is to report the failure.
-function is_overdue(marked_at: string, now: Date): boolean {
+function is_overdue(marked_at: string, now: Date, limit_ms: number = WAKE_GRACE_MS): boolean {
 	const marked = Date.parse(marked_at)
 
 	if (Number.isNaN(marked)) return true
 
-	return now.getTime() - marked > WAKE_GRACE_MS
+	return now.getTime() - marked > limit_ms
+}
+
+// **A launch goes out only where there is work, or where the idle stretch has run past its ceiling**
+// (joshuafolkken/kit#2417). This is the one gate every launch passes — the first wake of a cut, the
+// recovery of a dead owner and a retry alike — because a retry into an empty backlog is the same whiff
+// as a first wake into one. Past the ceiling the session is woken anyway, to finish the run.
+function launch_or_idle(input: WakeDecisionInput): WakeDecision {
+	if (input.has_work !== false) return WAKE_DECISION
+	if (input.idle_since === undefined) return IDLE_DECISION
+
+	return is_overdue(input.idle_since, input.now, IDLE_CEILING_MS) ? WAKE_DECISION : IDLE_DECISION
 }
 
 // **Whether to launch, pend, retry or give up, read from the wake mark alone.** It is reached from two
@@ -222,10 +260,10 @@ function is_overdue(marked_at: string, now: Date): boolean {
 // left. `woke_at === undefined` is "nothing outstanding, launch"; inside the window is `pending`; past
 // it, a retry while attempts remain and otherwise `failed`.
 function decide_launch(input: WakeDecisionInput): WakeDecision {
-	if (input.woke_at === undefined) return WAKE_DECISION
+	if (input.woke_at === undefined) return launch_or_idle(input)
 	if (!is_overdue(input.woke_at, input.now)) return PENDING_DECISION
 
-	return input.attempts < MAX_WAKE_ATTEMPTS ? WAKE_DECISION : FAILED_DECISION
+	return input.attempts < MAX_WAKE_ATTEMPTS ? launch_or_idle(input) : FAILED_DECISION
 }
 
 // **A record no cut handed off is one of two things, told apart by the owner's liveness**
@@ -352,6 +390,8 @@ function carried_state(existing: RunWake | undefined, invocation: string): Parti
 		// already started** (joshuafolkken/kit#2407) — and `josh time --run`, reading the record after
 		// the restart, would under-count the whiffs and read the loss as a saving.
 		spawned: existing.spawned,
+		// And `idle_since`, or a restart would slide the idle ceiling by the time already spent idle.
+		idle_since: existing.idle_since,
 		...(existing.profile && { profile: existing.profile }),
 	}
 }
@@ -407,7 +447,15 @@ function count_wake(wake: RunWake, now: Date, pid: number, session_id: string): 
 	const spawned = [...(wake.spawned ?? []), session_id]
 	const woke_at = now.toISOString()
 
-	return { ...wake, attempts, spawned, woke_at, woke_pid: pid, held_at: undefined }
+	return {
+		...wake,
+		attempts,
+		spawned,
+		woke_at,
+		woke_pid: pid,
+		held_at: undefined,
+		idle_since: undefined,
+	}
 }
 
 // Starts the clock on a wait without launching anything. `attempts` is deliberately untouched, so the
@@ -419,6 +467,12 @@ function count_wake(wake: RunWake, now: Date, pid: number, session_id: string): 
 // waited on for ever — the unbounded wait this bound exists to prevent, arrived at by another road.
 function mark_wait(wake: RunWake, now: Date): RunWake {
 	return wake.held_at === undefined ? { ...wake, held_at: now.toISOString() } : wake
+}
+
+// Starts the idle stretch a deferred launch is bounded by (joshuafolkken/kit#2417). Marked once, for
+// the reason `mark_wait` is: rewritten each pass, the ceiling would slide and never be reached.
+function mark_idle(wake: RunWake, now: Date): RunWake {
+	return wake.idle_since === undefined ? { ...wake, idle_since: now.toISOString() } : wake
 }
 
 // **The one pass that observes a claim, and therefore the one place `woke` may grow**
@@ -436,7 +490,14 @@ function mark_wait(wake: RunWake, now: Date): RunWake {
 function count_claim(wake: RunWake): RunWake {
 	const woke = wake.woke_at === undefined ? wake.woke : wake.woke + ONE_WAKE
 
-	return { ...wake, woke, woke_at: undefined, attempts: undefined, held_at: undefined }
+	return {
+		...wake,
+		woke,
+		woke_at: undefined,
+		attempts: undefined,
+		held_at: undefined,
+		idle_since: undefined,
+	}
 }
 
 // **Whether the record at the target is this process's own** (joshuafolkken/kit#1727). Everything
@@ -524,6 +585,7 @@ function update_wake(target: string, wake: RunWake): boolean {
 }
 
 const run_wake = {
+	IDLE_CEILING_MS,
 	MAX_WAKE_ATTEMPTS,
 	WAKE_GRACE_MS,
 	WAKE_PREFIX,
@@ -533,6 +595,7 @@ const run_wake = {
 	decide,
 	fresh_wake,
 	is_supervisor_live,
+	mark_idle,
 	mark_wait,
 	parse_wake,
 	read_own_wake,

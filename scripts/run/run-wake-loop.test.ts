@@ -58,6 +58,9 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 			// live successor is spending. A test that needs a *dead* owner over a not-handed-off record —
 			// the crash joshuafolkken/kit#2336 recovers — overrides this port with `() => false`.
 			is_owner_live: (read) => read.kind === 'carried' && read.carry.is_handed_off !== true,
+			// Work is there by default, so every test written before joshuafolkken/kit#2417 still sees
+			// the record-only decision; the idle tests override this port.
+			has_work: async () => true,
 			new_session_id: () => `sid-${String(session_ids.length + 1)}`,
 			wake: (invocation, session_id) => {
 				wakes.push(invocation)
