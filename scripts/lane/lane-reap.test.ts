@@ -97,6 +97,15 @@ describe('lane_reap.reap_child — what it spares', () => {
 	})
 })
 
+// joshuafolkken/kit#2472: the Stop hook matches a carry record's owner against this chain.
+describe('lane_reap.own_ancestry', () => {
+	it('holds this process and every process above it', () => {
+		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry() }, [])
+
+		expect([...lane_reap.own_ancestry(probes)]).toStrictEqual([process.pid, OWN_PARENT, INIT])
+	})
+})
+
 describe('lane_reap.parse_pids', () => {
 	it('reads one pid per line and drops blanks, init and non-numbers', () => {
 		expect(

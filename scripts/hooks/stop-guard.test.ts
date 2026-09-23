@@ -1,3 +1,4 @@
+import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +23,9 @@ describe('stop_guard — fail open', () => {
 			stop_hook_active: true,
 		})
 
-		expect(await stop_guard.stop_outcome_for_payload(payload)).toEqual(stop_rules.NO_OUTCOME)
+		expect(await stop_guard.stop_outcome_for_payload(payload, backlog_ready.DEFAULT_PORTS)).toEqual(
+			stop_rules.NO_OUTCOME,
+		)
 	})
 })
 
@@ -33,5 +36,16 @@ describe('write_stop_decision — the stall check is wired', () => {
 		await write_stop_decision('not json')
 
 		expect(check).toHaveBeenCalledOnce()
+	})
+
+	// joshuafolkken/kit#2472: two `backlog:next` reads per stop could outrun the hook's timeout.
+	it('hands the stall detector the one reading the pick-up check reuses', async () => {
+		const check = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
+		const shared = vi.spyOn(backlog_ready, 'shared_ports')
+
+		await write_stop_decision('not json')
+
+		expect(shared).toHaveBeenCalledOnce()
+		expect(check).toHaveBeenCalledWith(shared.mock.results[0]?.value)
 	})
 })

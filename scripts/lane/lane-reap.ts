@@ -90,6 +90,12 @@ function ancestry_of(pid: number, probes: ReapProbes): Set<number> {
 	return ancestry
 }
 
+// This process and every process above it. The Stop hook reads it to tell whether the session that
+// declared a carry record's `--owner "$PPID"` is the one it runs under (joshuafolkken/kit#2472).
+function own_ancestry(probes: ReapProbes = SYSTEM_PROBES): Set<number> {
+	return ancestry_of(process.pid, probes)
+}
+
 function tree_of(roots: ReadonlyArray<number>, probes: ReapProbes): Array<number> {
 	const tree: Array<number> = []
 	const pending = [...roots]
@@ -113,7 +119,7 @@ function tree_of(roots: ReadonlyArray<number>, probes: ReapProbes): Array<number
  * that had already ended by itself.
  */
 function reap_child(issue: string, probes: ReapProbes = SYSTEM_PROBES): Array<number> {
-	const own = ancestry_of(process.pid, probes)
+	const own = own_ancestry(probes)
 	const pattern = lane_child_invocation.process_pattern(issue)
 	const roots = probes.matching(pattern).filter((pid) => !own.has(pid))
 	const doomed = tree_of(roots, probes).filter((pid) => !own.has(pid))
@@ -122,6 +128,7 @@ function reap_child(issue: string, probes: ReapProbes = SYSTEM_PROBES): Array<nu
 }
 
 const lane_reap = {
+	own_ancestry,
 	parse_pids,
 	reap_child,
 }
