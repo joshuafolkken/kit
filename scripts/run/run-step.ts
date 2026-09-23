@@ -135,6 +135,12 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	// the backlog. The detector only reports the stall; reading it here as a dispatch is what turns the
 	// report into the action that resolves it.
 	[KIND.STALL]: () => command(OFFER_BACKLOG),
+	// The post-implementation region is with a detached ship supervisor (joshuafolkken/kit#2428): nothing
+	// is the agent's until the supervisor stops or the issue closes, which the terminal read answers.
+	[KIND.SHIP_LAUNCH]: () => verdict(WAIT),
+	// The supervisor stopped at a failed stage and handed control back — the next step is reading the
+	// report it stopped on, which names the stage and why.
+	[KIND.SHIP_STOP]: (issue_number) => command(`pnpm josh ship --log ${issue_number}`),
 }
 
 // The parent-only positions a dispatched lane child must never act on. `run:merge` is the parent's

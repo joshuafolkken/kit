@@ -14,6 +14,7 @@ const error_mock = vi.hoisted(() => vi.fn())
 // Hoisted so the mock's EVENT_KIND and the stale-event regression test name the one kind once
 // (joshuafolkken/kit#2395).
 const STALE_KIND = vi.hoisted(() => 'child-launch')
+const TRACE_KIND = vi.hoisted(() => 'ship-stage')
 
 vi.mock('./run-prep-cli', () => ({
 	run_prep_cli: { parse_number: parse_number_mock, gather: gather_mock, to_parts: to_parts_mock },
@@ -41,10 +42,13 @@ vi.mock('./run-event-stream', () => ({
 			STOP: 'stop',
 			PR_OPENED: 'pr-opened',
 			REVIEW_ROUND: 'review-round',
+			SHIP_STAGE: TRACE_KIND,
+			SHIP_LAUNCH: 'ship-launch',
+			SHIP_STOP: 'ship-stop',
 		},
 		target_of: (directory: string) => `${directory}/events`,
 		read_events: read_events_mock,
-		TRACE_KINDS: new Set(['ship-stage']),
+		TRACE_KINDS: new Set([TRACE_KIND]),
 	},
 }))
 
@@ -193,6 +197,20 @@ describe('run_step_cli.run — the invocation scope of the position', () => {
 		await run_step_cli.run([ISSUE])
 
 		expect(printed()).toBe(run_step.IMPLEMENT)
+	})
+
+	// joshuafolkken/kit#2428: the detached ship supervisor's stop names its issue, so it is this run's
+	// position even with no carry scope — and another issue's is not.
+	it('reads its own ship supervisor’s stop as the position without a carry scope', async () => {
+		read_carry_mock.mockReturnValue({ kind: 'none' })
+		read_events_mock.mockReturnValue([
+			{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` },
+			{ pos: 2, at: RUN_START, kind: 'ship-stop', text: '#99 gate failed' },
+		])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).toBe(`pnpm josh ship --log ${ISSUE}`)
 	})
 })
 

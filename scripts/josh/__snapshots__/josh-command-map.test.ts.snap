@@ -1019,7 +1019,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "ship": [
-      ""<title> #<N>" [<follow-up-N> ...] [--notify-message <text> | --notify-message-file <path>]",
+      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
       "automation",
       [
         "git",

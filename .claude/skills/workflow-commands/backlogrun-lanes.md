@@ -207,10 +207,10 @@ The bullets below describe that dispatch:
 
 **Start each child without blocking on it, and poll them all.** That is "A delegated unit that stopped
 without reporting" above applied N times, and `pnpm josh run:liveness <N> --output <path> --process
-alive` is read **in that child's lane**. **Run `pgrep -laf "fullrun #<N>$"` first and pass what it
-found** — `alive` where the child is there, `none` where it is not, and never `alive` merely because the
-child was dispatched. The child's command line is `claude … fullrun #<N>` and carries no path; the `$`
-anchor keeps `#12` from matching a running `#123`.
+alive` is read **in that child's lane**. **Run `pgrep -laf "(fullrun|run-ship-cli\.ts .*) #<N>$"`
+first and pass what it found** — `alive` where the child is there, `none` where it is not, and never
+`alive` merely because the child was dispatched. The command line carries no path; the `$` anchor
+keeps `#12` from matching a running `#123`.
 
 **`git switch main && git pull` is the parent's now, not the child's.** No lane can switch to the
 default branch, so the refresh moves to the primary checkout **before each `lane:open`** — the ref the

@@ -263,7 +263,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
 		category: 'AI tools',
 		reference: [
-			'"<title> #<N>" [<follow-up-N> ...] [--notify-message <text> | --notify-message-file <path>]',
+			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
 			'automation',
 			['git', 'network'],
 		],
