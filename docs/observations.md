@@ -86,3 +86,12 @@ dropping either side destroys exactly what it exists to record.
 - k:guard-reason-names-scratchpad-as-exempt | d1 | 2026-09-22 | pnpm josh investigation:guard | The refusal reason lists this session's scratchpad among the files never counted, while is_session_artifact exempts only the state root and a tasks/<id>.output file and investigation-reads.test.ts pins the scratchpad as counted, so a refused run is told its scratchpad reads cannot be what took the count
 - k:wake-role-waiting-heavy | d1 | 2026-09-22 | pnpm josh retrospective | The wake role took 52% of the wall clock against 25% of the cost over 520 sessions and the digest marked it waiting-heavy, with nothing yet saying whether a woken session's ramp is the wait or the cost
 - rf:none | none | - | 2026-09-22 | #2342
+- rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-steps.md | 2026-09-23 | #2393
+- rf:bug-risks | medium | scripts/retrospective/retrospective-cli.ts | 2026-09-23 | #2393
+- rf:performance | low | scripts/run/run-report-cli.ts | 2026-09-23 | #2393
+- rf:project-conventions | low | scripts/run/run-report.ts | 2026-09-23 | #2393
+- rf:tests | low | scripts/run/run-report.test.ts | 2026-09-23 | #2393
+- rf:tests | low | scripts/run/run-report-cli.ts | 2026-09-23 | #2393
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-steps.md | 2026-09-23 | #2393
+- rf:project-conventions | low | docs/josh-commands.md | 2026-09-23 | #2393
+- rf:comments | low | .claude/skills/workflow-commands/backlogrun-steps.md | 2026-09-23 | #2393

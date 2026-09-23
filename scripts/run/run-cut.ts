@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_utilities } from '#scripts/git/constants'
@@ -37,20 +38,15 @@ import { run_hold } from './run-hold'
 // adopter.
 
 const CUT_PREFIX = 'josh-run-cut-'
-const PRE_GATE_PHASE = 'pre-gate'
-// The second boundary a cut can be taken at (joshuafolkken/kit#1933). The pre-gate cut drops the
-// thinking accumulated *before* the gate; this one drops it *during* implementation, when a lane
-// child's context has already grown past the threshold below and every later request re-reads it. The
-// two phases share this whole record and the relaunch — only the resume differs, because an
-// implementation cut resumes into more implementation rather than into the gate.
-const IMPLEMENTATION_PHASE = 'implementation'
-// The earliest boundary a cut can be taken at (joshuafolkken/kit#2346). By the time the plan is
-// posted a lane child has already read the skill, the manual documents, the issue body and its
-// comments — measured at ~130,000 tokens before a single line is implemented — and every later request
-// re-reads all of it. The setup cut drops that setup context before implementation begins; like the
-// implementation cut it resumes back into implementation, so the two share one resume shape
-// (`resumes_into_implementation`).
-const SETUP_PHASE = 'setup'
+// **The three phase names are `agent-role-profile.ts`'s** (joshuafolkken/kit#2382): a lane child resumes
+// into a phase, and that module resolves the effort the resumed child runs at from the same name. Reading
+// them from there rather than restating the literals here is what keeps the phase a cut records and the
+// phase the effort table is keyed on from drifting. `PRE_GATE_PHASE` is the boundary before the gate;
+// `IMPLEMENTATION_PHASE` (joshuafolkken/kit#1933) drops the thinking accumulated *during* implementation;
+// `SETUP_PHASE` (joshuafolkken/kit#2346) drops the ~130,000-token setup context before implementation
+// begins. The last two both resume back into implementation, so they share one resume shape
+// (`resumes_into_implementation`); only the pre-gate cut resumes into the gate.
+const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE, SETUP_PHASE } = agent_role_profile
 // **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
 // child decides whether to take this cut with `pnpm josh cost --cut`
 // — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's

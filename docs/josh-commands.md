@@ -156,7 +156,7 @@ Refuse a file read once the run has read the threshold's worth of un-edited file
 ```
 
 - On the `Bash` side only read-only lines are refused (`bat`, `cat`, `head`, `less`, `more`, `nl`, `sed`, `tail`); a delegation clears the pending set. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
-- **Suppressed in a dispatched lane child** (`JOSH_LANE_CHILD`), because the child is itself the delegated unit the refusal asks for and cannot dispatch a sub-unit to read its own edit targets — decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` (joshuafolkken/kit#2138).
+- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), so the guard delivers the same guidance as a non-blocking notice — the read proceeds with the guidance attached, and the notice **names the concrete unedited files** the run read. It was `off` from #2138 to #2382 on the reason that a child cannot dispatch a sub-unit to read its own edit targets; kit#2382 re-measured six lane children each reading 4–17 unedited files, so the reading was there to send out. Re-measured on the next backlogrun, redesigned rather than kept if it misses the target. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
 - Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
 ### `josh duplicate-read:guard`
@@ -191,15 +191,16 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 - **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
 - **The pre-gate cut row**: the trigger is a `Bash` call that runs `pnpm josh gate` from a **lane** working tree that **has not yet taken its cut**, handing over `pnpm josh run:cut <N>` with what each of its six verdicts obliges. It exists because the step was carried as prose and fired **0 times in 6 lane children**; `--resume`, `--end` and `--json` do not count as taking the cut. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source of the procedure.
+- **The implementation-phase cut row**: the trigger is an `Edit` / `Write` from a **lane** working tree that has not yet taken its cut, once the recent-context verdict (`pnpm josh cost --cut`'s, unmeasurable read `!== UNDER` on the safety-net side) is over the shared threshold, handing over `pnpm josh run:cut --impl <N> --handoff <path>`. Unlike the pre-gate row it **fires on every threshold crossing** (joshuafolkken/kit#2385): once per run left a `busy` / `failed` verdict to grow the context unwatched, so it carries `decide` and lets an edit reissued right after a refusal through. The verdict read is reused over a few-second per-checkout window. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source.
 - **Bare `pnpm josh git`** — trigger is a `pnpm josh git` with no `-y` / `--yes` (joshuafolkken/kit#2297); it prompts to confirm the staging, cancels with no TTY, and the run reissues with `-y` after throwing the time away. Hands over `pnpm josh git -y "<title> #<N>"`. Disjoint from the run-tail push row by the flag — that one requires `-y`, this refuses its absence — and it fires on every occurrence.
 
-Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. One delivery per run.
+Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Most rows deliver once per run; some — force push / branch delete, the bare-`git` and run-tail push rows, and the implementation-phase cut — fire on every occurrence.
 
 ### `josh pretool:guard`
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `duplicate-read:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
-**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276, joshuafolkken/kit#2298). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `off` (its remedy is a delegated read the child cannot dispatch), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences, kit#2298), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276, joshuafolkken/kit#2298, joshuafolkken/kit#2382). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it was `off` until kit#2382 measured six lane children reading 4–17 unedited files each, so the reading was there to send out; it now names the concrete unedited files rather than refusing), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences, kit#2298), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh stop:guard`
 
@@ -1501,6 +1502,8 @@ lines); the resume prints the handoff to stderr so the fresh process continues o
 rather than the working tree alone, and a resume that finds no instruction is refused `incomplete`
 rather than continuing blind.
 
+The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while a `--setup` / `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
+
 **Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`). `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
 
 ### `josh run:liveness`
@@ -1668,7 +1671,17 @@ merge and the push above it stay their own calls.
 Generates the session-facing report _from_ the run's event stream, rather than composing the wording by
 hand each run (joshuafolkken/kit#2249). It reuses `run:event`'s `format_event` for every
 line — merges, parks with their reason, cuts — and appends the release tail `release:scope` decides (the
-request and the command on `required`, `unknown` printed as `unknown`, silent on `skip`). The printed
+request and the command on `required`, `unknown` printed as `unknown`, silent on `skip`).
+
+**It renders one invocation, not the whole stream** (joshuafolkken/kit#2393). The stream outlives an
+invocation, so the scope comes from the run record's start time: events from before it are left out, and
+because that field survives a `--cut` the events either side of a cut stay in one report. **A scope it
+cannot determine — no record, or one it cannot read — prints a notice and no events**, never a fallback
+to everything. That is why the report is generated before `pnpm josh run:carry --end` removes the record:
+`.claude/skills/workflow-commands/backlogrun-steps.md` → "End the record when the run ends" is that
+ordering rule's single source.
+
+The printed
 body is the Telegram body too: `josh notify --body-file` sends exactly this output, so a session's
 summary and the off-screen message are one string from one generator, and the AI writes only Step 0's
 three lines.

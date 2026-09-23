@@ -78,8 +78,12 @@ function verdict(): string {
 	return String(info.mock.calls.at(-1)?.[0])
 }
 
+// **The relaunch starts the child at the effort of the phase it resumes into** (joshuafolkken/kit#2382),
+// so the expected profile is resolved for that phase — the default pre-gate cut lowers the worker to the
+// ship/bookkeeping effort, which is the branch every relaunch case here takes.
 function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
-	const built = agent_argv.resolve_in(invocation, agent_role_profile.WORKER, LANE_DIRECTORY)
+	const phase = run_cut.PRE_GATE_PHASE
+	const built = agent_argv.resume_argv(invocation, undefined, phase, LANE_DIRECTORY)
 	if (built.kind === 'rejected') throw new Error(built.note)
 
 	return built

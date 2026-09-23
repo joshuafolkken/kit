@@ -94,7 +94,11 @@ interface DeliveredRule {
 	// afterwards, the enforcement is back to the parent's self-restraint, which is the thing that
 	// failed. A row with this field is asked it instead, and it is asked on every candidate call —
 	// `can_record` is what the batching stand-aside becomes for such a row (see `delivery_decision`).
-	decide?: (call: GuardedCall, run: GuardRun, can_record: boolean) => boolean
+	// **`delivered_at_ms` is this row's own last refusal instant** (joshuafolkken/kit#2385) — `fire_once`
+	// writes the stamp only when a refusal actually fired, so a row that fires per crossing but must let
+	// an immediate reissue through (the implementation-phase cut) can tell a fresh crossing from a
+	// reissue of the edit it just refused. Rows that refuse unconditionally ignore it.
+	decide?: (call: GuardedCall, run: GuardRun, can_record: boolean, at_ms: number) => boolean
 	// **What keeping this rule looks like, as a call** (joshuafolkken/kit#1525). It names the act the
 	// rule asks for, so a run that made it *before* the trigger fired can be told apart from one that
 	// complied only because the refusal made it. `scripts/rules/rule-value.ts` reads that difference
@@ -494,11 +498,20 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// rule-document edit made in a lane child that is already over threshold trips both. The cut is the
 	// right thing to do first — end the process and drop the accumulated context — and on the reissue in
 	// the fresh, under-threshold process this row is silent and `rule-body` delivers, the "losing rule's
-	// delivery still correct one reissue later" reading any admissible overlap needs. It carries no
-	// `decide`, so it is silent only **between a cut and its resume**: the implementation resume clears
-	// the record (joshuafolkken/kit#2310, `run-cut-cli.ts`), so the carried-record check stops silencing
-	// the guard, and the fresh session's own transcript reads under threshold — the row re-arms per
-	// resume rather than per edit, instead of a lingering record silencing it for the rest of the run.
+	// delivery still correct one reissue later" reading any admissible overlap needs.
+	//
+	// **It carries `decide`, and the inversion of the pre-gate cut's reasoning is why** (joshuafolkken/kit#2385).
+	// `pre-gate-cut` and `lane-park` are once per run because taking the cut, or the park, *ends the
+	// process* — the one act is not a recurring one, and the five verdicts that leave a run holding it
+	// all need the one reissue to go through. This cut ends the process too, but its *trigger* does not:
+	// crossing the threshold mid-implementation is a recurring state that once-per-run silenced for the
+	// rest of a process the moment its first refusal landed — so a `busy` / `failed` / `unready` verdict,
+	// or an edit the model reissued unchanged, left the context to grow unwatched (joshuafolkken/kit#2382
+	// ran to 282,747 tokens with the cut never taken). `decide` re-asks on every over-threshold edit, and
+	// its `delivered_at_ms` lets an edit reissued right after a refusal through, so `busy` / `failed`
+	// cannot wedge the run edit after edit — the reissue path once-per-run gave for free, now made
+	// explicit. The fresh process after a successful cut reads its own transcript under threshold, so it
+	// is silent without needing a carried record to quiet it.
 	//
 	// **No `reaches`, because the occasion is live-only.** `pre-gate-cut` gives a `reaches` because both
 	// its halves leave a command-string trace (`run:cut --resume` at entry); this row's occasion —
@@ -704,7 +717,7 @@ function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_blo
 		if (already_satisfied?.(tail, call) === true) return false
 		if (decide === undefined) return is_first_delivery(tail, call, delivered_at_ms, run)
 
-		return decide(call, run, !will_batch_guard_refuse(tail, call, run))
+		return decide(call, run, !will_batch_guard_refuse(tail, call, run), delivered_at_ms)
 	}
 }
 

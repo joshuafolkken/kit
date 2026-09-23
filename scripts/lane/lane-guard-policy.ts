@@ -59,9 +59,9 @@ interface LaneGuardEntry {
 const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 	{
 		id: 'investigation',
-		mode_in_lane_child: 'off',
+		mode_in_lane_child: 'notice',
 		because:
-			'the child is itself the delegated unit the refusal asks for — it cannot dispatch a sub-unit to read its own edit targets, and the remedy the reason names does not exist for it, so even a notice would carry guidance the child cannot act on',
+			'a refusal ends a child turn so it cannot fire as one (kit#2138), which is why it was `off` from #2138 to #2382. The exemption reason — "the child is itself the delegated unit, so it cannot dispatch a sub-unit to read its own edit targets" — did not hold in measurement: kit#2382 re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372 #2374 #2375) and every one dispatched sub-agents (10 launches, 2 of them investigation fan-outs) and read 4–17 files it never edited, all six over the threshold of 3. So the reading the guard exists to send out was there to send. It takes `notice`, not `off`: the child is nudged to delegate rather than killed, on the `additionalContext` path batching and duplicate-read already use, and the notice names the concrete unedited files this run read (the #2276 precedent) rather than the generic "delegate" #2164 → #2178 measured not to move the number. The density is a genuine experiment — re-measured on the next backlogrun, and a notice that still does not move it is redesigned rather than kept',
 	},
 	{
 		id: 'batching',

@@ -1241,7 +1241,7 @@ Release this working tree's run record
 
 _No arguments._
 
-Generate the session-facing report from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends
+Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends
 
 ---
 
