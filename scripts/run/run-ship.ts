@@ -9,6 +9,7 @@
 // `run:tail`, ship stops at the first failed step: a red gate must never reach the commit, so the
 // composite ends at the failure, and the report names the step that failed so the run reads only it.
 
+const REVIEW_HEADER = '=== review ==='
 const GATE_HEADER = '=== gate ==='
 const COMMIT_HEADER = '=== commit/push/PR ==='
 const FOLLOWUP_HEADER = '=== followup ==='
@@ -62,6 +63,7 @@ const run_ship = {
 	FOLLOWUP_HEADER,
 	GATE_HEADER,
 	REPORT_HEADER,
+	REVIEW_HEADER,
 	SKIPPED_BODY,
 	STOPPED_PREFIX,
 	SUCCESS_EXIT_CODE,

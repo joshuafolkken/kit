@@ -1,0 +1,148 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const josh_run_mock = vi.hoisted(() => vi.fn())
+const launch_mock = vi.hoisted(() => vi.fn())
+const resolve_in_mock = vi.hoisted(() => vi.fn())
+const stamps = vi.hoisted(() => ({
+	read_stamp_text: vi.fn(),
+	remove_stamp: vi.fn(),
+	stamp_path: vi.fn((prefix: string) => `stamps/${prefix}x`),
+	write_text_stamp: vi.fn(),
+}))
+
+vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: stamps }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: resolve_in_mock } }))
+vi.mock('./detached-launch', () => ({ detached_launch: { launch_attached: launch_mock } }))
+
+const { run_ship_review_steps } = await import('./run-ship-review-steps')
+
+// joshuafolkken/kit#2427: the supervised round-1 review — open, launch, join, attest, record — and each
+// branch that hands control back to the agent.
+
+const OK = 0
+const FAILED = 1
+const ISSUE = '2427'
+const BRIEF = 'medium\nbrief body'
+const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
+const OPEN = 'run:review'
+const JOIN = 'run:review --join'
+const ATTEST = 'review:attest --check'
+const RECORD = `review:record --issue ${ISSUE}`
+const HIGH = 'bug-risks:high:a.ts:4'
+const LOW = 'tests:low:a.ts'
+const COMPLETED = { kind: 'completed', pid: 1 } as const
+const SPAWN_NOTE = 'spawn failed'
+const PROFILE_NOTE = 'bad model'
+
+function commands(): ReadonlyArray<string> {
+	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
+}
+
+function answer_with(failing: string | undefined): void {
+	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+		const command = argv.join(' ')
+
+		return { code: command === failing ? FAILED : OK, out: command === OPEN ? BRIEF : '' }
+	})
+}
+
+async function stage_code(): Promise<number> {
+	const result = await run_ship_review_steps.review_stage(ISSUE)
+
+	return result.code
+}
+
+async function stage_out(): Promise<string> {
+	const result = await run_ship_review_steps.review_stage(ISSUE)
+
+	return result.out
+}
+
+beforeEach(() => {
+	josh_run_mock.mockReset()
+	answer_with(undefined)
+	launch_mock.mockReset().mockResolvedValue({ ...COMPLETED, exit_code: OK })
+	resolve_in_mock.mockReset().mockReturnValue({ kind: 'argv', argv: ARGV, profile: undefined })
+	stamps.read_stamp_text.mockReset().mockReturnValue('')
+	stamps.write_text_stamp.mockClear()
+	stamps.remove_stamp.mockClear()
+})
+
+describe('run_ship_review_steps.review_stage — the clean path', () => {
+	it('opens, reviews, joins, attests and records a clean round without stopping', async () => {
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, RECORD])
+		expect(stamps.write_text_stamp).toHaveBeenCalledWith(expect.any(String), BRIEF)
+		expect(launch_mock.mock.calls[0]?.[0]).toMatchObject({ argv: ARGV })
+	})
+
+	it('records Low findings and ships on', async () => {
+		stamps.read_stamp_text.mockReturnValue(`${LOW}\n`)
+
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toContain(`${RECORD} ${LOW}`)
+	})
+
+	it('launches under the reviewer role, handed the brief and findings paths', async () => {
+		await run_ship_review_steps.review_stage(ISSUE)
+
+		const [prompt, role] = resolve_in_mock.mock.calls[0] as [string, string]
+
+		expect(role).toBe('reviewer')
+		expect(prompt).toContain('josh-ship-review-brief-')
+		expect(prompt).toContain('josh-ship-review-findings-')
+	})
+})
+
+describe('run_ship_review_steps.review_stage — a finding or a refusal stops it', () => {
+	it('records a High finding, then stops and lists it', async () => {
+		stamps.read_stamp_text.mockReturnValue(HIGH)
+
+		expect(await stage_out()).toContain(HIGH)
+		expect(commands()).toContain(`${RECORD} ${HIGH}`)
+	})
+
+	it.each([JOIN, ATTEST])('stops at a failed `%s` without recording', async (failing) => {
+		answer_with(failing)
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(commands().at(-1)).toBe(failing)
+	})
+
+	it('stops when the brief is refused, launching no reviewer', async () => {
+		answer_with(OPEN)
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it('stops on an unfinished review (no findings file) without recording', async () => {
+		stamps.read_stamp_text.mockReturnValue(undefined)
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST])
+	})
+})
+
+describe('run_ship_review_steps.review_stage — a reviewer error stops it', () => {
+	it('stops when the reviewer exits non-zero, before the join', async () => {
+		launch_mock.mockResolvedValue({ ...COMPLETED, exit_code: FAILED })
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(commands()).toStrictEqual([OPEN])
+	})
+
+	it('stops when the reviewer could not start', async () => {
+		launch_mock.mockResolvedValue({ kind: 'failed', note: SPAWN_NOTE })
+
+		expect(await stage_out()).toContain(SPAWN_NOTE)
+	})
+
+	it('stops when the reviewer profile is rejected', async () => {
+		resolve_in_mock.mockReturnValue({ kind: 'rejected', note: PROFILE_NOTE })
+
+		expect(await stage_out()).toContain(PROFILE_NOTE)
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+})

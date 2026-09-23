@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
+const review_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 // A fresh ship: nothing recorded and nothing committed, pushed or merged. The resume paths are pinned in
@@ -16,6 +17,7 @@ vi.mock('./run-ship-probe', () => ({
 	},
 }))
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
+vi.mock('./run-ship-review-steps', () => ({ run_ship_review_steps: { review_stage: review_mock } }))
 
 const { run_ship_cli } = await import('./run-ship-cli')
 
@@ -41,6 +43,7 @@ function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
 
 beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
+	review_mock.mockReset().mockResolvedValue({ code: OK, out: 'review clean' })
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -133,5 +136,28 @@ describe('run_ship_cli.run — a failed step stops the ship', () => {
 	it('refuses a stray flag rather than forwarding it to a step', async () => {
 		expect(await run_ship_cli.run(['--force'])).toBe(FAILED)
 		expect(josh_run_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/kit#2427)', () => {
+	it('reviews before the gate, then ships the clean path without an agent turn', async () => {
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
+		expect(review_mock).toHaveBeenCalledWith(NUMBER)
+		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
+		expect(info_lines[0]).toMatch(/^=== review ===\nreview clean\n\n=== gate ===/u)
+	})
+
+	it('stops at a blocking review, never reaching the gate or the commit', async () => {
+		review_mock.mockResolvedValue({ code: FAILED, out: 'bug-risks:high:a.ts' })
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(FAILED)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+		expect(info_lines[0]).toContain('stopped at: === review ===')
+	})
+
+	it('runs no review without the flag', async () => {
+		await run_ship_cli.run([TITLE])
+
+		expect(review_mock).not.toHaveBeenCalled()
 	})
 })
