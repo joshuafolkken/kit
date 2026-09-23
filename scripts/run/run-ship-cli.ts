@@ -58,8 +58,11 @@ const CITE_PATTERN = /^[1-9]\d*$/u
 // Both body forms `followup` documents, forwarded verbatim: the inline `--notify-message` and the
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
+// joshuafolkken/kit#2446: the PR body carrying the live-execution evidence `followup` gates the merge
+// on, forwarded to `git -y` as a path because it holds commands and their output.
+const BODY_FILE_OPTION = 'body-file'
 const USAGE =
-	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
+	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
 const NO_LOG_NOTE = 'no detached ship supervisor log for this issue'
 const should_forward_stderr = true
 
@@ -68,6 +71,7 @@ type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
 const OPTIONS = {
 	[NOTIFY_OPTIONS[0]]: { type: 'string' },
 	[NOTIFY_OPTIONS[1]]: { type: 'string' },
+	[BODY_FILE_OPTION]: { type: 'string' },
 	review: { type: 'boolean' },
 	// joshuafolkken/kit#2428: hand the region to a detached supervisor (`run-ship-detach.ts`), print the
 	// report a stopped supervisor left, and carry follow-up citations as options so the supervisor's
@@ -81,6 +85,7 @@ interface ShipArguments {
 	title: string
 	number: string
 	notify: ReadonlyArray<string>
+	body: ReadonlyArray<string>
 	cites: ReadonlyArray<string>
 	is_review: boolean
 	is_detach: boolean
@@ -112,6 +117,10 @@ function notify_arguments(values: NotifyValues): ReadonlyArray<string> {
 	})
 }
 
+function body_arguments(path: string | undefined): ReadonlyArray<string> {
+	return path === undefined ? [] : [`--${BODY_FILE_OPTION}`, path]
+}
+
 const { STAGE, PHASE } = run_ship_stage
 
 // The four steps in the order a change ships: the gate before the commit, the commit/push/PR before
@@ -127,7 +136,7 @@ const STEPS: ReadonlyArray<Step> = [
 		stage: STAGE.COMMIT,
 		header: run_ship.COMMIT_HEADER,
 		run: async (args, state) =>
-			await josh(['git', '-y', ...run_ship_stage.commit_flags(state), args.title]),
+			await josh(['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]),
 	},
 	{
 		stage: STAGE.FOLLOWUP,
@@ -158,6 +167,7 @@ function issue_number(title: string): string | undefined {
 }
 
 interface ParsedValues extends NotifyValues {
+	[BODY_FILE_OPTION]?: string
 	review?: boolean
 	detach?: boolean
 	log?: string
@@ -185,6 +195,7 @@ function ship_args(
 		title,
 		number,
 		notify: notify_arguments(values),
+		body: body_arguments(values[BODY_FILE_OPTION]),
 		cites,
 		is_review: values.review === true,
 		is_detach: values.detach === true,

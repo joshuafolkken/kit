@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ISSUE_INPUT = vi.hoisted(() => 'feat: add login #42')
@@ -46,6 +49,8 @@ vi.mock('../scripts/git/git-pr', () => ({ git_pr: { create_with_issue_info: vi.f
 vi.mock('../scripts/git/git-error', () => ({ git_error: { handle: vi.fn() } }))
 
 const { git_workflow } = await import('./git-workflow')
+
+const PR_BODY = 'my pr body'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -129,9 +134,33 @@ describe('get_workflow_confirmations — interactive mode', () => {
 
 describe('get_workflow_confirmations — body flag is separate from confirmations', () => {
 	it('does not affect confirmations when body is provided', async () => {
-		const result = await git_workflow.get_workflow_confirmations(true, { body: 'my pr body' })
+		const result = await git_workflow.get_workflow_confirmations(true, { body: PR_BODY })
 
 		expect(result).toStrictEqual({ commit: true, push: true, pr: true })
+	})
+})
+
+// joshuafolkken/kit#2446. The PR body carries commands and their output, so it can come from a file.
+describe('resolve_pr_body', () => {
+	it('reads the body from --body-file verbatim, backticks included', () => {
+		const directory = mkdtempSync(path.join(tmpdir(), 'git-workflow-body-'))
+		const file = path.join(directory, 'body.md')
+		const body = '## 実機証跡\n\n- `pnpm josh followup`\n\n```\nok\n```\n'
+
+		writeFileSync(file, body)
+
+		expect(git_workflow.resolve_pr_body({ 'body-file': file })).toBe(body)
+		rmSync(directory, { recursive: true, force: true })
+	})
+
+	it('keeps the inline --body form', () => {
+		expect(git_workflow.resolve_pr_body({ body: PR_BODY })).toBe(PR_BODY)
+	})
+
+	it('refuses both forms at once', () => {
+		expect(() => git_workflow.resolve_pr_body({ body: 'a', 'body-file': 'b.md' })).toThrow(
+			'--body-file',
+		)
 	})
 })
 

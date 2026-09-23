@@ -46,6 +46,7 @@ interface DetachRequest {
 	title: string
 	number: string
 	notify: ReadonlyArray<string>
+	body: ReadonlyArray<string>
 	cites: ReadonlyArray<string>
 	is_review: boolean
 	repository: string
@@ -105,7 +106,15 @@ function supervisor_argv(request: DetachRequest): LaunchArgv {
 
 	return {
 		command: PNPM,
-		args: ['josh', 'ship', ...review, ...notify_arguments(request), ...cites, request.title],
+		args: [
+			'josh',
+			'ship',
+			...review,
+			...notify_arguments(request),
+			...request.body,
+			...cites,
+			request.title,
+		],
 	}
 }
 
