@@ -6,7 +6,7 @@ import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_label_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
-import { defect_rate, type RateIssue } from './defect-rate'
+import { defect_rate, type DefectRate, type RateIssue } from './defect-rate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -96,24 +96,42 @@ async function search(query: string): Promise<SearchResult | undefined> {
 	}
 }
 
-async function report(repo: string, days: number, now_ms: number): Promise<number> {
+// The rate over a window, or `undefined` when either search could not be read. `backlog:next` asks
+// this same measurement (joshuafolkken/kit#2455), so the two cannot disagree about the rate.
+async function measure_window(
+	repo: string,
+	days: number,
+	now_ms: number,
+): Promise<DefectRate | undefined> {
 	const since = defect_rate.window_start(now_ms, days)
 	const [filed, completed] = await Promise.all([
 		search(defect_rate.filed_query(repo, since)),
 		search(defect_rate.completed_query(repo, since)),
 	])
 
-	if (filed === undefined || completed === undefined) {
+	if (filed === undefined || completed === undefined) return undefined
+
+	const is_capped = filed.is_capped || completed.is_capped
+
+	return defect_rate.measure({
+		days,
+		since,
+		filed: filed.issues,
+		completed: completed.issues,
+		is_capped,
+	})
+}
+
+async function report(repo: string, days: number, now_ms: number): Promise<number> {
+	const measured = await measure_window(repo, days, now_ms)
+
+	if (measured === undefined) {
 		console.error(UNREADABLE_SEARCH_MESSAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const is_capped = filed.is_capped || completed.is_capped
-	const input = { days, since, filed: filed.issues, completed: completed.issues, is_capped }
-	const lines = defect_rate.format(defect_rate.measure(input))
-
-	for (const line of lines) console.info(line)
+	for (const line of defect_rate.format(measured)) console.info(line)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -142,7 +160,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const defect_rate_cli = { USAGE, read_days, search_path, run, main }
+const defect_rate_cli = { USAGE, read_days, search_path, measure_window, run, main }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
