@@ -7,8 +7,10 @@ import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
+import { run_headless } from './run-headless'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_describe, type WakeContext } from './run-wake-describe'
+import { run_wake_handoff } from './run-wake-handoff'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 import { run_wake_work } from './run-wake-work'
@@ -186,10 +188,12 @@ function wake_session(
 	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
 
-	return run_wake_session.launch(
-		{ argv: built.argv, cwd: context.worktree, log_path: context.log_target, profile },
-		note_to_stderr,
-	)
+	// The headless mark is what lets the stop hook hold this session's turn open while its lanes run —
+	// under `claude -p` a turn-end is the process's end (`run-headless.ts`, joshuafolkken/kit#2437).
+	const environment = run_headless.environment()
+	const target = { cwd: context.worktree, env: environment, log_path: context.log_target }
+
+	return run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
 }
 
 function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
@@ -198,6 +202,9 @@ function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_owner_live(read.carry),
 		has_work: async (read) => await run_wake_work.has_work(read),
 		new_session_id: () => randomUUID(),
+		hand_off: () => {
+			run_wake_handoff.hand_off(context.carry_target)
+		},
 		wake: (invocation, session_id) => wake_session(context, invocation, profile, session_id),
 		sleep: async (milliseconds) => {
 			await new Promise((resolve) => setTimeout(resolve, milliseconds))

@@ -1,11 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { josh_command } from '#scripts/josh/josh-run'
+import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_probe } from './run-ship-probe'
+import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on
@@ -24,6 +25,10 @@ import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-sh
 // commits, pushes or merges twice. Each stage's start, success, failure or skip goes onto the run's
 // event stream. `run-ship-stage.ts` carries which stage may be passed over, and why the gate never is
 // on the record's word alone.
+//
+// **`--review` owns the round-1 review too** (joshuafolkken/kit#2427): a `review` stage in front of the
+// gate launches the same-strength reviewer beside it and joins, attests and records the round without
+// an agent turn (`run-ship-review-steps.ts`); a High or Medium finding, or any failed join, stops there.
 //
 // The first positional is the `"<title> #<N>"` string `git -y` and `followup` already take; the issue
 // number is read off its tail for `run:tail`. Any further positionals are follow-up citations filed
@@ -48,7 +53,7 @@ const CITE_PATTERN = /^[1-9]\d*$/u
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
 const USAGE =
-	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--notify-message <text> | --notify-message-file <path>]'
+	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--review] [--notify-message <text> | --notify-message-file <path>]'
 const should_forward_stderr = true
 
 type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
@@ -56,6 +61,7 @@ type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
 const OPTIONS = {
 	[NOTIFY_OPTIONS[0]]: { type: 'string' },
 	[NOTIFY_OPTIONS[1]]: { type: 'string' },
+	review: { type: 'boolean' },
 } as const
 
 interface ShipArguments {
@@ -63,12 +69,13 @@ interface ShipArguments {
 	number: string
 	notify: ReadonlyArray<string>
 	cites: ReadonlyArray<string>
+	is_review: boolean
 }
 
 interface Step {
 	stage: Stage
 	header: string
-	argv: (args: ShipArguments, state: ShipState) => ReadonlyArray<string>
+	run: (args: ShipArguments, state: ShipState) => Promise<JoshResult>
 }
 
 // What a resumed ship knows before its first stage: the record's path (absent outside a repository),
@@ -94,24 +101,41 @@ const { STAGE, PHASE } = run_ship_stage
 // The four steps in the order a change ships: the gate before the commit, the commit/push/PR before
 // the merge, the merge before the report bookkeeping. The commit step carries the `--skip-*` flags a
 // resumed ship needs, so an existing commit or push is never made twice.
+async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
+	return await josh_command.josh_run(argv, should_forward_stderr)
+}
+
 const STEPS: ReadonlyArray<Step> = [
-	{ stage: STAGE.GATE, header: run_ship.GATE_HEADER, argv: () => ['gate'] },
+	{ stage: STAGE.GATE, header: run_ship.GATE_HEADER, run: async () => await josh(['gate']) },
 	{
 		stage: STAGE.COMMIT,
 		header: run_ship.COMMIT_HEADER,
-		argv: (args, state) => ['git', '-y', ...run_ship_stage.commit_flags(state), args.title],
+		run: async (args, state) =>
+			await josh(['git', '-y', ...run_ship_stage.commit_flags(state), args.title]),
 	},
 	{
 		stage: STAGE.FOLLOWUP,
 		header: run_ship.FOLLOWUP_HEADER,
-		argv: (args) => ['followup', args.title, ...args.notify],
+		run: async (args) => await josh(['followup', args.title, ...args.notify]),
 	},
 	{
 		stage: STAGE.REPORT,
 		header: run_ship.REPORT_HEADER,
-		argv: (args) => ['run:tail', args.number, ...args.cites],
+		run: async (args) => await josh(['run:tail', args.number, ...args.cites]),
 	},
 ]
+
+// `--review` (joshuafolkken/kit#2427) puts the supervised round-1 review in front of the gate: it
+// launches the gate itself, so the gate stage that follows reuses that tree's green record.
+const REVIEW_STEP: Step = {
+	stage: STAGE.REVIEW,
+	header: run_ship.REVIEW_HEADER,
+	run: async (args) => await run_ship_review_steps.review_stage(args.number),
+}
+
+function steps(args: ShipArguments): ReadonlyArray<Step> {
+	return args.is_review ? [REVIEW_STEP, ...STEPS] : STEPS
+}
 
 function issue_number(title: string): string | undefined {
 	return TRAILING_ISSUE_PATTERN.exec(title)?.[NUMBER_GROUP]
@@ -132,7 +156,13 @@ function read_args(argv: ReadonlyArray<string>): ShipArguments | undefined {
 
 	if (cites.some((token) => !CITE_PATTERN.test(token))) return undefined
 
-	return { title, number, notify: notify_arguments(parsed.values), cites }
+	return {
+		title,
+		number,
+		notify: notify_arguments(parsed.values),
+		cites,
+		is_review: parsed.values.review === true,
+	}
 }
 
 // Numbers-only tail and a strict parse, so a title with no `#<N>` or a stray flag is refused rather
@@ -146,7 +176,7 @@ function parse(argv: ReadonlyArray<string>): ShipArguments | undefined {
 }
 
 async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
-	const result = await josh_command.josh_run(step.argv(args, state), should_forward_stderr)
+	const result = await step.run(args, state)
 
 	return { header: step.header, body: result.out, code: result.code }
 }
@@ -224,7 +254,7 @@ async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const context = await open_context(args)
 	const sections: Array<ShipSection> = []
 
-	for (const step of STEPS) {
+	for (const step of steps(args)) {
 		const section = await run_stage(step, args, context)
 
 		sections.push(section)
