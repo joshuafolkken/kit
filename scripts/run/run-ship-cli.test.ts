@@ -3,6 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+// A fresh ship: nothing recorded and nothing committed, pushed or merged. The resume paths are pinned in
+// `run-ship-resume.test.ts`.
+vi.mock('./run-ship-probe', () => ({
+	run_ship_probe: {
+		read_state: vi.fn().mockResolvedValue({
+			is_committed: false,
+			is_pushed: false,
+			is_merged: false,
+		}),
+		record_target: vi.fn().mockResolvedValue(undefined),
+	},
+}))
+vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
 
 const { run_ship_cli } = await import('./run-ship-cli')
 

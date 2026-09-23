@@ -1707,6 +1707,10 @@ follow-up citations filed this run — branch-2 filing runs before `ship` — fo
 the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
 review finding — stays in front of this command.
 
+A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored only where the actual
+state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged
+as a `ship-stage` trace event.
+
 ### `josh run:report`
 
 Generates the session-facing report _from_ the run's event stream, rather than composing the wording by

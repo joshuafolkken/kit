@@ -106,6 +106,23 @@ describe('run_event_stream.read_last — the degenerate read', () => {
 	it('returns undefined for an empty stream', () => {
 		expect(run_event_stream.read_last(fresh_target())).toBeUndefined()
 	})
+
+	it('skips trace events so a ship stage never hides the run position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.MERGE, '#7 merged', AT)
+		run_event_stream.append(target, KIND.SHIP_STAGE, '#7 report done', AT)
+
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.MERGE)
+	})
+
+	it('returns undefined for a stream holding only trace events', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.SHIP_STAGE, '#7 gate start', AT)
+
+		expect(run_event_stream.read_last(target)).toBeUndefined()
+	})
 })
 
 describe('run_event_stream.format_event — the line a reader relays', () => {

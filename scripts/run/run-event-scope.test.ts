@@ -83,6 +83,12 @@ describe('run_event_scope.last_scoped_event', () => {
 		expect(run_event_scope.last_scoped_event(MIXED, since(START))).toEqual(LATER)
 	})
 
+	it('skips a ship-stage trace event so the run position stays readable', () => {
+		const trace = event(3, KIND.SHIP_STAGE, AFTER)
+
+		expect(run_event_scope.last_scoped_event([...MIXED, trace], since(START))).toEqual(LATER)
+	})
+
 	it('returns undefined when only a previous invocation’s events are on the stream', () => {
 		expect(run_event_scope.last_scoped_event([EARLIER], since(START))).toBeUndefined()
 	})
