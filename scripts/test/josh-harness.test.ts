@@ -169,13 +169,18 @@ describe('josh harness — the gate and its join race (#2434)', () => {
 		async () => {
 			const kit = environment(RACE)
 			const marker = file_map_stamp.create(review_stamps.IN_FLIGHT_PREFIX, kit.root).stamp_path()
+			const record = file_map_stamp.create(review_stamps.GATE_PREFIX, kit.root).stamp_path()
 			const gate = josh_harness.start(kit, ['gate', '--force'], GATE_TIMEOUT_MS)
 			const is_marked = await josh_harness.wait_for(() => existsSync(marker), MARKER_WAIT_MS)
 			const join = await josh_harness.start(kit, ['run:review', '--join'], GATE_TIMEOUT_MS)
 			const gate_result = await gate
 
-			expect(is_marked).toBe(true)
-			expect(gate_result.exit_code, gate_result.stdout).toBe(0)
+			// A green gate that withheld its record reads red to every join, race or not — asserted
+			// before the join so that failure is told from the race and carries the gate's own output.
+			expect(
+				{ is_marked, exit_code: gate_result.exit_code, is_recorded: existsSync(record) },
+				gate_result.stdout,
+			).toStrictEqual({ is_marked: true, exit_code: 0, is_recorded: true })
 			expect(join.exit_code, join.stdout).toBe(0)
 			expect(join.stdout).toContain(GATE_GREEN)
 		},
