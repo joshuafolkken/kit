@@ -10,6 +10,7 @@ import unicorn from 'eslint-plugin-unicorn'
 import { defineConfig } from 'eslint/config'
 import globals from 'globals'
 import ts from 'typescript-eslint'
+import { checkout_rooted_parser } from './checkout-rooted-parser.js'
 import { config_fingerprint } from './config-fingerprint.js'
 import { code_quality_rules } from './rules/code-quality.js'
 import { formatting_rules } from './rules/formatting.js'
@@ -151,11 +152,8 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			files: FILE_PATTERNS.typescript,
 			ignores: ['**/*.svelte.ts'],
 			languageOptions: {
-				parser: ts.parser,
-				parserOptions: {
-					project: './tsconfig.json',
-					tsconfigRootDir: tsconfig_root_dir,
-				},
+				parser: checkout_rooted_parser.create(tsconfig_root_dir),
+				parserOptions: { project: './tsconfig.json' },
 			},
 		},
 		{
