@@ -73,3 +73,28 @@ describe('Claude resume argv construction', () => {
 		expect(argv.args.at(-1)).toBe(INVOCATION)
 	})
 })
+
+// **A forced session id lets the wake supervisor know its child's transcript name in advance**
+// (joshuafolkken/kit#2407), so a whiff is attributed to a session it started rather than to any
+// transcript that moved while it was alive.
+describe('Claude forced-session argv construction', () => {
+	const SESSION = '44444444-4444-4444-8444-444444444444'
+	const SESSION_ID_FLAG = '--session-id'
+
+	it('puts --session-id and the id ahead of the model flags', () => {
+		const profile = agent_role_profile.DEFAULT_PROFILES.scheduler
+		const argv = claude_agent_argv.build(INVOCATION, profile, SESSION)
+		const at = argv.args.indexOf(SESSION_ID_FLAG)
+
+		expect(at).toBeGreaterThan(-1)
+		expect(argv.args[at + 1]).toBe(SESSION)
+		expect(at).toBeLessThan(argv.args.indexOf('--model'))
+		expect(argv.args.at(-1)).toBe(INVOCATION)
+	})
+
+	it('forces nothing when no id is given, so every other caller is unchanged', () => {
+		const argv = claude_agent_argv.build(INVOCATION, agent_role_profile.DEFAULT_PROFILES.worker)
+
+		expect(argv.args).not.toContain(SESSION_ID_FLAG)
+	})
+})

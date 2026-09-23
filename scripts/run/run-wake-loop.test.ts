@@ -36,16 +36,21 @@ const ENOENT_NOTE = 'spawn claude ENOENT'
 interface Recorder {
 	ports: LoopPorts
 	wakes: Array<string>
+	session_ids: Array<string>
 }
 
 // A scripted sequence of carry reads, one per pass, so a whole run of the supervisor is expressed as
 // what the record said over time. Running past the end reads as the run having ended.
 function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCHED): Recorder {
 	const wakes: Array<string> = []
+	// The forced ids handed to `wake`, one per launch, deterministic so a test can assert exactly which
+	// sessions the supervisor started (joshuafolkken/kit#2407).
+	const session_ids: Array<string> = []
 	const remaining = [...reads]
 
 	return {
 		wakes,
+		session_ids,
 		ports: {
 			read_carry: () => remaining.shift() ?? ENDED,
 			// Liveness read from the record itself: a handed-off record's owner is the predecessor, whose
@@ -53,8 +58,10 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 			// live successor is spending. A test that needs a *dead* owner over a not-handed-off record —
 			// the crash joshuafolkken/kit#2336 recovers — overrides this port with `() => false`.
 			is_owner_live: (read) => read.kind === 'carried' && read.carry.is_handed_off !== true,
-			wake: (invocation) => {
+			new_session_id: () => `sid-${String(session_ids.length + 1)}`,
+			wake: (invocation, session_id) => {
 				wakes.push(invocation)
+				session_ids.push(session_id)
 
 				return launch
 			},
@@ -103,6 +110,18 @@ describe('run_wake_loop.run_loop — one wake per cut', () => {
 		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
 
 		expect(run_wake.read_wake(scratch.target)?.woke).toBe(2)
+	})
+
+	// joshuafolkken/kit#2407. Each cut's forced session id is recorded on the record, so `josh time
+	// --run` can attribute a whiff to a session this supervisor started rather than to any transcript
+	// that moved while it was alive.
+	it('records the forced session id of every session it started', async () => {
+		const scripted = recorder([HANDED_OFF, IN_FLIGHT, HANDED_OFF, IN_FLIGHT])
+
+		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(run_wake.read_wake(scratch.target)?.spawned).toStrictEqual(scripted.session_ids)
+		expect(scripted.session_ids).toStrictEqual(['sid-1', 'sid-2'])
 	})
 })
 

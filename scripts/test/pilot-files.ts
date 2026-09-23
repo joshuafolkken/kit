@@ -363,7 +363,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/time-runtime/time-single-check.test.ts',
 	'scripts/time-runtime/time-spans.test.ts',
 	'scripts/time-runtime/time-writes.test.ts',
-	'scripts/time/time-run-state-collect.test.ts',
 	'scripts/time/time-run-state.test.ts',
 	'scripts/ui/ui-routes.test.ts',
 	'scripts/version/index.test.ts',

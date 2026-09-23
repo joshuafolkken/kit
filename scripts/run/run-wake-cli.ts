@@ -1,13 +1,14 @@
 #!/usr/bin/env tsx
+import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
-import { run_liveness } from './run-liveness'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
+import { run_wake_describe, type WakeContext } from './run-wake-describe'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
@@ -39,7 +40,6 @@ const INTERVAL_PATTERN = /^[1-9]\d*$/u
 // nowhere near the clamp.
 const MAX_INTERVAL_SECONDS = 3600
 const SCRIPT_PATH = fileURLToPath(import.meta.url)
-const UNKNOWN_CUTS = 'an unreadable number of'
 
 const STARTED_VERDICT = 'started'
 const RUNNING_VERDICT = 'running'
@@ -50,7 +50,6 @@ const NONE_VERDICT = 'none'
 const UNKNOWN_VERDICT = 'unknown'
 const FAILED_VERDICT = 'failed'
 
-const STOP_COMMAND = 'pnpm josh run:wake --stop'
 // **The note covers both ways `wake_argv` answers `undefined`**, because it cannot tell them apart and
 // a message that named only the first would accuse a legitimate invocation of carrying unsafe text
 // (joshuafolkken/kit#1774). The second is the one a person actually meets: a `queue` whose references
@@ -100,24 +99,6 @@ const OPTIONS = {
 } as const
 
 type ParsedValues = Partial<Record<keyof typeof OPTIONS, string | boolean>>
-
-// The three paths every verb needs: the carry record it reads, its own record, and the work tree a
-// woken session runs in. The work tree is the common git directory's parent, which is the *primary*
-// checkout — a lane must never be where the next session resumes, because a lane belongs to one child.
-interface WakeContext {
-	carry_target: string
-	wake_target: string
-	// Where everything this supervisor starts writes its output (joshuafolkken/kit#1746). It is named
-	// in `--list` and in every warning, because a path nobody is told is a file nobody reads.
-	log_target: string
-	// The run's event stream, keyed on the primary checkout's git directory — the one the resumed
-	// `backlogrun` parent runs in, so its own git directory is this common one, exactly the key the emit
-	// side uses. `--list` relays the newest event from here: the report surface belongs to the run, and
-	// `--list` is the degenerate last-event read of the same stream the attached session follows
-	// (joshuafolkken/kit#2207).
-	event_target: string
-	worktree: string
-}
 
 function report(verdict: string, exit_code: number = SUCCESS_EXIT_CODE): number {
 	console.info(verdict)
@@ -193,75 +174,13 @@ function refuse_without_carry(kind: CarryRead['kind']): number {
 	return report(NONE_VERDICT, FAILURE_EXIT_CODE)
 }
 
-function carry_cuts(read: CarryRead): string {
-	if (read.kind === 'carried') return String(read.carry.cuts)
-	if (read.kind === 'expired') return String(read.carry.cuts)
-
-	return UNKNOWN_CUTS
-}
-
-// **A wake that has gone out and has not been answered is said out loud** (joshuafolkken/kit#1746).
-// Read from `woke` and `cuts` alone, the forty minutes a supervisor spends retrying one lost cut look
-// exactly like the second before its first launch — so a person checking on a stalled backlog was
-// shown nothing to check. `attempts` is present only while a cut is unserved, which is why its
-// absence is what prints nothing.
-function outstanding_line(wake: RunWake): string | undefined {
-	if (wake.attempts === undefined) return undefined
-
-	return `${String(wake.attempts)} launch(es) outstanding for the current cut, none claimed yet`
-}
-
-// The run's stream, read here because a headless parent's progress reaches its own transcript alone —
-// after a cut, `--list` is the person's one window onto it (joshuafolkken/kit#1910). Two lines: the
-// newest event (the degenerate last-event read of the stream the attached session follows, so `--list`
-// and the follow read one stream rather than two paths), and how to follow on from here — the same
-// reader before and after the cut, with `tail -F` on the raw stream named as a recovery path rather
-// than the ambient one (joshuafolkken/kit#2207). The event line is omitted before the first event, the
-// way `outstanding_line` omits a count of zero; the follow line is always shown.
-function stream_lines(context: WakeContext): Array<string> {
-	const event = run_event_stream.read_last(context.event_target)
-	const progress = event === undefined ? [] : [`progress: ${run_event_stream.format_event(event)}`]
-	const follow = `follow: \`pnpm josh run:event --follow ${String(event?.pos ?? 0)}\` (recover with \`tail -F ${context.event_target}\`)`
-
-	return [...progress, follow]
-}
-
-// The wake count is printed beside the carry record's `cuts` rather than alone, because their relation
-// is the property worth being able to check — one wake per cut, plus one per crashed session the
-// supervisor recovered (joshuafolkken/kit#2336), so `woke >= cuts` and the gap is the recoveries.
-// `woke < cuts` is the shortfall that says a cut went unserved, and since joshuafolkken/kit#1746 `woke`
-// counts records actually claimed rather than sessions started.
-// **The outstanding line beside it is what makes a shortfall readable**: the count is observed at a
-// poll, so it lags a claim by up to one interval, and launches still outstanding are what say whether
-// a missing wake is one not yet seen or one that never arrived.
-
-function describe_wake(wake: RunWake, context: WakeContext): string {
-	const live = run_wake.is_supervisor_live(wake) ? 'running' : 'not running'
-	const cuts = carry_cuts(run_carry.read_carry(context.carry_target))
-
-	return [
-		`invocation: ${wake.invocation}`,
-		`profile: ${wake.profile === undefined ? 'unrecorded' : agent_role_profile.describe(wake.profile)}`,
-		`supervisor: process ${String(wake.pid)} (${live}), watching since ${wake.started_at}`,
-		`woke ${String(wake.woke)} session(s) across ${cuts} cut(s)`,
-		outstanding_line(wake),
-		run_liveness.describe_agent_state(context.log_target),
-		`output: ${context.log_target}`,
-		// How progress is seen without asking after the cut: the run's stream, followed from here
-		// (joshuafolkken/kit#2207). `--list` is that reader's one-shot last-event form.
-		...stream_lines(context),
-		`stop it with \`${STOP_COMMAND}\``,
-	]
-		.filter((line) => line !== undefined)
-		.join('\n')
-}
-
 function wake_session(
 	context: WakeContext,
 	invocation: string,
 	profile: AgentProfile,
+	session_id: string,
 ): LaunchResult {
-	const built = run_wake_session.wake_argv(invocation, profile, context.worktree)
+	const built = run_wake_session.wake_argv(invocation, profile, context.worktree, session_id)
 
 	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
@@ -276,7 +195,8 @@ function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 	return {
 		read_carry: () => run_carry.read_carry(context.carry_target),
 		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_owner_live(read.carry),
-		wake: (invocation) => wake_session(context, invocation, profile),
+		new_session_id: () => randomUUID(),
+		wake: (invocation, session_id) => wake_session(context, invocation, profile, session_id),
 		sleep: async (milliseconds) => {
 			await new Promise((resolve) => setTimeout(resolve, milliseconds))
 		},
@@ -349,7 +269,7 @@ function spawn_supervisor(context: WakeContext, interval: string | undefined): n
 	}
 
 	console.error(
-		`Supervisor started as process ${String(result.pid)}. Stop it with \`${STOP_COMMAND}\`.`,
+		`Supervisor started as process ${String(result.pid)}. Stop it with \`${run_wake_describe.STOP_COMMAND}\`.`,
 	)
 
 	return report(STARTED_VERDICT)
@@ -363,7 +283,7 @@ function start(context: WakeContext, interval: string | undefined): number {
 	const existing = run_wake.read_wake(context.wake_target)
 
 	if (existing !== undefined && run_wake.is_supervisor_live(existing)) {
-		console.error(describe_wake(existing, context))
+		console.error(run_wake_describe.describe_wake(existing, context))
 
 		return report(RUNNING_VERDICT)
 	}
@@ -415,7 +335,7 @@ function list(context: WakeContext): number {
 
 	if (wake === undefined) return report(NONE_VERDICT)
 
-	console.error(describe_wake(wake, context))
+	console.error(run_wake_describe.describe_wake(wake, context))
 
 	return report(run_wake.is_supervisor_live(wake) ? SUPERVISING_VERDICT : STALE_VERDICT)
 }
