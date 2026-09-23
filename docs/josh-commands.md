@@ -635,7 +635,7 @@ Bring the repository's default branch into the branch this checkout is on: fetch
 pnpm josh main:merge
 ```
 
-**Behavior:** the merge strategy is named by the command rather than read from git config, so a diverged branch — the state the command exists for — merges cleanly instead of aborting with `fatal: Need to specify how to reconcile divergent branches`. Merging (not rebasing) avoids the force push the distributed `.claude/settings.json` denies. A conflict, or uncommitted work on an incoming path, exits non-zero: commit with `pnpm josh git -y`.
+**Behavior:** the merge strategy is named by the command rather than read from git config, so a diverged branch — the state the command exists for — merges cleanly instead of aborting with `fatal: Need to specify how to reconcile divergent branches`. Merging (not rebasing) avoids the force push the distributed `.claude/settings.json` denies. A conflict or uncommitted work on an incoming path fails; commit via `pnpm josh git -y`.
 
 ---
 
