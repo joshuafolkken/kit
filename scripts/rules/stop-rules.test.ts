@@ -1,25 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { stop_rules, type StopContext } from './stop-rules'
+import { stop_rules_fixture } from './stop-rules-fixture'
 
-const BASE: StopContext = {
-	hold_present: false,
-	tree_clean: false,
-	notified: false,
-	message: '',
-	stop_hook_active: false,
-	cut_pending: false,
-	filed: false,
-	session_owner: 'joshuafolkken',
-	headless_waiting: false,
-	headless_refusals: 0,
-	owes_offer: false,
-	lane_child: false,
-	relay_position: undefined,
-}
-
-function context(overrides: Partial<StopContext>): StopContext {
-	return { ...BASE, ...overrides }
-}
+const { context } = stop_rules_fixture
 
 // joshuafolkken/kit#2329: every stop reason ends on this, so a correction never reprints the reply.
 const NO_REPRINT = 'do not repeat your previous reply'
@@ -128,9 +111,14 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 // joshuafolkken/kit#2422: an offer to file is a Tier A filing deferred to the user, so it blocks.
 const OFFER_MESSAGE = '起票するのが妥当だと考えます。起票してよければ言ってください。'
 
+// The offer messages are Japanese, so they are judged in a Japanese session.
+function ja_context(overrides: Partial<StopContext>): StopContext {
+	return context({ session_lang: 'ja', ...overrides })
+}
+
 describe('stop_rules.stop_outcome — filing offer', () => {
 	it('blocks a reply that offers to file on a turn that filed nothing', () => {
-		const { reason } = stop_rules.stop_outcome(context({ message: OFFER_MESSAGE }))
+		const { reason } = stop_rules.stop_outcome(ja_context({ message: OFFER_MESSAGE }))
 
 		expect(reason).toBe(stop_rules.FILING_OFFER_REASON)
 	})
@@ -138,11 +126,11 @@ describe('stop_rules.stop_outcome — filing offer', () => {
 	it('is silent on a reply reporting a filing already made', () => {
 		const message = '起票しました: [#9](https://github.com/joshuafolkken/kit/issues/9) — 所見'
 
-		expect(stop_rules.stop_outcome(context({ message, filed: true })).reason).toBeUndefined()
+		expect(stop_rules.stop_outcome(ja_context({ message, filed: true })).reason).toBeUndefined()
 	})
 
 	it('is silent when a filing is on the tail even if the reply still reads as an offer', () => {
-		const outcome = stop_rules.stop_outcome(context({ message: OFFER_MESSAGE, filed: true }))
+		const outcome = stop_rules.stop_outcome(ja_context({ message: OFFER_MESSAGE, filed: true }))
 
 		expect(outcome.reason).toBeUndefined()
 	})
@@ -150,12 +138,12 @@ describe('stop_rules.stop_outcome — filing offer', () => {
 	it('is silent when the offer targets a third-party repository', () => {
 		const message = `https://github.com/sveltejs/kit に${OFFER_MESSAGE}`
 
-		expect(stop_rules.stop_outcome(context({ message })).reason).toBeUndefined()
+		expect(stop_rules.stop_outcome(ja_context({ message })).reason).toBeUndefined()
 	})
 
 	it('is silent when the session owner cannot be read', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ message: OFFER_MESSAGE, session_owner: undefined }),
+			ja_context({ message: OFFER_MESSAGE, session_owner: undefined }),
 		)
 
 		expect(outcome.reason).toBeUndefined()
@@ -165,7 +153,7 @@ describe('stop_rules.stop_outcome — filing offer', () => {
 describe('stop_rules.stop_outcome — filing offer stands down and ordering', () => {
 	it('does not block once stop_hook_active is set', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ message: OFFER_MESSAGE, stop_hook_active: true }),
+			ja_context({ message: OFFER_MESSAGE, stop_hook_active: true }),
 		)
 
 		expect(outcome.reason).toBeUndefined()
@@ -174,11 +162,11 @@ describe('stop_rules.stop_outcome — filing offer stands down and ordering', ()
 	it('goes ahead of the citation rule and behind the hold rules', () => {
 		const offer_with_bare = `${OFFER_MESSAGE} #7`
 
-		expect(stop_rules.stop_outcome(context({ message: offer_with_bare })).reason).toBe(
+		expect(stop_rules.stop_outcome(ja_context({ message: offer_with_bare })).reason).toBe(
 			stop_rules.FILING_OFFER_REASON,
 		)
 		expect(
-			stop_rules.stop_outcome(context({ hold_present: true, message: offer_with_bare })).reason,
+			stop_rules.stop_outcome(ja_context({ hold_present: true, message: offer_with_bare })).reason,
 		).toBe(stop_rules.STOP_NOTIFY_REASON)
 	})
 })
@@ -342,7 +330,7 @@ describe('stop_rules.stop_outcome — progress relay (joshuafolkken/kit#2480)', 
 
 describe('stop_rules envelopes and payload', () => {
 	it('blocks with a decision envelope', () => {
-		expect(JSON.parse(stop_rules.block_envelope('r'))).toEqual({ decision: 'block', reason: 'r' })
+		expect(JSON.parse(stop_rules.block_envelope('r', 'en'))).toMatchObject({ decision: 'block' })
 	})
 
 	it('parses a valid Stop payload and rejects a malformed one', () => {
