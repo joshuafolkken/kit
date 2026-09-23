@@ -548,8 +548,8 @@ turn is the one the **watcher's exit delivers** — a background command's compl
 the session (`background-commands.md`). **A `Bash` call that only sleeps is the spelling this forbids**,
 and so is a turn whose whole content is asking `epic:next` again to see whether anything has changed.
 
-**A headless (`claude -p`) parent waits in the foreground** (a turn-end kills it) and stops
-only after `--cut` or `--end`; the `Stop` hook enforces it (#2437).
+**A `claude -p` parent waits in the foreground**, stopping only
+after `--cut` or `--end`; the `Stop` hook enforces it (#2437).
 
 **The wake is used for both halves at once.** The turn that relays the line is the turn that acts on what
 the line says: a free lane is the ask for the next child, and every lane still busy is not an ask at all.

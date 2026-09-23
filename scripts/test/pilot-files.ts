@@ -28,7 +28,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/agent/agent-exit-record.test.ts',
 	'scripts/agent/agent-role-profile-documents.test.ts',
 	'scripts/agent/agent-role-profile.test.ts',
-	'scripts/agent/claude-agent-argv.test.ts',
 	'scripts/agent/claude-result-event.test.ts',
 	'scripts/agent/codex-project-config.test.ts',
 	'scripts/agent/interactive-ask.test.ts',

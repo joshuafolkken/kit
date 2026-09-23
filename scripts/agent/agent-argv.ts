@@ -28,7 +28,7 @@ function build(
 ): AgentArgv {
 	return profile.provider === 'openai'
 		? codex_agent_argv.build(invocation, profile, cwd)
-		: claude_agent_argv.build(invocation, profile, session_id)
+		: claude_agent_argv.build(invocation, profile, session_id, cwd)
 }
 
 // The resume counterpart of `build` (joshuafolkken/kit#2317). Only the Claude path resumes by session
@@ -43,7 +43,7 @@ function build_resume(
 ): AgentArgv {
 	return profile.provider === 'openai'
 		? codex_agent_argv.build(invocation, profile, cwd)
-		: claude_agent_argv.build_resume(invocation, profile, session_id)
+		: claude_agent_argv.build_resume(invocation, profile, session_id, cwd)
 }
 
 // **`session_id` threads to the Claude build, so a wake launched in a lane's work tree still forces

@@ -211,7 +211,12 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 	it('starts the agent CLI headless in the lane’s own work tree, writing to its own log', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		const built = claude_agent_argv.build(`fullrun #${ISSUE}`, WORKER_PROFILE)
+		const built = claude_agent_argv.build(
+			`fullrun #${ISSUE}`,
+			WORKER_PROFILE,
+			undefined,
+			LANE_DIRECTORY,
+		)
 
 		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
 			argv: built,

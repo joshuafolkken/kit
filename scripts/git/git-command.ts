@@ -299,8 +299,13 @@ async function merge_fast_forward(branch_name: string): Promise<string> {
 //
 // `with_output` rather than `read`: a merge that conflicts has to put git's own report in front of
 // the person, which is what the `git pull` this replaced did.
-async function merge_branch(branch_name: string): Promise<void> {
-	await git_spawn.with_output('merge', [`origin/${branch_name}`])
+//
+// `message` replaces git's default merge message, which carries no `#N` and is therefore refused
+// by the `commit-msg` hook on an issue branch (joshuafolkken/kit#2439).
+async function merge_branch(branch_name: string, message?: string): Promise<void> {
+	const message_arguments = message === undefined ? [] : ['-m', message]
+
+	await git_spawn.with_output('merge', [...message_arguments, `origin/${branch_name}`])
 }
 
 async function checkout_b(branch_name: string): Promise<string> {

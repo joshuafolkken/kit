@@ -144,3 +144,18 @@ describe('run_ship_stage record — read, mark and clear', () => {
 		)
 	})
 })
+
+describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)', () => {
+	it('runs on a fresh tree with no record', () => {
+		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, NOTHING)).toBe(false)
+	})
+
+	it('runs again before a commit even when recorded, since the tree may have changed', () => {
+		expect(run_ship_stage.is_done(STAGE.REVIEW, new Set([STAGE.REVIEW]), NOTHING)).toBe(false)
+	})
+
+	it('is passed over once a commit or a merge exists', () => {
+		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, COMMITTED)).toBe(true)
+		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, MERGED)).toBe(true)
+	})
+})
