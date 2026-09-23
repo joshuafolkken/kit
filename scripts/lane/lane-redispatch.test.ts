@@ -6,6 +6,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { detached_launch } from '#scripts/run/detached-launch'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
@@ -34,6 +35,9 @@ vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
 const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
+
+// A started child is recorded on the run's stream; that write is kept off the real repository's stream.
+vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
 
 function lane(): LaneInfo {
 	return {

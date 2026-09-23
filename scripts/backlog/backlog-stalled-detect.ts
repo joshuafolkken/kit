@@ -44,8 +44,12 @@ async function real_ready_count(): Promise<number> {
 	return issues.length
 }
 
+// One stall per episode, and the episode ends at a dispatch rather than at whatever event lands next
+// (joshuafolkken/kit#2464) — every parallel lane appends to this stream, so a newest-event dedup re-fired.
 async function real_emit_stall(text: string): Promise<boolean> {
-	return await run_event_stream_emit.emit_once(run_event_stream.EVENT_KIND.STALL, text)
+	const { STALL, CHILD_LAUNCH } = run_event_stream.EVENT_KIND
+
+	return await run_event_stream_emit.emit_once_since(STALL, text, CHILD_LAUNCH)
 }
 
 async function real_notify_stalled(body: string): Promise<boolean> {
@@ -93,8 +97,8 @@ async function gather(ports: DetectPorts, threshold_ms: number): Promise<StallRe
 	return await probe_reading(ports, age)
 }
 
-// The marker and the notification, both once per stall episode. `emit_stall` refuses a second while the
-// stall event is still the newest, and its `false` is what holds the notification back too — so a stall
+// The marker and the notification, both once per stall episode. `emit_stall` refuses a second until a
+// dispatch has intervened, and its `false` is what holds the notification back too — so a stall
 // polled every stop reaches the person once, not once a turn.
 async function report(ports: DetectPorts, reading: StallReading): Promise<void> {
 	const text = backlog_stalled.describe(reading)

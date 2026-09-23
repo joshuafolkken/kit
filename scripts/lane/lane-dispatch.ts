@@ -5,6 +5,8 @@ import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ending } from '#scripts/run/run-ending'
+import { run_event_stream } from '#scripts/run/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
@@ -320,10 +322,17 @@ async function unmark_in_progress(issue: string): Promise<void> {
 	}
 }
 
+// A started child is recorded on the run's stream, which is where the stall detector ages the last
+// dispatch from (joshuafolkken/kit#2464) — unrecorded, every stall read "hours since the last dispatch"
+// minutes after a launch. A failed start records nothing: no child is running.
 async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
 	const outcome = await started(request)
 
-	if (outcome.kind === 'failed') await unmark_in_progress(issue)
+	const is_failed = outcome.kind === 'failed'
+
+	await (is_failed
+		? unmark_in_progress(issue)
+		: run_event_stream_emit.emit(run_event_stream.EVENT_KIND.CHILD_LAUNCH, `#${issue} dispatched`))
 
 	return outcome
 }

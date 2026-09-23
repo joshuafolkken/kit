@@ -75,6 +75,19 @@ describe('backlog_stalled.dispatch_age_ms', () => {
 	it('is undefined for an empty stream', () => {
 		expect(backlog_stalled.dispatch_age_ms([], NOW_MS)).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#2464: a run hours old that has just dispatched is not stalled — the launch record
+	// `lane:dispatch` now writes is what the age is measured from.
+	it('reads a run that just dispatched as not stalled, however old the run is', () => {
+		const events = [
+			event(run_event_stream.EVENT_KIND.PLAN, '2026-09-22T08:00:00.000Z', 0),
+			event(run_event_stream.EVENT_KIND.MERGE, '2026-09-22T11:00:00.000Z', 1),
+			event(run_event_stream.EVENT_KIND.CHILD_LAUNCH, '2026-09-22T12:18:00.000Z', 2),
+		]
+		const age = backlog_stalled.dispatch_age_ms(events, NOW_MS) ?? Infinity
+
+		expect(verdict_of({ dispatch_age_ms: age })).toBe(backlog_stalled.OK)
+	})
 })
 
 describe('backlog_stalled.count_ready_tokens', () => {
