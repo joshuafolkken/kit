@@ -106,18 +106,26 @@ function is_pr_state_merged(pr_state: string | undefined): boolean {
 	return pr_state === PR_STATE_MERGED
 }
 
-function is_pr_state_undefined(pr_state: string | undefined): boolean {
-	return pr_state === undefined
+// A body the caller supplied is written onto the pull request that is already open, rather than
+// dropped with the create that did not happen (joshuafolkken/kit#2446): a rerun carrying the
+// live-execution evidence is how a merge `followup` refused for lacking it is recovered.
+async function report_existing_pr(
+	body: string,
+	branch_name: string,
+	should_replace_body: boolean,
+): Promise<void> {
+	if (should_replace_body) await git_gh_command.pr_update_body(branch_name, body)
+
+	await report_open_pr(branch_name)
 }
 
-async function handle_existing_pr(title: string, body: string, branch_name: string): Promise<void> {
+async function handle_existing_pr(
+	title: string,
+	body: string,
+	branch_name: string,
+	should_replace_body: boolean,
+): Promise<void> {
 	const pr_state_result = await get_pr_state_safe(branch_name)
-
-	if (is_pr_state_undefined(pr_state_result)) {
-		await report_open_pr(branch_name)
-
-		return
-	}
 
 	if (is_pr_state_merged(pr_state_result)) {
 		git_pr_messages.display_merged_pr_message()
@@ -126,10 +134,15 @@ async function handle_existing_pr(title: string, body: string, branch_name: stri
 		return
 	}
 
-	await report_open_pr(branch_name)
+	await report_existing_pr(body, branch_name, should_replace_body)
 }
 
-async function create(title: string, body: string, branch_name: string): Promise<void> {
+async function create(
+	title: string,
+	body: string,
+	branch_name: string,
+	should_replace_body = false,
+): Promise<void> {
 	const has_pr = await git_gh_command.pr_exists(branch_name)
 
 	if (!has_pr) {
@@ -138,7 +151,7 @@ async function create(title: string, body: string, branch_name: string): Promise
 		return
 	}
 
-	await handle_existing_pr(title, body, branch_name)
+	await handle_existing_pr(title, body, branch_name, should_replace_body)
 }
 
 function build_title(issue_info: IssueInfo): string {
@@ -157,7 +170,7 @@ async function create_with_issue_info(issue_info: IssueInfo, extra_body?: string
 	const title = build_title(issue_info)
 	const body = build_body(issue_info, extra_body)
 
-	await create(title, body, issue_info.branch_name)
+	await create(title, body, issue_info.branch_name, extra_body !== undefined)
 }
 
 const git_pr = {

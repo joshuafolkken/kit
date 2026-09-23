@@ -49,7 +49,8 @@ const mocked_git = vi.mocked(git_command)
 const REPO_PATH = 'repos/{owner}/{repo}'
 const PULLS_PATH = `${REPO_PATH}/pulls`
 const PR_COMMENTS_PATH = `${REPO_PATH}/issues/${String(PR_NUMBER)}/comments`
-const PR_MERGE_PATH = `${PULLS_PATH}/${String(PR_NUMBER)}/merge`
+const PR_PATH = `${PULLS_PATH}/${String(PR_NUMBER)}`
+const PR_MERGE_PATH = `${PR_PATH}/merge`
 const HTML_URL_FILTER = '.html_url'
 const DEFAULT_BRANCH = 'main'
 const CREATED_URL = 'https://github.com/joshuafolkken/kit/pull/1045'
@@ -174,6 +175,15 @@ describe('pr_comment', () => {
 
 	it('answers the comment URL', async () => {
 		await expect(git_gh_pr.pr_comment(PR_BRANCH, BODY)).resolves.toBe(COMMENT_URL)
+	})
+})
+
+describe('pr_update_body', () => {
+	it('patches the body of the resolved pull request', async () => {
+		await git_gh_pr.pr_update_body(PR_BRANCH, BODY)
+
+		expect(request_to(PR_PATH).method).toBe('PATCH')
+		expect(parsed_body(PR_PATH)).toStrictEqual({ body: BODY })
 	})
 })
 
