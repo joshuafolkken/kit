@@ -34,6 +34,7 @@ const LOOP_FLAG = '--loop'
 const INTERVAL_FLAG = '--interval'
 const OUTPUT_LABEL = 'output: '
 const SUPERVISOR_PID = 4242
+const SID = '11111111-1111-4111-8111-111111111111'
 
 const out: Array<string> = []
 const errors: Array<string> = []
@@ -203,7 +204,7 @@ describe('josh run:wake --list — a person can see what is running', () => {
 	it('reports the wake count beside the run’s cut count', async () => {
 		write_carry(false)
 		const claimed = run_wake.count_claim(
-			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99),
+			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID),
 		)
 
 		run_wake.write_wake(wake_target(), claimed)
@@ -279,7 +280,7 @@ describe('josh run:wake --list — what a stalled cut looks like', () => {
 		write_carry(true)
 		run_wake.write_wake(
 			wake_target(),
-			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99),
+			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID),
 		)
 
 		await run_wake_cli.run(['--list'])

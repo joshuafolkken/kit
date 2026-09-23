@@ -33,7 +33,12 @@ interface LoopPorts {
 	// `--cut` and then exits, so the two moments are not the same one and the supervisor has to wait
 	// out the second — `run-wake.ts` → `WakeDecisionInput.is_owner_live`.
 	is_owner_live: (read: CarryRead) => boolean
-	wake: (invocation: string) => LaunchResult
+	// **The forced transcript id is generated here and handed to `wake`** (joshuafolkken/kit#2407), so
+	// the loop stays deterministic under test — a fixture returns a known id — while production draws a
+	// fresh UUID. The same id is recorded on the wake record, which is how `josh time --run` later knows
+	// the session was one this supervisor started.
+	new_session_id: () => string
+	wake: (invocation: string, session_id: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
 }
@@ -63,11 +68,12 @@ function wake_failure_note(wake: RunWake): string {
 }
 
 function wake_step(wake: RunWake, ports: LoopPorts): StepOutcome {
-	const result = ports.wake(wake.invocation)
+	const session_id = ports.new_session_id()
+	const result = ports.wake(wake.invocation, session_id)
 
 	if (result.kind === 'failed') return stopped(FAILED_REASON, result.note)
 
-	return { kind: 'continue', wake: run_wake.count_wake(wake, ports.now(), result.pid) }
+	return { kind: 'continue', wake: run_wake.count_wake(wake, ports.now(), result.pid, session_id) }
 }
 
 // A `wait` means the woken session has claimed the carry record, so the wake mark is cleared and the

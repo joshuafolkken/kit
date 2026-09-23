@@ -57,18 +57,25 @@ function whiff_of(file: SessionFile): WhiffSession | undefined {
 	return to_whiff(spans, cost_transcript.read_session(file).records, file.modified_ms)
 }
 
-// The whiffs are the wake supervisor's own doing, so they are looked for only where a wake record
-// exists and only among sessions touched since it began. A checkout with no supervisor has no
-// wake-spawned session to have whiffed.
+// **A whiff is attributed to a session this supervisor actually started, not to any transcript that
+// moved while it was alive** (joshuafolkken/kit#2407). The old test — every file touched since the
+// wake record began — swept in unrelated read-only sessions, so its total was a ceiling rather than
+// the real figure: the very session that filed #2407 met that condition. The supervisor now forces
+// each woken session's transcript id with `--session-id` and records it on the wake record, so the
+// attribution is an exact set membership on `session_id`. A record with no forced ids yet — an older
+// record, or one that has woken nothing — attributes no whiff, which is the honest answer rather than
+// the over-broad one.
 function collect_whiffs(
 	files: ReadonlyArray<SessionFile>,
 	wake: RunWake | undefined,
 ): Array<WhiffSession> {
-	if (wake === undefined) return []
+	const spawned = new Set(wake?.spawned)
 
-	const since = Date.parse(wake.started_at)
+	if (spawned.size === 0) return []
 
-	return files.filter((file) => file.modified_ms >= since).flatMap((file) => whiff_of(file) ?? [])
+	return files
+		.filter((file) => spawned.has(file.session_id))
+		.flatMap((file) => whiff_of(file) ?? [])
 }
 
 async function read_facts(cwd: string, now_ms: number): Promise<RunStateFacts> {

@@ -129,6 +129,13 @@ interface RunWake {
 	// stall. Kept apart, the predecessor's liveness is read on every pass and the mark only bounds how
 	// long the wait may last.
 	held_at?: string | undefined
+	// The transcript ids of every session this supervisor forced with `--session-id`
+	// (joshuafolkken/kit#2407). `josh time --run` attributes a whiff only to a session in this list, so
+	// an unrelated read-only session that moved while the supervisor was alive is no longer counted
+	// against the wake role — the $7.68 the Issue read as a ceiling becomes the real figure. Appended
+	// once per launch, retries included, since each retry is a real session that woke and may have done
+	// nothing, and carried across a supervisor restart exactly like the counters beside it.
+	spawned?: ReadonlyArray<string> | undefined
 }
 
 type WakeStopReason = 'ended' | 'expired' | 'unreadable' | 'failed' | 'stopped'
@@ -194,6 +201,7 @@ const run_wake_schema = z.object({
 	attempts: z.number().optional(),
 	woke_pid: z.number().optional(),
 	held_at: z.string().optional(),
+	spawned: z.array(z.string()).optional(),
 	profile: agent_role_profile.PROFILE_SCHEMA.optional(),
 })
 
@@ -340,6 +348,10 @@ function carried_state(existing: RunWake | undefined, invocation: string): Parti
 		attempts: existing.attempts,
 		woke_pid: existing.woke_pid,
 		held_at: existing.held_at,
+		// **`spawned` carries across too, or a restart mid-run would lose the ids of every session it
+		// already started** (joshuafolkken/kit#2407) — and `josh time --run`, reading the record after
+		// the restart, would under-count the whiffs and read the loss as a saving.
+		spawned: existing.spawned,
 		...(existing.profile && { profile: existing.profile }),
 	}
 }
@@ -385,10 +397,17 @@ function claim(
 
 // A launch marks the attempt and nothing else. `woke` is left alone here because a process that has
 // started has not yet done the thing `woke` counts — `count_claim` is where that is decided.
-function count_wake(wake: RunWake, now: Date, pid: number): RunWake {
+//
+// **The forced session id is recorded here, at the launch, because that is where it is known**
+// (joshuafolkken/kit#2407). It is appended rather than replaced: a run spawns one session per cut plus
+// one per retry, and `josh time --run` needs every id to tell a session it started from an unrelated
+// one that merely moved while it was alive.
+function count_wake(wake: RunWake, now: Date, pid: number, session_id: string): RunWake {
 	const attempts = (wake.attempts ?? NO_WAKES) + ONE_WAKE
+	const spawned = [...(wake.spawned ?? []), session_id]
+	const woke_at = now.toISOString()
 
-	return { ...wake, attempts, woke_at: now.toISOString(), woke_pid: pid, held_at: undefined }
+	return { ...wake, attempts, spawned, woke_at, woke_pid: pid, held_at: undefined }
 }
 
 // Starts the clock on a wait without launching anything. `attempts` is deliberately untouched, so the
