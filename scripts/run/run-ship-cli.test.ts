@@ -112,6 +112,22 @@ describe('run_ship_cli.run — forwards the notify body to followup alone', () =
 	})
 })
 
+// joshuafolkken/kit#2446: the PR body carries the live-execution evidence `followup` gates on.
+describe('run_ship_cli.run — forwards the PR body file to the commit step alone', () => {
+	const BODY_FILE_FLAG = '--body-file'
+
+	it('passes --body-file to git -y and not to followup', async () => {
+		await run_ship_cli.run([TITLE, BODY_FILE_FLAG, BODY_PATH])
+
+		expect(argv_calls()).toStrictEqual([
+			GATE,
+			['git', '-y', BODY_FILE_FLAG, BODY_PATH, TITLE],
+			['followup', TITLE],
+			REPORT,
+		])
+	})
+})
+
 describe('run_ship_cli.run — a failed step stops the ship', () => {
 	it('does not run the commit when the gate failed, and exits non-zero', async () => {
 		josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'lint red' })

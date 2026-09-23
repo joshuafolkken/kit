@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const launch_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
@@ -23,7 +24,6 @@ const INLINE_FLAG = '--notify-message'
 const FILE_FLAG = '--notify-message-file'
 const BODY = 'Cause: x\nFix: y'
 const START_NOTE = 'pnpm not found'
-const PARENT_SESSION_ID = 'parent-session-id'
 const GATE_HEADER = '=== gate ==='
 const NEWEST_HEADER = '=== 2026-09-23T02:00:00Z · started by process 2 · pnpm ==='
 
@@ -34,6 +34,7 @@ function request(
 		title: TITLE,
 		number: NUMBER,
 		notify: [],
+		body: [],
 		cites: [],
 		is_review: true,
 		repository: `/tmp/josh-ship-detach-test-${randomUUID()}`,
@@ -68,6 +69,13 @@ describe('run_ship_detach.supervisor_argv', () => {
 		expect(argv.args.at(-1)).toBe(TITLE)
 	})
 
+	it('passes the PR body file through, ahead of the title', () => {
+		const body = ['--body-file', 'pr.md']
+		const argv = run_ship_detach.supervisor_argv(request({ body }))
+
+		expect(argv.args).toEqual(['josh', 'ship', '--review', ...body, TITLE])
+	})
+
 	it('passes a notify file through unchanged', () => {
 		const argv = run_ship_detach.supervisor_argv(request({ notify: [FILE_FLAG, 'body.txt'] }))
 
@@ -83,16 +91,6 @@ describe('run_ship_detach.detach', () => {
 		expect(result.verdict).toBe(run_ship_detach.LAUNCHED)
 		expect(launched.env[run_ship_detach.SUPERVISED_KEY]).toBe('1')
 		expect(emit_mock).toHaveBeenCalledWith('ship-launch', `#${NUMBER} ship supervisor launched`)
-	})
-
-	it('launches the supervisor carrying the parent session id', async () => {
-		vi.stubEnv('CLAUDE_CODE_SESSION_ID', PARENT_SESSION_ID)
-
-		await run_ship_detach.detach(request())
-		vi.unstubAllEnvs()
-		const launched = launch_mock.mock.calls[0]?.[0] as { env: Record<string, string> }
-
-		expect(launched.env['CLAUDE_CODE_SESSION_ID']).toBe(PARENT_SESSION_ID)
 	})
 
 	it('refuses a second supervisor while the recorded one is alive', async () => {
@@ -126,26 +124,20 @@ describe('run_ship_detach.detach', () => {
 	})
 })
 
-// joshuafolkken/kit#2457: a supervisor launched with every parent session key stripped could not resolve
-// the review stage's provider and stopped at `no Codex or Claude Code session was detected`.
-describe('run_ship_detach.supervisor_environment', () => {
-	it('carries the parent session id so the review stage resolves its provider', () => {
-		const environment = run_ship_detach.supervisor_environment({
-			CLAUDE_CODE_SESSION_ID: PARENT_SESSION_ID,
-			CLAUDE_CODE_MESSAGING_SOCKET: 'parent.sock',
-			CLAUDE_CODE_MESSAGING_TOKEN: 'token',
-		})
-
-		expect(environment).toEqual({
-			[run_ship_detach.SUPERVISED_KEY]: '1',
-			CLAUDE_CODE_SESSION_ID: PARENT_SESSION_ID,
-		})
+// joshuafolkken/kit#2456: the launch strips the session keys `ship --review` detects the provider by.
+describe('run_ship_detach.detach provider hand-off', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
 	})
 
-	it('leaves the session id unset outside a Claude Code session', () => {
-		const environment = run_ship_detach.supervisor_environment({})
+	it('hands the supervisor the resolved provider without the parent-session keys', async () => {
+		vi.stubEnv('CODEX_THREAD_ID', '')
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'claude-session')
+		await run_ship_detach.detach(request())
+		const launched = launch_mock.mock.calls[0]?.[0] as { env: Record<string, string> }
 
-		expect(environment['CLAUDE_CODE_SESSION_ID']).toBeUndefined()
+		expect(launched.env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('anthropic')
+		expect(launched.env).not.toHaveProperty('CLAUDE_CODE_SESSION_ID')
 	})
 })
 

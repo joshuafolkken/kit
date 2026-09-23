@@ -31,6 +31,13 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<title> [--body <summary>]', 'automation', ['network']],
 	},
+	'defect:rate': {
+		script: 'scripts/issue/defect-rate-cli.ts',
+		description:
+			'Print the defect rate of merged work: defects filed per behavior change completed',
+		category: 'AI tools',
+		reference: ['[--days <n>]', 'automation', ['network']],
+	},
 	'issue:fold': {
 		script: 'scripts/issue/issue-fold-cli.ts',
 		description:

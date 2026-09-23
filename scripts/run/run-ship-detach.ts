@@ -1,4 +1,4 @@
-import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch, type LaunchArgv } from './detached-launch'
 import { run_event_stream } from './run-event-stream'
@@ -47,6 +47,7 @@ interface DetachRequest {
 	title: string
 	number: string
 	notify: ReadonlyArray<string>
+	body: ReadonlyArray<string>
 	cites: ReadonlyArray<string>
 	is_review: boolean
 	repository: string
@@ -106,21 +107,16 @@ function supervisor_argv(request: DetachRequest): LaunchArgv {
 
 	return {
 		command: PNPM,
-		args: ['josh', 'ship', ...review, ...notify_arguments(request), ...cites, request.title],
+		args: [
+			'josh',
+			'ship',
+			...review,
+			...notify_arguments(request),
+			...request.body,
+			...cites,
+			request.title,
+		],
 	}
-}
-
-// joshuafolkken/kit#2457: the launcher strips the parent session's keys, and those are what the
-// review stage resolves its provider from — so a supervisor carrying none of them stopped at
-// `no Codex or Claude Code session was detected`. The supervisor is not an agent session, and every
-// agent it starts goes back through `detached_launch`, which strips the keys again, so it carries the
-// parent's session id (the identifier, never the socket or its token) to resolve the provider.
-function supervisor_environment(
-	source: NodeJS.ProcessEnv = process.env,
-): Record<string, string | undefined> {
-	const session_key = agent_session_environment.SESSION_ID_KEY
-
-	return { [SUPERVISED_KEY]: SUPERVISED_VALUE, [session_key]: source[session_key] }
 }
 
 function launch(request: DetachRequest): DetachResult {
@@ -131,7 +127,9 @@ function launch(request: DetachRequest): DetachResult {
 			argv: supervisor_argv(request),
 			cwd: request.cwd,
 			log_path: log,
-			env: supervisor_environment(),
+			// The provider travels as a mark because the launch strips the session keys that name it, and
+			// `ship --review` resolves its reviewer from it (joshuafolkken/kit#2456).
+			env: { ...agent_role_profile.handoff_environment(), [SUPERVISED_KEY]: SUPERVISED_VALUE },
 		},
 		(note) => {
 			notes.push(note)
@@ -196,7 +194,6 @@ const run_ship_detach = {
 	log_path,
 	read_log,
 	supervisor_argv,
-	supervisor_environment,
 }
 
 export type { DetachRequest, DetachResult }

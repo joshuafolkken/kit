@@ -87,6 +87,18 @@ vi.mock('../scripts/review/review-record', () => ({
 	},
 }))
 
+// **Mocked for the same reason** (joshuafolkken/kit#2446): the real check reads the branch diff and
+// the pull request body over the network. Its default is `exempt`, so the import-time `main` passes.
+const EVIDENCE_REFUSAL_SENTINEL = vi.hoisted(() => 'evidence-refusal-sentinel')
+const evidence_check_mock = vi.hoisted(() => vi.fn(async () => 'exempt'))
+
+vi.mock('../scripts/review/live-evidence', () => ({
+	live_evidence: {
+		check: evidence_check_mock,
+		refusal_message: () => EVIDENCE_REFUSAL_SENTINEL,
+	},
+}))
+
 // **Mocked because `git_pr_followup` reaches `telegram-notify` and `main` runs at import time** — so
 // an unmocked sender would put this suite one send away from a live HTTP request.
 vi.mock('../scripts/git/telegram-notify', () => ({
@@ -225,6 +237,39 @@ describe('a merge is refused unless the review round was recorded', () => {
 		await git_followup_workflow.assert_review_recorded(true, undefined)
 
 		expect(record_check_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2446. A runtime change merges only with live-execution evidence in its body.
+describe('a merge is refused unless a runtime change carries live-execution evidence', () => {
+	const BRANCH = 'feature-branch'
+
+	it('throws when the verdict is required', async () => {
+		evidence_check_mock.mockResolvedValueOnce('required')
+
+		await expect(git_followup_workflow.assert_live_evidence(true, BRANCH)).rejects.toThrow(
+			EVIDENCE_REFUSAL_SENTINEL,
+		)
+	})
+
+	it.each([['satisfied'], ['exempt']])(ALLOWS_MERGE_TITLE, async (verdict) => {
+		evidence_check_mock.mockResolvedValueOnce(verdict)
+
+		await expect(git_followup_workflow.assert_live_evidence(true, BRANCH)).resolves.toBeUndefined()
+	})
+
+	it('asks about the branch being merged', async () => {
+		evidence_check_mock.mockClear()
+		await git_followup_workflow.assert_live_evidence(true, BRANCH)
+
+		expect(evidence_check_mock).toHaveBeenCalledWith(BRANCH)
+	})
+
+	it(NO_MERGE_TITLE, async () => {
+		evidence_check_mock.mockClear()
+		await git_followup_workflow.assert_live_evidence(false, BRANCH)
+
+		expect(evidence_check_mock).not.toHaveBeenCalled()
 	})
 })
 

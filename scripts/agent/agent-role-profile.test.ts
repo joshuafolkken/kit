@@ -70,6 +70,42 @@ describe('invoking session detection', () => {
 	})
 })
 
+// joshuafolkken/kit#2456: a detached supervisor has the parent-session keys stripped, so the provider
+// the launching session resolved travels as a mark instead.
+describe('the handed provider mark', () => {
+	const { HANDED_PROVIDER_KEY } = agent_role_profile
+
+	it('resolves the provider from the mark when no session is detected', () => {
+		expect(profile(REVIEWER, { [HANDED_PROVIDER_KEY]: 'openai' })).toMatchObject({
+			provider: 'openai',
+			model: OPENAI_MODEL,
+		})
+		expect(profile(REVIEWER, { [HANDED_PROVIDER_KEY]: 'anthropic' })).toMatchObject({
+			provider: 'anthropic',
+		})
+	})
+
+	it('lets a detected session decide over an inherited mark', () => {
+		const environment = { ...OPENAI_ENV, [HANDED_PROVIDER_KEY]: 'anthropic' }
+
+		expect(profile(WORKER, environment)).toMatchObject({ provider: 'openai' })
+	})
+
+	it('rejects a mark that names no allowed provider', () => {
+		const result = agent_role_profile.resolve(WORKER, { [HANDED_PROVIDER_KEY]: 'other' })
+
+		expect(result).toMatchObject({ kind: 'rejected' })
+		expect(JSON.stringify(result)).toContain(HANDED_PROVIDER_KEY)
+	})
+
+	it('builds the mark from the session it resolves, and nothing without one', () => {
+		expect(agent_role_profile.handoff_environment(ANTHROPIC_ENV)).toStrictEqual({
+			[HANDED_PROVIDER_KEY]: 'anthropic',
+		})
+		expect(agent_role_profile.handoff_environment({})).toStrictEqual({})
+	})
+})
+
 describe('role-specific overrides', () => {
 	it('changes only the role whose keys are set', () => {
 		const environment = {

@@ -29,6 +29,7 @@ import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 // displays. REST answers the whole object, so the same value is unwrapped out of it.
 const HTML_URL_FILTER = '.html_url'
 const PUT_METHOD = 'PUT'
+const PATCH_METHOD = 'PATCH'
 // `gh pr merge --merge` produced a merge commit, and this repository allows nothing else
 // (`allow_squash_merge` and `allow_rebase_merge` are both false). Sent explicitly rather than left to
 // the endpoint's default, so a change to either would fail loudly instead of silently squashing.
@@ -109,6 +110,19 @@ async function pr_comment(branch_name: string, body: string): Promise<string> {
 	const pr_number = await require_pr_number(branch_name)
 
 	return await git_gh_issue_write.issue_comment(String(pr_number), body)
+}
+
+// Replaces the body of the branch's open pull request. `git -y` opens a pull request once, so a
+// body supplied on a later run — the live-execution evidence `followup` gates the merge on
+// (joshuafolkken/kit#2446) — reaches an already-open one only through this write.
+async function pr_update_body(branch_name: string, body: string): Promise<void> {
+	const pr_number = await require_pr_number(branch_name)
+
+	await git_gh_exec.exec_gh_api({
+		path: git_gh_api_path.pull_api_path(String(pr_number)),
+		method: PATCH_METHOD,
+		body: JSON.stringify({ body }),
+	})
 }
 
 async function put_merge(pr_number: number): Promise<void> {
@@ -199,6 +213,7 @@ const git_gh_pr = {
 	pr_checkout,
 	pr_comment,
 	pr_merge,
+	pr_update_body,
 }
 
 export { git_gh_pr, MERGE_COMMIT_METHOD, MERGE_REQUEST_TIMEOUT_MS, MERGE_UNCONFIRMED_MESSAGE }
