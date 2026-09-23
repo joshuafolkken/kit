@@ -49,6 +49,12 @@ describe('run_ship_cli.run — folds the four ship steps into one call', () => {
 		expect(argv_calls().at(-1)).toStrictEqual(['run:tail', '2398'])
 	})
 
+	it('forwards follow-up citations filed this run to the report step', async () => {
+		await run_ship_cli.run([TITLE, '2400', '2401'])
+
+		expect(argv_calls().at(-1)).toStrictEqual(['run:tail', NUMBER, '2400', '2401'])
+	})
+
 	it('joins each executed step under its header in one composite report', async () => {
 		josh_run_mock
 			.mockResolvedValueOnce({ code: OK, out: 'green' })
@@ -103,6 +109,11 @@ describe('run_ship_cli.run — a failed step stops the ship', () => {
 
 	it('refuses a title with no issue number rather than shipping past run:tail', async () => {
 		expect(await run_ship_cli.run(['A title with no reference'])).toBe(FAILED)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+	})
+
+	it('refuses a non-numeric follow-up citation rather than forwarding it', async () => {
+		expect(await run_ship_cli.run([TITLE, 'not-a-number'])).toBe(FAILED)
 		expect(josh_run_mock).not.toHaveBeenCalled()
 	})
 

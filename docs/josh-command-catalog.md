@@ -1319,7 +1319,7 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 > **Audience:** automation · **Side effects:** git, network
 
-`"<title> #<N>" [--notify-message <text> | --notify-message-file <path>]`
+`"<title> #<N>" [<follow-up-N> ...] [--notify-message <text> | --notify-message-file <path>]`
 
 Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step
 

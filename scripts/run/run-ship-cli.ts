@@ -14,24 +14,30 @@ import { run_ship, type ShipSection } from './run-ship'
 // It stops at the first failed step: the gate must be green before the commit, the commit before the
 // merge. The report ends at the failure and names the stopped step, so the run reads only that one.
 //
-// The single positional is the `"<title> #<N>"` string `git -y` and `followup` already take; the issue
-// number is read off its tail for `run:tail`. A notify body — `--notify-message` or the shell-body-safe
-// `--notify-message-file` — is forwarded to `followup` alone; the completion prose is composed before
-// this command and passed straight through.
+// The first positional is the `"<title> #<N>"` string `git -y` and `followup` already take; the issue
+// number is read off its tail for `run:tail`. Any further positionals are follow-up citations filed
+// this run (`fullrun-steps.md` routes branch-2 filing before `ship`), forwarded to `run:tail` after the
+// closed issue so `issue:cite` reports them too. A notify body — `--notify-message` or the
+// shell-body-safe `--notify-message-file` — is forwarded to `followup` alone; the completion prose is
+// composed before this command and passed straight through.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const FIRST = 0
 const NUMBER_GROUP = 1
+const EXTRA_CITE_START = 1
 // The issue reference at the tail of the title — `git -y` and `followup` read the whole string, and
 // `run:tail` needs the number alone.
 const TRAILING_ISSUE_PATTERN = /#([1-9]\d*)\s*$/u
+// A follow-up citation passed as a trailing positional — a bare issue number, so a stray flag is
+// refused rather than forwarded to the wrong step.
+const CITE_PATTERN = /^[1-9]\d*$/u
 // Both body forms `followup` documents, forwarded verbatim: the inline `--notify-message` and the
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
 const USAGE =
-	'Usage: josh ship "<title> #<N>" [--notify-message <text> | --notify-message-file <path>]'
+	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--notify-message <text> | --notify-message-file <path>]'
 const should_forward_stderr = true
 
 type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
@@ -45,6 +51,7 @@ interface ShipArguments {
 	title: string
 	number: string
 	notify: ReadonlyArray<string>
+	cites: ReadonlyArray<string>
 }
 
 interface Step {
@@ -71,7 +78,7 @@ const STEPS: ReadonlyArray<Step> = [
 		header: run_ship.FOLLOWUP_HEADER,
 		argv: (args) => ['followup', args.title, ...args.notify],
 	},
-	{ header: run_ship.REPORT_HEADER, argv: (args) => ['run:tail', args.number] },
+	{ header: run_ship.REPORT_HEADER, argv: (args) => ['run:tail', args.number, ...args.cites] },
 ]
 
 function issue_number(title: string): string | undefined {
@@ -89,7 +96,11 @@ function read_args(argv: ReadonlyArray<string>): ShipArguments | undefined {
 
 	if (number === undefined) return undefined
 
-	return { title, number, notify: notify_arguments(parsed.values) }
+	const cites = parsed.positionals.slice(EXTRA_CITE_START)
+
+	if (cites.some((token) => !CITE_PATTERN.test(token))) return undefined
+
+	return { title, number, notify: notify_arguments(parsed.values), cites }
 }
 
 // Numbers-only tail and a strict parse, so a title with no `#<N>` or a stray flag is refused rather
