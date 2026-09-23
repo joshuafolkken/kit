@@ -13,9 +13,10 @@ const { usage_line, write_session, write_session_under, output } = cost_cli_fixt
 // A project other than the process cwd, so `--path` is seen to read a directory it was not already in.
 const TARGET = '/Users/someone/Development/other-project'
 const FAILURE_EXIT_CODE = 1
-const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
+// The environment names the session whose transcript the fixtures write (joshuafolkken/kit#2403).
+const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: SESSION_A }
 const OPENAI_ENV = { CODEX_THREAD_ID: 'thread' }
-const NO_TRANSCRIPTS = 'No transcripts found'
+const NO_TRANSCRIPT = 'No transcript'
 const PER_REQUEST = 'per request'
 const WORKTREE_GIT_PATH = '.git/worktrees/2089'
 const ISSUE = '2089'
@@ -95,7 +96,7 @@ describe('cost_cli.run — the target project path', () => {
 		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD, ANTHROPIC_ENV)).toBe(
 			FAILURE_EXIT_CODE,
 		)
-		expect(output()).toContain(NO_TRANSCRIPTS)
+		expect(output()).toContain(NO_TRANSCRIPT)
 	})
 
 	// Unspecified --path keeps the former behavior: this process's own working directory.
