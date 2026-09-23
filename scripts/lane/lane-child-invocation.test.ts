@@ -40,6 +40,9 @@ describe('the process pattern read as the extended regex pgrep applies', () => {
 	it.each([
 		[`claude -p Resuming the lane child ... fullrun #${ISSUE}`],
 		[`node tsx scripts/run/run-ship-cli.ts --review Hand the region over #${ISSUE}`],
+		[`node /usr/local/bin/pnpm josh ship --review Hand the region over #${ISSUE}`],
+		[`node tsx/dist/cli.mjs scripts/josh/josh.ts ship --review Hand the region over #${ISSUE}`],
+		[`node node_modules/@joshuafolkken/kit/dist/josh.js ship Hand the region over #${ISSUE}`],
 	])('matches a live child or ship supervisor: %s', (line) => {
 		expect(pattern.test(line)).toBe(true)
 	})

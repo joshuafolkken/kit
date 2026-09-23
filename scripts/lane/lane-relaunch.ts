@@ -1,5 +1,6 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
+import { run_ship_detach } from '#scripts/run/run-ship-detach'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
@@ -13,6 +14,8 @@ import type { LaneInfo } from './lane-registry'
 //
 // The prompt is the caller's: each composes it from `lane-child-invocation.ts`, and every one of them
 // ends with the bare `fullrun #<N>` so the parent's liveness poll keeps matching the relaunched process.
+
+const { SUPERVISED_KEY } = run_ship_detach
 
 type RelaunchResult = LaunchResult | { kind: 'rejected'; note: string }
 
@@ -34,8 +37,11 @@ function relaunch(
 			profile: built.profile,
 			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
 			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
-			// since the parent-session strip runs on the way in.
-			env: lane_child_marker.env_for(lane.issue),
+			// since the parent-session strip runs on the way in. **The ship supervisor's mark is dropped**
+			// (joshuafolkken/kit#2428): a detached supervisor is what relaunches after a stopped stage, and an
+			// agent that inherited its mark would read its own in-turn `josh ship` failure as a supervisor's —
+			// relaunching a second child into the lane beside itself.
+			env: { ...lane_child_marker.env_for(lane.issue), [SUPERVISED_KEY]: undefined },
 		},
 		on_note,
 	)

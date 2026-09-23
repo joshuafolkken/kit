@@ -2,10 +2,12 @@ import { run_issue_number } from '#scripts/run/run-issue-number'
 
 const CHILD_INVOCATION = 'fullrun'
 const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
-// The script a detached `josh ship --detach` supervisor runs (joshuafolkken/kit#2428). Its command line
-// ends with the `"<title> #<N>"` title on purpose, so the liveness pattern below finds it by the same
-// trailing anchor it finds a child by.
-const SHIP_SCRIPT = String.raw`run-ship-cli\.ts`
+// What a detached `josh ship --detach` supervisor's command line carries (joshuafolkken/kit#2428). It ends
+// with the `"<title> #<N>"` title on purpose, so the liveness pattern below finds it by the same trailing
+// anchor it finds a child by. **The script path alone is not enough**: where the dispatcher is TypeScript
+// (kit itself) `josh ship` runs in-process, so no process ever carries `run-ship-cli.ts` — the `pnpm josh
+// ship …` process and the `josh.ts ship …` / `josh.js ship …` dispatcher are what `pgrep` sees there.
+const SHIP_PROCESS = String.raw`(josh(\.[jt]s)? ship|run-ship-cli\.ts)`
 
 function child_invocation(issue: string): string {
 	run_issue_number.require_issue_number(issue)
@@ -25,7 +27,7 @@ function child_invocation(issue: string): string {
 function process_pattern(issue: string): string {
 	run_issue_number.require_issue_number(issue)
 
-	return `(${CHILD_INVOCATION}|${SHIP_SCRIPT} .*) #${issue}$`
+	return `(${CHILD_INVOCATION}|${SHIP_PROCESS} .*) #${issue}$`
 }
 
 function resume_invocation(issue: string): string {
