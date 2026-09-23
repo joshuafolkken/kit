@@ -65,8 +65,24 @@ function has_warnings(result: GateStepResult): boolean {
 // checker that actually emits per-tree warnings (`WARNING_CHECKER_LABELS`), never for a benign line
 // from another tool that happens to contain the word — a Vite config deprecation on `test:unit` was
 // the line that stopped a green gate's commit chain.
+//
+// **The safe-chain shim's banner is not the checker's either** (joshuafolkken/kit#2447). Where
+// `setup-ci` installed the shims but the binary cannot be reached, every `pnpm` a check spawns prints
+// "Warning: safe-chain is not available …" into that check's output, so a green lint withheld the
+// record on every CI run. The banner's lines are dropped before the match; a real warning on any
+// other line still withholds.
+const SAFE_CHAIN_BANNER = 'safe-chain is not available'
+
 function has_checker_warning(result: GateStepResult): boolean {
-	return gate_plan.WARNING_CHECKER_LABELS.includes(result.label) && has_warnings(result)
+	if (!gate_plan.WARNING_CHECKER_LABELS.includes(result.label)) return false
+
+	return result.output
+		.split('\n')
+		.some(
+			(line) =>
+				!line.includes(SAFE_CHAIN_BANNER) &&
+				WARNING_MARKERS.some((marker) => line.includes(marker)),
+		)
 }
 
 function should_print_body(result: GateStepResult, is_verbose: boolean): boolean {
