@@ -26,6 +26,12 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
 
+const has_changes_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/git/git-stash', () => ({
+	git_stash: { has_changes: has_changes_mock },
+}))
+
 const { run_prep_cli } = await import('./run-prep-cli')
 
 const SUCCESS = 0
@@ -152,6 +158,44 @@ describe('run_prep_cli.run dependency scope', () => {
 	})
 })
 
+// joshuafolkken/kit#2476: only a lane child's tree is asked for uncommitted work — a person's own
+// checkout keeps its unrelated edits out of the verdict.
+describe('run_prep_cli.gather — uncommitted work', () => {
+	beforeEach(() => {
+		has_changes_mock.mockReset()
+	})
+
+	it('reads the tree of a dispatched lane child', async () => {
+		stub_ok()
+		is_child_mock.mockReturnValue(true)
+		has_changes_mock.mockResolvedValue(true)
+
+		const reads = await run_prep_cli.gather(ISSUE)
+
+		expect(run_prep_cli.to_parts(ISSUE, reads).has_changes).toBe(true)
+	})
+
+	it('never reads a checkout that is not a lane', async () => {
+		stub_ok()
+		has_changes_mock.mockResolvedValue(true)
+
+		const reads = await run_prep_cli.gather(ISSUE)
+
+		expect(reads.has_changes).toBe(false)
+		expect(has_changes_mock).not.toHaveBeenCalled()
+	})
+
+	it('reports no changes when the lane status cannot be read', async () => {
+		stub_ok()
+		is_child_mock.mockReturnValue(true)
+		has_changes_mock.mockRejectedValue(new Error('not a git repository'))
+
+		const reads = await run_prep_cli.gather(ISSUE)
+
+		expect(reads.has_changes).toBe(false)
+	})
+})
+
 describe('run_prep.format_report', () => {
 	it('surfaces a human-review issue on the summary line', () => {
 		const report = run_prep.format_report({
@@ -161,6 +205,7 @@ describe('run_prep.format_report', () => {
 			state_failure: '',
 			latest_scope: 'required',
 			latest_reason: 'last update 20h ago',
+			has_changes: false,
 		})
 
 		expect(report.split('\n', 1)[0]).toContain('human_review: yes')

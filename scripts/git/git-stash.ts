@@ -90,13 +90,34 @@ async function has_conflict(directory?: string): Promise<boolean> {
 	return unmerged !== ''
 }
 
+// Uncommitted work is anything `git status --porcelain` lists — untracked files included, which is what
+// `push` below carries with `-u`, so the two agree on what "work" means (joshuafolkken/kit#2476).
+async function has_changes(directory?: string): Promise<boolean> {
+	return (await git_spawn.read(git_args(directory, ['status', '--porcelain']))) !== ''
+}
+
+// Push with a message `josh stash:pop` can later target — the stack is shared by every work tree, so an
+// entry pushed from a lane outlives the lane's own tree.
+async function push(message: string, directory?: string): Promise<void> {
+	await git_spawn.read(git_args(directory, ['stash', 'push', '-u', '-m', message]))
+}
+
+// The message uncommitted work is pushed with, keyed on the issue so `josh stash:pop` can target it and
+// on the occasion so two pushes for one issue — a lane close and an `already-done` read — stay apart.
+function work_message(issue: string, occasion: string): string {
+	return `${issue}: uncommitted work at ${occasion}`
+}
+
 const git_stash = {
+	has_changes,
 	has_conflict,
 	list,
 	matches,
 	parse_entries,
 	pop,
+	push,
 	select,
+	work_message,
 }
 
 export type { Selection }

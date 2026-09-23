@@ -75,6 +75,7 @@ async function gather(issue_number: string): Promise<StepInput> {
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
 		is_retrospective_enabled: hook_decision.is_switch_opt_in(RETROSPECTIVE_ENV_KEY),
+		has_changes: parts.has_changes,
 	}
 }
 

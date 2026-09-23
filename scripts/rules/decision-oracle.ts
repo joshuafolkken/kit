@@ -264,7 +264,16 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 		// The non-command answers: `run:step` prints a runnable command for a phase with one to run, and
 		// one of these verdicts otherwise. A command line is not a vocabulary token, exactly as an issue
 		// number is not one for `backlog:next`.
-		vocabulary: ['implement', HUMAN_REVIEW, 'update-deps', 'already-done', WAIT, STOP, UNKNOWN],
+		vocabulary: [
+			'implement',
+			HUMAN_REVIEW,
+			'update-deps',
+			'already-done',
+			'keep-work',
+			WAIT,
+			STOP,
+			UNKNOWN,
+		],
 		single_source: BACKLOGRUN_MD,
 	},
 	{

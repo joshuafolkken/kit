@@ -19,6 +19,7 @@ function input(overrides: Partial<StepInput>): StepInput {
 		is_lane_child: false,
 		is_consumer: false,
 		is_retrospective_enabled: true,
+		has_changes: false,
 		...overrides,
 	}
 }
@@ -35,6 +36,14 @@ describe('run_step.pre_verdict', () => {
 	it('closed wins over a required update', () => {
 		expect(run_step.pre_verdict(input({ state: 'CLOSED', latest_scope: 'required' }))).toBe(
 			run_step.ALREADY_DONE,
+		)
+	})
+
+	// joshuafolkken/kit#2476: `run:entry` and `run:next` read this verdict, so the lane's uncommitted
+	// work is surfaced there too, not only in `run:step`'s own decide line.
+	it('answers keep-work for a closed issue over a tree holding uncommitted work', () => {
+		expect(run_step.pre_verdict(input({ state: 'CLOSED', has_changes: true }))).toBe(
+			run_step.KEEP_WORK,
 		)
 	})
 
@@ -70,6 +79,18 @@ describe('run_step.next_action — carry and state guards', () => {
 		expect(run_step.next_action(input({ state: 'CLOSED', last_event: KIND.MERGE })).line).toBe(
 			run_step.ALREADY_DONE,
 		)
+	})
+
+	// joshuafolkken/kit#2476: a child that popped its parked work and read `already-done` ended without
+	// keeping it, and the lane close removed it — so a closed issue over a dirty tree names the work.
+	it('surfaces uncommitted work on a closed issue instead of answering already-done', () => {
+		const action = run_step.next_action(input({ state: 'CLOSED', has_changes: true }))
+
+		expect(action.kind).toBe('decide')
+		expect(action.line).toContain(
+			`git stash push -u -m "${ISSUE}: uncommitted work at already-done"`,
+		)
+		expect(action.line).toMatch(NOT_A_PROCEDURE)
 	})
 
 	it('answers unknown for an unreadable state', () => {
