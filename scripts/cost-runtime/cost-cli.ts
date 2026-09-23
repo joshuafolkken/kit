@@ -5,9 +5,10 @@ import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-rol
 import { codex_usage } from './codex-usage'
 import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
 import { cost_corpus } from './cost-corpus'
-import { cost_transcript } from './cost-transcript'
+import { cost_transcript, type SessionUsage } from './cost-transcript'
 import { cost_usage } from './cost-usage'
 import { cost_verdict, type OverMeasurement } from './cost-verdict'
+import { own_session } from './own-session'
 import { transcript_cwd } from './transcript-cwd'
 
 // `josh cost` — what the next turn of a run will cost, read from the active provider's own session
@@ -112,12 +113,14 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 }
 
 // An empty corpus is reported, never priced at zero. "No transcript was found" and "this run was
-// free" are different answers, and only one of them is ever true. The wording is `cost_transcript`'s,
-// so `josh time` says the same thing about the same directory.
-function report_empty(cwd: string): number {
+// free" are different answers, and only one of them is ever true. `session_id` names the session the
+// environment pointed at when its transcript is the one absent (joshuafolkken/kit#2403), so the
+// message says "No transcript named <id>" rather than the whole-corpus "No transcripts found". The
+// wording is `cost_transcript`'s, so `josh time` says the same thing about the same directory.
+function report_empty(cwd: string, session_id: string | undefined): number {
 	const searched = cost_transcript.searched_directories(cost_transcript.transcript_directories(cwd))
 
-	for (const line of cost_transcript.missing_message(searched, undefined)) console.error(line)
+	for (const line of cost_transcript.missing_message(searched, session_id)) console.error(line)
 
 	return FAILURE_EXIT_CODE
 }
@@ -128,11 +131,17 @@ function provider_of(environment: Environment): AgentProvider | undefined {
 	return resolved.kind === 'provider' ? resolved.provider : undefined
 }
 
-function anthropic_measurement(target: string): OverMeasurement | undefined {
-	const corpus = cost_corpus.load_corpus(target)
-	const session = corpus.sessions[cost_transcript.latest_own_index(corpus.files)]
-	if (session === undefined) return undefined
+// The own-session measurement, and — when there is none — which of the two "nothing to measure"
+// answers it is (joshuafolkken/kit#2403). `absent`: the environment named a session whose transcript
+// is not in this corpus, reported by that name and never measured as another session's newest file.
+// `empty`: no transcript at all. `measured` still carries a session that exists but billed nothing,
+// which `report_over` reports as "no requests" — a third, distinct answer.
+type OwnMeasurement =
+	| { kind: 'measured'; measurement: OverMeasurement }
+	| { kind: 'absent'; session_id: string }
+	| { kind: 'empty' }
 
+function measurement_of(session: SessionUsage): OverMeasurement {
 	return {
 		billed_input_per_request: session.records.map((record) =>
 			cost_usage.billed_input(record.totals),
@@ -140,12 +149,24 @@ function anthropic_measurement(target: string): OverMeasurement | undefined {
 	}
 }
 
-function report_missing(target: string, provider: AgentProvider): number {
-	if (provider === 'anthropic') return report_empty(target)
+function anthropic_own(target: string, environment: Environment): OwnMeasurement {
+	const corpus = cost_corpus.load_corpus(target)
+	const selection = own_session.select_own_session(corpus.files, environment)
+	if (selection.kind === 'absent') return { kind: 'absent', session_id: selection.session_id }
 
-	console.error(`No Codex usage found for the current OpenAI thread under ${target}.`)
+	const session = corpus.sessions[selection.index]
+	if (session === undefined) return { kind: 'empty' }
 
-	return FAILURE_EXIT_CODE
+	return { kind: 'measured', measurement: measurement_of(session) }
+}
+
+function anthropic_measurement(
+	target: string,
+	environment: Environment,
+): OverMeasurement | undefined {
+	const own = anthropic_own(target, environment)
+
+	return own.kind === 'measured' ? own.measurement : undefined
 }
 
 function same_openai_project(target: string, cwd: string): boolean {
@@ -177,20 +198,41 @@ function measure(
 ): OverMeasurement | undefined {
 	return provider === 'openai'
 		? codex_usage.measurement(target, cost_transcript.home_directory(), environment)
-		: anthropic_measurement(target)
+		: anthropic_measurement(target, environment)
 }
 
-// `--over`: what the next turn of this session will cost, read from the latest own session alone.
+// `--over` for the anthropic provider: measured → the verdict; `absent` → the named session's
+// missing message; `empty` → the whole-corpus missing message. A measured session that billed
+// nothing falls to `report_over`'s "no requests", which keeps a 0-request transcript distinct from a
+// transcript that is not there at all (joshuafolkken/kit#2403).
+function run_over_anthropic(own: OwnMeasurement, target: string, limit: number): number {
+	if (own.kind === 'measured') return cost_verdict.report_over(own.measurement, limit)
+
+	return report_empty(target, own.kind === 'absent' ? own.session_id : undefined)
+}
+
+function run_over_codex(target: string, limit: number, environment: Environment): number {
+	const measurement = measure(target, 'openai', environment)
+	if (measurement !== undefined) return cost_verdict.report_over(measurement, limit)
+
+	console.error(`No Codex usage found for the current OpenAI thread under ${target}.`)
+
+	return FAILURE_EXIT_CODE
+}
+
+// `--over`: what the next turn of this session will cost, read from the session's own transcript
+// alone — identified by id, not by mtime (joshuafolkken/kit#2403).
 function run_over(
 	target: string,
 	limit: number,
 	provider: AgentProvider,
 	environment: Environment,
 ): number {
-	const measurement = measure(target, provider, environment)
-	if (measurement === undefined) return report_missing(target, provider)
+	if (provider === 'anthropic') {
+		return run_over_anthropic(anthropic_own(target, environment), target, limit)
+	}
 
-	return cost_verdict.report_over(measurement, limit)
+	return run_over_codex(target, limit, environment)
 }
 
 // A measurement priced against the shared cut threshold, or `unmeasurable` for the empty session a
@@ -205,9 +247,9 @@ function verdict_of(measurement: OverMeasurement | undefined): CostVerdict {
 
 // The `--cut` verdict as a value, printing nothing (joshuafolkken/kit#2165). `run:status` bundles
 // this beside the issue state and the carry record, so it needs the token rather than the exit code
-// `run` returns. `unmeasurable` is the read-only counterpart of `report_missing` / the empty-session
-// error: a session with no provider, no transcript, or no request cannot be priced, and saying so is
-// not the same as `under`.
+// `run` returns. `unmeasurable` is the read-only counterpart of `report_empty` / the empty-session
+// error: a session with no provider, no transcript of its own, or no request cannot be priced, and
+// saying so is not the same as `under`.
 function session_verdict(
 	cwd: string = process.cwd(),
 	environment: Environment = process.env,

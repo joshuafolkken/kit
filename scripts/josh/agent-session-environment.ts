@@ -12,10 +12,17 @@
 // the parent's session as the child's own. Measured under joshuafolkken/kit#1158: removing them
 // restored 5/5 held in 54 seconds, and lowering the concurrency — the suspected cause before this one
 // was found — made it worse.
+//
+// **`SESSION_ID_KEY` is the name Claude Code exports for the running session's own id** — the base
+// name of that session's transcript file. It is single-sourced here rather than spelled a second time
+// where the cost reader identifies its own transcript by it (joshuafolkken/kit#2403): one env var,
+// one literal, so the list a child must not inherit and the selection that reads it cannot drift.
+const SESSION_ID_KEY = 'CLAUDE_CODE_SESSION_ID'
+
 const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
 	'CLAUDE_CODE_MESSAGING_SOCKET',
 	'CLAUDE_CODE_MESSAGING_TOKEN',
-	'CLAUDE_CODE_SESSION_ID',
+	SESSION_ID_KEY,
 	'CLAUDE_CODE_CHILD_SESSION',
 ]
 
@@ -128,6 +135,7 @@ const agent_session_environment = {
 	PARENT_SESSION_KEYS,
 	PROXY_CERTIFICATE_KEY,
 	PROXY_KEYS,
+	SESSION_ID_KEY,
 	removed_environment,
 }
 
