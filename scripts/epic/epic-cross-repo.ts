@@ -148,6 +148,7 @@ function pnpm_workspace_path(repo: string): string {
 // A read that failed for any reason other than a missing file leaves the layout unknown.
 function classify_workspace_failure(repo: string): WorkspaceCheck {
 	const probe = execaSync('gh', ['api', '--include', '--silent', pnpm_workspace_path(repo)], {
+		...git_gh_exec.direct_environment(),
 		reject: false,
 		timeout: GH_TIMEOUT_MS,
 	})
@@ -157,6 +158,7 @@ function classify_workspace_failure(repo: string): WorkspaceCheck {
 
 function read_pnpm_workspace(repo: string): WorkspaceCheck {
 	const result = execaSync('gh', ['api', pnpm_workspace_path(repo), '--jq', WORKSPACE_JQ], {
+		...git_gh_exec.direct_environment(),
 		reject: false,
 		timeout: GH_TIMEOUT_MS,
 	})
@@ -236,6 +238,7 @@ function to_manifest(repo: string, stdout: string): ManifestAnswer {
 // what is missing is the file.
 function classify_manifest_failure(repo: string): ManifestAnswer {
 	const probe = execaSync('gh', ['api', '--include', '--silent', manifest_path(repo)], {
+		...git_gh_exec.direct_environment(),
 		reject: false,
 		timeout: GH_TIMEOUT_MS,
 	})
@@ -248,6 +251,7 @@ function classify_manifest_failure(repo: string): ManifestAnswer {
 
 function fetch_manifest(repo: string): ManifestAnswer {
 	const result = execaSync('gh', ['api', manifest_path(repo), '--jq', VERSION_JQ], {
+		...git_gh_exec.direct_environment(),
 		reject: false,
 		timeout: GH_TIMEOUT_MS,
 	})

@@ -1,3 +1,4 @@
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { execaSync } from 'execa'
 import { safe_json_parse } from './parse-json'
 import { release_age } from './release-age'
@@ -38,7 +39,10 @@ function describe_failure(result: { stderr: string; shortMessage?: string | unde
 // `gh api` failures with an actionable message instead of a raw ExecaSyncError stack.
 function fetch_latest_version(versions_endpoint: string | undefined, package_name: string): string {
 	const endpoint = require_endpoint(versions_endpoint, package_name)
-	const result = execaSync('gh', ['api', endpoint, '--jq', '.[0].name'], { reject: false })
+	const result = execaSync('gh', ['api', endpoint, '--jq', '.[0].name'], {
+		...git_gh_exec.direct_environment(),
+		reject: false,
+	})
 
 	if (result.exitCode === 0) return result.stdout.trim()
 
@@ -69,7 +73,10 @@ function fetch_release_times(
 ): Record<string, string> | undefined {
 	if (versions_endpoint === undefined || versions_endpoint.trim() === '') return undefined
 	const endpoint = with_page_size(versions_endpoint, TIMES_PAGE_SIZE)
-	const result = execaSync('gh', ['api', endpoint, '--jq', TIMES_JQ], { reject: false })
+	const result = execaSync('gh', ['api', endpoint, '--jq', TIMES_JQ], {
+		...git_gh_exec.direct_environment(),
+		reject: false,
+	})
 	if (result.exitCode !== 0) return undefined
 	const parsed = release_age.release_times_schema.safeParse(safe_json_parse(result.stdout))
 

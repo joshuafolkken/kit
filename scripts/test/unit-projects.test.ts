@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { describe, expect, it } from 'vitest'
 import { PILOT_FILES } from './pilot-files'
 import { unit_projects, type UnitProject } from './unit-projects'
@@ -62,6 +63,15 @@ describe('each project carries the per-run environment and timeout', () => {
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('gives %s the session env and timeout', (name) => {
 		expect(project(name).env['CLAUDE_CODE_SESSION_ID']).toBe('vitest-session')
 		expect(project(name).testTimeout).toBeGreaterThan(0)
+	})
+
+	// joshuafolkken/kit#2436: a package-manager wrapper's loopback proxy would otherwise reach every
+	// suite that asserts what a `gh` spawn receives, passing in CI and failing on a wrapped machine.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks every proxy spelling for %s', (name) => {
+		const { env } = project(name)
+
+		for (const key of agent_session_environment.PROXY_KEYS) expect(env[key]).toBe('')
+		expect(env[agent_session_environment.PROXY_CERTIFICATE_KEY]).toBe('')
 	})
 })
 
