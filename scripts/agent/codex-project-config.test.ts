@@ -58,11 +58,20 @@ function normalize_adapter_command(
 	target.command = first_handler(claude, event).command
 }
 
+function normalize_codex_matchers(hooks: HookConfig['hooks']): void {
+	for (const event of ['PreToolUse', 'PostToolUse']) {
+		const group = hooks[event]?.[0]
+		if (group?.matcher === undefined) throw new Error(`Missing ${event} hook matcher`)
+		group.matcher = group.matcher.replace('|apply_patch', '')
+	}
+}
+
 function normalize_codex_hooks(codex: HookConfig, claude: HookConfig): HookConfig['hooks'] {
 	const normalized = structuredClone(codex.hooks)
 
 	normalize_adapter_command(normalized, claude.hooks, 'PreToolUse', CODEX_PRETOOL_COMMAND)
 	normalize_adapter_command(normalized, claude.hooks, 'PostToolUse', CODEX_POSTTOOL_COMMAND)
+	normalize_codex_matchers(normalized)
 	const prompt_group = normalized['UserPromptSubmit']?.[0]
 	if (prompt_group === undefined) throw new Error('Missing UserPromptSubmit hook group')
 	// Codex documents that UserPromptSubmit ignores matcher, so its omission is intentional.
@@ -99,6 +108,12 @@ describe('Codex project settings', () => {
 })
 
 describe('Codex hook wiring', () => {
+	it.each(['PreToolUse', 'PostToolUse'])('matches apply_patch during %s', (event) => {
+		const matcher = load_hooks(CODEX_HOOKS).hooks[event]?.[0]?.matcher
+
+		expect(matcher?.split('|')).toContain('apply_patch')
+	})
+
 	it.each(['PreToolUse', 'PostToolUse', 'SessionStart', 'UserPromptSubmit'])(
 		'keeps the %s hook event',
 		(event) => {
