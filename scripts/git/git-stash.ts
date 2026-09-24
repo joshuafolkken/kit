@@ -120,5 +120,5 @@ const git_stash = {
 	work_message,
 }
 
-export type { Selection }
+export type { Selection, StashEntry }
 export { git_stash }

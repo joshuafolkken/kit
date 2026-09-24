@@ -9,6 +9,7 @@ import {
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
 import { run_carry_flush } from './run-carry-flush'
+import { run_carry_stash } from './run-carry-stash'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_stop_notify } from './run-stop-notify'
@@ -326,7 +327,15 @@ async function count(
 // reason and stays silent, because a completed run has its own notification. The batch's one ledger
 // flush rides the same read for the same reason (joshuafolkken/kit#2492, `run-carry-flush.ts`), and
 // runs last: it waits out a pull request's CI, so a flush cut short must find the record already gone
-// and the stop already announced.
+// and the stop already announced. The closed-issue stash report (joshuafolkken/kit#2505,
+// `run-carry-stash.ts`) is once per invocation on the same read, and goes first because it is quick.
+async function report_end(read: CarryRead): Promise<void> {
+	if (read.kind === 'none') return
+
+	await run_carry_stash.report_orphans()
+	await run_carry_flush.flush_ledger()
+}
+
 async function finish(
 	target: string,
 	stopped: string | undefined,
@@ -340,7 +349,7 @@ async function finish(
 
 	if (notice !== undefined) await run_stop_notify.announce(notice)
 
-	if (read.kind !== 'none') await run_carry_flush.flush_ledger()
+	await report_end(read)
 
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, SUCCESS_EXIT_CODE)
 

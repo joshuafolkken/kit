@@ -16,6 +16,7 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('./run-carry-flush', () => ({
 	run_carry_flush: { flush_ledger: vi.fn().mockResolvedValue(undefined) },
 }))
+vi.mock('./run-carry-stash', () => ({ run_carry_stash: { report_orphans: vi.fn() } }))
 vi.mock('#scripts/git/telegram-notify', () => ({
 	telegram_notify: { confirm: vi.fn().mockResolvedValue(true) },
 }))

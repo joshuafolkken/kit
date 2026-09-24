@@ -22,6 +22,7 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('./run-carry-flush', () => ({
 	run_carry_flush: { flush_ledger: vi.fn().mockResolvedValue(undefined) },
 }))
+vi.mock('./run-carry-stash', () => ({ run_carry_stash: { report_orphans: vi.fn() } }))
 
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)

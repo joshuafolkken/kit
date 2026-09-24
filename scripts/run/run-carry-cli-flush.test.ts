@@ -15,14 +15,19 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('./run-carry-flush', () => ({
 	run_carry_flush: { flush_ledger: vi.fn().mockResolvedValue(undefined) },
 }))
+vi.mock('./run-carry-stash', () => ({
+	run_carry_stash: { report_orphans: vi.fn().mockResolvedValue(undefined) },
+}))
 vi.mock('./run-stop-notify', () => ({
 	run_stop_notify: { plan: vi.fn(), announce: vi.fn() },
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
 const { run_carry_flush } = await import('./run-carry-flush')
+const { run_carry_stash } = await import('./run-carry-stash')
 const git_directories = vi.mocked(git_command.git_directories)
 const flush_ledger = vi.mocked(run_carry_flush.flush_ledger)
+const report_orphans = vi.mocked(run_carry_stash.report_orphans)
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-flush-cli-test-'))
 const WORKTREE = path.join(scratch, 'worktree.git')
@@ -35,6 +40,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])
 	flush_ledger.mockClear()
+	report_orphans.mockClear()
 	run_carry.end_carry(run_carry.carry_path(REPOSITORY))
 })
 
@@ -83,5 +89,23 @@ describe('run:carry --end — the batch flushes its ledger once, at its end', ()
 		await run_carry_cli.run(['--merged', '1'])
 
 		expect(flush_ledger).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2505: the closed-issue stash report rides the same once-per-invocation read.
+describe('run:carry --end — the batch reports closed-issue stashes once, at its end', () => {
+	it('reports once when a record is there to end, and not again on a second --end', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		await run_carry_cli.run(['--end'])
+		await run_carry_cli.run(['--end'])
+
+		expect(report_orphans).toHaveBeenCalledOnce()
+	})
+
+	it('never reports from a begin or a count', async () => {
+		await run_carry_cli.run(['--begin', INVOCATION])
+		await run_carry_cli.run(['--merged', '1'])
+
+		expect(report_orphans).not.toHaveBeenCalled()
 	})
 })
