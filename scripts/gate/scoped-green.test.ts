@@ -126,6 +126,31 @@ describe('missing_checks — the three states that must never refuse', () => {
 	})
 })
 
+// joshuafolkken/kit#2500: the ship supervisor runs what the refusal would have asked for, so the script
+// names must be the same answer as the command lines.
+describe('missing_scripts', () => {
+	it('names both scripts when neither check has a record for this tree', () => {
+		expect(scoped_green.missing_scripts(tree_of(), BASE, sources())).toStrictEqual([
+			scoped_green.LINT_SCRIPT,
+			scoped_green.TEST_SCRIPT,
+		])
+	})
+
+	it('names only the script whose record is missing', () => {
+		const planted = sources()
+
+		plant(planted.lint, DIGEST, BASE)
+
+		expect(scoped_green.missing_scripts(tree_of(), BASE, planted)).toStrictEqual([
+			scoped_green.TEST_SCRIPT,
+		])
+	})
+
+	it('names no script once both records describe this tree', () => {
+		expect(scoped_green.missing_scripts(tree_of(), BASE, plant_both())).toStrictEqual([])
+	})
+})
+
 describe('refusal_for', () => {
 	it('answers undefined once both records describe this tree', () => {
 		expect(scoped_green.refusal_for(tree_of(), BASE, plant_both())).toBeUndefined()

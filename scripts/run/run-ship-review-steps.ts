@@ -1,5 +1,7 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { gate_tree } from '#scripts/gate/gate-tree'
+import { scoped_green } from '#scripts/gate/scoped-green'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -23,6 +25,10 @@ import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-sh
 // second round, and on `required` runs it through the same commands the chain does: the scoped pair
 // `review:brief` requires, `review:brief --round 2`, a fresh reviewer session, attest and record.
 //
+// **A precondition the supervisor can meet itself is met, not stopped on** (joshuafolkken/kit#2500).
+// The scoped pair `run:review` and the local gate refuse without is run in place when this tree has no
+// green record, and a round-1 fix is counted only once that pair is green on the fixed tree.
+//
 // **Every failure returns control to the agent**: a non-zero step, a reviewer that did not finish, an
 // unreadable findings file, a High or an unfixed Medium in round 1, and anything but a clean round 2 —
 // recorded first, because the round was attested, then routed back.
@@ -34,7 +40,6 @@ const RUN_REVIEW = 'run:review'
 const ATTEST_CHECK = ['review:attest', '--check']
 const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed']
 const ROUND_TWO_BRIEF = ['review:brief', '--round', '2']
-const SCOPED_CHECKS = [['lint:related'], ['test:related']]
 const ROUND_TWO_REQUIRED = 'required'
 const BRIEF_PREFIX = 'josh-ship-review-brief-'
 const FINDINGS_PREFIX = 'josh-ship-review-findings-'
@@ -160,14 +165,40 @@ function reviewed(open: ReadonlyArray<string>, prompt_of: PromptOf): ReadonlyArr
 	]
 }
 
-// The round-1 review, beside the gate: open → review → join → attest → record, stopping at the first
-// that did not pass.
+// The scoped pair's precondition, met by the supervisor itself rather than stopped on
+// (joshuafolkken/kit#2500): only the checks with no green record for this tree run — the same
+// question `review:brief` and the local gate refuse on — so a fresh record costs nothing and a stale
+// or absent one costs a scoped run instead of a stop and a relaunched session. A check that genuinely
+// fails still stops the ship, its output forwarded to the ship log.
+async function scoped_pair(): Promise<JoshResult> {
+	const tree = await gate_tree.read_gate_tree()
+	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
+
+	return await run_phases(scripts.map((script) => async () => await josh([script])))
+}
+
+// Fixes made in place are counted only once the scoped pair is green on the fixed tree. The reviewer is
+// asked to leave it green; this is the check that it did, and a fix it could not get green is routed as
+// the finding it still is — recorded, then stopped before the gate and the commit take it in.
+async function round_one_record(issue: string): Promise<JoshResult> {
+	const is_fixed = current_verdict().kind === run_ship_review.VERDICT.FIXED
+	const checked = is_fixed ? await scoped_pair() : undefined
+	const is_verified = checked === undefined || checked.code === SUCCESS_EXIT_CODE
+
+	return await record_and_route(issue, (verdict) =>
+		is_verified ? run_ship_review.round_one_outcome(verdict) : run_ship_review.UNVERIFIED_OUTCOME,
+	)
+}
+
+// The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
+// at the first that did not pass.
 async function review_stage(issue: string): Promise<JoshResult> {
 	return await run_phases([
+		scoped_pair,
 		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt),
 		join_gate,
 		async () => await josh(ATTEST_CHECK),
-		async () => await record_and_route(issue, run_ship_review.round_one_outcome),
+		async () => await round_one_record(issue),
 	])
 }
 
@@ -184,7 +215,7 @@ async function round_two_stage(issue: string): Promise<JoshResult> {
 	}
 
 	return await run_phases([
-		...SCOPED_CHECKS.map((check) => async () => await josh(check)),
+		scoped_pair,
 		...reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt),
 		async () => await josh(ATTEST_CHECK),
 		async () => await record_and_route(issue, run_ship_review.round_two_outcome),
