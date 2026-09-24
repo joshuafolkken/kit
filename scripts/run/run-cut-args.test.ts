@@ -21,9 +21,14 @@ describe('the --handoff path on a cut', () => {
 			kind: 'cut',
 			issue: ISSUE,
 			is_implementation: true,
-			is_setup: false,
 			handoff_path: HANDOFF_PATH,
 		})
+	})
+
+	// joshuafolkken/kit#2489: the setup-phase cut is retired, so its flag is refused rather than read as
+	// a bare pre-gate cut.
+	it('refuses the retired --setup flag', () => {
+		expect(request_for(['--setup', ISSUE, '--handoff', HANDOFF_PATH])).toBeUndefined()
 	})
 
 	it('reaches a bare pre-gate cut as a path', () => {

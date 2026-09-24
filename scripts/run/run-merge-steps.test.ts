@@ -254,7 +254,7 @@ const LANE_CUT = run_cut.fresh_cut(
 	{
 		issue: CONTEXT.child,
 		branch: CUT_LANE.branch,
-		phase: run_cut.SETUP_PHASE,
+		phase: run_cut.IMPLEMENTATION_PHASE,
 		handoff: { instruction: 'go', completed: [], remaining: [], untouched: [] },
 	},
 	new Date(),
@@ -282,7 +282,7 @@ describe('run_merge_steps.resume_cut — the fallback relaunch', () => {
 		expect(await run_merge_steps.has_resumable_cut(CONTEXT.child)).toBe(true)
 		expect(await run_merge_steps.resume_cut(CONTEXT.child)).toBe(true)
 		expect(mark).toHaveBeenCalledOnce()
-		expect(relaunch.mock.calls[0]?.[1]).toBe(run_cut.SETUP_PHASE)
+		expect(relaunch.mock.calls[0]?.[1]).toBe(run_cut.IMPLEMENTATION_PHASE)
 	})
 
 	it('does not relaunch a cut the fallback already relaunched once', async () => {

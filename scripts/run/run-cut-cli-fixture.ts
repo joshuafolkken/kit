@@ -85,7 +85,7 @@ function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv
 // The instruction a resume into implementation requires (joshuafolkken/kit#2354); carried on every
 // declared cut here, harmless where a pre-gate cut resumes into the gate and does not read it.
 const HANDOFF = { instruction: 'go', completed: [], remaining: [], untouched: [] }
-// The same instruction as a `--handoff` file, which a setup or implementation cut is refused without
+// The same instruction as a `--handoff` file, which an implementation cut is refused without
 // (joshuafolkken/kit#2484).
 const HANDOFF_PATH = path.join(scratch, 'handoff.json')
 const WITH_HANDOFF = ['--handoff', HANDOFF_PATH]

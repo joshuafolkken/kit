@@ -38,15 +38,14 @@ import { run_hold } from './run-hold'
 // adopter.
 
 const CUT_PREFIX = 'josh-run-cut-'
-// **The three phase names are `agent-role-profile.ts`'s** (joshuafolkken/kit#2382): a lane child resumes
+// **The two phase names are `agent-role-profile.ts`'s** (joshuafolkken/kit#2382): a lane child resumes
 // into a phase, and that module resolves the effort the resumed child runs at from the same name. Reading
 // them from there rather than restating the literals here is what keeps the phase a cut records and the
 // phase the effort table is keyed on from drifting. `PRE_GATE_PHASE` is the boundary before the gate;
-// `IMPLEMENTATION_PHASE` (joshuafolkken/kit#1933) drops the thinking accumulated *during* implementation;
-// `SETUP_PHASE` (joshuafolkken/kit#2346) drops the ~130,000-token setup context before implementation
-// begins. The last two both resume back into implementation, so they share one resume shape
-// (`resumes_into_implementation`); only the pre-gate cut resumes into the gate.
-const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE, SETUP_PHASE } = agent_role_profile
+// `IMPLEMENTATION_PHASE` (joshuafolkken/kit#1933) drops the thinking accumulated *during* implementation
+// and resumes back into implementation (`resumes_into_implementation`); only the pre-gate cut resumes
+// into the gate. The setup-phase cut (joshuafolkken/kit#2346) was retired by joshuafolkken/kit#2489.
+const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_role_profile
 // **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
 // child decides whether to take this cut with `pnpm josh cost --cut`
 // — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
@@ -67,7 +66,6 @@ const GIT_READ_TIMEOUT_MS = 5000
 // The two lines `GIT_DIRECTORY_ARGUMENTS` prints, in order: the work tree's own git directory, then the
 // common one every lane of a repository shares. `git_directories` reads the same two asynchronously.
 const WORKTREE_DIRECTORY_INDEX = 0
-const COMMON_DIRECTORY_INDEX = 1
 
 const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'
@@ -264,14 +262,6 @@ function worktree_git_directory_sync(): string | undefined {
 	return git_directories_sync()[WORKTREE_DIRECTORY_INDEX]
 }
 
-// The common git directory (index 1) — `.git` in the main work tree and the same `.git` from inside a
-// lane, which the run's event stream keys on (joshuafolkken/kit#2346). The setup-cut guard reads the
-// stream synchronously to learn whether the plan has been posted, so it needs this key without the
-// asynchronous `git_directories` a `PreToolUse` hook cannot await.
-function common_git_directory_sync(): string | undefined {
-	return git_directories_sync()[COMMON_DIRECTORY_INDEX]
-}
-
 // **The directory is injectable so a test never has to write to the live record.** Keyed to the work
 // tree, that record is the one a resumed lane child depends on, and a suite that wrote to it would
 // erase the very state the guard reads — the unit suite runs inside `pnpm josh gate`, which is the
@@ -312,12 +302,11 @@ function fresh_cut(spec: CutSpec, now: Date): RunCut {
 	}
 }
 
-// **The setup and implementation cuts resume back into implementation; the pre-gate cut resumes into
-// the gate** (joshuafolkken/kit#2346). The two phases that resume into implementation share one resume
-// shape — the `resume-impl` verdict and the record cleared on adoption — so the grouping is named once
-// here rather than spelled as `phase === SETUP || phase === IMPLEMENTATION` at each call site.
+// **The implementation cut resumes back into implementation; the pre-gate cut resumes into the gate**
+// (joshuafolkken/kit#1933). The resume shape — the `resume-impl` verdict and the record cleared on
+// adoption — is named once here rather than spelled as a phase comparison at each call site.
 function resumes_into_implementation(phase: string): boolean {
-	return phase === SETUP_PHASE || phase === IMPLEMENTATION_PHASE
+	return phase === IMPLEMENTATION_PHASE
 }
 
 // Whether a record serializes within the hand-off bound. The record a fresh process reads back must
@@ -494,14 +483,12 @@ const run_cut = {
 	IMPLEMENTATION_PHASE,
 	MAX_HANDOFF_BYTES,
 	PRE_GATE_PHASE,
-	SETUP_PHASE,
 	adopt_cut,
 	begin_cut,
 	busy_message,
 	carried_cut_sync,
 	classify,
 	classify_resume,
-	common_git_directory_sync,
 	current_state,
 	cut_path,
 	describe_cut,
