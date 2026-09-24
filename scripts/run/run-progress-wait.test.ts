@@ -38,7 +38,12 @@ vi.mock('./run-progress-clock', () => ({
 vi.mock('#scripts/backlog/backlog-ready', () => ({
 	backlog_ready: { print_ready_line: vi.fn() },
 }))
+// The arrival probe's own reading is `backlog-arrival.test.ts`'s; here only its answer matters.
+vi.mock('#scripts/backlog/backlog-arrival', () => ({
+	backlog_arrival: { start: vi.fn() },
+}))
 
+const { backlog_arrival } = await import('#scripts/backlog/backlog-arrival')
 const { backlog_ready } = await import('#scripts/backlog/backlog-ready')
 const { run_progress_read } = await import('./run-progress-read')
 const { run_progress_clock } = await import('./run-progress-clock')
@@ -106,6 +111,7 @@ beforeEach(() => {
 	is_life_ended.mockReturnValue(false)
 	read_last_report.mockReturnValue(undefined)
 	read_observations.mockResolvedValue(OBSERVED)
+	vi.mocked(backlog_arrival.start).mockResolvedValue({ has_arrived: async () => false })
 })
 
 afterEach(() => {
@@ -176,6 +182,27 @@ describe('--wait — nothing to report is not something to exit on', () => {
 
 		await expect(wait_bounded()).resolves.toBe(SUCCESS)
 		expect(output.printed).toHaveLength(NOTHING)
+		expect(output.warned).toContain(run_progress_cli.WAIT_EXPIRED_NOTICE)
+	})
+})
+
+// joshuafolkken/kit#2503: an issue opted in while children are in flight waited out the stall
+// detector's ten minutes; the probe ends the wait instead, so the parent is woken to dispatch it.
+describe('--wait — newly runnable work ends the wait early', () => {
+	it('exits on an arrival before the interval, printing the pick-up reading and no progress line', async () => {
+		read_last_report.mockImplementation(() => Date.now())
+		vi.mocked(backlog_arrival.start).mockResolvedValue({ has_arrived: async () => true })
+
+		await expect(run_progress_cli.wait_once(options_of())).resolves.toBe(SUCCESS)
+		expect(output.printed).toHaveLength(NOTHING)
+		expect(output.warned).not.toContain(run_progress_cli.WAIT_EXPIRED_NOTICE)
+		expect(backlog_ready.print_ready_line).toHaveBeenCalledTimes(ONE_LINE)
+	})
+
+	it('keeps waiting while the probe sees nothing new', async () => {
+		read_last_report.mockImplementation(() => Date.now())
+
+		await expect(wait_bounded()).resolves.toBe(SUCCESS)
 		expect(output.warned).toContain(run_progress_cli.WAIT_EXPIRED_NOTICE)
 	})
 })
