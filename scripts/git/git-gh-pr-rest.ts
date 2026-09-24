@@ -44,6 +44,11 @@ const rest_pull_schema = z.looseObject({
 		.looseObject({ ref: z.string().optional(), sha: z.string().optional(), repo: rest_repo_schema })
 		.nullish(),
 	base: rest_pull_side_schema.nullish(),
+	// `node_id` is what the GraphQL auto-merge mutation addresses a pull request by, and `auto_merge`
+	// is `null` until auto-merge is enabled — both read by `git-gh-pr-auto-merge.ts`
+	// (joshuafolkken/kit#2497).
+	node_id: z.string().optional(),
+	auto_merge: z.looseObject({}).nullish(),
 })
 
 type RestPull = z.infer<typeof rest_pull_schema>

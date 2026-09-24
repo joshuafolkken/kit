@@ -222,6 +222,24 @@ function is_review_decision_decisive(snapshot: PrStateSnapshot): boolean {
 	return evaluate_pr_state(snapshot) !== 'pending'
 }
 
+// **Whether GitHub's auto-merge can never fire on this pull request** (joshuafolkken/kit#2497). This is
+// narrower than the merge gate's `failure`: the gate also fails a red check outside the required list
+// (joshuafolkken/kit#990), but auto-merge waits only on the required ones, so such a pull request still
+// lands — reading it as blocked would call a landing flush stuck.
+function is_auto_merge_blocked(snapshot: PrStateSnapshot): boolean {
+	const failed_required = snapshot.rollup.filter(
+		(check) => check.status === CHECK_STATUS_FAIL && is_required_check(check.name),
+	)
+
+	return (
+		evaluate_failure_state({
+			review_decision: snapshot.review_decision,
+			failed_checks: failed_required.map((check) => check.name),
+			merge_state_status: snapshot.merge_state_status,
+		}) !== undefined
+	)
+}
+
 const git_pr_checks_eval = {
 	evaluate_pr_state,
 	is_review_decision_decisive,
@@ -234,6 +252,7 @@ const git_pr_checks_eval = {
 export {
 	git_pr_checks_eval,
 	evaluate_pr_state,
+	is_auto_merge_blocked,
 	is_review_decision_decisive,
 	read_required_statuses,
 	is_coderabbit_check,

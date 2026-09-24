@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises'
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { main_sync } from '#scripts/git/main-sync'
 import { observation_ledger, OBSERVATION_LEDGER_PATH } from './observation-ledger'
 import { observation_ledger_line, type BrokenLine } from './observation-ledger-line'
+import { observations_flush_landing } from './observations-flush-landing'
 
 // The commit path the observation ledger did not have (joshuafolkken/kit#1756). The parent session
 // that appends a line never runs `pnpm josh git`; a child runs it inside a lane work tree, which
@@ -15,7 +15,9 @@ import { observation_ledger_line, type BrokenLine } from './observation-ledger-l
 // **The shape is `scripts/release/release-publish.ts`'s, deliberately.** Both open a pull request of
 // their own over one path, wait on the same required checks every other pull request waits on, and
 // merge — so this reuses the same primitives rather than growing a second answer to "how does a
-// josh command open and land a pull request".
+// josh command open and land a pull request". The one difference is that this pull request is handed
+// to GitHub's auto-merge as soon as it opens (joshuafolkken/kit#2497), so it lands even when the wait
+// below does not survive — `observations-flush-landing.ts` carries why.
 
 const COMMIT_MESSAGE = 'Record observation ledger entries'
 const CLEAN_MESSAGE = `clean — ${OBSERVATION_LEDGER_PATH} matches the commit it sits on, so there is nothing to flush`
@@ -318,15 +320,30 @@ async function open_pull_request(branch_name: string, default_branch: string): P
 // revert to main's content, leaving the appended lines on a branch nothing in this checkout points
 // at any more. The next flush would read `has_ledger_change` as false and report `clean`, which is
 // the silent loss the refusals above exist to prevent. Left on the branch, the refusal fires.
-async function land(branch_name: string, default_branch: string): Promise<void> {
+//
+// With auto-merge on, a failed wait no longer strands the lines for good — GitHub still merges once
+// the checks pass (joshuafolkken/kit#2497) — but the checkout stays on the branch all the same,
+// because only a merge this command has seen makes returning to the default branch safe.
+async function land(
+	branch_name: string,
+	default_branch: string,
+	is_auto_merge: boolean,
+): Promise<void> {
 	try {
-		await git_pr_checks.wait_for_pr_success(branch_name)
-		await git_gh_command.pr_merge(branch_name)
+		await observations_flush_landing.wait_for_landing(branch_name, is_auto_merge)
 	} catch (error) {
 		throw new Error(stranded_branch_message(branch_name, message_of(error)), { cause: error })
 	}
 
 	await return_to_default_branch(default_branch)
+}
+
+async function open_and_land(branch_name: string, default_branch: string): Promise<void> {
+	console.info(await open_pull_request(branch_name, default_branch))
+
+	const is_auto_merge = await observations_flush_landing.request_auto_merge(branch_name)
+
+	await land(branch_name, default_branch, is_auto_merge)
 }
 
 function merged_message(branch_name: string): string {
@@ -357,7 +374,8 @@ async function refuse_broken_ledger(): Promise<void> {
 // point is read from the remote first (joshuafolkken/kit#1768), and `catch_up_default` fast-forwards
 // only where git can do it without touching the ledger (joshuafolkken/kit#2462): a default branch
 // that predates another merged flush still stops here — before a branch is cut — rather than opening
-// a pull request that cannot merge.
+// a pull request that cannot merge. An earlier flush pull request still open is checked for the same
+// reason (joshuafolkken/kit#2497): a branch cut beside it conflicts with it at the ledger's tail.
 async function flush(now: Date): Promise<string> {
 	const status_output = await git_command.status()
 	const default_branch = await refuse_unsafe_flush(status_output)
@@ -365,12 +383,15 @@ async function flush(now: Date): Promise<string> {
 	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
 
 	await refuse_broken_ledger()
+
+	const deferred = await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
+	if (deferred !== undefined) return deferred
+
 	await catch_up_default(default_branch)
 
 	const branch_name = branch_name_for(timestamp_for(now))
 
-	console.info(await open_pull_request(branch_name, default_branch))
-	await land(branch_name, default_branch)
+	await open_and_land(branch_name, default_branch)
 
 	return merged_message(branch_name)
 }
