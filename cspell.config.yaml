@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # git's `for-each-ref` modifier that removes leading path components (joshuafolkken/kit#2504).
+  - lstrip
+  # git's `for-each-ref` atom naming the work tree a branch is checked out in (joshuafolkken/kit#2504).
+  - worktreepath
   # An observation-ledger line appended but not yet committed by a flush (joshuafolkken/kit#2492).
   - unflushed
   # ISO 15924 script codes `Intl.Locale#maximize` returns and Unicode regex scripts name — the
