@@ -53,6 +53,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ird": "issue:read",
     "isc": "issue:scout",
     "isf": "issue:fold",
+    "isfe": "issue:fold-existing",
     "ist": "issue:state",
     "l": "lint",
     "lc": "latest:corepack",
@@ -480,6 +481,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "issue:fold": [
       "<title>... [--not-separable] [--json]",
+      "automation",
+      [
+        "none",
+      ],
+    ],
+    "issue:fold-existing": [
+      "<assessment.json>",
       "automation",
       [
         "none",

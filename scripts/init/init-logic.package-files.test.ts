@@ -20,6 +20,12 @@ function is_covered_by_files_array(source_path: string): boolean {
 }
 
 describe('package.json files covers all AI copy sources', () => {
+	it('selects both Codex project configuration files for init and sync', () => {
+		expect(init_logic.get_ai_copy_files()).toEqual(
+			expect.arrayContaining(['.codex/config.toml', '.codex/hooks.json']),
+		)
+	})
+
 	it.each(init_logic.get_ai_copy_files())(
 		'covers ai copy file %s with a top-level files entry',
 		(filename) => {

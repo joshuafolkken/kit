@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # `josh issue:fold-existing` short command alias (joshuafolkken/kit#2553).
+  - isfe
   # git's `for-each-ref` modifier that removes leading path components (joshuafolkken/kit#2504).
   - lstrip
   # git's `for-each-ref` atom naming the work tree a branch is checked out in (joshuafolkken/kit#2504).

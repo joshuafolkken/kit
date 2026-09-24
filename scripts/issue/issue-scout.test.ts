@@ -176,6 +176,26 @@ describe('issue_scout.find_duplicates — an epic is not a duplicate', () => {
 	})
 })
 
+describe('issue_scout.find_duplicates — explicit references', () => {
+	it('includes a referenced issue despite unrelated title words', () => {
+		const issues = [{ number: UNRELATED_NUMBER, title: UNRELATED_TITLE }]
+		const found = issue_scout.find_duplicates(DRAFT_TITLE, issues, [UNRELATED_NUMBER])
+
+		expect(found.candidates[0]?.number).toBe(UNRELATED_NUMBER)
+		expect(found.candidates[0]?.is_referenced).toBe(true)
+	})
+
+	it('puts referenced issues before title-only matches', () => {
+		const issues = [
+			{ number: NEAR_DUPLICATE_NUMBER, title: NEAR_DUPLICATE_TITLE },
+			{ number: UNRELATED_NUMBER, title: UNRELATED_TITLE },
+		]
+		const found = issue_scout.find_duplicates(DRAFT_TITLE, issues, [UNRELATED_NUMBER])
+
+		expect(found.candidates[0]?.number).toBe(UNRELATED_NUMBER)
+	})
+})
+
 describe('issue_scout.find_duplicates — the issue filed minutes ago', () => {
 	it('finds a candidate sitting last in the listing', () => {
 		const issues = [

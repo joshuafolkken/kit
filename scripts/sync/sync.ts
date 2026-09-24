@@ -23,6 +23,7 @@ const PACKAGE_JSON = 'package.json'
 const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
 const CLAUDE_MD_FILENAME = 'CLAUDE.md'
 const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
+const CODEX_HOOKS_FILE = '.codex/hooks.json'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -31,14 +32,15 @@ function sync_ai_file(source_path: string, destination_path: string): void {
 	writeFileSync(destination_path, transform_copied_content(destination_path, content))
 }
 
-// The hook file is the one AI-copied file whose commands the consumer's *installed* bundle has to be
-// able to run. When sync is run from a newer source than that install, writing it would leave hooks
+// Both copied hook files must run against the consumer's installed bundle. When sync is run from a
+// newer source than that install, writing either file would leave hooks
 // that fail every prompt (joshuafolkken/kit#1930); skip it and print how to update instead.
 function should_skip_hook_file(filename: string): boolean {
-	if (filename !== CLAUDE_SETTINGS_FILE) return false
+	if (filename !== CLAUDE_SETTINGS_FILE && filename !== CODEX_HOOKS_FILE) return false
 	const warning = sync_hook_safety.hook_write_warning(
 		PROJECT_ROOT,
 		sync_hook_safety.read_version_at(path.join(PACKAGE_DIR, PACKAGE_JSON)),
+		filename,
 	)
 	if (warning === undefined) return false
 	console.warn(warning)
@@ -389,6 +391,7 @@ function main(): void {
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const sync = {
+	should_skip_hook_file,
 	sync_file_mapping,
 	sync_ai_file,
 	sync_workspace_yaml,

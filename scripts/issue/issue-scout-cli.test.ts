@@ -125,6 +125,34 @@ describe('issue_scout_cli.run — a duplicate is already open', () => {
 	})
 })
 
+describe('issue_scout_cli.run — explicit references', () => {
+	it('includes an unrelated title that the draft body cites', async () => {
+		const output = await printed(
+			[DRAFT_TITLE, '--body', `Add a criterion to #${String(UNRELATED_NUMBER)}`],
+			UNRELATED_BACKLOG,
+		)
+
+		expect(output).toContain(`${link(UNRELATED_NUMBER)}  ref`)
+	})
+
+	it('marks a truncated candidate list incomplete even when it found a candidate', async () => {
+		const backlog = [row(NEAR_DUPLICATE_NUMBER, NEAR_DUPLICATE_TITLE)]
+
+		stub_reads(backlog)
+		vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(
+			capped_listing_outcome(JSON.stringify(backlog)),
+		)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		await issue_scout_cli.run([DRAFT_TITLE])
+
+		expect(info.mock.calls.join('\n')).toContain(issue_scout_cli.INCOMPLETE_DUPLICATE_LINE)
+		expect(info.mock.calls.join('\n')).toContain(link(NEAR_DUPLICATE_NUMBER))
+	})
+})
+
 // joshuafolkken/kit#1679: the work most likely to be filed twice is the work that just finished, and
 // a scan reading open issues only cannot see any of it — joshuafolkken/kit#1656 was filed about five
 // hours after the issue that had already done it closed.
@@ -229,9 +257,11 @@ describe('issue_scout_cli.run — what the closed half says about its own gaps',
 		vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 		expect(await issue_scout_cli.run([DRAFT_TITLE])).toBe(SUCCESS_EXIT_CODE)
 		expect(error.mock.calls.join('\n')).toContain(issue_scout_cli.CLOSED_UNREADABLE_LINE)
+		expect(info.mock.calls.join('\n')).toContain(issue_scout_cli.INCOMPLETE_DUPLICATE_LINE)
 	})
 })
 

@@ -29,7 +29,11 @@ SECURITY.md         tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
+.codex/config.toml
+.codex/hooks.json
 ```
+
+The Codex project files are managed by kit. Sync overwrites both files, and rewrites `.codex/hooks.json` commands to run the consumer's installed kit bundles. If sync is run from a newer kit than the consumer has installed, it skips both hook files (`.claude/settings.json` and `.codex/hooks.json`) and tells the consumer to update the installed package first; `.codex/config.toml` can still be synced.
 
 > **The four distributed skills ship as the `kit` Claude Code plugin, not as copies
 > (joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file — it

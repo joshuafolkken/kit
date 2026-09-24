@@ -1,5 +1,5 @@
 {
-	"version": "1.848.0",
+	"version": "1.851.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -38,6 +38,7 @@
 		".claude/skills",
 		".claude/.claude-plugin",
 		".claude-plugin",
+		".codex",
 		".vscode",
 		".github",
 		"CLAUDE.md",
