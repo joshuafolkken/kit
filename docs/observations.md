@@ -326,3 +326,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | medium | scripts/rules/stop-rules.test.ts:188 | 2026-09-24 | #2510
 - rf:comments | medium | prompts/collaboration-workflow/rule-delivery.md:52 | 2026-09-24 | #2510
 - rf:none | none | - | 2026-09-24 | #2510
+- rf:none | none | - | 2026-09-24 | #2545
