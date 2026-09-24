@@ -203,3 +203,20 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/rules/reply-language.ts:79 | 2026-09-23 | #2470
 - rf:bug-risks | low | scripts/rules/reply-language.ts:74 | 2026-09-23 | #2470
 - rf:tests | low | scripts/hooks/stop-guard.test.ts:17 | 2026-09-23 | #2470
+- k:headless-parent-dies-in-watch | d1 | 2026-09-24 | pnpm josh run:wake | The woken backlogrun successor started its idle-watch poll in the background, ended its turn and exited, leaving the carry record carried and the watch unfinished until the attached session ended it an hour later
+- rf:bug-risks | medium | scripts/run/run-merge-cli.ts:275 | 2026-09-24 | #2484
+- rf:tests | medium | scripts/run/run-cut.test.ts:269 | 2026-09-24 | #2484
+- rf:comments | low | scripts/run/run-cut.ts:396 | 2026-09-24 | #2484
+- rf:performance | low | scripts/run/run-merge-cli.ts:192 | 2026-09-24 | #2484
+- rf:project-conventions | low | scripts/run/run-merge-steps.ts:38 | 2026-09-24 | #2484
+- rf:comments | low | scripts/run/run-cut-cli-fixture.ts:99 | 2026-09-24 | #2484
+- rf:assumptions | low | scripts/run/run-step.ts:245 | 2026-09-24 | #2484
+- rf:comments | low | .claude/skills/workflow-commands/pre-gate-cut.md:197 | 2026-09-24 | #2484
+- rf:bug-risks | low | scripts/run/run-merge-steps.ts:270 | 2026-09-24 | #2484
+- rf:comments | medium | .claude/skills/workflow-commands/chain-rule.md:10 | 2026-09-24 | #2489
+- rf:comments | low | scripts/run/run-ship-review.ts:61 | 2026-09-24 | #2489
+- rf:comments | low | scripts/run/run-ship-stage.ts:100 | 2026-09-24 | #2489
+- rf:assumptions | low | scripts/run/run-cut.ts:308 | 2026-09-24 | #2489
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:39 | 2026-09-24 | #2489
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:39 | 2026-09-24 | #2489
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:10 | 2026-09-24 | #2489
