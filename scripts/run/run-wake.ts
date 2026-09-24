@@ -26,17 +26,11 @@ import type { CarryRead } from './run-carry'
 // (`run-wake-handoff.ts`, joshuafolkken/kit#2437) — so a live session's record never reads as waiting to
 // be woken, and a crash is carried on as if the dead session had cut rather than left standing.
 //
-// **The supervisor never declares itself the record's owner, and that is the load-bearing decision.**
-// joshuafolkken/kit#1722's hand-over note asks a machine-driven caller to always pass the owner
-// declaration, because the half that refuses an interruption of a live run is opt-in. Read literally
-// that would have this process name itself, and doing so would break the very thing it exists for:
-// the owner is meant to be the process *spending the budget*, and here that is the session the
-// supervisor wakes, not the supervisor. Named as owner, this long-lived process would still be alive
-// when the woken session ran `run:carry --begin`, which `is_foreign_live_owner` answers `busy` — and
-// the run would never resume. So the supervisor **reads** the carry record and never claims it, and
-// the woken session claims it with `--owner "$PPID"` as `backlogrun.md` already requires; inside an
-// agent session that names the long-lived agent process, which is the structure the same note asks to
-// be confirmed when the waking side's process layout is decided.
+// **The supervisor owns the record while its deterministic driver spends the budget.** After a cut or
+// dead-owner recovery it adopts the record as this process, so `run:merge` has one live owner to
+// count against. A judgment branch first hands the record off; `classify_claim` reads that explicit
+// handoff before liveness, allowing one AI session to adopt it even while the supervisor is alive.
+// The supervisor does not keep running the driver while that session owns the record.
 
 const WAKE_PREFIX = 'josh-run-wake-'
 // **Where the output of everything this supervisor starts is kept** (joshuafolkken/kit#1746).

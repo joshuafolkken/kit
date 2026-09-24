@@ -10,10 +10,10 @@ import { run_event_stream } from './run-event-stream'
 import { run_headless } from './run-headless'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_describe, type WakeContext } from './run-wake-describe'
+import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
-import { run_wake_work } from './run-wake-work'
 
 // `josh run:wake --start | --list | --stop | --loop` — the supervisor that continues a cut
 // `backlogrun` or `queue` without a person retyping the keyword (joshuafolkken/kit#1719,
@@ -181,9 +181,9 @@ function wake_session(
 	context: WakeContext,
 	invocation: string,
 	profile: AgentProfile,
-	session_id: string,
+	session: { id: string; material: string },
 ): LaunchResult {
-	const built = run_wake_session.wake_argv(invocation, profile, context.worktree, session_id)
+	const built = run_wake_session.wake_argv(invocation, profile, context.worktree, session)
 
 	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
@@ -200,12 +200,14 @@ function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 	return {
 		read_carry: () => run_carry.read_carry(context.carry_target),
 		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_owner_live(read.carry),
-		has_work: async (read) => await run_wake_work.has_work(read),
+		has_work: async () => true,
 		new_session_id: () => randomUUID(),
 		hand_off: () => {
 			run_wake_handoff.hand_off(context.carry_target)
 		},
-		wake: (invocation, session_id) => wake_session(context, invocation, profile, session_id),
+		drive: async () => await run_wake_driver.drive(context.carry_target),
+		wake: (invocation, session_id, material) =>
+			wake_session(context, invocation, profile, { id: session_id, material }),
 		sleep: async (milliseconds) => {
 			await new Promise((resolve) => setTimeout(resolve, milliseconds))
 		},

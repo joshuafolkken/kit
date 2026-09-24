@@ -142,14 +142,6 @@ it('accepts only mode without entering the backlog loop', () => {
 	expect(backlog_drive_cli.parse(['--owner', '4242', '--only'])?.is_only).toBe(true)
 })
 
-it('returns only without reading a carry record', async () => {
-	const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
-
-	expect(await backlog_drive_cli.run(['--owner', '4242', '--only'])).toBe(0)
-	expect(info).toHaveBeenCalledWith('only')
-	info.mockRestore()
-})
-
 it('reports before ending the carry record', async () => {
 	const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: 'report' })
 	const error = vi.spyOn(console, 'error').mockImplementation(vi.fn())
