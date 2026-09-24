@@ -157,6 +157,7 @@ const lane_await = {
 	NEVER_APPEARED_TIMEOUT_MS,
 	RECONFIRM_MS,
 	check_issue,
+	is_process_running_default,
 	wait_for_any,
 }
 

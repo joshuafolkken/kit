@@ -11,6 +11,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bg": "batch:guard",
     "bh": "behavior",
     "bl": "backlog:next",
+    "bld": "backlog:drive",
     "blo": "backlog:offer",
     "blp": "backlog:plan",
     "bls": "backlog:stalled",
@@ -180,6 +181,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "backlog:drive": [
+      "--owner <pid> [options]",
+      "automation",
+      [
+        "network",
       ],
     ],
     "backlog:next": [

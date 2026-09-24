@@ -134,19 +134,19 @@ The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries ba
 
 ### Available `pnpm josh` subcommands
 
-| Command              | Runs                                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| `lint`               | `prettier --check .` then `eslint . --cache --cache-strategy content`                  |
-| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`            |
-| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`        |
-| `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file) |
-| `lefthook:install`   | `lefthook install`                                                                     |
-| `lefthook:uninstall` | `lefthook uninstall`                                                                   |
-| `lefthook:commit`    | `lefthook run pre-commit`                                                              |
-| `lefthook:push`      | `lefthook run pre-push`                                                                |
-| `main:sync`          | `git checkout <default> && git pull --ff-only` (refuses inside a linked work tree)     |
-| `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                         |
-| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                            |
+| Command              | Runs                                                                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lint`               | `prettier --check .` then `eslint . --cache --cache-strategy content`                                                                                    |
+| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`                                                                              |
+| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`                                                                          |
+| `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file)                                                                   |
+| `lefthook:install`   | `lefthook install`                                                                                                                                       |
+| `lefthook:uninstall` | `lefthook uninstall`                                                                                                                                     |
+| `lefthook:commit`    | `lefthook run pre-commit`                                                                                                                                |
+| `lefthook:push`      | `lefthook run pre-push`                                                                                                                                  |
+| `main:sync`          | `git checkout <default> && git pull --ff-only`, then prunes merged branches with a `[gone]` remote-tracking upstream (refuses inside a linked work tree) |
+| `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                                                                                           |
+| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                                                                                              |
 
 SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
 

@@ -48,10 +48,19 @@ vi.mock('#scripts/git/git-command', () => ({
 	},
 }))
 vi.mock('#scripts/git/git-gh-command', () => ({
-	git_gh_command: { pr_create: vi.fn(), pr_merge: vi.fn() },
+	git_gh_command: {
+		pr_create: vi.fn(),
+		pr_enable_auto_merge: vi.fn(),
+		pr_list_open_with_head_prefix: vi.fn(),
+		pr_merge: vi.fn(),
+	},
 }))
 vi.mock('#scripts/git/git-pr-checks', () => ({
-	git_pr_checks: { wait_for_pr_success: vi.fn() },
+	git_pr_checks: {
+		read_merge_progress: vi.fn(),
+		wait_for_pr_merged: vi.fn(),
+		wait_for_pr_success: vi.fn(),
+	},
 }))
 vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
 
@@ -62,7 +71,7 @@ const NO_COMMITS = 0
 const SUCCESS_EXIT_CODE = 0
 
 // The collaborators the success path drives, listed in the order `flush` is expected to call them:
-// branch -> stage -> commit -> push -> open -> wait -> merge -> return. Pinning their first-call
+// branch -> stage -> commit -> push -> open -> auto-merge -> wait for the merge -> return. Pinning their first-call
 // order as a strictly increasing sequence is one assertion for the whole path.
 type MockedCommand = (...args: Array<never>) => unknown
 const SUCCESS_SEQUENCE: ReadonlyArray<MockedCommand> = [
@@ -71,8 +80,8 @@ const SUCCESS_SEQUENCE: ReadonlyArray<MockedCommand> = [
 	git_command.commit,
 	git_command.push,
 	git_gh_command.pr_create,
-	git_pr_checks.wait_for_pr_success,
-	git_gh_command.pr_merge,
+	git_gh_command.pr_enable_auto_merge,
+	git_pr_checks.wait_for_pr_merged,
 	git_command.fast_forward_local,
 	main_sync.run,
 ]
@@ -81,6 +90,14 @@ function first_call_order(command: MockedCommand): number {
 	const [order] = vi.mocked(command).mock.invocationCallOrder
 
 	return order ?? NaN
+}
+
+// No earlier flush pull request is open, and GitHub opens the new one, accepts auto-merge and merges.
+function on_github(): void {
+	vi.mocked(git_gh_command.pr_create).mockResolvedValue(PULL_REQUEST_URL)
+	vi.mocked(git_gh_command.pr_list_open_with_head_prefix).mockResolvedValue([])
+	vi.mocked(git_pr_checks.wait_for_pr_merged).mockResolvedValue('merged')
+	vi.mocked(main_sync.run).mockResolvedValue(SUCCESS_EXIT_CODE)
 }
 
 function on_default_branch(): void {
@@ -92,8 +109,7 @@ function on_default_branch(): void {
 	vi.mocked(git_command.commit_count_beyond).mockResolvedValue(NO_COMMITS)
 	vi.mocked(git_command.checkout_b).mockResolvedValue('')
 	vi.mocked(git_command.checkout).mockResolvedValue('')
-	vi.mocked(git_gh_command.pr_create).mockResolvedValue(PULL_REQUEST_URL)
-	vi.mocked(main_sync.run).mockResolvedValue(SUCCESS_EXIT_CODE)
+	on_github()
 }
 
 // The message the command exits with, whichever side it came out of — so an arm can be asserted by
@@ -148,11 +164,11 @@ describe('observations_flush — a merged flush', () => {
 		on_default_branch()
 	})
 
-	it('waits for checks, merges the branch, returns to default, and reports the merge', async () => {
+	it('waits for the auto-merge, returns to default, and reports the merge', async () => {
 		const message = await observations_flush.flush(new Date(MORNING_INSTANT))
 
-		expect(git_pr_checks.wait_for_pr_success).toHaveBeenCalledWith(FLUSH_BRANCH)
-		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_pr_checks.wait_for_pr_merged).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_gh_command.pr_merge).not.toHaveBeenCalled()
 		// joshuafolkken/kit#2462: the local default branch is brought up to the merge before the
 		// checkout, so lines appended while the pull request waited carry over rather than block it.
 		expect(git_command.fast_forward_local).toHaveBeenCalledWith(DEFAULT_BRANCH)
