@@ -1,7 +1,8 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
+import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { execaSync } from 'execa'
 import { describe, expect, it } from 'vitest'
@@ -15,6 +16,7 @@ import { describe, expect, it } from 'vitest'
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const CSPELL_BIN = 'cspell'
 const DISTRIBUTED_DICTIONARY = path.join('cspell', 'index.yaml')
+const CODEX_HOOKS = path.join('.codex', 'hooks.json')
 const CSPELL_FLAGS: ReadonlyArray<string> = [
 	'lint',
 	'--no-config-search',
@@ -55,9 +57,10 @@ const DISTRIBUTED_GLOBS: ReadonlyArray<string> = DISTRIBUTED_DIRECTORIES.map(
 	(directory) => `${directory}/**`,
 )
 
-function collect_unknown_words(files: ReadonlyArray<string>): Array<string> {
+function collect_unknown_words(files: ReadonlyArray<string>, input?: string): Array<string> {
 	const result = execaSync(resolve_local_bin(REPO_ROOT, CSPELL_BIN), [...CSPELL_FLAGS, ...files], {
 		cwd: REPO_ROOT,
+		input: input ?? '',
 		reject: false,
 	})
 
@@ -94,4 +97,12 @@ describe('files distributed by josh init / josh sync', () => {
 		},
 		SCAN_TIMEOUT_MS,
 	)
+
+	it('spells the transformed Codex hooks through the distributed dictionary', () => {
+		const source = readFileSync(path.join(REPO_ROOT, CODEX_HOOKS), 'utf8')
+		const transformed = transform_copied_content(CODEX_HOOKS, source)
+
+		expect(transformed).toContain('show-toplevel')
+		expect(collect_unknown_words([`stdin://${CODEX_HOOKS}`], transformed)).toEqual([])
+	})
 })

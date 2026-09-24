@@ -117,9 +117,6 @@ words:
   # The things that depend on a given one — British spelling of "dependents". `epic-next-views.ts` uses
   # it for the issues a blocked or parked issue holds up for a person to resolve.
   - dependants
-  # `git rev-parse --show-toplevel`, quoted in `docs/josh-commands.md` as the source of the checkout
-  # root the review brief prints. git's own spelling of the flag.
-  - toplevel
   # What `josh lint:related` calls a file the two linters read (joshuafolkken/kit#1298), matching
   # the "relatable" the sibling unit narrowing already uses for a file a test can import.
   - lintable
