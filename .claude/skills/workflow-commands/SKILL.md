@@ -317,8 +317,8 @@ pnpm josh issue:scout "<title>" --body-file <complete-draft.md>
 ```
 
 - **`Duplicates:` is read, not skimmed.** Open each candidate and apply `issue-fold-existing.md`
-  before deciding to file. A complete duplicate stops with a `confirmation` Telegram and "Please run
-  `fullrun #<existing>` to execute this Issue." A compatible addition follows that file's fold path;
+  before deciding to file. A complete duplicate of an **open** Issue stops with a `confirmation`
+  Telegram and "Please run `fullrun #<existing>` to execute this Issue." A compatible addition follows that file's fold path;
   a separate deliverable follows the ordinary filing path. A title match alone never authorizes an edit.
 - **A candidate marked `(closed)` is a different answer.** The scan covers what closed recently as
   well as what is open, because the work most likely to be filed twice is the work that just finished.
