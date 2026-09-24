@@ -318,3 +318,11 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts:232 | 2026-09-24 | #2509
 - rf:tests | medium | scripts/backlog/backlog-drive-named.test.ts:48 | 2026-09-24 | #2509
 - rf:bug-risks | medium | scripts/backlog/backlog-drive-named-offer.ts:60 | 2026-09-24 | #2509
+- rf:bug-risks | medium | scripts/init/init-logic-sonar.ts:70 | 2026-09-24 | #2539
+- rf:bug-risks | medium | scripts/init/init-logic-sonar.ts:71 | 2026-09-24 | #2539
+- rf:tests | medium | scripts/init/init-logic-sonar.test.ts:101 | 2026-09-24 | #2539
+- rf:bug-risks | medium | scripts/init/init-logic-sonar.ts:149 | 2026-09-24 | #2539
+- rf:bug-risks | medium | scripts/rules/stop-rules.ts:229 | 2026-09-24 | #2510
+- rf:tests | medium | scripts/rules/stop-rules.test.ts:188 | 2026-09-24 | #2510
+- rf:comments | medium | prompts/collaboration-workflow/rule-delivery.md:52 | 2026-09-24 | #2510
+- rf:none | none | - | 2026-09-24 | #2510
