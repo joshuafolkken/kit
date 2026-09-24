@@ -635,6 +635,16 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 ---
 
+### `josh backlog:drive` · `josh bld`
+
+> **Audience:** automation · **Side effects:** network
+
+`[--max <n>] [--idle <minutes>] [--stash <message>] [--owner <pid>]`
+
+Drive the backlogrun parent loop (offer, launch, await, merge) until a judgement branch, and print that branch as one line
+
+---
+
 ### `josh backlog:next` · `josh bl`
 
 > **Audience:** automation · **Side effects:** network

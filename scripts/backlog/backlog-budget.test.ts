@@ -308,3 +308,18 @@ describe('backlog_budget.decide — the answers no budget can rescue', () => {
 		expect(decision.reason).toBe(backlog_budget.PARKED_REASON)
 	})
 })
+
+// joshuafolkken/kit#2508: `backlog:drive` ends the carry record with `--stopped` unless the stop is the
+// run finishing — the idle watch ending on an empty backlog.
+describe('backlog_budget.is_finish — finishing against stopping', () => {
+	it('reads an empty backlog with the watch off as the run finishing', () => {
+		expect(backlog_budget.is_finish(input_of({ answer: 'exhausted' }))).toBe(true)
+	})
+
+	it('reads a parked backlog and the maximum as stopping', () => {
+		const at_max = input_of({ answer: 'exhausted', merged: MAX_ISSUES, max_issues: MAX_ISSUES })
+
+		expect(backlog_budget.is_finish(input_of({ answer: 'parked' }))).toBe(false)
+		expect(backlog_budget.is_finish(at_max)).toBe(false)
+	})
+})

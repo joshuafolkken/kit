@@ -166,10 +166,14 @@ function refuse(): number {
 // picks up. A watch that opened while children were still merging (`running > 0`) is not this drain: the
 // retrospective waits for the true idle, and the marker is emitted from the loop head for the same
 // reason `run:merge` emits its own events — the command that detects the event owns writing it.
-async function mark_drain(verdict: string, answer: string, running: number): Promise<void> {
-	if (verdict !== WATCH_VERDICT || answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return
+// Returns whether this call wrote the marker, so `backlog:drive` stops once per drain
+// (joshuafolkken/kit#2508).
+async function mark_drain(verdict: string, answer: string, running: number): Promise<boolean> {
+	if (verdict !== WATCH_VERDICT || answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) {
+		return false
+	}
 
-	await run_event_stream_emit.emit_once(run_event_stream.EVENT_KIND.DRAIN, DRAIN_TEXT)
+	return await run_event_stream_emit.emit_once(run_event_stream.EVENT_KIND.DRAIN, DRAIN_TEXT)
 }
 
 async function decide(values: ParsedValues, counts: OfferCounts): Promise<number> {
@@ -220,6 +224,7 @@ const backlog_offer_cli = {
 	counts_of,
 	emit,
 	main,
+	mark_drain,
 	next_argv,
 	read_values,
 	run,

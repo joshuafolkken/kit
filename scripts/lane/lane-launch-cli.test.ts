@@ -131,6 +131,21 @@ describe('lane_launch_cli.run — a refused dispatch', () => {
 	})
 })
 
+describe('lane_launch_cli.launch_lane — the chain an in-process caller shares', () => {
+	it('returns the dispatched pid without printing it', async () => {
+		stub({ open: { code: OK, out: DIR }, dispatch: { code: OK, out: PID } })
+
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toBe(PID)
+		expect(info_lines).toStrictEqual([])
+	})
+
+	it('returns undefined when a step refused', async () => {
+		stub({ open: { code: FAILED, out: '' } })
+
+		expect(await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })).toBeUndefined()
+	})
+})
+
 describe('lane_launch_cli.read_context — the argument shape', () => {
 	it('reads the issue number and an optional stash message', () => {
 		expect(lane_launch_cli.read_context([ISSUE])).toStrictEqual({ issue: ISSUE, stash: undefined })

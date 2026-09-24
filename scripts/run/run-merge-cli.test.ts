@@ -120,6 +120,21 @@ describe('run_merge_cli.run — a parked child', () => {
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_merged_mock).not.toHaveBeenCalled()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked`)
+	})
+
+	it('returns the outcome beside the token to an in-process caller', async () => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [NEEDS_DECISION]))
+		const ctx = run_merge_cli.parse(EPIC_ARGS)
+
+		expect(ctx).toBeDefined()
+		if (ctx === undefined) return
+		expect(await run_merge_cli.merge_child(ctx)).toEqual({
+			outcome: 'parked',
+			token: NEXT,
+			code: SUCCESS,
+		})
+		expect(info_mock).not.toHaveBeenCalled()
 	})
 })
 

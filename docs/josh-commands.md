@@ -1287,6 +1287,16 @@ pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --re
 
 At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the run's event stream (once per drain, best-effort), so the next `run:step` fires the end-of-run retrospective before the idle watch rather than after it (joshuafolkken/kit#2335). A watch that opened while children were still merging is not this drain and is left unmarked.
 
+### `josh backlog:drive`
+
+Run the `backlogrun` parent loop without a session — offer, launch, await, merge, offer again — until a branch needs a judgement, then print that branch as one line (joshuafolkken/kit#2508). Every answer comes from the same generator: `backlog_offer.answer_of` / `backlog_budget.decide`, `lane:launch`'s chain, `lane_await`, `run:merge`'s handlers.
+
+```bash
+pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--stash <message>]
+```
+
+Needs an open carry record (start, merged count and the 8-hour bound are read from it); `--max` / `--idle` mean what they mean to `backlog:budget`, `--stash` goes to the first launch only. stdout: `done` / `stopped <reason>` (after `run:report`, `run:carry --end [--stopped]` and `run:wake --stop`), `drain` (first empty ask — ask `run:step` for the retrospective, then re-run), `over`, or `park` / `failed` / `human-review` / `stop` / `environment` / `busy` / `unresolved` / `launch-failed` with `#N`, `error <message>` when a step threw; `only` refuses a `--only` run. Restart-safe: running children are the open lanes whose newest stream event is not `merge` / `park` / `outage`, so a re-run neither re-launches nor re-merges.
+
 ### `needs-human-review` — the opposite label
 
 The inverse of `auto-ok`: implemented and taken through the verification gate as usual, then nothing is committed, pushed, opened as a PR or merged — the working tree is left uncommitted, a `confirmation` notification carries the resume command, and the run stops. For work no test can judge. Only a person applies or removes it.

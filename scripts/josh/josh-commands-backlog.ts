@@ -21,6 +21,17 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[options]', 'automation', ['network']],
 	},
+	'backlog:drive': {
+		script: 'scripts/backlog/backlog-drive-cli.ts',
+		description:
+			'Drive the backlogrun parent loop (offer, launch, await, merge) until a judgement branch, and print that branch as one line',
+		category: 'AI tools',
+		reference: [
+			'[--max <n>] [--idle <minutes>] [--stash <message>] [--owner <pid>]',
+			'automation',
+			['network'],
+		],
+	},
 	'backlog:plan': {
 		script: 'scripts/backlog/backlog-plan-cli.ts',
 		description:
