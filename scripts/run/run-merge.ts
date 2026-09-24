@@ -1,4 +1,9 @@
-import { ALREADY_DONE_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	ALREADY_DONE_LABEL,
+	EPIC_LABEL,
+	has_label_name,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/git/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import type { CarryChange, RunCarry } from './run-carry'
 
@@ -30,6 +35,7 @@ const ONE = 1
 // - `merged`      — CLOSED; the child finished and its pull request merged.
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (SKILL.md → §2z).
 // - `parked`      — OPEN and carrying `needs-decision` or `already-done`; a person still owns it.
+// - `split`       — OPEN and carrying `epic`; its work was divided into new children.
 // - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API; not
 //                   the child's failure, so it is re-dispatchable and uncounted against the failure guard
 //                   (joshuafolkken/kit#2240).
@@ -39,7 +45,7 @@ const ONE = 1
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `unresolved`  — the state could not be read; re-read before deciding.
 type ChildOutcome =
-	'merged' | 'human-review' | 'parked' | 'cut' | 'outage' | 'failed' | 'unresolved'
+	'merged' | 'human-review' | 'parked' | 'split' | 'cut' | 'outage' | 'failed' | 'unresolved'
 
 // What the CLI read beside the GitHub state: whether the exit record is an API outage, and whether the
 // lane holds a cut its successor never adopted.
@@ -78,6 +84,8 @@ function unfinished_outcome(signals: EndingSignals): ChildOutcome {
 function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
 	if (state.is_human_review) return 'human-review'
 
+	if (has_label_name(state.labels, EPIC_LABEL)) return 'split'
+
 	if (is_parked(state)) return 'parked'
 
 	return unfinished_outcome(signals)
@@ -97,7 +105,7 @@ function classify_child(
 }
 
 // The counter change a child's outcome implies. A merge counts a merge (which resets the failure
-// streak); a failure counts a failure; a parked or human-review child counts nothing — a decision
+// streak); a failure counts a failure; a split, parked or human-review child counts nothing — a decision
 // waiting on a person is not the environment failing — and `undefined` says the carry record is left
 // untouched.
 function change_of(outcome: ChildOutcome): CarryChange | undefined {
