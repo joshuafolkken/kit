@@ -340,3 +340,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/init/init-logic.ts:104 | 2026-09-24 | #2554
 - rf:tests | medium | scripts/sync/sync-hook-safety.test.ts:67 | 2026-09-24 | #2554
 - rf:comments | low | scripts/sync/sync.ts:35 | 2026-09-24 | #2554
+- rf:none | none | - | 2026-09-24 | #2560
+- rf:none | none | - | 2026-09-24 | #2560
