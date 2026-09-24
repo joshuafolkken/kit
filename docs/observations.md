@@ -329,3 +329,11 @@ dropping either side destroys exactly what it exists to record.
 - rf:none | none | - | 2026-09-24 | #2545
 - rf:none | none | - | 2026-09-24 | #2549
 - rf:none | none | - | 2026-09-24 | #2549
+- rf:bug-risks | medium | scripts/issue/issue-scout-cli.ts | 2026-09-24 | #2553
+- rf:bug-risks | medium | scripts/issue/issue-fold-existing-cli.ts | 2026-09-24 | #2553
+- rf:tests | medium | scripts/issue/issue-scout-cli.test.ts | 2026-09-24 | #2553
+- rf:comments | medium | .claude/skills/workflow-commands/SKILL.md | 2026-09-24 | #2553
+- rf:comments | medium | .claude/skills/workflow-commands/SKILL.md | 2026-09-24 | #2553
+- rf:tests | medium | scripts/sync/sync-hook-safety.test.ts:59 | 2026-09-24 | #2554
+- rf:comments | low | scripts/init/hook-command-rewrite.ts:60 | 2026-09-24 | #2554
+- rf:comments | low | scripts/sync/sync-hook-safety.ts:8 | 2026-09-24 | #2554
