@@ -109,6 +109,32 @@ async function emit_heartbeat(line: string): Promise<void> {
 	await emit(run_event_stream.EVENT_KIND.HEARTBEAT, line)
 }
 
-const run_event_stream_emit = { emit, emit_heartbeat, emit_once, emit_once_since, stream_target }
+// The events of the invocation now running, for a reader restoring the run from its stream
+// (`backlog:drive`, joshuafolkken/kit#2508). Fail-quiet like the writers: no repository or an unreadable
+// stream is an empty invocation.
+async function current_events(): Promise<ReadonlyArray<RunEvent>> {
+	try {
+		const repository = await run_carry.repository_directory()
+
+		if (repository === undefined) return []
+
+		const read = run_carry.read_carry(run_carry.carry_path(repository))
+		const scope = run_event_scope.scope_of(read)
+		const events = run_event_stream.read_events(run_event_stream.target_of(repository))
+
+		return run_event_scope.scoped_events(events, scope) ?? []
+	} catch {
+		return []
+	}
+}
+
+const run_event_stream_emit = {
+	current_events,
+	emit,
+	emit_heartbeat,
+	emit_once,
+	emit_once_since,
+	stream_target,
+}
 
 export { run_event_stream_emit }

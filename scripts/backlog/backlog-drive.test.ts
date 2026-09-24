@@ -77,6 +77,9 @@ function harness(script: Script): Harness {
 			sleep: async (milliseconds) => {
 				now_ms += milliseconds
 			},
+			finish: async () => {
+				calls.push('finish')
+			},
 			on_state: (next) => {
 				states.push(next)
 			},
@@ -246,7 +249,13 @@ describe('backlog_drive.run_loop', () => {
 		})
 		const end = await backlog_drive.run_loop(state(), CONFIG, ports)
 
-		expect(calls).toStrictEqual(['offer', `launch ${OFFERED}`, `merge ${OFFERED}`, 'offer'])
+		expect(calls).toStrictEqual([
+			'offer',
+			`launch ${OFFERED}`,
+			`merge ${OFFERED}`,
+			'offer',
+			'finish',
+		])
 		expect(states[0]?.in_flight).toStrictEqual([OFFERED])
 		expect(end.reason).toBe('stop')
 	})
@@ -258,20 +267,43 @@ describe('backlog_drive.run_loop', () => {
 		})
 		const end = await backlog_drive.run_loop(state([FIRST_CHILD]), CONFIG, ports)
 
-		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'offer'])
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'offer', 'finish'])
 		expect(end.reason).toBe('stop')
 	})
+})
 
-	it('returns window once the bounded wait is spent', async () => {
-		const { ports } = harness({})
-		const end = await backlog_drive.run_loop(
-			state([FIRST_CHILD]),
-			{ ...CONFIG, window_ms: POLL_MS * 2 },
-			ports,
-		)
+it('returns window once the bounded wait is spent', async () => {
+	const { ports } = harness({})
+	const end = await backlog_drive.run_loop(
+		state([FIRST_CHILD]),
+		{ ...CONFIG, window_ms: POLL_MS * 2 },
+		ports,
+	)
 
-		expect(end.reason).toBe('window')
-	})
+	expect(end.reason).toBe('window')
+})
+
+it('continues the idle watch after the retrospective has run', async () => {
+	const { ports } = harness({ offers: [{ ...offer('watch'), is_retrospective_done: true }] })
+	const end = await backlog_drive.run_loop(state(), { ...CONFIG, window_ms: POLL_MS }, ports)
+
+	expect(end.reason).toBe('window')
+})
+
+it('keeps the budget reason on the first stop verdict', async () => {
+	const reason = 'maximum reached'
+	const { ports } = harness({ offers: [{ ...offer('stop'), reason }] })
+	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
+
+	expect(end.detail).toBe(reason)
+})
+
+it('returns the drained stop for a retrospective before ending the carry', async () => {
+	const { ports, calls } = harness({ offers: [{ ...offer('stop'), answer: 'exhausted' }] })
+	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
+
+	expect(end.reason).toBe('retrospective')
+	expect(calls).not.toContain('finish')
 })
 
 describe('backlog_drive.run_loop — hand-back state', () => {

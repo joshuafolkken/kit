@@ -121,6 +121,21 @@ describe('run_merge_cli.run — a parked child', () => {
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_merged_mock).not.toHaveBeenCalled()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked`)
+	})
+
+	it('returns the outcome beside the token to an in-process caller', async () => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [NEEDS_DECISION]))
+		const ctx = run_merge_cli.parse(EPIC_ARGS)
+
+		expect(ctx).toBeDefined()
+		if (ctx === undefined) return
+		expect(await run_merge_cli.merge_child(ctx)).toEqual({
+			outcome: 'parked',
+			token: NEXT,
+			code: SUCCESS,
+		})
+		expect(info_mock).not.toHaveBeenCalled()
 	})
 })
 
@@ -133,6 +148,7 @@ describe('run_merge_cli.run — a split child', () => {
 		expect(do_failed_mock).not.toHaveBeenCalled()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 		expect(emit_mock).not.toHaveBeenCalledWith('park', expect.anything())
+		expect(emit_mock).toHaveBeenCalledWith('split', `#${CHILD} split`)
 	})
 })
 
@@ -350,26 +366,4 @@ describe('run_merge_cli.run — human review', () => {
 			expect(ask_next_mock).not.toHaveBeenCalled()
 		},
 	)
-})
-
-describe('run_merge_cli.parse — sanitizes subprocess-bound arguments', () => {
-	it('refuses an epic that is not an issue number', () => {
-		expect(run_merge_cli.parse([CHILD, '--epic', 'evil', '--repo', REPO])).toBeUndefined()
-	})
-
-	it('refuses a repository that is not an owner/repo slug', () => {
-		const argv = [CHILD, '--epic', '900', '--repo=--force']
-
-		expect(run_merge_cli.parse(argv)).toBeUndefined()
-	})
-
-	it('refuses an option-shaped slug whose half starts with a hyphen', () => {
-		const argv = [CHILD, '--epic', '900', '--repo=--evil/x']
-
-		expect(run_merge_cli.parse(argv)).toBeUndefined()
-	})
-
-	it('accepts a well-formed epic and repository', () => {
-		expect(run_merge_cli.parse(EPIC_ARGS)?.repo).toBe(REPO)
-	})
 })

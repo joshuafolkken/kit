@@ -44,6 +44,7 @@ const EVENT_KIND = {
 	CHILD_LAUNCH: 'child-launch',
 	MERGE: 'merge',
 	PARK: 'park',
+	SPLIT: 'split',
 	OUTAGE: 'outage',
 	CUT: 'cut',
 	// The backlog emptied while nothing of the run's own was in flight — the drain

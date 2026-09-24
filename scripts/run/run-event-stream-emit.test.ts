@@ -168,3 +168,42 @@ describe('run_event_stream_emit.emit_once_since — one marker until the reset k
 		expect(await run_event_stream_emit.emit_once_since(STALL, STALL_TEXT, CHILD_LAUNCH)).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#2508: `backlog:drive` restores its running set from this invocation's events alone.
+describe('run_event_stream_emit.current_events — the invocation now running', () => {
+	it('drops the events a previous invocation left behind', async () => {
+		const repository = fresh_repository()
+		const carry = run_carry.carry_path(repository)
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(run_event_stream.target_of(repository), MERGE, '#6 merged', EARLIER_ISO)
+		run_carry.begin_carry(carry, 'backlogrun')
+		await run_event_stream_emit.emit(MERGE, '#7 merged')
+
+		const events = await run_event_stream_emit.current_events()
+		const texts = events.map((event) => event.text)
+
+		rmSync(carry, { force: true })
+		expect(texts).toStrictEqual(['#7 merged'])
+	})
+
+	it('reads an empty invocation when the target will not resolve', async () => {
+		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
+
+		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+	})
+
+	it('does not adopt old events when the carry scope is missing', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(
+			run_event_stream.target_of(repository),
+			CHILD_LAUNCH,
+			'#6 dispatched',
+			EARLIER_ISO,
+		)
+
+		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+	})
+})

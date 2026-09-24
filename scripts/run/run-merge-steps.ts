@@ -174,7 +174,10 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	if (refused !== undefined) return refused
 
 	await sync_main()
-	const result = await apply_carry(ctx, run_merge.change_of('merged'))
+	const result = await apply_carry(ctx, {
+		...run_merge.change_of('merged'),
+		merged_issue: Number(ctx.child),
+	})
 
 	if (result.kind === 'refused') return result.carry
 

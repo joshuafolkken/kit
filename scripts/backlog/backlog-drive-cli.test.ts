@@ -1,5 +1,6 @@
+import { josh_command } from '#scripts/josh/josh-run'
 import type { RunCarry } from '#scripts/run/run-carry'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_cli } from './backlog-drive-cli'
 
@@ -39,19 +40,21 @@ describe('backlog_drive_cli.parse', () => {
 			exclude: ['2400', '2401'],
 			awaited: ['2500'],
 			window_ms: WINDOW_MINUTES * MS_PER_MINUTE,
+			window: String(WINDOW_MINUTES),
+			is_only: false,
 		})
 	})
+})
 
-	it.each([
-		[[]],
-		[['--owner', 'abc']],
-		[['--owner', '1', '--exclude', '2400,--evil']],
-		[['--owner', '1', '--max', 'many']],
-		[['--owner', '1', '--window', 'soon']],
-		[['--owner', '1', '--unknown', 'x']],
-	])('refuses %j', (argv) => {
-		expect(backlog_drive_cli.parse(argv)).toBeUndefined()
-	})
+it.each([
+	[[]],
+	[['--owner', 'abc']],
+	[['--owner', '1', '--exclude', '2400,--evil']],
+	[['--owner', '1', '--max', 'many']],
+	[['--owner', '1', '--window', 'soon']],
+	[['--owner', '1', '--unknown', 'x']],
+])('refuses %j', (argv) => {
+	expect(backlog_drive_cli.parse(argv)).toBeUndefined()
 })
 
 describe('backlog_drive_cli.offer_argv', () => {
@@ -99,6 +102,14 @@ describe('backlog_drive_cli output', () => {
 		expect(backlog_drive_cli.end_line({ reason: 'merge', token: 'over', issue: '2493' })).toBe(
 			'merge over #2493',
 		)
+		expect(
+			backlog_drive_cli.end_line({
+				reason: 'stop',
+				token: 'stop',
+				issue: undefined,
+				detail: 'max',
+			}),
+		).toBe('stop max')
 		expect(backlog_drive_cli.end_line({ reason: 'stop', token: 'stop', issue: undefined })).toBe(
 			'stop',
 		)
@@ -125,4 +136,42 @@ describe('backlog_drive_cli.merge_token', () => {
 
 		expect(backlog_drive_cli.merge_token(out, 1)).toBe('')
 	})
+})
+
+it('accepts only mode without entering the backlog loop', () => {
+	expect(backlog_drive_cli.parse(['--owner', '4242', '--only'])?.is_only).toBe(true)
+})
+
+it('returns only without reading a carry record', async () => {
+	const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+	expect(await backlog_drive_cli.run(['--owner', '4242', '--only'])).toBe(0)
+	expect(info).toHaveBeenCalledWith('only')
+	info.mockRestore()
+})
+
+it('reports before ending the carry record', async () => {
+	const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: 'report' })
+	const error = vi.spyOn(console, 'error').mockImplementation(vi.fn())
+
+	await backlog_drive_cli.finish({
+		reason: 'stop',
+		token: 'stop',
+		issue: undefined,
+		is_finish: true,
+	})
+
+	expect(run.mock.calls.map(([argv]) => argv)).toStrictEqual([
+		['run:report'],
+		['run:carry', '--end'],
+	])
+	run.mockRestore()
+	error.mockRestore()
+})
+
+it('keeps the window bound in the resume command', () => {
+	const context = backlog_drive_cli.parse(['--owner', '4242', '--window', '9'])
+	const state = backlog_drive.initial_state([], ACTIVE)
+
+	expect(context && backlog_drive_cli.resume_line(state, context)).toContain('--window 9')
 })

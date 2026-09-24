@@ -641,7 +641,7 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 `--owner <pid> [options]`
 
-Run a backlogrun parent loop without the model: collect finished children, ask backlog:offer, launch lanes, and hand back only a token that needs the parent
+Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete
 
 ---
 

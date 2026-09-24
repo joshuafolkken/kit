@@ -43,6 +43,10 @@ interface OfferRead {
 	verdict: string
 	issues: ReadonlyArray<string>
 	retries: number
+	answer?: string | undefined
+	reason?: string | undefined
+	is_retrospective_done?: boolean
+	is_finish?: boolean | undefined
 }
 
 interface DriveState {
@@ -55,6 +59,8 @@ interface DriveState {
 	retries: number
 	// A `stop` verdict: start nothing more, collect what is in flight, then end.
 	is_stopping: boolean
+	stop_reason?: string | undefined
+	stop_is_finish?: boolean | undefined
 }
 
 interface DriveEnd {
@@ -63,6 +69,8 @@ interface DriveEnd {
 	// The token the parent reads, where one command printed it.
 	token: string | undefined
 	issue: string | undefined
+	detail?: string
+	is_finish?: boolean | undefined
 }
 
 interface DrivePorts {
@@ -81,7 +89,34 @@ type PassResult =
 	{ kind: 'continue'; state: DriveState } | { kind: 'end'; end: DriveEnd; state: DriveState }
 
 function ended(reason: string, state: DriveState, token?: string, issue?: string): PassResult {
-	return { kind: 'end', end: { reason, token, issue }, state }
+	const detail = reason === STOP_VERDICT ? state.stop_reason : undefined
+
+	return {
+		kind: 'end',
+		end: {
+			reason,
+			token,
+			issue,
+			...(detail !== undefined && { detail }),
+			...(reason === STOP_VERDICT && { is_finish: state.stop_is_finish }),
+		},
+		state,
+	}
+}
+
+function is_drain(read: OfferRead, state: DriveState): boolean {
+	return (
+		read.verdict === WATCH_VERDICT && state.in_flight.length === 0 && !read.is_retrospective_done
+	)
+}
+
+function needs_retrospective(read: OfferRead, state: DriveState): boolean {
+	return (
+		read.verdict === STOP_VERDICT &&
+		read.answer === 'exhausted' &&
+		state.in_flight.length === 0 &&
+		!read.is_retrospective_done
+	)
 }
 
 function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveState {
@@ -149,14 +184,21 @@ async function launch_all(
 // parent's. With children still running the watch is only waiting on them.
 function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	if (!KNOWN_VERDICTS.has(read.verdict)) return ended(read.verdict, state, read.verdict)
+	if (needs_retrospective(read, state)) return ended('retrospective', state, 'retrospective')
 
 	if (read.verdict === STOP_VERDICT) {
-		return { kind: 'continue', state: { ...state, is_stopping: true } }
+		return {
+			kind: 'continue',
+			state: {
+				...state,
+				is_stopping: true,
+				stop_reason: read.reason,
+				stop_is_finish: read.is_finish,
+			},
+		}
 	}
 
-	if (read.verdict === WATCH_VERDICT && state.in_flight.length === 0) {
-		return ended(WATCH_VERDICT, state, WATCH_VERDICT)
-	}
+	if (is_drain(read, state)) return ended(WATCH_VERDICT, state, WATCH_VERDICT)
 
 	return { kind: 'continue', state }
 }
@@ -216,6 +258,7 @@ interface LoopConfig {
 
 interface LoopPorts extends DrivePorts {
 	sleep: (milliseconds: number) => Promise<void>
+	finish: (end: DriveEnd) => Promise<void>
 	// Called after every pass, ended ones included, so the caller can keep the resume line current.
 	on_state: (state: DriveState) => void
 }
@@ -267,6 +310,8 @@ async function run_loop(
 		await ports.sleep(config.poll_ms)
 		step = await loop_step(step.run, config, ports)
 	}
+
+	if (step.end.reason === STOP_VERDICT) await ports.finish(step.end)
 
 	return step.end
 }

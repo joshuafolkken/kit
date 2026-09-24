@@ -229,6 +229,14 @@ function idle_decision(input: BudgetInput): BudgetDecision {
 	return { verdict: WATCH_VERDICT, reason: watching_reason(input, left_ms) }
 }
 
+// Whether a `stop` for this input is the run finishing — the idle watch ending on an empty backlog —
+// rather than stopping on something a person must act on: a parked backlog, an unreadable listing, the
+// maximum or the whole-run bound. The two end the carry record differently (`--end` against
+// `--end --stopped`), and `backlog:drive` reads which one from here (joshuafolkken/kit#2508).
+function is_finish(input: BudgetInput): boolean {
+	return stop_reason(input) === undefined && max_decision(input) === undefined
+}
+
 function decide(input: BudgetInput): BudgetDecision {
 	const reason = stop_reason(input)
 
@@ -265,6 +273,7 @@ const backlog_budget = {
 	draining_reason,
 	idle_expired_reason,
 	idle_watch_reason,
+	is_finish,
 	max_reached_reason,
 	run_reason,
 	running_watch_reason,

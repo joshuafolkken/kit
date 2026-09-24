@@ -1289,7 +1289,13 @@ At the drain — a `watch` verdict over an `exhausted` answer with `--running 0`
 
 ### `josh backlog:drive`
 
-The `backlogrun` parent loop (`run:merge`, `backlog:offer`, `lane:launch`) as one wait. stdout: hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `stop`, `window`), then `resume:` flags.
+Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then offer again. It uses the same `backlog:offer`, `lane:launch`, and `run:merge` decisions as the individual commands (joshuafolkken/kit#2499, #2508).
+
+```bash
+pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
+```
+
+An open carry record supplies the start time and merged count. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective, while a completed retrospective lets the idle watch continue. `--only` returns `only` without dispatching backlog work. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
 
 ### `needs-human-review` — the opposite label
 
