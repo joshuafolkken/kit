@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_section } from './document-section'
@@ -22,16 +22,26 @@ import { document_section } from './document-section'
 // batching guard can hand this command out safely (`time-batch-guard.ts` → the write-side fold).
 //
 // **A file is written only when every one of its edits applied.** The edits of one file are applied in
-// order against the running text, so a later edit sees an earlier one's result; if any of them fails to
-// match, that file is left exactly as it was and its failures are named. So a partial plan never leaves
-// a file half-edited.
+// order against the running text; if any of them fails to match, that file is left exactly as it was
+// and its failures are named. So a partial plan never leaves a file half-edited.
+//
+// **Only independent edits are folded (joshuafolkken/kit#2493).** An edit whose original range overlaps
+// an earlier edit's of the same file, or whose match count that earlier edit changed, depends on it — it
+// addresses text that edit rewrote, removed or duplicated — and is refused as `dependent`. Such an edit is
+// issued on its own after the batch, so a fold never hides an ordering the author did not see.
+//
+// **`-` reads the plan from standard input (joshuafolkken/kit#2493)**, so a lane child passes its edits
+// in the one call as a quoted heredoc (`pnpm josh edit:files - <<'EDITS'`) instead of writing a plan file
+// first — the quoted delimiter expands nothing, and the call carries the old/new pairs an `Edit` would.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NONE = 0
 const SINGLE = 1
-const USAGE = 'Usage: josh edit:files <plan-path>'
+const USAGE = 'Usage: josh edit:files <plan-path | ->'
+const STDIN_PATH = '-'
+const STDIN_DESCRIPTOR = 0
 
 // The plan format, chosen for a model to author without escaping code into JSON: a `=====`-fenced path
 // header — the same rule `read:files` prints between files — then a git-conflict-marker pair. Every
@@ -46,11 +56,17 @@ const APPLIED = 'applied'
 const NO_MATCH = 'no match'
 const AMBIGUOUS = 'ambiguous'
 const MISSING = 'missing'
+const DEPENDENT = 'dependent'
 
 interface EditSpec {
 	path: string
 	old: string
 	new: string
+}
+
+interface TextRange {
+	start: number
+	end: number
 }
 
 interface EditResult {
@@ -77,9 +93,20 @@ function match_count(haystack: string, needle: string): number {
 
 // Apply one edit to the running text, or report why it could not. The replacement is passed as a
 // function so a `$` in the new text is written literally rather than read as a `String#replace` token,
-// and the single-match gate above means only the intended occurrence is swapped.
-function apply_one(content: string, spec: EditSpec): { text: string; result: EditResult } {
+// and the single-match gate above means only the intended occurrence is swapped. An edit is `dependent`
+// when an earlier edit of the same file claimed its original range, or changed its match count.
+function apply_one(
+	content: string,
+	spec: EditSpec,
+	original: string,
+	is_claimed: boolean,
+): { text: string; result: EditResult } {
 	const count = match_count(content, spec.old)
+
+	if (is_claimed || count !== match_count(original, spec.old)) {
+		return { text: content, result: { spec, status: DEPENDENT, count } }
+	}
+
 	if (count === NONE) return { text: content, result: { spec, status: NO_MATCH, count } }
 	if (count > SINGLE) return { text: content, result: { spec, status: AMBIGUOUS, count } }
 
@@ -88,16 +115,42 @@ function apply_one(content: string, spec: EditSpec): { text: string; result: Edi
 	return { text, result: { spec, status: APPLIED, count } }
 }
 
-// One file's edits folded against its text in order, each edit seeing the previous one's result.
+// Where the `old` text sits in the original file — an empty range unless it matches exactly once, so a
+// failed edit claims nothing. Two edits whose ranges overlap address the same
+// text, so the later one would land in the earlier one's output even when its match count is unchanged
+// (`foo()` → `try { foo() }`, then `foo()` → `bar()`).
+function original_range(original: string, old: string): TextRange {
+	if (match_count(original, old) !== SINGLE) return { start: -1, end: -1 }
+
+	const start = original.indexOf(old)
+
+	return { start, end: start + old.length }
+}
+
+function overlaps(left: TextRange, right: TextRange): boolean {
+	return left.start < right.end && right.start < left.end
+}
+
+// Record this edit's original range, answering whether an earlier edit had already claimed any of it.
+function claim(claimed: Array<TextRange>, range: TextRange): boolean {
+	const is_claimed = claimed.some((earlier) => overlaps(earlier, range))
+
+	claimed.push(range)
+
+	return is_claimed
+}
+
+// One file's edits folded against its text in order, each edit checked against the original as well.
 function fold_edits(
 	original: string,
 	specs: ReadonlyArray<EditSpec>,
 ): { text: string; results: Array<EditResult> } {
 	const results: Array<EditResult> = []
+	const claimed: Array<TextRange> = []
 	let text = original
 
 	for (const spec of specs) {
-		const step = apply_one(text, spec)
+		const step = apply_one(text, spec, original, claim(claimed, original_range(original, spec.old)))
 
 		text = step.text
 		results.push(step.result)
@@ -141,15 +194,11 @@ function apply_all(root: string, specs: ReadonlyArray<EditSpec>): ReadonlyArray<
 // One line per edit: what happened and to which file, with the match count where it explains the
 // failure. `applied` is the only success; every other status makes the whole call non-zero.
 function describe(result: EditResult): string {
-	if (result.status === APPLIED) return `${APPLIED} ${result.spec.path}`
-
 	if (result.status === AMBIGUOUS) {
 		return `${AMBIGUOUS} (${String(result.count)}) ${result.spec.path}`
 	}
 
-	if (result.status === MISSING) return `${MISSING} ${result.spec.path}`
-
-	return `${NO_MATCH} ${result.spec.path}`
+	return `${result.status} ${result.spec.path}`
 }
 
 function report(results: ReadonlyArray<EditResult>): number {
@@ -159,10 +208,25 @@ function report(results: ReadonlyArray<EditResult>): number {
 	return has_failure ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
+function read_stdin(): string {
+	return readFileSync(STDIN_DESCRIPTOR, 'utf8')
+}
+
+// The plan text: standard input for `-`, otherwise the named file (`undefined` when it cannot be read).
+function read_plan(root: string, plan_path: string, read_input: () => string): string | undefined {
+	if (plan_path === STDIN_PATH) return read_input()
+
+	return document_section.read_optional(path.resolve(root, plan_path))
+}
+
 // Read and validate the plan, or print the reason and answer `undefined`. Kept apart from `run` so the
 // entry stays under the statement limit.
-function load_specs(root: string, plan_path: string): ReadonlyArray<EditSpec> | undefined {
-	const plan = document_section.read_optional(path.resolve(root, plan_path))
+function load_specs(
+	root: string,
+	plan_path: string,
+	read_input: () => string,
+): ReadonlyArray<EditSpec> | undefined {
+	const plan = read_plan(root, plan_path, read_input)
 
 	if (plan === undefined) {
 		console.error(`Cannot read ${plan_path}`)
@@ -181,7 +245,11 @@ function load_specs(root: string, plan_path: string): ReadonlyArray<EditSpec> | 
 	return specs
 }
 
-function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number {
+function run(
+	argv: ReadonlyArray<string>,
+	root: string = process.cwd(),
+	read_input: () => string = read_stdin,
+): number {
 	const [plan_path] = argv
 
 	if (plan_path === undefined) {
@@ -190,7 +258,7 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 		return FAILURE_EXIT_CODE
 	}
 
-	const specs = load_specs(root, plan_path)
+	const specs = load_specs(root, plan_path, read_input)
 	if (specs === undefined) return FAILURE_EXIT_CODE
 
 	return report(apply_all(root, specs))

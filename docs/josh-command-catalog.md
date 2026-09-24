@@ -769,7 +769,7 @@ Claude Code hook: refuse a second whole-file read of a path whose content has no
 
 > **Audience:** automation · **Side effects:** none
 
-`<plan-path>`
+`<plan-path | ->`
 
 Apply several content-addressed edits from a plan in one call
 

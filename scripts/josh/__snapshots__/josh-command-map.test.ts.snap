@@ -337,7 +337,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "edit:files": [
-      "<plan-path>",
+      "<plan-path | ->",
       "automation",
       [
         "none",
