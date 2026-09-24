@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { document_byte_budget } from './document-byte-budget'
 import { entry_read_budget } from './entry-read-budget'
@@ -12,6 +15,22 @@ const ROOT = process.cwd()
 function sorted(values: ReadonlyArray<string>): Array<string> {
 	return [...values].toSorted((left, right) => left.localeCompare(right))
 }
+
+describe('consumer resident document', () => {
+	it.each(ENTRY_READ_BUDGET)(
+		'$entry measures kit rules even when a consumer adds resident rules',
+		({ entry }) => {
+			const consumer = mkdtempSync(path.join(os.tmpdir(), 'kit-entry-budget-'))
+
+			try {
+				writeFileSync(path.join(consumer, 'CLAUDE.md'), 'consumer rules'.repeat(10_000))
+				expect(entry_total_bytes(consumer, entry)).toBe(entry_total_bytes(ROOT, entry))
+			} finally {
+				rmSync(consumer, { recursive: true, force: true })
+			}
+		},
+	)
+})
 
 describe('entry-read byte budget — the primary ceiling on what an entry reads', () => {
 	it.each(ENTRY_READ_BUDGET)('$entry stays within its block ceiling', ({ entry, bytes }) => {

@@ -22,6 +22,7 @@
 
 import { statSync } from 'node:fs'
 import path from 'node:path'
+import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { backlogrun_parent_read_set } from './backlogrun-parent-read-set'
 import { document_byte_budget } from './document-byte-budget'
 import { document_reachability } from './document-reachability'
@@ -101,9 +102,9 @@ function total_read_bytes(cost: ReadSetCost): number {
 	return entry_read_set.total([cost.scoped, ...cost.point_of_use.map((one) => one.cost)]).bytes
 }
 
-function resident_base_bytes(root: string): number {
+function resident_base_bytes(): number {
 	return document_reachability.RESIDENT_BASE.reduce(
-		(sum, one) => sum + byte_size(root, one),
+		(sum, one) => sum + byte_size(PACKAGE_DIR, one),
 		NOTHING,
 	)
 }
@@ -111,7 +112,7 @@ function resident_base_bytes(root: string): number {
 // The bytes an entry's mandated read comes to right now — what the recorded ceiling is compared
 // against.
 function entry_total_bytes(root: string, entry: string): number {
-	return total_read_bytes(entry_cost(root, entry)) + resident_base_bytes(root)
+	return total_read_bytes(entry_cost(root, entry)) + resident_base_bytes()
 }
 
 function recorded_bytes_for(entry: string): number | undefined {
