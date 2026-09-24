@@ -298,3 +298,7 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | low | scripts/run/run-cut.ts:236 | 2026-09-24 | #2517
 - rf:project-conventions | low | scripts/run/run-cut.ts:243 | 2026-09-24 | #2517
 - rf:bug-risks | medium | scripts/git/stash-orphans.ts | 2026-09-24 | #2505
+- rf:bug-risks | medium | scripts/agent/codex-agent-argv.ts:45 | 2026-09-24 | #2528
+- rf:security | medium | scripts/agent/agent-launch-environment.ts:27 | 2026-09-24 | #2528
+- rf:tests | medium | scripts/run/run-merge-steps.test.ts:233 | 2026-09-24 | #2528
+- rf:bug-risks | medium | scripts/run/run-merge-steps.ts:115 | 2026-09-24 | #2528
