@@ -259,7 +259,10 @@ from the existing offer command. The supervisor writes no `auto-ok` label. A jud
 the original invocation plus the driver's reason and resume state.
 For a named epic, the driver hands off `epic #N` with the original invocation. The judgment session
 follows the named epic procedure and dispatches its children; the epic root is never launched as a
-standalone `fullrun` child. The named prefix also consults the carried maximum and whole-run bound
+standalone `fullrun` child. Once every child has merged or parked, record the root with
+`pnpm josh run:carry --done <E> --owner "$PPID"` before continuing the invocation. This removes it
+from the carry record's remaining named list, so the next driver pass can advance. The named prefix
+also consults the carried maximum and whole-run bound
 before each launch, and a failed named issue skips the remaining named prefix.
 
 **A failure is visible rather than silent.** A judgment wake that never claims the carry record is retried, and

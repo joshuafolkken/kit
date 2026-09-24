@@ -27,7 +27,7 @@ function is_final_stop(verdict: string | undefined, read: CarryRead): boolean {
 function handoff_material(verdict: string, resume: string, details: string): string {
 	const context = details === '' ? '' : `\nDetails: ${details}`
 	const epic = verdict.startsWith('epic #')
-		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child.'
+		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> --owner "$PPID" before continuing to the next named item.'
 		: ''
 
 	return `Driver result: ${verdict}\n${resume}${context}${epic}`

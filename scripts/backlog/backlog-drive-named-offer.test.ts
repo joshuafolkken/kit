@@ -35,3 +35,17 @@ test('hands a named epic to the judgment session instead of launching the root',
 	expect(offer?.verdict).toBe('epic #1')
 	read.mockRestore()
 })
+
+test('offers the next named issue after the epic root is recorded done', async () => {
+	const state = backlog_drive.initial_state([], ACTIVE)
+	const read = vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: [], is_human_review: false },
+	})
+	const carry = { ...CARRY, done: [1] }
+	const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+	const offer = await backlog_drive_named_offer.read(carry, state, context)
+
+	expect(offer).toMatchObject({ verdict: 'run', issues: ['2'] })
+	read.mockRestore()
+})

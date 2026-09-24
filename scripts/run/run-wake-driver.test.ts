@@ -66,6 +66,14 @@ test('refuses an incomplete driver result without waking an agent', () => {
 	expect(run_wake_driver.driver_result('', { kind: 'none' })).toMatchObject({ kind: 'failed' })
 })
 
+test('tells an epic judgment session how to advance the named carry', () => {
+	const result = run_wake_driver.driver_result('epic #1\nresume: --owner 1', { kind: 'none' })
+
+	expect(result).toMatchObject({ kind: 'judgment' })
+	if (result.kind !== 'judgment') return
+	expect(result.material).toContain('run:carry --done <epic-number> --owner "$PPID"')
+})
+
 test('does not take a live owner over on supervisor restart', async () => {
 	run_carry.end_carry(scratch.target)
 	run_carry.begin_carry(scratch.target, INVOCATION, run_carry.owner_of(process.pid))
