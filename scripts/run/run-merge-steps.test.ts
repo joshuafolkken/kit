@@ -185,6 +185,15 @@ function did_close(spies: LaneCloseSpies): boolean {
 	return spies.josh_run.mock.calls.some(([args]) => args[0] === LANE_CLOSE_COMMAND)
 }
 
+function stub_active_carry(): MockInstance<typeof run_carry.apply_change> {
+	const active = { ...HANDED_OFF_CARRY, is_handed_off: false as const }
+
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
+	vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: active })
+
+	return vi.spyOn(run_carry, 'apply_change').mockReturnValue(active)
+}
+
 describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	const MESSAGE = LANE_CLOSE_MESSAGE
 	let spies: LaneCloseSpies
@@ -240,12 +249,19 @@ describe('run_merge_steps.do_merged — primary checkout sync', () => {
 
 	it('leaves the lane open when primary checkout sync fails', async () => {
 		const spies = stub_lane_close()
+		const apply = stub_active_carry()
 
 		spies.josh_run.mockResolvedValueOnce({ code: 1, out: 'pull failed' })
 		await expect(run_merge_steps.do_merged(CONTEXT)).rejects.toThrow(
 			'main:sync failed: pull failed',
 		)
+		expect(apply).not.toHaveBeenCalled()
 		expect(did_close(spies)).toBe(false)
+
+		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+		await run_merge_steps.do_merged(CONTEXT)
+		expect(apply).toHaveBeenCalledTimes(1)
+		expect(did_close(spies)).toBe(true)
 	})
 })
 

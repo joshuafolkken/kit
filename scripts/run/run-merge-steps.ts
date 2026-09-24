@@ -169,11 +169,15 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 // fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child
 // (joshuafolkken/kit#2114). Returns `undefined` on success.
 async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
+	const refused = await refused_carry(ctx)
+
+	if (refused !== undefined) return refused
+
+	await sync_main()
 	const result = await apply_carry(ctx, run_merge.change_of('merged'))
 
 	if (result.kind === 'refused') return result.carry
 
-	await sync_main()
 	if (await preserve_uncommitted(ctx.child)) await close_lane(ctx.child)
 	await post_counters(ctx, result.kind === 'applied' ? result.carry : undefined)
 
