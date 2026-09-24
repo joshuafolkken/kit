@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const review_mock = vi.hoisted(() => vi.fn())
+const round_two_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 // A fresh ship: nothing recorded and nothing committed, pushed or merged. The resume paths are pinned in
@@ -17,7 +18,9 @@ vi.mock('./run-ship-probe', () => ({
 	},
 }))
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
-vi.mock('./run-ship-review-steps', () => ({ run_ship_review_steps: { review_stage: review_mock } }))
+vi.mock('./run-ship-review-steps', () => ({
+	run_ship_review_steps: { review_stage: review_mock, round_two_stage: round_two_mock },
+}))
 // Outside a lane, so a gate run inside a lane child never hands these ships to a real supervisor.
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
@@ -51,6 +54,7 @@ beforeEach(() => {
 	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '')
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	review_mock.mockReset().mockResolvedValue({ code: OK, out: 'review clean' })
+	round_two_mock.mockReset().mockResolvedValue({ code: OK, out: 'round 2 not due' })
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -182,5 +186,49 @@ describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/k
 		await run_ship_cli.run([TITLE])
 
 		expect(review_mock).not.toHaveBeenCalled()
+		expect(round_two_mock).not.toHaveBeenCalled()
+	})
+})
+
+// Every stage the ship runs, in the order it ran them — the two review stages and each josh command.
+function order(): ReadonlyArray<string> {
+	const events: Array<string> = []
+
+	review_mock.mockImplementation(async () => {
+		events.push('review')
+
+		return { code: OK, out: 'review fixes applied in place' }
+	})
+	round_two_mock.mockImplementation(async () => {
+		events.push('round-2')
+
+		return { code: OK, out: 'round 2 clean' }
+	})
+	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+		events.push(argv[0] ?? '')
+
+		return { code: OK, out: '' }
+	})
+
+	return events
+}
+
+// joshuafolkken/kit#2489: round 1 fixed its local Mediums in place, so the supervisor carries the ship
+// through the gate, the commit, a round-2 pass and the followup without handing it back.
+describe('run_ship_cli.run — --review carries round 2 between the commit and the followup', () => {
+	it('runs review → gate → commit → round 2 → followup → report without stopping', async () => {
+		const events = order()
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
+		expect(events).toStrictEqual(['review', 'gate', 'git', 'round-2', 'followup', 'run:tail'])
+		expect(round_two_mock).toHaveBeenCalledWith(NUMBER)
+	})
+
+	it('stops at a blocking round 2, never reaching the followup', async () => {
+		round_two_mock.mockResolvedValue({ code: FAILED, out: 'round 2 is final' })
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(FAILED)
+		expect(argv_calls()).toStrictEqual([GATE, COMMIT])
+		expect(info_lines[0]).toContain('stopped at: === round-2 review ===')
 	})
 })

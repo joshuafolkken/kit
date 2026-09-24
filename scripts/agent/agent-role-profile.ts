@@ -14,7 +14,7 @@ const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
 // resumes across — `run-cut.ts` imports these names for its own cut record, so the phase a run passes
 // and the phase this table is keyed on cannot drift. A phase-less call resolves the role default, which
 // is what keeps every existing caller unchanged.
-const PHASE_SCHEMA = z.enum(['setup', 'implementation', 'pre-gate'])
+const PHASE_SCHEMA = z.enum(['implementation', 'pre-gate'])
 const PROFILE_SCHEMA = z.object({
 	provider: PROVIDER_SCHEMA.default('anthropic'),
 	role: ROLE_SCHEMA,
@@ -36,7 +36,6 @@ type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider }
 const SCHEDULER: AgentRole = 'scheduler'
 const WORKER: AgentRole = 'worker'
 const REVIEWER: AgentRole = 'reviewer'
-const SETUP_PHASE: AgentPhase = 'setup'
 const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
 const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
 const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
@@ -307,7 +306,6 @@ const agent_role_profile = {
 	PROFILE_SCHEMA,
 	REVIEWER,
 	SCHEDULER,
-	SETUP_PHASE,
 	WORKER,
 	describe,
 	handoff_environment,

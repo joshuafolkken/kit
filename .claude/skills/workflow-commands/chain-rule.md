@@ -7,8 +7,8 @@ Review results and successful pushes are never turn boundaries.
 
 0. **A lane child** (#2428): `pnpm josh main:merge`, the scoped pair, `pnpm josh ship --detach --review
    "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. A stop relaunches a child
-   whose `run:step` names `ship --log <N>`: fix, re-detach (`--review` only if review never passed;
-   High/Medium → round 2). `failed` → step 1.
+   whose `run:step` names `ship --log <N>`: fix, re-detach (`--review` only if no round is recorded,
+   else step 4). `failed` → step 1.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
    the gate** — the pre-gate cut (a no-op outside a lane, joshuafolkken/kit#2177). Then run the final scoped lint/test pair and `pnpm josh run:review`: it starts
    `pnpm josh gate` in the background and prints the `/code-review` brief in one call, so the two overlap
@@ -36,8 +36,8 @@ Review results and successful pushes are never turn boundaries.
    (`pnpm josh review:record --check --issue <N>`, joshuafolkken/kit#2343).
 5. **The clean path ships in one call** — with no second round due, background
    `pnpm josh ship "<title> #<N>" --body-file <evidence.md>`: gate → `git -y` → foreground `followup` → `run:tail`, stopping at the
-   first failure (joshuafolkken/kit#2398). `--review` = round 1. **A due second round does not fit `ship`**: the PR opens
-   between the rounds — background `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then
+   first failure (joshuafolkken/kit#2398). `--review` runs both rounds (#2489). **Else a due round 2
+   does not fit `ship`**: the PR opens between the rounds — background `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then
    `pnpm josh followup`.
 
 A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and

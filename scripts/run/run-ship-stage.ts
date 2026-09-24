@@ -20,6 +20,7 @@ const STAGE = {
 	REVIEW: 'review',
 	GATE: 'gate',
 	COMMIT: 'commit',
+	ROUND_TWO: 'round-2',
 	FOLLOWUP: 'followup',
 	REPORT: 'report',
 } as const
@@ -95,6 +96,10 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	[STAGE.REVIEW]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
+	// The round-2 pass (joshuafolkken/kit#2489) reads the pushed fix delta, so its record is honored only
+	// while that push still stands — new work pushed on top reruns it.
+	[STAGE.ROUND_TWO]: (done, state) =>
+		state.is_merged || (done.has(STAGE.ROUND_TWO) && is_shipped(state)),
 	// A recorded followup still needs the shipped state: a record left by a merged ship whose report
 	// failed must not pass over the followup of new, not-yet-pushed work on the same issue.
 	[STAGE.FOLLOWUP]: (done, state) =>

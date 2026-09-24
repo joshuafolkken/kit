@@ -352,12 +352,13 @@ describe('the synchronous read the pre-gate guard makes', () => {
 })
 
 describe('the resume grouping — which phase resumes into implementation', () => {
-	// The setup and implementation cuts both resume into more implementation; only the pre-gate cut
-	// resumes into the gate. The grouping is named once so `run-cut-cli.ts` cannot disagree with it.
-	it('groups setup and implementation together, apart from the pre-gate cut', () => {
-		expect(run_cut.resumes_into_implementation(run_cut.SETUP_PHASE)).toBe(true)
+	// The implementation cut resumes into more implementation; the pre-gate cut resumes into the gate.
+	// The grouping is named once so `run-cut-cli.ts` cannot disagree with it. The retired setup phase
+	// (joshuafolkken/kit#2489) no longer resumes into implementation.
+	it('resumes implementation alone into implementation', () => {
 		expect(run_cut.resumes_into_implementation(run_cut.IMPLEMENTATION_PHASE)).toBe(true)
 		expect(run_cut.resumes_into_implementation(run_cut.PRE_GATE_PHASE)).toBe(false)
+		expect(run_cut.resumes_into_implementation('setup')).toBe(false)
 	})
 })
 
@@ -365,14 +366,17 @@ describe('the hand-off record stays within its byte bound', () => {
 	// Every field is a short scalar, so a well-formed record is far under the cap — the mechanical check
 	// exists so a field that ever grew unbounded is refused at the write rather than silently carried.
 	it('accepts a well-formed record', () => {
-		const spec = { issue: ISSUE, branch: BRANCH, phase: run_cut.SETUP_PHASE }
+		const spec = { issue: ISSUE, branch: BRANCH, phase: run_cut.IMPLEMENTATION_PHASE }
 
 		expect(run_cut.within_handoff_bound(run_cut.fresh_cut(spec, START))).toBe(true)
 	})
 
 	it('rejects a record whose field grew past the bound', () => {
 		const bloated = {
-			...run_cut.fresh_cut({ issue: ISSUE, branch: BRANCH, phase: run_cut.SETUP_PHASE }, START),
+			...run_cut.fresh_cut(
+				{ issue: ISSUE, branch: BRANCH, phase: run_cut.IMPLEMENTATION_PHASE },
+				START,
+			),
 			branch: 'x'.repeat(run_cut.MAX_HANDOFF_BYTES + 1),
 		}
 
@@ -387,7 +391,7 @@ describe('the hand-off record stays within its byte bound', () => {
 			{
 				issue: ISSUE,
 				branch: 'y'.repeat(run_cut.MAX_HANDOFF_BYTES + 1),
-				phase: run_cut.SETUP_PHASE,
+				phase: run_cut.IMPLEMENTATION_PHASE,
 			},
 			START,
 		)

@@ -100,7 +100,7 @@ type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
 const EVENT_KINDS: ReadonlyArray<string> = Object.values(EVENT_KIND)
 
 // The kinds that trace progress inside a step rather than mark where the run is. Every last-event reader
-// — `run:step`'s position, the setup-cut hook, `emit_once`'s dedup — asks "where is the run", and a
+// — `run:step`'s position, `emit_once`'s dedup — asks "where is the run", and a
 // ship's four stage lines after its `merge` would otherwise read as an unknown position.
 const TRACE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE, EVENT_KIND.HEARTBEAT])
 

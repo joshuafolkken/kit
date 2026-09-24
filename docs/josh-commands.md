@@ -1544,7 +1544,7 @@ pnpm josh run:cut --resume 1839                 # a fresh process's entry check
 pnpm josh run:cut --end                         # clear the record
 ```
 
-A cut that resumes back into implementation (`--impl` / `--setup`) carries a **handoff** — the run's
+A cut that resumes back into implementation (`--impl`) carries a **handoff** — the run's
 instruction verbatim and a curated list of what is done, what remains, and what was deliberately left
 alone (joshuafolkken/kit#2354). It is passed by path with `--handoff <path>`, never inlined, so a
 backtick or `$` in the instruction is not executed. The record stays small (bounded, a few short
@@ -1552,9 +1552,9 @@ lines); the resume prints the handoff to stderr so the fresh process continues o
 rather than the working tree alone, and a resume that finds no instruction is refused `incomplete`
 rather than continuing blind.
 
-The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while a `--setup` / `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
+The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while an `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
 
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or a `--setup` / `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
+**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or an `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). The setup-phase `--setup` cut (joshuafolkken/kit#2346) is retired (joshuafolkken/kit#2489): a lane child's context is bounded by the threshold-gated implementation cut alone, and `--setup` is a usage error. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
 
 ### `josh run:liveness`
 
@@ -1738,7 +1738,7 @@ A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored onl
 state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged
 as a `ship-stage` trace event.
 
-`--review` (#2427) runs review round 1 beside the gate; High/Medium or a refusal stops it.
+`--review` (#2427) runs review round 1 beside the gate. The round-1 reviewer fixes a small, local Medium in place and marks it `fixed ` in its findings (#2489); a High, an unfixed Medium or a refusal stops the ship. After the commit a `round-2` stage asks `review:round2 --round-1-closed` and, on `required`, runs the scoped pair, `review:brief --round 2`, a fresh read-only reviewer session over the fix delta, `review:attest --check` and `review:record` — anything but a clean or Low-only round 2 stops before `followup`.
 
 `--detach` (#2428; implied in a lane child, #2457): a supervisor; a stop emits `ship-stop` (`--log <N>`).
 

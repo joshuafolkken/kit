@@ -133,7 +133,7 @@ async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
 	return await josh_command.josh_run(argv, should_forward_stderr)
 }
 
-const STEPS: ReadonlyArray<Step> = [
+const COMMIT_STEPS: ReadonlyArray<Step> = [
 	{ stage: STAGE.GATE, header: run_ship.GATE_HEADER, run: async () => await josh(['gate']) },
 	{
 		stage: STAGE.COMMIT,
@@ -141,6 +141,9 @@ const STEPS: ReadonlyArray<Step> = [
 		run: async (args, state) =>
 			await josh(['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]),
 	},
+]
+
+const MERGE_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.FOLLOWUP,
 		header: run_ship.FOLLOWUP_HEADER,
@@ -154,15 +157,24 @@ const STEPS: ReadonlyArray<Step> = [
 ]
 
 // `--review` (joshuafolkken/kit#2427) puts the supervised round-1 review in front of the gate: it
-// launches the gate itself, so the gate stage that follows reuses that tree's green record.
+// launches the gate itself, so the gate stage that follows reuses that tree's green record. It also
+// puts the round-2 pass between the commit and the followup (joshuafolkken/kit#2489), so the PR opens
+// between the rounds and round 2 runs beside CI — a no-op when round 1 left no fix delta.
 const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,
 	run: async (args) => await run_ship_review_steps.review_stage(args.number),
 }
+const ROUND_TWO_STEP: Step = {
+	stage: STAGE.ROUND_TWO,
+	header: run_ship.ROUND_TWO_HEADER,
+	run: async (args) => await run_ship_review_steps.round_two_stage(args.number),
+}
 
 function steps(args: ShipArguments): ReadonlyArray<Step> {
-	return args.is_review ? [REVIEW_STEP, ...STEPS] : STEPS
+	if (!args.is_review) return [...COMMIT_STEPS, ...MERGE_STEPS]
+
+	return [REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
 }
 
 function issue_number(title: string): string | undefined {

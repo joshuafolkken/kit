@@ -30,7 +30,13 @@ const JOIN = 'run:review --join'
 const ATTEST = 'review:attest --check'
 const RECORD = `review:record --issue ${ISSUE}`
 const HIGH = 'bug-risks:high:a.ts:4'
+const MEDIUM = 'bug-risks:medium:a.ts:7'
+const MEDIUM_UNFIXED = 'tests:medium:b.ts'
 const LOW = 'tests:low:a.ts'
+const DECIDE = 'review:round2 --round-1-closed'
+const LINT = 'lint:related'
+const TEST = 'test:related'
+const BRIEF_TWO = 'review:brief --round 2'
 const COMPLETED = { kind: 'completed', pid: 1 } as const
 const SPAWN_NOTE = 'spawn failed'
 const PROFILE_NOTE = 'bad model'
@@ -144,5 +150,99 @@ describe('run_ship_review_steps.review_stage — a reviewer error stops it', () 
 
 		expect(await stage_out()).toContain(PROFILE_NOTE)
 		expect(launch_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2489: a round-1 reviewer that fixed its local Mediums hands the ship on rather
+// than back — the join drains a gate that read the pre-fix tree, and the round is recorded as passing.
+describe('run_ship_review_steps.review_stage — findings fixed in place', () => {
+	const FIXED_MEDIUM = `fixed ${MEDIUM}`
+
+	it('records a fixed Medium and ships on, draining a join the fixes turned red', async () => {
+		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
+		answer_with(JOIN)
+
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM}`])
+	})
+
+	it('still stops at a red join when nothing was fixed', async () => {
+		stamps.read_stamp_text.mockReturnValue(LOW)
+		answer_with(JOIN)
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(commands().at(-1)).toBe(JOIN)
+	})
+
+	it('stops on a Medium left unfixed, after recording it', async () => {
+		stamps.read_stamp_text.mockReturnValue(`${FIXED_MEDIUM}\n${MEDIUM_UNFIXED}`)
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(commands()).toContain(`${RECORD} ${MEDIUM} ${MEDIUM_UNFIXED}`)
+	})
+})
+
+// What each command prints in a round-2 stage: the decision, the brief, and nothing for the rest.
+function round_two_output(command: string, decision: string): string {
+	if (command === DECIDE) return `${decision}\n`
+
+	return command === BRIEF_TWO ? BRIEF : ''
+}
+
+function answer_round_two(decision: string, failing?: string): void {
+	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+		const command = argv.join(' ')
+
+		return { code: command === failing ? FAILED : OK, out: round_two_output(command, decision) }
+	})
+}
+
+async function round_two_code(): Promise<number> {
+	const result = await run_ship_review_steps.round_two_stage(ISSUE)
+
+	return result.code
+}
+
+describe('run_ship_review_steps.round_two_stage — due or not', () => {
+	it('skips when round 1 left no fix delta, launching no reviewer', async () => {
+		answer_round_two('skip')
+
+		expect(await round_two_code()).toBe(OK)
+		expect(commands()).toStrictEqual([DECIDE])
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it('stops at a red scoped check without launching a reviewer', async () => {
+		answer_round_two('required', TEST)
+
+		expect(await round_two_code()).toBe(FAILED)
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_review_steps.round_two_stage — the verification pass after the commit', () => {
+	it('runs the scoped pair, the round-2 brief, a fresh reviewer, attest and record', async () => {
+		answer_round_two('required')
+
+		expect(await round_two_code()).toBe(OK)
+		expect(commands()).toStrictEqual([DECIDE, LINT, TEST, BRIEF_TWO, ATTEST, RECORD])
+		expect(launch_mock).toHaveBeenCalledOnce()
+		expect(stamps.write_text_stamp).toHaveBeenCalledWith(expect.any(String), BRIEF)
+		expect(resolve_in_mock.mock.calls[0]?.[0]).toContain('round-2 verification pass')
+	})
+
+	it.each([
+		[MEDIUM, MEDIUM],
+		[`fixed ${MEDIUM}`, MEDIUM],
+		[HIGH, HIGH],
+	])('stops before the followup on a round-2 %s, after recording it', async (finding, recorded) => {
+		answer_round_two('required')
+		stamps.read_stamp_text.mockReturnValue(finding)
+
+		const result = await run_ship_review_steps.round_two_stage(ISSUE)
+
+		expect(result.code).toBe(FAILED)
+		expect(result.out).toContain('round 2 is final')
+		expect(commands().at(-1)).toBe(`${RECORD} ${recorded}`)
 	})
 })

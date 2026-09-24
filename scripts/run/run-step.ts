@@ -221,31 +221,12 @@ function is_pre_implementation(last_event: string | undefined): boolean {
 	return last_event === undefined || last_event === run_event_stream.EVENT_KIND.PLAN
 }
 
-// **The setup→implementation boundary, decided here in the run driver rather than in prose**
-// (joshuafolkken/kit#2346). A dispatched lane child that has posted its plan has finished setup — it
-// has read the skill, the manual documents and the issue, ~130,000 tokens that every later request
-// would otherwise re-read — so its next step is to cut before implementing rather than to implement in
-// the same session. The position is exactly the `plan` event: an empty stream is a run still in setup,
-// and a `cut` event already past it. The verdict must be `implement`, so a `needs-human-review`,
-// `update-deps` or closed position — which change where the run goes, not where it cuts — is untouched.
-function is_setup_cut_position(input: StepInput, token: PreVerdict): boolean {
-	return (
-		input.last_event === run_event_stream.EVENT_KIND.PLAN &&
-		input.is_lane_child &&
-		token === IMPLEMENT
-	)
-}
-
+// **No cut at the setup→implementation boundary** (joshuafolkken/kit#2489). A lane child's context is
+// bounded by the threshold-gated implementation cut alone (`implementation-cut.ts`): the first edit is
+// the moment both would have looked at, and below the threshold a cut there is one that does not pay
+// for itself (`context-cut-payback.ts`), so a planned lane child implements in the same session.
 function pre_implementation_action(input: StepInput): StepAction {
-	const token = pre_verdict(input)
-
-	if (is_setup_cut_position(input, token)) {
-		// The resume refuses a setup cut with no instruction, so the command names the handoff file the
-		// setup-cut guard tells the child to write (joshuafolkken/kit#2484).
-		return command(`pnpm josh run:cut ${input.issue_number} --setup --handoff <path>`)
-	}
-
-	return verdict(token)
+	return verdict(pre_verdict(input))
 }
 
 // A closed issue ends the run, but a tree still holding uncommitted work is surfaced rather than

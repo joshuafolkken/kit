@@ -180,8 +180,8 @@ const PRE_GATE_CUT_REASON =
 // denominator is only the runs that reached the boundary: a run that issues the cut's entry check and,
 // somewhere in the same run, claimed the working-tree hold — the near half of the boundary a fresh
 // process never makes. Read only by the offline measurement, never the live delivery path. Moved here
-// from `delivered-rules.ts` so the pre-gate row lives with its rule, as `implementation-cut.ts`'s and
-// `setup-cut.ts`'s do (joshuafolkken/kit#2346).
+// from `delivered-rules.ts` so the pre-gate row lives with its rule, as `implementation-cut.ts`'s does
+// (joshuafolkken/kit#2346).
 function reaches_the_pre_gate_boundary(
 	call: GuardedCall,
 	_turn: ReadonlyArray<GuardedCall>,

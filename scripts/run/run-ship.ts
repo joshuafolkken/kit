@@ -12,6 +12,7 @@
 const REVIEW_HEADER = '=== review ==='
 const GATE_HEADER = '=== gate ==='
 const COMMIT_HEADER = '=== commit/push/PR ==='
+const ROUND_TWO_HEADER = '=== round-2 review ==='
 const FOLLOWUP_HEADER = '=== followup ==='
 const REPORT_HEADER = '=== report ==='
 const SECTION_SEPARATOR = '\n\n'
@@ -64,6 +65,7 @@ const run_ship = {
 	GATE_HEADER,
 	REPORT_HEADER,
 	REVIEW_HEADER,
+	ROUND_TWO_HEADER,
 	SKIPPED_BODY,
 	STOPPED_PREFIX,
 	SUCCESS_EXIT_CODE,
