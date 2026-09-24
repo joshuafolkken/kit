@@ -164,6 +164,17 @@ describe('edit_files_cli.run keeps a plain miss apart from a dependent edit', ()
 		expect(run(directory)).toBe(1)
 		expect(info).toHaveBeenCalledWith(NO_MATCH_REPORT)
 	})
+
+	it('lets an ambiguous edit claim no range for a later edit', () => {
+		const directory = root()
+
+		write(directory, 'a.ts', 'x = 1; x = 2\n')
+		plan(directory, block('a.ts', 'x', 'y'), block('a.ts', 'x = 1', 'z'))
+		const info = mute('info')
+
+		expect(run(directory)).toBe(1)
+		expect(info).toHaveBeenCalledWith('applied a.ts')
+	})
 })
 
 describe('edit_files_cli.run reads the plan from standard input', () => {

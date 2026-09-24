@@ -115,12 +115,14 @@ function apply_one(
 	return { text, result: { spec, status: APPLIED, count } }
 }
 
-// Where the `old` text first sits in the original file. Two edits whose ranges overlap address the same
+// Where the `old` text sits in the original file — an empty range unless it matches exactly once, so a
+// failed edit claims nothing. Two edits whose ranges overlap address the same
 // text, so the later one would land in the earlier one's output even when its match count is unchanged
 // (`foo()` → `try { foo() }`, then `foo()` → `bar()`).
 function original_range(original: string, old: string): TextRange {
+	if (match_count(original, old) !== SINGLE) return { start: -1, end: -1 }
+
 	const start = original.indexOf(old)
-	if (start === -1) return { start, end: start }
 
 	return { start, end: start + old.length }
 }
