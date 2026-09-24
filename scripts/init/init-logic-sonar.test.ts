@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
@@ -6,6 +7,7 @@ const REPO_NAME = 'joshuafolkken/myapp'
 const PROJECT_KEY = 'joshuafolkken_myapp'
 const ORGANIZATION = 'joshuafolkken'
 const SONAR_EXCLUSIONS_LINE = 'sonar.exclusions=.claude/**'
+const EXISTING = 'sonar.projectKey=org_repo\nsonar.organization=org\n'
 
 describe('apply_sonar_template', () => {
 	it('replaces PROJECT_KEY placeholder with given project key', () => {
@@ -58,7 +60,6 @@ describe('get_sonar_template_destination', () => {
 })
 
 describe('merge_sonar_properties', () => {
-	const EXISTING = 'sonar.projectKey=org_repo\nsonar.organization=org\n'
 	const TEMPLATE_CONTENT =
 		'sonar.projectKey=org_repo\nsonar.organization=org\nsonar.exclusions=.claude/**\n'
 
@@ -92,5 +93,78 @@ describe('merge_sonar_properties', () => {
 
 		expect(result).toContain('sonar.newKey=val')
 		expect(result).not.toContain('# a comment\n# a comment')
+	})
+})
+
+describe('merge_sonar_properties multicriteria exclusions', () => {
+	it('activates new template exclusions while preserving custom IDs and values', () => {
+		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5,custom\nsonar.issue.ignore.multicriteria.e1.ruleKey=custom:rule\nsonar.issue.ignore.multicriteria.e1.resourceKey=custom/**\n`
+		const template = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5,e6,e7,e8\nsonar.issue.ignore.multicriteria.e1.ruleKey=template:rule\nsonar.issue.ignore.multicriteria.e1.resourceKey=scripts/**\nsonar.issue.ignore.multicriteria.e6.ruleKey=typescript:S8707\nsonar.issue.ignore.multicriteria.e7.ruleKey=javascript:S8707\nsonar.issue.ignore.multicriteria.e8.ruleKey=jssecurity:S8707\n`
+		const result = init_logic.merge_sonar_properties(existing, template)
+
+		expect(result).toContain('sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5,custom,e9,e6,e7,e8\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e1.ruleKey=custom:rule\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e9.ruleKey=template:rule\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e9.resourceKey=scripts/**\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e6.ruleKey=typescript:S8707\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e7.ruleKey=javascript:S8707\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e8.ruleKey=jssecurity:S8707\n')
+	})
+
+	it('keeps exclusion IDs unique and stable across repeated syncs', () => {
+		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e2\n`
+		const template = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e2,e3\nsonar.issue.ignore.multicriteria.e3.ruleKey=rule\n`
+		const merged = init_logic.merge_sonar_properties(existing, template)
+
+		expect(merged).toContain('sonar.issue.ignore.multicriteria=e1,e2,e3\n')
+		expect(init_logic.merge_sonar_properties(merged, template)).toBe(merged)
+	})
+
+	it('uses the template exclusion list when the existing list is empty', () => {
+		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=\n`
+		const template = `${EXISTING}sonar.issue.ignore.multicriteria=e1\n`
+
+		expect(init_logic.merge_sonar_properties(existing, template)).toContain(
+			'sonar.issue.ignore.multicriteria=e1\n',
+		)
+	})
+})
+
+describe('merge_sonar_properties multicriteria edge cases', () => {
+	it('activates new IDs when the existing list contains duplicates', () => {
+		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e1\n`
+		const template = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e2\nsonar.issue.ignore.multicriteria.e2.ruleKey=rule\n`
+
+		expect(init_logic.merge_sonar_properties(existing, template)).toContain(
+			'sonar.issue.ignore.multicriteria=e1,e2\n',
+		)
+	})
+
+	it('allocates a new ID when a template criterion conflicts with a custom criterion', () => {
+		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=e5\nsonar.issue.ignore.multicriteria.e5.ruleKey=custom:rule\nsonar.issue.ignore.multicriteria.e5.resourceKey=custom/**\n`
+		const template = `${EXISTING}sonar.issue.ignore.multicriteria=e5,e6\nsonar.issue.ignore.multicriteria.e5.ruleKey=template:rule\nsonar.issue.ignore.multicriteria.e5.resourceKey=scripts/**\nsonar.issue.ignore.multicriteria.e6.ruleKey=other:rule\nsonar.issue.ignore.multicriteria.e6.resourceKey=other/**\n`
+		const result = init_logic.merge_sonar_properties(existing, template)
+
+		expect(result).toContain('sonar.issue.ignore.multicriteria=e5,e7,e6\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e5.ruleKey=custom:rule\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e7.ruleKey=template:rule\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e7.resourceKey=scripts/**\n')
+		expect(init_logic.merge_sonar_properties(result, template)).toBe(result)
+	})
+
+	it('activates the new criteria in the distributed Sonar template', () => {
+		const template = readFileSync(
+			new URL('../../templates/sonar-project.properties', import.meta.url),
+			'utf8',
+		)
+		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5\n`
+		const result = init_logic.merge_sonar_properties(existing, template)
+
+		for (const id of ['e6', 'e7', 'e8']) {
+			expect(result).toContain(`sonar.issue.ignore.multicriteria.${id}.ruleKey=`)
+			expect(result).toContain(`sonar.issue.ignore.multicriteria.${id}.resourceKey=`)
+		}
+
+		expect(result).toContain('sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5,e6,e7,e8\n')
 	})
 })
