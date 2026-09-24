@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { CarryRead, RunCarry } from './run-carry'
 import { run_wake, type RunWake } from './run-wake'
-import { run_wake_loop, type LoopPorts } from './run-wake-loop'
+import { run_wake_loop, type DriveResult, type LoopPorts } from './run-wake-loop'
 import type { LaunchResult } from './run-wake-session'
 
 // joshuafolkken/kit#1719. The loop is where "one wake per cut" either holds or does not, and no test
@@ -32,10 +32,14 @@ const IN_FLIGHT: CarryRead = { kind: 'carried', carry: carry() }
 const ENDED: CarryRead = { kind: 'none' }
 const FAILED = 'failed'
 const ENOENT_NOTE = 'spawn claude ENOENT'
+const HANDOFF_MATERIAL = 'merge over #2500'
+const TRANSPORT_FAILED = 'transport failed'
+const scratch = { directory: '', target: '' }
 
 interface Recorder {
 	ports: LoopPorts
 	wakes: Array<string>
+	materials: Array<string>
 	session_ids: Array<string>
 	order: Array<string>
 }
@@ -47,6 +51,7 @@ const WAKE_CALL = 'wake'
 // what the record said over time. Running past the end reads as the run having ended.
 function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCHED): Recorder {
 	const wakes: Array<string> = []
+	const materials: Array<string> = []
 	// The forced ids handed to `wake`, one per launch, deterministic so a test can assert exactly which
 	// sessions the supervisor started (joshuafolkken/kit#2407).
 	const session_ids: Array<string> = []
@@ -57,6 +62,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 
 	return {
 		wakes,
+		materials,
 		session_ids,
 		order,
 		ports: {
@@ -73,9 +79,11 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 			hand_off: () => {
 				order.push(HAND_OFF_CALL)
 			},
-			wake: (invocation, session_id) => {
+			drive: async () => ({ kind: 'judgment', material: HANDOFF_MATERIAL }),
+			wake: (invocation, session_id, material) => {
 				order.push(WAKE_CALL)
 				wakes.push(invocation)
+				materials.push(material)
 				session_ids.push(session_id)
 
 				return launch
@@ -88,7 +96,38 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 	}
 }
 
-const scratch = { directory: '', target: '' }
+describe('run_wake_loop.run_loop — deterministic driver', () => {
+	it('finishes a no-judgment run without launching an agent', async () => {
+		const scripted = recorder([HANDED_OFF])
+		const ports = { ...scripted.ports, drive: async () => ({ kind: 'finished' as const }) }
+
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(stop.reason).toBe('ended')
+		expect(scripted.wakes).toStrictEqual([])
+	})
+
+	it('launches an agent with the exact driver handoff', async () => {
+		const scripted = recorder([HANDED_OFF, ENDED])
+
+		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(scripted.materials).toStrictEqual([HANDOFF_MATERIAL])
+	})
+
+	it('stops on driver failure without launching an agent', async () => {
+		const scripted = recorder([HANDED_OFF])
+		const ports = {
+			...scripted.ports,
+			drive: async (): Promise<DriveResult> => ({ kind: FAILED, note: TRANSPORT_FAILED }),
+		}
+
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(stop).toStrictEqual({ reason: FAILED, note: TRANSPORT_FAILED })
+		expect(scripted.wakes).toStrictEqual([])
+	})
+})
 
 beforeEach(() => {
 	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-loop-test-'))

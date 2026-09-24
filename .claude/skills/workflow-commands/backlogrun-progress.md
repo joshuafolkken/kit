@@ -6,6 +6,10 @@ document, never an entry read: the entry procedure is `backlogrun.md`, which poi
 steps (joshuafolkken/kit#2010). This file is the single source of the heartbeat, the session hand-off
 and cut/resume, waiting without waiting forever, and the end-of-run summary and propagate.
 
+After a carry hand-off, the detached `run:wake` supervisor runs the deterministic `backlog:drive`
+loop. References below to a parent's mechanical polling and lane collection describe work now done
+by that supervisor; an AI parent is started only for a driver branch that requires judgment.
+
 ## Progress while the run is quiet
 
 **Start the progress step before step 1 of the loop, and do it without being asked.**
@@ -529,56 +533,27 @@ to untangle**: `epic:next` detects it and exits with an error.
 
 ### The parent keeps no clock of its own — the watcher's exit is the wake
 
+**After hand-off, the supervisor's driver owns the mechanical clock.** `backlog:drive` polls lane
+completion and the backlog inside the detached process, without waking an AI parent. The historical
+parent-turn instructions below apply only while an AI session is handling a returned judgment branch;
+they do not schedule the supervisor's normal loop. `run:progress --wait` remains the source of human
+heartbeat lines, and `run:report` remains the final report source.
+
 **The numbers above are floors between asks, not a timer the parent sets.** A parent that sets one spends
 a turn per tick at the point its context is largest — the exact cost `run:progress` was built to remove.
 The watcher took the *reporting* out of the parent; the parent must not go on keeping the clock anyway,
 or the two run side by side and the run pays for both.
 
-**The two are separated by arithmetic, not by inspection.** At the default twenty-minute interval the
-watcher can exit no more often than once an interval, so any parent call more frequent than that is a
-turn the parent woke itself for. That needs no second reading of the transcript — which matters, because
-the transcript parsing is what run measurement must avoid, and the re-measurement belongs to
-`pnpm josh cost` and the run-timing report.
-
-**So the parent starts no wait of its own.** While something of this run's own is in flight, the next
-turn is the one the **watcher's exit delivers** — a background command's completion is what re-invokes
-the session (`background-commands.md`). **A `Bash` call that only sleeps is the spelling this forbids**,
-and so is a turn whose whole content is asking `epic:next` again to see whether anything has changed.
-
-**A `claude -p` parent waits in the foreground**, stopping only
-after `--cut` or `--end`; the `Stop` hook enforces it (#2437).
-
-**The wake is used for both halves at once.** The turn that relays the line is the turn that acts on what
-the line says: a free lane is the ask for the next child, and every lane still busy is not an ask at all.
-
-**The cost is latency, and it is named rather than hidden.** A lane that frees just after a line can sit
-idle until the next one — **up to one interval**. **A person who wants the latency back shortens the
-interval** — `--interval`, or `progress_interval_minutes` in the repository's configuration. An issue
-newly runnable mid-wait is not held to it (joshuafolkken/kit#2503): `--wait` exits about a minute later
-with no progress line — act on its `ready #N` line.
-
-**What is not dropped.** Every timeout in the table above still ends its wait, and the silent-unit
-liveness check is still asked — on the wake the watcher delivers rather than on a clock of the parent's
-own.
+The driver checks lane completion every five seconds and makes a new backlog offer no sooner than one
+minute after the previous offer, except after collecting a child. These waits cost no AI turns.
+The progress watcher keeps reporting on its own interval; a judgment session may still receive its
+exit as a prompt to act. The bounds above continue to apply to both processes.
 
 #### The wake exists only while something is in flight
 
-**`--wait` ends at the first line it *prints* (or an arrival), and it prints only where there is something to report.**
-With no child in flight it **declines**, and a `gh` listing it could not read declines the same way. **A
-declined watcher does not exit until its `--hours` bound, an hour by default.** So the wake above is not
-available in every state, and where it is unavailable **the parent keeps the interval after all**:
-
-| The parent is waiting on | What wakes it |
-| --- | --- |
-| A child of this run's, in flight | **The watcher's exit.** Start no wait of your own |
-| A blocker that resolves elsewhere with nothing of this run's in flight — a cross-repository publish, another repository's work | **The polling interval, kept by the parent.** The watcher declines and will not exit |
-| GitHub not answering (`retry`) | **The polling interval, kept by the parent.** The outage that produced `retry` stops the watcher reading too, so it declines |
-| An empty backlog during `backlogrun`'s idle watch | **The 5-minute idle poll, kept by the parent.** Nothing carries `in-progress`, so the watcher declines for the whole watch |
-
-**This boundary is a table because reading the rule past it is expensive and silent.** A `backlogrun`
-idle watch has a 30-minute budget, and a parent waiting for a wake that cannot arrive before the
-watcher's one-hour bound would end that watch having polled the backlog **zero** times. The saving comes
-from the in-flight row, which is where a run spends nearly all of its waiting.
+`run:progress --wait` prints only when it has a human-facing line. With no child in flight it may
+decline; the driver still polls for new work and enforces the idle and whole-run bounds. A GitHub
+listing failure stays a retry or unreadable answer from the offer command, never an empty backlog.
 
 `epic:next` does not report when a label was applied, so read that from the issue's timeline:
 

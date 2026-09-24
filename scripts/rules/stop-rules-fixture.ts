@@ -13,7 +13,6 @@ const BASE: StopContext = {
 	session_owner: 'joshuafolkken',
 	headless_waiting: false,
 	headless_refusals: 0,
-	owes_offer: false,
 	lane_child: false,
 	session_lang: 'en',
 }

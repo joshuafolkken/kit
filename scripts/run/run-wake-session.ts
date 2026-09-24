@@ -17,8 +17,8 @@ import { run_invocation } from './run-invocation'
 // `backlogrun` by joshuafolkken/kit#1984). `run-carry.ts` reads the same grammar to say which of a
 // `backlogrun`'s named issues are still outstanding — so it is `run-invocation.ts`'s, imported
 // rather than restated. What that move does **not** change is the rebuild-from-constants design: the
-// text handed to the agent CLI is still composed out of that module's own constants and validated
-// integers, and the recorded string still never reaches `spawn`.
+// invocation handed to the agent CLI is still composed out of that module's own constants and
+// validated integers; a judgment handoff adds the driver's result after that validated invocation.
 //
 // **The agent CLI is a constant, not configuration, and it is the Claude adapter's constant.** It was
 // an environment variable first (`JOSH_WAKE_COMMAND`), which put the choice of *which binary runs* in
@@ -100,14 +100,17 @@ function wake_argv(
 	invocation: string,
 	profile?: AgentProfile,
 	cwd?: string,
-	session_id?: string,
+	session?: string | { id: string; material: string },
 ): AgentArgvResult | undefined {
 	const matched = safe_invocation(invocation)
 	if (matched === undefined) return undefined
+	const prompt =
+		typeof session === 'object' ? `${matched}\n\nDriver handoff:\n${session.material}` : matched
+	const session_id = typeof session === 'object' ? session.id : session
 
 	return profile === undefined
-		? resolved_argv(matched, cwd)
-		: profiled_argv(matched, profile, cwd, session_id)
+		? resolved_argv(prompt, cwd)
+		: profiled_argv(prompt, profile, cwd, session_id)
 }
 
 // Re-invoking this very script under the same runner, which is what makes the supervisor outlive the

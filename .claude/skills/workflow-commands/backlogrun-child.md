@@ -75,7 +75,8 @@ reference is named, the refusal is the whole answer. Where several are, a task-l
 **A child is not run in the parent loop's context.** One child goes to an isolated execution unit,
 and only its summary comes back.
 
-**The parent orchestrates and never implements a child in its own context.** *Every* child takes a
+**The supervisor's driver is the mechanical parent after hand-off.** It uses the same lane dispatch
+and GitHub verification commands; an AI parent handles only a returned judgment branch. *Every* child takes a
 delegated unit — a fresh one and **a child just released from `needs-decision`** alike. The rule is
 one sentence: **whatever offers a child — the loop, or a person clearing a label — the child is handed
 to a lane, never to the parent.**

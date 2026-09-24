@@ -223,6 +223,8 @@ The `PreToolUse` dispatcher that routes each pending tool call to the delivered-
 
 The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247, joshuafolkken/kit#2422): one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to run `pnpm josh issue:scout` through the filing, because a first-party filing is Tier A (`SKILL.md` → §2i); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
+`backlogrun` の通常の親ループと次の Issue の取得は監督プロセスが扱う。`stop:guard` は次の Issue の取得をブロック判定に含めない。名前を指定したエピックを判断用の headless セッションに渡した場合は、子レーンの待機保護が残る。停滞と取り残しの検出は Stop イベント時に実行する。
+
 ### `josh session:lang`
 
 Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit` so the value is injected every turn.
@@ -1295,7 +1297,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time and merged count. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective, while a completed retrospective lets the idle watch continue. `--only` returns `only` without dispatching backlog work. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
+An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective, while a completed retrospective lets the idle watch continue. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
 
 ### `needs-human-review` — the opposite label
 
@@ -1521,7 +1523,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 
 ### `josh run:wake`
 
-Continue a cut `backlogrun` by waking the next session from outside the conversation. It reads the carry record and wakes only on `carried`, handed off by `run:carry --cut`.
+Continue a cut `backlogrun` from outside the conversation. The detached supervisor adopts the handed-off carry record, runs `backlog:drive`, and starts an AI session only for a driver branch requiring judgment. A dead owner can be recovered through the same path.
 
 ```bash
 pnpm josh run:wake --start                 # launch the detached supervisor
@@ -1533,13 +1535,11 @@ pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 `scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local
 `sqlite_home` and `--ephemeral`, retaining native auth/config. Unclaimed wakes try thrice.
 
-**A launch goes out only where a woken session would find work** (joshuafolkken/kit#2417). Before
-every launch — first wake, dead-owner recovery and retry alike — the supervisor asks, cheap first:
-named issues left on the carry record (or a finished `--only` list) are work; otherwise a free lane
-and a ready issue from `backlog:next` are. With no work it launches nothing and polls again, each wait
-as long as the idle stretch so far, capped at eight times `--interval`. A failed `backlog:next` read
-counts as work, and a stretch past the `backlogrun` idle-watch default (30 minutes) wakes one session
-anyway, so the run is still finished by a session rather than left to expire.
+**Ordinary work launches no parent AI session.** The driver uses the carry record's named list, the
+existing backlog offer, lane launch and merge commands. It performs the idle watch and final report
+itself. A judgment handoff includes the driver's verdict, affected issue when present, diagnostic
+output and resume flags. The carry record prevents a restarted supervisor from counting a merge into
+another live owner's run.
 
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
