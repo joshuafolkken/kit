@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_carry } from '#scripts/run/run-carry'
@@ -51,12 +52,18 @@ function ledger_text(directory: string): string {
 	return readFileSync(path.join(directory, LEDGER), 'utf8')
 }
 
-function run_only_driver(kind: string): void {
-	const opened = environment(kind)
+function carry_target(opened: JoshEnvironment): string {
 	const git_directory = execaSync('git', ['rev-parse', '--git-common-dir'], {
 		cwd: opened.root,
+		env: git_location_environment.location_free_environment(),
 	}).stdout
-	const target = run_carry.carry_path(path.resolve(opened.root, git_directory))
+
+	return run_carry.carry_path(path.resolve(opened.root, git_directory))
+}
+
+function run_only_driver(kind: string): void {
+	const opened = environment(kind)
+	const target = carry_target(opened)
 
 	run_carry.begin_carry(target, 'backlogrun --only', run_carry.owner_of(process.pid))
 	const result = josh_harness.run(opened, [
@@ -66,7 +73,7 @@ function run_only_driver(kind: string): void {
 		'--only',
 	])
 
-	expect(result.exit_code, result.stderr).toBe(0)
+	expect(result.exit_code, `${result.stdout}\n${result.stderr}`).toBe(0)
 	expect(result.stdout).toContain('stop')
 	expect(run_carry.read_carry(target).kind).toBe('none')
 }
@@ -77,6 +84,20 @@ beforeAll(async () => {
 
 afterAll(() => {
 	for (const opened of environments.values()) josh_harness.close_environment(opened)
+})
+
+it('targets the fixture repository even when a push hook supplies GIT_DIR', () => {
+	const kit = environment('kit')
+	const consumer = environment('consumer')
+	const previous = process.env['GIT_DIR']
+
+	try {
+		process.env['GIT_DIR'] = path.join(kit.root, '.git')
+		expect(carry_target(consumer)).toBe(run_carry.carry_path(path.join(consumer.root, '.git')))
+	} finally {
+		if (previous === undefined) Reflect.deleteProperty(process.env, 'GIT_DIR')
+		else process.env['GIT_DIR'] = previous
+	}
 })
 
 describe.each(KINDS)('josh harness — the %s environment', (kind) => {
