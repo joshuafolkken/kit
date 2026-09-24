@@ -302,3 +302,13 @@ dropping either side destroys exactly what it exists to record.
 - rf:security | medium | scripts/agent/agent-launch-environment.ts:27 | 2026-09-24 | #2528
 - rf:tests | medium | scripts/run/run-merge-steps.test.ts:233 | 2026-09-24 | #2528
 - rf:bug-risks | medium | scripts/run/run-merge-steps.ts:115 | 2026-09-24 | #2528
+- rf:none | none | - | 2026-09-24 | #2521
+- rf:none | none | - | 2026-09-24 | #2521
+- rf:bug-risks | high | scripts/run/run-merge.ts | 2026-09-24 | #2525
+- rf:none | none | - | 2026-09-24 | #2525
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-finish.ts | 2026-09-24 | #2508
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-finish.ts | 2026-09-24 | #2508
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts | 2026-09-24 | #2508
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-restore.ts | 2026-09-24 | #2508
+- rf:none | none | - | 2026-09-24 | #2508
+- rf:none | none | - | 2026-09-24 | #2524
