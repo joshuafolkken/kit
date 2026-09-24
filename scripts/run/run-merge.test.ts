@@ -13,6 +13,7 @@ const NEEDS_DECISION = 'needs-decision'
 const ALREADY_DONE = 'already-done'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
 const IN_PROGRESS = 'in-progress'
+const EPIC = 'epic'
 const HUMAN_REVIEW = 'human-review'
 const MERGED = 'merged'
 const PARKED = 'parked'
@@ -69,6 +70,25 @@ describe('classify_child', () => {
 	})
 })
 
+describe('classify_child — a split epic', () => {
+	it.each([
+		{ labels: [EPIC], signals: OUTAGE },
+		{ labels: [EPIC, NEEDS_DECISION], signals: CUT },
+	])('reads an OPEN epic as split regardless of other ending signals', ({ labels, signals }) => {
+		expect(run_merge.classify_child(issue_state_of({ labels }), signals)).toBe('split')
+	})
+
+	it('stops for human review when an OPEN epic carries needs-human-review', () => {
+		const open = issue_state_of({ labels: [EPIC, NEEDS_HUMAN_REVIEW], is_human_review: true })
+
+		expect(run_merge.classify_child(open)).toBe(HUMAN_REVIEW)
+	})
+
+	it('keeps a CLOSED epic classified as merged', () => {
+		expect(run_merge.classify_child(issue_state_of({ state: CLOSED, labels: [EPIC] }))).toBe(MERGED)
+	})
+})
+
 // is_outage only splits the failed case: a CLOSED or parked child is what its state says regardless of
 // the exit record (joshuafolkken/kit#2240).
 describe('classify_child — is_outage is ignored outside the failed case', () => {
@@ -121,6 +141,10 @@ describe('change_of', () => {
 
 	it('counts nothing for a parked child', () => {
 		expect(run_merge.change_of('parked')).toBeUndefined()
+	})
+
+	it('counts nothing for a split child', () => {
+		expect(run_merge.change_of('split')).toBeUndefined()
 	})
 
 	it('counts nothing for a human-review child', () => {

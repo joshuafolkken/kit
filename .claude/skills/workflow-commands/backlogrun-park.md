@@ -23,7 +23,8 @@ authorization, whether it came from a named epic or from the opted-in pool:
   prerequisite is offered on the next ask if it carries `auto-ok`.
 - **A split found mid-run** files the children and the epic and does not stop the batch, because the
   keyword already authorized a batch — `split-assessment.md` for the assessment, → "Splitting a child
-  mid-run" for the branch.
+  mid-run" for the branch. The split child is not parked or counted as a failure; its new children
+  remain available to the normal `backlog:next` / `epic:next` offer.
 - **`in-progress` left behind by an interrupted run** is → "`in-progress` is removed by
   whoever finds it stale".
 - **A child released from `needs-decision` is re-dispatched to a lane, never implemented by the
@@ -175,4 +176,4 @@ Discovering that a child is really several is not a reason to stop. File the new
 `route:split` label (Tier A for a first-party repository — no confirmation), then add them with
 `pnpm josh epic --add <E> <N...> [--before <M> | --after <M>]` rather than editing the epic body by hand.
 Use the same split criteria as `kickoff`. If what remains of the original child needs a person, park
-**that** child and move on.
+**that** child and move on. Splitting alone never adds `needs-decision` to the promoted epic.
