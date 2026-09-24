@@ -95,7 +95,8 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// linked work tree it would hijack the default branch from every other one (joshuafolkken/kit#1535).
 	'main:sync': {
 		script: 'scripts/git/main-sync.ts',
-		description: 'Checkout default branch and pull latest (refuses inside a lane)',
+		description:
+			'Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane)',
 		category: 'Workflow',
 		reference: ['', 'developer', ['git', 'network']],
 	},

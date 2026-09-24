@@ -1,15 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { agent_argv } from '#scripts/agent/agent-argv'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { git_command } from '#scripts/git/git-command'
-import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
-import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
-import { detached_launch } from './detached-launch'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_handoff } from './run-cut-handoff'
@@ -87,6 +83,10 @@ function report_incomplete(cut_record: RunCut): number {
 // The `--handoff` file parsed but the assembled record would not fit the byte bound — the scalar fields
 // carry a handoff that fit alone past the cap (joshuafolkken/kit#2354).
 const HANDOFF_OVERFLOW_NOTE = '--handoff <path> would grow the cut record past its byte bound'
+// An implementation cut resumes into implementation, and that resume refuses a record with no
+// instruction (`incomplete`) — so the cut is refused here instead of relaunching a successor that can
+// only stop (joshuafolkken/kit#2484).
+const HANDOFF_MISSING_NOTE = 'this cut resumes into implementation and needs --handoff <path>'
 
 function report_bad_handoff(note: string): number {
 	console.error(`${note}. Nothing was cut; write the handoff file and reissue.`)
@@ -179,36 +179,15 @@ function report_missing_supervisor(issue: string): number {
 
 // **The relaunched child is started at the effort of the phase it is resuming into**
 // (joshuafolkken/kit#2382). A pre-gate resume drives the gate, commit, PR and merge — the mechanical
-// ship/bookkeeping region, lowered — while a setup or implementation resume keeps the role default. The
+// ship/bookkeeping region, lowered — while an implementation resume keeps the role default. The
 // phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it.
 function relaunch(target: string, lane: LaneInfo, phase: string): number {
 	const notes: Array<string> = []
-	// The relaunched child is given a resume-specific prompt, not the record's bare `fullrun #<N>`
-	// (joshuafolkken/kit#2022), so it goes straight to `run:cut --resume` without reading the
-	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
-	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
-	const invocation = lane_child_invocation.resume_invocation(lane.issue)
-	const built = agent_argv.resume_argv(invocation, lane.profile, phase, lane.directory)
+	const result = lane_relaunch.resume(lane, phase, (note) => {
+		notes.push(note)
+	})
 
-	if (built.kind === 'rejected') return report_relaunch_failure(target, built.note)
-
-	const result = detached_launch.launch(
-		{
-			argv: built.argv,
-			cwd: lane.directory,
-			log_path: lane_dispatch_log.default_log_path(lane),
-			profile: built.profile,
-			// The relaunch keeps the mark, so the resumed child is still a dispatched child to every rule
-			// that reads it (joshuafolkken/kit#1904); the inherited environment cannot be relied on here,
-			// since the parent-session strip runs on the way in.
-			env: lane_child_marker.env_for(lane.issue),
-		},
-		(note) => {
-			notes.push(note)
-		},
-	)
-
-	if (result.kind === 'failed') return report_relaunch_failure(target, result.note)
+	if (result.kind !== 'launched') return report_relaunch_failure(target, result.note)
 
 	if (notes.length > 0) console.error(notes.join('\n'))
 
@@ -227,12 +206,8 @@ function clear_expired(target: string): void {
 	if (run_cut.read_cut(target).kind === 'expired') run_cut.end_cut(target)
 }
 
-function is_openai_lane(lane: LaneInfo): boolean {
-	return lane.profile?.provider === 'openai'
-}
-
 function has_matching_supervisor(lane: LaneInfo, issue: string): boolean {
-	if (!is_openai_lane(lane)) return true
+	if (!lane_relaunch.is_openai_lane(lane)) return true
 
 	return openai_lane_supervisor.active(lane.directory)?.issue === issue
 }
@@ -247,15 +222,22 @@ interface CutRequest {
 }
 
 // **Every cut appends a `cut` event to the run's stream** (joshuafolkken/kit#2346). It is what advances
-// `run:step` past the phase boundary — a setup cut emitted here is why the run's next position reads as
-// `run:cut --resume` rather than the setup cut again, and why the setup-cut guard, which reads the
-// stream's newest event, falls silent once the plan-then-cut boundary has been crossed. Best-effort by
-// the stream's contract, so a failed append never fails the cut it reports.
+// `run:step` past the phase boundary — a cut emitted here is why the run's next position reads as
+// `run:cut --resume`. Best-effort by the stream's contract, so a failed append never fails the cut it
+// reports.
 async function emit_cut_event(request: CutRequest): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CUT,
 		`#${request.issue} cut (${request.phase})`,
 	)
+}
+
+// The note a cut record is refused with before it is written, or `undefined` when it may be written.
+function spec_refusal(spec: Parameters<typeof run_cut.begin_cut>[1]): string | undefined {
+	if (!run_cut.has_required_handoff(spec)) return HANDOFF_MISSING_NOTE
+	if (!run_cut.record_within_bound(spec)) return HANDOFF_OVERFLOW_NOTE
+
+	return undefined
 }
 
 async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): Promise<number> {
@@ -269,12 +251,14 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 		handoff: loaded.handoff,
 	}
 
-	if (!run_cut.record_within_bound(spec)) return report_bad_handoff(HANDOFF_OVERFLOW_NOTE)
+	const spec_note = spec_refusal(spec)
+
+	if (spec_note !== undefined) return report_bad_handoff(spec_note)
 	if (run_cut.begin_cut(target, spec) === undefined) return report_cut_exists(target)
 
 	await emit_cut_event(request)
 
-	return is_openai_lane(lane)
+	return lane_relaunch.is_openai_lane(lane)
 		? report(CUT_VERDICT, SUCCESS_EXIT_CODE)
 		: relaunch(target, lane, request.phase)
 }
@@ -302,20 +286,20 @@ async function cut(
 
 // **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two
 // racing resumes only one wins the create and the loser is answered `busy`.
-// A setup or implementation cut resumes back into implementation; a pre-gate one into the gate. The
-// resuming child is told which by the verdict rather than reconstructing it from the record
-// (joshuafolkken/kit#1933, joshuafolkken/kit#2346).
+// An implementation cut resumes back into implementation; a pre-gate one into the gate. The resuming
+// child is told which by the verdict rather than reconstructing it from the record
+// (joshuafolkken/kit#1933).
 function resume_verdict_for(cut_record: RunCut): string {
 	return run_cut.resumes_into_implementation(cut_record.phase)
 		? RESUME_IMPL_VERDICT
 		: RESUME_VERDICT
 }
 
-// **A setup or implementation resume removes the record; a pre-gate one marks it handed off**
-// (joshuafolkken/kit#2310, joshuafolkken/kit#2346). The cuts have different multiplicities sharing one
+// **An implementation resume removes the record; a pre-gate one marks it handed off**
+// (joshuafolkken/kit#2310). The cuts have different multiplicities sharing one
 // record: the pre-gate cut fires once per lane, so its record must survive to answer a second resume
-// `handed-off` (joshuafolkken/kit#1935); the setup and implementation cuts are guarded by the run's
-// event stream rather than the cut record, so their records are cleared on resume — a lingering record
+// `handed-off` (joshuafolkken/kit#1935); the implementation cut is guarded by the run's
+// event stream rather than the cut record, so its record is cleared on resume — a lingering record
 // would keep the pre-gate guard, which reads `carried_cut_sync`, silent for the rest of the run. A double
 // cut stays impossible either way: `begin_cut`'s exclusive create is what prevents it.
 function take_over(target: string, cut_record: RunCut): RunCut | undefined {
@@ -396,14 +380,9 @@ function end(target: string): number {
 	return report(ENDED_VERDICT, SUCCESS_EXIT_CODE)
 }
 
-// A bare cut is the pre-gate boundary; `--setup` is the setup-phase one and `--impl` the
-// implementation-phase one (joshuafolkken/kit#1933, joshuafolkken/kit#2346). The two flags are mutually
-// exclusive by `run-cut-args.ts`, so the order here only picks which named boundary was asked for.
-function cut_phase(request: { is_setup: boolean; is_implementation: boolean }): string {
-	if (request.is_setup) return run_cut.SETUP_PHASE
-	if (request.is_implementation) return run_cut.IMPLEMENTATION_PHASE
-
-	return run_cut.PRE_GATE_PHASE
+// A bare cut is the pre-gate boundary and `--impl` the implementation-phase one (joshuafolkken/kit#1933).
+function cut_phase(request: { is_implementation: boolean }): string {
+	return request.is_implementation ? run_cut.IMPLEMENTATION_PHASE : run_cut.PRE_GATE_PHASE
 }
 
 async function act(target: string, request: Request): Promise<number> {

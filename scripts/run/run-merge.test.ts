@@ -13,9 +13,12 @@ const NEEDS_DECISION = 'needs-decision'
 const ALREADY_DONE = 'already-done'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
 const IN_PROGRESS = 'in-progress'
+const EPIC = 'epic'
 const HUMAN_REVIEW = 'human-review'
 const MERGED = 'merged'
 const PARKED = 'parked'
+const OUTAGE = { is_outage: true, is_cut: false }
+const CUT = { is_outage: false, is_cut: true }
 
 function issue_state_of(over: Partial<IssueState>): IssueState {
 	return { state: 'OPEN', labels: [], is_human_review: false, ...over }
@@ -57,11 +60,32 @@ describe('classify_child', () => {
 	// joshuafolkken/kit#2240: an OPEN, unparked child whose exit record shows it could not reach the API
 	// is an outage, not a failure — the distinction the parent needs to leave it re-dispatchable.
 	it('reads an OPEN unparked child as an outage when the exit record is an outage', () => {
-		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), true)).toBe('outage')
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), OUTAGE)).toBe(
+			'outage',
+		)
 	})
 
 	it('reads an unreadable state as unresolved', () => {
 		expect(run_merge.classify_child(undefined)).toBe('unresolved')
+	})
+})
+
+describe('classify_child — a split epic', () => {
+	it.each([
+		{ labels: [EPIC], signals: OUTAGE },
+		{ labels: [EPIC, NEEDS_DECISION], signals: CUT },
+	])('reads an OPEN epic as split regardless of other ending signals', ({ labels, signals }) => {
+		expect(run_merge.classify_child(issue_state_of({ labels }), signals)).toBe('split')
+	})
+
+	it('stops for human review when an OPEN epic carries needs-human-review', () => {
+		const open = issue_state_of({ labels: [EPIC, NEEDS_HUMAN_REVIEW], is_human_review: true })
+
+		expect(run_merge.classify_child(open)).toBe(HUMAN_REVIEW)
+	})
+
+	it('keeps a CLOSED epic classified as merged', () => {
+		expect(run_merge.classify_child(issue_state_of({ state: CLOSED, labels: [EPIC] }))).toBe(MERGED)
 	})
 })
 
@@ -72,7 +96,32 @@ describe('classify_child — is_outage is ignored outside the failed case', () =
 		{ over: { state: CLOSED }, expected: 'merged' },
 		{ over: { labels: [ALREADY_DONE] }, expected: 'parked' },
 	])('classifies $expected regardless of an outage exit record', ({ over, expected }) => {
-		expect(run_merge.classify_child(issue_state_of(over), true)).toBe(expected)
+		expect(run_merge.classify_child(issue_state_of(over), OUTAGE)).toBe(expected)
+	})
+})
+
+// joshuafolkken/kit#2484: a child that ended its session with a declared cut its successor never adopted
+// is resumed, not parked — and only an OPEN, unparked child is read that way.
+describe('classify_child — a declared cut', () => {
+	it('reads an OPEN unparked child as a cut when its lane holds an unadopted cut', () => {
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), CUT)).toBe('cut')
+	})
+
+	it('reads a cut before an outage exit record', () => {
+		const signals = { is_outage: true, is_cut: true }
+
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), signals)).toBe('cut')
+	})
+
+	it.each([
+		{ over: { state: CLOSED }, expected: MERGED },
+		{ over: { labels: [NEEDS_DECISION] }, expected: PARKED },
+	])('classifies $expected regardless of a carried cut', ({ over, expected }) => {
+		expect(run_merge.classify_child(issue_state_of(over), CUT)).toBe(expected)
+	})
+
+	it('counts nothing for a cut child', () => {
+		expect(run_merge.change_of('cut')).toBeUndefined()
 	})
 })
 
@@ -92,6 +141,10 @@ describe('change_of', () => {
 
 	it('counts nothing for a parked child', () => {
 		expect(run_merge.change_of('parked')).toBeUndefined()
+	})
+
+	it('counts nothing for a split child', () => {
+		expect(run_merge.change_of('split')).toBeUndefined()
 	})
 
 	it('counts nothing for a human-review child', () => {

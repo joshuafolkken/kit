@@ -292,6 +292,13 @@ async function merge_fast_forward(branch_name: string): Promise<string> {
 	return await git_spawn.read(['merge', '--ff-only', `origin/${branch_name}`])
 }
 
+// The same fast-forward for a branch that is *not* checked out, so no file in the working tree moves
+// (joshuafolkken/kit#2462). A plain refspec refuses a non-fast-forward update, and git refuses it
+// outright for a branch checked out in any work tree — both are failures, never a rewrite.
+async function fast_forward_local(branch_name: string): Promise<string> {
+	return await git_spawn.read(['fetch', 'origin', `${branch_name}:${branch_name}`])
+}
+
 // The merge `josh main:merge` runs, and the deliberate opposite of the one above: **no `--ff-only`**,
 // because the branch it is called on has diverged whenever the command is worth typing at all
 // (joshuafolkken/kit#1659). Naming the strategy here is the whole fix — `git pull` decides it from
@@ -299,8 +306,13 @@ async function merge_fast_forward(branch_name: string): Promise<string> {
 //
 // `with_output` rather than `read`: a merge that conflicts has to put git's own report in front of
 // the person, which is what the `git pull` this replaced did.
-async function merge_branch(branch_name: string): Promise<void> {
-	await git_spawn.with_output('merge', [`origin/${branch_name}`])
+//
+// `message` replaces git's default merge message, which carries no `#N` and is therefore refused
+// by the `commit-msg` hook on an issue branch (joshuafolkken/kit#2439).
+async function merge_branch(branch_name: string, message?: string): Promise<void> {
+	const message_arguments = message === undefined ? [] : ['-m', message]
+
+	await git_spawn.with_output('merge', [...message_arguments, `origin/${branch_name}`])
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
@@ -551,6 +563,7 @@ const git_command = {
 	default_branch_reference,
 	fetch_branch,
 	merge_fast_forward,
+	fast_forward_local,
 	merge_branch,
 	checkout_b,
 	checkout,

@@ -180,7 +180,15 @@ function run(argv: ReadonlyArray<string>, now_ms: number = Date.now()): number {
 
 	const { verdict, reason } = backlog_budget.decide(input)
 
-	path_decision.print_decision(JSON_KEY, verdict, reason, values.json === true)
+	if (values.json === true) {
+		console.info(
+			JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish: backlog_budget.is_finish(input) }),
+		)
+
+		return SUCCESS_EXIT_CODE
+	}
+
+	path_decision.print_decision(JSON_KEY, verdict, reason, false)
 
 	return SUCCESS_EXIT_CODE
 }

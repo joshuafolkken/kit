@@ -2,6 +2,7 @@ import { existsSync, rmSync } from 'node:fs'
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_paths } from './lane-paths'
+import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
 // Closing a lane: no work tree, no branch, no directory (joshuafolkken/kit#1490).
@@ -17,12 +18,22 @@ interface LaneTargets {
 	branch: string
 }
 
+// The lane an issue number names: its registration, when there is one, and the paths a close acts on.
+// Resolved once here so a caller that has to look inside the tree before closing it reads the same
+// directory the close removes (joshuafolkken/kit#2476).
+interface ResolvedLane {
+	existing: LaneInfo | undefined
+	targets: LaneTargets
+}
+
 type CloseKind = 'closed' | 'incomplete' | 'none'
 
 interface CloseOutcome {
 	issue: string
 	kind: CloseKind
 	left_behind: Array<string>
+	// The lane child's processes this close terminated — empty for a child that ended by itself.
+	reaped: Array<number>
 }
 
 interface SweepOutcome {
@@ -107,18 +118,26 @@ async function lane_root_directory(): Promise<string> {
  * cleaning up after an interruption cannot know whether the lane was ever opened. `incomplete` means
  * something survived the removal, and `left_behind` names it.
  */
-async function close_lane(issue: string): Promise<CloseOutcome> {
+async function resolve_lane(issue: string): Promise<ResolvedLane> {
 	const root = await lane_root_directory()
-	const lanes = await lane_registry.list_lanes()
-	const existing = lane_registry.find_lane(lanes, issue)
-	const targets = lane_targets(root, issue, existing)
+	const existing = lane_registry.find_lane(await lane_registry.list_lanes(), issue)
+
+	return { existing, targets: lane_targets(root, issue, existing) }
+}
+
+async function close_lane(issue: string): Promise<CloseOutcome> {
+	const { existing, targets } = await resolve_lane(issue)
 	const did_exist = existing !== undefined || existsSync(targets.directory)
+	// Before the removal, not after: a child still running in the tree would keep writing into a
+	// directory being deleted, and a process outliving its lane is the half-discarded state
+	// joshuafolkken/kit#2421 found — the work tree gone, the child still answering `alive`.
+	const reaped = lane_reap.reap_child(issue)
 
 	await remove_lane(targets)
 
 	const left_behind = await residue(targets)
 
-	return { issue, kind: close_kind(did_exist, left_behind), left_behind }
+	return { issue, kind: close_kind(did_exist, left_behind), left_behind, reaped }
 }
 
 // A lane that could not be closed is recorded rather than thrown: a sweep has to attempt every lane,
@@ -171,7 +190,8 @@ const lane_close = {
 	lane_targets,
 	prune_lanes,
 	remove_lane,
+	resolve_lane,
 }
 
-export type { CloseKind, CloseOutcome, SweepOutcome }
+export type { CloseKind, CloseOutcome, ResolvedLane, SweepOutcome }
 export { lane_close }

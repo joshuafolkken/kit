@@ -13,6 +13,7 @@ vi.mock('./git-gh-command', () => ({
 		pr_checks_watch: vi.fn(),
 		pr_get_url: vi.fn(),
 		pr_view: vi.fn(),
+		pr_update_body: vi.fn(),
 	},
 }))
 
@@ -43,6 +44,8 @@ const PR_BODY = 'Test body'
 const FAKE_ISSUE_COMMIT = 'My feature #42'
 const FAKE_PR_URL = 'https://github.com/owner/repo/pull/1'
 const CREATED_PR_URL = 'https://github.com/owner/repo/pull/2'
+const EXTRA_BODY = 'Some description'
+const FULL_BODY = `closes #42\n\n${EXTRA_BODY}`
 const FAKE_ISSUE_INFO = {
 	title: 'My feature',
 	number: '42',
@@ -71,12 +74,31 @@ describe('git_pr.create_with_issue_info — build_body behavior', () => {
 	})
 
 	it('prepends closes #N to extra_body when extra_body is supplied', async () => {
-		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, 'Some description')
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, EXTRA_BODY)
 
-		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(
-			FAKE_ISSUE_COMMIT,
-			'closes #42\n\nSome description',
-		)
+		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(FAKE_ISSUE_COMMIT, FULL_BODY)
+	})
+})
+
+// joshuafolkken/kit#2446: a rerun carrying the live-execution evidence must reach the pull request the
+// first run already opened, or the merge `followup` refused for lacking it can never be recovered.
+describe('git_pr.create_with_issue_info — a pull request that is already open', () => {
+	beforeEach(() => {
+		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
+		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'OPEN' }))
+	})
+
+	it('writes a supplied body onto the open pull request', async () => {
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, EXTRA_BODY)
+
+		expect(vi.mocked(git_gh_command.pr_update_body)).toHaveBeenCalledWith(BRANCH, FULL_BODY)
+		expect(vi.mocked(git_gh_command.pr_create)).not.toHaveBeenCalled()
+	})
+
+	it('leaves the open pull request body alone when no body is supplied', async () => {
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO)
+
+		expect(vi.mocked(git_gh_command.pr_update_body)).not.toHaveBeenCalled()
 	})
 })
 

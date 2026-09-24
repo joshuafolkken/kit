@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { git_stash } from '#scripts/git/git-stash'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -35,6 +36,7 @@ interface PrepReads {
 	content: BlockRead
 	state: StateRead
 	latest: LatestDecision
+	has_changes: boolean
 }
 
 // Exactly one issue number, or the call is refused: `run:prep` prepares one run, and a second number
@@ -67,13 +69,29 @@ function latest_decision(): LatestDecision {
 	return latest_scope_cli.decide()
 }
 
+// Whether a dispatched lane child's tree holds uncommitted work (joshuafolkken/kit#2476). A lane child
+// that popped its parked work back and then found its issue closed is the one position that work is
+// lost from — the lane is removed by force — so only a lane is asked; a person's own checkout keeps its
+// unrelated edits out of the verdict. A status that cannot be read reports none, leaving the verdict
+// printed before this read existed.
+async function lane_has_changes(): Promise<boolean> {
+	if (!lane_child_marker.is_child_of(process.cwd())) return false
+
+	try {
+		return await git_stash.has_changes(process.cwd())
+	} catch {
+		return false
+	}
+}
+
 async function gather(issue_number: string): Promise<PrepReads> {
-	const [content, state] = await Promise.all([
+	const [content, state, has_changes] = await Promise.all([
 		issue_read_cli.read_block(issue_number),
 		issue_state_cli.read_issue(issue_number),
+		lane_has_changes(),
 	])
 
-	return { content, state, latest: latest_decision() }
+	return { content, state, latest: latest_decision(), has_changes }
 }
 
 function content_body(issue_number: string, content: BlockRead): string {
@@ -91,6 +109,7 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		state_failure,
 		latest_scope: reads.latest.scope,
 		latest_reason: reads.latest.reason,
+		has_changes: reads.has_changes,
 	}
 }
 

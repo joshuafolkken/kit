@@ -95,6 +95,27 @@ describe('release_history.read_base', () => {
 	})
 })
 
+const ORIGIN_DEFAULT = 'origin/main'
+
+describe('release_history.read_current_version', () => {
+	// `josh release` reads the version from `origin/<default>` rather than the checkout's own
+	// package.json, so the number it raises is main's latest (joshuafolkken/kit#2411).
+	it('reads the version at the tip it is given', async () => {
+		const reader = reader_for({
+			shas: [],
+			manifests: manifests_of([[ORIGIN_DEFAULT, CURRENT]]),
+		})
+
+		expect(await release_history.read_current_version(ORIGIN_DEFAULT, reader)).toBe(CURRENT)
+	})
+
+	it('answers undefined when the tip has no readable package.json', async () => {
+		const reader = reader_for({ shas: [], manifests: new Map() })
+
+		expect(await release_history.read_current_version(ORIGIN_DEFAULT, reader)).toBeUndefined()
+	})
+})
+
 describe('release_history.read_release_plan', () => {
 	it('raises the version by one minor per merge since the base', async () => {
 		const plan = await release_history.read_release_plan(CURRENT, plan_reader(THREE))

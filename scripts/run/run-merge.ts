@@ -1,4 +1,9 @@
-import { ALREADY_DONE_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	ALREADY_DONE_LABEL,
+	EPIC_LABEL,
+	has_label_name,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/git/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import type { CarryChange, RunCarry } from './run-carry'
 
@@ -30,12 +35,26 @@ const ONE = 1
 // - `merged`      — CLOSED; the child finished and its pull request merged.
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (SKILL.md → §2z).
 // - `parked`      — OPEN and carrying `needs-decision` or `already-done`; a person still owns it.
+// - `split`       — OPEN and carrying `epic`; its work was divided into new children.
 // - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API; not
 //                   the child's failure, so it is re-dispatchable and uncounted against the failure guard
 //                   (joshuafolkken/kit#2240).
+// - `cut`         — OPEN and carrying neither, but its lane holds a declared cut no successor adopted;
+//                   the child ended its session on purpose, so it is resumed rather than parked and
+//                   counts nothing (joshuafolkken/kit#2484).
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `unresolved`  — the state could not be read; re-read before deciding.
-type ChildOutcome = 'merged' | 'human-review' | 'parked' | 'outage' | 'failed' | 'unresolved'
+type ChildOutcome =
+	'merged' | 'human-review' | 'parked' | 'split' | 'cut' | 'outage' | 'failed' | 'unresolved'
+
+// What the CLI read beside the GitHub state: whether the exit record is an API outage, and whether the
+// lane holds a cut its successor never adopted.
+interface EndingSignals {
+	is_outage: boolean
+	is_cut: boolean
+}
+
+const NO_SIGNALS: EndingSignals = { is_outage: false, is_cut: false }
 
 function is_closed(state: IssueState): boolean {
 	return state.state.toUpperCase() === CLOSED_STATE
@@ -52,29 +71,41 @@ function is_parked(state: IssueState): boolean {
 // **CLOSED means merged, whatever labels it carries** — a child that finished and merged keeps the
 // `needs-human-review` a person put on it, so that label is read only on an OPEN child
 // (`backlogrun-progress.md` → "Running a named epic's children").
-// An OPEN child's outcome: a person's review, a park, or the failed/outage split. `is_outage` is
-// consulted only here, in the last case — an OPEN, unparked child that could not reach the API is an
-// `outage`, not a `failed` (joshuafolkken/kit#2240).
-function open_outcome(state: IssueState, is_outage: boolean): ChildOutcome {
+// An OPEN, unparked child that is not waiting on a person: a declared cut is resumed
+// (joshuafolkken/kit#2484), and it is read before the outage so a cut whose process then lost the API is
+// still resumed from its record; an OPEN, unparked child that could not reach the API is an `outage`,
+// not a `failed` (joshuafolkken/kit#2240).
+function unfinished_outcome(signals: EndingSignals): ChildOutcome {
+	if (signals.is_cut) return 'cut'
+
+	return signals.is_outage ? 'outage' : 'failed'
+}
+
+function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
 	if (state.is_human_review) return 'human-review'
+
+	if (has_label_name(state.labels, EPIC_LABEL)) return 'split'
 
 	if (is_parked(state)) return 'parked'
 
-	return is_outage ? 'outage' : 'failed'
+	return unfinished_outcome(signals)
 }
 
-// `is_outage` is read from the child's exit record by the CLI and matters only for an OPEN child — a
-// CLOSED child is merged regardless of how the process exited.
-function classify_child(state: IssueState | undefined, is_outage = false): ChildOutcome {
+// The signals are read by the CLI and matter only for an OPEN child — a CLOSED child is merged
+// regardless of how the process exited.
+function classify_child(
+	state: IssueState | undefined,
+	signals: EndingSignals = NO_SIGNALS,
+): ChildOutcome {
 	if (state === undefined) return 'unresolved'
 
 	if (is_closed(state)) return 'merged'
 
-	return open_outcome(state, is_outage)
+	return open_outcome(state, signals)
 }
 
 // The counter change a child's outcome implies. A merge counts a merge (which resets the failure
-// streak); a failure counts a failure; a parked or human-review child counts nothing — a decision
+// streak); a failure counts a failure; a split, parked or human-review child counts nothing — a decision
 // waiting on a person is not the environment failing — and `undefined` says the carry record is left
 // untouched.
 function change_of(outcome: ChildOutcome): CarryChange | undefined {
@@ -123,5 +154,5 @@ const run_merge = {
 	is_outage_guard_tripped,
 }
 
-export type { ChildOutcome }
+export type { ChildOutcome, EndingSignals }
 export { run_merge }

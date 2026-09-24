@@ -27,6 +27,8 @@ function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 }
 
 const NO_ATTEMPTS = 0
+const SID = '11111111-1111-4111-8111-111111111111'
+const SID_RETRY = '22222222-2222-4222-8222-222222222222'
 
 // What a successor's record looks like to the loop it replaced (joshuafolkken/kit#1727): the pid is
 // this very process, so every liveness reading of it answers "running", and only the start time
@@ -236,9 +238,9 @@ describe('run_wake — launches counted apart from arrivals', () => {
 		const wake = run_wake.fresh_wake(INVOCATION, NOW)
 
 		expect(wake.woke).toBe(0)
-		expect(run_wake.count_wake(wake, NOW, 99).attempts).toBe(1)
-		expect(run_wake.count_wake(wake, NOW, 99).woke_at).toBe(NOW.toISOString())
-		expect(run_wake.count_wake(wake, NOW, 99).woke_pid).toBe(99)
+		expect(run_wake.count_wake(wake, NOW, 99, SID).attempts).toBe(1)
+		expect(run_wake.count_wake(wake, NOW, 99, SID).woke_at).toBe(NOW.toISOString())
+		expect(run_wake.count_wake(wake, NOW, 99, SID).woke_pid).toBe(99)
 	})
 
 	// joshuafolkken/kit#1746. Counted at the launch, `woke` asserted the very thing the supervisor had
@@ -247,21 +249,21 @@ describe('run_wake — launches counted apart from arrivals', () => {
 	it('does not count a launched session as a wake until it claims the record', () => {
 		const wake = run_wake.fresh_wake(INVOCATION, NOW)
 
-		expect(run_wake.count_wake(wake, NOW, 99).woke).toBe(0)
+		expect(run_wake.count_wake(wake, NOW, 99, SID).woke).toBe(0)
 	})
 
 	// `woke` is published against the carry record's `cuts`, so a retry of the same cut must not
 	// inflate it — otherwise the invariant reports a discrepancy that never happened.
 	it('counts a retry as another attempt but not as another wake', () => {
-		const first = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
-		const retry = run_wake.count_wake(first, NOW, 100)
+		const first = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID)
+		const retry = run_wake.count_wake(first, NOW, 100, SID_RETRY)
 
 		expect(retry.woke).toBe(0)
 		expect(retry.attempts).toBe(2)
 	})
 
 	it('clears the wake mark and the attempts once a session has claimed the carry record', () => {
-		const woken = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
+		const woken = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID)
 
 		expect(run_wake.count_claim(woken).woke_at).toBeUndefined()
 		expect(run_wake.count_claim(woken).attempts).toBeUndefined()
@@ -277,8 +279,8 @@ describe('run_wake — launches counted apart from arrivals', () => {
 
 	// One retried cut is still one cut served, however many launches it took.
 	it('counts a retried cut once when it is finally claimed', () => {
-		const first = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
-		const retry = run_wake.count_wake(first, NOW, 100)
+		const first = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID)
+		const retry = run_wake.count_wake(first, NOW, 100, SID_RETRY)
 
 		expect(run_wake.count_claim(retry).woke).toBe(1)
 	})

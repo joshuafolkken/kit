@@ -1,9 +1,13 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { agent_role_profile } from './agent-role-profile'
 import { claude_agent_argv } from './claude-agent-argv'
 
 const INVOCATION = 'fullrun #2070'
 const CLAUDE_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
+const WORKER_MODEL = 'claude-opus-5-5'
 
 describe('Claude argv construction', () => {
 	it('puts an already-resolved profile and the invocation on the command line', () => {
@@ -30,9 +34,9 @@ describe('Claude argv construction', () => {
 
 		expect(result).toMatchObject({
 			kind: 'argv',
-			profile: { provider: 'anthropic', role: 'worker', model: 'opus', effort: 'medium' },
+			profile: { provider: 'anthropic', role: 'worker', model: WORKER_MODEL, effort: 'medium' },
 		})
-		if (result.kind === 'argv') expect(result.argv.args).toContain('opus')
+		if (result.kind === 'argv') expect(result.argv.args).toContain(WORKER_MODEL)
 	})
 
 	it('passes no permission-bypass flag', () => {
@@ -71,5 +75,84 @@ describe('Claude resume argv construction', () => {
 		)
 
 		expect(argv.args.at(-1)).toBe(INVOCATION)
+	})
+})
+
+// **A forced session id lets the wake supervisor know its child's transcript name in advance**
+// (joshuafolkken/kit#2407), so a whiff is attributed to a session it started rather than to any
+// transcript that moved while it was alive.
+describe('Claude forced-session argv construction', () => {
+	const SESSION = '44444444-4444-4444-8444-444444444444'
+	const SESSION_ID_FLAG = '--session-id'
+
+	it('puts --session-id and the id ahead of the model flags', () => {
+		const profile = agent_role_profile.DEFAULT_PROFILES.scheduler
+		const argv = claude_agent_argv.build(INVOCATION, profile, SESSION)
+		const at = argv.args.indexOf(SESSION_ID_FLAG)
+
+		expect(at).toBeGreaterThan(-1)
+		expect(argv.args[at + 1]).toBe(SESSION)
+		expect(at).toBeLessThan(argv.args.indexOf('--model'))
+		expect(argv.args.at(-1)).toBe(INVOCATION)
+	})
+
+	it('forces nothing when no id is given, so every other caller is unchanged', () => {
+		const argv = claude_agent_argv.build(INVOCATION, agent_role_profile.DEFAULT_PROFILES.worker)
+
+		expect(argv.args).not.toContain(SESSION_ID_FLAG)
+	})
+})
+
+const MCP_CONFIG_FILE = '.mcp.json'
+
+function project_directory(has_mcp_config: boolean): string {
+	const directory = mkdtempSync(path.join(tmpdir(), 'kit-agent-argv-'))
+
+	if (has_mcp_config) writeFileSync(path.join(directory, MCP_CONFIG_FILE), '{"mcpServers":{}}\n')
+
+	return directory
+}
+
+// **A launched child carries only the tools a lane uses, and only the project's MCP servers**
+// (joshuafolkken/kit#2435), so the user's connectors and the unused tool definitions leave every
+// request's preamble.
+describe('Claude launched-tool argv construction', () => {
+	const TOOLS_FLAG = '--tools'
+	const STRICT_FLAG = '--strict-mcp-config'
+	const MCP_CONFIG_FLAG = '--mcp-config'
+	const WORKER = agent_role_profile.DEFAULT_PROFILES.worker
+
+	it('names the launched tool list from the one constant', () => {
+		const argv = claude_agent_argv.build(INVOCATION, WORKER, undefined, project_directory(false))
+		const at = argv.args.indexOf(TOOLS_FLAG)
+
+		expect(argv.args[at + 1]).toBe(claude_agent_argv.LAUNCHED_TOOLS.join(','))
+		expect(claude_agent_argv.LAUNCHED_TOOLS).not.toContain('AskUserQuestion')
+		expect(argv.args.at(-1)).toBe(INVOCATION)
+	})
+
+	it('loads the project MCP config by absolute path when the project has one', () => {
+		const directory = project_directory(true)
+		const argv = claude_agent_argv.build(INVOCATION, WORKER, undefined, directory)
+		const at = argv.args.indexOf(MCP_CONFIG_FLAG)
+
+		expect(argv.args).toContain(STRICT_FLAG)
+		expect(argv.args[at + 1]).toBe(path.join(directory, MCP_CONFIG_FILE))
+		expect(at).toBeLessThan(argv.args.indexOf('--model'))
+	})
+
+	it('drops every MCP server when the project declares none', () => {
+		const argv = claude_agent_argv.build(INVOCATION, WORKER, undefined, project_directory(false))
+
+		expect(argv.args).toContain(STRICT_FLAG)
+		expect(argv.args).not.toContain(MCP_CONFIG_FLAG)
+	})
+
+	it('narrows a resumed session the same way', () => {
+		const directory = project_directory(true)
+		const argv = claude_agent_argv.build_resume(INVOCATION, WORKER, 'session', directory)
+
+		expect(argv.args).toContain(TOOLS_FLAG)
+		expect(argv.args).toContain(path.join(directory, MCP_CONFIG_FILE))
 	})
 })

@@ -36,16 +36,29 @@ const ENOENT_NOTE = 'spawn claude ENOENT'
 interface Recorder {
 	ports: LoopPorts
 	wakes: Array<string>
+	session_ids: Array<string>
+	order: Array<string>
 }
+
+const HAND_OFF_CALL = 'hand_off'
+const WAKE_CALL = 'wake'
 
 // A scripted sequence of carry reads, one per pass, so a whole run of the supervisor is expressed as
 // what the record said over time. Running past the end reads as the run having ended.
 function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCHED): Recorder {
 	const wakes: Array<string> = []
+	// The forced ids handed to `wake`, one per launch, deterministic so a test can assert exactly which
+	// sessions the supervisor started (joshuafolkken/kit#2407).
+	const session_ids: Array<string> = []
+	// Every hand-off and launch in call order, so a test can pin that the hand-off lands first
+	// (joshuafolkken/kit#2437).
+	const order: Array<string> = []
 	const remaining = [...reads]
 
 	return {
 		wakes,
+		session_ids,
+		order,
 		ports: {
 			read_carry: () => remaining.shift() ?? ENDED,
 			// Liveness read from the record itself: a handed-off record's owner is the predecessor, whose
@@ -53,8 +66,17 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 			// live successor is spending. A test that needs a *dead* owner over a not-handed-off record —
 			// the crash joshuafolkken/kit#2336 recovers — overrides this port with `() => false`.
 			is_owner_live: (read) => read.kind === 'carried' && read.carry.is_handed_off !== true,
-			wake: (invocation) => {
+			// Work is there by default, so every test written before joshuafolkken/kit#2417 still sees
+			// the record-only decision; the idle tests override this port.
+			has_work: async () => true,
+			new_session_id: () => `sid-${String(session_ids.length + 1)}`,
+			hand_off: () => {
+				order.push(HAND_OFF_CALL)
+			},
+			wake: (invocation, session_id) => {
+				order.push(WAKE_CALL)
 				wakes.push(invocation)
+				session_ids.push(session_id)
 
 				return launch
 			},
@@ -104,6 +126,18 @@ describe('run_wake_loop.run_loop — one wake per cut', () => {
 
 		expect(run_wake.read_wake(scratch.target)?.woke).toBe(2)
 	})
+
+	// joshuafolkken/kit#2407. Each cut's forced session id is recorded on the record, so `josh time
+	// --run` can attribute a whiff to a session this supervisor started rather than to any transcript
+	// that moved while it was alive.
+	it('records the forced session id of every session it started', async () => {
+		const scripted = recorder([HANDED_OFF, IN_FLIGHT, HANDED_OFF, IN_FLIGHT])
+
+		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(run_wake.read_wake(scratch.target)?.spawned).toStrictEqual(scripted.session_ids)
+		expect(scripted.session_ids).toStrictEqual(['sid-1', 'sid-2'])
+	})
 })
 
 describe('run_wake_loop.run_loop — recovering a session that claimed and died', () => {
@@ -117,6 +151,18 @@ describe('run_wake_loop.run_loop — recovering a session that claimed and died'
 		await run_wake_loop.run_loop(scratch.target, ports, 0)
 
 		expect(scripted.wakes).toStrictEqual([INVOCATION])
+	})
+
+	// joshuafolkken/kit#2437. The recovery's successor ran `--begin` over a record no cut handed off and
+	// was answered `standing`, so the record is handed off first — before the launch, or a fast boot could
+	// still read it un-handed-off.
+	it('hands the record off before launching a recovery', async () => {
+		const scripted = recorder([IN_FLIGHT, ENDED])
+		const ports = { ...scripted.ports, is_owner_live: () => false }
+
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(scripted.order).toStrictEqual([HAND_OFF_CALL, WAKE_CALL])
 	})
 
 	// The live successor is a session doing the run's work — the ordinary in-flight state — so the loop

@@ -152,6 +152,13 @@ function lines_outside_fences(message: string): ReadonlyArray<string> {
 	return lines
 }
 
+// The run's own prose: the lines outside every fenced-code block and off every quote line. Shared with
+// the filing-offer row of the stop guard (joshuafolkken/kit#2422), which asks the same "is this the
+// run speaking, not an example or a quote" question of the same reply.
+function prose_lines(message: string): ReadonlyArray<string> {
+	return lines_outside_fences(message).filter((line) => !QUOTE_LINE.test(line))
+}
+
 // The bare references in the message, in the order they appear and de-duplicated: the block reason
 // names them and turns them into `issue:cite` arguments, so a reference cited twice is not nudged
 // about twice. Fenced-code blocks and quote lines are skipped, so a `#N` shown in an example or quoted
@@ -159,9 +166,7 @@ function lines_outside_fences(message: string): ReadonlyArray<string> {
 function bare_references(message: string): ReadonlyArray<string> {
 	const found: Array<string> = []
 
-	for (const line of lines_outside_fences(message)) {
-		if (!QUOTE_LINE.test(line)) collect_line_references(line, found)
-	}
+	for (const line of prose_lines(message)) collect_line_references(line, found)
 
 	return [...new Set(found)]
 }
@@ -232,6 +237,6 @@ function linkify(message: string, slug: string): string {
 	return out.join('\n')
 }
 
-const issue_citation = { bare_references, cite_arguments, has_bare_reference, linkify }
+const issue_citation = { bare_references, cite_arguments, has_bare_reference, linkify, prose_lines }
 
 export { issue_citation }

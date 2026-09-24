@@ -23,7 +23,7 @@ const DUPLICATE_READ = 'duplicate-read'
 describe('lane_guard_policy.mode_in_lane_child', () => {
 	it.each([
 		['investigation', 'notice'],
-		['batching', 'notice'],
+		['batching', 'off'],
 		['rule', 'refuse'],
 		[DUPLICATE_READ, 'notice'],
 	])('says %j behaves as %s in a lane child', (id, mode) => {
@@ -93,7 +93,7 @@ describe('lane_guard_policy.mode_here', () => {
 	// In a marked lane child every guard takes its enumerated mode — this is the table the wrappers read.
 	it.each([
 		['investigation', 'notice'],
-		['batching', 'notice'],
+		['batching', 'off'],
 		['rule', 'refuse'],
 		[DUPLICATE_READ, 'notice'],
 	])('gives %j its enumerated mode %s in a marked lane child', (id, mode) => {
@@ -117,22 +117,22 @@ describe('lane_guard_policy.mode_here', () => {
 })
 
 describe('lane_guard_policy.is_suppressed_here', () => {
-	// `is_suppressed_here` is the `off` mode alone — the guard says nothing at all. No enumerated guard is
-	// `off` since kit#2382 moved investigation to `notice`, so the `off` path is exercised through the
-	// fail-safe wrappers rather than a real row, and every enumerated guard reads `false` below.
+	// `is_suppressed_here` is the `off` mode alone — the guard says nothing at all. Batching is `off` in a
+	// lane child since kit#2405 (its notice was cut off after the re-measurement missed 1.40), so that row
+	// reads `true` below while every `notice`- and `refuse`-mode guard reads `false`.
 	it('does not suppress the notice-mode investigation guard in a marked lane child (kit#2382)', () => {
 		expect(
 			lane_guard_policy.is_suppressed_here('investigation', LANE_DIRECTORY, LANE_CHILD_SOURCE),
 		).toBe(false)
 	})
 
-	// **The batching guard is not suppressed in a lane child since kit#2276.** It is `notice` there again,
-	// not `off`, so `is_suppressed_here` — which is the `off` mode alone — must read `false`: the guard
-	// still speaks, it only withholds the `permissionDecision` that would end a headless child's turn.
-	it('does not suppress the notice-mode batching guard in a marked lane child', () => {
+	// **The batching guard is suppressed in a lane child since kit#2405.** Its notice was cut off (`off`)
+	// after the re-measurement missed 1.40, so `is_suppressed_here` — the `off` mode alone — reads `true`:
+	// the guard says nothing at all in a child, which is what turning the failed advisory off means.
+	it('suppresses the off-mode batching guard in a marked lane child (kit#2405)', () => {
 		expect(
 			lane_guard_policy.is_suppressed_here('batching', LANE_DIRECTORY, LANE_CHILD_SOURCE),
-		).toBe(false)
+		).toBe(true)
 	})
 
 	// The duplicate-read guard is `notice` in a lane child (kit#2298), not `off`, so it still speaks —

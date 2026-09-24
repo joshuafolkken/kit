@@ -1,4 +1,5 @@
 import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { execaSync } from 'execa'
 
@@ -13,6 +14,7 @@ import { execaSync } from 'execa'
 // undefined value for it, and an explicit `undefined` would not mean "no timeout" anyway.
 function fetch_repo_name(timeout_ms: number | undefined): string | undefined {
 	const result = execaSync('gh', ['api', git_gh_api_path.repo_api_path(), '--jq', '.full_name'], {
+		...git_gh_exec.direct_environment(),
 		cwd: PROJECT_ROOT,
 		reject: false,
 		...(timeout_ms !== undefined && { timeout: timeout_ms }),

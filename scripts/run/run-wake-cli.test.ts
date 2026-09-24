@@ -34,6 +34,7 @@ const LOOP_FLAG = '--loop'
 const INTERVAL_FLAG = '--interval'
 const OUTPUT_LABEL = 'output: '
 const SUPERVISOR_PID = 4242
+const SID = '11111111-1111-4111-8111-111111111111'
 
 const out: Array<string> = []
 const errors: Array<string> = []
@@ -203,7 +204,7 @@ describe('josh run:wake --list — a person can see what is running', () => {
 	it('reports the wake count beside the run’s cut count', async () => {
 		write_carry(false)
 		const claimed = run_wake.count_claim(
-			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99),
+			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID),
 		)
 
 		run_wake.write_wake(wake_target(), claimed)
@@ -213,15 +214,17 @@ describe('josh run:wake --list — a person can see what is running', () => {
 	})
 })
 
-// joshuafolkken/kit#2207: after a cut the ambient surface is the run's event stream, followed from
-// `--list`, with `tail -F` on the raw stream named as a recovery path rather than the ambient one.
+// joshuafolkken/kit#2207, joshuafolkken/kit#2492: after a cut the ambient surface is the run's event
+// stream, watched from a pane of its own that `--list` names, with `tail -F` on the raw stream named as
+// a recovery path rather than the ambient one — never a follow for the conversation to relay.
 describe('josh run:wake --list — the ambient surface across the cut', () => {
-	it('names the follow reader and the stream to recover from across the cut', async () => {
+	it('names the watch pane and the stream to recover from across the cut', async () => {
 		write_carry(false)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
 
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
-		expect(errors.join('\n')).toContain('pnpm josh run:event --follow')
+		expect(errors.join('\n')).toContain('pnpm josh run:event --watch')
+		expect(errors.join('\n')).not.toContain('run:event --follow')
 		expect(errors.join('\n')).toContain(`tail -F ${event_target()}`)
 	})
 })
@@ -279,7 +282,7 @@ describe('josh run:wake --list — what a stalled cut looks like', () => {
 		write_carry(true)
 		run_wake.write_wake(
 			wake_target(),
-			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99),
+			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99, SID),
 		)
 
 		await run_wake_cli.run(['--list'])

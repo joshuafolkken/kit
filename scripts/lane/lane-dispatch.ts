@@ -5,6 +5,8 @@ import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ending } from '#scripts/run/run-ending'
+import { run_event_stream } from '#scripts/run/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_issue_number } from '#scripts/run/run-issue-number'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
@@ -320,10 +322,17 @@ async function unmark_in_progress(issue: string): Promise<void> {
 	}
 }
 
+// A started child is recorded on the run's stream, which is where the stall detector ages the last
+// dispatch from (joshuafolkken/kit#2464) — unrecorded, every stall read "hours since the last dispatch"
+// minutes after a launch. A failed start records nothing: no child is running.
 async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
 	const outcome = await started(request)
 
-	if (outcome.kind === 'failed') await unmark_in_progress(issue)
+	const is_failed = outcome.kind === 'failed'
+
+	await (is_failed
+		? unmark_in_progress(issue)
+		: run_event_stream_emit.emit(run_event_stream.EVENT_KIND.CHILD_LAUNCH, `#${issue} dispatched`))
 
 	return outcome
 }
@@ -353,6 +362,15 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 // The child is running — saying otherwise would send the caller to dispatch a second one into the same
 // lane — but its output is going nowhere, so a message naming the path would point at a file that will
 // never grow, and a poll of that file would book a working child as stopped.
+// The liveness pattern the parent polls with — the shared one, which also finds a detached ship
+// supervisor (joshuafolkken/kit#2428). `describe` never throws, so an issue that is not a number falls
+// back to the launched invocation rather than raising from the validator.
+function poll_pattern(outcome: Dispatched, issue: string): string {
+	if (!run_issue_number.ISSUE_NUMBER_PATTERN.test(issue)) return `${outcome.invocation}$`
+
+	return lane_child_invocation.process_pattern(issue)
+}
+
 function log_sentence(outcome: Dispatched, issue: string): string {
 	// **The pattern matches the child's own command line, not the lane it runs in**
 	// (joshuafolkken/kit#1948). The child is `claude … ${outcome.invocation}` and its argv carries no
@@ -362,7 +380,7 @@ function log_sentence(outcome: Dispatched, issue: string): string {
 	// `--process` as what the caller *saw*, never as a property of the child's kind — told to pass
 	// `alive`, a parent that never ran `pgrep` would answer `alive` for a child that crashed an hour ago
 	// and poll it for ever.
-	const poll = `run \`pgrep -laf "${outcome.invocation}$"\` and pass what it found to \`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\` — or \`--process none\` where it found nothing`
+	const poll = `run \`pgrep -laf "${poll_pattern(outcome, issue)}"\` and pass what it found to \`pnpm josh run:liveness ${issue} --output ${outcome.log_path} --process alive\` — or \`--process none\` where it found nothing`
 
 	if (outcome.notes.length > 0) {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`

@@ -1,4 +1,5 @@
 import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { observations_flush } from '#scripts/observations/observations-flush'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_command } from './git-command'
@@ -9,6 +10,9 @@ vi.mock('./git-command', () => ({ git_command: { status: vi.fn() } }))
 vi.mock('./main-sync', () => ({ main_sync: { run: vi.fn() } }))
 vi.mock('#scripts/observations/observations-flush', () => ({
 	observations_flush: { flush: vi.fn() },
+}))
+vi.mock('#scripts/observations/observation-ledger-home', () => ({
+	observation_ledger_home: { is_lane: vi.fn() },
 }))
 
 const DIRTY_LEDGER = ` M ${OBSERVATION_LEDGER_PATH}`
@@ -21,6 +25,7 @@ const FLUSH_FAILURE = new Error('remote hung up')
 const mocked_status = vi.mocked(git_command.status)
 const mocked_sync = vi.mocked(main_sync.run)
 const mocked_flush = vi.mocked(observations_flush.flush)
+const mocked_is_lane = vi.mocked(observation_ledger_home.is_lane)
 
 function warned_text(): string {
 	return vi
@@ -36,6 +41,22 @@ beforeEach(() => {
 	mocked_status.mockResolvedValue(DIRTY_LEDGER)
 	mocked_sync.mockResolvedValue(MAIN_SYNC_SUCCESS)
 	mocked_flush.mockResolvedValue('merged observations/2026-09-12-000000')
+	mocked_is_lane.mockReturnValue(false)
+})
+
+// joshuafolkken/kit#2419: a lane's ledger is the primary checkout's, and `main_sync` refuses inside a
+// linked work tree — so the step there printed a recovery a lane could not complete.
+describe('flush_ledger_step — inside a lane', () => {
+	it('neither reads the tree nor returns to the default branch', async () => {
+		mocked_is_lane.mockReturnValue(true)
+
+		await git_followup_flush.flush_ledger_step(true)
+
+		expect(mocked_status).not.toHaveBeenCalled()
+		expect(mocked_sync).not.toHaveBeenCalled()
+		expect(mocked_flush).not.toHaveBeenCalled()
+		expect(warned_text()).toBe('')
+	})
 })
 
 describe('flush_ledger_step — when the ledger holds a pending append', () => {

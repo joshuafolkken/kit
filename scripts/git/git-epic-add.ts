@@ -1,3 +1,4 @@
+import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
@@ -176,6 +177,11 @@ async function comment_decision(children: ReadonlyArray<number>, decision: strin
 // The record posted to the children is `plan.decision`, not the caller's file: the plan is what folded
 // the replaced relations into it, and reading the raw input here would leave the epic's `## Decisions`
 // carrying a line the child comments do not (joshuafolkken/kit#1711).
+// A child new to the epic, not a reordering — the only insertion that can put runnable work in the pool.
+function has_new_child(input: AddChildrenInput, plan: AddPlan): boolean {
+	return input.is_order_only !== true && plan.additions.length > 0
+}
+
 async function write_plan(input: AddChildrenInput, plan: AddPlan): Promise<void> {
 	await git_gh_command.issue_edit_body(String(input.epic_number), plan.body)
 	report_success(input, plan)
@@ -186,6 +192,8 @@ async function write_plan(input: AddChildrenInput, plan: AddPlan): Promise<void>
 	if (plan.decision !== undefined) {
 		await comment_decision([...plan.additions, ...plan.relocations], plan.decision)
 	}
+
+	if (has_new_child(input, plan)) await backlog_ready.print_offer_hint()
 }
 
 // The epic ready to receive children, or the reason it cannot be added to: unreadable, or closed

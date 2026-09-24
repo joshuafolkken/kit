@@ -44,6 +44,7 @@ const EVENT_KIND = {
 	CHILD_LAUNCH: 'child-launch',
 	MERGE: 'merge',
 	PARK: 'park',
+	SPLIT: 'split',
 	OUTAGE: 'outage',
 	CUT: 'cut',
 	// The backlog emptied while nothing of the run's own was in flight — the drain
@@ -64,7 +65,8 @@ const EVENT_KIND = {
 	RETROSPECTIVE: 'retrospective',
 	// Ready backlog work is sitting undispatched while a lane is free and nothing has dispatched for a
 	// while (joshuafolkken/kit#2359). Emitted once per stall episode by the stop-time detector, it is
-	// both the dedup marker — `emit_once` refuses a second while it is the newest event — and the line a
+	// both the dedup marker — `emit_once_since` refuses a second until a `CHILD_LAUNCH` intervenes
+	// (joshuafolkken/kit#2464) — and the line a
 	// terminal reader following the stream sees. `run:step` reads it as `backlog:next`, so a run that
 	// stalled is pointed straight at dispatching the work rather than left waiting.
 	STALL: 'stall',
@@ -74,11 +76,34 @@ const EVENT_KIND = {
 	// than once, and a terminal reader following the stream sees the line. The strand is the step before
 	// the stall: a stalled run still has a driver that could dispatch, a stranded one has none.
 	STRANDED: 'stranded',
+	// One `josh ship` stage starting, succeeding or failing (joshuafolkken/kit#2426). It is a trace of the
+	// composite's progress rather than a position the run is at — the positions a ship leaves behind are
+	// the closed issue its `followup` merges, or a detached supervisor's `SHIP_LAUNCH` / `SHIP_STOP` below
+	// — so it is one of the `TRACE_KINDS` the last-event read skips.
+	SHIP_STAGE: 'ship-stage',
+	// One progress watcher line — the `at … / next …` heartbeat `run:progress` prints
+	// (joshuafolkken/kit#2437). Printed only to the watcher's own output, a headless successor's heartbeat
+	// was buried in its log after a cut; on the stream it reaches the attached session's relay. It says
+	// the run is alive rather than where it is, so it is a trace kind like `SHIP_STAGE`.
+	HEARTBEAT: 'heartbeat',
+	// The post-implementation region handed to a detached `josh ship --detach` supervisor
+	// (joshuafolkken/kit#2428). Unlike a stage trace it is a position: the agent has ended and the
+	// supervisor carries the run, so `run:step` answers `wait` until it stops or the issue closes.
+	SHIP_LAUNCH: 'ship-launch',
+	// The supervisor stopped at a failed stage — a red gate, a High/Medium review, a failed push, red CI
+	// (joshuafolkken/kit#2428). The position that hands control back: `run:step` prints the command that
+	// shows the stopped report, so the agent fixes it and relaunches rather than rebuilding the context.
+	SHIP_STOP: 'ship-stop',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
 
 const EVENT_KINDS: ReadonlyArray<string> = Object.values(EVENT_KIND)
+
+// The kinds that trace progress inside a step rather than mark where the run is. Every last-event reader
+// — `run:step`'s position, `emit_once`'s dedup — asks "where is the run", and a
+// ship's four stage lines after its `merge` would otherwise read as an unknown position.
+const TRACE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE, EVENT_KIND.HEARTBEAT])
 
 const event_schema = z.object({
 	pos: z.number(),
@@ -186,11 +211,20 @@ function read_from(target: string, position: number): StreamRead {
 }
 
 // The degenerate single-event read the "last line" consumers keep working as (joshuafolkken/kit#2205):
-// the newest event, or `undefined` for an empty stream.
+// the newest positional event, or `undefined` for a stream with none. Trace events are skipped
+// (joshuafolkken/kit#2426), so the answer stays the run's position however many stage lines follow it.
 function read_last(target: string): RunEvent | undefined {
-	const events = read_events(target)
+	return read_events(target).findLast((event) => !TRACE_KINDS.has(event.kind))
+}
 
-	return events[events.length - POSITION_INCREMENT]
+// Whether `kind` is already on the stream after the newest `reset_kind` — or anywhere, before the first
+// one. The episode test for a marker whose episode ends only when something specific happens rather than
+// when any other event lands (joshuafolkken/kit#2464): a stall ends at a dispatch, and the merges, parks
+// and heartbeats every parallel lane appends in between must not read as a fresh stall.
+function has_since(events: ReadonlyArray<RunEvent>, kind: string, reset_kind: string): boolean {
+	const reset_at = events.findLastIndex((event) => event.kind === reset_kind)
+
+	return events.slice(reset_at + POSITION_INCREMENT).some((event) => event.kind === kind)
 }
 
 // One event as the line a reader relays (joshuafolkken/kit#2207). The follow reader and the degenerate
@@ -209,8 +243,10 @@ const run_event_stream = {
 	EVENT_KINDS,
 	EVENT_PREFIX,
 	EVENT_SUFFIX,
+	TRACE_KINDS,
 	append,
 	format_event,
+	has_since,
 	is_event_kind,
 	read_events,
 	read_from,

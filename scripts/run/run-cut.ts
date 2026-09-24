@@ -4,6 +4,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_utilities } from '#scripts/git/constants'
 import { git_command } from '#scripts/git/git-command'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { z } from 'zod'
@@ -38,15 +39,14 @@ import { run_hold } from './run-hold'
 // adopter.
 
 const CUT_PREFIX = 'josh-run-cut-'
-// **The three phase names are `agent-role-profile.ts`'s** (joshuafolkken/kit#2382): a lane child resumes
+// **The two phase names are `agent-role-profile.ts`'s** (joshuafolkken/kit#2382): a lane child resumes
 // into a phase, and that module resolves the effort the resumed child runs at from the same name. Reading
 // them from there rather than restating the literals here is what keeps the phase a cut records and the
 // phase the effort table is keyed on from drifting. `PRE_GATE_PHASE` is the boundary before the gate;
-// `IMPLEMENTATION_PHASE` (joshuafolkken/kit#1933) drops the thinking accumulated *during* implementation;
-// `SETUP_PHASE` (joshuafolkken/kit#2346) drops the ~130,000-token setup context before implementation
-// begins. The last two both resume back into implementation, so they share one resume shape
-// (`resumes_into_implementation`); only the pre-gate cut resumes into the gate.
-const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE, SETUP_PHASE } = agent_role_profile
+// `IMPLEMENTATION_PHASE` (joshuafolkken/kit#1933) drops the thinking accumulated *during* implementation
+// and resumes back into implementation (`resumes_into_implementation`); only the pre-gate cut resumes
+// into the gate. The setup-phase cut (joshuafolkken/kit#2346) was retired by joshuafolkken/kit#2489.
+const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_role_profile
 // **The measurement is the parent hand-off's, never a second one** (joshuafolkken/kit#1933). The lane
 // child decides whether to take this cut with `pnpm josh cost --cut`
 // — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
@@ -67,7 +67,6 @@ const GIT_READ_TIMEOUT_MS = 5000
 // The two lines `GIT_DIRECTORY_ARGUMENTS` prints, in order: the work tree's own git directory, then the
 // common one every lane of a repository shares. `git_directories` reads the same two asynchronously.
 const WORKTREE_DIRECTORY_INDEX = 0
-const COMMON_DIRECTORY_INDEX = 1
 
 const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'
@@ -107,6 +106,11 @@ interface RunCut {
 	// legacy shape — while a resume into implementation refuses to continue without it (`classify_resume`
 	// → `incomplete`), so a session is never silently continued lacking the instruction it needs.
 	handoff?: Handoff | undefined
+	// Set when `run:merge` found this cut still unadopted after every process of the lane had gone and
+	// relaunched its successor itself (joshuafolkken/kit#2484). The fallback fires once per cut: a
+	// successor that dies again before adopting is not relaunched a second time, so a lane that keeps
+	// failing its resume is parked rather than relaunched forever.
+	is_merge_relaunched?: boolean | undefined
 }
 
 // The current tree's state, read once and handed to the pure classifier.
@@ -164,6 +168,7 @@ const run_cut_schema = z.object({
 	cut_at: z.string(),
 	is_handed_off: z.boolean().optional(),
 	handoff: run_cut_handoff.handoff_schema.optional(),
+	is_merge_relaunched: z.boolean().optional(),
 })
 
 function cut_path(git_directory: string): string {
@@ -228,7 +233,7 @@ function read_cut(target: string, now: Date = new Date()): CutRead {
 // The alternative errs the other way: a read fault would be taken for "already cut" and the guard
 // would go quiet on exactly the run it exists for. The cost of this direction is one refusal a lane
 // can answer by reissuing, since that row is delivered once per run.
-function git_directories_sync(): ReadonlyArray<string> {
+function git_directories_sync(cwd?: string): ReadonlyArray<string> {
 	try {
 		// The binary is resolved through `git_utilities` exactly as `git-spawn.ts` resolves it, so this
 		// call does not answer to whatever `PATH` happens to hold. It runs the binary directly with an
@@ -242,7 +247,21 @@ function git_directories_sync(): ReadonlyArray<string> {
 			// in front of a tool call that is about to be allowed.
 			// A `PreToolUse` hook holds the tool call while it runs, so the read is bounded rather than
 			// left to whatever git does.
-			{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: GIT_READ_TIMEOUT_MS },
+			// `cwd` is set only by `lane_cut_sync`, which reads another lane's record from the parent.
+			// With a `cwd`, the git location variables are cleared so it is what git answers for: a hook
+			// exports `GIT_DIR`, which beats `cwd` and would name the hook's checkout instead
+			// (joshuafolkken/kit#2515). Without one the environment is kept, so this read resolves the same
+			// checkout as the asynchronous `git_directories` that writes the record.
+			{
+				cwd,
+				env:
+					cwd === undefined
+						? process.env
+						: { ...process.env, ...git_location_environment.location_free_environment() },
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'ignore'],
+				timeout: GIT_READ_TIMEOUT_MS,
+			},
 		) // NOSONAR
 
 		return output.split('\n').filter((line) => line !== '')
@@ -255,14 +274,6 @@ function git_directories_sync(): ReadonlyArray<string> {
 // the record and the pre-gate guard both key on it.
 function worktree_git_directory_sync(): string | undefined {
 	return git_directories_sync()[WORKTREE_DIRECTORY_INDEX]
-}
-
-// The common git directory (index 1) — `.git` in the main work tree and the same `.git` from inside a
-// lane, which the run's event stream keys on (joshuafolkken/kit#2346). The setup-cut guard reads the
-// stream synchronously to learn whether the plan has been posted, so it needs this key without the
-// asynchronous `git_directories` a `PreToolUse` hook cannot await.
-function common_git_directory_sync(): string | undefined {
-	return git_directories_sync()[COMMON_DIRECTORY_INDEX]
 }
 
 // **The directory is injectable so a test never has to write to the live record.** Keyed to the work
@@ -280,6 +291,19 @@ function carried_cut_sync(
 	return read.kind === 'carried' ? read.cut : undefined
 }
 
+// A lane's carried cut, read from outside the lane (joshuafolkken/kit#2484). The record is keyed to the
+// lane's own git directory, so the parent — standing in the main checkout — resolves that directory
+// from the lane's path rather than its own, and gets the record path back to mark it.
+function lane_cut_sync(lane_directory: string): { target: string; cut: RunCut } | undefined {
+	const directory = git_directories_sync(lane_directory)[WORKTREE_DIRECTORY_INDEX]
+
+	if (directory === undefined) return undefined
+
+	const cut = carried_cut_sync(new Date(), directory)
+
+	return cut === undefined ? undefined : { target: cut_path(directory), cut }
+}
+
 function fresh_cut(spec: CutSpec, now: Date): RunCut {
 	return {
 		invocation: invocation_for(spec.issue),
@@ -292,12 +316,11 @@ function fresh_cut(spec: CutSpec, now: Date): RunCut {
 	}
 }
 
-// **The setup and implementation cuts resume back into implementation; the pre-gate cut resumes into
-// the gate** (joshuafolkken/kit#2346). The two phases that resume into implementation share one resume
-// shape — the `resume-impl` verdict and the record cleared on adoption — so the grouping is named once
-// here rather than spelled as `phase === SETUP || phase === IMPLEMENTATION` at each call site.
+// **The implementation cut resumes back into implementation; the pre-gate cut resumes into the gate**
+// (joshuafolkken/kit#1933). The resume shape — the `resume-impl` verdict and the record cleared on
+// adoption — is named once here rather than spelled as a phase comparison at each call site.
 function resumes_into_implementation(phase: string): boolean {
-	return phase === SETUP_PHASE || phase === IMPLEMENTATION_PHASE
+	return phase === IMPLEMENTATION_PHASE
 }
 
 // Whether a record serializes within the hand-off bound. The record a fresh process reads back must
@@ -356,8 +379,29 @@ function is_adopted_cut(cut: RunCut, issue: string): boolean {
 
 // A cut that resumes into implementation must carry the instruction; a pre-gate cut resumes into the
 // gate and needs none, so it always passes (joshuafolkken/kit#2354).
-function has_required_handoff(cut: RunCut): boolean {
+// It reads a spec as well as a record, so `run:cut` refuses to write the cut its resume would refuse
+// (joshuafolkken/kit#2484) with the same predicate the resume answers `incomplete` on.
+function has_required_handoff(cut: Pick<RunCut, 'phase' | 'handoff'>): boolean {
 	return !resumes_into_implementation(cut.phase) || run_cut_handoff.is_complete_handoff(cut.handoff)
+}
+
+// Whether `run:merge` may relaunch the successor of a lane whose processes have all gone
+// (joshuafolkken/kit#2484): a cut this issue declared and no successor adopted, carrying what its resume
+// needs, and not relaunched by the fallback before. The tree itself is verified by the resume.
+function is_relaunchable(cut: RunCut, issue: string): boolean {
+	return (
+		is_declared_cut(cut, issue) && has_required_handoff(cut) && cut.is_merge_relaunched !== true
+	)
+}
+
+// Marks the fallback relaunch spent, with the same remove-then-exclusive-create `adopt_cut` uses. A
+// later `run:merge` reads the mark and does not relaunch. It does not arbitrate two truly concurrent
+// ones — both creates can succeed — so a stray session is refused by the carry ownership check
+// `run:merge` asks first.
+function mark_merge_relaunched(target: string, cut: RunCut): boolean {
+	stamp_file.remove_stamp(target)
+
+	return stamp_file.create_stamp(target, { ...cut, is_merge_relaunched: true })
 }
 
 // A resume requires a declared cut, a matching tree, and — for a resume into implementation — the
@@ -453,23 +497,25 @@ const run_cut = {
 	IMPLEMENTATION_PHASE,
 	MAX_HANDOFF_BYTES,
 	PRE_GATE_PHASE,
-	SETUP_PHASE,
 	adopt_cut,
 	begin_cut,
 	busy_message,
 	carried_cut_sync,
 	classify,
 	classify_resume,
-	common_git_directory_sync,
 	current_state,
 	cut_path,
 	describe_cut,
 	end_cut,
 	fresh_cut,
 	handed_off_message,
+	has_required_handoff,
 	incomplete_message,
 	invocation_for,
 	is_expired,
+	is_relaunchable,
+	lane_cut_sync,
+	mark_merge_relaunched,
 	read_cut,
 	record_within_bound,
 	resumes_into_implementation,

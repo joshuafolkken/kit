@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { backlog_budget } from './backlog-budget'
 import { backlog_budget_cli } from './backlog-budget-cli'
 
@@ -92,6 +92,25 @@ describe('backlog_budget_cli.build_input — an unreadable invocation is refused
 	])('refuses %s', (_name, argv) => {
 		expect(build(argv)).toBeUndefined()
 	})
+})
+
+it('prints the finish classification beside a JSON budget verdict', () => {
+	const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+	const args = [
+		'--answer',
+		'exhausted',
+		'--started',
+		STARTED,
+		'--active',
+		ACTIVE,
+		'--idle',
+		'0',
+		'--json',
+	]
+
+	expect(backlog_budget_cli.run(args, NOW_MS)).toBe(0)
+	expect(info).toHaveBeenCalledWith(expect.stringContaining('"is_finish":true'))
+	info.mockRestore()
 })
 
 describe('backlog_budget_cli.run', () => {

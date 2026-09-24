@@ -81,6 +81,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// distributed under `scripts/time-runtime/`.
 		is_kit_only: true,
 	},
+	// The tool-calls-per-round-trip density the batching guard is measured on, aggregated across the
+	// recent lane sessions (joshuafolkken/kit#2405). Kit-only for the same reason `time` is: it reads
+	// kit's own lane transcripts and means nothing in a consumer project.
+	'time:density': {
+		script: 'scripts/time/time-density-cli.ts',
+		description: 'Report tool calls per round trip across the recent lane sessions',
+		category: 'AI tools',
+		reference: ['[--lanes <n>] [--path <dir>]', 'maintainer', ['none']],
+		is_kit_only: true,
+	},
 	retrospective: {
 		script: 'scripts/retrospective/retrospective-cli.ts',
 		description:
@@ -157,7 +167,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/run-cut-cli.ts',
 		description: 'Cut a lane child before the gate and resume a fresh process',
 		category: 'AI tools',
-		reference: ['[--resume] <issue> [--impl|--setup] [--handoff <path>]', 'automation', ['files']],
+		reference: ['[--resume] <issue> [--impl] [--handoff <path>]', 'automation', ['files']],
 	},
 	'run:liveness': {
 		script: 'scripts/run/run-liveness-cli.ts',
@@ -243,12 +253,31 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[<issue> ...]', 'automation', ['git', 'network']],
 	},
+	// The commit-to-report region a run ships a change on, folded into one call (joshuafolkken/kit#2398):
+	// the gate, the commit/push/PR (`git -y`), the CI-wait merge (`followup`) and the report bookkeeping
+	// (`run:tail`) were four round trips re-billing the run's full context each. It stops at the first
+	// failed step and names it, so the run reads only the step to fix.
+	ship: {
+		script: 'scripts/run/run-ship-cli.ts',
+		description:
+			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
+		category: 'AI tools',
+		reference: [
+			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
+			'automation',
+			['git', 'network'],
+		],
+	},
 	'run:event': {
 		script: 'scripts/run/run-event-cli.ts',
 		description:
-			'Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)',
+			'Append to, read or watch the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last)',
 		category: 'AI tools',
-		reference: ['--append <kind> <text> | --from|--follow <n> | --last', 'automation', ['files']],
+		reference: [
+			'--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last',
+			'automation',
+			['files'],
+		],
 	},
 	'run:report': {
 		script: 'scripts/run/run-report-cli.ts',

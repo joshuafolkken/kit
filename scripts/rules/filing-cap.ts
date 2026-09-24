@@ -69,6 +69,30 @@ function prior_filing_count(tail: string): number {
 	return filing_ids.filter((id) => (refusals.get(id) ?? '') === '').length
 }
 
+// A person's prompt: a `user` line carrying no tool result. Tool results ride `user` lines too, so the
+// absence of one is what marks the line as typed rather than returned.
+function is_prompt_line(line: string): boolean {
+	const parsed = time_transcript_line.parse_line(line)
+
+	if (parsed?.type !== 'user') return false
+
+	return parsed.blocks.every((block) => block.result_id === '')
+}
+
+// The tail from the last prompt on, so a filing an earlier turn made does not answer for this one
+// (joshuafolkken/kit#2422). A tail with no prompt on it is returned whole.
+function current_turn(tail: string): string {
+	const lines = tail.split('\n')
+	const start = lines.findLastIndex((line) => is_prompt_line(line))
+
+	return lines.slice(Math.max(start, 0)).join('\n')
+}
+
+// How many Issues this turn has filed — the per-run count read over `current_turn`.
+function turn_filing_count(tail: string): number {
+	return prior_filing_count(current_turn(tail))
+}
+
 // **Fires on every filing past the cap, not once per run.** It records nothing and ignores the
 // last-fired instant, so `decide` — which the enumeration asks unconditionally — refuses each filing
 // while the count stands at or above the ceiling. `can_record` has nothing to protect for a row that
@@ -96,6 +120,14 @@ const ROW = {
 	decide,
 }
 
-const filing_cap = { FILING_CAP, FILING_CAP_REASON, ROW, decide, prior_filing_count }
+const filing_cap = {
+	FILING_CAP,
+	FILING_CAP_REASON,
+	ROW,
+	current_turn,
+	decide,
+	prior_filing_count,
+	turn_filing_count,
+}
 
 export { filing_cap }

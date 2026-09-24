@@ -95,20 +95,19 @@ promoted to interrupt, never demoted to requested.**
 session-facing events — a plan posted, a child launched, a PR opened, a review round, a park, a cut, a
 stop, a merge — are appended to one ordered stream keyed to the run's identity (`pnpm josh run:event`),
 which survives the cut because it is the run's and not any one session's. **Every session is a writer;
-whichever session is attached to a terminal is the reader.** The reader follows the stream from its own
-last position — `pnpm josh run:event --follow <position>` returns the moment a new event lands and
-otherwise at the interval, so a person sees progress arrive at once and still sees the run is alive when
-it is quiet — and relays the events it prints. **This is the same reader before and after the cut**,
-because a cut moves who executes, never where the stream lives or where a reader stands in it. Writing
-ambient as a *mechanism* ("a pull, not a push") is what let the surface vanish at the cut with the words
-still reading as kept; anchoring it to the run's stream is what keeps it.
+the reader is a script in a pane of the person's own, never a conversation** (#2492):
+`pnpm josh run:event --watch` prints each event the moment it lands, in the session language, and the
+`heartbeat` events say the run is alive when quiet. A relaying session re-read its whole history per
+event, so **no session relays the stream** — name the watch command once, at the first cut or when
+asked. **It is the same reader before and after the cut**: a cut moves who executes, never where the
+stream lives.
 
 **Interrupt is withheld on purpose**: no Telegram, because `confirmation` and `completion` are what
 interrupt a person, and a line every fifteen minutes is the fatigue that stops them being
 read. **`pnpm josh run:wake --list` is the requested tier** — the last-event read of the stream the
-follow reads, for a person who types for one line rather than following. **`tail -F` on the
-raw stream file is a recovery path, not the ambient surface** — the follow is how progress is seen
-without asking, and the raw `tail` is the fallback when the relay has stopped, named for that role in
+watch pane reads, for a person who types for one line rather than watching. **`tail -F` on the
+raw stream file is a recovery path, not the ambient surface** — the watch pane is how progress is seen
+without asking, and the raw `tail` is the fallback when the pane has stopped, named for that role in
 `--list`'s own output.
 
 **A stop is an interrupt, and only a stop** (joshuafolkken/kit#2136). The heartbeat says a run is still
@@ -225,7 +224,7 @@ single non-numeric line as the verdict.
 
    **`run:liveness` stays the fallback for a lane no `lane:await` is watching** — a handed-over lane a
    resumed session polls ("Picking the lanes up in the fresh session"). Ask
-   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "fullrun #<N>$"` found>` where
+   `pnpm josh run:liveness <N> --output <path> --process <what `pgrep -laf "(fullrun|run-ship-cli\.ts .*) #<N>$"` found>` where
    that file has been unchanged for the silent-unit window; on `stopped` its own advice routes the child
    through the same `run:merge --output` classification. **The flag is what you saw, never what kind of
    child it is.**
@@ -289,20 +288,19 @@ single non-numeric line as the verdict.
    `pnpm josh lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (OPEN,
    `needs-decision` or `already-done`) is left alone and not counted; an **outage** child (OPEN, neither
    label, but the exit record shows it could not reach the API) has its stale `in-progress` dropped, is
-   **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable —
-   a run of consecutive outages trips its own guard and stops the run as an environment failure
+   **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable
    (joshuafolkken/kit#2240); a **failed** child (OPEN, neither label, not an outage) has its stale
    `in-progress` dropped, is parked with `needs-decision`, and is counted against the consecutive-failure
    guard. **A turn whose whole content is one read, or one two-line progress report, is the shape this
    collapses.**
 
    **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
-   `error` pass through), the composite adds five verdict tokens: `over` — the merge crossed the budget,
+   `error` pass through), the composite adds six verdict tokens: `over` — the merge crossed the budget,
    so hand the lanes over and take the cut ("The hand-off" below); `human-review` — the child stopped
    before its commit, the run's own ending (SKILL.md → §2z), so stop; `stop` — the consecutive-failure
    guard tripped; `environment` — the consecutive-**outage** guard tripped, so the API is down and the
-   run stops as an environment failure rather than the children's (joshuafolkken/kit#2240); and `retry`
-   — the child's state could not be read, so re-read before deciding.
+   run stops as an environment failure rather than the children's (joshuafolkken/kit#2240); `resumed` —
+   an unadopted cut was relaunched; `lane:await <N>` it again (joshuafolkken/kit#2484); and `retry` — the child's state could not be read, so re-read it.
 
    **The counters are the carry record's, and the epic progress comment is generated from it** (see "The
    counters live in the record" below). **The hand-off check is folded into the merge branch of the one
@@ -348,10 +346,10 @@ It prints `over` or `under` on standard output and the measured figure on standa
 the next turn of this session costs more than the threshold in billed input, and the number is passed
 explicitly so a run cannot drift it by remembering it wrong.
 
-**150,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
+**135,000 is shared by the scheduler entry, scheduler hand-off and lane worker implementation cut.**
 The value is `CONTEXT_CUT_THRESHOLD` in `scripts/cost-runtime/context-cut-threshold.ts`; `cost --cut`,
 `run:merge` and `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` all read it rather than carrying separate
-numbers. The output ceiling and the entry-read figure coincide at 150,000 but are separate systems.
+numbers. The output ceiling and the entry-read figure are a separate 150,000, not this threshold.
 
 ### The check is asked at every merge, and delegation does not excuse it
 
@@ -378,11 +376,10 @@ on the default branch, and the epic's state on GitHub is complete.
 **The same `pnpm josh cost --over` measurement bounds a lane child's context _during_ implementation, not
 only the parent's between children** — the pre-gate cut fires only once implementation is done, so it
 never caps the thinking a child accumulates while implementing. The child measures its own per-request
-context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 150_000, and cuts with
-`pnpm josh run:cut --impl <N>`. **The measurement and threshold are single-sourced**:
+context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 135_000, and cuts with
+`pnpm josh run:cut --impl <N> --handoff <path>`. **The measurement and threshold are single-sourced**:
 `cost_verdict.per_request_cost` is what both seams compare, and `cost --cut` selects the same constant
-for the parent and child. The boundary and the resume are `pre-gate-cut.md` → "The
-implementation-phase cut", its single source.
+for both. The boundary and the resume: `pre-gate-cut.md` → "The implementation-phase cut".
 
 **A merge is not by itself a safe seam, because another lane may still be running.** The reference to
 where each unit writes lives in the lane, so a session that never dispatched the child can poll it and
@@ -402,7 +399,7 @@ unit_output=$(pnpm josh lane:output <N>) &&
 ```
 
 **`--process` carries what `pgrep` found, and with a dispatched child that is the whole answer.** Run
-`pgrep -laf "fullrun #<N>$"` first and pass `alive` where it found the child and `none` where it did not
+`pgrep -laf "(fullrun|run-ship-cli\.ts .*) #<N>$"` first and pass `alive` where it found the child and `none` where it did not
 — **never `alive` because the child was dispatched.** The child's command line holds no path, so a
 `pgrep` on the lane's directory never matches a live child; the trace is the deciding input, because a
 log that has stopped moving is a session thinking rather than one that died.
@@ -425,8 +422,9 @@ ever.
   everything the session has, then run `pnpm josh run:carry --cut --owner "$PPID"`. **Unless it answers
   `capped`** (below), `pnpm josh run:wake` then starts the next session, which polls the still-running
   lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
-  records**. `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of
-  the carry; this reading is only where the cut is *taken*.
+  records**, name `pnpm josh run:event --watch` for a pane, and end the turn — nothing is relayed (#2492).
+  `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
+  carry; this reading is only where the cut is *taken*.
 - **`capped`** — the invocation has taken its `MAX_CUTS` cuts (joshuafolkken/kit#2346), so `--cut`
   refused and left the record un-handed-off. **Do not `run:wake` or hand off**: a wake over it recovers
   as a crashed owner into a fresh cold session — the churn the cap prevents. Carry **this** session on
@@ -547,12 +545,17 @@ turn is the one the **watcher's exit delivers** — a background command's compl
 the session (`background-commands.md`). **A `Bash` call that only sleeps is the spelling this forbids**,
 and so is a turn whose whole content is asking `epic:next` again to see whether anything has changed.
 
+**A `claude -p` parent waits in the foreground**, stopping only
+after `--cut` or `--end`; the `Stop` hook enforces it (#2437).
+
 **The wake is used for both halves at once.** The turn that relays the line is the turn that acts on what
 the line says: a free lane is the ask for the next child, and every lane still busy is not an ask at all.
 
 **The cost is latency, and it is named rather than hidden.** A lane that frees just after a line can sit
 idle until the next one — **up to one interval**. **A person who wants the latency back shortens the
-interval** — `--interval`, or `progress_interval_minutes` in the repository's configuration.
+interval** — `--interval`, or `progress_interval_minutes` in the repository's configuration. An issue
+newly runnable mid-wait is not held to it (joshuafolkken/kit#2503): `--wait` exits about a minute later
+with no progress line — act on its `ready #N` line.
 
 **What is not dropped.** Every timeout in the table above still ends its wait, and the silent-unit
 liveness check is still asked — on the wake the watcher delivers rather than on a clock of the parent's
@@ -560,7 +563,7 @@ own.
 
 #### The wake exists only while something is in flight
 
-**`--wait` ends at the first line it *prints*, and it prints only where there is something to report.**
+**`--wait` ends at the first line it *prints* (or an arrival), and it prints only where there is something to report.**
 With no child in flight it **declines**, and a `gh` listing it could not read declines the same way. **A
 declined watcher does not exit until its `--hours` bound, an hour by default.** So the wake above is not
 available in every state, and where it is unavailable **the parent keeps the interval after all**:

@@ -176,7 +176,7 @@ is `docs/josh-commands.md` → "`josh run:carry`"; what this loop does with each
 | `began`      | Nothing was carried. This is the invocation's first session: report the plan and run the decision pass as written below                                                                                                     |
 | `resumed`    | **This session is continuing a run that was cut** — a `--cut` handed the record off, or a `--resume` adopted it. Read the record with `--json` and take the budget figures from it, never from this session's own zero. Report the plan again — the pool has moved — and skip nothing else |
 | `busy`       | The record's **owner process is still running and no cut handed it off**: another parent is spending this budget right now. **Stop; do not open a lane.** Counting into it would put two parents on one record. (A record a `--cut` _did_ hand off answers `resumed` here even with its owner still alive — joshuafolkken/kit#1935.) Nothing here is yours to end — either that run finishes and ends its own record, or a person decides it is over |
-| `standing`   | A record is here that **no cut handed off** — the crashed run, and the same command retyped over it. **Stop; do not open a lane**, and do not guess: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. The `--owner` belongs to the resume as much as to the begin: adopt without it and the record declares no owner, so `busy` degrades to `standing` for every parent after |
+| `standing`   | A record is here that **no cut or supervisor handed off** — an unwatched crash, and the same command retyped over it. **Stop; do not open a lane**, and do not guess: the choice is the person's. Report the two commands the answer names — `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` to carry that budget on, or `pnpm josh run:carry --end` and begin again to discard it. The `--owner` belongs to the resume as much as to the begin: adopt without it and the record declares no owner, so `busy` degrades to `standing` for every parent after |
 | `mismatch`   | A record is here for a **different** invocation — a run that never reached `--end`. **Stop; do not open a lane.** Resuming into it would spend that run's `--max` and its hours. End it deliberately, with `pnpm josh run:carry --end`, once you know that run is over |
 | `expired`    | The 8-hour whole-run bound is spent. **Where a `--cut` handed the record off it is this run's own bound**, so this is the verdict on standard output and the run ends: report it and stop, and clear the record with `pnpm josh run:carry --end` once it is genuinely over. Where nothing handed it off it is printed on standard error ahead of a `began` instead — a person typing the keyword again over a spent record is starting a new run, and the record is replaced. A `--resume` over a spent record answers `expired` and adopts nothing |
 | `unreadable` | Report what it printed and **stop before opening a lane**. A budget that cannot be carried is a run that restarts it at the next cut, which is the whole defect                                                             |
@@ -196,12 +196,9 @@ sending a total would be sending arithmetic done in its head. **`--owner "$PPID"
 count**: a count that does not name the record's owning process is refused, so a session whose record a
 successor took over cannot advance a budget that is no longer its own.
 
-**`--cut` is also what hands the record off, and it is the only thing that does.** A crash never
-reaches it, which is why a declared cut is the one standing record the next session carries without
-anybody deciding: `--cut`, then the next `--begin` naming the same invocation answers `resumed` —
-**even while the cutting process is still running**, so a cut is handed to exactly one successor rather
-than stalling every resume with `busy`. Skip the `--cut` and the resumed session is answered `standing`
-and stops for the person.
+**`--cut` hands the record off, and so does `run:wake` for a dead owner** (joshuafolkken/kit#2437): the
+next `--begin` naming the same invocation answers `resumed` — **even while the cutting process is still
+running**, so a cut is handed to exactly one successor rather than stalling every resume with `busy`.
 
 **So `--cut` is the session's last write to the record**: count everything the session has, then cut.
 A `--merged` or `--filed` issued after the `--cut` is **refused**, so the hand-off is protected rather
@@ -251,8 +248,7 @@ pnpm josh run:wake --stop    # in the same turn as `run:carry --end`
 ```
 
 **It reads the same record this section already keeps, and decides from nothing else.** It wakes on
-`carried` **and** handed off — which is to say on a cut this run declared with `--cut` — and stops on
-`none`, `expired` and `unreadable`. So the 8-hour whole-run bound binds the waking for free: it is the
+`carried` handed off, or with a dead owner it hands off first (#2437). It stops on `none`, `expired` and `unreadable`. So the 8-hour whole-run bound binds the waking for free: it is the
 record's own expiry, and a spent budget reads `expired` and wakes nothing. **A new authorization is
 still a person's**, which is decision B's boundary exactly: the supervisor spends the budget that was
 declared and never declares another.
@@ -272,13 +268,13 @@ expired or cannot be read ends it the same way. `none` — the run having finish
 setting are `docs/josh-commands.md` → "`josh run:wake`".
 
 **Every unattended role runs with the provider selected from the invoking CLI and its own profile.**
-Codex sessions use OpenAI; Claude Code sessions use Anthropic. Anthropic uses scheduler `opus`, worker
-`opus` and reviewer `opus`; OpenAI uses `gpt-5.6-sol`, with role efforts
-`medium`/`medium`/`high` (scheduler / worker / reviewer) for both. Role-specific environment overrides are resolved before launch;
-model overrides apply only to Claude Code, effort overrides apply to either provider, and legacy
-`JOSH_LANE_*` values migrate to the worker only. Invalid configuration, a missing or conflicting
-session marker, a missing CLI or missing authentication refuses the selected provider without
-fallback, promotion or worker retry. `run:wake --list`, `lane:list`, the review brief and each launch
+Codex sessions use OpenAI; Claude Code sessions use Anthropic. Anthropic uses scheduler
+`claude-opus-5-5`, worker `claude-opus-5-5` and reviewer `claude-opus-5-5`; OpenAI uses `gpt-6-sol`,
+with role efforts `medium`/`medium`/`high` (scheduler / worker / reviewer) for both. Role overrides
+resolve before launch; model overrides apply only to Claude Code, effort overrides to either provider,
+and legacy `JOSH_LANE_*` values to the worker only. Invalid configuration, a missing or conflicting
+session marker, or a missing, outdated or unauthenticated CLI refuses without fallback, promotion or
+worker retry. `run:wake --list`, `lane:list`, the review brief and each launch
 log expose the resolved provider, role, model and effort.
 `docs/josh-commands.md` → "`josh lane:dispatch`" and `backlogrun-child.md` → "Each child runs in a
 delegated unit" are the single sources.
@@ -356,17 +352,19 @@ finding rather than an authorization — which is why a run parks with it and a 
 
 ## The loop
 
+**Run the loop as one background `pnpm josh backlog:drive --owner "$PPID" --active "$active"`** and
+end the turn (joshuafolkken/kit#2499); it runs all below. Its exit's first line is the wake:
+`merge <token> #N` → that token's `run:merge` row; `watch` → `run:step`; `window` → `resume:`;
+`stop` → reported and ended; other answers → "Where the run stops".
+
 **The loop's head is one command — `pnpm josh backlog:offer`** (joshuafolkken/kit#2162). It runs
 `backlog:next`, maps its answer to the budget word the table below fixes, runs `backlog:budget`, and
-returns the verdict with the issue numbers to start — the two turns the loop's head used to spend
-folded into one where the parent's context is largest, the same reasoning `run:merge` folded a merge
-event on. What follows is still the single source of both halves' contracts: `backlog:offer` is glue
-over them, so a change to what an answer *means* is a change here.
+returns the verdict with the issues to start. It stays both halves' contract source: what an answer
+*means* changes here.
 
 ```bash
 offer=$(pnpm josh backlog:offer --started "$started" --active "$active")   # alias: josh blo
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630)        # after #1630 merged
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after two
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after #1630, #1631 merged
 ```
 
 **The first line of standard output is the budget verdict; on `run`, the issue numbers to start
@@ -387,8 +385,7 @@ of it decide how the mapping is written:**
    `backlogrun` takes no `owner/repo#N` token.** A qualified token was implemented and withdrawn,
    because `--exclude` parses bare integers and feeding one back produces a usage error rather than
    an exclusion (joshuafolkken/kit#1630). Report the other repository's candidates in the run summary
-   and leave them to a session running there — the same one-session-per-repository shape
-   `backlogrun-lanes.md` → "Concurrency" already has.
+   and leave them to a session running there (`backlogrun-lanes.md` → "Concurrency").
 3. **The verdict words are `wait`, `stop`, `retry`, `error` and `none`** — `none` is `epic:next`'s
    `complete` under this command's spelling, and there is no `complete` here. **`retry` is the one
    with no `epic:next` counterpart**: it says GitHub did not answer, which is a statement about the

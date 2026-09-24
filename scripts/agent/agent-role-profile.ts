@@ -14,7 +14,7 @@ const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
 // resumes across — `run-cut.ts` imports these names for its own cut record, so the phase a run passes
 // and the phase this table is keyed on cannot drift. A phase-less call resolves the role default, which
 // is what keeps every existing caller unchanged.
-const PHASE_SCHEMA = z.enum(['setup', 'implementation', 'pre-gate'])
+const PHASE_SCHEMA = z.enum(['implementation', 'pre-gate'])
 const PROFILE_SCHEMA = z.object({
 	provider: PROVIDER_SCHEMA.default('anthropic'),
 	role: ROLE_SCHEMA,
@@ -36,18 +36,32 @@ type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider }
 const SCHEDULER: AgentRole = 'scheduler'
 const WORKER: AgentRole = 'worker'
 const REVIEWER: AgentRole = 'reviewer'
-const SETUP_PHASE: AgentPhase = 'setup'
 const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
 const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
 const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
 const OPENAI_PROVIDER: AgentProvider = 'openai'
-const OPENAI_MODEL = 'gpt-5.6-sol'
+// **Pinned model ids, never a floating alias** (joshuafolkken/kit#2415). An alias such as `opus` moves
+// whenever the CLI moves it, so a run log could not say which model produced it and a model migration
+// could not be measured apart from everything else. A new lane records the id it resolved; a lane
+// created before a migration keeps the model it recorded (`with_phase_effort` leaves it untouched).
+const OPENAI_MODEL = 'gpt-6-sol'
+const ANTHROPIC_MODEL = 'claude-opus-5-5'
 const CODEX_SESSION_KEY = 'CODEX_THREAD_ID'
 
 const DEFAULT_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
-	scheduler: { provider: ANTHROPIC_PROVIDER, role: SCHEDULER, model: 'opus', effort: 'medium' },
-	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: 'opus', effort: 'medium' },
-	reviewer: { provider: ANTHROPIC_PROVIDER, role: REVIEWER, model: 'opus', effort: 'high' },
+	scheduler: {
+		provider: ANTHROPIC_PROVIDER,
+		role: SCHEDULER,
+		model: ANTHROPIC_MODEL,
+		effort: 'medium',
+	},
+	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: ANTHROPIC_MODEL, effort: 'medium' },
+	reviewer: {
+		provider: ANTHROPIC_PROVIDER,
+		role: REVIEWER,
+		model: ANTHROPIC_MODEL,
+		effort: 'high',
+	},
 }
 
 const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
@@ -156,13 +170,45 @@ function session_rejection(is_conflicting: boolean): Rejected {
 	return { kind: 'rejected', note }
 }
 
-function resolve_provider(environment: AgentEnvironment = process.env): ProviderResult {
+// The provider a detached launcher hands a process that is not itself an agent session
+// (joshuafolkken/kit#2456). `detached_launch` strips the parent-session keys — the very keys the
+// detection below reads — so a `josh ship --detach --review` supervisor could never resolve its reviewer.
+// **It is a fallback, read only when no session is detected**: the mark is inherited by everything the
+// supervisor starts, and a real session's own keys must keep deciding for that session.
+const HANDED_PROVIDER_KEY = 'JOSH_AGENT_PROVIDER'
+
+function handed_provider(environment: AgentEnvironment): ProviderResult {
+	const value = trimmed(environment[HANDED_PROVIDER_KEY])
+	if (value === undefined) return session_rejection(false)
+	const parsed = PROVIDER_SCHEMA.safeParse(value)
+
+	return parsed.success
+		? { kind: 'provider', provider: parsed.data }
+		: rejection(HANDED_PROVIDER_KEY, value, 'is not an allowed provider')
+}
+
+// The session this process runs in, read from its own keys: `undefined` when none is detected.
+function detected_provider(environment: AgentEnvironment): ProviderResult | undefined {
 	const has_codex = has_session(environment, [CODEX_SESSION_KEY])
 	const has_claude = has_session(environment, agent_session_environment.PARENT_SESSION_KEYS)
 
-	if (has_codex === has_claude) return session_rejection(has_codex)
+	if (has_codex === has_claude) return has_codex ? session_rejection(true) : undefined
 
 	return { kind: 'provider', provider: has_codex ? OPENAI_PROVIDER : ANTHROPIC_PROVIDER }
+}
+
+function resolve_provider(environment: AgentEnvironment = process.env): ProviderResult {
+	return detected_provider(environment) ?? handed_provider(environment)
+}
+
+// The mark a detached launch sets on its child: the provider this session resolved, or nothing when it
+// resolved none — the child then fails the same way this session would have.
+function handoff_environment(
+	environment: AgentEnvironment = process.env,
+): Readonly<Record<string, string>> {
+	const selected = resolve_provider(environment)
+
+	return selected.kind === 'provider' ? { [HANDED_PROVIDER_KEY]: selected.provider } : {}
 }
 
 function validate(profile: AgentProfile, model_key: string): ProfileResult {
@@ -248,6 +294,7 @@ const agent_role_profile = {
 	DEFAULT_PROFILES,
 	EFFORT_SCHEMA,
 	ENV_KEYS,
+	HANDED_PROVIDER_KEY,
 	IMPLEMENTATION_PHASE,
 	LEGACY_WORKER_KEYS,
 	MAX_VALUE_LENGTH,
@@ -259,9 +306,9 @@ const agent_role_profile = {
 	PROFILE_SCHEMA,
 	REVIEWER,
 	SCHEDULER,
-	SETUP_PHASE,
 	WORKER,
 	describe,
+	handoff_environment,
 	is_safe_value,
 	parse,
 	phase_effort,

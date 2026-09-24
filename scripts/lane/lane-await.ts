@@ -46,8 +46,8 @@ interface RunConfig extends CheckConfig {
 }
 
 function is_process_running_default(issue: string): boolean {
-	const invocation = lane_child_invocation.child_invocation(issue)
-	const result = spawnSync('pgrep', ['-f', `${invocation}$`], { encoding: 'utf8' })
+	const pattern = lane_child_invocation.process_pattern(issue)
+	const result = spawnSync('pgrep', ['-f', pattern], { encoding: 'utf8' })
 
 	return result.status === PROCESS_FOUND
 }
@@ -157,6 +157,7 @@ const lane_await = {
 	NEVER_APPEARED_TIMEOUT_MS,
 	RECONFIRM_MS,
 	check_issue,
+	is_process_running_default,
 	wait_for_any,
 }
 

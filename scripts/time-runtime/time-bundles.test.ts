@@ -444,4 +444,17 @@ describe('time_bundles.open_sequence', () => {
 
 		expect(time_bundles.open_sequence(spans)).toHaveLength(1)
 	})
+
+	// **A subagent launch resets the open sequence — by design (joshuafolkken/kit#2405).** An `Agent` /
+	// `Task` / `Skill` call is never bundleable, so it closes the run of single-call turns rather than
+	// extending it. That is deliberate, not a miss the batching guard should count around: a subagent
+	// boundary — a `fullrun`'s `/code-review` above all, recorded in `docs/observations.md` — separates
+	// independent work phases, and the calls on either side of it were never candidates to share a turn.
+	// kit#2405 asked whether the reset is unfair; it is pinned here as intended, so a future edit that let
+	// a launch continue the sequence is caught rather than shipped.
+	it('resets the open sequence at a subagent launch, so a fan-out breaks the run (kit#2405)', () => {
+		const spans = [MODEL, call(['a.ts']), MODEL, call(['b.ts']), MODEL, launch('m3'), MODEL]
+
+		expect(time_bundles.open_sequence(spans)).toEqual([])
+	})
 })

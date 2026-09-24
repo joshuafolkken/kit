@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { run_event_stream } from './run-event-stream'
+import { run_event_stream, type RunEvent } from './run-event-stream'
 
 // joshuafolkken/kit#2205: the append-only, ordered event stream. The pure module takes an explicit
 // target, so the tests write to a temp file rather than resolving a run identity — the emit side is
@@ -105,6 +105,61 @@ describe('run_event_stream.read_last — the degenerate read', () => {
 
 	it('returns undefined for an empty stream', () => {
 		expect(run_event_stream.read_last(fresh_target())).toBeUndefined()
+	})
+
+	it('skips trace events so a ship stage never hides the run position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.MERGE, '#7 merged', AT)
+		run_event_stream.append(target, KIND.SHIP_STAGE, '#7 report done', AT)
+
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.MERGE)
+	})
+
+	// joshuafolkken/kit#2437: the heartbeat reaches a relay through the stream but is not a position.
+	it('appends a heartbeat and skips it for the last position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.MERGE, '#7 merged', AT)
+		const heartbeat = run_event_stream.append(target, KIND.HEARTBEAT, 'at 10:00 · next 10:15', AT)
+
+		expect(heartbeat.appended).toBe(true)
+		expect(run_event_stream.read_from(target, 1).events[0]?.kind).toBe(KIND.HEARTBEAT)
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.MERGE)
+	})
+
+	it('returns undefined for a stream holding only trace events', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.SHIP_STAGE, '#7 gate start', AT)
+
+		expect(run_event_stream.read_last(target)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#2464: the stall episode ends at a dispatch, not at the next event of any kind.
+function events_of(kinds: ReadonlyArray<string>): ReadonlyArray<RunEvent> {
+	return kinds.map((kind, index) => ({ pos: index + 1, at: AT, kind, text: kind }))
+}
+
+describe('run_event_stream.has_since — an episode that ends at the reset kind', () => {
+	it('finds the kind after the newest reset, whatever else lands in between', () => {
+		const events = events_of([KIND.CHILD_LAUNCH, KIND.STALL, KIND.MERGE, KIND.HEARTBEAT, KIND.PARK])
+
+		expect(run_event_stream.has_since(events, KIND.STALL, KIND.CHILD_LAUNCH)).toBe(true)
+	})
+
+	it('does not find a kind the newest reset came after', () => {
+		const events = events_of([KIND.STALL, KIND.MERGE, KIND.CHILD_LAUNCH, KIND.MERGE])
+
+		expect(run_event_stream.has_since(events, KIND.STALL, KIND.CHILD_LAUNCH)).toBe(false)
+	})
+
+	it('searches the whole stream when no reset has happened yet', () => {
+		const events = events_of([KIND.PLAN, KIND.STALL, KIND.MERGE])
+
+		expect(run_event_stream.has_since(events, KIND.STALL, KIND.CHILD_LAUNCH)).toBe(true)
+		expect(run_event_stream.has_since([], KIND.STALL, KIND.CHILD_LAUNCH)).toBe(false)
 	})
 })
 

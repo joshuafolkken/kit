@@ -12,10 +12,21 @@ const { CWD, MAIN, SESSION_A, usage_line, write_session, output, stdout } = cost
 cost_cli_fixture.capture_console()
 
 const FAILURE_EXIT_CODE = 1
-const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
+// The environment names the session whose transcript the fixture writes, so `josh cost` reads its own
+// file by id rather than by mtime (joshuafolkken/kit#2403).
+const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: SESSION_A }
+const OTHER_SESSION_ENV = { CLAUDE_CODE_SESSION_ID: 'a-different-session' }
+// A Claude session that names no session id of its own, so the read falls back to the newest own
+// transcript — the behavior a plain shell keeps (joshuafolkken/kit#2403).
+const ANTHROPIC_NO_ID_ENV = { CLAUDE_CODE_CHILD_SESSION: 'x' }
 const OPENAI_ENV = { CODEX_THREAD_ID: 'thread' }
 const BAD_FLAG = '--nonsense'
 const NO_TRANSCRIPTS = 'No transcripts found'
+const NO_NAMED_TRANSCRIPT = 'No transcript named'
+const NO_REQUESTS = 'No requests in this session'
+// A line the parser skips: valid JSON, but not a priced assistant request — a transcript that exists
+// yet bills nothing.
+const UNPRICED_LINE = JSON.stringify({ type: 'user' })
 // The readerless report scopes retired in #2016: now unknown flags, so each is refused rather than
 // silently parsed into a report that no longer exists.
 const RETIRED_FLAGS: ReadonlyArray<ReadonlyArray<string>> = [
@@ -115,7 +126,7 @@ describe('cost_cli.run --over', () => {
 	// exit code and the message, not by a substring that both share.
 	it('reports a missing transcript rather than answering a verdict', () => {
 		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
-		expect(output()).toContain(NO_TRANSCRIPTS)
+		expect(output()).toContain(NO_NAMED_TRANSCRIPT)
 	})
 
 	it('prints the usage line for a bad invocation', () => {
@@ -130,6 +141,38 @@ describe('cost_cli.run --over', () => {
 
 		expect(cost_cli.run([], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(cost_cli.USAGE)
+	})
+})
+
+// The session that just ran is identified by its exported id, not by the newest mtime
+// (joshuafolkken/kit#2403), so a parent waiting on a lane child prices its own transcript.
+describe('cost_cli.run --over own-session identification', () => {
+	// The bug this fixes: a newer transcript under another session's name must not be measured as this
+	// session's own. The environment names a session with no transcript, so the answer is "not found"
+	// even though a priced transcript sits right there.
+	it('does not fall back to another session when its own transcript is absent', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
+		expect(cost_cli.run(['--over', '0'], CWD, OTHER_SESSION_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(NO_NAMED_TRANSCRIPT)
+	})
+
+	// A transcript that exists but bills nothing, and a transcript that is not there at all, are
+	// different answers: the first is priced as "no requests", the second as "not found".
+	it('distinguishes a zero-request transcript from a missing one', () => {
+		write_session(SESSION_A, [UNPRICED_LINE])
+
+		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(NO_REQUESTS)
+		expect(output()).not.toContain(NO_NAMED_TRANSCRIPT)
+	})
+
+	// A Claude session that names no id of its own keeps the mtime fallback: a whole empty corpus reads
+	// as "no transcripts found", not as one named session gone missing.
+	it('reports the whole corpus as empty when the environment names no session', () => {
+		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_NO_ID_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(NO_TRANSCRIPTS)
+		expect(output()).not.toContain(NO_NAMED_TRANSCRIPT)
 	})
 })
 

@@ -12,10 +12,17 @@
 // the parent's session as the child's own. Measured under joshuafolkken/kit#1158: removing them
 // restored 5/5 held in 54 seconds, and lowering the concurrency — the suspected cause before this one
 // was found — made it worse.
+//
+// **`SESSION_ID_KEY` is the name Claude Code exports for the running session's own id** — the base
+// name of that session's transcript file. It is single-sourced here rather than spelled a second time
+// where the cost reader identifies its own transcript by it (joshuafolkken/kit#2403): one env var,
+// one literal, so the list a child must not inherit and the selection that reads it cannot drift.
+const SESSION_ID_KEY = 'CLAUDE_CODE_SESSION_ID'
+
 const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
 	'CLAUDE_CODE_MESSAGING_SOCKET',
 	'CLAUDE_CODE_MESSAGING_TOKEN',
-	'CLAUDE_CODE_SESSION_ID',
+	SESSION_ID_KEY,
 	'CLAUDE_CODE_CHILD_SESSION',
 ]
 
@@ -70,6 +77,7 @@ const LOOPBACK_PREFIX = '127.'
 const NO_HOST = ''
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
+type RemovedEnvironment = Record<string, undefined>
 
 function parsed_host(value: string): string {
 	try {
@@ -105,9 +113,12 @@ function is_declared(value: string | undefined): boolean {
 // The certificate joins only when the environment declares no proxy this leaves standing. A machine
 // whose wrapper wrote one loopback proxy beside the person's own corporate one keeps both the
 // corporate proxy and the trust store that makes it usable.
-function loopback_proxy_keys(source: EnvironmentSource): ReadonlyArray<string> {
+function loopback_proxy_keys(
+	source: EnvironmentSource,
+	is_removed: (value: string | undefined) => boolean = is_loopback_proxy,
+): ReadonlyArray<string> {
 	const declared = PROXY_KEYS.filter((key) => is_declared(source[key]))
-	const matched = declared.filter((key) => is_loopback_proxy(source[key]))
+	const matched = declared.filter((key) => is_removed(source[key]))
 	const is_certificate_included = matched.length > 0 && matched.length === declared.length
 
 	return is_certificate_included ? [...matched, PROXY_CERTIFICATE_KEY] : matched
@@ -117,10 +128,51 @@ function loopback_proxy_keys(source: EnvironmentSource): ReadonlyArray<string> {
 // reads it. Node's spawn omits an environment key whose value is `undefined`, which is the only way
 // to hand the child an environment that does not have the variable at all — and both callers spread
 // this over an inherited environment, so anything less than absent leaves the variable set.
-function removed_environment(source: EnvironmentSource = process.env): Record<string, undefined> {
-	const keys = [...PARENT_SESSION_KEYS, ...loopback_proxy_keys(source)]
-
+function to_removed(keys: ReadonlyArray<string>): RemovedEnvironment {
 	return Object.fromEntries(keys.map((key) => [key, undefined]))
+}
+
+function removed_environment(source: EnvironmentSource = process.env): RemovedEnvironment {
+	return to_removed([...PARENT_SESSION_KEYS, ...loopback_proxy_keys(source)])
+}
+
+// **The scanner is recognized by the CA it writes beside its proxy** — a file under its own
+// `.safe-chain` directory. Either separator is accepted so the test holds wherever the path came from.
+const SCANNER_DIRECTORY = '.safe-chain'
+const PATH_SEPARATOR = /[/\\]/u
+
+function is_scanner_certificate(value: string | undefined): boolean {
+	return value?.split(PATH_SEPARATOR).includes(SCANNER_DIRECTORY) ?? false
+}
+
+// **Only the scanner's own address goes.** It writes one address into `HTTPS_PROXY` and its
+// `global-agent` twin; a loopback proxy at any other address — a sandbox egress proxy in `ALL_PROXY`
+// or a lowercase spelling — is not its, may be the only route out, and stays.
+const SCANNER_PROXY_KEY = 'HTTPS_PROXY'
+
+function is_scanner_proxy(source: EnvironmentSource): (value: string | undefined) => boolean {
+	const scanner_proxy = source[SCANNER_PROXY_KEY]
+
+	return function is_match(value: string | undefined): boolean {
+		return value === scanner_proxy && is_loopback_proxy(value)
+	}
+}
+
+// **The proxy half alone, for a spawn that is not a session** (joshuafolkken/kit#2436). kit's `gh`
+// requests inherited the same loopback proxy, and the scanner behind it tunnels api.github.com
+// without inspecting it — so routing GitHub through it protected nothing and added a failure point:
+// the scanner release installed here marked a host it had once timed out on as dead for the rest of
+// the invocation, and every later `followup` read of that run failed at once with `Bad Gateway`.
+// The session keys stay out: a `gh` spawn has no parent session to be confused with.
+//
+// **Unlike a detached session, a `gh` spawn runs while its loopback proxy is alive** — and that
+// proxy may be the machine's only way out (a sandboxed agent's egress proxy, a corporate authenticating proxy on
+// `127.0.0.1:3128`). Loopback alone therefore cannot decide it: the removal happens only when the
+// declared CA is the scanner's own, and every other loopback proxy is left exactly as it was.
+function removed_proxy_environment(source: EnvironmentSource = process.env): RemovedEnvironment {
+	if (!is_scanner_certificate(source[PROXY_CERTIFICATE_KEY])) return {}
+
+	return to_removed(loopback_proxy_keys(source, is_scanner_proxy(source)))
 }
 
 const agent_session_environment = {
@@ -128,7 +180,9 @@ const agent_session_environment = {
 	PARENT_SESSION_KEYS,
 	PROXY_CERTIFICATE_KEY,
 	PROXY_KEYS,
+	SESSION_ID_KEY,
 	removed_environment,
+	removed_proxy_environment,
 }
 
 export { agent_session_environment }

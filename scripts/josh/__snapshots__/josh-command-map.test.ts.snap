@@ -11,6 +11,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bg": "batch:guard",
     "bh": "behavior",
     "bl": "backlog:next",
+    "bld": "backlog:drive",
     "blo": "backlog:offer",
     "blp": "backlog:plan",
     "bls": "backlog:stalled",
@@ -22,6 +23,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "co": "cost",
     "cs": "clone:scan",
     "dcr": "doc:read",
+    "dfr": "defect:rate",
     "dg": "delegate",
     "dp": "disposition",
     "dr": "doctor",
@@ -122,6 +124,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "sa": "split:assess",
     "sd": "cspell:dot",
     "sg": "stop:guard",
+    "shp": "ship",
     "shs": "sonar:hotspots",
     "sl": "session:lang",
     "sp": "stash:pop",
@@ -132,7 +135,9 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "td": "test:declared",
     "te": "test:e2e",
     "tm": "time",
+    "tmd": "time:density",
     "tr": "test:related",
+    "trd": "test:red",
     "tu": "test:unit",
     "u": "latest",
     "uir": "ui:routes",
@@ -176,6 +181,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "backlog:drive": [
+      "--owner <pid> [options]",
+      "automation",
+      [
+        "network",
       ],
     ],
     "backlog:next": [
@@ -276,6 +288,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
+    "defect:rate": [
+      "[--days <n>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "delegate": [
       "<step> | --list",
       "automation",
@@ -326,7 +345,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "edit:files": [
-      "<plan-path>",
+      "<plan-path | ->",
       "automation",
       [
         "none",
@@ -861,7 +880,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:cut": [
-      "[--resume] <issue> [--impl|--setup] [--handoff <path>]",
+      "[--resume] <issue> [--impl] [--handoff <path>]",
       "automation",
       [
         "files",
@@ -884,7 +903,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:event": [
-      "--append <kind> <text> | --from|--follow <n> | --last",
+      "--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last",
       "automation",
       [
         "files",
@@ -1016,6 +1035,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "ship": [
+      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
+      "automation",
+      [
+        "git",
+        "network",
+      ],
+    ],
     "sonar:hotspots": [
       "<PR>",
       "automation",
@@ -1079,6 +1106,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
+    "test:red": [
+      "",
+      "developer",
+      [
+        "git",
+        "processes",
+      ],
+    ],
     "test:related": [
       "[files...]",
       "developer",
@@ -1095,6 +1130,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "time": [
       "[options]",
+      "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "time:density": [
+      "[--lanes <n>] [--path <dir>]",
       "maintainer",
       [
         "none",

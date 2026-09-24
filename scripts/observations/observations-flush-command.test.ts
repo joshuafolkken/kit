@@ -39,17 +39,28 @@ vi.mock('#scripts/git/git-command', () => ({
 		commit: vi.fn(),
 		commit_count_beyond: vi.fn(),
 		delete_branch: vi.fn(),
+		fast_forward_local: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
+		merge_fast_forward: vi.fn(),
 		push: vi.fn(),
 		status: vi.fn(),
 	},
 }))
 vi.mock('#scripts/git/git-gh-command', () => ({
-	git_gh_command: { pr_create: vi.fn(), pr_merge: vi.fn() },
+	git_gh_command: {
+		pr_create: vi.fn(),
+		pr_enable_auto_merge: vi.fn(),
+		pr_list_open_with_head_prefix: vi.fn(),
+		pr_merge: vi.fn(),
+	},
 }))
 vi.mock('#scripts/git/git-pr-checks', () => ({
-	git_pr_checks: { wait_for_pr_success: vi.fn() },
+	git_pr_checks: {
+		read_merge_progress: vi.fn(),
+		wait_for_pr_merged: vi.fn(),
+		wait_for_pr_success: vi.fn(),
+	},
 }))
 vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
 
@@ -60,7 +71,7 @@ const NO_COMMITS = 0
 const SUCCESS_EXIT_CODE = 0
 
 // The collaborators the success path drives, listed in the order `flush` is expected to call them:
-// branch -> stage -> commit -> push -> open -> wait -> merge -> return. Pinning their first-call
+// branch -> stage -> commit -> push -> open -> auto-merge -> wait for the merge -> return. Pinning their first-call
 // order as a strictly increasing sequence is one assertion for the whole path.
 type MockedCommand = (...args: Array<never>) => unknown
 const SUCCESS_SEQUENCE: ReadonlyArray<MockedCommand> = [
@@ -69,8 +80,9 @@ const SUCCESS_SEQUENCE: ReadonlyArray<MockedCommand> = [
 	git_command.commit,
 	git_command.push,
 	git_gh_command.pr_create,
-	git_pr_checks.wait_for_pr_success,
-	git_gh_command.pr_merge,
+	git_gh_command.pr_enable_auto_merge,
+	git_pr_checks.wait_for_pr_merged,
+	git_command.fast_forward_local,
 	main_sync.run,
 ]
 
@@ -78,6 +90,14 @@ function first_call_order(command: MockedCommand): number {
 	const [order] = vi.mocked(command).mock.invocationCallOrder
 
 	return order ?? NaN
+}
+
+// No earlier flush pull request is open, and GitHub opens the new one, accepts auto-merge and merges.
+function on_github(): void {
+	vi.mocked(git_gh_command.pr_create).mockResolvedValue(PULL_REQUEST_URL)
+	vi.mocked(git_gh_command.pr_list_open_with_head_prefix).mockResolvedValue([])
+	vi.mocked(git_pr_checks.wait_for_pr_merged).mockResolvedValue('merged')
+	vi.mocked(main_sync.run).mockResolvedValue(SUCCESS_EXIT_CODE)
 }
 
 function on_default_branch(): void {
@@ -89,8 +109,7 @@ function on_default_branch(): void {
 	vi.mocked(git_command.commit_count_beyond).mockResolvedValue(NO_COMMITS)
 	vi.mocked(git_command.checkout_b).mockResolvedValue('')
 	vi.mocked(git_command.checkout).mockResolvedValue('')
-	vi.mocked(git_gh_command.pr_create).mockResolvedValue(PULL_REQUEST_URL)
-	vi.mocked(main_sync.run).mockResolvedValue(SUCCESS_EXIT_CODE)
+	on_github()
 }
 
 // The message the command exits with, whichever side it came out of — so an arm can be asserted by
@@ -145,11 +164,14 @@ describe('observations_flush — a merged flush', () => {
 		on_default_branch()
 	})
 
-	it('waits for checks, merges the branch, returns to default, and reports the merge', async () => {
+	it('waits for the auto-merge, returns to default, and reports the merge', async () => {
 		const message = await observations_flush.flush(new Date(MORNING_INSTANT))
 
-		expect(git_pr_checks.wait_for_pr_success).toHaveBeenCalledWith(FLUSH_BRANCH)
-		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_pr_checks.wait_for_pr_merged).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_gh_command.pr_merge).not.toHaveBeenCalled()
+		// joshuafolkken/kit#2462: the local default branch is brought up to the merge before the
+		// checkout, so lines appended while the pull request waited carry over rather than block it.
+		expect(git_command.fast_forward_local).toHaveBeenCalledWith(DEFAULT_BRANCH)
 		expect(main_sync.run).toHaveBeenCalledWith([])
 		expect(message).toContain(FLUSH_BRANCH)
 		expect(message).toContain('default branch')
@@ -162,6 +184,18 @@ describe('observations_flush — a merged flush', () => {
 
 		expect(git_command.delete_branch).not.toHaveBeenCalled()
 		expect(git_command.checkout).not.toHaveBeenCalled()
+	})
+
+	it('says the merge is in when the local default branch cannot be fast-forwarded', async () => {
+		const reason = 'fatal: refusing to fetch into branch checked out'
+
+		vi.mocked(git_command.fast_forward_local).mockRejectedValueOnce(new Error(reason))
+
+		const message = await flush_message()
+
+		expect(message).toContain('merged')
+		expect(message).toContain(reason)
+		expect(main_sync.run).not.toHaveBeenCalled()
 	})
 })
 
@@ -239,6 +273,7 @@ describe('observations_flush — a rollback that cannot finish', () => {
 
 describe('observations_flush — a default branch behind origin', () => {
 	const COMMITS_BEHIND = 3
+	const LEDGER_CONFLICT = 'Your local changes to the following files would be overwritten by merge'
 
 	beforeEach(() => {
 		vi.clearAllMocks()
@@ -246,19 +281,37 @@ describe('observations_flush — a default branch behind origin', () => {
 		vi.mocked(git_command.commit_count_beyond).mockResolvedValue(COMMITS_BEHIND)
 	})
 
+	// joshuafolkken/kit#2462: a lane's flush always finds the primary default branch behind by the
+	// lane's own merge, so a fast-forward that git accepts is taken before the branch is cut.
+	it('fast-forwards the default branch before cutting the flush branch', async () => {
+		vi.mocked(git_command.merge_fast_forward).mockResolvedValue('')
+
+		await flush_message()
+
+		expect(git_command.merge_fast_forward).toHaveBeenCalledWith(DEFAULT_BRANCH)
+		expect(first_call_order(git_command.merge_fast_forward)).toBeLessThan(
+			first_call_order(git_command.checkout_b),
+		)
+	})
+
 	// joshuafolkken/kit#1768: the branch cut from a stale default branch conflicts by construction, so
-	// the flush refuses before cutting one and names the command that brings the start point current.
-	it('refuses before cutting a branch and names pnpm josh ms', async () => {
+	// a fast-forward git refuses still stops the flush before a branch is cut, carrying git's reason.
+	it('refuses before cutting a branch and names pnpm josh ms when the fast-forward fails', async () => {
+		vi.mocked(git_command.merge_fast_forward).mockRejectedValue(new Error(LEDGER_CONFLICT))
+
 		const message = await flush_message()
 
 		expect(message).toContain(MS_COMMAND)
+		expect(message).toContain(LEDGER_CONFLICT)
 		expect(message).not.toContain(ONLY_COPY)
 		expect(git_command.checkout_b).not.toHaveBeenCalled()
 	})
 
-	// The acceptance criterion the fix turns on: the ledger is dirty when this runs, so the refusal
-	// must read the remote and write nothing — no commit, no staging, no push.
-	it('does not touch the working tree while the ledger is dirty', async () => {
+	// The ledger is dirty when this runs, so a refused fast-forward must write nothing — no commit, no
+	// staging, no push.
+	it('does not touch the working tree when the fast-forward is refused', async () => {
+		vi.mocked(git_command.merge_fast_forward).mockRejectedValue(new Error(LEDGER_CONFLICT))
+
 		await flush_message()
 
 		expect(git_command.commit).not.toHaveBeenCalled()

@@ -31,6 +31,15 @@ function format_report(sections: ReadonlyArray<TailSection>): string {
 	return sections.map((section) => section_report(section)).join(SECTION_SEPARATOR)
 }
 
+// **A failed step's stderr joins its body** (joshuafolkken/kit#2462). A detached run's log keeps the
+// report, not the terminal, so a refusal printed only to stderr left the section reading
+// `ELIFECYCLE` alone. A passing step's stderr is commentary and stays out of the report.
+function section_body(out: string, error_output: string | undefined, code: number): string {
+	if (code === SUCCESS_EXIT_CODE || error_output === undefined) return out
+
+	return [out, error_output].filter((part) => part.length > 0).join('\n')
+}
+
 // Non-zero when any step failed, exactly as each of the three exits on its own — a bundle where the
 // ledger commit failed is never read as a clean close because the citations after it succeeded.
 function exit_code(sections: ReadonlyArray<TailSection>): number {
@@ -45,6 +54,7 @@ const run_tail = {
 	RELEASE_HEADER,
 	exit_code,
 	format_report,
+	section_body,
 }
 
 export type { TailSection }

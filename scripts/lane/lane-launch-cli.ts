@@ -82,21 +82,29 @@ async function prepare(stash: string | undefined, directory: string): Promise<bo
 	return await install(directory)
 }
 
-async function launch(context: LaunchContext): Promise<number> {
+// The launch chain in-process: the dispatched child's pid, or `undefined` when a step refused. The CLI
+// prints the pid; `backlog:drive` launches through this same chain (joshuafolkken/kit#2508).
+async function launch_lane(context: LaunchContext): Promise<string | undefined> {
 	const opened = await josh_command.josh_run(['lane:open', context.issue], should_forward_stderr)
 
-	if (opened.code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
+	if (opened.code !== SUCCESS_EXIT_CODE) return undefined
 
-	if (!(await prepare(context.stash, opened.out))) return FAILURE_EXIT_CODE
+	if (!(await prepare(context.stash, opened.out))) return undefined
 
 	const dispatched = await josh_command.josh_run(
 		['lane:dispatch', context.issue],
 		should_forward_stderr,
 	)
 
-	if (dispatched.code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
+	return dispatched.code === SUCCESS_EXIT_CODE ? dispatched.out : undefined
+}
 
-	console.info(dispatched.out)
+async function launch(context: LaunchContext): Promise<number> {
+	const pid = await launch_lane(context)
+
+	if (pid === undefined) return FAILURE_EXIT_CODE
+
+	console.info(pid)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -117,8 +125,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const lane_launch_cli = { USAGE, install, launch, prepare, read_context, run }
+const lane_launch_cli = { USAGE, install, launch, launch_lane, prepare, read_context, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
+export type { LaunchContext }
 export { lane_launch_cli }

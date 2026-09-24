@@ -114,9 +114,11 @@ describe('observations_flush — the refusals name what to do next', () => {
 	// joshuafolkken/kit#1768: a default branch behind origin cuts a branch that conflicts by
 	// construction, so the refusal names the branch, the remote it is behind, and `pnpm josh ms`.
 	it('sends a stale default branch to pnpm josh ms before cutting a branch', () => {
-		const message = observations_flush.behind_default_message(DEFAULT_BRANCH)
+		const reason = 'not possible'
+		const message = observations_flush.behind_default_message(DEFAULT_BRANCH, reason)
 
 		expect(message).toContain(DEFAULT_BRANCH)
+		expect(message).toContain(reason)
 		expect(message).toContain(`origin/${DEFAULT_BRANCH}`)
 		expect(message).toContain(MS_COMMAND)
 	})

@@ -1,4 +1,5 @@
 import { observation_ledger } from '#scripts/observations/observation-ledger'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { observations_flush } from '#scripts/observations/observations-flush'
 import { git_command } from './git-command'
 import { git_followup_cleanup } from './git-followup-cleanup'
@@ -30,12 +31,21 @@ async function sync_and_flush(): Promise<void> {
 }
 
 // **Short-circuits when the ledger holds no pending append.** That is every run that recorded no
-// observation and every lane/worktree child (a delegated child never appends — SKILL.md §2i), so the
-// ordinary run pays nothing and never reaches `main_sync`, which refuses inside a linked work tree
-// anyway. Guarded like its sibling tail steps (joshuafolkken/kit#1539): past the merge a flush
+// observation, so the ordinary run pays nothing. Guarded like its sibling tail steps (joshuafolkken/kit#1539): past the merge a flush
 // failure is reported, never allowed to take the merge, the epic close and the hold release with it.
+//
+// **A lane skips it outright** (joshuafolkken/kit#2419). Its ledger is the primary checkout's
+// (`observation-ledger-home.ts`), which this step cannot flush — `main_sync` refuses in a linked work
+// tree — so the line waits in the primary checkout and the `backlogrun` commits every lane's lines at
+// once through `pnpm josh run:carry --end` (joshuafolkken/kit#2492).
 async function flush_ledger_step(should_merge: boolean): Promise<void> {
-	if (!should_merge || !observation_ledger.has_pending_append(await git_command.status())) return
+	if (
+		!should_merge ||
+		observation_ledger_home.is_lane() ||
+		!observation_ledger.has_pending_append(await git_command.status())
+	) {
+		return
+	}
 
 	// `should_merge` is always true past the early return; it is passed on as `run_guarded_step`'s
 	// guard flag rather than a literal `true` so this step stays identical to its sibling tail steps —

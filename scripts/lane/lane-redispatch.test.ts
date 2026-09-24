@@ -1,10 +1,12 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { detached_launch } from '#scripts/run/detached-launch'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
@@ -27,9 +29,15 @@ const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${RELEASED_CHI
 const PID = 909
 
 const launch = vi.spyOn(detached_launch, 'launch')
+
+// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
+vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const record_output = vi.spyOn(lane_output, 'record_output')
 const add_label = vi.spyOn(git_gh_command, 'issue_add_label')
+
+// A started child is recorded on the run's stream; that write is kept off the real repository's stream.
+vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
 
 function lane(): LaneInfo {
 	return {
@@ -63,6 +71,8 @@ describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', (
 		const built = claude_agent_argv.build(
 			`fullrun #${RELEASED_CHILD}`,
 			agent_role_profile.DEFAULT_PROFILES.worker,
+			undefined,
+			LANE_DIRECTORY,
 		)
 
 		expect(outcome.kind).toBe('dispatched')
@@ -117,6 +127,7 @@ describe('re-dispatching an outage child by resuming its session', () => {
 			lane_child_invocation.outage_resume_invocation(RELEASED_CHILD),
 			agent_role_profile.DEFAULT_PROFILES.worker,
 			SESSION,
+			LANE_DIRECTORY,
 		)
 
 		expect(launch.mock.calls[0]?.[0].argv).toStrictEqual(resumed)

@@ -8,8 +8,10 @@ import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
+import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
@@ -45,6 +47,9 @@ const active_supervisor = vi.spyOn(openai_lane_supervisor, 'active')
 const wait_for_supervisor = vi.spyOn(openai_lane_supervisor, 'wait_for_active')
 const approve_supervisor = vi.spyOn(openai_lane_supervisor, 'approve')
 const cancel_supervisor = vi.spyOn(openai_lane_supervisor, 'cancel')
+
+// The launch record is `lane-dispatch-launch-event.test.ts`'s; here it stays off the real stream.
+vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
 
 function lane(output: string | undefined): LaneInfo {
 	return {
@@ -211,7 +216,12 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 	it('starts the agent CLI headless in the lane’s own work tree, writing to its own log', async () => {
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		const built = claude_agent_argv.build(`fullrun #${ISSUE}`, WORKER_PROFILE)
+		const built = claude_agent_argv.build(
+			`fullrun #${ISSUE}`,
+			WORKER_PROFILE,
+			undefined,
+			LANE_DIRECTORY,
+		)
 
 		expect(launch.mock.calls[0]?.[0]).toStrictEqual({
 			argv: built,
@@ -220,7 +230,7 @@ describe('lane_dispatch.dispatch_child — the request the lane gets', () => {
 			profile: WORKER_PROFILE,
 			env: { [lane_child_marker.KEY]: ISSUE },
 		})
-		expect(launched_request().profile).toMatchObject({ model: 'opus', effort: 'medium' })
+		expect(launched_request().profile).toMatchObject({ model: 'claude-opus-5-5', effort: 'medium' })
 	})
 
 	// **The mark is what tells the child it was dispatched rather than typed** (joshuafolkken/kit#1904),
@@ -373,7 +383,7 @@ describe('lane_dispatch.describe — what a reader is told to do next', () => {
 	it('matches the child’s command line, not the lane directory its argv omits', async () => {
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
-		expect(message).toContain(`pgrep -laf "fullrun #${ISSUE}$"`)
+		expect(message).toContain(`pgrep -laf "${lane_child_invocation.process_pattern(ISSUE)}"`)
 		expect(message).not.toContain(`pgrep -laf ${LANE_DIRECTORY}`)
 		expect(message).toContain(ALIVE_PROCESS)
 	})

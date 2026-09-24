@@ -5,6 +5,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { find_package_directory } from '#scripts/josh/josh-logic'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry, type CarryRead } from './run-carry'
+import { run_event_scope } from './run-event-scope'
 import { run_event_stream } from './run-event-stream'
 import { run_prep_cli } from './run-prep-cli'
 import { run_step, type StepInput } from './run-step'
@@ -33,13 +34,23 @@ interface RunReads {
 
 // The run-level reads, keyed on the common git directory both the carry and the event stream share. A
 // directory that cannot be read leaves the position unknowable, which `next_action` answers `unknown`.
-function read_run(directory: string | undefined): RunReads {
+function read_run(directory: string | undefined, issue_number: string): RunReads {
 	if (directory === undefined) {
 		return { carry_kind: 'unreadable', is_retrospective_done: false, last_event: undefined }
 	}
 
 	const carry = run_carry.read_carry(run_carry.carry_path(directory))
-	const last = run_event_stream.read_last(run_event_stream.target_of(directory))
+	const events = run_event_stream.read_events(run_event_stream.target_of(directory))
+	// The last event *within this invocation's scope*, not the raw newest one: a stale event a previous
+	// invocation left on the stream must not be read as this run's position (joshuafolkken/kit#2395). The
+	// observed defect was a `run:step` that printed `wait` on a fresh run because an old `child-launch` was
+	// still the stream's tail. Another issue's detached ship supervisor is left out the same way
+	// (joshuafolkken/kit#2428).
+	const last = run_event_scope.last_issue_event(
+		events,
+		run_event_scope.scope_of(carry),
+		issue_number,
+	)
 
 	return {
 		carry_kind: carry.kind,
@@ -51,7 +62,7 @@ function read_run(directory: string | undefined): RunReads {
 async function gather(issue_number: string): Promise<StepInput> {
 	const reads = await run_prep_cli.gather(issue_number)
 	const parts = run_prep_cli.to_parts(issue_number, reads)
-	const run_reads = read_run(await run_carry.repository_directory())
+	const run_reads = read_run(await run_carry.repository_directory(), issue_number)
 
 	return {
 		issue_number,
@@ -64,6 +75,7 @@ async function gather(issue_number: string): Promise<StepInput> {
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
 		is_retrospective_enabled: hook_decision.is_switch_opt_in(RETROSPECTIVE_ENV_KEY),
+		has_changes: parts.has_changes,
 	}
 }
 

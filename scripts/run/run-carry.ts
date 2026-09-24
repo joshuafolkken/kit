@@ -3,7 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
-import { run_carry_streak } from './run-carry-streak'
+import { run_carry_change } from './run-carry-change'
 import { run_invocation } from './run-invocation'
 
 // joshuafolkken/kit#1714: a `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour
@@ -69,6 +69,9 @@ interface RunCarry {
 	invocation: string
 	started_at: string
 	merged: number
+	// Issue numbers counted as merges by this invocation. Kept with the count so a restarted
+	// run cannot count a child twice if it stopped before writing the merge event.
+	merged_issues?: ReadonlyArray<number> | undefined
 	filed: number
 	cuts: number
 	// The consecutive-failure streak (joshuafolkken/kit#2024). It is the count the stopped-unit guard
@@ -150,6 +153,7 @@ interface CarryClaimRequest {
 // measured a run walking past.
 interface CarryChange {
 	merged?: number
+	merged_issue?: number
 	filed?: number
 	cuts?: number
 	// One failed child to add to the streak (joshuafolkken/kit#2024). It is never sent in the same
@@ -183,6 +187,7 @@ const run_carry_schema = z.object({
 	invocation: z.string(),
 	started_at: z.string(),
 	merged: z.number(),
+	merged_issues: z.array(z.number()).optional(),
 	filed: z.number(),
 	cuts: z.number(),
 	// Defaulted, so a record written before this field existed parses with a zero streak rather than
@@ -330,54 +335,6 @@ function adopt_carry(
 	stamp_file.remove_stamp(target)
 
 	return stamp_file.create_stamp(target, next) ? next : undefined
-}
-
-// Recording the same issue twice leaves the record alone, so a `--done` reissued after a retry — or by
-// a resumed session repeating the merge it was cut on — cannot list an issue twice and cannot shorten
-// `remaining` by something already taken out of it.
-function next_done(carry: RunCarry, done: number | undefined): ReadonlyArray<number> | undefined {
-	if (done === undefined) return carry.done
-
-	const current = carry.done ?? []
-
-	return current.includes(done) ? current : [...current, done]
-}
-
-// Sticky: a retrospective that has run stays run, so a later count never clears the flag. Held apart
-// from `apply_change` so its one branch stays out of that function's complexity.
-function next_retrospective(carry: RunCarry, change: CarryChange): boolean | undefined {
-	return change.retrospective === true || carry.retrospective
-}
-
-// The streak arithmetic — the two consecutive counters and the outage fold — is `run-carry-streak.ts`'s
-// (joshuafolkken/kit#2317), so the reset-with-the-increment rule lives with it rather than in a caller
-// that could forget it. `now` is threaded in so the fold window is measured against the record and
-// injectable in tests; it defaults to the wall clock like the other reads here.
-function apply_change(
-	target: string,
-	carry: RunCarry,
-	change: CarryChange,
-	now: Date = new Date(),
-): RunCarry {
-	const cuts = change.cuts ?? NO_INCREMENT
-	const streak = run_carry_streak.next_state(carry, change, now)
-	const next: RunCarry = {
-		...carry,
-		merged: carry.merged + (change.merged ?? NO_INCREMENT),
-		filed: carry.filed + (change.filed ?? NO_INCREMENT),
-		cuts: carry.cuts + cuts,
-		failures: streak.failures,
-		outages: streak.outages,
-		last_outage_at: streak.last_outage_at,
-		done: next_done(carry, change.done),
-		retrospective: next_retrospective(carry, change),
-		// A cut declares the hand-off; any other count is the run carrying on, which spends it.
-		is_handed_off: cuts > NO_INCREMENT,
-	}
-
-	stamp_file.write_stamp(target, next)
-
-	return next
 }
 
 // A live pid with no readable start token is conservatively held rather than replaced. The command
@@ -558,7 +515,7 @@ const run_carry = {
 	NO_OWNER,
 	RESUME_COMMAND,
 	adopt_carry,
-	apply_change,
+	apply_change: run_carry_change.apply_change,
 	begin_carry,
 	busy_message,
 	carry_path,

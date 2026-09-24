@@ -55,7 +55,8 @@ function is_active(): boolean {
 }
 
 // The guard's note when the watcher is stale and this call is the once-per-run one that refuses, or
-// `undefined` when the watcher is fresh (or the refusal was already spent this run).
+// `undefined` when the watcher is fresh (or the refusal was already spent this run). No session is asked
+// to relay the run's stream any more — the watch pane does (joshuafolkken/kit#2492).
 async function stale_reason(transcript: string, now_ms: number): Promise<string | undefined> {
 	const result = await run_watcher_guard.check(await run_progress_read.live_target())
 

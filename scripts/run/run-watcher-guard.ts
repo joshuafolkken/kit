@@ -9,6 +9,10 @@ import { run_progress_clock } from './run-progress-clock'
 // every tick (every 30 s), so a gap wider than three ticks means the process has almost certainly
 // stopped: either the bound expired or the session was cut without a restart. Three gives one missed
 // tick of slack before the guard fires.
+//
+// **It watches no relay** (joshuafolkken/kit#2492). A session following the run's event stream after a
+// cut used to be held to it here; that relay re-read the session's whole history per event, so the
+// stream is now watched from a pane of its own (`run:event --watch`) and no session owes it.
 
 const WATCHER_TICK_MS = 30_000
 const TICK_MULTIPLIER = 3
@@ -23,16 +27,23 @@ const STALE_NOTE =
 
 type GuardResult = { kind: 'ok' } | { kind: 'stale'; note: string }
 
+const OK_RESULT: GuardResult = { kind: 'ok' }
+
+// The lanes a parent is still waiting on. A stranded lane has no child working in it, so it is not
+// in-flight — the one definition both this guard and the headless stop rule read (`run-headless.ts`).
+async function has_lanes_in_flight(): Promise<boolean> {
+	const all_lanes = await lane_registry.list_lanes()
+
+	return all_lanes.some((lane) => !lane.is_stranded)
+}
+
 // `life_target` is the path returned by `run_progress_read.stamp_target()` or
 // `run_progress_clock.life_target_of(git_directory)`. Passed in rather than resolved here so the
 // caller can use whichever resolution fits its sync/async context.
 async function check(life_target: string): Promise<GuardResult> {
-	const all_lanes = await lane_registry.list_lanes()
-	const lanes = all_lanes.filter((lane) => !lane.is_stranded)
+	if (!(await has_lanes_in_flight())) return OK_RESULT
 
-	if (lanes.length === 0) return { kind: 'ok' }
-
-	if (run_progress_clock.is_life_fresh(life_target, STALE_THRESHOLD_MS)) return { kind: 'ok' }
+	if (run_progress_clock.is_life_fresh(life_target, STALE_THRESHOLD_MS)) return OK_RESULT
 
 	return { kind: 'stale', note: STALE_NOTE }
 }
@@ -41,6 +52,8 @@ const run_watcher_guard = {
 	STALE_NOTE,
 	STALE_THRESHOLD_MS,
 	check,
+	has_lanes_in_flight,
 }
 
+export type { GuardResult }
 export { run_watcher_guard }

@@ -95,7 +95,7 @@ takes. `pnpm josh lane:dispatch` is where a lane's child is started; "Handing th
 carries the command.
 
 **The lane child uses the invoking CLI's `worker` profile.** Claude Code defaults to Anthropic
-`opus` / `medium`; Codex uses `codex exec`, OpenAI `gpt-5.6-sol` / `medium`, workspace-write and
+`claude-opus-5-5` / `medium`; Codex uses `codex exec`, OpenAI `gpt-6-sol` / `medium`, workspace-write and
 JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
 and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
 refuse or park without fallback or retry.

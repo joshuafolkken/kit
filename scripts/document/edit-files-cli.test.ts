@@ -10,6 +10,8 @@ import { edit_files_cli } from './edit-files-cli'
 // real disk rather than a mock. Every literal is kept short so no two edits share the same code line.
 
 const PLAN = 'plan.txt'
+const DEPENDENT_REPORT = 'dependent a.ts'
+const NO_MATCH_REPORT = 'no match a.ts'
 
 function root(): string {
 	return mkdtempSync(path.join(tmpdir(), 'edit-files-'))
@@ -77,7 +79,7 @@ describe('edit_files_cli.run reports failures without corrupting', () => {
 
 		expect(run(directory)).toBe(1)
 		expect(read(directory, 'a.ts')).toBe('kept\n')
-		expect(info).toHaveBeenCalledWith('no match a.ts')
+		expect(info).toHaveBeenCalledWith(NO_MATCH_REPORT)
 	})
 
 	it('names an ambiguous edit by its match count', () => {
@@ -110,6 +112,89 @@ describe('edit_files_cli.run reports failures without corrupting', () => {
 
 		expect(run(directory)).toBe(1)
 		expect(info).toHaveBeenCalledWith('missing gone.ts')
+	})
+})
+
+describe('edit_files_cli.run folds only independent edits', () => {
+	it('refuses an edit that addresses text an earlier edit wrote', () => {
+		const directory = root()
+
+		write(directory, 'a.ts', 'one\n')
+		plan(directory, block('a.ts', 'one', 'two'), block('a.ts', 'two', 'three'))
+		const info = mute('info')
+
+		expect(run(directory)).toBe(1)
+		expect(read(directory, 'a.ts')).toBe('one\n')
+		expect(info).toHaveBeenCalledWith(DEPENDENT_REPORT)
+	})
+
+	it('refuses an edit whose text an earlier edit removed', () => {
+		const directory = root()
+
+		write(directory, 'a.ts', 'one two\n')
+		plan(directory, block('a.ts', 'one two', 'x'), block('a.ts', 'two', 'y'))
+		const info = mute('info')
+
+		expect(run(directory)).toBe(1)
+		expect(read(directory, 'a.ts')).toBe('one two\n')
+		expect(info).toHaveBeenCalledWith(DEPENDENT_REPORT)
+	})
+
+	it('refuses an edit whose text an earlier edit re-created', () => {
+		const directory = root()
+
+		write(directory, 'a.ts', 'f()\n')
+		plan(directory, block('a.ts', 'f()', 'try { f() }'), block('a.ts', 'f()', 'g()'))
+		const info = mute('info')
+
+		expect(run(directory)).toBe(1)
+		expect(read(directory, 'a.ts')).toBe('f()\n')
+		expect(info).toHaveBeenCalledWith(DEPENDENT_REPORT)
+	})
+})
+
+describe('edit_files_cli.run keeps a plain miss apart from a dependent edit', () => {
+	it('names a no-match edit after an earlier edit as no match', () => {
+		const directory = root()
+
+		write(directory, 'a.ts', 'abc\n')
+		plan(directory, block('a.ts', 'abc', 'X'), block('a.ts', 'zz', 'Y'))
+		const info = mute('info')
+
+		expect(run(directory)).toBe(1)
+		expect(info).toHaveBeenCalledWith(NO_MATCH_REPORT)
+	})
+
+	it('lets an ambiguous edit claim no range for a later edit', () => {
+		const directory = root()
+
+		write(directory, 'a.ts', 'x = 1; x = 2\n')
+		plan(directory, block('a.ts', 'x', 'y'), block('a.ts', 'x = 1', 'z'))
+		const info = mute('info')
+
+		expect(run(directory)).toBe(1)
+		expect(info).toHaveBeenCalledWith('applied a.ts')
+	})
+})
+
+describe('edit_files_cli.run reads the plan from standard input', () => {
+	it('applies edits across files without a plan file', () => {
+		const directory = root()
+		const input = [block('a.ts', 'A1', 'A2'), block('b.ts', 'B1', 'B2')].join('\n')
+
+		write(directory, 'a.ts', 'A1\n')
+		write(directory, 'b.ts', 'B1\n')
+
+		expect(edit_files_cli.run(['-'], directory, () => input)).toBe(0)
+		expect(read(directory, 'a.ts')).toBe('A2\n')
+		expect(read(directory, 'b.ts')).toBe('B2\n')
+	})
+
+	it('fails on empty standard input', () => {
+		const error = mute('error')
+
+		expect(edit_files_cli.run(['-'], root(), () => '')).toBe(1)
+		expect(error).toHaveBeenCalledWith('No edit blocks in -')
 	})
 })
 

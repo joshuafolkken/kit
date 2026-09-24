@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_tail, type TailSection } from './run-tail'
 
 // `josh run:tail [<N> ...]` — one call for the fixed post-merge sequence a run closes on
@@ -13,6 +14,12 @@ import { run_tail, type TailSection } from './run-tail'
 // The issue numbers are the completion's citations — the closed issue and any follow-ups filed this run
 // — and go to `issue:cite`; the other two take none. A `run:tail` with no numbers still closes the run,
 // because `issue:cite` with no target exits zero.
+//
+// **A dispatched lane child skips the ledger step** (joshuafolkken/kit#2492). A flush opens a
+// ledger-only pull request and waits out its whole CI before it merges — minutes per issue, spent on a
+// file only the retrospective and the measurements read. The line stays appended in the primary
+// checkout, and the `backlogrun` parent flushes once at its end (`run:carry --end`, `run-carry-flush.ts`).
+// A single run outside a lane keeps the step: its one end is already the run's end.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -26,13 +33,20 @@ interface Step {
 	argv: (issues: ReadonlyArray<string>) => ReadonlyArray<string>
 }
 
-// The three steps in the order a run closes on: the ledger is committed first so the recurrence count is
-// on main, the citations are read for the completion report, and the release scope is decided last.
-const STEPS: ReadonlyArray<Step> = [
-	{ header: run_tail.OBSERVATIONS_HEADER, argv: () => ['observations:flush'] },
+// The steps in the order a run closes on: the ledger is committed first so the recurrence count is on
+// main, the citations are read for the completion report, and the release scope is decided last.
+const FLUSH_STEP: Step = {
+	header: run_tail.OBSERVATIONS_HEADER,
+	argv: () => ['observations:flush'],
+}
+const REPORT_STEPS: ReadonlyArray<Step> = [
 	{ header: run_tail.CITATIONS_HEADER, argv: (issues) => ['issue:cite', ...issues] },
 	{ header: run_tail.RELEASE_HEADER, argv: () => ['release:scope'] },
 ]
+
+function steps_for(is_lane_child: boolean): ReadonlyArray<Step> {
+	return is_lane_child ? REPORT_STEPS : [FLUSH_STEP, ...REPORT_STEPS]
+}
 
 // Numbers only — a target `issue:cite` reads as an issue, so a stray flag is refused rather than
 // forwarded to the wrong step.
@@ -45,15 +59,21 @@ function parse_issues(argv: ReadonlyArray<string>): ReadonlyArray<string> | unde
 async function run_step(step: Step, issues: ReadonlyArray<string>): Promise<TailSection> {
 	const result = await josh_command.josh_run(step.argv(issues), should_forward_stderr)
 
-	return { header: step.header, body: result.out, code: result.code }
+	return {
+		header: step.header,
+		body: run_tail.section_body(result.out, result.err, result.code),
+		code: result.code,
+	}
 }
 
-// Run the three in order, not concurrently: the ledger commit must land on main before the release scope
+// Run the steps in order, not concurrently: the ledger commit must land on main before the release scope
 // reads main's pending count, and the order is what a lane spent three turns on.
 async function close_run(issues: ReadonlyArray<string>): Promise<ReadonlyArray<TailSection>> {
 	const sections: Array<TailSection> = []
 
-	for (const step of STEPS) sections.push(await run_step(step, issues))
+	const is_lane_child = lane_child_marker.is_child_of(process.cwd())
+
+	for (const step of steps_for(is_lane_child)) sections.push(await run_step(step, issues))
 
 	return sections
 }

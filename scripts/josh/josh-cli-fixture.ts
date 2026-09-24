@@ -13,6 +13,17 @@ const JOSH_ENTRY = path.join(REPO_ROOT, 'scripts', 'josh', 'josh.ts')
 const TSX_RUNNER = resolve_tsx_runner()
 const PORT_SEED_KEY = 'PORT_SEED'
 
+interface JoshLauncher {
+	executable: string
+	leading_arguments: ReadonlyArray<string>
+}
+
+// The source CLI as one launcher, so the integration harness spawns exactly what `run_josh` does.
+const SOURCE_JOSH: JoshLauncher = {
+	executable: TSX_RUNNER.executable,
+	leading_arguments: [...TSX_RUNNER.leading_arguments, JOSH_ENTRY],
+}
+
 interface CliResult {
 	stdout: string
 	exit_code: number | undefined
@@ -27,8 +38,8 @@ interface CliOptions {
 // so a developer who exports `PORT_SEED` would otherwise decide what these assertions see.
 function run_josh(cli_arguments: ReadonlyArray<string>, options: CliOptions = {}): CliResult {
 	const result = execaSync(
-		TSX_RUNNER.executable,
-		[...TSX_RUNNER.leading_arguments, JOSH_ENTRY, ...cli_arguments],
+		SOURCE_JOSH.executable,
+		[...SOURCE_JOSH.leading_arguments, ...cli_arguments],
 		{
 			cwd: options.cwd ?? REPO_ROOT,
 			reject: false,
@@ -39,7 +50,7 @@ function run_josh(cli_arguments: ReadonlyArray<string>, options: CliOptions = {}
 	return { stdout: result.stdout, exit_code: result.exitCode }
 }
 
-const josh_cli_fixture = { run_josh, REPO_ROOT }
+const josh_cli_fixture = { run_josh, REPO_ROOT, SOURCE_JOSH }
 
-export type { CliResult }
+export type { CliResult, JoshLauncher }
 export { josh_cli_fixture }

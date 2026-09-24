@@ -19,6 +19,7 @@ function input(overrides: Partial<StepInput>): StepInput {
 		is_lane_child: false,
 		is_consumer: false,
 		is_retrospective_enabled: true,
+		has_changes: false,
 		...overrides,
 	}
 }
@@ -35,6 +36,14 @@ describe('run_step.pre_verdict', () => {
 	it('closed wins over a required update', () => {
 		expect(run_step.pre_verdict(input({ state: 'CLOSED', latest_scope: 'required' }))).toBe(
 			run_step.ALREADY_DONE,
+		)
+	})
+
+	// joshuafolkken/kit#2476: `run:entry` and `run:next` read this verdict, so the lane's uncommitted
+	// work is surfaced there too, not only in `run:step`'s own decide line.
+	it('answers keep-work for a closed issue over a tree holding uncommitted work', () => {
+		expect(run_step.pre_verdict(input({ state: 'CLOSED', has_changes: true }))).toBe(
+			run_step.KEEP_WORK,
 		)
 	})
 
@@ -72,6 +81,18 @@ describe('run_step.next_action — carry and state guards', () => {
 		)
 	})
 
+	// joshuafolkken/kit#2476: a child that popped its parked work and read `already-done` ended without
+	// keeping it, and the lane close removed it — so a closed issue over a dirty tree names the work.
+	it('surfaces uncommitted work on a closed issue instead of answering already-done', () => {
+		const action = run_step.next_action(input({ state: 'CLOSED', has_changes: true }))
+
+		expect(action.kind).toBe('decide')
+		expect(action.line).toContain(
+			`git stash push -u -m "${ISSUE}: uncommitted work at already-done"`,
+		)
+		expect(action.line).toMatch(NOT_A_PROCEDURE)
+	})
+
 	it('answers unknown for an unreadable state', () => {
 		expect(run_step.next_action(input({ state: undefined })).line).toBe(run_step.UNKNOWN)
 	})
@@ -87,25 +108,25 @@ describe('run_step.next_action — pre-implementation position', () => {
 	})
 })
 
-describe('run_step.next_action — the setup→implementation boundary', () => {
-	const SETUP_CUT_COMMAND = `pnpm josh run:cut ${ISSUE} --setup`
-
-	it('cuts a dispatched lane child once its plan is posted', () => {
+// joshuafolkken/kit#2489: the unconditional setup cut is retired — a planned lane child implements in
+// the same session, and only the threshold-gated implementation cut bounds its context.
+describe('run_step.next_action — no cut at the setup→implementation boundary', () => {
+	it('implements a dispatched lane child once its plan is posted', () => {
 		expect(run_step.next_action(input({ last_event: KIND.PLAN, is_lane_child: true }))).toEqual({
-			kind: 'command',
-			line: SETUP_CUT_COMMAND,
+			kind: 'verdict',
+			line: run_step.IMPLEMENT,
 		})
 	})
 
-	it('does not cut before the plan is posted — an empty stream is still setup', () => {
+	it('implements a lane child whose plan is not posted yet', () => {
 		expect(run_step.next_action(input({ is_lane_child: true })).line).toBe(run_step.IMPLEMENT)
 	})
 
-	it('does not cut an interactive run — only a dispatched lane child relaunches', () => {
+	it('implements an interactive run once its plan is posted', () => {
 		expect(run_step.next_action(input({ last_event: KIND.PLAN })).line).toBe(run_step.IMPLEMENT)
 	})
 
-	it('leaves a needs-human-review position untouched — it changes where the run ends, not where it cuts', () => {
+	it('leaves a needs-human-review position untouched', () => {
 		expect(
 			run_step.next_action(
 				input({ last_event: KIND.PLAN, is_lane_child: true, is_human_review: true }),
@@ -113,7 +134,7 @@ describe('run_step.next_action — the setup→implementation boundary', () => {
 		).toBe(run_step.HUMAN_REVIEW)
 	})
 
-	it('leaves a required dependency update ahead of the cut', () => {
+	it('leaves a required dependency update ahead of implementing', () => {
 		expect(
 			run_step.next_action(
 				input({ last_event: KIND.PLAN, is_lane_child: true, latest_scope: 'required' }),
@@ -121,7 +142,7 @@ describe('run_step.next_action — the setup→implementation boundary', () => {
 		).toBe(run_step.UPDATE_DEPS)
 	})
 
-	it('reads the setup cut back as a resume once the cut event lands', () => {
+	it('reads an implementation cut back as a resume once the cut event lands', () => {
 		expect(run_step.next_action(input({ last_event: KIND.CUT, is_lane_child: true })).line).toBe(
 			`pnpm josh run:cut --resume ${ISSUE}`,
 		)
@@ -136,12 +157,30 @@ describe('run_step.next_action — event-driven position', () => {
 		[KIND.OUTAGE, MERGE_COMMAND],
 		[KIND.PARK, 'pnpm josh backlog:next'],
 		[KIND.CUT, `pnpm josh run:cut --resume ${ISSUE}`],
+		[KIND.SHIP_STOP, `pnpm josh ship --log ${ISSUE}`],
 	])('dispatches to a command after %s', (last_event, line) => {
 		expect(run_step.next_action(input({ last_event }))).toEqual({ kind: 'command', line })
 	})
 
 	it('answers a wait verdict after a child launch', () => {
 		expect(run_step.next_action(input({ last_event: KIND.CHILD_LAUNCH })).line).toBe(run_step.WAIT)
+	})
+
+	// joshuafolkken/kit#2428: the detached supervisor carries the run, so the agent has nothing to do
+	// until it stops — and a lane child waits too, rather than being pointed at a parent-only step.
+	it.each([false, true])(
+		'waits while a detached ship supervisor carries the run (lane: %s)',
+		(is_lane_child) => {
+			const action = run_step.next_action(input({ last_event: KIND.SHIP_LAUNCH, is_lane_child }))
+
+			expect(action).toEqual({ kind: 'verdict', line: run_step.WAIT })
+		},
+	)
+
+	it('answers already-done once the supervisor merged and the issue closed', () => {
+		const action = run_step.next_action(input({ last_event: KIND.SHIP_LAUNCH, state: 'CLOSED' }))
+
+		expect(action.line).toBe(run_step.ALREADY_DONE)
 	})
 })
 

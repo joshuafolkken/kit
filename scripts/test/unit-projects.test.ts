@@ -1,10 +1,20 @@
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { run_ship_detach } from '#scripts/run/run-ship-detach'
 import { describe, expect, it } from 'vitest'
 import { PILOT_FILES } from './pilot-files'
 import { unit_projects, type UnitProject } from './unit-projects'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
-const { ISOLATED_PROJECT, MAIN_EXCLUDE, PURE_PROJECT, STATE_GUARD, STDOUT_GUARD, UNIT_PROJECTS } =
-	unit_projects
+const {
+	ISOLATED_PROJECT,
+	MAIN_EXCLUDE,
+	PURE_PROJECT,
+	STATE_GUARD,
+	STDOUT_GUARD,
+	TELEGRAM_GUARD,
+	UNIT_PROJECTS,
+} = unit_projects
 
 function project(name: string): UnitProject['test'] {
 	const found = UNIT_PROJECTS.find((entry) => entry.test.name === name)
@@ -63,6 +73,24 @@ describe('each project carries the per-run environment and timeout', () => {
 		expect(project(name).env['CLAUDE_CODE_SESSION_ID']).toBe('vitest-session')
 		expect(project(name).testTimeout).toBeGreaterThan(0)
 	})
+
+	// joshuafolkken/kit#2436: a package-manager wrapper's loopback proxy would otherwise reach every
+	// suite that asserts what a `gh` spawn receives, passing in CI and failing on a wrapped machine.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks every proxy spelling for %s', (name) => {
+		const { env } = project(name)
+
+		for (const key of agent_session_environment.PROXY_KEYS) expect(env[key]).toBe('')
+		expect(env[agent_session_environment.PROXY_CERTIFICATE_KEY]).toBe('')
+	})
+
+	// joshuafolkken/kit#2456: the pre-push run inside a detached ship supervisor would otherwise send a
+	// ship fixture down the supervised stop path.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the ship supervisor marks for %s', (name) => {
+		const { env } = project(name)
+
+		expect(env[run_ship_detach.SUPERVISED_KEY]).toBe('')
+		expect(env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('')
+	})
 })
 
 // The state guard belongs to the pure project alone: isolate:false is the only run a leaked branch or
@@ -79,9 +107,10 @@ describe('the state guard is scoped to the pure project', () => {
 })
 
 // joshuafolkken/kit#2296: the stdout guard must run inside every worker of both projects, so a
-// fixture's direct stream write never leaks into `pnpm josh test:unit`'s output.
-describe('the stdout guard runs on both projects', () => {
-	it.each([PURE_PROJECT, ISOLATED_PROJECT])('sets up the stdout guard on %s', (name) => {
-		expect(project(name).setupFiles).toEqual([...STDOUT_GUARD])
+// fixture's direct stream write never leaks into `pnpm josh test:unit`'s output. joshuafolkken/kit#2494
+// puts the Telegram guard beside it, since it wraps each worker's own `fetch`.
+describe('the per-worker guards run on both projects', () => {
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('sets up both guards on %s', (name) => {
+		expect(project(name).setupFiles).toEqual([...STDOUT_GUARD, ...TELEGRAM_GUARD])
 	})
 })

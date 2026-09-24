@@ -1,3 +1,4 @@
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { poll } from '#scripts/lib/poll'
 import { with_page_size } from '#scripts/version/version-remote'
 import { execaSync } from 'execa'
@@ -58,6 +59,7 @@ function finish(state: PublishWaitState, version: string, attempts: number): Pub
 function fetch_published_versions(versions_endpoint: string): Array<string> | undefined {
 	const endpoint = with_page_size(versions_endpoint, VERSIONS_PAGE_SIZE)
 	const result = execaSync('gh', ['api', endpoint, '--jq', NAMES_JQ], {
+		...git_gh_exec.direct_environment(),
 		reject: false,
 		timeout: GH_TIMEOUT_MS,
 	})

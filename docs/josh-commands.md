@@ -126,21 +126,38 @@ Format the single file an agent just edited. Not run by hand: `.claude/settings.
 
 ### `josh batch:guard`
 
-Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. Wired to `PreToolUse` via `.claude/settings.json`, fed the pending call as JSON on stdin.
+Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. It is **not wired standalone**: it is one of the three `PreToolUse` guards consolidated into `josh pretool:guard` (with `investigation:guard` and the rule guard), so `.claude/settings.json` names the union of their matchers and runs the one process, fed the pending call as JSON on stdin.
 
 ```json
 "PreToolUse": [
 	{
-		"matcher": "Bash|Edit|Read|Write",
-		"hooks": [{ "type": "command", "command": "pnpm josh batch:guard", "timeout": 20 }]
+		"matcher": "Bash|Edit|Read|Write|AskUserQuestion",
+		"hooks": [
+			{
+				"type": "command",
+				"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi",
+				"timeout": 20
+			}
+		]
 	}
 ]
 ```
 
-- `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
-- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), so the guard downgrades to a non-blocking notice — the call proceeds with the guidance attached. kit#2178 took kit#2164's notice `off` after it did not move the density; with it `off` it fired **zero** times across the 2026-09-21 backlogrun measured next, so the 1.147 read there is the rate with no guidance. kit#2276 re-enables it with the two things #2164's lacked — it **names the concrete recent calls** and **recurs every single-call turn** — to be re-measured, redesigned rather than kept if it misses the target. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`.
-- **Fires more than once per run.** The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the **refusal** every `REFIRE_EVERY` further turns (the initial limit), the **notice** every `NOTICE_REFIRE_EVERY` (joshuafolkken/kit#2276, tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence — replacing the old one-firing-per-run behavior that fell silent for the rest of a run that ignored it.
+- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's, not this one's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
+- **Silent in a dispatched lane child since kit#2405** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn (joshuafolkken/kit#2138), and every advisory notice tried instead (kit#2164, kit#2178, kit#2276) missed 1.40 — kit#2405 measured **1.13** calls per round trip (`josh time:density`, ten most recent lanes). The cause is structural — a `PreToolUse` hook cannot see the turn it is in — so the notice is **`off`**; the lever that moves the density is a composite command (`read:files` / `edit:files`). Decided in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`.
+- **Fires more than once per run** (main line). The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the **refusal** every `REFIRE_EVERY` further turns (the initial limit), the **notice** every `NOTICE_REFIRE_EVERY` (joshuafolkken/kit#2276, tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence — replacing the old one-firing-per-run behavior that fell silent for the rest of a run that ignored it.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
+
+### `josh time:density`
+
+Report tool calls per round trip across the recent lane sessions — the density the batching guard is measured on, as a command rather than a hand-counted `node -e` (joshuafolkken/kit#2405). Kit-only (it reads kit's own lane transcripts). Aggregates the ten most recent lane sessions holding at least thirty round trips, dividing summed calls by summed round trips through the same `time-round-trips.ts` the guard and the live density line read, so the three cannot disagree about what a round trip is.
+
+```
+lanes=10 round_trips=634 tools/turn=1.13 batched=63/634
+```
+
+- `--lanes <n>` averages over a different count of recent qualifying lanes (default 10); `--path <dir>` reads another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.
+- `tools/turn` is the canonical calls-per-round-trip density (floor 1.5), so it runs a little above the Issue's per-assistant-message frame (1.04), whose denominator also counts text-only turns. Use it as a behavior-change Issue's baseline so `josh measure:rerun` carries a before/after without a paste.
 
 ### `josh investigation:guard`
 
@@ -200,11 +217,11 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Most rows deli
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `duplicate-read:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
 
-**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276, joshuafolkken/kit#2298, joshuafolkken/kit#2382). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it was `off` until kit#2382 measured six lane children reading 4–17 unedited files each, so the reading was there to send out; it now names the concrete unedited files rather than refusing), `batching` is `notice` (kit#2178 took kit#2164's notice `off` after it did not move the density; kit#2276 restores it naming the concrete recent calls and recurring every single-call turn), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences, kit#2298), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement** (joshuafolkken/kit#2138, joshuafolkken/kit#2164, joshuafolkken/kit#2178, joshuafolkken/kit#2276, joshuafolkken/kit#2298, joshuafolkken/kit#2382). A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it was `off` until kit#2382 measured six lane children reading 4–17 unedited files each, so the reading was there to send out; it now names the concrete unedited files rather than refusing), `batching` is `off` (kit#2178 took kit#2164's notice `off`; kit#2276 restored it naming concrete recent calls and recurring every single-call turn, but kit#2405's re-measurement read 1.13 calls/round trip — below the 1.40 target and under the pre-restore baseline — so the notice was cut off for good, the notification being structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences, kit#2298), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ### `josh stop:guard`
 
-The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247): one process delivering the three stop-time rules — stop-notification, hold-release and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247, joshuafolkken/kit#2422): one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to run `pnpm josh issue:scout` through the filing, because a first-party filing is Tier A (`SKILL.md` → §2i); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
 ### `josh session:lang`
 
@@ -278,6 +295,10 @@ pnpm josh test:declared --help    # print usage, including the --match stdin for
 An unknown flag is refused with the usage rather than ignored (joshuafolkken/kit#2297), the same convention `josh time` follows.
 
 `--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch.
+
+### `josh test:red`
+
+Run the changed `*.test.ts` files on a temporary merge-base worktree (the pre-fix tree; the working tree and index are untouched) and print `red`, `green` or `no-test`. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green` (joshuafolkken/kit#2448).
 
 ### `josh test:e2e`
 
@@ -522,6 +543,8 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 - `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
 
+**Live-execution evidence (joshuafolkken/kit#2446):** a merge is refused when the branch changes a runtime path (`josh test:declared`'s classification) and the PR body lacks a `## 実機証跡` section of a backticked command plus its fenced output (`issue:lint`'s `## 再現` parser). Pass it with `josh git -y --body-file <path>`.
+
 **Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
@@ -556,7 +579,7 @@ Commit the observation ledger (`docs/observations.md`) as a docs-only pull reque
 pnpm josh observations:flush
 ```
 
-**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand.
+**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand. **Run from a lane it acts on the primary checkout**, where the ledger lives (joshuafolkken/kit#2419): it moves there first, and each refusal names that checkout. A lane never flushes (`followup` and `run:tail` skip it); `pnpm josh run:carry --end` commits every lane's lines (joshuafolkken/kit#2492).
 
 Related: [`josh followup`](#josh-followup).
 
@@ -582,7 +605,7 @@ pnpm josh review:record --issue 2325          # a zero-finding round — records
 pnpm josh review:record --check --issue 2325  # the merge gate: was it recorded?
 ```
 
-**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
+**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. Both the append and `--check` use the primary checkout's ledger, even when run in a lane (joshuafolkken/kit#2419) — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs (joshuafolkken/kit#2343): a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 
@@ -608,7 +631,7 @@ Checkout the default branch and pull the latest changes with `git pull --ff-only
 pnpm josh main:sync
 ```
 
-**Behavior:** refuses inside a linked work tree (a lane) and exits non-zero — run it in the primary checkout instead; a lane's terminal step is `pnpm josh lane:close <issue-number>`. A default branch that has diverged fails loudly under `--ff-only` rather than growing a merge commit — the deliberate opposite of [`josh main:merge`](#josh-mainmerge). The same `--ff-only` pull is used by [`josh git`](#josh-git), `josh pr` and [`josh release`](#josh-release) when they start from the default branch.
+**Behavior:** refuses inside a linked work tree (a lane) and exits non-zero — run it in the primary checkout instead; a lane's terminal step is `pnpm josh lane:close <issue-number>`. A default branch that has diverged fails loudly under `--ff-only` rather than growing a merge commit — the deliberate opposite of [`josh main:merge`](#josh-mainmerge). The same `--ff-only` pull is used by [`josh git`](#josh-git) and `josh pr` when they start from the default branch. After the pull it runs `git fetch --prune` and deletes, with `git branch -d`, every local branch whose remote-tracking upstream is `[gone]`, that is merged into the default branch, and that no work tree has checked out — a lane's branch, an unmerged branch, a branch with no upstream and a branch with a deleted local upstream are kept (joshuafolkken/kit#2504). It prints how many it pruned and names any `git branch -d` refused.
 
 ### `josh main:merge`
 
@@ -618,7 +641,7 @@ Bring the repository's default branch into the branch this checkout is on: fetch
 pnpm josh main:merge
 ```
 
-**Behavior:** the merge strategy is named by the command rather than read from git config, so a diverged branch — the state the command exists for — merges cleanly instead of aborting with `fatal: Need to specify how to reconcile divergent branches`. Merging (not rebasing) avoids the force push the distributed `.claude/settings.json` denies. A conflicting merge leaves git's report on screen and exits non-zero; resolve it as any merge.
+**Behavior:** the merge strategy is named by the command rather than read from git config, so a diverged branch — the state the command exists for — merges cleanly instead of aborting with `fatal: Need to specify how to reconcile divergent branches`. Merging (not rebasing) avoids the force push the distributed `.claude/settings.json` denies. A conflict or uncommitted work on an incoming path fails; commit via `pnpm josh git -y`.
 
 ---
 
@@ -638,19 +661,21 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 
 ### `josh release`
 
-Release everything main has taken since the version last changed — one command, run by a person. It counts merges on main's first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag.
+Release everything main has taken since the version last changed — one command, run by a person. It counts merges on `origin/<default>`'s first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag.
 
 ```bash
 pnpm josh release
 pnpm josh release --dry-run   # count and report, write nothing
 ```
 
+**Runs in its own work tree, never the root checkout.** The count is read from `origin/<default>`, and the version bump, commit and push happen in a dedicated linked work tree cut from `origin/<default>` as the `release/v<version>` branch (placed under the same `.<repo>-lanes/` sibling directory the lanes use, named `release` so it collides with no lane). The tree is removed whether the run succeeds or fails, and its local release branch with it. Because the root is never touched, a release can run beside a [`backlogrun`](#backlogrun) and can start even when the root is dirty or sitting on another branch. The commit goes through lefthook's pre-commit, so the work tree gets its own dependency install (the hook is never disabled to skip it).
+
 **Options:**
 
-- `--dry-run` — count and report only; does not pull (a pull is a write).
+- `--dry-run` — count and report only; writes nothing, fetches nothing, and creates no work tree.
 - `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (env) — tag-watch budget, default 30 minutes.
 
-**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if the working tree is dirty, the checkout is not on the default branch, no version base can be found, or the `v<version>` tag never appears.
+**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base can be found, the `release/v<version>` branch is already taken (locally or on origin), or the `v<version>` tag never appears.
 
 ### `josh release:scope`
 
@@ -1003,6 +1028,21 @@ Prints `ok` (exit 0) when every heading is present, or each missing heading name
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現` (joshuafolkken/kit#2212, joshuafolkken/kit#2353). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun) re-runs the baseline.
 
+### `josh defect:rate`
+
+Print the defect rate of merged work over a window — the number that says whether to add a new mechanism or stabilize (joshuafolkken/kit#2449).
+
+```bash
+pnpm josh defect:rate            # the last 14 days
+pnpm josh defect:rate --days 30
+```
+
+**Options:**
+
+- `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
+
+**Behavior:** the numerator is the issues filed in the window that declare `- 種別: 不具合` or carry `route:interrupt`; the denominator is the issues closed as completed in the window that declare `- 種別: 振る舞い変更`. The defect declaration is not yet in the issue template and no filing lint enforces it, so a defect filed without it counts only through `route:interrupt`. A window with no completed behavior change prints `n/a` rather than a number. The search API serves at most 1000 results; when a window exceeds it the counts are printed as lower bounds, and an unreadable search exits 1 without a rate. `backlog:next` reads the same measurement to decide whether to offer defects first (joshuafolkken/kit#2455).
+
 ### `josh issue:backlinks`
 
 Classify an origin issue's upstream backlinks into one fixed word. The backlink headings (`## Origin` / `## Upstream issues` / `## Upstream candidate`, single-sourced in `prompts/collaboration-workflow/issue-template.md`) were fixed so a grep could find them; this is that grep. It reads issue N, then the bodies of every upstream it lists, and checks the pair points both ways.
@@ -1192,6 +1232,8 @@ pnpm josh backlog:next --exclude 1630  # skip the issue just merged
 
 stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
 
+**Defect priority** (joshuafolkken/kit#2455): on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline recorded on joshuafolkken/kit#2449 (0.42), the runnable numbers are re-ordered — defects (`- 種別: 不具合` or `route:interrupt`) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
+
 ### `josh backlog:plan`
 
 The whole backlog rendered as a plan a person reads before a run starts — four sections on stdout, using `backlog:next`'s own classification. Separate because that command's stdout is bare tokens a loop branches on.
@@ -1235,7 +1277,7 @@ stdout is the verdict word (reason to stderr): `run` (start what was offered), `
 
 ### `josh backlog:offer`
 
-Collapse a `backlogrun` loop-head event into one call: run `backlog:next`, map its answer to the budget word `backlogrun-steps.md` → "The loop" fixes, run `backlog:budget`, return the verdict — two turns folded into one where the parent's context is largest, as `run:merge` did for a merge event.
+A `backlogrun` loop-head event in one call: `backlog:next`, mapped to the budget word `backlogrun-steps.md` → "The loop" fixes, then `backlog:budget`.
 
 ```bash
 pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --retries 1
@@ -1243,7 +1285,17 @@ pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --re
 
 `--exclude` / `--repo` forward to `backlog:next`; `--started` / `--active` / `--merged` / `--running` / `--max` / `--idle` forward to `backlog:budget` (`--answer` is computed here). `--running` also decides `wait` (→ `blocked` with children in flight, else `exhausted`) and `--retries` decides `retry` (→ `blocked` below three, `unreadable` at the third). stdout is the verdict, then — on `run` — the issue numbers one per line; the new retry count is the last stderr line (`retries: <n>`) and in `--json`. Exit 1 from `backlog:next` maps to `unreadable`, never `none`.
 
-At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the run's event stream (once per drain, best-effort), so the next `run:step` fires the end-of-run retrospective before the idle watch rather than after it (joshuafolkken/kit#2335). A watch that opened while children were still merging is not this drain and is left unmarked.
+At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the event stream (once per drain, best-effort), so the next `run:step` fires the retrospective before the idle watch (joshuafolkken/kit#2335). A watch opened while children still merge is left unmarked.
+
+### `josh backlog:drive`
+
+Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then offer again. It uses the same `backlog:offer`, `lane:launch`, and `run:merge` decisions as the individual commands (joshuafolkken/kit#2499, #2508).
+
+```bash
+pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
+```
+
+An open carry record supplies the start time and merged count. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective, while a completed retrospective lets the idle watch continue. `--only` returns `only` without dispatching backlog work. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
 
 ### `needs-human-review` — the opposite label
 
@@ -1463,6 +1515,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 - `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
 - `--retrospective` marks the end-of-run retrospective run, once per invocation, and requires `--summary <text>` — the same close writes that result as one `retrospective` event on the run's event stream (best-effort), so a run that filed zero improvements reads apart from one whose retrospective never ran (joshuafolkken/kit#2342). Either flag without the other is refused.
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not (joshuafolkken/kit#2136). A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
+- `--end` over a live record flushes pending ledger lines once (joshuafolkken/kit#2492); a failed flush goes to stderr and the record is still cleared.
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
@@ -1480,6 +1533,14 @@ pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 `scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local
 `sqlite_home` and `--ephemeral`, retaining native auth/config. Unclaimed wakes try thrice.
 
+**A launch goes out only where a woken session would find work** (joshuafolkken/kit#2417). Before
+every launch — first wake, dead-owner recovery and retry alike — the supervisor asks, cheap first:
+named issues left on the carry record (or a finished `--only` list) are work; otherwise a free lane
+and a ready issue from `backlog:next` are. With no work it launches nothing and polls again, each wait
+as long as the idle stretch so far, capped at eight times `--interval`. A failed `backlog:next` read
+counts as work, and a stretch past the `backlogrun` idle-watch default (30 minutes) wakes one session
+anyway, so the run is still finished by a session rather than left to expire.
+
 **Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
 
 ### `josh run:cut`
@@ -1494,7 +1555,7 @@ pnpm josh run:cut --resume 1839                 # a fresh process's entry check
 pnpm josh run:cut --end                         # clear the record
 ```
 
-A cut that resumes back into implementation (`--impl` / `--setup`) carries a **handoff** — the run's
+A cut that resumes back into implementation (`--impl`) carries a **handoff** — the run's
 instruction verbatim and a curated list of what is done, what remains, and what was deliberately left
 alone (joshuafolkken/kit#2354). It is passed by path with `--handoff <path>`, never inlined, so a
 backtick or `$` in the instruction is not executed. The record stays small (bounded, a few short
@@ -1502,9 +1563,9 @@ lines); the resume prints the handoff to stderr so the fresh process continues o
 rather than the working tree alone, and a resume that finds no instruction is refused `incomplete`
 rather than continuing blind.
 
-The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while a `--setup` / `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
+The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while an `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
 
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`). `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
+**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or an `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). The setup-phase `--setup` cut (joshuafolkken/kit#2346) is retired (joshuafolkken/kit#2489): a lane child's context is bounded by the threshold-gated implementation cut alone, and `--setup` is a usage error. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
 
 ### `josh run:liveness`
 
@@ -1628,13 +1689,18 @@ or `already-done`) is left alone; an **outage** child (OPEN, unparked, exit reco
 reach the API — joshuafolkken/kit#2240) has its stale `in-progress` dropped but is **not** parked and
 **not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
 stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
+A **cut** child (OPEN, unparked, its lane holding a declared cut with its handoff that no successor
+adopted — joshuafolkken/kit#2484) is neither parked nor counted: its successor is relaunched in the same
+lane through the relaunch the cut itself uses, once per cut; a relaunch that cannot start, or a second
+unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
 `--output <path>` names the transcript the outage split reads; absent, it is off.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
-`over` (the merge crossed the shared 150,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
+`over` (the merge crossed the shared 135,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
 before its commit — stop), `stop` (failure guard), `environment` (the consecutive-outage guard tripped —
-the API is down), `retry` (unreadable), `busy` (refused count; exit 1).
+the API is down), `resumed` (a cut child's successor was relaunched — await that lane again), `retry`
+(unreadable), `busy` (refused count; exit 1).
 
 **Options:**
 
@@ -1664,7 +1730,29 @@ Closes a run in one call, folding the three-round-trip post-merge sequence (josh
 `observations:flush`, `issue:cite` (the closed issue and any follow-ups filed this run) and
 `release:scope`, run in order — the ledger commits before the release scope reads main — and joined
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
-merge and the push above it stay their own calls.
+merge and the push above it stay their own calls. **A lane child skips `observations:flush`**; its
+line waits for `pnpm josh run:carry --end` (joshuafolkken/kit#2492).
+
+### `josh ship`
+
+Ships a finished change in one call (joshuafolkken/kit#2398): the gate, the commit/push/PR (`git -y`), the CI-wait merge
+(`followup`, kept in the foreground) and the report bookkeeping (`run:tail`), run in order and joined
+under one header per step. It extends `run:tail`'s post-merge fold into the body of the region.
+Unlike `run:tail` it stops at the first failed step — a red gate never reaches the commit — and closes
+the report with the name of the stopped step, so the run reads only that one. The first positional is
+the `"<title> #<N>"` string `git -y` and `followup` already take; the issue number is read off its tail
+for `run:tail`, `--notify-message` is forwarded to `followup` alone, and `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on — to `git -y` alone. Any further positionals are
+follow-up citations filed this run — branch-2 filing runs before `ship` — forwarded to `run:tail` after
+the closed issue so `issue:cite` reports them too. The one decision the region carried — disposing of a
+review finding — stays in front of this command.
+
+A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored only where the actual
+state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged
+as a `ship-stage` trace event.
+
+`--review` (#2427) runs review round 1 beside the gate, after any scoped check not yet green (#2500). The round-1 reviewer fixes a small, local Medium in place and marks it `fixed ` (#2489), counted once the scoped pair is green; a High, an unfixed Medium or a refusal stops the ship. After the commit a `round-2` stage asks `review:round2 --round-1-closed` and, on `required`, runs the scoped pair, `review:brief --round 2`, a fresh read-only reviewer, attest and record — anything but a clean or Low-only round 2 stops before `followup`.
+
+`--detach` (#2428; implied in a lane child, #2457): a supervisor; a stop emits `ship-stop` (`--log <N>`).
 
 ### `josh run:report`
 
@@ -1694,20 +1782,22 @@ pnpm josh run:report   # print the report; the same text josh notify sends
 
 Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205). Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
 lane child append to one stream that survives a session cut; `--from` reads everything after a position,
-`--last` the newest event alone, and `--follow` the reader an attached session relays with
-(joshuafolkken/kit#2207).
+`--last` the newest event alone, `--follow` one bounded read that waits (joshuafolkken/kit#2207), and
+`--watch` the ambient pane (joshuafolkken/kit#2492).
 
 ```bash
 pnpm josh run:event --append <kind> <text>   # append one event; prints its position
 pnpm josh run:event --from <position>         # every event after <position>, in order (JSON)
-pnpm josh run:event --follow <position>       # relay new events, waiting for one; position on stderr
+pnpm josh run:event --follow <position>       # new events, waiting for one; position on stderr
+pnpm josh run:event --watch [<position>]      # every new event, rendered, until interrupted
 pnpm josh run:event --last                    # the newest event alone
 ```
 
 `--follow` is `--from` that waits: it returns the moment an event is past `<position>` and otherwise at
-the interval, so an attached session sees a new event at once and the run's aliveness while quiet. Events
-go to standard output to relay verbatim and the next position to standard error — the same before and
-after a cut, the stream the run's, the position the caller's.
+the interval. Events go to standard output and the next position to standard error — the same before
+and after a cut, the stream the run's, the position the caller's.
+
+`--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
 `stop`, `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge`, `park`
@@ -1808,13 +1898,25 @@ put. The printed PID is the supervisor's.
 
 **Options:**
 
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `opus`, `opus`, and `opus`. Codex keeps its provider-specific model.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `claude-opus-5-5`, `claude-opus-5-5`, and `claude-opus-5-5`. Codex keeps its provider-specific model.
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.
 
 Blank means unset. The inherited agent session identifier selects the provider; a missing or
 conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
 refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
-defaults to `gpt-5.6-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`. Legacy
+defaults to `gpt-6-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
+drops to `low` only in the pre-gate phase, on either provider.
+
+The defaults are pinned model ids rather than an alias such as `opus`, so a run log names the exact
+model and a model migration can be measured at unchanged effort. Before launch the selected CLI's
+version is checked against the model it will run: `claude-opus-5-5` needs Claude Code 2.1.280 or later
+(`claude update`), and `gpt-6-sol` needs Codex CLI 0.155.0 or later
+(`npm install -g @openai/codex@latest`). A CLI below the floor, or one whose version cannot be read,
+refuses launch with that update named — never a quiet switch to an older model. A lane keeps the
+profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on
+its recorded model (a model the floor table does not name is not version-checked), and only a newly
+dispatched lane takes the new default. `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
+only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
 evaluation procedure](./backlogrun-worker-evaluation.md).
 
@@ -1843,10 +1945,10 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 ### `josh cost`
 
-Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 150,000 limit; `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
+Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 135,000 limit — the break-even context a cut pays back at, derived by `context-cut-payback.ts` (joshuafolkken/kit#2406); `--over <tokens>` sets an explicit one. The old report scopes and `--cap` are retired; `josh time` retains hand-off aggregates.
 
 ```bash
-pnpm josh cost --cut             # compare billed input per request with the shared 150,000 context-cut threshold
+pnpm josh cost --cut             # compare billed input per request with the shared 135,000 context-cut threshold
 pnpm josh cost --over <tokens>   # compare with an explicit limit
 pnpm josh cost --cut --path <dir> # Anthropic project or current OpenAI worktree
 ```
@@ -1938,7 +2040,11 @@ Apply several content-addressed edits from a plan in one call — the write-side
 
 ```bash
 pnpm josh edit:files plan.txt   # applies every block in the plan, one line per edit reporting the outcome
+pnpm josh edit:files - <<'EDITS'   # plan from stdin, then EDITS (kit#2493)
 ```
+
+- **`-` needs no plan file** — the lane form (`report-format.md`); quote the delimiter so nothing expands.
+- **Fall back to `Edit`** for a `dependent` edit, one edit, or a `Write`; no `format:edited` runs.
 
 - **Why a command at all.** kit#2202 folded the pre-edit _reads_ and left the edits to native multiple `Edit` blocks, on the ground that presupposing a multi-edit tool would leave the rule unfired where the harness lacks one. kit#2366 measured that bet across six lanes — **230 of 230 edit turns issued a single `Edit`**, a per-turn density of exactly 1.000 — so native multiple edits never happened. A `pnpm josh` command runs on every harness, and a composite command is the only lever measured to move round-trip density (kit#2165 / kit#2162 / kit#2202), never advice.
 - **The plan is a `=====`-fenced path header then a git-conflict-marker pair**, so a model authors it without escaping code into JSON. Several blocks may name one file:
@@ -1953,9 +2059,10 @@ pnpm josh edit:files plan.txt   # applies every block in the plan, one line per 
   ```
 
 - **Each edit is content-addressed**: its `old` text must match exactly once — zero matches is `no match`, more than one is `ambiguous (N)` — so a false fold surfaces rather than corrupts, the same guarantee the `Edit` tool gives. A file is written **only when every one of its edits applied**, so a partial plan leaves the file untouched.
+- **`dependent`** (kit#2493): an earlier edit touched this one's text; file untouched.
 - **The batching guard hands it out.** On a run of single-call `Edit` turns the notice names the edits and offers `pnpm josh edit:files` over their files (`turn-batching.md` → "ガード発火時にも合成コマンドを手渡す"), the write-side of the read fold.
 
-**Output / exit codes:** one line per edit (`applied` / `no match` / `ambiguous (N)` / `missing`); any non-`applied` edit, an unreadable plan, or a plan with no blocks exits non-zero.
+**Output / exit codes:** one line per edit (`applied` / `no match` / `ambiguous (N)` / `dependent` / `missing`); any non-`applied` edit, an unreadable plan, or a plan with no blocks exits non-zero.
 
 ### `josh time`
 

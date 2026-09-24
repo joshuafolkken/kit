@@ -1,7 +1,15 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
+import { git_stash } from '#scripts/git/git-stash'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { lane_close } from '#scripts/lane/lane-close'
+import { lane_reap } from '#scripts/lane/lane-reap'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { run_carry, type CarryChange, type CarryOwner, type RunCarry } from './run-carry'
+import { run_cut, type RunCut } from './run-cut'
 import { run_merge } from './run-merge'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
@@ -24,6 +32,8 @@ type ApplyCarryResult =
 const OVER = 'over'
 const LANES = '--lanes'
 const REPO_FLAG = '--repo'
+const LANE_CLOSE_OCCASION = 'lane close'
+const GIT_ENTRY = '.git'
 
 // One returned child's context, gathered from the command line by the CLI.
 interface MergeContext {
@@ -88,12 +98,62 @@ async function apply_carry(
 	return { kind: 'applied', carry: run_carry.apply_change(record.target, record.carry, change) }
 }
 
+// The carry record when this session may not act on it — the same ownership guard `apply_carry` asks —
+// or `undefined`. Asked before an action that counts nothing, like the cut fallback's relaunch, so a
+// stray session is refused rather than relaunching a lane it does not own (joshuafolkken/kit#2484).
+async function refused_carry(ctx: MergeContext): Promise<RunCarry | undefined> {
+	const record = await read_record()
+
+	if (record === undefined || !run_carry.is_count_refused(record.carry, ctx.owner)) return undefined
+
+	return record.carry
+}
+
 async function sync_main(): Promise<void> {
-	await josh(['main:sync'])
+	const result = await josh(['main:sync'])
+
+	if (result.code !== 0) throw new Error(`main:sync failed: ${result.out}`)
 }
 
 async function close_lane(child: string): Promise<void> {
 	await josh(['lane:close', child])
+}
+
+function preserved_comment(message: string): string {
+	return [
+		'The lane held uncommitted work when `run:merge` closed it, so it was stashed before the close:',
+		`- recover with \`pnpm josh stash:pop "${message}"\``,
+	].join('\n')
+}
+
+async function stash_work(child: string, directory: string): Promise<void> {
+	const message = git_stash.work_message(child, LANE_CLOSE_OCCASION)
+
+	await git_stash.push(message, directory)
+	await git_gh_issue_write.issue_try_comment(child, preserved_comment(message))
+}
+
+// Stash whatever the lane still holds uncommitted before its tree is removed (joshuafolkken/kit#2476):
+// `lane:close` deletes by force, and a merged child that had popped its parked work and then read
+// `already-done` left that work nowhere else. The stash stack outlives the tree, so the push is the copy.
+// Returns whether closing is safe — `false` when the tree could not be read or pushed, so it is left
+// rather than lost. A directory with no `.git` is no work tree — the remnant of an interrupted close —
+// and holds nothing git could keep, so it is closed rather than stranded behind a status that fails.
+async function preserve_uncommitted(child: string): Promise<boolean> {
+	const lane = await lane_close.resolve_lane(child)
+	const { directory } = lane.targets
+
+	if (!existsSync(path.join(directory, GIT_ENTRY))) return true
+
+	try {
+		if (await git_stash.has_changes(directory)) await stash_work(child, directory)
+
+		return true
+	} catch {
+		console.error(`#${child}: uncommitted work could not be stashed — lane left at ${directory}`)
+
+		return false
+	}
 }
 
 // The progress comment is a human-readable mirror of the carry record, so it is best-effort and only
@@ -105,16 +165,23 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 }
 
 // A merged child: count the merge (which resets the failure streak), return to the default branch,
-// close the lane, and mirror the counters onto the epic. Returns the carry when the ownership check
+// stash any uncommitted work the lane still holds and close it, and mirror the counters onto the epic. Returns the carry when the ownership check
 // fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child
 // (joshuafolkken/kit#2114). Returns `undefined` on success.
 async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
-	const result = await apply_carry(ctx, run_merge.change_of('merged'))
+	const refused = await refused_carry(ctx)
+
+	if (refused !== undefined) return refused
+
+	await sync_main()
+	const result = await apply_carry(ctx, {
+		...run_merge.change_of('merged'),
+		merged_issue: Number(ctx.child),
+	})
 
 	if (result.kind === 'refused') return result.carry
 
-	await sync_main()
-	await close_lane(ctx.child)
+	if (await preserve_uncommitted(ctx.child)) await close_lane(ctx.child)
 	await post_counters(ctx, result.kind === 'applied' ? result.carry : undefined)
 
 	return undefined
@@ -130,9 +197,11 @@ async function remove_in_progress(child: string): Promise<void> {
 	}
 }
 
-// A failed child: count the failure, drop the stale `in-progress`, and park it with `needs-decision`
-// so the next offer does not hand the same child straight back. Returns the record so the caller can
-// read the streak against the guard. Returns `is_refused: true` without touching labels when the
+// A failed child: count the failure, end whatever of its process is still running (a child judged
+// abandoned that hung on a wait loop would otherwise answer the pgrep liveness check `alive` for its
+// issue number forever, joshuafolkken/kit#2421), drop the stale `in-progress`, and park it with
+// `needs-decision` so the next offer does not hand the same child straight back. Returns the record
+// so the caller can read the streak against the guard. Returns `is_refused: true` without touching labels when the
 // carry record rejected the count (joshuafolkken/kit#2114).
 async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 	const result = await apply_carry(ctx, run_merge.change_of('failed'))
@@ -141,6 +210,7 @@ async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
+	lane_reap.reap_child(ctx.child)
 	await remove_in_progress(ctx.child)
 	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
 
@@ -154,8 +224,9 @@ interface OutageResult {
 	is_refused: boolean
 }
 
-// An API-outage child: count the outage into its own streak and drop the stale `in-progress` so the
-// child is offerable again, but **do not** park it with `needs-decision` — the environment failed, not
+// An API-outage child: count the outage into its own streak, end any process it left — before the
+// re-dispatch launches a second one matching the same pattern (joshuafolkken/kit#2421) — and drop the
+// stale `in-progress` so the child is offerable again, but **do not** park it with `needs-decision` — the environment failed, not
 // the child, so it is re-dispatchable in the same run (joshuafolkken/kit#2240). Returns the record so
 // the caller can read the outage streak against its guard. Returns `is_refused: true` without touching
 // labels when the carry record rejected the count (joshuafolkken/kit#2114).
@@ -164,9 +235,57 @@ async function do_outage(ctx: MergeContext): Promise<OutageResult> {
 
 	if (result.kind === 'refused') return { carry: result.carry, is_refused: true }
 
+	lane_reap.reap_child(ctx.child)
 	await remove_in_progress(ctx.child)
 
 	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }
+}
+
+interface RelaunchableCut {
+	lane: LaneInfo
+	target: string
+	cut: RunCut
+}
+
+// The lane's cut the fallback may relaunch, or `undefined` (joshuafolkken/kit#2484). An OpenAI lane is
+// left out: its supervisor, not this command, starts the process after a standing cut.
+async function relaunchable_lane(child: string): Promise<LaneInfo | undefined> {
+	const lane = await lane_registry.find_open_lane(child)
+
+	return lane === undefined || lane_relaunch.is_openai_lane(lane) ? undefined : lane
+}
+
+async function relaunchable_cut(child: string): Promise<RelaunchableCut | undefined> {
+	const lane = await relaunchable_lane(child)
+
+	if (lane === undefined) return undefined
+
+	const carried = run_cut.lane_cut_sync(lane.directory)
+
+	if (carried === undefined || !run_cut.is_relaunchable(carried.cut, child)) return undefined
+
+	return { lane, ...carried }
+}
+
+async function has_resumable_cut(child: string): Promise<boolean> {
+	return (await relaunchable_cut(child)) !== undefined
+}
+
+// **The cutting child launches its own successor; this is only the fallback** (joshuafolkken/kit#2484).
+// `lane:await` wakes the parent once every process of the lane has gone, so a cut still unadopted then
+// means the successor never took it over. It is relaunched through the same `lane_relaunch` the cut uses,
+// once per cut — the record is marked first, so a second unadopted return is parked instead. Returns
+// whether a successor was started.
+async function resume_cut(child: string): Promise<boolean> {
+	const found = await relaunchable_cut(child)
+
+	if (found === undefined || !run_cut.mark_merge_relaunched(found.target, found.cut)) return false
+
+	const result = lane_relaunch.resume(found.lane, found.cut.phase, (note) => {
+		console.error(note)
+	})
+
+	return result.kind === 'launched'
 }
 
 // The hand-off check, asked at a merge alone. A subprocess that cannot measure exits non-zero, which
@@ -197,7 +316,10 @@ const run_merge_steps = {
 	do_failed,
 	do_merged,
 	do_outage,
+	has_resumable_cut,
 	is_over_budget,
+	refused_carry,
+	resume_cut,
 }
 
 export type { MergeContext, OutageResult }

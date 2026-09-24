@@ -205,6 +205,16 @@ Run E2E tests with Playwright (skips when absent or no e2e files)
 
 ---
 
+### `josh test:red` · `josh trd`
+
+> **Audience:** developer · **Side effects:** git, processes
+
+_No arguments._
+
+Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test
+
+---
+
 ### `josh test:related` · `josh tr`
 
 > **Audience:** developer · **Side effects:** processes
@@ -331,7 +341,7 @@ Merge origin default branch into the current branch
 
 _No arguments._
 
-Checkout default branch and pull latest (refuses inside a lane)
+Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane)
 
 ---
 
@@ -625,6 +635,16 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 ---
 
+### `josh backlog:drive` · `josh bld`
+
+> **Audience:** automation · **Side effects:** network
+
+`--owner <pid> [options]`
+
+Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete
+
+---
+
 ### `josh backlog:next` · `josh bl`
 
 > **Audience:** automation · **Side effects:** network
@@ -695,6 +715,16 @@ Report a run's token and credit cost from Claude Code's session transcripts
 
 ---
 
+### `josh defect:rate` · `josh dfr`
+
+> **Audience:** automation · **Side effects:** network
+
+`[--days <n>]`
+
+Print the defect rate of merged work: defects filed per behavior change completed
+
+---
+
 ### `josh delegate` · `josh dg`
 
 > **Audience:** automation · **Side effects:** none
@@ -749,7 +779,7 @@ Claude Code hook: refuse a second whole-file read of a path whose content has no
 
 > **Audience:** automation · **Side effects:** none
 
-`<plan-path>`
+`<plan-path | ->`
 
 Apply several content-addressed edits from a plan in one call
 
@@ -1129,7 +1159,7 @@ Carry one invocation’s budget across its own session cuts
 
 > **Audience:** automation · **Side effects:** files
 
-`[--resume] <issue> [--impl|--setup] [--handoff <path>]`
+`[--resume] <issue> [--impl] [--handoff <path>]`
 
 Cut a lane child before the gate and resume a fresh process
 
@@ -1159,9 +1189,9 @@ Open a run in one call: claim the tree, read the budget, bundle the reads, decid
 
 > **Audience:** automation · **Side effects:** files
 
-`--append <kind> <text> | --from|--follow <n> | --last`
+`--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last`
 
-Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)
+Append to, read or watch the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last)
 
 ---
 
@@ -1315,6 +1345,16 @@ Guard: exits non-zero when lane children are in-flight but the watcher has not p
 
 ---
 
+### `josh ship` · `josh shp`
+
+> **Audience:** automation · **Side effects:** git, network
+
+`"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--notify-message <text> | --notify-message-file <path>] | --log <N>`
+
+Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step
+
+---
+
 ### `josh split:assess` · `josh sa`
 
 > **Audience:** automation · **Side effects:** none
@@ -1342,3 +1382,13 @@ Pop the stash matching this message, not whichever a shared stack has on top
 `[options]`
 
 Report where a run's wall clock went: model wait, tool execution, human wait
+
+---
+
+### `josh time:density` · `josh tmd`
+
+> **Audience:** maintainer · **Side effects:** none · **kit only**
+
+`[--lanes <n>] [--path <dir>]`
+
+Report tool calls per round trip across the recent lane sessions

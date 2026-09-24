@@ -30,13 +30,25 @@ test('the woken scheduler uses the selected OpenAI provider', () => {
 	const argv = openai_argv()
 
 	expect(argv.command).toBe('codex')
-	expect(argv.args).toContain('gpt-5.6-sol')
+	expect(argv.args).toContain('gpt-6-sol')
 	expect(argv.args).toContain('--json')
 	expect(argv.args).toContain('--ephemeral')
 	expect(argv.args).toContain('sqlite_home="/projects/kit/node_modules/.cache/josh/openai"')
 	expect(argv.args).toContain('--add-dir')
 	expect(argv.args).toContain(COMMON_DIRECTORY)
 	expect(argv.args.at(-1)).toBe(INVOCATION)
+})
+
+// joshuafolkken/kit#2415: a wake with a recorded profile keeps its model across a model migration.
+test('the woken scheduler keeps the model its recorded profile names', () => {
+	const recorded = { ...agent_role_profile.DEFAULT_PROFILES.scheduler, model: 'opus' }
+	const diagnostic = vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+	const built = run_wake_session.wake_argv(INVOCATION, recorded, WORKTREE)
+
+	diagnostic.mockRestore()
+
+	expect(built).toMatchObject({ kind: 'argv', profile: recorded })
+	expect(built?.kind === 'argv' && built.argv.args).toContain('opus')
 })
 
 test('the detached supervisor retains a Claude Code invocation marker', () => {

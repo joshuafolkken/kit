@@ -4,6 +4,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_hold_cli } from './run-hold-cli'
+import { run_next } from './run-next'
 import { run_prep } from './run-prep'
 import { run_prep_cli } from './run-prep-cli'
 import { run_step } from './run-step'
@@ -78,11 +79,7 @@ interface Reads {
 async function gather_reads(issue_number: string): Promise<Reads> {
 	const reads = await run_prep_cli.gather(issue_number)
 	const parts = run_prep_cli.to_parts(issue_number, reads)
-	const verdict = run_step.pre_verdict({
-		state: parts.state?.state,
-		is_human_review: parts.state?.is_human_review ?? false,
-		latest_scope: parts.latest_scope,
-	})
+	const verdict = run_step.pre_verdict(run_next.to_input(parts))
 
 	return { report: run_prep.format_report(parts), verdict }
 }

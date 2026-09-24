@@ -1,3 +1,4 @@
+import { git_stash } from '#scripts/git/git-stash'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import type { CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
@@ -27,6 +28,9 @@ const IMPLEMENT = 'implement'
 const HUMAN_REVIEW = 'human-review'
 const UPDATE_DEPS = 'update-deps'
 const ALREADY_DONE = 'already-done'
+// A closed issue whose lane tree still holds uncommitted work (joshuafolkken/kit#2476) — `run:step`
+// itself prints the `decide:` line naming the stash, and this is the token `run:entry` reports.
+const KEEP_WORK = 'keep-work'
 const WAIT = 'wait'
 const STOP = 'stop'
 const UNKNOWN = 'unknown'
@@ -36,6 +40,7 @@ const VOCABULARY: ReadonlyArray<string> = [
 	HUMAN_REVIEW,
 	UPDATE_DEPS,
 	ALREADY_DONE,
+	KEEP_WORK,
 	WAIT,
 	STOP,
 	UNKNOWN,
@@ -56,12 +61,26 @@ const RETROSPECTIVE_COMMAND = 'pnpm josh retrospective'
 // event yet. `run-next.ts` maps each of these to its prose sentence, so this is the single copy of the
 // state → step mapping and there is no second implementation (joshuafolkken/kit#2248).
 type PreVerdict =
-	typeof IMPLEMENT | typeof HUMAN_REVIEW | typeof UPDATE_DEPS | typeof ALREADY_DONE | typeof UNKNOWN
+	| typeof IMPLEMENT
+	| typeof HUMAN_REVIEW
+	| typeof UPDATE_DEPS
+	| typeof ALREADY_DONE
+	| typeof KEEP_WORK
+	| typeof UNKNOWN
 
 interface PreInput {
 	state: string | undefined
 	is_human_review: boolean
 	latest_scope: string
+	// Whether a lane child's tree holds uncommitted work, read by `run:prep`'s gather
+	// (joshuafolkken/kit#2476). A closed issue over such a tree is not "nothing to do": the work was
+	// popped back from a park and is lost with the lane unless it is kept, so `already-done` gives way to
+	// `keep-work`.
+	has_changes: boolean
+}
+
+function closed_verdict(input: PreInput): typeof ALREADY_DONE | typeof KEEP_WORK {
+	return input.has_changes ? KEEP_WORK : ALREADY_DONE
 }
 
 // The three facts the run branches on before its first edit, ordered because they are not independent:
@@ -69,7 +88,7 @@ interface PreInput {
 // action, and `needs-human-review` changes where the run ends so it precedes the ordinary implement.
 function pre_verdict(input: PreInput): PreVerdict {
 	if (input.state === undefined) return UNKNOWN
-	if (input.state === CLOSED) return ALREADY_DONE
+	if (input.state === CLOSED) return closed_verdict(input)
 	if (input.latest_scope === latest_scope_cli.REQUIRED_SCOPE) return UPDATE_DEPS
 	if (input.is_human_review) return HUMAN_REVIEW
 
@@ -135,6 +154,12 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	// the backlog. The detector only reports the stall; reading it here as a dispatch is what turns the
 	// report into the action that resolves it.
 	[KIND.STALL]: () => command(OFFER_BACKLOG),
+	// The post-implementation region is with a detached ship supervisor (joshuafolkken/kit#2428): nothing
+	// is the agent's until the supervisor stops or the issue closes, which the terminal read answers.
+	[KIND.SHIP_LAUNCH]: () => verdict(WAIT),
+	// The supervisor stopped at a failed stage and handed control back — the next step is reading the
+	// report it stopped on, which names the stage and why.
+	[KIND.SHIP_STOP]: (issue_number) => command(`pnpm josh ship --log ${issue_number}`),
 }
 
 // The parent-only positions a dispatched lane child must never act on. `run:merge` is the parent's
@@ -196,29 +221,26 @@ function is_pre_implementation(last_event: string | undefined): boolean {
 	return last_event === undefined || last_event === run_event_stream.EVENT_KIND.PLAN
 }
 
-// **The setup→implementation boundary, decided here in the run driver rather than in prose**
-// (joshuafolkken/kit#2346). A dispatched lane child that has posted its plan has finished setup — it
-// has read the skill, the manual documents and the issue, ~130,000 tokens that every later request
-// would otherwise re-read — so its next step is to cut before implementing rather than to implement in
-// the same session. The position is exactly the `plan` event: an empty stream is a run still in setup,
-// and a `cut` event already past it. The verdict must be `implement`, so a `needs-human-review`,
-// `update-deps` or closed position — which change where the run goes, not where it cuts — is untouched.
-function is_setup_cut_position(input: StepInput, token: PreVerdict): boolean {
-	return (
-		input.last_event === run_event_stream.EVENT_KIND.PLAN &&
-		input.is_lane_child &&
-		token === IMPLEMENT
-	)
+// **No cut at the setup→implementation boundary** (joshuafolkken/kit#2489). A lane child's context is
+// bounded by the threshold-gated implementation cut alone (`implementation-cut.ts`): the first edit is
+// the moment both would have looked at, and below the threshold a cut there is one that does not pay
+// for itself (`context-cut-payback.ts`), so a planned lane child implements in the same session.
+function pre_implementation_action(input: StepInput): StepAction {
+	return verdict(pre_verdict(input))
 }
 
-function pre_implementation_action(input: StepInput): StepAction {
-	const token = pre_verdict(input)
+// A closed issue ends the run, but a tree still holding uncommitted work is surfaced rather than
+// answered `already-done` — the answer a child read as "nothing to do" before its lane was removed
+// with the work in it (joshuafolkken/kit#2476).
+function closed_action(input: StepInput): StepAction {
+	if (closed_verdict(input) === ALREADY_DONE) return verdict(ALREADY_DONE)
 
-	if (is_setup_cut_position(input, token)) {
-		return command(`pnpm josh run:cut ${input.issue_number} --setup`)
+	const message = git_stash.work_message(input.issue_number, ALREADY_DONE)
+
+	return {
+		kind: 'decide',
+		line: `decide: #${input.issue_number} is closed but this tree holds uncommitted work — keep it with \`git stash push -u -m "${message}"\` | carry it into a new issue`,
 	}
-
-	return verdict(token)
 }
 
 // The terminal answers read before the run's position matters: an unreadable carry record leaves the
@@ -228,7 +250,7 @@ function terminal_action(input: StepInput): StepAction | undefined {
 	if (input.carry_kind === 'unreadable') return verdict(UNKNOWN)
 	if (input.carry_kind === 'expired') return { kind: 'decide', line: EXPIRED_DECISION }
 	if (input.state === undefined) return verdict(UNKNOWN)
-	if (input.state === CLOSED) return verdict(ALREADY_DONE)
+	if (input.state === CLOSED) return closed_action(input)
 
 	return undefined
 }
@@ -255,6 +277,7 @@ const run_step = {
 	EXPIRED_DECISION,
 	HUMAN_REVIEW,
 	IMPLEMENT,
+	KEEP_WORK,
 	RETROSPECTIVE_COMMAND,
 	STOP,
 	UNKNOWN,

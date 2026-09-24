@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
-import { appendFile } from 'node:fs/promises'
+import { appendFile, mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger, type Finding } from './review-finding-ledger'
 import { review_record, type RecordVerdict } from './review-record'
 
@@ -153,16 +154,23 @@ async function run_record(parsed: Parsed, now: Date, ledger_path: string): Promi
 
 	const lines = build_lines(request, today(now))
 
+	// A consumer that does not keep the observation ledger has no `docs/` at its root, so the append
+	// below would fail with ENOENT and leave the merge gate unsatisfiable (joshuafolkken/kit#2402).
+	// Creating the parent first is the one write path that can bring the ledger into existence there.
+	await mkdir(path.dirname(ledger_path), { recursive: true })
 	await appendFile(ledger_path, `${lines.join('\n')}\n`, 'utf8')
 	console.info(confirmation(lines.length, ledger_path))
 
 	return 0
 }
 
+// **The default is the primary checkout's ledger, even inside a lane** (joshuafolkken/kit#2419). A line
+// appended to a lane's own copy never reached the default branch — the lane's flush is refused and
+// `lane:close` does not carry the file — while `--check` read that same copy and let the merge through.
 async function run(
 	argv: ReadonlyArray<string>,
 	now: Date,
-	ledger_path: string = OBSERVATION_LEDGER_PATH,
+	ledger_path: string = observation_ledger_home.ledger_path(),
 ): Promise<number> {
 	const parsed = parse_argv(argv)
 

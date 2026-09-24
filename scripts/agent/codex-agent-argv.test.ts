@@ -1,21 +1,28 @@
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 import { codex_agent_argv } from './codex-agent-argv'
 
 const INVOCATION = 'fullrun #2071'
-const MODEL = 'gpt-5.6-sol'
+const MODEL = 'gpt-6-sol'
 const SANDBOX = 'workspace-write'
 const EPHEMERAL_FLAG = '--ephemeral'
 const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
 const LANE = '/lanes/2071'
-const GIT_COMMON_DIRECTORY = '/projects/kit with spaces/.git'
+const FIXTURE = path.join(process.cwd(), 'node_modules', '.cache', 'codex-argv-test')
+const PRIMARY = path.join(FIXTURE, 'primary')
+const GIT_COMMON_DIRECTORY = path.join(FIXTURE, 'kit with spaces', '.git')
 
 const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 
 beforeEach(() => {
 	resolve_common_directory.mockReturnValue(undefined)
+})
+
+afterEach(() => {
+	rmSync(FIXTURE, { force: true, recursive: true })
 })
 
 function openai_worker(): AgentProfile {
@@ -86,7 +93,8 @@ describe('Codex lane runtime state', () => {
 		expect(argv.args).toContain(`sqlite_home=${JSON.stringify(expected)}`)
 	})
 
-	it('adds exactly the linked worktree common Git directory as a writable root', () => {
+	it('adds the linked worktree Git and ledger directories as writable roots', () => {
+		mkdirSync(path.dirname(GIT_COMMON_DIRECTORY), { recursive: true })
 		resolve_common_directory.mockReturnValue(GIT_COMMON_DIRECTORY)
 
 		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
@@ -95,6 +103,48 @@ describe('Codex lane runtime state', () => {
 		)
 
 		expect(resolve_common_directory).toHaveBeenCalledWith(LANE)
-		expect(additions).toStrictEqual([GIT_COMMON_DIRECTORY])
+		expect(additions).toStrictEqual([
+			GIT_COMMON_DIRECTORY,
+			path.join(path.dirname(GIT_COMMON_DIRECTORY), 'docs'),
+		])
+	})
+})
+
+describe('Codex lane ledger scope', () => {
+	it('creates a missing primary ledger directory before granting worker access', () => {
+		const documents = path.join(PRIMARY, 'docs')
+
+		mkdirSync(PRIMARY, { recursive: true })
+		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
+		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
+
+		expect(existsSync(documents)).toBe(true)
+		expect(argv.args).toContain(documents)
+	})
+
+	it('adds only the primary ledger directory for a lane worker', () => {
+		const documents = path.join(PRIMARY, 'docs')
+
+		mkdirSync(documents, { recursive: true })
+		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
+		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
+		const additions = argv.args.flatMap((argument, index) =>
+			argument === '--add-dir' ? [argv.args[index + 1]] : [],
+		)
+
+		expect(additions).toStrictEqual([path.join(PRIMARY, '.git'), documents])
+		expect(additions).not.toContain(PRIMARY)
+	})
+
+	it('does not expose the primary ledger directory to a reviewer', () => {
+		mkdirSync(path.join(PRIMARY, 'docs'), { recursive: true })
+		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
+		const argv = codex_agent_argv.build(
+			INVOCATION,
+			agent_role_profile.OPENAI_PROFILES.reviewer,
+			LANE,
+		)
+
+		expect(argv.args).not.toContain(path.join(PRIMARY, 'docs'))
 	})
 })

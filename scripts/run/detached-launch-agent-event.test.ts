@@ -52,6 +52,7 @@ function write_provider_fakes(): void {
 	const codex = String.raw`#!/bin/sh
 printf '%s\n' "$*" >> "$FAKE_CALLS"
 if [ "$1" = "login" ]; then exit 0; fi
+if [ "$1" = "--version" ]; then printf '%s\n' 'codex-cli 0.156.1'; exit 0; fi
 printf '%s\n%s\n' "$GH_TOKEN" "$TMPDIR" > "$FAKE_ENV"
 printf '%s\n' '{"type":"thread.started","thread_id":"fake"}'
 printf '%s\n' '{"type":"error","message":"${BUDGET_EXCEEDED}"}'

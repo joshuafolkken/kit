@@ -24,7 +24,6 @@ import { prior_comment_read } from './prior-comment-read'
 import { raw_field_body } from './raw-field-body'
 import { rule_body_guard } from './rule-body-guard'
 import { run_tail } from './run-tail'
-import { setup_cut } from './setup-cut'
 import { shell_body_trigger } from './shell-body-trigger'
 import { shell_segments } from './shell-segments'
 import { test_declared_commit } from './test-declared-commit'
@@ -521,13 +520,6 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// redesign), the same honest-unmeasured stance the batching and investigation rows take for the same
 	// reason: a trigger no transcript can reconstruct. The row itself lives in `implementation-cut.ts`.
 	implementation_cut.ROW,
-	// **The setup-phase cut, one boundary earlier than the implementation cut** (joshuafolkken/kit#2346).
-	// Its trigger is the first `Edit` / `Write` a dispatched lane child makes with the plan event newest
-	// on the run stream — the setup-then-implement boundary. Like `implementation_cut.ROW` its occasion
-	// rests on the working directory, the dispatch mark and the event stream, none of which a transcript
-	// records, so `pnpm josh rule:value` reads it as no runs rather than 0% kept; `keeps` names the
-	// compliance act for a future measurement. The row itself lives in `setup-cut.ts`.
-	setup_cut.ROW,
 	// **The first row whose trigger is an `Edit` / `Write` rather than a shell call**
 	// (joshuafolkken/kit#2272). It delivers the residency questions at the edit that writes a rule into
 	// prose, and self-gates on the tool name and the file path, so it claims no `Bash` command any row

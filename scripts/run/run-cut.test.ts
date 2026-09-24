@@ -239,6 +239,34 @@ describe('a legacy record without a handoff', () => {
 	})
 })
 
+// joshuafolkken/kit#2484: `run:merge` relaunches the successor of a cut nobody adopted — once, and only
+// for a cut this issue declared that carries what its resume needs.
+describe('the fallback relaunch run:merge takes', () => {
+	it('relaunches a declared implementation cut carrying its instruction', () => {
+		expect(run_cut.is_relaunchable(begun_impl(HANDOFF), ISSUE)).toBe(true)
+	})
+
+	it('does not relaunch a cut its resume would refuse incomplete', () => {
+		expect(run_cut.is_relaunchable(begun_impl(), ISSUE)).toBe(false)
+	})
+
+	it('does not relaunch another issue’s cut or an adopted one', () => {
+		expect(run_cut.is_relaunchable(begun(), OTHER_ISSUE)).toBe(false)
+		expect(run_cut.is_relaunchable({ ...begun(), is_handed_off: false }, ISSUE)).toBe(false)
+	})
+
+	it('relaunches once — the mark it writes makes the record no longer relaunchable', () => {
+		const cut = begun_impl(HANDOFF)
+
+		expect(run_cut.mark_merge_relaunched(target(), cut)).toBe(true)
+
+		const read = run_cut.read_cut(target(), WITHIN_BOUND)
+
+		expect(read.kind === 'carried' && run_cut.is_relaunchable(read.cut, ISSUE)).toBe(false)
+		expect(read.kind === 'carried' ? read.cut.handoff : undefined).toStrictEqual(HANDOFF)
+	})
+})
+
 describe('the adoption that carries a cut', () => {
 	it('spends the hand-off', () => {
 		expect(run_cut.adopt_cut(target(), begun())).toMatchObject({ is_handed_off: false })
@@ -306,12 +334,13 @@ describe('the synchronous read the pre-gate guard makes', () => {
 })
 
 describe('the resume grouping — which phase resumes into implementation', () => {
-	// The setup and implementation cuts both resume into more implementation; only the pre-gate cut
-	// resumes into the gate. The grouping is named once so `run-cut-cli.ts` cannot disagree with it.
-	it('groups setup and implementation together, apart from the pre-gate cut', () => {
-		expect(run_cut.resumes_into_implementation(run_cut.SETUP_PHASE)).toBe(true)
+	// The implementation cut resumes into more implementation; the pre-gate cut resumes into the gate.
+	// The grouping is named once so `run-cut-cli.ts` cannot disagree with it. The retired setup phase
+	// (joshuafolkken/kit#2489) no longer resumes into implementation.
+	it('resumes implementation alone into implementation', () => {
 		expect(run_cut.resumes_into_implementation(run_cut.IMPLEMENTATION_PHASE)).toBe(true)
 		expect(run_cut.resumes_into_implementation(run_cut.PRE_GATE_PHASE)).toBe(false)
+		expect(run_cut.resumes_into_implementation('setup')).toBe(false)
 	})
 })
 
@@ -319,14 +348,17 @@ describe('the hand-off record stays within its byte bound', () => {
 	// Every field is a short scalar, so a well-formed record is far under the cap — the mechanical check
 	// exists so a field that ever grew unbounded is refused at the write rather than silently carried.
 	it('accepts a well-formed record', () => {
-		const spec = { issue: ISSUE, branch: BRANCH, phase: run_cut.SETUP_PHASE }
+		const spec = { issue: ISSUE, branch: BRANCH, phase: run_cut.IMPLEMENTATION_PHASE }
 
 		expect(run_cut.within_handoff_bound(run_cut.fresh_cut(spec, START))).toBe(true)
 	})
 
 	it('rejects a record whose field grew past the bound', () => {
 		const bloated = {
-			...run_cut.fresh_cut({ issue: ISSUE, branch: BRANCH, phase: run_cut.SETUP_PHASE }, START),
+			...run_cut.fresh_cut(
+				{ issue: ISSUE, branch: BRANCH, phase: run_cut.IMPLEMENTATION_PHASE },
+				START,
+			),
 			branch: 'x'.repeat(run_cut.MAX_HANDOFF_BYTES + 1),
 		}
 
@@ -341,7 +373,7 @@ describe('the hand-off record stays within its byte bound', () => {
 			{
 				issue: ISSUE,
 				branch: 'y'.repeat(run_cut.MAX_HANDOFF_BYTES + 1),
-				phase: run_cut.SETUP_PHASE,
+				phase: run_cut.IMPLEMENTATION_PHASE,
 			},
 			START,
 		)

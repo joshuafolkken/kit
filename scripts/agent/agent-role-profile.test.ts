@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
 const { REVIEWER, SCHEDULER, WORKER } = agent_role_profile
-const OPENAI_MODEL = 'gpt-5.6-sol'
+const OPENAI_MODEL = 'gpt-6-sol'
+const ANTHROPIC_MODEL = 'claude-opus-5-5'
 const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: 'claude-session' }
 const OPENAI_ENV = { CODEX_THREAD_ID: 'codex-thread' }
 
@@ -22,17 +23,17 @@ describe('the role policy defaults', () => {
 		expect(profile(SCHEDULER, ANTHROPIC_ENV)).toStrictEqual({
 			provider: 'anthropic',
 			role: SCHEDULER,
-			model: 'opus',
+			model: ANTHROPIC_MODEL,
 			effort: 'medium',
 		})
 		expect(profile(WORKER, ANTHROPIC_ENV)).toMatchObject({
 			provider: 'anthropic',
-			model: 'opus',
+			model: ANTHROPIC_MODEL,
 			effort: 'medium',
 		})
 		expect(profile(REVIEWER, ANTHROPIC_ENV)).toMatchObject({
 			provider: 'anthropic',
-			model: 'opus',
+			model: ANTHROPIC_MODEL,
 			effort: 'high',
 		})
 	})
@@ -47,6 +48,13 @@ describe('the role policy defaults', () => {
 		expect(profile(WORKER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
 		expect(profile(REVIEWER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'high' })
 	})
+
+	// joshuafolkken/kit#2415: a floating alias cannot say which model a logged run used.
+	it('pins every Anthropic default to a model id rather than the opus alias', () => {
+		const models = Object.values(agent_role_profile.DEFAULT_PROFILES).map((entry) => entry.model)
+
+		expect(models).toStrictEqual([ANTHROPIC_MODEL, ANTHROPIC_MODEL, ANTHROPIC_MODEL])
+	})
 })
 
 describe('invoking session detection', () => {
@@ -59,6 +67,42 @@ describe('invoking session detection', () => {
 
 		expect(result).toMatchObject({ kind: 'rejected' })
 		expect(JSON.stringify(result)).toContain('both Codex and Claude Code')
+	})
+})
+
+// joshuafolkken/kit#2456: a detached supervisor has the parent-session keys stripped, so the provider
+// the launching session resolved travels as a mark instead.
+describe('the handed provider mark', () => {
+	const { HANDED_PROVIDER_KEY } = agent_role_profile
+
+	it('resolves the provider from the mark when no session is detected', () => {
+		expect(profile(REVIEWER, { [HANDED_PROVIDER_KEY]: 'openai' })).toMatchObject({
+			provider: 'openai',
+			model: OPENAI_MODEL,
+		})
+		expect(profile(REVIEWER, { [HANDED_PROVIDER_KEY]: 'anthropic' })).toMatchObject({
+			provider: 'anthropic',
+		})
+	})
+
+	it('lets a detected session decide over an inherited mark', () => {
+		const environment = { ...OPENAI_ENV, [HANDED_PROVIDER_KEY]: 'anthropic' }
+
+		expect(profile(WORKER, environment)).toMatchObject({ provider: 'openai' })
+	})
+
+	it('rejects a mark that names no allowed provider', () => {
+		const result = agent_role_profile.resolve(WORKER, { [HANDED_PROVIDER_KEY]: 'other' })
+
+		expect(result).toMatchObject({ kind: 'rejected' })
+		expect(JSON.stringify(result)).toContain(HANDED_PROVIDER_KEY)
+	})
+
+	it('builds the mark from the session it resolves, and nothing without one', () => {
+		expect(agent_role_profile.handoff_environment(ANTHROPIC_ENV)).toStrictEqual({
+			[HANDED_PROVIDER_KEY]: 'anthropic',
+		})
+		expect(agent_role_profile.handoff_environment({})).toStrictEqual({})
 	})
 })
 

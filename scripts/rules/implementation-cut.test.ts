@@ -24,6 +24,7 @@ const OVER: CostVerdict = 'over'
 const UNDER: CostVerdict = 'under'
 const UNMEASURABLE: CostVerdict = 'unmeasurable'
 
+const IMPLEMENTATION_CUT_ID = 'implementation-cut'
 const TAKE_THE_IMPL_CUT = `pnpm josh run:cut --impl ${ISSUE}`
 const BARE_CUT = `pnpm josh run:cut ${ISSUE}`
 const RESUME_CHECK = `pnpm josh run:cut --resume ${ISSUE}`
@@ -184,9 +185,24 @@ describe('is_over_threshold_edit', () => {
 
 describe('the row in the enumeration', () => {
 	it('is delivered under the id implementation-cut', () => {
-		const row = delivered_rules.DELIVERED_RULES.find((rule) => rule.id === 'implementation-cut')
+		const row = delivered_rules.DELIVERED_RULES.find((rule) => rule.id === IMPLEMENTATION_CUT_ID)
 
 		expect(row?.reason).toBe(implementation_cut.IMPLEMENTATION_CUT_REASON)
+	})
+
+	// joshuafolkken/kit#2489: the unconditional setup cut is retired, so the threshold-gated row here is
+	// the one cut a lane child's first edit meets — over the threshold it is still refused (the context
+	// bound holds), and under it nothing else refuses the edit.
+	it('is the only cut row a first edit meets, now the setup cut is retired', () => {
+		const cut_rows = delivered_rules.DELIVERED_RULES.filter((rule) => rule.id.endsWith('-cut'))
+
+		expect(new Set(cut_rows.map((rule) => rule.id))).toStrictEqual(
+			new Set([IMPLEMENTATION_CUT_ID, 'pre-gate-cut']),
+		)
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state_of())).toBe(true)
+		expect(
+			implementation_cut.is_over_threshold_edit(edit_call(), state_of({ verdict: () => UNDER })),
+		).toBe(false)
 	})
 
 	// **The cut this rule asks for must itself pass every row in the enumeration** — a refusal on the
@@ -222,8 +238,9 @@ describe('IMPLEMENTATION_CUT_REASON', () => {
 		// The pointer every delivery names.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		// **The threshold is the shared value, assembled from the constant** (joshuafolkken/kit#2385):
-		// joshuafolkken/kit#2374 lowered it and the old literal told agents the wrong number.
-		['150,000-token'],
+		// joshuafolkken/kit#2406 derives it from the break-even model, so the old literal would tell
+		// agents the wrong number — this reads the constant's current formatting.
+		['135,000-token'],
 		// **The reissue sentence, now the per-crossing form** (joshuafolkken/kit#2385): a reissue right
 		// after a refusal passes so `busy` / `failed` cannot wedge the run, and the row fires again on the
 		// next crossing rather than once per run.

@@ -1,0 +1,234 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const josh_run_mock = vi.hoisted(() => vi.fn())
+const review_mock = vi.hoisted(() => vi.fn())
+const round_two_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+// A fresh ship: nothing recorded and nothing committed, pushed or merged. The resume paths are pinned in
+// `run-ship-resume.test.ts`.
+vi.mock('./run-ship-probe', () => ({
+	run_ship_probe: {
+		read_state: vi.fn().mockResolvedValue({
+			is_committed: false,
+			is_pushed: false,
+			is_merged: false,
+		}),
+		record_target: vi.fn().mockResolvedValue(undefined),
+	},
+}))
+vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
+vi.mock('./run-ship-review-steps', () => ({
+	run_ship_review_steps: { review_stage: review_mock, round_two_stage: round_two_mock },
+}))
+// Outside a lane, so a gate run inside a lane child never hands these ships to a real supervisor.
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
+}))
+
+const { run_ship_cli } = await import('./run-ship-cli')
+const { run_ship_detach } = await import('./run-ship-detach')
+
+const OK = 0
+const FAILED = 1
+const TITLE = 'Fold the ship region #2398'
+const NUMBER = '2398'
+
+const NOTIFY_FLAG = '--notify-message'
+const NOTIFY = 'done: cause/fix/result'
+const NOTIFY_FILE_FLAG = '--notify-message-file'
+const BODY_PATH = 'notify-body.txt'
+const GATE = ['gate']
+const COMMIT = ['git', '-y', TITLE]
+const FOLLOWUP = ['followup', TITLE]
+const REPORT = ['run:tail', NUMBER]
+
+const info_lines: Array<string> = []
+
+function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
+	return josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)
+}
+
+beforeEach(() => {
+	// Outside a supervisor, so a gate the detached supervisor runs never reads these ships as supervised.
+	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '')
+	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
+	review_mock.mockReset().mockResolvedValue({ code: OK, out: 'review clean' })
+	round_two_mock.mockReset().mockResolvedValue({ code: OK, out: 'round 2 not due' })
+	info_lines.length = 0
+	vi.spyOn(console, 'info').mockImplementation((line: string) => {
+		info_lines.push(line)
+	})
+	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+describe('run_ship_cli.run — folds the four ship steps into one call', () => {
+	it('runs gate, commit, followup and report in order', async () => {
+		const code = await run_ship_cli.run([TITLE])
+
+		expect(code).toBe(OK)
+		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
+	})
+
+	it('reads the issue number off the title tail for the report step', async () => {
+		await run_ship_cli.run(['Some other #17 mid-title work #2398'])
+
+		expect(argv_calls().at(-1)).toStrictEqual(['run:tail', '2398'])
+	})
+
+	it('forwards follow-up citations filed this run to the report step', async () => {
+		await run_ship_cli.run([TITLE, '2400', '2401'])
+
+		expect(argv_calls().at(-1)).toStrictEqual(['run:tail', NUMBER, '2400', '2401'])
+	})
+
+	it('joins each executed step under its header in one composite report', async () => {
+		josh_run_mock
+			.mockResolvedValueOnce({ code: OK, out: 'green' })
+			.mockResolvedValueOnce({ code: OK, out: 'pushed' })
+			.mockResolvedValueOnce({ code: OK, out: 'merged' })
+			.mockResolvedValueOnce({ code: OK, out: 'shipped' })
+
+		await run_ship_cli.run([TITLE])
+
+		expect(info_lines[0]).toBe(
+			'=== gate ===\ngreen\n\n=== commit/push/PR ===\npushed\n\n=== followup ===\nmerged\n\n=== report ===\nshipped',
+		)
+	})
+})
+
+describe('run_ship_cli.run — forwards the notify body to followup alone', () => {
+	it('forwards an inline notify message', async () => {
+		await run_ship_cli.run([TITLE, NOTIFY_FLAG, NOTIFY])
+
+		expect(argv_calls()).toStrictEqual([
+			GATE,
+			COMMIT,
+			['followup', TITLE, NOTIFY_FLAG, NOTIFY],
+			REPORT,
+		])
+	})
+
+	it('forwards the shell-body-safe file form', async () => {
+		await run_ship_cli.run([TITLE, NOTIFY_FILE_FLAG, BODY_PATH])
+
+		expect(argv_calls().at(-2)).toStrictEqual(['followup', TITLE, NOTIFY_FILE_FLAG, BODY_PATH])
+	})
+})
+
+// joshuafolkken/kit#2446: the PR body carries the live-execution evidence `followup` gates on.
+describe('run_ship_cli.run — forwards the PR body file to the commit step alone', () => {
+	const BODY_FILE_FLAG = '--body-file'
+
+	it('passes --body-file to git -y and not to followup', async () => {
+		await run_ship_cli.run([TITLE, BODY_FILE_FLAG, BODY_PATH])
+
+		expect(argv_calls()).toStrictEqual([
+			GATE,
+			['git', '-y', BODY_FILE_FLAG, BODY_PATH, TITLE],
+			['followup', TITLE],
+			REPORT,
+		])
+	})
+})
+
+describe('run_ship_cli.run — a failed step stops the ship', () => {
+	it('does not run the commit when the gate failed, and exits non-zero', async () => {
+		josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'lint red' })
+
+		const code = await run_ship_cli.run([TITLE])
+
+		expect(code).toBe(FAILED)
+		expect(argv_calls()).toStrictEqual([GATE])
+	})
+
+	it('names the stopped step in the report', async () => {
+		josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'lint red' })
+
+		await run_ship_cli.run([TITLE])
+
+		expect(info_lines[0]).toBe('=== gate ===\nlint red\n\nstopped at: === gate ===')
+	})
+
+	it('refuses a title with no issue number rather than shipping past run:tail', async () => {
+		expect(await run_ship_cli.run(['A title with no reference'])).toBe(FAILED)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+	})
+
+	it('refuses a non-numeric follow-up citation rather than forwarding it', async () => {
+		expect(await run_ship_cli.run([TITLE, 'not-a-number'])).toBe(FAILED)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+	})
+
+	it('refuses a stray flag rather than forwarding it to a step', async () => {
+		expect(await run_ship_cli.run(['--force'])).toBe(FAILED)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/kit#2427)', () => {
+	it('reviews before the gate, then ships the clean path without an agent turn', async () => {
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
+		expect(review_mock).toHaveBeenCalledWith(NUMBER)
+		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
+		expect(info_lines[0]).toMatch(/^=== review ===\nreview clean\n\n=== gate ===/u)
+	})
+
+	it('stops at a blocking review, never reaching the gate or the commit', async () => {
+		review_mock.mockResolvedValue({ code: FAILED, out: 'bug-risks:high:a.ts' })
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(FAILED)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+		expect(info_lines[0]).toContain('stopped at: === review ===')
+	})
+
+	it('runs no review without the flag', async () => {
+		await run_ship_cli.run([TITLE])
+
+		expect(review_mock).not.toHaveBeenCalled()
+		expect(round_two_mock).not.toHaveBeenCalled()
+	})
+})
+
+// Every stage the ship runs, in the order it ran them — the two review stages and each josh command.
+function order(): ReadonlyArray<string> {
+	const events: Array<string> = []
+
+	review_mock.mockImplementation(async () => {
+		events.push('review')
+
+		return { code: OK, out: 'review fixes applied in place' }
+	})
+	round_two_mock.mockImplementation(async () => {
+		events.push('round-2')
+
+		return { code: OK, out: 'round 2 clean' }
+	})
+	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+		events.push(argv[0] ?? '')
+
+		return { code: OK, out: '' }
+	})
+
+	return events
+}
+
+// joshuafolkken/kit#2489: round 1 fixed its local Mediums in place, so the supervisor carries the ship
+// through the gate, the commit, a round-2 pass and the followup without handing it back.
+describe('run_ship_cli.run — --review carries round 2 between the commit and the followup', () => {
+	it('runs review → gate → commit → round 2 → followup → report without stopping', async () => {
+		const events = order()
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
+		expect(events).toStrictEqual(['review', 'gate', 'git', 'round-2', 'followup', 'run:tail'])
+		expect(round_two_mock).toHaveBeenCalledWith(NUMBER)
+	})
+
+	it('stops at a blocking round 2, never reaching the followup', async () => {
+		round_two_mock.mockResolvedValue({ code: FAILED, out: 'round 2 is final' })
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(FAILED)
+		expect(argv_calls()).toStrictEqual([GATE, COMMIT])
+		expect(info_lines[0]).toContain('stopped at: === round-2 review ===')
+	})
+})

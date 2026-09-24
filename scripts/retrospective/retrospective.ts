@@ -2,6 +2,7 @@ import { cost_format } from '#scripts/cost-runtime/cost-format'
 import type { RunCostReport } from '#scripts/cost/cost-run-report'
 import type { RoleTotals } from '#scripts/cost/cost-run-roles'
 import type { CategoryCount } from '#scripts/review/review-finding-ledger'
+import { run_event_scope, type EventScope } from '#scripts/run/run-event-scope'
 import type { RunEvent } from '#scripts/run/run-event-stream'
 
 // The composition half of `josh retrospective` — the end-of-run retrospective's aggregation
@@ -35,6 +36,11 @@ interface RetrospectiveInputs {
 	// The observation ledger's entry lines, already filtered to entries by the caller.
 	observations: ReadonlyArray<string>
 	events: ReadonlyArray<RunEvent>
+	// Which invocation the friction count covers (joshuafolkken/kit#2395). The stream is the repository's
+	// event log, not this run's, so a digest handed the whole of it would report a previous invocation's
+	// cut and park as this run's friction — the very numbers the retrospective weighs to file improvement
+	// issues. The scope is `run-event-scope.ts`'s, shared with `run:report` and `run:step`.
+	scope: EventScope
 }
 
 const CLOSING =
@@ -89,8 +95,12 @@ function friction_count(events: ReadonlyArray<RunEvent>, kind: string): number {
 	return events.filter((event) => event.kind === kind).length
 }
 
-function friction_lines(events: ReadonlyArray<RunEvent>): Array<string> {
-	const counts = FRICTION_KINDS.map((kind) => `${kind} ${String(friction_count(events, kind))}`)
+// This invocation's friction, counted over its own events only. An undetermined scope falls to an empty
+// list rather than the whole stream (joshuafolkken/kit#2395): counting every invocation's friction as this
+// run's is the defect, so the safe fall is to attribute nothing that cannot be attributed.
+function friction_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Array<string> {
+	const scoped = run_event_scope.scoped_events(events, scope) ?? []
+	const counts = FRICTION_KINDS.map((kind) => `${kind} ${String(friction_count(scoped, kind))}`)
 
 	return [`Run events: ${counts.join(', ')}`]
 }
@@ -105,7 +115,7 @@ function compose(inputs: RetrospectiveInputs): string {
 		'',
 		...observation_lines(inputs.observations),
 		'',
-		...friction_lines(inputs.events),
+		...friction_lines(inputs.events, inputs.scope),
 		'',
 		CLOSING,
 	].join('\n')

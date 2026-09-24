@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { josh_environment_file } from './josh-environment-file'
+import { session_language, type Resolution } from './session-language'
 
 // `josh session:lang` — say, on stdout, which language this session writes in, so a
 // `SessionStart` / `UserPromptSubmit` hook injects the resolved value into context every turn
@@ -17,26 +18,12 @@ import { josh_environment_file } from './josh-environment-file'
 // The line itself is a script-fixed string, so it stays English by the same rule that pins the
 // Telegram header labels and the `--notify-message` default (`CLAUDE.md` → "Output language").
 
-const ENV_KEY = 'JOSH_SESSION_LANG'
-const DEFAULT_SESSION_LANG = 'ja'
+const { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang } = session_language
 const ENGLISH_OPT_IN_LANG = 'en'
 const SCOPE_NOTE =
 	'write session dialogue, AskUserQuestion labels/descriptions and artifact prose (Issue bodies, comments, Telegram) in this language. English stays only for Issue/PR titles, code comments/test titles/commit messages, and script-fixed strings.'
 
-interface Resolution {
-	lang: string
-	is_default: boolean
-}
-
-// Reads the process environment alone, so a unit test sets `process.env[ENV_KEY]` and never touches a
-// real `.env`. The file load happens in `main`, on the command path only.
-function resolve_session_lang(): Resolution {
-	const value = process.env[ENV_KEY]?.trim()
-	if (value) return { lang: value, is_default: false }
-
-	return { lang: DEFAULT_SESSION_LANG, is_default: true }
-}
-
+// The file load happens in `main`, on the command path only; the resolver reads the environment.
 function format_line(resolution: Resolution): string {
 	const suffix = resolution.is_default
 		? ` (default; set ${ENV_KEY}=${ENGLISH_OPT_IN_LANG} for English)`
@@ -61,5 +48,4 @@ const session_language_cli = {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-export type { Resolution }
 export { session_language_cli }

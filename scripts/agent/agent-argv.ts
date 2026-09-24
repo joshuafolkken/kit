@@ -16,10 +16,19 @@ interface AgentArgv {
 type AgentArgvResult =
 	{ kind: 'argv'; argv: AgentArgv; profile: AgentProfile } | { kind: 'rejected'; note: string }
 
-function build(invocation: string, profile: AgentProfile, cwd?: string): AgentArgv {
+// **`session_id` forces the fresh session's id, and only the Claude path can honour it**
+// (joshuafolkken/kit#2407). Codex has no such flag, and the run-state report reads Claude transcripts
+// alone, so an OpenAI scheduler simply builds as before; whiff attribution is a Claude-transcript
+// property, so nothing is lost by the omission.
+function build(
+	invocation: string,
+	profile: AgentProfile,
+	cwd?: string,
+	session_id?: string,
+): AgentArgv {
 	return profile.provider === 'openai'
 		? codex_agent_argv.build(invocation, profile, cwd)
-		: claude_agent_argv.build(invocation, profile)
+		: claude_agent_argv.build(invocation, profile, session_id, cwd)
 }
 
 // The resume counterpart of `build` (joshuafolkken/kit#2317). Only the Claude path resumes by session
@@ -34,14 +43,22 @@ function build_resume(
 ): AgentArgv {
 	return profile.provider === 'openai'
 		? codex_agent_argv.build(invocation, profile, cwd)
-		: claude_agent_argv.build_resume(invocation, profile, session_id)
+		: claude_agent_argv.build_resume(invocation, profile, session_id, cwd)
 }
 
-function with_profile_in(invocation: string, profile: AgentProfile, cwd: string): AgentArgvResult {
+// **`session_id` threads to the Claude build, so a wake launched in a lane's work tree still forces
+// its transcript id** (joshuafolkken/kit#2407). It is optional, so every other caller of the
+// cwd-scoped build is unchanged.
+function with_profile_in(
+	invocation: string,
+	profile: AgentProfile,
+	cwd: string,
+	session_id?: string,
+): AgentArgvResult {
 	const diagnostic = agent_diagnostics.check(profile)
 	if (diagnostic.kind === 'rejected') return diagnostic
 
-	return { kind: 'argv', argv: build(invocation, profile, cwd), profile }
+	return { kind: 'argv', argv: build(invocation, profile, cwd, session_id), profile }
 }
 
 // A resume build under the same profile diagnostics as `with_profile_in`, so a lane re-dispatch that

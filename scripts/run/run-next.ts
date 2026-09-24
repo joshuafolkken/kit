@@ -14,6 +14,8 @@ import { run_step, type PreVerdict } from './run-step'
 
 const ALREADY_DONE_STEP =
 	'Issue is CLOSED — nothing to run. Verify it against merged code before starting.'
+const KEEP_WORK_STEP =
+	'Issue is CLOSED but this lane holds uncommitted work — stash it with `git stash push -u -m "<N>: uncommitted work at already-done"` before ending.'
 const LATEST_STEP =
 	'Update dependencies first (latest: required), load the dependency-update skill, then implement.'
 const HUMAN_REVIEW_STEP =
@@ -28,6 +30,7 @@ const STEP_OF: Record<PreVerdict, string> = {
 	'already-done': ALREADY_DONE_STEP,
 	'human-review': HUMAN_REVIEW_STEP,
 	implement: IMPLEMENT_STEP,
+	'keep-work': KEEP_WORK_STEP,
 	unknown: UNKNOWN_STEP,
 	'update-deps': LATEST_STEP,
 }
@@ -38,6 +41,7 @@ interface NextInput {
 	state: string | undefined
 	is_human_review: boolean
 	latest_scope: string
+	has_changes: boolean
 }
 
 function to_input(parts: PrepParts): NextInput {
@@ -45,6 +49,7 @@ function to_input(parts: PrepParts): NextInput {
 		state: parts.state?.state,
 		is_human_review: parts.state?.is_human_review ?? false,
 		latest_scope: parts.latest_scope,
+		has_changes: parts.has_changes,
 	}
 }
 
@@ -63,6 +68,7 @@ const run_next = {
 	ALREADY_DONE_STEP,
 	HUMAN_REVIEW_STEP,
 	IMPLEMENT_STEP,
+	KEEP_WORK_STEP,
 	LATEST_STEP,
 	UNKNOWN_STEP,
 	format_report,

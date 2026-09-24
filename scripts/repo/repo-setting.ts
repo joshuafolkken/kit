@@ -1,3 +1,4 @@
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
@@ -30,6 +31,7 @@ interface RepoApiResult {
 // reported status, not a command failure.
 function query_repo_api(api_path: string): RepoApiResult {
 	const result = execaSync('gh', ['api', api_path], {
+		...git_gh_exec.direct_environment(),
 		cwd: PROJECT_ROOT,
 		reject: false,
 		timeout: GH_TIMEOUT_MS,

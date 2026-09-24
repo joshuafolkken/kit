@@ -1,8 +1,11 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { z } from 'zod'
+import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
+import { reply_language } from './reply-language'
 
-// The three stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121).
+// The stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2422,
+// joshuafolkken/kit#2445).
 //
 // **It exists because `.claude/settings.json` wired no `Stop` event.** The four events it did wire
 // (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse`) can catch the moment a call is
@@ -16,11 +19,11 @@ import { issue_citation } from './issue-citation'
 // permission envelope. The stop guard is a second *entry* on the one foundation, exactly as
 // `pretool-guard` is one — not a second copy of the plumbing.
 //
-// **All three rules refuse** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
+// **Every rule refuses** (joshuafolkken/kit#2247). Missing the stop notification or leaving a hold
 // on a clean tree costs a person a silent wait or a trampled tree; a bare `#N` in the reply reaches
 // the person watching but not the model that could fix it, so it too blocks — `{"decision":"block"}`
 // is the one channel a `Stop` hook has to the model, and `stop_hook_active` caps a false positive at a
-// single wasted turn. The detection is tightened to match (`issue-citation.ts`).
+// single wasted turn. The detection is tightened to match (`issue-citation.ts`, `filing-offer.ts`).
 
 const SWITCH_ENV_KEY = 'JOSH_STOP_GUARD'
 const BLOCK_DECISION = 'block'
@@ -52,6 +55,22 @@ interface StopContext {
 	// the cut holding the tree by design and hands off to a fresh process (`pre-gate-cut.md`), so that
 	// turn-end is an automatic continuation, not the person-waiting pause the block rules are for.
 	cut_pending: boolean
+	// An Issue filing no guard refused is on this run's transcript tail — `filing_cap`'s count.
+	filed: boolean
+	// The owner of the repository the session runs in, or `undefined` when it cannot be read.
+	session_owner: string | undefined
+	// This session is a headless `backlogrun` parent with lanes still in flight and no cut handed its
+	// record off — `run-headless.ts` → `must_keep_waiting` (joshuafolkken/kit#2437).
+	headless_waiting: boolean
+	// How many headless-wait refusals sit on this run's transcript tail — the spin bound below.
+	headless_refusals: number
+	// This session drives a `backlogrun` and its turn holds a pick-up signal — a watcher `ready` line or
+	// a pending `stall` — with no dispatch and no ask on it: `backlog_ready.owes_offer` (joshuafolkken/kit#2452).
+	owes_offer: boolean
+	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
+	lane_child: boolean
+	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
+	session_lang: string
 }
 
 interface StopOutcome {
@@ -106,6 +125,112 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 	)
 }
 
+// **An offer to file is a Tier A filing deferred to the user** (joshuafolkken/kit#2422). The judgement
+// is already made, so the reason hands over the filing chain rather than a question; the rule itself
+// is resident in `SKILL.md` → §2i and only pointed at.
+const FILING_OFFER_REASON =
+	'⛔ filing offer: your reply offers to file an Issue instead of filing it. Filing into a ' +
+	'first-party repository is Tier A — the trigger is the judgement that it is worth filing, not the ' +
+	"run's progress (`.claude/skills/workflow-commands/SKILL.md` → §2i, `observation-filing.md`). Run " +
+	'`pnpm josh issue:scout "<title>"`, file it, run `pnpm josh epic:bundle <new>`, then end with the ' +
+	'one-line citation of what was filed — do not repeat your previous reply. If it is not worth filing ' +
+	'after all, say so in one line instead.'
+
+// **A headless parent's turn-end is its process's end** (joshuafolkken/kit#2437). Under `claude -p` the
+// background waits die with the turn, so the lanes lose their parent and nothing re-invokes it. The
+// reason hands over the foreground wait rather than a question, because there is nobody to answer one.
+// The refusal's opening, which the transcript tail is counted by.
+const HEADLESS_WAIT_MARKER = '⛔ headless parent:'
+
+// Refusals with no foreground wait between them before the loop-breaker is honoured again. A parent
+// that obeys runs a wait after each refusal, which resets the count; one that only re-stops piles them
+// up. The bound lets that one end when "in flight" is a kept lane no child is working in
+// (`backlogrun-park.md`), rather than spinning until the carry record expires.
+const HEADLESS_REFUSAL_CAP = 3
+
+// The foreground waits as they appear in a transcript's tool-call input — the JSON `command` field, so
+// the refusal's own prose, which names the same commands, never matches.
+const HEADLESS_WAIT_CALLS = ['"command":"pnpm josh lane:await', '"command":"pnpm josh run:progress']
+
+const HEADLESS_WAIT_BODY =
+	' this is a `claude -p` `backlogrun` parent (`JOSH_RUN_HEADLESS`) with lanes still ' +
+	'in flight, and ending this turn ends the process — its background waits are killed with it and the ' +
+	'lanes are left without a parent. Wait in the foreground instead: run `pnpm josh lane:await <N...>` ' +
+	'for the in-flight lanes (and `pnpm josh run:progress --wait` for the heartbeat) as foreground ' +
+	'commands within the tool timeout, act on what they report, and continue the loop. End the turn only ' +
+	'after `pnpm josh run:carry --cut` or `--end` (`backlogrun-progress.md` → "The parent keeps no clock ' +
+	'of its own").'
+
+const HEADLESS_WAIT_REASON = `${HEADLESS_WAIT_MARKER}${HEADLESS_WAIT_BODY}`
+
+// **A lane child never asks a person for the index** (joshuafolkken/kit#2445). The index rule protects
+// a person's own staging, and a lane is a per-run work tree with none to protect; the sanctioned commit
+// flow is already authorized, so the reason hands it over instead of letting the run wait on a person.
+// Both halves must appear — an index command and a request for permission — so a report that merely
+// names `git add` is not refused.
+const INDEX_COMMAND_PATTERN = /git (?:add|stage|rm --cached|restore --staged|restore -S)\b/u
+const PERMISSION_PATTERN = /許可|承認|permission|approve|approval|authorization/iu
+
+const LANE_INDEX_REASON =
+	'⛔ lane index permission: this is a dispatched lane child (`JOSH_LANE_CHILD`) and your reply asks ' +
+	"a person for permission to change the git index. A lane is a per-run work tree with no person's " +
+	'staging to protect, and the sanctioned commit flow is already authorized: remove any conflict ' +
+	'markers, then run `pnpm josh git -y`, which stages and commits them — a conflicted merge included. ' +
+	'This is Tier A (`.claude/skills/workflow-commands/chain-rule.md` → "origin/main is merged in before ' +
+	'the gate"). Do it and continue the run — do not repeat your previous reply.'
+
+function asks_index_permission(message: string): boolean {
+	return INDEX_COMMAND_PATTERN.test(message) && PERMISSION_PATTERN.test(message)
+}
+
+function needs_index_route(context: StopContext): boolean {
+	return context.lane_child && asks_index_permission(context.message)
+}
+
+// **A wake that relays the line and skips the ask is the stall it was meant to prevent**
+// (joshuafolkken/kit#2452). The ask on each wake was prose alone, and a parent that judged it had
+// nothing to do left runnable work idle across five wakes; the reason hands over the ask itself.
+const PICKUP_REASON =
+	'⛔ backlog pick-up: this `backlogrun` parent holds runnable work and a free lane — a `ready` line ' +
+	'from the progress watcher or a `stall` newer than the last launch — and this turn ran neither ' +
+	'`pnpm josh backlog:offer` nor `pnpm josh lane:launch`. Ask with `pnpm josh backlog:offer` and ' +
+	'launch what it answers on `run`; a `watch` or `wait` answer is itself the ask, so end the turn ' +
+	'after it (`backlogrun-progress.md` → "The parent keeps no clock of its own") — do not repeat your ' +
+	'previous reply.'
+
+// **A refusal is the turn's only input, so it names the language the answer is written in**
+// (joshuafolkken/kit#2470). The session-language line reaches a turn only through `UserPromptSubmit`;
+// a turn this hook continues has no prompt, and an English refusal read alone was answered in English.
+function language_note(lang: string): string {
+	return (
+		`Write your reply in the session language (JOSH_SESSION_LANG: ${lang}); code, commands and ` +
+		'identifiers stay as they are.'
+	)
+}
+
+// **A reply that drifted out of the session language is sent back once to be rewritten**
+// (joshuafolkken/kit#2470). The drift persists — each turn matches the language of the one before — so
+// the rewrite has to happen on the turn it starts; `stop_hook_active` bounds it to one.
+function build_language_reason(lang: string): string {
+	return (
+		`⛔ session language: your reply is not written in the session language (JOSH_SESSION_LANG: ` +
+		`${lang}). Rewrite it in that language and keep writing in it on the turns that follow, whatever ` +
+		'language a notification, tool output or hook message was in (`CLAUDE.md` → "Output language").'
+	)
+}
+
+function language_reason(context: StopContext): string | undefined {
+	if (!reply_language.is_mismatch(context.message, context.session_lang)) return undefined
+
+	return build_language_reason(context.session_lang)
+}
+
+function needs_filing(context: StopContext): boolean {
+	if (context.filed || !filing_offer.offers_filing(context.message)) return false
+
+	return filing_offer.is_first_party_target(context.message, context.session_owner)
+}
+
 function needs_notify(context: StopContext): boolean {
 	return context.hold_present && !context.notified
 }
@@ -121,17 +246,64 @@ function citation_reason(message: string): string | undefined {
 	return build_citation_reason(references)
 }
 
-// First-wins across all three rules. Two things stand every rule down: `stop_hook_active` (the
-// loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
-// flight (a lane child's automatic turn-end, not a person-waiting pause). The two existing rules keep
-// their order ahead of the citation rule, so a stop that both still owes its notify and holds a bare
-// `#N` still reports the notify first.
-function block_reason(context: StopContext): string | undefined {
-	if (context.stop_hook_active || context.cut_pending) return undefined
+// The three rules that read the reply itself, filing offer first and the language last. A drifted reply
+// refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
+// session-language note to every refusal, so the turn it continues is written in the session language.
+function reply_reason(context: StopContext): string | undefined {
+	if (needs_filing(context)) return FILING_OFFER_REASON
+
+	return citation_reason(context.message) ?? language_reason(context)
+}
+
+// The headless wait holds past the loop-breaker until the spin bound is reached.
+function is_headless_held(context: StopContext): boolean {
+	if (!context.headless_waiting) return false
+
+	return !context.stop_hook_active || context.headless_refusals < HEADLESS_REFUSAL_CAP
+}
+
+// The headless-wait refusals on a transcript tail since the last foreground wait the parent ran — a
+// wait is progress, so only refusals with none between them count toward the spin bound.
+function count_headless_refusals(tail: string): number {
+	const last_wait = Math.max(...HEADLESS_WAIT_CALLS.map((call) => tail.lastIndexOf(call)))
+
+	return tail.slice(Math.max(last_wait, 0)).split(HEADLESS_WAIT_MARKER).length - 1
+}
+
+// The two hold rules, notify ahead of release — behind the lane index route (joshuafolkken/kit#2445),
+// since the notify they would ask for announces a pause the run has no reason to take.
+function hold_reason(context: StopContext): string | undefined {
+	if (needs_index_route(context)) return LANE_INDEX_REASON
 	if (needs_notify(context)) return STOP_NOTIFY_REASON
 	if (needs_release(context)) return HOLD_RELEASE_REASON
 
-	return citation_reason(context.message)
+	return undefined
+}
+
+// The run-state rules — the two hold rules, then the pick-up — ahead of the rules that read the reply.
+// No rule holds a session to relay the run's stream: the watch pane does, outside any conversation
+// (joshuafolkken/kit#2492).
+function run_reason(context: StopContext): string | undefined {
+	return hold_reason(context) ?? (context.owes_offer ? PICKUP_REASON : undefined)
+}
+
+// First-wins across every rule. Two things stand every rule down: `stop_hook_active` (the
+// loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
+// flight (a lane child's automatic turn-end, not a person-waiting pause). The two hold rules keep their
+// order ahead of the reply rules, so a stop that both still owes its notify and holds a bare `#N` still
+// reports the notify first; the filing offer goes ahead of the citation, since the filing it forces
+// produces the citation the reply then needs.
+//
+// **The headless wait comes first and outlasts `stop_hook_active` up to its spin bound** (joshuafolkken/kit#2437).
+// The loop-breaker exists so a person is not wedged behind a rule the run will not satisfy; a headless
+// parent has no person, and letting its second stop through is exactly the silent end the rule is for.
+// Each continuation it forces is a foreground wait of minutes, and the rule falls silent by itself once
+// the lanes finish or a cut hands the record off; refusals with no wait between them are bounded.
+function block_reason(context: StopContext): string | undefined {
+	if (is_headless_held(context)) return HEADLESS_WAIT_REASON
+	if (context.stop_hook_active || context.cut_pending) return undefined
+
+	return run_reason(context) ?? reply_reason(context)
 }
 
 function stop_outcome(context: StopContext): StopOutcome {
@@ -139,9 +311,10 @@ function stop_outcome(context: StopContext): StopOutcome {
 }
 
 // The documented shape a `Stop` hook blocks with: `reason` is fed back to Claude, which then continues
-// instead of stopping. Plain stdout is not it — only this envelope holds the stop.
-function block_envelope(reason: string): string {
-	return JSON.stringify({ decision: BLOCK_DECISION, reason })
+// instead of stopping. Plain stdout is not it — only this envelope holds the stop. Every reason leaves
+// with the session-language note, so no rule can hand the model an English-only turn.
+function block_envelope(reason: string, lang: string): string {
+	return JSON.stringify({ decision: BLOCK_DECISION, reason: `${reason} ${language_note(lang)}` })
 }
 
 function parse_stop_payload(raw_payload: string): StopPayload | undefined {
@@ -155,13 +328,20 @@ function is_enabled(): boolean {
 }
 
 const stop_rules = {
+	FILING_OFFER_REASON,
+	HEADLESS_REFUSAL_CAP,
+	HEADLESS_WAIT_REASON,
 	HOLD_RELEASE_REASON,
 	ISSUE_CITATION_REASON,
+	LANE_INDEX_REASON,
 	NO_OUTCOME,
+	PICKUP_REASON,
 	STOP_NOTIFY_REASON,
 	SWITCH_ENV_KEY,
 	block_envelope,
 	block_reason,
+	build_language_reason,
+	count_headless_refusals,
 	is_enabled,
 	parse_stop_payload,
 	stop_outcome,

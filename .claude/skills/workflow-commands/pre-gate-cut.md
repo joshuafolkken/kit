@@ -20,6 +20,8 @@ joshuafolkken/kit#1837 puts the `origin/main` merge at: implementation complete,
 the gate not started. Everything before it produced the thinking to be dropped; everything after it
 (gate → review → commit → push → merge) is verification the fresh process runs on the tree.
 
+**A lane child first hands it to a detached supervisor** (`chain-rule.md` step 0); the cut is the fallback.
+
 ## It applies to a dispatched lane child, and to nothing else
 
 The cut is for a **detached** `fullrun` a lane dispatched. A person's interactive `fullrun` must not
@@ -179,7 +181,7 @@ The guard below refuses on the same measurement the parent uses between children
 `cost_verdict.per_request_cost`, read through `cost_cli.session_verdict` (the read-only form of
 `pnpm josh cost --cut`, joshuafolkken/kit#2312), single-sourced at `backlogrun-progress.md` → "The
 hand-off". The parent's seam and the child's `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` share the
-**150_000** `CONTEXT_CUT_THRESHOLD` (aliased so the tests cannot drift). No separate measurement is
+**135_000** `CONTEXT_CUT_THRESHOLD` (aliased so the tests cannot drift). No separate measurement is
 built for the lane child.
 
 ### It is a guard, fired at the edit that crosses the threshold (joshuafolkken/kit#2310)
@@ -192,7 +194,7 @@ five lanes: the verdict was read once each at session entry, before the context 
 **0 times** while 33.9% of their requests ran past 200,000 tokens.
 
 So `pnpm josh rule:guard` **refuses an `Edit` / `Write`** while this checkout is a dispatched lane child
-whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N>` — a
+whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N> --handoff <path>` — a
 `PreToolUse` refusal lands *before* the edit, so the tree is at the state the previous edit left it. `cut`
 ends the turn, the rest leave this process implementing; a fresh process's `pnpm josh run:cut --resume
 <N>` then answers **`resume-impl`**, so it **skips the title, plan, hold claim and split assessment** and
@@ -227,14 +229,14 @@ edits, not after each one** — every check is a request too (joshuafolkken/kit#
 
 ## The threshold, and the statistic it is measured against
 
-**The `CONTEXT_CUT_THRESHOLD` (150_000) is one value; what joshuafolkken/kit#2295 changed is the
+**The `CONTEXT_CUT_THRESHOLD` (135_000) is one value; what joshuafolkken/kit#2295 changed is the
 statistic — `cost_verdict.per_request_cost` now averages the most recent `RECENT_REQUEST_WINDOW` (10)
 requests rather than the whole session.** It is still *one* measurement both read. This supersedes
 joshuafolkken/kit#2282, which kept the whole-session average and rejected this option on the batch it
 measured — short-lived lane children with no parent session, for which the two averages nearly coincide.
 
 - **The safety net now fires.** Built (joshuafolkken/kit#1933) for a pathological regime a typical lane
-  never enters, 150_000 sits below the 208k floor of that regime, so a runaway implementation still trips
+  never enters, 135_000 sits below the 208k floor of that regime, so a runaway implementation still trips
   it — and joshuafolkken/kit#2310 made the guard trip actively at the crossing edit.
 - **The recent window catches the long parent the whole-session average missed.** The 2026-09-21
   parent `567f8eac` (186 requests, 7 hours) first crossed 200k at request 65, but its whole-session
@@ -243,15 +245,15 @@ measured — short-lived lane children with no parent session, for which the two
 - **It is not the forbidden second measurement.** joshuafolkken/kit#1933 forbids the child pricing its
   cut on a statistic the parent does not share; #2295 keeps one statistic both read and redefines it.
 
-### Why 150_000, not the lane optimum of ~100_000 (joshuafolkken/kit#2374)
+### The value is a break-even, not a chosen number (joshuafolkken/kit#2406)
 
-**The value was lowered from 200_000 to 150_000 once all four shared uses were simulated.** #2366 priced
-only the lane cut, whose per-request cost bottoms out near **100_000**, so it held the value and split
-the reduction to [#2374](https://github.com/joshuafolkken/kit/issues/2374), which simulated the other
-three (hand-off, pre-gate, boundary). **100_000 is rejected**: it fires the pre-gate cut on 100–150k
-lanes, raising their resume cost. **150_000 Pareto-improves 200_000 across all four** — near the pre-gate
-optimum, the other three all move closer to theirs, none regresses. The simulation and #2354 carry
-validation are in the #2374 PR body.
+**The threshold is derived.** joshuafolkken/kit#2374 set 150_000; joshuafolkken/kit#2406 replaced the
+hand-picked number with the arithmetic behind it. A cut costs one preamble rewrite
+(`POST_CUT_CONTEXT`, ~60_000 tokens) and saves the dropped context's cache read on every later request,
+so it turns on a rate, not a ceiling: `context-cut-payback.ts` computes the per-request context at which a
+cut pays back over the expected remaining requests, from the cache multipliers in `cost-pricing.ts` (no
+second price list). At a 10-request horizon that is **135_000**, in #2374's band; the horizon is the knob
+a before/after lane measurement tunes (#2406 PR).
 
 ### The cut is conditional, and the resume side is why (joshuafolkken/kit#2312)
 
@@ -271,12 +273,10 @@ same verdict and stays silent. A lane like #2298 (31% of requests over 200k) sti
 
 ## Consistency with the chain rule
 
-`chain-rule.md` and `background-commands.md` forbid ending a turn at the push, where the review and
-commit are behind you and CI is in flight with nothing set to resume. **The pre-gate cut is the opposite
-case and a sanctioned boundary**: it ends the turn *before* the gate and relaunches a fresh process in
-the same act, so the run continues — and the resumed process runs gate → review → commit → push → merge
-**without ending**, so "the turn never ends at the push" holds. The implementation-phase cut is the same
-pattern one boundary earlier (joshuafolkken/kit#1933): it adds turn boundaries and removes no prohibition.
+The chain forbids ending a turn at the push, with CI in flight and nothing set to resume. **The pre-gate
+cut and the detached hand-off end it _before_ the gate** and start what carries the run on in the same
+act — a fresh process, or the supervisor — so the push is never a turn boundary. The implementation-phase
+cut is the same pattern one boundary earlier (joshuafolkken/kit#1933).
 
 ## A lane child records its park before it stops
 

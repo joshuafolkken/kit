@@ -22,7 +22,7 @@ pointers, the detail read on demand from the file each pointer names.
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`, exactly as
    `fullrun`; `over` stops with a `confirmation` Telegram and the resume command (`halfrun #<N>` /
    `halfrun new`). **Skip it when dispatched by a batch.** `backlogrun-progress.md` → "The hand-off" is
-   the single source of the check and the shared 150,000 threshold.
+   the single source of the check and the shared 135,000 threshold.
 4. **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
    background, `--mark` in the same turn as every real report; the stop before commit ends the watcher
    itself (`backlogrun-progress.md` → "Progress while the run is quiet").

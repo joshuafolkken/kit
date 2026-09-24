@@ -269,6 +269,15 @@ describe('git_command.fetch_branch', () => {
 			`+refs/heads/${PR_HEAD_BRANCH}:refs/remotes/origin/${PR_HEAD_BRANCH}`,
 		])
 	})
+
+	// joshuafolkken/kit#2462: no `+`, so a local branch that diverged is refused rather than rewritten.
+	it('fast-forwards a branch that is not checked out without a forced update', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.fast_forward_local('main')
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['fetch', 'origin', 'main:main'])
+	})
 })
 
 // joshuafolkken/kit#1659: `josh main:merge` needs the opposite of `merge_fast_forward`. `--ff-only`
@@ -283,6 +292,21 @@ describe('git_command.merge_branch', () => {
 		await git_command.merge_branch(DEFAULT_BRANCH)
 
 		expect(execa_mock.state.last_arguments).toStrictEqual(['merge', `origin/${DEFAULT_BRANCH}`])
+	})
+
+	// joshuafolkken/kit#2439: git's default merge message has no `#N`, which the commit-msg hook refuses.
+	it('passes a merge message ahead of the branch when one is given', async () => {
+		const { git_command } = await import('./git-command')
+		const message = 'Merge main into 2421-lane #2421'
+
+		await git_command.merge_branch(DEFAULT_BRANCH, message)
+
+		expect(execa_mock.state.last_arguments).toStrictEqual([
+			'merge',
+			'-m',
+			message,
+			`origin/${DEFAULT_BRANCH}`,
+		])
 	})
 })
 

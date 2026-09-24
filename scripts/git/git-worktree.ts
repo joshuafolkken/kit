@@ -53,6 +53,13 @@ async function worktree_add(
 	return await git_spawn.read([WORKTREE, ...flags, directory, start_point ?? branch_name])
 }
 
+// A throwaway tree at one commit, on no branch — `josh test:red` checks the merge-base out here, so
+// the pre-fix tree is built without creating a branch or touching the caller's tree and index
+// (joshuafolkken/kit#2448).
+async function worktree_add_detached(directory: string, commit: string): Promise<string> {
+	return await git_spawn.read([WORKTREE, 'add', '--detach', directory, commit])
+}
+
 // **`--force` is the point, not a convenience.** A lane is closed after a park, a failure or an
 // interruption as readily as after a success, and in each of those the tree still holds uncommitted
 // or untracked work. Refusing to remove it there would leave exactly the debris the close exists to
@@ -94,6 +101,7 @@ const git_worktree = {
 	branch_delete,
 	ls_remote_branch,
 	worktree_add,
+	worktree_add_detached,
 	worktree_list,
 	worktree_prune,
 	worktree_remove,

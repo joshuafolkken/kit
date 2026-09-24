@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PILOT_FILES } from './pilot-files'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
@@ -17,7 +18,7 @@ import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 const TEST_TIMEOUT_MS = 10_000
 
 // Smoke test packs and installs the real tarball — too slow (~60 s setup) for the unit gate. Run
-// before release with: pnpm vitest run scripts/build/packed-consumer.test.ts
+// before release with: pnpm vitest run --config vitest.harness.config.ts
 const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test.ts']
 
 // **`JOSH_LANE_CHILD` is blanked so the unit suite never inherits the lane it happens to run in**
@@ -26,10 +27,28 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // read a delivery fixture as a real lane-child call and fire on it. A suite that wants to test
 // lane-child behavior sets the mark itself in its own `beforeEach`, exactly as it always has; blank is
 // the "no dispatch mark" a person's session carries, which `marked_issue` reads as absent.
+//
+// **The proxy spellings are blanked for the same reason** (joshuafolkken/kit#2436): a package-manager
+// wrapper writes its loopback proxy and CA into everything `pnpm` spawns, so a suite asserting what a
+// `gh` spawn receives would pass in CI and fail on a machine with the wrapper. A suite about proxies
+// declares the one it is testing in its own `beforeEach`.
+//
+// **The detached ship supervisor's marks are blanked too** (joshuafolkken/kit#2456): the pre-push unit
+// run inherits `JOSH_SHIP_SUPERVISED` and `JOSH_AGENT_PROVIDER` from the supervisor that pushes, so a
+// ship fixture would take the supervised stop path — and try to relaunch a real lane child — only there.
+const PROXY_ENV: Record<string, string> = Object.fromEntries(
+	[...agent_session_environment.PROXY_KEYS, agent_session_environment.PROXY_CERTIFICATE_KEY].map(
+		(key) => [key, ''],
+	),
+)
+
 const ENV: Record<string, string> = {
+	...PROXY_ENV,
 	CLAUDE_CODE_SESSION_ID: 'vitest-session',
 	CODEX_THREAD_ID: '',
+	JOSH_AGENT_PROVIDER: '',
 	JOSH_LANE_CHILD: '',
+	JOSH_SHIP_SUPERVISED: '',
 }
 
 const PURE_PROJECT = 'pure'
@@ -47,6 +66,10 @@ const STATE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-state-guard.ts'
 // (joshuafolkken/kit#2296). `setupFiles` rather than `globalSetup` because it must run inside the
 // worker where the test's writes happen, not once in the main process.
 const STDOUT_GUARD: ReadonlyArray<string> = ['./scripts/test/test-stdout-guard.ts']
+
+// Runs in every worker for the same reason: it wraps that worker's own `fetch`, refusing a real
+// Telegram send and recording which test tried (joshuafolkken/kit#2494).
+const TELEGRAM_GUARD: ReadonlyArray<string> = ['./scripts/test/test-telegram-guard.ts']
 
 interface UnitProjectTest {
 	name: string
@@ -81,7 +104,7 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 			isolate: spec.isolate,
 			testTimeout: TEST_TIMEOUT_MS,
 			globalSetup: [...(spec.globalSetup ?? [])],
-			setupFiles: [...STDOUT_GUARD],
+			setupFiles: [...STDOUT_GUARD, ...TELEGRAM_GUARD],
 		},
 	}
 }
@@ -108,6 +131,7 @@ const unit_projects = {
 	PURE_PROJECT,
 	STATE_GUARD,
 	STDOUT_GUARD,
+	TELEGRAM_GUARD,
 	UNIT_PROJECTS,
 }
 

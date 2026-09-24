@@ -45,6 +45,9 @@ const VITE_DEPRECATION =
 	"(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`.\n" +
 	'Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.'
 const ESLINT_WARNING = 'src/a.ts:1:1  warning  Unexpected console statement'
+const SAFE_CHAIN_OUTPUT =
+	'All matched files use Prettier code style!\u{1B}[43;30mWarning:\u{1B}[0m safe-chain is not ' +
+	'available to protect you from installing malware. pnpm will run without it.'
 
 describe('has_checker_warning', () => {
 	it.each(['lint', 'check'])('withholds for a %s step that passed with warnings', (label) => {
@@ -59,5 +62,16 @@ describe('has_checker_warning', () => {
 
 	it('does not withhold a checker step that said nothing warning-shaped', () => {
 		expect(gate_report.has_checker_warning(passed_saying('lint', 'all files pass'))).toBe(false)
+	})
+
+	// joshuafolkken/kit#2447: CI's safe-chain shim prints its banner into every check's output.
+	it('does not withhold for the safe-chain shim banner alone', () => {
+		expect(gate_report.has_checker_warning(passed_saying('lint', SAFE_CHAIN_OUTPUT))).toBe(false)
+	})
+
+	it('still withholds for a checker warning printed beside the banner', () => {
+		const output = `${SAFE_CHAIN_OUTPUT}\n${ESLINT_WARNING}`
+
+		expect(gate_report.has_checker_warning(passed_saying('lint', output))).toBe(true)
 	})
 })
