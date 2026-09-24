@@ -337,3 +337,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | medium | scripts/sync/sync-hook-safety.test.ts:59 | 2026-09-24 | #2554
 - rf:comments | low | scripts/init/hook-command-rewrite.ts:60 | 2026-09-24 | #2554
 - rf:comments | low | scripts/sync/sync-hook-safety.ts:8 | 2026-09-24 | #2554
+- rf:bug-risks | medium | scripts/init/init-logic.ts:104 | 2026-09-24 | #2554
+- rf:tests | medium | scripts/sync/sync-hook-safety.test.ts:67 | 2026-09-24 | #2554
+- rf:comments | low | scripts/sync/sync.ts:35 | 2026-09-24 | #2554
