@@ -159,6 +159,7 @@ const LANE_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-'))
 
 mkdirSync(path.join(LANE_DIRECTORY, '.git'))
 const LANE_CLOSE_MESSAGE = `${CONTEXT.child}: uncommitted work at lane close`
+const LANE_CLOSE_COMMAND = 'lane:close'
 
 interface LaneCloseSpies {
 	josh_run: MockInstance<typeof josh_command.josh_run>
@@ -181,7 +182,7 @@ function stub_lane_close(): LaneCloseSpies {
 }
 
 function did_close(spies: LaneCloseSpies): boolean {
-	return spies.josh_run.mock.calls.some(([args]) => args[0] === 'lane:close')
+	return spies.josh_run.mock.calls.some(([args]) => args[0] === LANE_CLOSE_COMMAND)
 }
 
 describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
@@ -219,6 +220,31 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 
 		await run_merge_steps.do_merged(CONTEXT)
 
+		expect(did_close(spies)).toBe(false)
+	})
+})
+
+describe('run_merge_steps.do_merged — primary checkout sync', () => {
+	it('synchronizes the primary checkout before closing the merged lane', async () => {
+		const spies = stub_lane_close()
+
+		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+
+		await run_merge_steps.do_merged(CONTEXT)
+
+		expect(spies.josh_run.mock.calls.map(([args]) => args[0])).toEqual([
+			'main:sync',
+			LANE_CLOSE_COMMAND,
+		])
+	})
+
+	it('leaves the lane open when primary checkout sync fails', async () => {
+		const spies = stub_lane_close()
+
+		spies.josh_run.mockResolvedValueOnce({ code: 1, out: 'pull failed' })
+		await expect(run_merge_steps.do_merged(CONTEXT)).rejects.toThrow(
+			'main:sync failed: pull failed',
+		)
 		expect(did_close(spies)).toBe(false)
 	})
 })

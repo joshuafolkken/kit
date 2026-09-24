@@ -110,7 +110,9 @@ async function refused_carry(ctx: MergeContext): Promise<RunCarry | undefined> {
 }
 
 async function sync_main(): Promise<void> {
-	await josh(['main:sync'])
+	const result = await josh(['main:sync'])
+
+	if (result.code !== 0) throw new Error(`main:sync failed: ${result.out}`)
 }
 
 async function close_lane(child: string): Promise<void> {

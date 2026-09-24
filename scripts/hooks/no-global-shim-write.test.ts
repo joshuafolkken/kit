@@ -40,10 +40,13 @@ const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = [...SHARED_PATH_MARKERS,
 // plugin-install hint at the end of `josh init` / `josh sync` when the kit plugin is already present.
 // It only reads the directory listing and never puts a byte on disk, which is the price of the
 // exemption (joshuafolkken/kit#1930).
+// `codex-home-source` resolves the default Codex config location for a nested reviewer. It only
+// returns the path; the caller keeps reviewer state inside its own lane (joshuafolkken/kit#2528).
 const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
 	path.join('cost-runtime', 'cost-transcript.ts'),
 	path.join('run', 'run-liveness.ts'),
 	path.join('init', 'plugin-install-hint.ts'),
+	path.join('agent', 'codex-home-source.ts'),
 ]
 // Every way a Node script can put bytes on disk — sync, async and `fs/promises` alike — plus the
 // low-level primitives the named calls are built on. Each entry is written so it can only match a
