@@ -1,14 +1,14 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { backlog_arrival, type ArrivalProbe } from '#scripts/backlog/backlog-arrival'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_progress, type ProgressState } from './run-progress'
+import { run_progress_args, type ParsedValues } from './run-progress-args'
 import { run_progress_clock } from './run-progress-clock'
-import { run_progress_config } from './run-progress-config'
 import { run_progress_read, type ObservationRead } from './run-progress-read'
 
 // `josh run:progress` — the background watcher that breaks a long silence with one line of
@@ -50,15 +50,7 @@ const TICK_SECONDS = 30
 const DECLINE_RETRY_SECONDS = 120
 // The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
 const NO_RETRY = 0
-// A watcher outlives the turn that started it, so something has to end it. One hour is three of the
-// default twenty-minute intervals: long enough that the bound never truncates a report, short enough
-// that a watcher left waiting on a run that has already merged is gone within the hour. It is
-// deliberately **not** `run:hold`'s eight-hour expiry — that holds an uncommitted working tree across
-// a person's latency and is trampled by being short (joshuafolkken/kit#1091), while a watcher holds
-// only a heartbeat the caller restarts on the next interval, so the two guard different things and
-// only one has anything to lose by being short.
-const DEFAULT_MAX_HOURS = 1
-const MS_PER_HOUR = 3_600_000
+const { DEFAULT_MAX_HOURS } = run_progress_args
 const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
 const DISABLED_VALUE = '0'
 
@@ -294,15 +286,23 @@ function seed_loop(target: string, started_ms: number): WatchLoop {
 	return { ...FRESH_LOOP, last_ms: run_progress_read.read_last_report(target) ?? started_ms }
 }
 
-// `state` is set by the one branch of `step` that printed a line and by no other, so this asks "was
-// anything reported" without keeping a second copy of the loop's own bookkeeping.
-function has_reported(loop: WatchLoop, should_stop_on_report: boolean): boolean {
-	return should_stop_on_report && loop.state !== undefined
-}
-
 // Why the loop stopped, so `drive` prints the bound-expired notice only when the bound is what
 // expired — not when `josh followup` ended the watcher, which is a clean stop with nothing to report.
-type WatchExit = 'reported' | 'ended' | 'bound'
+// `arrived` is a `--wait` ended early by newly runnable work (joshuafolkken/kit#2503).
+type WatchExit = 'reported' | 'arrived' | 'ended' | 'bound'
+
+// `wait` is present for `--wait` alone, which ends at the first line it prints or at the first arrival
+// its probe sees. `state` is set by the one branch of `step` that printed a line and by no other, so
+// this asks "was anything reported" without keeping a second copy of the loop's own bookkeeping.
+async function wait_exit(
+	loop: WatchLoop,
+	wait: ArrivalProbe | undefined,
+): Promise<WatchExit | undefined> {
+	if (wait === undefined) return undefined
+	if (loop.state !== undefined) return 'reported'
+
+	return (await wait.has_arrived(Date.now())) ? 'arrived' : undefined
+}
 
 // The record the watcher writes to say it is alive, resolved once at the start. `begin_life` refreshes
 // it, so a `--wait` the caller restarts cleanly replaces a record an earlier one left behind.
@@ -329,7 +329,7 @@ async function run_ticks(
 	options: WatchOptions,
 	target: string,
 	life: string,
-	should_stop_on_report: boolean,
+	wait: ArrivalProbe | undefined,
 ): Promise<WatchExit> {
 	const started_ms = Date.now()
 	let loop = seed_loop(target, started_ms)
@@ -339,20 +339,24 @@ async function run_ticks(
 		run_progress_clock.ping_life(life)
 		loop = await step(options, target, loop)
 
-		if (has_reported(loop, should_stop_on_report)) return 'reported'
+		const exit = await wait_exit(loop, wait)
+
+		if (exit !== undefined) return exit
 	}
 
 	return final_exit(life)
 }
 
-async function drive(options: WatchOptions, should_stop_on_report: boolean): Promise<number> {
+async function drive(options: WatchOptions, is_wait: boolean): Promise<number> {
 	const target = await run_progress_read.stamp_target()
 	const life = await begin_watch()
-	const exit = await run_ticks(options, target, life, should_stop_on_report)
+	const wait = is_wait ? await backlog_arrival.start(Date.now()) : undefined
+	const exit = await run_ticks(options, target, life, wait)
 
-	if (exit === 'bound' && should_stop_on_report) console.error(WAIT_EXPIRED_NOTICE)
-	// Every `--wait` exit is a wake, so it carries the pick-up reading with it (joshuafolkken/kit#2452).
-	if (should_stop_on_report) await backlog_ready.print_ready_line()
+	if (exit === 'bound' && is_wait) console.error(WAIT_EXPIRED_NOTICE)
+	// Every `--wait` exit is a wake, so it carries the pick-up reading with it (joshuafolkken/kit#2452) —
+	// the reading an `arrived` exit was woken for.
+	if (is_wait) await backlog_ready.print_ready_line()
 
 	return SUCCESS_EXIT_CODE
 }
@@ -422,59 +426,14 @@ async function report_path(): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-const OPTIONS = {
-	hours: { type: 'string' },
-	interval: { type: 'string' },
-	mark: { type: 'boolean' },
-	once: { type: 'boolean' },
-	output: { type: 'string', multiple: true },
-	path: { type: 'boolean' },
-	repo: { type: 'string' },
-	wait: { type: 'boolean' },
-} as const
-
-interface ParsedValues {
-	hours?: string
-	interval?: string
-	mark?: boolean
-	once?: boolean
-	output?: Array<string>
-	path?: boolean
-	repo?: string
-	wait?: boolean
-}
-
-function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS }).values
-	} catch {
-		return undefined
-	}
-}
-
-// A hand-typed `--interval` outranks the environment, the environment outranks the interval the
-// repository commits, and that outranks the twenty-minute default. Every step goes through the same
-// reader, so an unusable value falls back rather than ending an unattended run over an optional
-// setting — `run-progress-config.ts` → `resolve_interval_ms` is where that order is written down.
-function to_interval_ms(raw: string | undefined): number {
-	return run_progress_config.resolve_interval_ms(raw)
-}
-
-function to_max_ms(raw: string | undefined): number {
-	const hours = Number(raw)
-	const is_usable = raw !== undefined && Number.isFinite(hours) && hours > 0
-
-	return (is_usable ? hours : DEFAULT_MAX_HOURS) * MS_PER_HOUR
-}
-
 function to_options(values: ParsedValues): WatchOptions | undefined {
 	const repo = values.repo ?? gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS)
 
 	if (repo === undefined) return undefined
 
 	return {
-		interval_ms: to_interval_ms(values.interval),
-		max_ms: to_max_ms(values.hours),
+		interval_ms: run_progress_args.to_interval_ms(values.interval),
+		max_ms: run_progress_args.to_max_ms(values.hours),
 		output_paths: values.output ?? [],
 		repo,
 		tick_ms: TICK_SECONDS * run_progress.MS_PER_SECOND,
@@ -502,7 +461,7 @@ async function query_verb(values: ParsedValues): Promise<number | undefined> {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const values = read_arguments(argv)
+	const values = run_progress_args.read_arguments(argv)
 
 	if (values === undefined) return report_usage()
 
@@ -533,12 +492,12 @@ const run_progress_cli = {
 	USAGE,
 	WAIT_EXPIRED_NOTICE,
 	main,
-	read_arguments,
+	read_arguments: run_progress_args.read_arguments,
 	report_decline,
 	run,
 	step,
-	to_interval_ms,
-	to_max_ms,
+	to_interval_ms: run_progress_args.to_interval_ms,
+	to_max_ms: run_progress_args.to_max_ms,
 	to_options,
 	wait_once,
 }

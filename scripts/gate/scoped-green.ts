@@ -43,10 +43,13 @@ const SWITCH_ENV_KEY = 'JOSH_SCOPED_GREEN'
 
 const SUCCESS_EXIT_CODE = 0
 
-const LINT_COMMAND = 'pnpm josh lint:related'
-const TEST_COMMAND = 'pnpm josh test:related'
+const LINT_SCRIPT = 'lint:related'
+const TEST_SCRIPT = 'test:related'
+const LINT_COMMAND = `pnpm josh ${LINT_SCRIPT}`
+const TEST_COMMAND = `pnpm josh ${TEST_SCRIPT}`
 
 interface ScopedCheck {
+	script: string
 	command: string
 	stamp: FileMapStampAccess
 	// Present and `undefined` rather than optional: under `exactOptionalPropertyTypes` an absent
@@ -64,8 +67,18 @@ interface ScopedSources {
 
 function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 	return [
-		{ command: LINT_COMMAND, stamp: review_stamps.lint_related_stamp, source: sources.lint },
-		{ command: TEST_COMMAND, stamp: review_stamps.test_related_stamp, source: sources.test },
+		{
+			script: LINT_SCRIPT,
+			command: LINT_COMMAND,
+			stamp: review_stamps.lint_related_stamp,
+			source: sources.lint,
+		},
+		{
+			script: TEST_SCRIPT,
+			command: TEST_COMMAND,
+			stamp: review_stamps.test_related_stamp,
+			source: sources.test,
+		},
 	]
 }
 
@@ -99,16 +112,33 @@ function is_answerable(tree: Record<string, string>, base: string | undefined): 
 	return is_describable(tree, base)
 }
 
+function stale_checks(
+	tree: Record<string, string>,
+	base: string | undefined,
+	sources: ScopedSources,
+): ReadonlyArray<ScopedCheck> {
+	if (!is_answerable(tree, base)) return []
+
+	return checks_of(sources).filter((check) => !describes_tree(check, tree, base))
+}
+
 function missing_checks(
 	tree: Record<string, string>,
 	base: string | undefined,
 	sources: ScopedSources = {},
 ): ReadonlyArray<string> {
-	if (!is_answerable(tree, base)) return []
+	return stale_checks(tree, base, sources).map((check) => check.command)
+}
 
-	return checks_of(sources)
-		.filter((check) => !describes_tree(check, tree, base))
-		.map((check) => check.command)
+// The same answer as `missing_checks`, as the `josh` script names a caller runs rather than the
+// command lines a refusal prints — so the ship supervisor (joshuafolkken/kit#2500) meets the
+// precondition itself by running exactly what the refusal would have asked for.
+function missing_scripts(
+	tree: Record<string, string>,
+	base: string | undefined,
+	sources: ScopedSources = {},
+): ReadonlyArray<string> {
+	return stale_checks(tree, base, sources).map((check) => check.script)
 }
 
 const REFUSAL_HEADLINE = '⛔ scoped checks not green on this tree'
@@ -210,12 +240,15 @@ async function record_if_green(stamp: FileMapStampAccess, record: GreenRecord): 
 
 const scoped_green = {
 	LINT_COMMAND,
+	LINT_SCRIPT,
 	REFUSAL_HEADLINE,
 	SWITCH_ENV_KEY,
 	TEST_COMMAND,
+	TEST_SCRIPT,
 	is_recordable_scope,
 	is_unmoved,
 	missing_checks,
+	missing_scripts,
 	read_before,
 	record_green,
 	record_if_green,

@@ -7,6 +7,7 @@ import { PLATFORM_TEMP_ROOT, platform_temporary, POSIX_TEMP_ROOT } from './platf
 // and a POSIX host that cannot write `/tmp` keeps the `os.tmpdir()` it had.
 const LINUX_PLATFORM = 'linux'
 const WINDOWS_PLATFORM = 'win32'
+const EXPLICIT_ROOT = '/var/josh-explicit-root'
 
 function always_writable(): boolean {
 	return true
@@ -34,8 +35,27 @@ describe('platform_temporary.resolve_temporary_root', () => {
 	})
 })
 
+describe('platform_temporary.temporary_root', () => {
+	it('uses an explicit root when one is set', () => {
+		expect(platform_temporary.temporary_root(EXPLICIT_ROOT, LINUX_PLATFORM)).toBe(EXPLICIT_ROOT)
+	})
+
+	it('resolves the platform root when none is set', () => {
+		expect(platform_temporary.temporary_root(undefined, WINDOWS_PLATFORM)).toBe(tmpdir())
+	})
+
+	it('reads an empty value as unset', () => {
+		expect(platform_temporary.temporary_root('', WINDOWS_PLATFORM)).toBe(tmpdir())
+	})
+})
+
 describe('PLATFORM_TEMP_ROOT', () => {
-	it('is the root this host resolves', () => {
-		expect(PLATFORM_TEMP_ROOT).toBe(platform_temporary.resolve_temporary_root(process.platform))
+	it('is the root this process resolves', () => {
+		expect(PLATFORM_TEMP_ROOT).toBe(
+			platform_temporary.temporary_root(
+				process.env[platform_temporary.TEMP_ROOT_KEY],
+				process.platform,
+			),
+		)
 	})
 })
