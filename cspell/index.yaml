@@ -41,6 +41,9 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  # Git's `--show-toplevel` flag is added to every Codex hook command when `josh sync` copies the
+  # hooks into a consumer. The consumer spell-checks that transformed file with this dictionary.
+  - toplevel
   # The POSIX call named in the shell error a lane close leaves behind when it removes the directory
   # the shell is sitting in (joshuafolkken/kit#1587). Distributed, because `epicrun.md` quotes that
   # message so the failure can be searched for, and `josh sync` copies that skill.
