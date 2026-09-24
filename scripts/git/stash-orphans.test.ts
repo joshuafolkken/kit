@@ -20,7 +20,6 @@ describe('stash_orphans.issue_of — the owning issue read from a stash subject'
 		['an N-lane branch', LANE.subject, '2346'],
 		['a message pushed with no branch context', '2370: opt-out', '2370'],
 		['a WIP entry on an N-lane branch', 'WIP on 2346-lane: abc1234 message', '2346'],
-		['run:hold reclaimed before #N', 'On 2400-lane: run:hold reclaimed before #2401', '2401'],
 	])('reads %s', (_label, subject, expected) => {
 		expect(stash_orphans.issue_of(subject)).toBe(expected)
 	})
@@ -35,6 +34,10 @@ describe('stash_orphans.issue_of — the owning issue read from a stash subject'
 	it('reads no issue from a subject that names none', () => {
 		expect(stash_orphans.issue_of(OWNERLESS.subject)).toBeUndefined()
 		expect(stash_orphans.issue_of('On main: fix 2 things')).toBeUndefined()
+	})
+
+	it('reads no owner from a run:hold reclaim, whose #N is the run that found the work', () => {
+		expect(stash_orphans.issue_of('On 2400-lane: run:hold reclaimed before #2401')).toBeUndefined()
 	})
 })
 

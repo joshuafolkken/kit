@@ -1,3 +1,4 @@
+import { run_preflight } from '#scripts/run/run-preflight'
 import type { StashEntry } from './git-stash'
 
 // Which stashes nobody is coming back for (joshuafolkken/kit#2505). A parked or paused run pushes its
@@ -8,7 +9,7 @@ import type { StashEntry } from './git-stash'
 // with the person the report is printed for.
 
 // The three shapes a run's stash subject takes, tried in this order. An explicit `#N` in the message
-// (`backlogrun: parked #N`, `run:hold reclaimed before #N`) names the issue outright; a message that
+// (`backlogrun: parked #N`) names the issue outright; a message that
 // opens with `N: ` is `git_stash.work_message`'s; and a lane branch (`On N-lane: …`) names it by where
 // the work was pushed from. A subject is `On <branch>: <message>` (or `WIP on <branch>: …` without
 // `-m`), and a branch name carries no `:`, so `(?:^|: )` anchors the message start either way.
@@ -19,6 +20,9 @@ const BRANCH_PATTERN = /^(?:WIP on|On) (?<issue>\d+)-lane: /u
 // message pattern there would name the last merged pull request, closed by definition, as the owner of
 // live work. Only the branch can name the owner of such an entry.
 const WIP_PREFIX = 'WIP on '
+// `run:hold` stashes an earlier run's leftovers before claiming the tree for `#N`, so the `#N` in that
+// message is the run that found the work, not its owner — the entry has none, and no run pops it.
+const NO_PATTERNS: ReadonlyArray<RegExp> = []
 
 const HEADER =
 	'Stashes whose issue is closed, or whose owner cannot be read — decide for each whether to revive or discard it (none is dropped automatically):'
@@ -35,6 +39,8 @@ interface OrphanStash {
 }
 
 function patterns_for(subject: string): ReadonlyArray<RegExp> {
+	if (subject.includes(run_preflight.STASH_LABEL_PREFIX)) return NO_PATTERNS
+
 	return subject.startsWith(WIP_PREFIX) ? [BRANCH_PATTERN] : [...MESSAGE_PATTERNS, BRANCH_PATTERN]
 }
 
