@@ -100,6 +100,8 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/release.yml',
 	'.github/dependabot.yml',
 	'.claude/settings.json',
+	'.codex/config.toml',
+	'.codex/hooks.json',
 ]
 
 interface FileCopyMapping {

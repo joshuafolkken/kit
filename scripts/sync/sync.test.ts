@@ -6,6 +6,7 @@ import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-log
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
+import { sync_hook_safety } from './sync-hook-safety'
 import { workflow_pin_logic } from './workflow-pin-logic'
 
 // Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
@@ -52,6 +53,21 @@ beforeEach(() => {
 afterEach(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
 	vi.restoreAllMocks()
+})
+
+describe('sync hook file guard', () => {
+	it('blocks both hook files when the installed kit is older', () => {
+		const warning = vi.spyOn(sync_hook_safety, 'hook_write_warning').mockReturnValue('unsafe')
+		const console_warning = vi.spyOn(console, 'warn').mockImplementation(() => {
+			/* suppress */
+		})
+
+		expect(sync.should_skip_hook_file('.claude/settings.json')).toBe(true)
+		expect(sync.should_skip_hook_file('.codex/hooks.json')).toBe(true)
+		expect(sync.should_skip_hook_file('.codex/config.toml')).toBe(false)
+		expect(warning).toHaveBeenCalledTimes(2)
+		expect(console_warning).toHaveBeenCalledTimes(2)
+	})
 })
 
 describe('sync_file_mapping', () => {

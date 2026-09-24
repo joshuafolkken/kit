@@ -14,12 +14,16 @@ import { hook_launch } from './hook-launch'
 // place.
 
 const PNPM_JOSH_PREFIX = 'pnpm josh '
+const CODEX_ADAPTER_SOURCE = 'pnpm exec tsx scripts/hooks/codex-hook-adapter.ts'
 // Relative to the consumer's project root, which is the working directory a Claude Code hook runs in.
 // The path is the plugin marketplace's `node_modules` location plus the built entry `bin.josh` names.
 const BUNDLE_INVOCATION = `node ${claude_plugin_config.MARKETPLACE_PATH}/dist/josh.js `
 // The per-hook bundle directory a fresh clone builds, and where it lives inside the installed package.
 const HOOK_BUNDLE_DIR = `${hook_launch.HOOK_DIST_DIR}/`
 const CONSUMER_HOOK_BUNDLE_DIR = `${claude_plugin_config.MARKETPLACE_PATH}/${HOOK_BUNDLE_DIR}`
+const CODEX_ADAPTER_BUNDLE = `node ${CONSUMER_HOOK_BUNDLE_DIR}codex-hook-adapter.js`
+const CODEX_HOOKS_DESTINATION = '.codex/hooks.json'
+const CODEX_ROOT_PREFIX = String.raw`cd \"$(git rev-parse --show-toplevel)\" && `
 // Capture the value of every `"command"` field, escapes and all, so the rewrites below touch command
 // values alone — never an echo reminder's prose or a `"description"` that merely mentions the string.
 const COMMAND_FIELD = /("command":\s*")((?:[^"\\]|\\.)*)(")/gu
@@ -39,26 +43,36 @@ function rebase_bundle_directory(value: string): string {
 // independent whichever order they run. The fallback rewrite is idempotent too (`BUNDLE_INVOCATION`
 // holds no `pnpm josh `), so the whole rewrite is safe to run more than once.
 function rewrite_command_value(value: string): string {
-	return rebase_bundle_directory(value).split(PNPM_JOSH_PREFIX).join(BUNDLE_INVOCATION)
+	return rebase_bundle_directory(value)
+		.split(PNPM_JOSH_PREFIX)
+		.join(BUNDLE_INVOCATION)
+		.split(CODEX_ADAPTER_SOURCE)
+		.join(CODEX_ADAPTER_BUNDLE)
 }
 
-function rewrite_hook_commands(content: string): string {
-	return content.replaceAll(
-		COMMAND_FIELD,
-		(_match, open: string, value: string, close: string) =>
-			`${open}${rewrite_command_value(value)}${close}`,
-	)
+function rewrite_hook_commands(content: string, is_codex = false): string {
+	return content.replaceAll(COMMAND_FIELD, (_match, open: string, value: string, close: string) => {
+		const rewritten = rewrite_command_value(value)
+		const prefix = is_codex && !rewritten.startsWith(CODEX_ROOT_PREFIX) ? CODEX_ROOT_PREFIX : ''
+
+		return `${open}${prefix}${rewritten}${close}`
+	})
 }
 
-// Gated on the same destination as the plugin injection: only the copied `.claude/settings.json` is
-// rewritten, so kit's own file keeps `pnpm josh`.
+// Rewrite copied Claude and Codex hook files only; kit's source files keep their live-source fallback.
 function apply_hook_command_rewrite_for_destination(
 	destination_path: string,
 	content: string,
 ): string {
-	return destination_path.endsWith(claude_plugin_config.CLAUDE_SETTINGS_DESTINATION)
-		? rewrite_hook_commands(content)
-		: content
+	if (destination_path.endsWith(CODEX_HOOKS_DESTINATION)) {
+		return rewrite_hook_commands(content, true)
+	}
+
+	if (destination_path.endsWith(claude_plugin_config.CLAUDE_SETTINGS_DESTINATION)) {
+		return rewrite_hook_commands(content)
+	}
+
+	return content
 }
 
 const hook_command_rewrite = {

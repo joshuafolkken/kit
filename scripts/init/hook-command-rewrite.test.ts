@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
 import { describe, expect, it } from 'vitest'
 import { hook_command_rewrite } from './hook-command-rewrite'
@@ -6,6 +8,8 @@ import { transform_copied_content } from './init-copy-content'
 
 const { apply_hook_command_rewrite_for_destination, rewrite_hook_commands } = hook_command_rewrite
 const SETTINGS_DESTINATION = path.join('.claude', 'settings.json')
+const CODEX_HOOKS_DESTINATION = path.join('.codex', 'hooks.json')
+const CODEX_HOOKS_SOURCE = fileURLToPath(new URL('../../.codex/hooks.json', import.meta.url))
 const SESSION_LANG_COMMAND = '{"command": "pnpm josh session:lang"}'
 // A kit-side fallback-form command: prefers the built bundle, drops to `pnpm josh` when it is absent.
 const KIT_FALLBACK_FORM =
@@ -66,6 +70,35 @@ describe('rewrite_hook_commands', () => {
 })
 
 describe('apply_hook_command_rewrite_for_destination', () => {
+	it('rebases Codex hook commands to the installed adapter bundle', () => {
+		const source = readFileSync(CODEX_HOOKS_SOURCE, 'utf8')
+		const transformed = transform_copied_content(CODEX_HOOKS_DESTINATION, source)
+
+		expect(JSON.parse(transformed)).toHaveProperty('hooks')
+
+		const commands = [...transformed.matchAll(/"command":\s*"((?:[^"\\]|\\.)*)"/gu)]
+			.map((match) => match[1] ?? '')
+			.filter((command) => command.includes('codex-hook-adapter.js'))
+
+		expect(commands).toHaveLength(2)
+
+		for (const command of commands) {
+			expect(command).toContain('git rev-parse --show-toplevel')
+			expect(command).toContain(
+				'node ./node_modules/@joshuafolkken/kit/dist/hooks/codex-hook-adapter.js',
+			)
+			expect(command).not.toContain('pnpm exec tsx')
+			expect(command).not.toContain('node dist/hooks/')
+		}
+	})
+
+	it('keeps the Codex hook rewrite stable when applied twice', () => {
+		const source = readFileSync(CODEX_HOOKS_SOURCE, 'utf8')
+		const once = transform_copied_content(CODEX_HOOKS_DESTINATION, source)
+
+		expect(transform_copied_content(CODEX_HOOKS_DESTINATION, once)).toBe(once)
+	})
+
 	it('rewrites only the consumer .claude/settings.json destination', () => {
 		expect(
 			apply_hook_command_rewrite_for_destination(SETTINGS_DESTINATION, SESSION_LANG_COMMAND),

@@ -11,7 +11,6 @@ const CLAUDE_SKILLS = path.join(ROOT, '.claude', 'skills')
 const CODEX_CONFIG = path.join(ROOT, '.codex', 'config.toml')
 const CODEX_HOOKS = path.join(ROOT, '.codex', 'hooks.json')
 const CLAUDE_SETTINGS = path.join(ROOT, '.claude', 'settings.json')
-const CODEX_ROOTS = ['.agents', '.codex']
 const CODEX_PRETOOL_COMMAND =
 	'if [ -f dist/hooks/codex-hook-adapter.js ]; then node dist/hooks/codex-hook-adapter.js pretool; else pnpm exec tsx scripts/hooks/codex-hook-adapter.ts pretool; fi'
 const CODEX_POSTTOOL_COMMAND =
@@ -38,10 +37,6 @@ function read(file_path: string): string {
 
 function load_hooks(file_path: string): HookConfig {
 	return JSON.parse(read(file_path)) as HookConfig
-}
-
-function is_codex_project_path(file_path: string): boolean {
-	return CODEX_ROOTS.some((root) => file_path === root || file_path.startsWith(`${root}/`))
 }
 
 function first_handler(hooks: HookConfig['hooks'], event: string): HookHandler {
@@ -142,13 +137,15 @@ describe('Codex and Claude hook parity', () => {
 })
 
 describe('josh setup and sync boundaries', () => {
-	it('does not recreate repository-local Codex configuration as distributed copies', () => {
+	it('distributes Codex project files without copying the local skill link', () => {
 		const destinations = [
 			...init_logic.get_ai_copy_files(),
 			...init_logic.get_ai_copy_file_mappings().map((mapping) => mapping.dest),
 			...init_logic.get_ai_copy_directories(),
 		]
 
-		expect(destinations.some((destination) => is_codex_project_path(destination))).toBe(false)
+		expect(destinations).toContain('.codex/config.toml')
+		expect(destinations).toContain('.codex/hooks.json')
+		expect(destinations.some((destination) => destination.startsWith('.agents/'))).toBe(false)
 	})
 })

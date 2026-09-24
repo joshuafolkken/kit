@@ -1,11 +1,18 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { sync_hook_safety } from './sync-hook-safety'
 
 const WRITING_VERSION = '1.340.0'
+const HOOK_FILES = ['.claude/settings.json', '.codex/hooks.json']
+const PROJECT_ROOTS = new Set<string>()
+
+afterEach(() => {
+	for (const project_root of PROJECT_ROOTS) rmSync(project_root, { recursive: true, force: true })
+	PROJECT_ROOTS.clear()
+})
 
 function write_installed_version(project_root: string, version: string): void {
 	const install_directory = path.join(project_root, 'node_modules', KIT_PACKAGE_NAME)
@@ -16,6 +23,8 @@ function write_installed_version(project_root: string, version: string): void {
 
 function project_with_installed_version(version: string | undefined): string {
 	const project_root = mkdtempSync(path.join(tmpdir(), 'sync-hook-safety-'))
+
+	PROJECT_ROOTS.add(project_root)
 	if (version !== undefined) write_installed_version(project_root, version)
 
 	return project_root
@@ -55,23 +64,28 @@ describe('installed_consumer_version', () => {
 })
 
 describe('hook_write_warning', () => {
-	it('warns and blocks the write against an older installed CLI', () => {
+	it.each(HOOK_FILES)('warns for %s against an older installed CLI', (filename) => {
 		const project_root = project_with_installed_version('1.214.0')
-		const warning = sync_hook_safety.hook_write_warning(project_root, WRITING_VERSION)
+		const warning = sync_hook_safety.hook_write_warning(project_root, WRITING_VERSION, filename)
 
+		expect(warning).toContain(filename)
 		expect(warning).toContain('1.214.0')
 		expect(warning).toContain('pnpm update')
 	})
 
-	it('does not block when the installed CLI matches', () => {
+	it.each(HOOK_FILES)('does not block %s when the installed CLI matches', (filename) => {
 		const project_root = project_with_installed_version(WRITING_VERSION)
 
-		expect(sync_hook_safety.hook_write_warning(project_root, WRITING_VERSION)).toBeUndefined()
+		expect(
+			sync_hook_safety.hook_write_warning(project_root, WRITING_VERSION, filename),
+		).toBeUndefined()
 	})
 
-	it('does not block when kit is not installed yet', () => {
+	it.each(HOOK_FILES)('does not block %s when kit is not installed yet', (filename) => {
 		const project_root = project_with_installed_version(undefined)
 
-		expect(sync_hook_safety.hook_write_warning(project_root, WRITING_VERSION)).toBeUndefined()
+		expect(
+			sync_hook_safety.hook_write_warning(project_root, WRITING_VERSION, filename),
+		).toBeUndefined()
 	})
 })
