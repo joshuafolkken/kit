@@ -106,6 +106,7 @@ interface DuplicateCandidate {
 	number: number
 	title: string
 	score: number
+	is_referenced?: boolean
 	epic?: number
 	is_closed?: boolean
 }
@@ -162,24 +163,47 @@ function to_closed_field(is_closed: boolean | undefined): { is_closed?: boolean 
 	return is_closed === true ? { is_closed: true } : {}
 }
 
+function candidate_score(
+	query: ReadonlySet<string>,
+	issue: ScoutIssue,
+	references: ReadonlySet<number>,
+): number | undefined {
+	const score = qualifying_score(query, tokenize(issue.title ?? ''))
+
+	if (score !== undefined) return score
+
+	return references.has(issue.number) ? 0 : undefined
+}
+
+function to_reference_field(is_referenced: boolean): { is_referenced?: boolean } {
+	return is_referenced ? { is_referenced: true } : {}
+}
+
 function to_candidate(
 	query: ReadonlySet<string>,
 	issue: ScoutIssue,
+	references: ReadonlySet<number>,
 ): DuplicateCandidate | undefined {
 	if (issue.is_epic === true) return undefined
 
-	const title = issue.title ?? ''
-	const score = qualifying_score(query, tokenize(title))
+	const score = candidate_score(query, issue, references)
 
 	if (score === undefined) return undefined
 
 	return {
 		number: issue.number,
-		title,
+		title: issue.title ?? '',
 		score,
+		...to_reference_field(references.has(issue.number)),
 		...to_epic_field(issue.epic),
 		...to_closed_field(issue.is_closed),
 	}
+}
+
+function compare_candidates(left: DuplicateCandidate, right: DuplicateCandidate): number {
+	const reference_order = Number(right.is_referenced === true) - Number(left.is_referenced === true)
+
+	return reference_order || right.score - left.score
 }
 
 // The issues whose titles look like this one, strongest first.
@@ -189,11 +213,16 @@ function to_candidate(
 // nobody controls (joshuafolkken/kit#1252). Since joshuafolkken/kit#1679 the rows may be closed as
 // well as open, and the two rank together: a run about to file has to be shown the strongest match
 // there is, and which listing it came out of says nothing about how well it matches.
-function find_duplicates(title: string, issues: ReadonlyArray<ScoutIssue>): DuplicateSearch {
+function find_duplicates(
+	title: string,
+	issues: ReadonlyArray<ScoutIssue>,
+	referenced_numbers: ReadonlyArray<number> = [],
+): DuplicateSearch {
 	const query = tokenize(title)
+	const references = new Set(referenced_numbers)
 	const matched = issues
-		.flatMap((issue) => to_candidate(query, issue) ?? [])
-		.toSorted((left, right) => right.score - left.score)
+		.flatMap((issue) => to_candidate(query, issue, references) ?? [])
+		.toSorted(compare_candidates)
 
 	// `total` rather than the shown list's length: a caller printing only what it was handed would
 	// report a truncation as a complete answer, which is the one gap in this feature that nothing else

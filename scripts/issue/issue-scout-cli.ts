@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
@@ -35,7 +36,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const SCORE_DIGITS = 2
-const USAGE = 'Usage: josh issue:scout "<title>" [--body "<summary>"]'
+const USAGE = 'Usage: josh issue:scout "<title>" [--body "<draft>" | --body-file <path>]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the backlog cannot be scanned — check `gh auth status` and that this is a checkout with an `origin` remote.'
 
@@ -127,19 +128,41 @@ function warn_about_closed(scan: ClosedScan): void {
 interface ScoutArguments {
 	title: string
 	body: string
+	body_file?: string | undefined
+}
+
+function has_invalid_arguments(
+	title: string | undefined,
+	body: string | undefined,
+	body_file: string | undefined,
+): boolean {
+	return (
+		title === undefined || title.trim() === '' || (body !== undefined && body_file !== undefined)
+	)
 }
 
 function parse_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
 	const { values, positionals } = parseArgs({
 		args: [...argv],
-		options: { body: { type: 'string' } },
+		options: { body: { type: 'string' }, 'body-file': { type: 'string' } },
 		allowPositionals: true,
 	})
 	const [title] = positionals
 
-	if (title === undefined || title.trim() === '') return undefined
+	if (has_invalid_arguments(title, values.body, values['body-file'])) return undefined
+	if (title === undefined) return undefined
 
-	return { title, body: values.body ?? '' }
+	return { title, body: values.body ?? '', body_file: values['body-file'] }
+}
+
+async function with_draft_body(args: ScoutArguments): Promise<ScoutArguments | undefined> {
+	if (args.body_file === undefined) return args
+
+	try {
+		return { ...args, body: await readFile(args.body_file, 'utf8') }
+	} catch {
+		return undefined
+	}
 }
 
 // An unknown flag makes `parseArgs` throw. Caught so the answer is the usage line rather than a stack
@@ -167,7 +190,7 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 // The epic beside a candidate is the placement answer for a draft that cites nothing: the epic half
 // below decides from prose references, and a title-only draft has none to give it.
 function format_duplicate(candidate: DuplicateCandidate): string {
-	const score = candidate.score.toFixed(SCORE_DIGITS)
+	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
 	const epic = candidate.epic === undefined ? '' : ` (epic #${String(candidate.epic)})`
 	// The reader does two different things with the two states, so the row has to say which it is: an
 	// open candidate means somebody is already tracking this, a closed one means it may already be
@@ -183,6 +206,8 @@ function format_duplicate(candidate: DuplicateCandidate): string {
 // for the title dropped by the shared-word count.
 const NO_DUPLICATE_LINE =
 	"Duplicates: none — no open or recently closed issue's title shares enough of this one's words to be worth reading."
+const INCOMPLETE_DUPLICATE_LINE =
+	'Duplicates: incomplete — an issue listing or referenced issue could not be fully read; inspect the gaps before filing.'
 
 // What the list is, when there is one. `total` is what cleared the bar; the list is what fits.
 function duplicates_headline(shown: number, total: number): string {
@@ -314,7 +339,12 @@ function format_report(
 	is_membership_established: boolean,
 	closed: ReadonlyArray<ScoutIssue> = [],
 ): string {
-	const duplicates = issue_scout.find_duplicates(draft.title ?? '', [...issues, ...closed])
+	const references = epic_audit_logic.parse_references(draft.body, draft.repo)
+	const duplicates = issue_scout.find_duplicates(
+		draft.title ?? '',
+		[...issues, ...closed],
+		references,
+	)
 	const decision = epic_bundle.decide_bundle(draft, issues)
 
 	return [
@@ -325,6 +355,24 @@ function format_report(
 
 type Widened = Awaited<ReturnType<typeof epic_bundle_cli.widen_with_referenced>>
 type ClosedListing = Awaited<ReturnType<typeof read_recently_closed>>
+
+function is_duplicate_scan_incomplete(widened: Widened, closed: ClosedListing): boolean {
+	const has_open_gap = widened.cutoff !== undefined && widened.cutoff !== 'none'
+
+	return (
+		widened.unreadable.length > 0 || has_open_gap || closed.rows === undefined || closed.is_capped
+	)
+}
+
+function qualify_duplicate_report(report_text: string, is_incomplete: boolean): string {
+	if (!is_incomplete) return report_text
+
+	const details = report_text.startsWith(NO_DUPLICATE_LINE)
+		? report_text.slice(NO_DUPLICATE_LINE.length).trimStart()
+		: report_text
+
+	return `${INCOMPLETE_DUPLICATE_LINE}\n${details}`
+}
 
 // The report a run copies into its reply, with every `#N` in the `Related:` / `Target epic:` /
 // duplicate listings linkified so the references it carries are clickable rather than bare
@@ -341,8 +389,12 @@ function linkified_report(
 		epic_bundle_gaps.is_membership_established(widened.epic_cutoff),
 		closed.rows ?? [],
 	)
+	const qualified = qualify_duplicate_report(
+		report_text,
+		is_duplicate_scan_incomplete(widened, closed),
+	)
 
-	return issue_citation.linkify(report_text, repo)
+	return issue_citation.linkify(qualified, repo)
 }
 
 // The backlog is read without its `blocked-by` relations: a draft has no number, so no recorded
@@ -376,7 +428,8 @@ async function report(args: ScoutArguments, repo: string): Promise<number> {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const args = read_arguments(argv)
+	const parsed = read_arguments(argv)
+	const args = parsed === undefined ? undefined : await with_draft_body(parsed)
 
 	if (args === undefined) {
 		console.error(USAGE)
@@ -408,12 +461,14 @@ const issue_scout_cli = {
 	USAGE,
 	UNKNOWN_REPO_MESSAGE,
 	NO_DUPLICATE_LINE,
+	INCOMPLETE_DUPLICATE_LINE,
 	NO_EPIC_LINE,
 	NO_REFERENCE_LINE,
 	CLOSED_UNREADABLE_LINE,
 	CLOSED_CEILING_LINE,
 	DRAFT_NUMBER,
 	read_arguments,
+	with_draft_body,
 	draft_of,
 	format_duplicates,
 	format_epic_decision,
