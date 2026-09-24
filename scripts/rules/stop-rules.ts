@@ -64,9 +64,6 @@ interface StopContext {
 	headless_waiting: boolean
 	// How many headless-wait refusals sit on this run's transcript tail — the spin bound below.
 	headless_refusals: number
-	// This session drives a `backlogrun` and its turn holds a pick-up signal — a watcher `ready` line or
-	// a pending `stall` — with no dispatch and no ask on it: `backlog_ready.owes_offer` (joshuafolkken/kit#2452).
-	owes_offer: boolean
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
 	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
@@ -187,17 +184,6 @@ function needs_index_route(context: StopContext): boolean {
 	return context.lane_child && asks_index_permission(context.message)
 }
 
-// **A wake that relays the line and skips the ask is the stall it was meant to prevent**
-// (joshuafolkken/kit#2452). The ask on each wake was prose alone, and a parent that judged it had
-// nothing to do left runnable work idle across five wakes; the reason hands over the ask itself.
-const PICKUP_REASON =
-	'⛔ backlog pick-up: this `backlogrun` parent holds runnable work and a free lane — a `ready` line ' +
-	'from the progress watcher or a `stall` newer than the last launch — and this turn ran neither ' +
-	'`pnpm josh backlog:offer` nor `pnpm josh lane:launch`. Ask with `pnpm josh backlog:offer` and ' +
-	'launch what it answers on `run`; a `watch` or `wait` answer is itself the ask, so end the turn ' +
-	'after it (`backlogrun-progress.md` → "The parent keeps no clock of its own") — do not repeat your ' +
-	'previous reply.'
-
 // **A refusal is the turn's only input, so it names the language the answer is written in**
 // (joshuafolkken/kit#2470). The session-language line reaches a turn only through `UserPromptSubmit`;
 // a turn this hook continues has no prompt, and an English refusal read alone was answered in English.
@@ -280,13 +266,6 @@ function hold_reason(context: StopContext): string | undefined {
 	return undefined
 }
 
-// The run-state rules — the two hold rules, then the pick-up — ahead of the rules that read the reply.
-// No rule holds a session to relay the run's stream: the watch pane does, outside any conversation
-// (joshuafolkken/kit#2492).
-function run_reason(context: StopContext): string | undefined {
-	return hold_reason(context) ?? (context.owes_offer ? PICKUP_REASON : undefined)
-}
-
 // First-wins across every rule. Two things stand every rule down: `stop_hook_active` (the
 // loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
 // flight (a lane child's automatic turn-end, not a person-waiting pause). The two hold rules keep their
@@ -303,7 +282,7 @@ function block_reason(context: StopContext): string | undefined {
 	if (is_headless_held(context)) return HEADLESS_WAIT_REASON
 	if (context.stop_hook_active || context.cut_pending) return undefined
 
-	return run_reason(context) ?? reply_reason(context)
+	return hold_reason(context) ?? reply_reason(context)
 }
 
 function stop_outcome(context: StopContext): StopOutcome {
@@ -335,7 +314,6 @@ const stop_rules = {
 	ISSUE_CITATION_REASON,
 	LANE_INDEX_REASON,
 	NO_OUTCOME,
-	PICKUP_REASON,
 	STOP_NOTIFY_REASON,
 	SWITCH_ENV_KEY,
 	block_envelope,
