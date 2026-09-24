@@ -95,20 +95,19 @@ promoted to interrupt, never demoted to requested.**
 session-facing events — a plan posted, a child launched, a PR opened, a review round, a park, a cut, a
 stop, a merge — are appended to one ordered stream keyed to the run's identity (`pnpm josh run:event`),
 which survives the cut because it is the run's and not any one session's. **Every session is a writer;
-whichever session is attached to a terminal is the reader.** The reader follows the stream from its own
-last position — `pnpm josh run:event --follow <position>` returns the moment a new event lands and
-otherwise at the interval, so a person sees progress arrive at once and still sees the run is alive when
-it is quiet — and relays the events it prints. **This is the same reader before and after the cut**,
-because a cut moves who executes, never where the stream lives or where a reader stands in it. Writing
-ambient as a *mechanism* ("a pull, not a push") is what let the surface vanish at the cut with the words
-still reading as kept; anchoring it to the run's stream is what keeps it.
+the reader is a script in a pane of the person's own, never a conversation** (#2492):
+`pnpm josh run:event --watch` prints each event the moment it lands, in the session language, and the
+`heartbeat` events say the run is alive when quiet. A relaying session re-read its whole history per
+event, so **no session relays the stream** — name the watch command once, at the first cut or when
+asked. **It is the same reader before and after the cut**: a cut moves who executes, never where the
+stream lives.
 
 **Interrupt is withheld on purpose**: no Telegram, because `confirmation` and `completion` are what
 interrupt a person, and a line every fifteen minutes is the fatigue that stops them being
 read. **`pnpm josh run:wake --list` is the requested tier** — the last-event read of the stream the
-follow reads, for a person who types for one line rather than following. **`tail -F` on the
-raw stream file is a recovery path, not the ambient surface** — the follow is how progress is seen
-without asking, and the raw `tail` is the fallback when the relay has stopped, named for that role in
+watch pane reads, for a person who types for one line rather than watching. **`tail -F` on the
+raw stream file is a recovery path, not the ambient surface** — the watch pane is how progress is seen
+without asking, and the raw `tail` is the fallback when the pane has stopped, named for that role in
 `--list`'s own output.
 
 **A stop is an interrupt, and only a stop** (joshuafolkken/kit#2136). The heartbeat says a run is still
@@ -423,7 +422,7 @@ ever.
   everything the session has, then run `pnpm josh run:carry --cut --owner "$PPID"`. **Unless it answers
   `capped`** (below), `pnpm josh run:wake` then starts the next session, which polls the still-running
   lanes from `lane:list`. Post the progress comment naming **every lane in flight and the path each
-  records**, and relay `run:event --follow <pos>` in the background, restarting on exit (#2437).
+  records**, name `pnpm josh run:event --watch` for a pane, and end the turn — nothing is relayed (#2492).
   `backlogrun-steps.md` → "The session cut is inside the invocation" is the single source of the
   carry; this reading is only where the cut is *taken*.
 - **`capped`** — the invocation has taken its `MAX_CUTS` cuts (joshuafolkken/kit#2346), so `--cut`

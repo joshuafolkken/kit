@@ -257,8 +257,10 @@ joshuafolkken/kit#1728 created the ledger to end.
   epic close or the hold release down with it. **A side effect: on a run that did flush, `followup`
   ends on the default branch.**
 - **A lane's writers use the primary checkout's ledger** (joshuafolkken/kit#2419): a lane refuses
-  `pnpm josh ms`, so its own copy had no way out. `pnpm josh observations:flush` (in `run:tail`) acts
-  on the primary checkout from a lane.
+  `pnpm josh ms`, so its own copy had no way out. `pnpm josh observations:flush` acts on the primary
+  checkout from a lane. **A dispatched lane child does not flush at all** (joshuafolkken/kit#2492): its
+  `run:tail` skips the step, and the `backlogrun` flushes every lane's lines once, in one pull request,
+  at `pnpm josh run:carry --end`.
 - **Mixing the lines into a child's pull request was considered and is refused.** That is the
   contamination the exclusion above exists to end, and adopting it would turn the defect into the
   specification: a ledger line in an unrelated diff is a line no reviewer of that diff has a reason

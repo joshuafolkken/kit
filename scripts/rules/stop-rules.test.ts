@@ -300,31 +300,15 @@ describe('stop_rules.stop_outcome — backlog pick-up (joshuafolkken/kit#2452)',
 	})
 })
 
-describe('stop_rules.stop_outcome — progress relay (joshuafolkken/kit#2480)', () => {
-	const POSITION = 42
-
-	it('refuses a stop that owes the relay, handing over the restart at the position', () => {
-		const { reason } = stop_rules.stop_outcome(context({ relay_position: POSITION }))
-
-		expect(reason).toBe(stop_rules.build_relay_reason(POSITION))
-		expect(reason).toContain(`pnpm josh run:event --follow ${String(POSITION)}`)
-		expect(reason).toContain(NO_REPRINT)
+// joshuafolkken/kit#2492: the run's stream is watched from a pane of its own, so no stop is held to
+// relay it — an event landing never costs the attached conversation a turn.
+describe('stop_rules.stop_outcome — no stop is held to relay the event stream', () => {
+	it('lets an attached session with a run going end its turn', () => {
+		expect(stop_rules.stop_outcome(context({ lane_child: false })).reason).toBeUndefined()
 	})
 
-	it('lets a stop that owes no relay through', () => {
-		expect(stop_rules.stop_outcome(context({ relay_position: undefined })).reason).toBeUndefined()
-	})
-
-	it('reports the pick-up ahead of the relay', () => {
-		const both = context({ relay_position: POSITION, owes_offer: true })
-
-		expect(stop_rules.stop_outcome(both).reason).toBe(stop_rules.PICKUP_REASON)
-	})
-
-	it('lets the relay refusal through on the loop-breaker', () => {
-		const looped = context({ relay_position: POSITION, stop_hook_active: true })
-
-		expect(stop_rules.stop_outcome(looped).reason).toBeUndefined()
+	it('names no follow relay in the pick-up reason', () => {
+		expect(stop_rules.PICKUP_REASON).not.toContain('run:event --follow')
 	})
 })
 

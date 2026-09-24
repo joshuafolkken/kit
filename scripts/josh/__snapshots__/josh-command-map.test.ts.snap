@@ -895,7 +895,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:event": [
-      "--append <kind> <text> | --from|--follow <n> | --last",
+      "--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last",
       "automation",
       [
         "files",

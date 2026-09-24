@@ -77,7 +77,8 @@ release:scope` and close the completion summary with what it answered** (`follow
 ## The release ask — the last step of either form
 
 **One call folds the post-merge bookkeeping** (joshuafolkken/kit#2372): after the merge, `pnpm josh
-run:tail <N>` commits the observation ledger (`observations:flush`), reads the completion citations
+run:tail <N>` commits the observation ledger (`observations:flush` — skipped by a dispatched lane child,
+whose `backlogrun` flushes once at `run:carry --end`; joshuafolkken/kit#2492), reads the completion citations
 (`issue:cite`, given the closed issue and any follow-ups filed this run) and decides the release scope
 (`release:scope`) in one round trip, joining each under its own header. **On the clean path `run:tail`
 runs inside `pnpm josh ship`** as its report step (joshuafolkken/kit#2398), so it is a standalone call

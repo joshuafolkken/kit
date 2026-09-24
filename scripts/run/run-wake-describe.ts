@@ -48,15 +48,16 @@ function outstanding_line(wake: RunWake): string | undefined {
 
 // The run's stream, read here because a headless parent's progress reaches its own transcript alone —
 // after a cut, `--list` is the person's one window onto it (joshuafolkken/kit#1910). Two lines: the
-// newest event (the degenerate last-event read of the stream the attached session follows, so `--list`
-// and the follow read one stream rather than two paths), and how to follow on from here — the same
-// reader before and after the cut, with `tail -F` on the raw stream named as a recovery path rather
-// than the ambient one (joshuafolkken/kit#2207). The event line is omitted before the first event, the
-// way `outstanding_line` omits a count of zero; the follow line is always shown.
+// newest event (the degenerate last-event read of the stream the watch pane follows, so `--list` and
+// the pane read one stream rather than two paths), and how to watch on from here in a pane of its own —
+// the same surface before and after the cut, with `tail -F` on the raw stream named as a recovery path
+// rather than the ambient one (joshuafolkken/kit#2207, joshuafolkken/kit#2492). The event line is
+// omitted before the first event, the way `outstanding_line` omits a count of zero; the watch line is
+// always shown.
 function stream_lines(context: WakeContext): Array<string> {
 	const event = run_event_stream.read_last(context.event_target)
 	const progress = event === undefined ? [] : [`progress: ${run_event_stream.format_event(event)}`]
-	const follow = `follow: \`pnpm josh run:event --follow ${String(event?.pos ?? 0)}\` (recover with \`tail -F ${context.event_target}\`)`
+	const follow = `watch: \`pnpm josh run:event --watch ${String(event?.pos ?? 0)}\` in a pane of its own (recover with \`tail -F ${context.event_target}\`)`
 
 	return [...progress, follow]
 }

@@ -110,6 +110,25 @@ describe('run_event_cli.run — read', () => {
 	})
 })
 
+// joshuafolkken/kit#2492: a pane opened with no position shows what happens next, never a replay.
+describe('run_event_cli.watch_start — where the watch pane begins', () => {
+	it("starts at the stream's current end when no position is given", async () => {
+		const target = fresh_target()
+
+		await run_event_cli.run(['--append', 'plan', 'planned'])
+		await run_event_cli.run(['--append', 'merge', 'merged'])
+
+		expect(run_event_cli.watch_start(target, undefined)).toBe(2)
+	})
+
+	it('starts at a given position, and refuses one that is not an integer', () => {
+		const target = fresh_target()
+
+		expect(run_event_cli.watch_start(target, '7')).toBe(7)
+		expect(run_event_cli.watch_start(target, 'soon')).toBeUndefined()
+	})
+})
+
 describe('run_event_cli.run — usage', () => {
 	it('reports usage for an unknown flag', async () => {
 		expect(await run_event_cli.run(['--nope'])).toBe(FAILURE)

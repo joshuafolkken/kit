@@ -69,9 +69,6 @@ interface StopContext {
 	owes_offer: boolean
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
-	// The run's stream position when this attached session owes a `backlogrun` its relay and nothing
-	// is relaying — `run_watcher_guard.owes_relay_here` (joshuafolkken/kit#2480); `undefined` otherwise.
-	relay_position: number | undefined
 	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
 	session_lang: string
 }
@@ -201,28 +198,6 @@ const PICKUP_REASON =
 	'after it (`backlogrun-progress.md` → "The parent keeps no clock of its own") — do not repeat your ' +
 	'previous reply.'
 
-// **A cut moves who executes, never who relays** (joshuafolkken/kit#2480). The relay rule was prose, and
-// a session that cut reasoned "I am not the parent any more" and stopped restarting its follow while
-// the headless successor — which reaches nobody — kept the run going. The reason hands over the restart
-// with the stream's current position, so the command can be pasted as printed.
-function build_relay_reason(position: number): string {
-	return (
-		'⛔ progress relay: a `backlogrun` is still running and this is the session a person is watching, ' +
-		"but nothing is relaying the run's event stream here, so ending the turn leaves them without " +
-		`progress. Run \`pnpm josh run:event --follow ${String(position)}\` in the background, relay what ` +
-		'it prints, and restart it from the `next_position` it reports each time it exits — before and ' +
-		'after a cut alike, since a cut hands off the execution and not the relay ' +
-		'(`backlogrun-progress.md` → "Progress while the run is quiet"). Start it, then end with one line ' +
-		'saying it is running — do not repeat your previous reply.'
-	)
-}
-
-function relay_reason(context: StopContext): string | undefined {
-	return context.relay_position === undefined
-		? undefined
-		: build_relay_reason(context.relay_position)
-}
-
 // **A refusal is the turn's only input, so it names the language the answer is written in**
 // (joshuafolkken/kit#2470). The session-language line reaches a turn only through `UserPromptSubmit`;
 // a turn this hook continues has no prompt, and an English refusal read alone was answered in English.
@@ -305,10 +280,11 @@ function hold_reason(context: StopContext): string | undefined {
 	return undefined
 }
 
-// The run-state rules — the two hold rules, the pick-up, then the relay — ahead of the rules that read
-// the reply.
+// The run-state rules — the two hold rules, then the pick-up — ahead of the rules that read the reply.
+// No rule holds a session to relay the run's stream: the watch pane does, outside any conversation
+// (joshuafolkken/kit#2492).
 function run_reason(context: StopContext): string | undefined {
-	return hold_reason(context) ?? (context.owes_offer ? PICKUP_REASON : relay_reason(context))
+	return hold_reason(context) ?? (context.owes_offer ? PICKUP_REASON : undefined)
 }
 
 // First-wins across every rule. Two things stand every rule down: `stop_hook_active` (the
@@ -365,7 +341,6 @@ const stop_rules = {
 	block_envelope,
 	block_reason,
 	build_language_reason,
-	build_relay_reason,
 	count_headless_refusals,
 	is_enabled,
 	parse_stop_payload,

@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
+const is_child_of_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: is_child_of_mock },
+}))
 
 const { run_tail_cli } = await import('./run-tail-cli')
 
@@ -24,6 +28,7 @@ function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
 
 beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
+	is_child_of_mock.mockReset().mockReturnValue(false)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -56,6 +61,29 @@ describe('run_tail_cli.run — folds the three post-merge steps into one call', 
 		expect(info_lines[0]).toBe(
 			`=== observations ===\nflushed\n\n=== citations ===\ncited ${ISSUE}\n\n=== release ===\nskip`,
 		)
+	})
+})
+
+// joshuafolkken/kit#2492: the per-issue ledger PR and its CI wait move to the backlogrun's end.
+describe('run_tail_cli.run — a dispatched lane child leaves the ledger to the parent', () => {
+	it('runs cite and scope alone, never the flush', async () => {
+		is_child_of_mock.mockReturnValue(true)
+
+		const code = await run_tail_cli.run([ISSUE])
+
+		expect(code).toBe(OK)
+		expect(argv_calls()).toStrictEqual([CITE, SCOPE])
+	})
+
+	it('reports only the citations and release sections', async () => {
+		is_child_of_mock.mockReturnValue(true)
+		josh_run_mock
+			.mockResolvedValueOnce({ code: OK, out: `cited ${ISSUE}` })
+			.mockResolvedValueOnce({ code: OK, out: 'skip' })
+
+		await run_tail_cli.run([ISSUE])
+
+		expect(info_lines[0]).toBe(`=== citations ===\ncited ${ISSUE}\n\n=== release ===\nskip`)
 	})
 })
 

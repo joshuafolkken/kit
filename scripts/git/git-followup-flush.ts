@@ -36,8 +36,8 @@ async function sync_and_flush(): Promise<void> {
 //
 // **A lane skips it outright** (joshuafolkken/kit#2419). Its ledger is the primary checkout's
 // (`observation-ledger-home.ts`), which this step cannot flush — `main_sync` refuses in a linked work
-// tree — so the line is committed by `pnpm josh observations:flush`, which acts on the primary
-// checkout from a lane and is the first step of `pnpm josh run:tail`.
+// tree — so the line waits in the primary checkout and the `backlogrun` commits every lane's lines at
+// once through `pnpm josh run:carry --end` (joshuafolkken/kit#2492).
 async function flush_ledger_step(should_merge: boolean): Promise<void> {
 	if (
 		!should_merge ||

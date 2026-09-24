@@ -15,7 +15,6 @@ const BASE: StopContext = {
 	headless_refusals: 0,
 	owes_offer: false,
 	lane_child: false,
-	relay_position: undefined,
 	session_lang: 'en',
 }
 

@@ -579,7 +579,7 @@ Commit the observation ledger (`docs/observations.md`) as a docs-only pull reque
 pnpm josh observations:flush
 ```
 
-**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand. **Run from a lane it acts on the primary checkout**, where the ledger lives (joshuafolkken/kit#2419): it moves there first, and each refusal names that checkout. `followup` skips its own flush step inside a lane, so there the commit path is this command — the first step of `pnpm josh run:tail`.
+**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand. **Run from a lane it acts on the primary checkout**, where the ledger lives (joshuafolkken/kit#2419): it moves there first, and each refusal names that checkout. A lane never flushes (`followup` and `run:tail` skip it); `pnpm josh run:carry --end` commits every lane's lines (joshuafolkken/kit#2492).
 
 Related: [`josh followup`](#josh-followup).
 
@@ -1505,6 +1505,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 - `--done <issue>` shrinks a named-issue run's `remaining` list; `--merged` / `--filed` / `--cut` are increments, never totals.
 - `--retrospective` marks the end-of-run retrospective run, once per invocation, and requires `--summary <text>` — the same close writes that result as one `retrospective` event on the run's event stream (best-effort), so a run that filed zero improvements reads apart from one whose retrospective never ran (joshuafolkken/kit#2342). Either flag without the other is refused.
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not (joshuafolkken/kit#2136). A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
+- `--end` over a live record flushes pending ledger lines once (joshuafolkken/kit#2492); a failed flush goes to stderr and the record is still cleared.
 
 **Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
@@ -1719,7 +1720,8 @@ Closes a run in one call, folding the three-round-trip post-merge sequence (josh
 `observations:flush`, `issue:cite` (the closed issue and any follow-ups filed this run) and
 `release:scope`, run in order — the ledger commits before the release scope reads main — and joined
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
-merge and the push above it stay their own calls.
+merge and the push above it stay their own calls. **A lane child skips `observations:flush`**; its
+line waits for `pnpm josh run:carry --end` (joshuafolkken/kit#2492).
 
 ### `josh ship`
 
@@ -1770,20 +1772,22 @@ pnpm josh run:report   # print the report; the same text josh notify sends
 
 Appends to, or reads back, the run's append-only ordered event stream (joshuafolkken/kit#2205). Keyed to the run's identity — the common git directory `run:carry` uses — so parent and every
 lane child append to one stream that survives a session cut; `--from` reads everything after a position,
-`--last` the newest event alone, and `--follow` the reader an attached session relays with
-(joshuafolkken/kit#2207).
+`--last` the newest event alone, `--follow` one bounded read that waits (joshuafolkken/kit#2207), and
+`--watch` the ambient pane (joshuafolkken/kit#2492).
 
 ```bash
 pnpm josh run:event --append <kind> <text>   # append one event; prints its position
 pnpm josh run:event --from <position>         # every event after <position>, in order (JSON)
-pnpm josh run:event --follow <position>       # relay new events, waiting for one; position on stderr
+pnpm josh run:event --follow <position>       # new events, waiting for one; position on stderr
+pnpm josh run:event --watch [<position>]      # every new event, rendered, until interrupted
 pnpm josh run:event --last                    # the newest event alone
 ```
 
 `--follow` is `--from` that waits: it returns the moment an event is past `<position>` and otherwise at
-the interval, so an attached session sees a new event at once and the run's aliveness while quiet. Events
-go to standard output to relay verbatim and the next position to standard error — the same before and
-after a cut, the stream the run's, the position the caller's.
+the interval. Events go to standard output and the next position to standard error — the same before
+and after a cut, the stream the run's, the position the caller's.
+
+`--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
 `stop`, `pr-opened`, `review-round`); a kind outside it is refused. `run:merge` appends `merge`, `park`
