@@ -312,3 +312,9 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/backlog/backlog-drive-restore.ts | 2026-09-24 | #2508
 - rf:none | none | - | 2026-09-24 | #2508
 - rf:none | none | - | 2026-09-24 | #2524
+- rf:bug-risks | high | scripts/backlog/backlog-drive-named.ts:35 | 2026-09-24 | #2509
+- rf:bug-risks | high | scripts/backlog/backlog-drive-named.ts:14 | 2026-09-24 | #2509
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-named.ts:27 | 2026-09-24 | #2509
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts:232 | 2026-09-24 | #2509
+- rf:tests | medium | scripts/backlog/backlog-drive-named.test.ts:48 | 2026-09-24 | #2509
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-named-offer.ts:60 | 2026-09-24 | #2509
