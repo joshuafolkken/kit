@@ -4,6 +4,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_utilities } from '#scripts/git/constants'
 import { git_command } from '#scripts/git/git-command'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { z } from 'zod'
@@ -232,6 +233,16 @@ function read_cut(target: string, now: Date = new Date()): CutRead {
 // The alternative errs the other way: a read fault would be taken for "already cut" and the guard
 // would go quiet on exactly the run it exists for. The cost of this direction is one refusal a lane
 // can answer by reissuing, since that row is delivered once per run.
+// An explicit `cwd` names the checkout to read, and an inherited `GIT_DIR` (exported to every hook,
+// `pre-push` included) would beat it outright and answer about the repository the hook fires in
+// (joshuafolkken/kit#2517). The work tree's own read passes no `cwd` and keeps the inherited
+// environment, since there the hook's repository is the one being asked about.
+function location_environment(cwd: string | undefined): NodeJS.ProcessEnv {
+	if (cwd === undefined) return process.env
+
+	return { ...process.env, ...git_location_environment.location_free_environment() }
+}
+
 function git_directories_sync(cwd?: string): ReadonlyArray<string> {
 	try {
 		// The binary is resolved through `git_utilities` exactly as `git-spawn.ts` resolves it, so this
@@ -247,7 +258,13 @@ function git_directories_sync(cwd?: string): ReadonlyArray<string> {
 			// A `PreToolUse` hook holds the tool call while it runs, so the read is bounded rather than
 			// left to whatever git does.
 			// `cwd` is set only by `lane_cut_sync`, which reads another lane's record from the parent.
-			{ cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: GIT_READ_TIMEOUT_MS },
+			{
+				cwd,
+				env: location_environment(cwd),
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'ignore'],
+				timeout: GIT_READ_TIMEOUT_MS,
+			},
 		) // NOSONAR
 
 		return output.split('\n').filter((line) => line !== '')
