@@ -19,6 +19,10 @@ import {
 	type OfferRead,
 } from './backlog-drive'
 import { backlog_drive_finish } from './backlog-drive-finish'
+import { backlog_drive_named } from './backlog-drive-named'
+import { backlog_drive_named_offer } from './backlog-drive-named-offer'
+import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
+import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_offer_cli } from './backlog-offer-cli'
 
@@ -140,31 +144,6 @@ function parse(argv: ReadonlyArray<string>): DriveContext | undefined {
 	return values === undefined || owner === undefined ? undefined : to_context(values, owner)
 }
 
-// `--started` and `--merged` are the carry record's, read at every ask so a merge counted by `run:merge`
-// reaches the budget on the next one (`backlogrun-steps.md` → "The session cut is inside the invocation").
-function offer_argv(
-	state: DriveState,
-	carry: RunCarry,
-	forwarded: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-	return [
-		'backlog:offer',
-		'--json',
-		'--started',
-		carry.started_at,
-		'--active',
-		state.active,
-		'--merged',
-		String(carry.merged),
-		'--running',
-		String(state.in_flight.length),
-		'--retries',
-		String(state.retries),
-		...(state.exclude.length === 0 ? [] : ['--exclude', state.exclude.join(LIST_SEPARATOR)]),
-		...forwarded,
-	]
-}
-
 // The `--json` object `backlog:offer` prints, keyed under its `JSON_KEY`.
 const offer_read_schema = z.object({
 	verdict: z.string(),
@@ -198,13 +177,16 @@ async function read_record(): Promise<RunCarry | undefined> {
 
 async function read_offer(
 	state: DriveState,
-	forwarded: ReadonlyArray<string>,
+	context: DriveContext,
 ): Promise<OfferRead | undefined> {
+	await backlog_drive_owner.assert_current(context.owner)
 	const carry = await read_record()
 
 	if (carry === undefined) return undefined
+	const named = await backlog_drive_named_offer.read(carry, state, context)
+	if (named !== undefined) return named
 
-	const argv = offer_argv(state, carry, forwarded)
+	const argv = backlog_drive_offer_argv.offer_argv(state, carry, context.forwarded)
 	const result = await josh_command.josh_run(argv, should_forward_stderr)
 
 	const offer = result.code === SUCCESS_EXIT_CODE ? to_offer(result.out) : undefined
@@ -227,6 +209,7 @@ function merge_token(out: string, code: number): string {
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
 // failure exactly as it does for the parent that passes `--output` by hand.
 async function merge(issue: string, owner: string): Promise<string> {
+	await backlog_drive_owner.assert_current(owner)
 	const lane = await lane_registry.find_open_lane(issue)
 	const result = await run_merge_cli.merge_child({
 		child: issue,
@@ -237,10 +220,14 @@ async function merge(issue: string, owner: string): Promise<string> {
 		output: lane?.output,
 	})
 
+	await backlog_drive_named.mark_done(issue, result, owner)
+
 	return result.token
 }
 
-async function launch(issue: string): Promise<boolean> {
+async function launch(issue: string, owner: string): Promise<boolean> {
+	await backlog_drive_owner.assert_current(owner)
+
 	return (await lane_launch_cli.launch_lane({ issue, stash: undefined })) !== undefined
 }
 
@@ -305,8 +292,8 @@ function ports_of(
 	return {
 		is_finished: finished_checker(seeded),
 		merge: async (issue) => await merge(issue, context.owner),
-		offer: async (state) => await read_offer(state, context.forwarded),
-		launch,
+		offer: async (state) => await read_offer(state, context),
+		launch: async (issue) => await launch(issue, context.owner),
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
 			await sleep(milliseconds)
@@ -324,6 +311,9 @@ async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string
 	if (carry === undefined) return undefined
 
 	const events = await run_event_stream_emit.current_events()
+
+	await backlog_drive_named.reconcile(carry, events, context.owner)
+
 	const lanes = [...new Set([...(await open_lanes()), ...context.awaited])]
 
 	return backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [])
@@ -363,12 +353,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	if (context.is_only) {
-		console.info('only')
-
-		return SUCCESS_EXIT_CODE
-	}
-
 	return await run_safe(context)
 }
 
@@ -381,7 +365,7 @@ const backlog_drive_cli = {
 	end_line,
 	finish: backlog_drive_finish.finish,
 	merge_token,
-	offer_argv,
+	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse,
 	resume_line,
 	run,

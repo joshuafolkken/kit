@@ -236,9 +236,10 @@ grown across the cut** — an issue the first session filed, and `epic:bundle` p
 opted-in epic, is offered to the resumed one — and that is "What one invocation approves" rather than
 anything the record did. The ceiling on it is counted across cuts too, from the record's `filed`.
 
-**Nothing waits for a person any more — `pnpm josh run:wake` is the supervisor that starts the next
-session** (joshuafolkken/kit#1719), so a cut no longer ends at a `confirmation` Telegram and a resume
-line waiting to be typed.
+**Nothing waits for a person any more — `pnpm josh run:wake` supervises the driver**. After a cut or
+dead-owner recovery, it adopts the carry record and runs `backlog:drive` itself. The driver dispatches,
+collects, watches and reports without starting a parent AI session. Only a returned branch that needs
+judgment starts an AI session, with the branch result and resume flags in its prompt.
 
 **Start it in the same turn as `--begin`, and stop it in the same turn as `--end`:**
 
@@ -247,17 +248,24 @@ pnpm josh run:wake --start   # alias: josh rw ; right after `run:carry --begin`
 pnpm josh run:wake --stop    # in the same turn as `run:carry --end`
 ```
 
-**It reads the same record this section already keeps, and decides from nothing else.** It wakes on
-`carried` handed off, or with a dead owner it hands off first (#2437). It stops on `none`, `expired` and `unreadable`. So the 8-hour whole-run bound binds the waking for free: it is the
-record's own expiry, and a spent budget reads `expired` and wakes nothing. **A new authorization is
-still a person's**, which is decision B's boundary exactly: the supervisor spends the budget that was
-declared and never declares another.
+**It reads the same record this section already keeps.** A handed-off carry record, or one whose owner
+died, starts the driver. The supervisor adopts that record before the driver counts a merge; a live
+owner prevents a second driver from taking it over. On `none`, `expired` or `unreadable` it stops. The
+8-hour whole-run bound therefore still comes from the carry record. **A new authorization is still a
+person's**: the supervisor spends the declared budget and never declares another.
 
-**What may be run is untouched.** The supervisor hands the woken session the invocation the person
-typed and nothing else; it writes no label, so `auto-ok` stays a person's to apply and a woken session
-is offered by exactly the rules the first one was.
+**What may be run is untouched.** The driver takes named issues from the invocation and pool issues
+from the existing offer command. The supervisor writes no `auto-ok` label. A judgment session receives
+the original invocation plus the driver's reason and resume state.
+For a named epic, the driver hands off `epic #N` with the original invocation. The judgment session
+follows the named epic procedure and dispatches its children; the epic root is never launched as a
+standalone `fullrun` child. Once every child has merged or parked, record the root with
+`pnpm josh run:carry --done <E> --owner "$PPID"` before continuing the invocation. This removes it
+from the carry record's remaining named list, so the next driver pass can advance. The named prefix
+also consults the carried maximum and whole-run bound
+before each launch, and a failed named issue skips the remaining named prefix.
 
-**A failure is visible rather than silent.** A wake that never claims the carry record is retried, and
+**A failure is visible rather than silent.** A judgment wake that never claims the carry record is retried, and
 once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry record that
 expired or cannot be read ends it the same way. `none` — the run having finished — and a person's own
 `--stop` stay silent. Everything the supervisor starts writes to one log file per repository, named by
@@ -279,10 +287,9 @@ log expose the resolved provider, role, model and effort.
 `docs/josh-commands.md` → "`josh lane:dispatch`" and `backlogrun-child.md` → "Each child runs in a
 delegated unit" are the single sources.
 
-**It relays the woken parent's progress**, because after a cut the parent is a headless provider
-session whose heartbeat reaches only its own transcript: the watcher persists each line into the
-report record and `pnpm josh run:wake --list` relays the last one verbatim beside the supervisor's
-state — a **pull**, never a Telegram push (→ "It goes to the session only").
+**It relays progress from the existing report record.** The driver keeps the same `run:merge` event
+stream and `run:report` finish path; `pnpm josh run:wake --list` relays the latest line from that
+record. Telegram notifications retain their existing generation points (→ "It goes to the session only").
 
 **The completion report names how many sessions were woken beside the record's `cuts`** — one wake per
 cut is the invariant, and what counts is a carry record actually claimed, never a process started.
@@ -352,10 +359,10 @@ finding rather than an authorization — which is why a run parks with it and a 
 
 ## The loop
 
-**Run the loop as one background `pnpm josh backlog:drive --owner "$PPID" --active "$active"`** and
-end the turn (joshuafolkken/kit#2499); it runs all below. Its exit's first line is the wake:
-`merge <token> #N` → that token's `run:merge` row; `watch` → `run:step`; `window` → `resume:`;
-`stop` → reported and ended; other answers → "Where the run stops".
+**The detached `run:wake` supervisor runs `backlog:drive`** after the carry record is handed off.
+Its driver keeps the loop below running without a parent AI turn. A returned judgment branch includes
+the first-line verdict, affected issue and `resume:` flags in the AI prompt; `stop` reports and ends
+inside the driver. This uses the same command and decisions as the former parent-launched wait.
 
 **The loop's head is one command — `pnpm josh backlog:offer`** (joshuafolkken/kit#2162). It runs
 `backlog:next`, maps its answer to the budget word the table below fixes, runs `backlog:budget`, and

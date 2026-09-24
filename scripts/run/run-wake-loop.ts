@@ -39,21 +39,25 @@ interface LoopPorts {
 	// `--cut` and then exits, so the two moments are not the same one and the supervisor has to wait
 	// out the second — `run-wake.ts` → `WakeDecisionInput.is_owner_live`.
 	is_owner_live: (read: CarryRead) => boolean
-	// Whether a woken session would find work — `run-wake-work.ts` in production. Asked only on a pass
-	// that would otherwise launch, because its last read is a network call (joshuafolkken/kit#2417).
+	// A compatibility probe for the wake decision. Production lets the resident driver inspect work,
+	// including an empty idle watch, without starting an AI session.
 	has_work: (read: CarryRead) => Promise<boolean | undefined>
 	// **The forced transcript id is generated here and handed to `wake`** (joshuafolkken/kit#2407), so
 	// the loop stays deterministic under test — a fixture returns a known id — while production draws a
 	// fresh UUID. The same id is recorded on the wake record, which is how `josh time --run` later knows
 	// the session was one this supervisor started.
 	new_session_id: () => string
-	// Marks the carry record handed off before a launch, so a recovery from a dead owner reads to the
-	// woken session exactly as a declared cut does — `run-wake-handoff.ts` (joshuafolkken/kit#2437).
+	// Hands the carry record from the supervisor-owned driver to a judgment session.
 	hand_off: () => void
-	wake: (invocation: string, session_id: string) => LaunchResult
+	// Runs the deterministic backlog driver. A normal completion never calls `wake`.
+	drive: () => Promise<DriveResult>
+	wake: (invocation: string, session_id: string, material: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
 }
+
+type DriveResult =
+	{ kind: 'finished' } | { kind: 'judgment'; material: string } | { kind: 'failed'; note: string }
 
 interface LoopStop {
 	reason: WakeStopReason
@@ -81,12 +85,16 @@ function wake_failure_note(wake: RunWake): string {
 
 // The hand-off is written before the launch, never after: a successor that boots fast enough to run
 // `--begin` before a post-launch write would read the record un-handed-off and be answered `standing`.
-function wake_step(wake: RunWake, ports: LoopPorts): StepOutcome {
+async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> {
+	const driven = await ports.drive()
+	if (driven.kind === 'finished') return stopped('ended')
+	if (driven.kind === 'failed') return stopped(FAILED_REASON, driven.note)
+
 	const session_id = ports.new_session_id()
 
 	ports.hand_off()
 
-	const result = ports.wake(wake.invocation, session_id)
+	const result = ports.wake(wake.invocation, session_id, driven.material)
 
 	if (result.kind === 'failed') return stopped(FAILED_REASON, result.note)
 
@@ -114,10 +122,10 @@ function continue_step(wake: RunWake, decision: WakeDecision, ports: LoopPorts):
 	return { kind: 'continue', wake }
 }
 
-function step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): StepOutcome {
+async function step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): Promise<StepOutcome> {
 	if (decision.kind === 'stop') return stopped(decision.reason)
 	if (decision.kind === 'failed') return stopped(FAILED_REASON, wake_failure_note(wake))
-	if (decision.kind === 'wake') return wake_step(wake, ports)
+	if (decision.kind === 'wake') return await wake_step(wake, ports)
 
 	return continue_step(wake, decision, ports)
 }
@@ -171,7 +179,7 @@ async function run_pass(
 	wake: RunWake,
 	ports: LoopPorts,
 ): Promise<LoopStop | undefined> {
-	const outcome = step(wake, await decide_pass(wake, ports), ports)
+	const outcome = await step(wake, await decide_pass(wake, ports), ports)
 
 	if (outcome.kind === 'stop') return outcome.stop
 
@@ -211,5 +219,5 @@ const run_wake_loop = {
 	step,
 }
 
-export type { LoopPorts, LoopStop }
+export type { DriveResult, LoopPorts, LoopStop }
 export { run_wake_loop }

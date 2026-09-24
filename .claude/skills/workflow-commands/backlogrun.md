@@ -59,17 +59,20 @@ Each step is a terse trigger and a pointer; the procedure is read on demand from
    `needs-decision` issue decidable from its body in one pass. `backlogrun-steps.md` → "The plan,
    before the first child starts" and its "Resolve what the plan can resolve, before starting".
 5. **Named issues run first, in order** — `backlogrun-steps.md` → "Named issues run first, in order":
-   each a delegated `fullrun`, one at a time, then the pool drains; `--only` stops after the list.
-6. **The loop** — `pnpm josh backlog:offer` is the loop's head; `backlogrun-steps.md` → "The loop"
+   the supervisor's driver dispatches each as a delegated `fullrun`, one at a time, then drains the
+   pool; `--only` stops after the list.
+6. **The loop belongs to the supervisor** — `run:wake` runs `backlog:drive`; the driver uses
+   `pnpm josh backlog:offer` as its loop head and returns a branch to an AI session only when it needs
+   judgment. `backlogrun-steps.md` → "The loop"
    fixes the answer-to-word mapping, "The two budgets" the `run` / `watch` / `stop` verdict, "The cost
    check is not asked during a watch", and "Where the run stops" every termination.
 7. **What runs once per session, not once per issue** — `backlogrun-steps.md` → "What runs once per
    session, not once per issue": the per-repository preflight, `josh latest` on `required`, the
    progress watcher, the carry/wake pair, and the release ask.
-8. **End the record when the run ends** — `pnpm josh run:carry --end` (or `--end --stopped
-   "<reason>"`) and `pnpm josh run:wake --stop`, in the same turn as the final report and **after** it:
-   the report reads its invocation scope off the record `--end` removes, so the two are ordered rather
-   than batched (`backlogrun-steps.md` → "End the record when the run ends" is the single source).
+8. **End the record when the run ends** — the driver's finish path runs `run:report` before
+   `run:carry --end` (or `--end --stopped "<reason>"`). The supervisor then observes that the record
+   ended and exits; a judgment branch hands its reason and resume flags to the AI session.
+   `backlogrun-steps.md` → "End the record when the run ends" is the single source.
 
 ## Running a child — read the phase document at its point of use
 

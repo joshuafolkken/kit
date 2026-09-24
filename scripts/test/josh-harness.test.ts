@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { run_carry } from '#scripts/run/run-carry'
 import { execaSync } from 'execa'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { josh_harness, type EnvironmentKind, type JoshEnvironment } from './josh-harness'
@@ -50,6 +51,26 @@ function ledger_text(directory: string): string {
 	return readFileSync(path.join(directory, LEDGER), 'utf8')
 }
 
+function run_only_driver(kind: string): void {
+	const opened = environment(kind)
+	const git_directory = execaSync('git', ['rev-parse', '--git-common-dir'], {
+		cwd: opened.root,
+	}).stdout
+	const target = run_carry.carry_path(path.resolve(opened.root, git_directory))
+
+	run_carry.begin_carry(target, 'backlogrun --only', run_carry.owner_of(process.pid))
+	const result = josh_harness.run(opened, [
+		'backlog:drive',
+		'--owner',
+		String(process.pid),
+		'--only',
+	])
+
+	expect(result.exit_code, result.stderr).toBe(0)
+	expect(result.stdout).toContain('stop')
+	expect(run_carry.read_carry(target).kind).toBe('none')
+}
+
 beforeAll(async () => {
 	for (const kind of KINDS) environments.set(kind, await josh_harness.open_environment(kind))
 }, SETUP_TIMEOUT_MS)
@@ -59,6 +80,13 @@ afterAll(() => {
 })
 
 describe.each(KINDS)('josh harness — the %s environment', (kind) => {
+	it(
+		'finishes a supervised only-mode backlog through the real driver',
+		() => {
+			run_only_driver(kind)
+		},
+		SCENARIO_TIMEOUT_MS,
+	)
 	it(
 		'records a review round and finds it again',
 		() => {

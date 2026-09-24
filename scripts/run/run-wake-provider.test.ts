@@ -39,6 +39,21 @@ test('the woken scheduler uses the selected OpenAI provider', () => {
 	expect(argv.args.at(-1)).toBe(INVOCATION)
 })
 
+test('the judgment prompt carries the driver result and resume state', () => {
+	vi.spyOn(git_common_directory, 'resolve').mockReturnValue(COMMON_DIRECTORY)
+	const diagnostic = vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+	const built = run_wake_session.wake_argv(
+		INVOCATION,
+		agent_role_profile.OPENAI_PROFILES.scheduler,
+		WORKTREE,
+		{ id: 'session', material: 'merge over #2509\nresume: --owner 1' },
+	)
+
+	expect(built?.kind === 'argv' && built.argv.args.at(-1)).toContain('merge over #2509')
+	expect(built?.kind === 'argv' && built.argv.args.at(-1)).toContain('resume: --owner 1')
+	diagnostic.mockRestore()
+})
+
 // joshuafolkken/kit#2415: a wake with a recorded profile keeps its model across a model migration.
 test('the woken scheduler keeps the model its recorded profile names', () => {
 	const recorded = { ...agent_role_profile.DEFAULT_PROFILES.scheduler, model: 'opus' }

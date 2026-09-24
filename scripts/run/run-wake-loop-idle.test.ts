@@ -61,6 +61,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, work: ReadonlyArray<boolean>)
 		},
 		new_session_id: () => 'sid',
 		hand_off: () => undefined,
+		drive: async () => ({ kind: 'judgment', material: 'merge over #2500' }),
 		wake: (invocation) => {
 			wakes.push(invocation)
 			wake_times.push(clock.now)
