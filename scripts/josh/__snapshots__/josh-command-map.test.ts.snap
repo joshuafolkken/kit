@@ -184,7 +184,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "backlog:drive": [
-      "[--max <n>] [--idle <minutes>] [--stash <message>] [--owner <pid>]",
+      "--owner <pid> [options]",
       "automation",
       [
         "network",

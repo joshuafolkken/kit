@@ -307,6 +307,12 @@ async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
 
+async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SPLIT, `#${ctx.child} split`)
+
+	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
+}
+
 // The child's own ending: it stopped before its commit for a person to look at, so nothing is counted
 // and no next child is offered.
 async function on_human_review(): Promise<MergeVerdict> {
@@ -325,6 +331,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	merged: on_merged,
 	outage: on_outage,
 	parked: on_parked,
+	split: on_skipped,
 	unresolved: on_unresolved,
 }
 

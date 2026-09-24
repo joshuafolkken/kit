@@ -42,8 +42,7 @@ implementation summary via `--notify-message` in the session language, leading w
 plain-language lines: `"Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n-
 <change1>\n- <change2>"`. **`pnpm josh followup` waits for CI, verifies AI review findings, sends the
 completion notification, then merges; if blockers are found it exits non-zero — fix and re-run.**
-**After the merge succeeds, run `pnpm josh ms`** to return to the default branch and pull the merge
-commit (`followup.md` → `auto-merge`).
+**マージ後に `pnpm josh ms` を実行する。** Codex レーンでは省略し、親の `run:merge` が主チェックアウトで同期する。Claude は従来どおり。
 
 ## The `fullrun new` step list
 

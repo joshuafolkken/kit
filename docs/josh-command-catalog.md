@@ -341,7 +341,7 @@ Merge origin default branch into the current branch
 
 _No arguments._
 
-Checkout default branch and pull latest (refuses inside a lane)
+Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane)
 
 ---
 
@@ -639,9 +639,9 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 > **Audience:** automation · **Side effects:** network
 
-`[--max <n>] [--idle <minutes>] [--stash <message>] [--owner <pid>]`
+`--owner <pid> [options]`
 
-Drive the backlogrun parent loop (offer, launch, await, merge) until a judgement branch, and print that branch as one line
+Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete
 
 ---
 

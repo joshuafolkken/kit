@@ -118,7 +118,11 @@ async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 
 		if (repository === undefined) return []
 
-		return invocation_events(repository, run_event_stream.target_of(repository))
+		const read = run_carry.read_carry(run_carry.carry_path(repository))
+		const scope = run_event_scope.scope_of(read)
+		const events = run_event_stream.read_events(run_event_stream.target_of(repository))
+
+		return run_event_scope.scoped_events(events, scope) ?? []
 	} catch {
 		return []
 	}

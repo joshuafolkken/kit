@@ -4,6 +4,7 @@ import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_utilities } from '#scripts/git/constants'
 import { git_command } from '#scripts/git/git-command'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { z } from 'zod'
@@ -247,7 +248,20 @@ function git_directories_sync(cwd?: string): ReadonlyArray<string> {
 			// A `PreToolUse` hook holds the tool call while it runs, so the read is bounded rather than
 			// left to whatever git does.
 			// `cwd` is set only by `lane_cut_sync`, which reads another lane's record from the parent.
-			{ cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: GIT_READ_TIMEOUT_MS },
+			// With a `cwd`, the git location variables are cleared so it is what git answers for: a hook
+			// exports `GIT_DIR`, which beats `cwd` and would name the hook's checkout instead
+			// (joshuafolkken/kit#2515). Without one the environment is kept, so this read resolves the same
+			// checkout as the asynchronous `git_directories` that writes the record.
+			{
+				cwd,
+				env:
+					cwd === undefined
+						? process.env
+						: { ...process.env, ...git_location_environment.location_free_environment() },
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'ignore'],
+				timeout: GIT_READ_TIMEOUT_MS,
+			},
 		) // NOSONAR
 
 		return output.split('\n').filter((line) => line !== '')

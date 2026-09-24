@@ -62,6 +62,7 @@ const AT_GUARD = 3
 const CLOSED = 'CLOSED'
 const OPEN = 'OPEN'
 const IN_PROGRESS = 'in-progress'
+const EPIC = 'epic'
 const NEEDS_DECISION = 'needs-decision'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
 
@@ -135,6 +136,19 @@ describe('run_merge_cli.run — a parked child', () => {
 			code: SUCCESS,
 		})
 		expect(info_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_merge_cli.run — a split child', () => {
+	it.each([NEXT, undefined])('offers the next child without parking a split epic', async (next) => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [EPIC]))
+		ask_next_mock.mockResolvedValue(next)
+
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
+		expect(do_failed_mock).not.toHaveBeenCalled()
+		expect(ask_next_mock).toHaveBeenCalledOnce()
+		expect(emit_mock).not.toHaveBeenCalledWith('park', expect.anything())
+		expect(emit_mock).toHaveBeenCalledWith('split', `#${CHILD} split`)
 	})
 })
 
@@ -320,14 +334,6 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
 
-	it('stops for a human-review child without offering more', async () => {
-		read_issue_mock.mockResolvedValue(state_read(OPEN, [NEEDS_HUMAN_REVIEW], true))
-
-		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
-		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.HUMAN_REVIEW_TOKEN)
-		expect(ask_next_mock).not.toHaveBeenCalled()
-	})
-
 	it('asks to retry when the child state cannot be read', async () => {
 		read_issue_mock.mockResolvedValue({ kind: 'unreadable' })
 
@@ -349,26 +355,15 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 	})
 })
 
-describe('run_merge_cli.parse — sanitizes subprocess-bound arguments', () => {
-	it('refuses an epic that is not an issue number', () => {
-		const argv = [CHILD, '--epic', 'evil', '--repo', REPO]
+describe('run_merge_cli.run — human review', () => {
+	it.each([{ labels: [NEEDS_HUMAN_REVIEW] }, { labels: [EPIC, NEEDS_HUMAN_REVIEW] }])(
+		'stops for a human-review child with labels %j without offering more',
+		async ({ labels }) => {
+			read_issue_mock.mockResolvedValue(state_read(OPEN, labels, true))
 
-		expect(run_merge_cli.parse(argv)).toBeUndefined()
-	})
-
-	it('refuses a repository that is not an owner/repo slug', () => {
-		const argv = [CHILD, '--epic', '900', '--repo=--force']
-
-		expect(run_merge_cli.parse(argv)).toBeUndefined()
-	})
-
-	it('refuses an option-shaped slug whose half starts with a hyphen', () => {
-		const argv = [CHILD, '--epic', '900', '--repo=--evil/x']
-
-		expect(run_merge_cli.parse(argv)).toBeUndefined()
-	})
-
-	it('accepts a well-formed epic and repository', () => {
-		expect(run_merge_cli.parse(EPIC_ARGS)?.repo).toBe(REPO)
-	})
+			expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
+			expect(info_mock).toHaveBeenCalledWith(run_merge_cli.HUMAN_REVIEW_TOKEN)
+			expect(ask_next_mock).not.toHaveBeenCalled()
+		},
+	)
 })

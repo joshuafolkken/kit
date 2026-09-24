@@ -192,4 +192,18 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 
 		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
 	})
+
+	it('does not adopt old events when the carry scope is missing', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_event_stream.append(
+			run_event_stream.target_of(repository),
+			CHILD_LAUNCH,
+			'#6 dispatched',
+			EARLIER_ISO,
+		)
+
+		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+	})
 })

@@ -119,17 +119,21 @@ describe('OpenAI lane supervisor generations', () => {
 })
 
 describe('OpenAI lane supervisor Git access', () => {
-	it('allows the linked worktree Git common directory in the launched generation', async () => {
+	it('allows the linked worktree Git and ledger directories in the launched generation', async () => {
 		resolve_common_directory.mockReturnValue(common_directory)
 
 		await supervise('git-common-directory')
 
 		const { args } = launched_request().argv
-		const flag_index = args.indexOf('--add-dir')
+		const additions = args.flatMap((argument, index) =>
+			argument === '--add-dir' ? [args[index + 1]] : [],
+		)
 
 		expect(resolve_common_directory).toHaveBeenCalledWith(lane_directory)
-		expect(args.at(flag_index + 1)).toBe(common_directory)
-		expect(args.lastIndexOf('--add-dir')).toBe(flag_index)
+		expect(additions).toStrictEqual([
+			common_directory,
+			path.join(path.dirname(common_directory), 'docs'),
+		])
 	})
 })
 

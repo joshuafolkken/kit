@@ -1,98 +1,320 @@
-import type { RunEvent } from '#scripts/run/run-event-stream'
 import { describe, expect, it } from 'vitest'
-import { backlog_drive } from './backlog-drive'
+import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
 
-// joshuafolkken/kit#2508: the pure transitions of `backlog:drive` — what a restart restores from the
-// open lanes and the event stream, and which `run:merge` answer is a judgement branch.
+const ACTIVE = '2026-09-24T00:00:00.000Z'
+const START_MS = Date.parse(ACTIVE)
+const POLL_MS = 5000
+const OFFER_MS = 60_000
+const CONFIG = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: undefined }
+const FIRST_CHILD = '2400'
+const SECOND_CHILD = '2401'
+const OFFERED = '2500'
+const OFFERED_TOO = '2501'
+// The next-issue token `run:merge` prints after an ordinary merge.
+const NEXT_TOKEN = '2600'
 
-const NOW = 1000
-const LAUNCH = 'child-launch'
-const ELEVEN = '11'
-const ELEVEN_LAUNCHED = '#11 dispatched'
-const AT = '2026-09-24T00:00:00.000Z'
-
-function event(kind: string, text: string): RunEvent {
-	return { pos: 0, at: AT, kind, text }
+interface Harness {
+	ports: LoopPorts
+	calls: Array<string>
+	offers: Array<DriveState>
+	states: Array<DriveState>
 }
 
-describe('backlog_drive.restore — a restart reads, never remembers', () => {
-	it('keeps an open lane running while its newest event is a launch', () => {
-		const state = backlog_drive.restore([ELEVEN], [event(LAUNCH, ELEVEN_LAUNCHED)], NOW)
+interface Script {
+	finished?: ReadonlyArray<string>
+	merges?: ReadonlyMap<string, string>
+	offers?: ReadonlyArray<OfferRead | undefined>
+	failed_launches?: ReadonlyArray<string>
+}
 
-		expect(state.running).toStrictEqual([ELEVEN])
-		expect(state.active_at_ms).toBe(NOW)
+function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
+	return { verdict, issues, retries: 0 }
+}
+
+// The child-facing ports: a finished child is merged once and then reads as gone.
+function child_ports(
+	script: Script,
+	calls: Array<string>,
+): Pick<LoopPorts, 'is_finished' | 'merge'> {
+	const finished = new Set(script.finished)
+
+	return {
+		is_finished: (issue) => finished.has(issue),
+		merge: async (issue) => {
+			calls.push(`merge ${issue}`)
+			finished.delete(issue)
+
+			return script.merges?.get(issue) ?? NEXT_TOKEN
+		},
+	}
+}
+
+function harness(script: Script): Harness {
+	const calls: Array<string> = []
+	const offers: Array<DriveState> = []
+	const states: Array<DriveState> = []
+	const queue = [...(script.offers ?? [])]
+	let now_ms = START_MS
+
+	return {
+		calls,
+		offers,
+		states,
+		ports: {
+			...child_ports(script, calls),
+			offer: async (asked) => {
+				calls.push('offer')
+				offers.push(asked)
+
+				return queue.length === 0 ? offer('wait') : queue.shift()
+			},
+			launch: async (issue) => {
+				calls.push(`launch ${issue}`)
+
+				return !(script.failed_launches ?? []).includes(issue)
+			},
+			now: () => new Date(now_ms),
+			sleep: async (milliseconds) => {
+				now_ms += milliseconds
+			},
+			finish: async () => {
+				calls.push('finish')
+			},
+			on_state: (next) => {
+				states.push(next)
+			},
+		},
+	}
+}
+
+function state(in_flight: ReadonlyArray<string> = []): DriveState {
+	return backlog_drive.initial_state(in_flight, ACTIVE)
+}
+
+describe('backlog_drive.run_pass — dispatch', () => {
+	it('launches every issue a run verdict offers and counts them in flight', async () => {
+		const { ports, calls } = harness({ offers: [offer('run', [OFFERED, OFFERED_TOO])] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(calls).toStrictEqual(['offer', `launch ${OFFERED}`, `launch ${OFFERED_TOO}`])
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([
+			OFFERED,
+			OFFERED_TOO,
+		])
 	})
 
-	it('treats an open lane whose newest event is a merge or a park as settled', () => {
-		const events = [
-			event(LAUNCH, ELEVEN_LAUNCHED),
-			event('merge', '#11 merged'),
-			event(LAUNCH, '#12 dispatched'),
-			event('park', '#12 parked'),
-		]
-		const state = backlog_drive.restore([ELEVEN, '12'], events, NOW)
+	it('hands the running count to the offer so the lane limit stays the offer’s', async () => {
+		const { ports, offers } = harness({})
 
-		expect(state.running).toStrictEqual([])
-		expect(state.excludes).toStrictEqual([ELEVEN])
+		await backlog_drive.run_pass(state([FIRST_CHILD, SECOND_CHILD]), true, ports)
+
+		expect(offers[0]?.in_flight).toStrictEqual([FIRST_CHILD, SECOND_CHILD])
 	})
 
-	it('reads a child launched again after an outage as running', () => {
-		const events = [
-			event('outage', '#13 outage (re-dispatchable)'),
-			event(LAUNCH, '#13 dispatched'),
-		]
+	it('hands a refused launch back to the parent', async () => {
+		const { ports } = harness({ offers: [offer('run', [OFFERED])], failed_launches: [OFFERED] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
 
-		expect(backlog_drive.restore(['13'], events, NOW).running).toStrictEqual(['13'])
+		expect(result.kind === 'end' && result.end).toStrictEqual({
+			reason: 'launch',
+			token: undefined,
+			issue: OFFERED,
+		})
 	})
 
-	it('ignores events that name no issue or are not launch-or-settle kinds', () => {
-		const events = [event('drain', 'backlog drained'), event('heartbeat', '#14 at gate')]
+	it('does not ask the offer when throttled and nothing was collected', async () => {
+		const { ports, calls } = harness({})
 
-		expect(backlog_drive.restore(['14'], events, NOW).running).toStrictEqual(['14'])
+		await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(calls).toStrictEqual([])
+	})
+
+	it('hands back an offer that could not be read', async () => {
+		const { ports } = harness({ offers: [undefined] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind === 'end' && result.end.reason).toBe('offer')
 	})
 })
 
-describe('backlog_drive.settle_of — which run:merge answer needs a judgement', () => {
-	it('continues past a merged child that offered the next', () => {
-		expect(backlog_drive.settle_of('7', { outcome: 'merged', token: '8' })).toStrictEqual({
-			kind: 'next',
-			outcome: 'merged',
-		})
+describe('backlog_drive.run_pass — collection', () => {
+	it('collects a finished child, excludes it and asks the offer for the freed lane', async () => {
+		const { ports, calls, offers } = harness({ finished: [FIRST_CHILD] })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD, SECOND_CHILD]), false, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer'])
+		expect(offers[0]?.exclude).toStrictEqual([FIRST_CHILD])
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([SECOND_CHILD])
 	})
 
-	it('stops on a control token with the child named', () => {
-		const settled = backlog_drive.settle_of('7', { outcome: 'merged', token: 'over' })
+	it.each(['over', 'human-review', 'stop', 'environment', 'busy', 'retry'])(
+		'hands the merge token %s back without offering',
+		async (token) => {
+			const { ports, calls } = harness({
+				finished: [FIRST_CHILD],
+				merges: new Map([[FIRST_CHILD, token]]),
+			})
+			const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
 
-		expect(settled).toStrictEqual({
-			kind: 'stop',
-			stop: { verdict: 'over', issue: '7', detail: undefined },
-		})
+			expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`])
+			expect(result.kind === 'end' && result.end).toStrictEqual({
+				reason: 'merge',
+				token,
+				issue: FIRST_CHILD,
+			})
+		},
+	)
+})
+
+describe('backlog_drive.run_pass — hand-back state', () => {
+	it('hands back a merge that printed no token instead of reading it as collected', async () => {
+		const { ports } = harness({ finished: [FIRST_CHILD], merges: new Map([[FIRST_CHILD, '']]) })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+
+		expect(result.kind === 'end' && result.end.reason).toBe('merge')
+		expect(result.state.in_flight).toStrictEqual([FIRST_CHILD])
 	})
 
-	it('stops on a parked or failed child even though its token is the next offer', () => {
-		expect(backlog_drive.settle_of('7', { outcome: 'parked', token: '8' })).toMatchObject({
-			stop: { verdict: 'park' },
+	it('keeps a child collected earlier in the pass when a later one hands back', async () => {
+		const { ports } = harness({
+			finished: [FIRST_CHILD, SECOND_CHILD],
+			merges: new Map([[SECOND_CHILD, 'over']]),
 		})
-		expect(backlog_drive.settle_of('7', { outcome: 'failed', token: '8' })).toMatchObject({
-			stop: { verdict: 'failed' },
-		})
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD, SECOND_CHILD]), true, ports)
+
+		expect(result.kind).toBe('end')
+		expect(result.state.exclude).toStrictEqual([FIRST_CHILD])
+		expect(result.state.in_flight).toStrictEqual([SECOND_CHILD])
 	})
 
-	it('awaits a resumed child again and re-reads an unresolved one', () => {
-		expect(backlog_drive.settle_of('7', { outcome: 'cut', token: 'resumed' }).kind).toBe('again')
-		expect(backlog_drive.settle_of('7', { outcome: 'unresolved', token: 'retry' }).kind).toBe(
-			'retry',
-		)
+	it('keeps a resumed child in flight', async () => {
+		const { ports } = harness({
+			finished: [FIRST_CHILD],
+			merges: new Map([[FIRST_CHILD, 'resumed']]),
+		})
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([FIRST_CHILD])
 	})
 })
 
-describe('backlog_drive.line_of — the one line a caller branches on', () => {
-	it('joins the verdict, the issue and the detail that are present', () => {
-		expect(backlog_drive.line_of({ verdict: 'park', issue: '7', detail: undefined })).toBe(
-			'park #7',
+describe('backlog_drive.run_pass — verdicts', () => {
+	it('stops launching on stop and ends once nothing is in flight', async () => {
+		const { ports } = harness({ offers: [offer('stop')] })
+		const first = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+
+		expect(first.kind === 'continue' && first.state.is_stopping).toBe(true)
+
+		const { ports: after, calls } = harness({ finished: [FIRST_CHILD] })
+		const stopping = first.kind === 'continue' ? first.state : state()
+		const second = await backlog_drive.run_pass(stopping, true, after)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`])
+		expect(second.kind === 'end' && second.end.reason).toBe('stop')
+	})
+
+	it('hands a drained watch back but waits out a watch with children in flight', async () => {
+		const drained = await backlog_drive.run_pass(
+			state(),
+			true,
+			harness({ offers: [offer('watch')] }).ports,
 		)
-		expect(backlog_drive.line_of({ verdict: 'done', issue: undefined, detail: 'empty' })).toBe(
-			'done empty',
+		const waiting = await backlog_drive.run_pass(
+			state([FIRST_CHILD]),
+			true,
+			harness({ offers: [offer('watch')] }).ports,
 		)
+
+		expect(drained.kind === 'end' && drained.end.reason).toBe('watch')
+		expect(waiting.kind).toBe('continue')
+	})
+
+	it('hands an unknown verdict back as printed', async () => {
+		const result = await backlog_drive.run_pass(
+			state(),
+			true,
+			harness({ offers: [offer('odd')] }).ports,
+		)
+
+		expect(result.kind === 'end' && result.end.token).toBe('odd')
+	})
+})
+
+describe('backlog_drive.run_loop', () => {
+	it('dispatches, collects and ends without the parent until the run stops', async () => {
+		const { ports, calls, states } = harness({
+			offers: [offer('run', [OFFERED]), offer('stop')],
+			finished: [OFFERED],
+		})
+		const end = await backlog_drive.run_loop(state(), CONFIG, ports)
+
+		expect(calls).toStrictEqual([
+			'offer',
+			`launch ${OFFERED}`,
+			`merge ${OFFERED}`,
+			'offer',
+			'finish',
+		])
+		expect(states[0]?.in_flight).toStrictEqual([OFFERED])
+		expect(end.reason).toBe('stop')
+	})
+
+	it('resumes the lanes a restarted loop was seeded with', async () => {
+		const { ports, calls } = harness({
+			finished: [FIRST_CHILD],
+			offers: [offer('wait'), offer('stop')],
+		})
+		const end = await backlog_drive.run_loop(state([FIRST_CHILD]), CONFIG, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'offer', 'finish'])
+		expect(end.reason).toBe('stop')
+	})
+})
+
+it('returns window once the bounded wait is spent', async () => {
+	const { ports } = harness({})
+	const end = await backlog_drive.run_loop(
+		state([FIRST_CHILD]),
+		{ ...CONFIG, window_ms: POLL_MS * 2 },
+		ports,
+	)
+
+	expect(end.reason).toBe('window')
+})
+
+it('continues the idle watch after the retrospective has run', async () => {
+	const { ports } = harness({ offers: [{ ...offer('watch'), is_retrospective_done: true }] })
+	const end = await backlog_drive.run_loop(state(), { ...CONFIG, window_ms: POLL_MS }, ports)
+
+	expect(end.reason).toBe('window')
+})
+
+it('keeps the budget reason on the first stop verdict', async () => {
+	const reason = 'maximum reached'
+	const { ports } = harness({ offers: [{ ...offer('stop'), reason }] })
+	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
+
+	expect(end.detail).toBe(reason)
+})
+
+it('returns the drained stop for a retrospective before ending the carry', async () => {
+	const { ports, calls } = harness({ offers: [{ ...offer('stop'), answer: 'exhausted' }] })
+	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
+
+	expect(end.reason).toBe('retrospective')
+	expect(calls).not.toContain('finish')
+})
+
+describe('backlog_drive.run_loop — hand-back state', () => {
+	it('reports the state an ending pass reached so the resume line keeps it', async () => {
+		const { ports, states } = harness({
+			finished: [FIRST_CHILD, SECOND_CHILD],
+			merges: new Map([[SECOND_CHILD, 'over']]),
+		})
+		const end = await backlog_drive.run_loop(state([FIRST_CHILD, SECOND_CHILD]), CONFIG, ports)
+
+		expect(end.reason).toBe('merge')
+		expect(states.at(-1)?.exclude).toStrictEqual([FIRST_CHILD])
 	})
 })

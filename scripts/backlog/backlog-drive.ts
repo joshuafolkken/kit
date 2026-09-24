@@ -1,310 +1,322 @@
-import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
-import type { ChildOutcome } from '#scripts/run/run-merge'
-import { run_merge_cli } from '#scripts/run/run-merge-cli'
-import { backlog_budget, type BacklogAnswer, type BudgetVerdict } from './backlog-budget'
-
-// `josh backlog:drive` — the `backlogrun` parent loop run without an AI session (joshuafolkken/kit#2508).
-// The loop — `backlog:offer` → `lane:launch` → `lane:await` → `run:merge` → the next offer — already had
-// every answer computed by a command; a session only relayed them, one turn at a time. This drives the
-// loop itself until a branch that needs a judgement, then stops with that branch as one line.
+// The body of `josh backlog:drive`: the backlogrun parent's mechanical transitions, run as one resident
+// wait instead of a model turn per event (joshuafolkken/kit#2499).
 //
-// **Every answer comes from the generator it came from before**: the offer from `backlog_offer.answer_of`
-// and `backlog_budget.decide`, the launch from `lane:launch`'s chain, the wait from `lane_await`, the
-// merge event from `run:merge`'s handlers. This file is the order they are asked in and nothing else, so
-// the ports below are the only seam — the CLI wires production, a test wires a fixture.
+// **What it replaces is the parent's turn between two commands.** Measured after #2492 the parent still
+// spent about half of its backlogrun requests on nothing but glue: a child's process ends, the model
+// wakes, runs `run:merge`, reads a number, runs `lane:launch`, restarts `lane:await`, ends its turn — or,
+// headless, polls in the foreground because its turn cannot end. Every one of those steps is a command
+// whose answer is already a token, so the loop here only reads tokens and never decides what one means.
+//
+// **It decides nothing another command answers.** Collecting a child is `run:merge`'s, choosing the next
+// issue and the budget are `backlog:offer`'s, opening a lane is `lane:launch`'s, and a child's exit is
+// `lane:await`'s re-confirmed process check. What is left is which of them runs next, and when a token is
+// one the model has to read — a control verdict, a refused launch, a watch, the end of the run — the
+// loop stops and hands that token back rather than acting on it.
+//
+// **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
+// without a process, a network or a clock.
 
-const SETTLED_KINDS: ReadonlySet<string> = new Set([
-	run_event_stream.EVENT_KIND.MERGE,
-	run_event_stream.EVENT_KIND.PARK,
-	run_event_stream.EVENT_KIND.OUTAGE,
+// The `run:merge` tokens that need the parent: a hand-off, a person's stop, a tripped guard, a foreign
+// owner, an unreadable state. `resumed` is not among them — the same lane is awaited again.
+const HANDOFF_TOKENS: ReadonlySet<string> = new Set([
+	'over',
+	'human-review',
+	'stop',
+	'environment',
+	'busy',
+	'retry',
 ])
-const TRACKED_KINDS: ReadonlySet<string> = new Set([
-	...SETTLED_KINDS,
-	run_event_stream.EVENT_KIND.CHILD_LAUNCH,
+const RESUMED_TOKEN = 'resumed'
+const RUN_VERDICT = 'run'
+const STOP_VERDICT = 'stop'
+const WATCH_VERDICT = 'watch'
+// The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
+const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
+	RUN_VERDICT,
+	STOP_VERDICT,
+	WATCH_VERDICT,
+	'wait',
 ])
-const ISSUE_TEXT = /^#(\d+)\b/u
-const MERGE_ATTEMPTS = 3
-const WATCH_POLL_MS = backlog_budget.IDLE_POLL_MINUTES * backlog_budget.MS_PER_MINUTE
+const NO_RETRIES = 0
 
-// The judgement branches, keyed by the token `run:merge` answered with. Each is a stop the loop cannot
-// decide past: a hand-off (`over`), a child's own ending, a tripped guard, a down environment, or a
-// carry record this process does not own.
-const TOKEN_STOPS: Readonly<Record<string, string>> = {
-	[run_merge_cli.OVER_TOKEN]: 'over',
-	[run_merge_cli.HUMAN_REVIEW_TOKEN]: 'human-review',
-	[run_merge_cli.STOP_TOKEN]: 'stop',
-	[run_merge_cli.ENVIRONMENT_TOKEN]: 'environment',
-	[run_merge_cli.BUSY_TOKEN]: 'busy',
-}
-
-// The outcomes that answer with the next offer yet still need a person: a child that parked itself and
-// a child that failed (a cut no successor adopted is handled as failed by `run:merge`).
-const OUTCOME_STOPS: Partial<Record<ChildOutcome, string>> = {
-	cut: 'failed',
-	failed: 'failed',
-	parked: 'park',
-}
-
-interface DriveOffer {
-	verdict: BudgetVerdict
-	reason: string
-	answer: BacklogAnswer
+interface OfferRead {
+	verdict: string
 	issues: ReadonlyArray<string>
 	retries: number
-	// Whether a `stop` is the run finishing rather than stopping — `backlog_budget.is_finish`.
-	is_finish: boolean
-}
-
-interface OfferAsk {
-	running: number
-	retries: number
-	excludes: ReadonlyArray<string>
-	active_at_ms: number
-}
-
-interface ChildResult {
-	outcome: ChildOutcome
-	token: string
-}
-
-interface DrivePorts {
-	offer: (ask: OfferAsk) => Promise<DriveOffer>
-	launch: (issue: string, stash: string | undefined) => Promise<boolean>
-	// Whether the lane's child process is alive now — asked once at start, so a lane whose child ended
-	// while nothing was driving is merged at once rather than awaited for a process that never appears.
-	is_running: (issue: string) => boolean
-	await_any: (issues: ReadonlyArray<string>) => Promise<string>
-	merge: (issue: string) => Promise<ChildResult>
-	// Writes the drain marker once per drain; `true` only when this call wrote it.
-	mark_drain: () => Promise<boolean>
-	finish: (offer: DriveOffer) => Promise<void>
-	sleep: (milliseconds: number) => Promise<void>
-	now: () => number
-}
-
-interface DriveStop {
-	verdict: string
-	issue: string | undefined
-	detail: string | undefined
+	answer?: string | undefined
+	reason?: string | undefined
+	is_retrospective_done?: boolean
+	is_finish?: boolean | undefined
 }
 
 interface DriveState {
-	running: Array<string>
-	excludes: Array<string>
+	// The children this run has in flight — seeded from the open lanes, so a restarted loop resumes them.
+	in_flight: Array<string>
+	// Every child collected, fed back to `backlog:offer` because GitHub closes a merged issue late.
+	exclude: Array<string>
+	// When the run last did something, handed to `backlog:budget` as `--active`.
+	active: string
 	retries: number
-	active_at_ms: number
-	// The `josh latest` stash message, carried to the first launch only and then cleared.
-	stash: string | undefined
+	// A `stop` verdict: start nothing more, collect what is in flight, then end.
+	is_stopping: boolean
+	stop_reason?: string | undefined
+	stop_is_finish?: boolean | undefined
 }
 
-type Settle =
-	| { kind: 'next'; outcome: ChildOutcome }
-	| { kind: 'again' }
-	| { kind: 'retry' }
-	| { kind: 'stop'; stop: DriveStop }
-
-function stop_of(verdict: string, issue?: string, detail?: string): DriveStop {
-	return { verdict, issue, detail }
+interface DriveEnd {
+	// Why the loop handed control back: `merge`, `launch`, `offer`, `watch`, `stop`, `window` or a verdict.
+	reason: string
+	// The token the parent reads, where one command printed it.
+	token: string | undefined
+	issue: string | undefined
+	detail?: string
+	is_finish?: boolean | undefined
 }
 
-function issue_of(event: RunEvent): string | undefined {
-	return ISSUE_TEXT.exec(event.text)?.[1]
+interface DrivePorts {
+	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
+	is_finished: (issue: string) => boolean
+	// `run:merge <N>`'s first stdout token.
+	merge: (issue: string) => Promise<string>
+	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
+	offer: (state: DriveState) => Promise<OfferRead | undefined>
+	launch: (issue: string) => Promise<boolean>
+	now: () => Date
 }
 
-// Each child's newest launch-or-settle event: a child launched again after an outage reads as running.
-function last_kinds(events: ReadonlyArray<RunEvent>): ReadonlyMap<string, string> {
-	const kinds = new Map<string, string>()
+// An end carries the state reached so far, so the resume line keeps what the pass collected before it.
+type PassResult =
+	{ kind: 'continue'; state: DriveState } | { kind: 'end'; end: DriveEnd; state: DriveState }
 
-	for (const event of events) {
-		const issue = issue_of(event)
+function ended(reason: string, state: DriveState, token?: string, issue?: string): PassResult {
+	const detail = reason === STOP_VERDICT ? state.stop_reason : undefined
 
-		if (issue !== undefined && TRACKED_KINDS.has(event.kind)) kinds.set(issue, event.kind)
+	return {
+		kind: 'end',
+		end: {
+			reason,
+			token,
+			issue,
+			...(detail !== undefined && { detail }),
+			...(reason === STOP_VERDICT && { is_finish: state.stop_is_finish }),
+		},
+		state,
+	}
+}
+
+function is_drain(read: OfferRead, state: DriveState): boolean {
+	return (
+		read.verdict === WATCH_VERDICT && state.in_flight.length === 0 && !read.is_retrospective_done
+	)
+}
+
+function needs_retrospective(read: OfferRead, state: DriveState): boolean {
+	return (
+		read.verdict === STOP_VERDICT &&
+		read.answer === 'exhausted' &&
+		state.in_flight.length === 0 &&
+		!read.is_retrospective_done
+	)
+}
+
+function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveState {
+	return {
+		in_flight: [...in_flight],
+		exclude: [],
+		active,
+		retries: NO_RETRIES,
+		is_stopping: false,
+	}
+}
+
+// One finished child: collected, excluded, and — unless its cut was resumed in place — out of flight.
+async function collect(issue: string, state: DriveState, ports: DrivePorts): Promise<PassResult> {
+	const token = await ports.merge(issue)
+
+	// An empty first line is a `run:merge` that failed before printing one: never read as a collection.
+	if (token === '') return ended('merge', state, undefined, issue)
+	if (HANDOFF_TOKENS.has(token)) return ended('merge', state, token, issue)
+
+	const in_flight =
+		token === RESUMED_TOKEN ? state.in_flight : state.in_flight.filter((item) => item !== issue)
+	const exclude = state.exclude.includes(issue) ? state.exclude : [...state.exclude, issue]
+
+	return {
+		kind: 'continue',
+		state: { ...state, in_flight, exclude, active: ports.now().toISOString() },
+	}
+}
+
+async function collect_finished(state: DriveState, ports: DrivePorts): Promise<PassResult> {
+	const finished = state.in_flight.filter((item) => ports.is_finished(item))
+	let current = state
+
+	for (const issue of finished) {
+		const result = await collect(issue, current, ports)
+
+		if (result.kind === 'end') return { ...result, state: current }
+
+		current = result.state
 	}
 
-	return kinds
-}
-
-// **Restart is read, never remembered**: the running children are the open lanes whose newest event is
-// not a settle, and the merged ones are excluded from the offer. A driver killed and started again
-// therefore neither re-merges a settled child nor launches onto a lane that is still open.
-function restore(
-	lanes: ReadonlyArray<string>,
-	events: ReadonlyArray<RunEvent>,
-	now_ms: number,
-): DriveState {
-	const kinds = last_kinds(events)
-	const running = lanes.filter((lane) => !SETTLED_KINDS.has(kinds.get(lane) ?? ''))
-	const excludes = [...kinds]
-		.filter(([, kind]) => kind === run_event_stream.EVENT_KIND.MERGE)
-		.map(([issue]) => issue)
-
-	// The resume moment is the run's newest activity, as a resumed parent states it with `--active`.
-	return { running, excludes, retries: 0, active_at_ms: now_ms, stash: undefined }
-}
-
-function settle_of(issue: string, result: ChildResult): Settle {
-	if (result.token === run_merge_cli.RESUMED_TOKEN) return { kind: 'again' }
-	if (result.token === run_merge_cli.RETRY_TOKEN) return { kind: 'retry' }
-
-	const token_stop = TOKEN_STOPS[result.token]
-
-	if (token_stop !== undefined) return { kind: 'stop', stop: stop_of(token_stop, issue) }
-
-	const outcome_stop = OUTCOME_STOPS[result.outcome]
-
-	if (outcome_stop !== undefined) return { kind: 'stop', stop: stop_of(outcome_stop, issue) }
-
-	return { kind: 'next', outcome: result.outcome }
-}
-
-// One pass's result: the state the next pass starts from, and the stop when the pass reached one.
-interface Pass {
-	state: DriveState
-	stop: DriveStop | undefined
-}
-
-function going(state: DriveState): Pass {
-	return { state, stop: undefined }
-}
-
-function stopped(state: DriveState, stop: DriveStop): Pass {
-	return { state, stop }
-}
-
-// A child that answered anything but `resumed` has left the running set; a merged one is excluded from
-// the next offer as the parent's `--exclude` did.
-function apply_settle(state: DriveState, issue: string, settled: Settle): Pass {
-	if (settled.kind === 'again') return going(state)
-
-	const running = state.running.filter((child) => child !== issue)
-
-	if (settled.kind === 'stop') return stopped({ ...state, running }, settled.stop)
-
-	const is_merged = settled.kind === 'next' && settled.outcome === 'merged'
-	const excludes = is_merged ? [...state.excludes, issue] : state.excludes
-
-	return going({ ...state, running, excludes })
-}
-
-// `retry` means the child's state could not be read; it is read again, a bounded number of times.
-async function settle(ports: DrivePorts, state: DriveState, issue: string): Promise<Pass> {
-	for (let attempt = 0; attempt < MERGE_ATTEMPTS; attempt += 1) {
-		const settled = settle_of(issue, await ports.merge(issue))
-
-		if (settled.kind !== 'retry') return apply_settle(state, issue, settled)
-	}
-
-	return stopped(state, stop_of('unresolved', issue))
-}
-
-// The children whose process ended while nothing was driving: merged now, before the first offer.
-async function settle_ended(ports: DrivePorts, state: DriveState): Promise<Pass> {
-	const ended = state.running.filter((child) => !ports.is_running(child))
-	let pass = going(state)
-
-	for (const issue of ended) {
-		pass = await settle(ports, pass.state, issue)
-
-		if (pass.stop !== undefined) return pass
-	}
-
-	return pass
+	return { kind: 'continue', state: current }
 }
 
 async function launch_all(
-	ports: DrivePorts,
-	state: DriveState,
 	issues: ReadonlyArray<string>,
-): Promise<Pass> {
-	let current = state
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	const in_flight = [...state.in_flight]
 
 	for (const issue of issues) {
-		const is_launched = await ports.launch(issue, current.stash)
+		const is_launched = await ports.launch(issue)
 
-		if (!is_launched) return stopped(current, stop_of('launch-failed', issue))
+		if (!is_launched) return ended('launch', { ...state, in_flight }, undefined, issue)
 
-		current = { ...current, stash: undefined, running: [...current.running, issue] }
+		in_flight.push(issue)
 	}
 
-	return going(current)
+	return { kind: 'continue', state: { ...state, in_flight, active: ports.now().toISOString() } }
 }
 
-// A watch with children in flight waits for one to return; with none, the first ask of a drain stops
-// for the end-of-run retrospective (`run:step` decides whether one is owed), and any later ask sleeps.
-async function watch(ports: DrivePorts, state: DriveState, offer: DriveOffer): Promise<Pass> {
-	if (state.running.length > 0) {
-		return await settle(ports, state, await ports.await_any(state.running))
+// A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the
+// parent's. With children still running the watch is only waiting on them.
+function on_verdict(read: OfferRead, state: DriveState): PassResult {
+	if (!KNOWN_VERDICTS.has(read.verdict)) return ended(read.verdict, state, read.verdict)
+	if (needs_retrospective(read, state)) return ended('retrospective', state, 'retrospective')
+
+	if (read.verdict === STOP_VERDICT) {
+		return {
+			kind: 'continue',
+			state: {
+				...state,
+				is_stopping: true,
+				stop_reason: read.reason,
+				stop_is_finish: read.is_finish,
+			},
+		}
 	}
 
-	if (offer.answer === 'exhausted' && (await ports.mark_drain())) {
-		return stopped(state, stop_of('drain'))
+	if (is_drain(read, state)) return ended(WATCH_VERDICT, state, WATCH_VERDICT)
+
+	return { kind: 'continue', state }
+}
+
+async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResult> {
+	const read = await ports.offer(state)
+
+	if (read === undefined) return ended('offer', state)
+
+	const next = { ...state, retries: read.retries }
+
+	if (read.verdict === RUN_VERDICT) return await launch_all(read.issues, next, ports)
+
+	return on_verdict(read, next)
+}
+
+// One pass: collect every child that ended, then — unless a `stop` has been read — ask what to start.
+// `should_offer` is the caller's throttle on the one network read; a collection always asks, because a
+// lane just freed.
+function is_offering(before: DriveState, after: DriveState, should_offer: boolean): boolean {
+	if (after.is_stopping) return false
+
+	return should_offer || after.in_flight.length !== before.in_flight.length
+}
+
+// A stopping run with nothing left in flight has ended.
+function settle(result: PassResult): PassResult {
+	if (result.kind === 'end') return result
+
+	const is_done = result.state.is_stopping && result.state.in_flight.length === 0
+
+	return is_done ? ended(STOP_VERDICT, result.state, STOP_VERDICT) : result
+}
+
+async function run_pass(
+	state: DriveState,
+	should_offer: boolean,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	const collected = await collect_finished(state, ports)
+
+	if (collected.kind === 'end') return collected
+	if (!is_offering(state, collected.state, should_offer)) return settle(collected)
+
+	return settle(await ask_offer(collected.state, ports))
+}
+
+interface LoopConfig {
+	poll_ms: number
+	// The floor between two `backlog:offer` asks while nothing was collected — the same one-minute
+	// cadence the wake supervisor polls the backlog on, so an idle stretch is not a network hammer.
+	offer_ms: number
+	// How long one invocation may wait before returning `window`, or `undefined` for no bound. A headless
+	// parent's foreground call is capped by its shell's timeout, so it passes one under that cap.
+	window_ms: number | undefined
+}
+
+interface LoopPorts extends DrivePorts {
+	sleep: (milliseconds: number) => Promise<void>
+	finish: (end: DriveEnd) => Promise<void>
+	// Called after every pass, ended ones included, so the caller can keep the resume line current.
+	on_state: (state: DriveState) => void
+}
+
+interface LoopRun {
+	state: DriveState
+	started_ms: number
+	offered_ms: number
+}
+
+const WINDOW_END: DriveEnd = { reason: 'window', token: undefined, issue: undefined }
+
+function is_window_spent(run: LoopRun, config: LoopConfig, now_ms: number): boolean {
+	if (config.window_ms === undefined) return false
+
+	return now_ms - run.started_ms >= config.window_ms
+}
+
+type LoopStep = { kind: 'end'; end: DriveEnd } | { kind: 'next'; run: LoopRun }
+
+// One pass of the loop: the offer is due on the first pass and then no oftener than `offer_ms`, bar the
+// passes that collected a child. A `next` carries the run to sleep on and pass again.
+async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Promise<LoopStep> {
+	const now_ms = ports.now().getTime()
+	const is_due = now_ms - run.offered_ms >= config.offer_ms
+	const result = await run_pass(run.state, is_due, ports)
+
+	ports.on_state(result.state)
+
+	if (result.kind === 'end') return result
+
+	const next = { ...run, state: result.state, offered_ms: is_due ? now_ms : run.offered_ms }
+
+	return is_window_spent(next, config, ports.now().getTime())
+		? { kind: 'end', end: WINDOW_END }
+		: { kind: 'next', run: next }
+}
+
+// Pass, sleep, repeat — until a pass hands a token back or the window is spent.
+async function run_loop(
+	state: DriveState,
+	config: LoopConfig,
+	ports: LoopPorts,
+): Promise<DriveEnd> {
+	const first: LoopRun = { state, started_ms: ports.now().getTime(), offered_ms: -Infinity }
+	let step = await loop_step(first, config, ports)
+
+	while (step.kind === 'next') {
+		await ports.sleep(config.poll_ms)
+		step = await loop_step(step.run, config, ports)
 	}
 
-	await ports.sleep(WATCH_POLL_MS)
+	if (step.end.reason === STOP_VERDICT) await ports.finish(step.end)
 
-	return going(state)
+	return step.end
 }
 
-async function finish(ports: DrivePorts, state: DriveState, offer: DriveOffer): Promise<Pass> {
-	await ports.finish(offer)
+const backlog_drive = { HANDOFF_TOKENS, collect, initial_state, on_verdict, run_loop, run_pass }
 
-	return stopped(state, stop_of(offer.is_finish ? 'done' : 'stopped', undefined, offer.reason))
-}
-
-function ask_of(state: DriveState): OfferAsk {
-	const { running, retries, excludes, active_at_ms } = state
-
-	return { running: running.length, retries, excludes, active_at_ms }
-}
-
-// What the offer itself changes: the retry count, and the last moment the run had work.
-function offered(state: DriveState, offer: DriveOffer, now_ms: number): DriveState {
-	const active_at_ms = offer.answer === 'exhausted' ? state.active_at_ms : now_ms
-
-	return { ...state, retries: offer.retries, active_at_ms }
-}
-
-// One pass of the loop head: ask the offer, then act on its verdict.
-async function step(ports: DrivePorts, state: DriveState): Promise<Pass> {
-	const offer = await ports.offer(ask_of(state))
-	const next = offered(state, offer, ports.now())
-
-	if (offer.verdict === backlog_budget.RUN_VERDICT) {
-		return await launch_all(ports, next, offer.issues)
-	}
-
-	if (offer.verdict === backlog_budget.WATCH_VERDICT) return await watch(ports, next, offer)
-
-	return await finish(ports, next, offer)
-}
-
-async function run_loop(ports: DrivePorts, state: DriveState): Promise<DriveStop> {
-	let pass = await settle_ended(ports, state)
-
-	while (pass.stop === undefined) pass = await step(ports, pass.state)
-
-	return pass.stop
-}
-
-// A port that throws — `lane_await` does for a child that never appeared — is a stop with its message,
-// never a crash: the caller always gets its one line.
-async function drive(ports: DrivePorts, state: DriveState): Promise<DriveStop> {
-	try {
-		return await run_loop(ports, state)
-	} catch (error: unknown) {
-		return stop_of('error', undefined, error instanceof Error ? error.message : String(error))
-	}
-}
-
-// The one line a caller branches on: the verdict, then the issue and the detail where there are any.
-function line_of(stop: DriveStop): string {
-	const issue = stop.issue === undefined ? [] : [`#${stop.issue}`]
-	const detail = stop.detail === undefined ? [] : [stop.detail]
-
-	return [stop.verdict, ...issue, ...detail].join(' ')
-}
-
-const backlog_drive = { MERGE_ATTEMPTS, WATCH_POLL_MS, drive, line_of, restore, settle_of }
-
-export type { ChildResult, DriveOffer, DrivePorts, DriveState, DriveStop, OfferAsk }
+export type { DriveEnd, DrivePorts, DriveState, LoopConfig, LoopPorts, OfferRead, PassResult }
 export { backlog_drive }

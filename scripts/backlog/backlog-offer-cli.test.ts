@@ -54,7 +54,10 @@ async function answer_for(
 ): Promise<string> {
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValueOnce(next)
-	josh_run_mock.mockResolvedValueOnce({ code: OK, out: budget_verdict })
+	josh_run_mock.mockResolvedValueOnce({
+		code: OK,
+		out: JSON.stringify({ budget: budget_verdict, reason: 'budget reason', is_finish: true }),
+	})
 
 	await backlog_offer_cli.run([...BASE, ...argv])
 	const [, budget_call] = josh_run_mock.mock.calls
@@ -138,6 +141,12 @@ describe('backlog_offer_cli.run — the drain marks the stream before the idle w
 		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String))
 	})
 
+	it('marks a drain when idle zero stops on an empty backlog', async () => {
+		await answer_for({ code: OK, out: 'none' }, 'stop')
+
+		expect(emit_once_mock).toHaveBeenCalledWith(DRAIN_KIND, expect.any(String))
+	})
+
 	it('does not mark the stream on a watch that opened while children were still merging', async () => {
 		await answer_for({ code: OK, out: 'none' }, 'watch', RUNNING)
 
@@ -177,6 +186,7 @@ describe('backlog_offer_cli — the argv it builds for each underlying command',
 		])
 		expect(backlog_offer_cli.budget_argv(values ?? {}, CANDIDATES)).toStrictEqual([
 			'backlog:budget',
+			'--json',
 			ANSWER_FLAG,
 			CANDIDATES,
 			...BASE,

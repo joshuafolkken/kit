@@ -5,6 +5,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { rule_value_cli } from '#scripts/rules/rule-value-cli'
 import { run_event_stream } from '#scripts/run/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/run-event-stream-emit'
+import { z } from 'zod'
 import { backlog_offer, type OfferAnswer } from './backlog-offer'
 
 // `josh backlog:offer` — one composite command for a `backlogrun` loop-head event
@@ -25,9 +26,11 @@ const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'offer'
 const DEFAULT_COUNT = 0
 const RUN_VERDICT = 'run'
+const BUDGET_JSON_KEY = 'budget'
 // The one budget verdict and mapped answer that name a drain, plus the running count that means the run
 // has nothing of its own in flight (joshuafolkken/kit#2335). Read together in `mark_drain`.
 const WATCH_VERDICT = 'watch'
+const STOP_VERDICT = 'stop'
 const EXHAUSTED_ANSWER = 'exhausted'
 const NO_RUNNING = 0
 const DRAIN_TEXT = 'backlog drained'
@@ -122,7 +125,35 @@ function budget_argv(values: ParsedValues, answer: string): ReadonlyArray<string
 		return value === undefined ? [] : [`--${name}`, value]
 	})
 
-	return ['backlog:budget', '--answer', answer, ...forwarded]
+	return ['backlog:budget', '--json', '--answer', answer, ...forwarded]
+}
+
+const budget_read_schema = z.object({
+	[BUDGET_JSON_KEY]: z.string(),
+	reason: z.string(),
+	is_finish: z.boolean(),
+})
+
+interface BudgetRead {
+	verdict: string
+	reason: string
+	is_finish: boolean
+}
+
+function budget_of(out: string): BudgetRead | undefined {
+	try {
+		const parsed = budget_read_schema.safeParse(JSON.parse(out))
+
+		return parsed.success
+			? {
+					verdict: parsed.data[BUDGET_JSON_KEY],
+					reason: parsed.data.reason,
+					is_finish: parsed.data.is_finish,
+				}
+			: undefined
+	} catch {
+		return undefined
+	}
 }
 
 function to_tokens(out: string): ReadonlyArray<string> {
@@ -135,11 +166,19 @@ function issues_for(verdict: string, offer: OfferAnswer): ReadonlyArray<string> 
 	return verdict === RUN_VERDICT ? offer.issues : []
 }
 
-function emit(verdict: string, offer: OfferAnswer, is_json: boolean): number {
+function emit(decision: BudgetRead, offer: OfferAnswer, is_json: boolean): number {
+	const { verdict, reason, is_finish } = decision
 	const issues = issues_for(verdict, offer)
 
 	if (is_json) {
-		const payload = { verdict, issues, answer: offer.answer, retries: offer.retries }
+		const payload = {
+			verdict,
+			issues,
+			answer: offer.answer,
+			retries: offer.retries,
+			reason,
+			is_finish,
+		}
 
 		console.info(JSON.stringify({ [JSON_KEY]: payload }))
 
@@ -160,7 +199,7 @@ function refuse(): number {
 }
 
 // The drain: the backlog is empty (`exhausted`) and nothing of the run's own is in flight, so the run is
-// about to open its idle watch. Marking the stream here — once per drain, which `emit_once` guarantees —
+// about to open its idle watch or stop with `--idle 0`. Marking once per drain with `emit_once`
 // is what lets `run:step` fire the end-of-run retrospective *before* the watch rather than after it
 // (joshuafolkken/kit#2335), so the improvement issues the retrospective files are what the watch then
 // picks up. A watch that opened while children were still merging (`running > 0`) is not this drain: the
@@ -169,9 +208,8 @@ function refuse(): number {
 // Returns whether this call wrote the marker, so `backlog:drive` stops once per drain
 // (joshuafolkken/kit#2508).
 async function mark_drain(verdict: string, answer: string, running: number): Promise<boolean> {
-	if (verdict !== WATCH_VERDICT || answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) {
-		return false
-	}
+	if (answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return false
+	if (verdict !== WATCH_VERDICT && verdict !== STOP_VERDICT) return false
 
 	return await run_event_stream_emit.emit_once(run_event_stream.EVENT_KIND.DRAIN, DRAIN_TEXT)
 }
@@ -190,9 +228,13 @@ async function decide(values: ParsedValues, counts: OfferCounts): Promise<number
 
 	if (budget.code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
 
-	await mark_drain(budget.out, offer.answer, counts.running)
+	const decision = budget_of(budget.out)
 
-	return emit(budget.out, offer, values.json === true)
+	if (decision === undefined) return FAILURE_EXIT_CODE
+
+	await mark_drain(decision.verdict, offer.answer, counts.running)
+
+	return emit(decision, offer, values.json === true)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
