@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const resolve_in_mock = vi.hoisted(() => vi.fn())
+const missing_mock = vi.hoisted(() => vi.fn())
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -14,8 +15,13 @@ vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mo
 vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: stamps }))
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: resolve_in_mock } }))
 vi.mock('./detached-launch', () => ({ detached_launch: { launch_attached: launch_mock } }))
+vi.mock('#scripts/gate/gate-tree', () => ({
+	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
+}))
+vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: missing_mock } }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
+const { run_ship_review } = await import('./run-ship-review')
 
 // joshuafolkken/kit#2427: the supervised round-1 review — open, launch, join, attest, record — and each
 // branch that hands control back to the agent.
@@ -70,6 +76,7 @@ beforeEach(() => {
 	answer_with(undefined)
 	launch_mock.mockReset().mockResolvedValue({ ...COMPLETED, exit_code: OK })
 	resolve_in_mock.mockReset().mockReturnValue({ kind: 'argv', argv: ARGV, profile: undefined })
+	missing_mock.mockReset().mockReturnValue([])
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
 	stamps.write_text_stamp.mockClear()
 	stamps.remove_stamp.mockClear()
@@ -182,6 +189,65 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 	})
 })
 
+// joshuafolkken/kit#2500: the scoped pair is a precondition the supervisor meets itself — run in place
+// when the tree has no green record, stopped on only when a check genuinely fails.
+describe('run_ship_review_steps.review_stage — the scoped pair before the review', () => {
+	it('runs the checks the tree has no green record for, then reviews without stopping', async () => {
+		missing_mock.mockReturnValue([LINT, TEST])
+
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toStrictEqual([LINT, TEST, OPEN, JOIN, ATTEST, RECORD])
+	})
+
+	it('runs only the check whose record is stale', async () => {
+		missing_mock.mockReturnValueOnce([TEST])
+
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toStrictEqual([TEST, OPEN, JOIN, ATTEST, RECORD])
+	})
+
+	it('stops before the review on a genuinely failing check, launching no reviewer', async () => {
+		missing_mock.mockReturnValue([LINT, TEST])
+		answer_with(LINT)
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(commands()).toStrictEqual([LINT])
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_review_steps.review_stage — fixes in place are verified by the scoped pair', () => {
+	const FIXED_MEDIUM = `fixed ${MEDIUM}`
+
+	it('verifies the fixed tree and ships on when the pair is green', async () => {
+		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
+		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([LINT, TEST])
+
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${MEDIUM}`])
+	})
+
+	it('records a fix the pair turned down as unfixed, then stops', async () => {
+		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
+		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([TEST])
+		answer_with(TEST)
+
+		const result = await run_ship_review_steps.review_stage(ISSUE)
+
+		expect(result.code).toBe(FAILED)
+		expect(result.out).toContain(run_ship_review.UNVERIFIED_OUTCOME.note)
+		expect(commands()).toContain(`${RECORD} ${MEDIUM}`)
+	})
+
+	it('runs no scoped check after a round that fixed nothing', async () => {
+		stamps.read_stamp_text.mockReturnValue(LOW)
+
+		await run_ship_review_steps.review_stage(ISSUE)
+
+		expect(missing_mock).toHaveBeenCalledOnce()
+	})
+})
+
 // What each command prints in a round-2 stage: the decision, the brief, and nothing for the rest.
 function round_two_output(command: string, decision: string): string {
 	if (command === DECIDE) return `${decision}\n`
@@ -213,6 +279,7 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 	})
 
 	it('stops at a red scoped check without launching a reviewer', async () => {
+		missing_mock.mockReturnValue([LINT, TEST])
 		answer_round_two('required', TEST)
 
 		expect(await round_two_code()).toBe(FAILED)
@@ -222,6 +289,7 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 
 describe('run_ship_review_steps.round_two_stage — the verification pass after the commit', () => {
 	it('runs the scoped pair, the round-2 brief, a fresh reviewer, attest and record', async () => {
+		missing_mock.mockReturnValue([LINT, TEST])
 		answer_round_two('required')
 
 		expect(await round_two_code()).toBe(OK)

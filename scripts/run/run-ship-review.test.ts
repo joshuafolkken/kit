@@ -114,6 +114,14 @@ describe('run_ship_review — the two prompts', () => {
 		expect(prompt).toContain('never fix a High')
 	})
 
+	// joshuafolkken/kit#2500: a fix comes back already green on the scoped pair, or not at all.
+	it('asks round 1 to leave its fixes green on the scoped pair, or revert them', () => {
+		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS)
+
+		expect(prompt).toContain('pnpm josh lint:related && pnpm josh test:related')
+		expect(prompt).toContain('revert a fix you cannot get green')
+	})
+
 	it('keeps round 2 a launch-safe, read-only verification pass', () => {
 		const prompt = run_ship_review.verification_prompt(BRIEF, FINDINGS)
 
