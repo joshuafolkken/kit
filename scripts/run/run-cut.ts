@@ -233,16 +233,6 @@ function read_cut(target: string, now: Date = new Date()): CutRead {
 // The alternative errs the other way: a read fault would be taken for "already cut" and the guard
 // would go quiet on exactly the run it exists for. The cost of this direction is one refusal a lane
 // can answer by reissuing, since that row is delivered once per run.
-// An explicit `cwd` names the checkout to read, and an inherited `GIT_DIR` (exported to every hook,
-// `pre-push` included) would beat it outright and answer about the repository the hook fires in
-// (joshuafolkken/kit#2517). The work tree's own read passes no `cwd` and keeps the inherited
-// environment, since there the hook's repository is the one being asked about.
-function location_environment(cwd: string | undefined): NodeJS.ProcessEnv {
-	if (cwd === undefined) return process.env
-
-	return { ...process.env, ...git_location_environment.location_free_environment() }
-}
-
 function git_directories_sync(cwd?: string): ReadonlyArray<string> {
 	try {
 		// The binary is resolved through `git_utilities` exactly as `git-spawn.ts` resolves it, so this
@@ -258,9 +248,16 @@ function git_directories_sync(cwd?: string): ReadonlyArray<string> {
 			// A `PreToolUse` hook holds the tool call while it runs, so the read is bounded rather than
 			// left to whatever git does.
 			// `cwd` is set only by `lane_cut_sync`, which reads another lane's record from the parent.
+			// With a `cwd`, the git location variables are cleared so it is what git answers for: a hook
+			// exports `GIT_DIR`, which beats `cwd` and would name the hook's checkout instead
+			// (joshuafolkken/kit#2515). Without one the environment is kept, so this read resolves the same
+			// checkout as the asynchronous `git_directories` that writes the record.
 			{
 				cwd,
-				env: location_environment(cwd),
+				env:
+					cwd === undefined
+						? process.env
+						: { ...process.env, ...git_location_environment.location_free_environment() },
 				encoding: 'utf8',
 				stdio: ['ignore', 'pipe', 'ignore'],
 				timeout: GIT_READ_TIMEOUT_MS,
