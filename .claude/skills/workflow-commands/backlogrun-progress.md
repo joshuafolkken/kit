@@ -553,7 +553,9 @@ the line says: a free lane is the ask for the next child, and every lane still b
 
 **The cost is latency, and it is named rather than hidden.** A lane that frees just after a line can sit
 idle until the next one — **up to one interval**. **A person who wants the latency back shortens the
-interval** — `--interval`, or `progress_interval_minutes` in the repository's configuration.
+interval** — `--interval`, or `progress_interval_minutes` in the repository's configuration. An issue
+newly runnable mid-wait is not held to it (joshuafolkken/kit#2503): `--wait` exits about a minute later
+with no progress line — act on its `ready #N` line.
 
 **What is not dropped.** Every timeout in the table above still ends its wait, and the silent-unit
 liveness check is still asked — on the wake the watcher delivers rather than on a clock of the parent's
@@ -561,7 +563,7 @@ own.
 
 #### The wake exists only while something is in flight
 
-**`--wait` ends at the first line it *prints*, and it prints only where there is something to report.**
+**`--wait` ends at the first line it *prints* (or an arrival), and it prints only where there is something to report.**
 With no child in flight it **declines**, and a `gh` listing it could not read declines the same way. **A
 declined watcher does not exit until its `--hours` bound, an hour by default.** So the wake above is not
 available in every state, and where it is unavailable **the parent keeps the interval after all**:

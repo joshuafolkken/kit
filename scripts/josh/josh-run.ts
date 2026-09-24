@@ -14,6 +14,9 @@ import { execa } from 'execa'
 // **Forwarded stderr is captured as well** (joshuafolkken/kit#2462): a composite that writes a report
 // of its own — `run:tail` — puts a failed step's reason in that report, where a detached run's log
 // otherwise showed only pnpm's `ELIFECYCLE` line.
+//
+// **`timeout_ms` bounds a read made from inside a loop** (joshuafolkken/kit#2503): the step is killed and
+// its exit reads as a failure, so a hung network call ends a pass instead of the loop around it.
 
 const PNPM = 'pnpm'
 const JOSH = 'josh'
@@ -29,10 +32,12 @@ interface JoshResult {
 async function josh_run(
 	args: ReadonlyArray<string>,
 	should_forward_stderr = false,
+	timeout_ms?: number,
 ): Promise<JoshResult> {
 	const result = await execa(PNPM, [JOSH, ...args], {
 		reject: false,
 		stderr: should_forward_stderr ? FORWARDED_STDERR : 'pipe',
+		...(timeout_ms !== undefined && { timeout: timeout_ms }),
 	})
 
 	return {

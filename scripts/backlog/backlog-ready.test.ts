@@ -1,6 +1,8 @@
+import { josh_command } from '#scripts/josh/josh-run'
 import type { RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_headless } from '#scripts/run/run-headless'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
 
 // joshuafolkken/kit#2452: a parent woken five times relayed each progress line without asking for the
@@ -195,5 +197,29 @@ describe('backlog_ready.print_offer_hint', () => {
 
 		await backlog_ready.print_offer_hint(parent)
 		expect(info).toHaveBeenCalledWith(backlog_ready.OFFER_HINT)
+	})
+})
+
+// joshuafolkken/kit#2503: the arrival probe's baseline must tell a failed read from an empty pool.
+describe('backlog_ready.answered_ready_issues', () => {
+	const TIMEOUT_MS = 30_000
+	const BACKLOG_NEXT = 'backlog:next'
+
+	beforeEach(() => {
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(undefined)
+	})
+
+	it('reads the pool with the bound and piped stderr', async () => {
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '2445\n2446' })
+
+		await expect(backlog_ready.answered_ready_issues(TIMEOUT_MS)).resolves.toEqual(['2445', '2446'])
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], false, TIMEOUT_MS)
+	})
+
+	it('throws on a read that did not answer, where the lenient form reads an empty pool', async () => {
+		vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 1, out: '' })
+
+		await expect(backlog_ready.answered_ready_issues(TIMEOUT_MS)).rejects.toThrow(BACKLOG_NEXT)
+		await expect(backlog_ready.ready_issues()).resolves.toEqual([])
 	})
 })
