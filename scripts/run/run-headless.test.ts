@@ -74,6 +74,15 @@ describe('run_headless.must_keep_waiting', () => {
 		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(true)
 	})
 
+	it('holds a named epic session while its child lane is in flight', async () => {
+		read_carry.mockReturnValue({
+			kind: 'carried',
+			carry: carry({ invocation: 'backlogrun #2501 --only' }),
+		})
+
+		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(true)
+	})
+
 	it('lets a headless parent with no lanes in flight stop', async () => {
 		lanes_in_flight.mockResolvedValue(false)
 
@@ -101,7 +110,7 @@ describe('run_headless.must_keep_waiting', () => {
 	})
 })
 
-// joshuafolkken/kit#2452: the pick-up rules bind the driving `backlogrun` parent, attached or headless.
+// Arrival and ready probes read the driving `backlogrun` parent, attached or headless.
 describe('run_headless.is_backlog_parent', () => {
 	beforeEach(() => {
 		read_carry.mockReturnValue(OWNED)

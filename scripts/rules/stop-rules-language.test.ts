@@ -47,9 +47,9 @@ describe('stop_rules.stop_outcome — session language (joshuafolkken/kit#2470)'
 
 describe('stop_rules.block_envelope — every refusal names the session language', () => {
 	it.each(['ja', 'en'])('appends the %s session-language instruction to the reason', (lang) => {
-		const reason = envelope_reason(stop_rules.PICKUP_REASON, lang)
+		const reason = envelope_reason(stop_rules.STOP_NOTIFY_REASON, lang)
 
-		expect(reason).toContain(stop_rules.PICKUP_REASON)
+		expect(reason).toContain(stop_rules.STOP_NOTIFY_REASON)
 		expect(reason).toContain(`JOSH_SESSION_LANG: ${lang}`)
 	})
 })

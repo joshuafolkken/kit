@@ -34,9 +34,7 @@ describe('stop_guard — fail open', () => {
 			stop_hook_active: true,
 		})
 
-		expect(await stop_guard.stop_outcome_for_payload(payload, backlog_ready.DEFAULT_PORTS)).toEqual(
-			stop_rules.NO_OUTCOME,
-		)
+		expect(await stop_guard.stop_outcome_for_payload(payload)).toEqual(stop_rules.NO_OUTCOME)
 	})
 })
 
@@ -49,15 +47,12 @@ describe('write_stop_decision — the stall check is wired', () => {
 		expect(check).toHaveBeenCalledOnce()
 	})
 
-	// joshuafolkken/kit#2472: two `backlog:next` reads per stop could outrun the hook's timeout.
-	it('hands the stall detector the one reading the pick-up check reuses', async () => {
+	it('hands the stall detector its ready ports', async () => {
 		const check = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
-		const shared = vi.spyOn(backlog_ready, 'shared_ports')
 
 		await write_stop_decision('not json')
 
-		expect(shared).toHaveBeenCalledOnce()
-		expect(check).toHaveBeenCalledWith(shared.mock.results[0]?.value)
+		expect(check).toHaveBeenCalledWith(backlog_ready.DEFAULT_PORTS)
 	})
 })
 
@@ -74,6 +69,17 @@ function quiet_world(): void {
 	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
 	vi.spyOn(repo_party, 'current_owner').mockReturnValue('joshuafolkken')
 }
+
+it('keeps a named epic session waiting when its child lane is in flight', async () => {
+	quiet_world()
+	vi.mocked(run_headless.must_keep_waiting).mockResolvedValue(true)
+	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+	const payload = JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT })
+
+	await write_stop_decision(payload)
+
+	expect(String(write.mock.calls[0]?.[0])).toContain('⛔ headless parent:')
+})
 
 // The stdout writes of one stop decision on `message`, in a session configured for `lang`.
 async function decide_in(lang: string, message: string): Promise<Array<string>> {
