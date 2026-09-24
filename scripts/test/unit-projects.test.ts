@@ -6,8 +6,15 @@ import { PILOT_FILES } from './pilot-files'
 import { unit_projects, type UnitProject } from './unit-projects'
 import { VITEST_INCLUDE_GLOBS } from './vitest-include-globs'
 
-const { ISOLATED_PROJECT, MAIN_EXCLUDE, PURE_PROJECT, STATE_GUARD, STDOUT_GUARD, UNIT_PROJECTS } =
-	unit_projects
+const {
+	ISOLATED_PROJECT,
+	MAIN_EXCLUDE,
+	PURE_PROJECT,
+	STATE_GUARD,
+	STDOUT_GUARD,
+	TELEGRAM_GUARD,
+	UNIT_PROJECTS,
+} = unit_projects
 
 function project(name: string): UnitProject['test'] {
 	const found = UNIT_PROJECTS.find((entry) => entry.test.name === name)
@@ -100,9 +107,10 @@ describe('the state guard is scoped to the pure project', () => {
 })
 
 // joshuafolkken/kit#2296: the stdout guard must run inside every worker of both projects, so a
-// fixture's direct stream write never leaks into `pnpm josh test:unit`'s output.
-describe('the stdout guard runs on both projects', () => {
-	it.each([PURE_PROJECT, ISOLATED_PROJECT])('sets up the stdout guard on %s', (name) => {
-		expect(project(name).setupFiles).toEqual([...STDOUT_GUARD])
+// fixture's direct stream write never leaks into `pnpm josh test:unit`'s output. joshuafolkken/kit#2494
+// puts the Telegram guard beside it, since it wraps each worker's own `fetch`.
+describe('the per-worker guards run on both projects', () => {
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('sets up both guards on %s', (name) => {
+		expect(project(name).setupFiles).toEqual([...STDOUT_GUARD, ...TELEGRAM_GUARD])
 	})
 })

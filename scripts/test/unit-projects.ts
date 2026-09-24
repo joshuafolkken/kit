@@ -67,6 +67,10 @@ const STATE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-state-guard.ts'
 // worker where the test's writes happen, not once in the main process.
 const STDOUT_GUARD: ReadonlyArray<string> = ['./scripts/test/test-stdout-guard.ts']
 
+// Runs in every worker for the same reason: it wraps that worker's own `fetch`, refusing a real
+// Telegram send and recording which test tried (joshuafolkken/kit#2494).
+const TELEGRAM_GUARD: ReadonlyArray<string> = ['./scripts/test/test-telegram-guard.ts']
+
 interface UnitProjectTest {
 	name: string
 	env: Record<string, string>
@@ -100,7 +104,7 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 			isolate: spec.isolate,
 			testTimeout: TEST_TIMEOUT_MS,
 			globalSetup: [...(spec.globalSetup ?? [])],
-			setupFiles: [...STDOUT_GUARD],
+			setupFiles: [...STDOUT_GUARD, ...TELEGRAM_GUARD],
 		},
 	}
 }
@@ -127,6 +131,7 @@ const unit_projects = {
 	PURE_PROJECT,
 	STATE_GUARD,
 	STDOUT_GUARD,
+	TELEGRAM_GUARD,
 	UNIT_PROJECTS,
 }
 
