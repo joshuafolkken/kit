@@ -355,7 +355,7 @@ finding rather than an authorization — which is why a run parks with it and a 
 **Run the loop as one background `pnpm josh backlog:drive --owner "$PPID" --active "$active"`** and
 end the turn (joshuafolkken/kit#2499); it runs all below. Its exit's first line is the wake:
 `merge <token> #N` → that token's `run:merge` row, `watch` → `run:step`, `window` → re-issue with
-its `resume:` flags, else (`stop`, `launch #N`, `offer`, a verdict) → "Where the run stops".
+its `resume:` flags, else (`stop`, `launch #N`, `offer`, bare `merge #N`) → "Where the run stops".
 
 **The loop's head is one command — `pnpm josh backlog:offer`** (joshuafolkken/kit#2162). It runs
 `backlog:next`, maps its answer to the budget word the table below fixes, runs `backlog:budget`, and

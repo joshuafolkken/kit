@@ -195,13 +195,23 @@ async function output_argv(issue: string): Promise<ReadonlyArray<string>> {
 	return output.code === SUCCESS_EXIT_CODE && output.out !== '' ? ['--output', output.out] : []
 }
 
+// A non-zero `run:merge` prints its token first only for a hand-off (`busy`, `stop`, `retry`); any
+// other first line — pnpm's `[ELIFECYCLE]` note after a crash — reads as no token, never a collection.
+function merge_token(out: string, code: number): string {
+	const token = out.split('\n', FIRST_LINE + 1)[FIRST_LINE] ?? ''
+
+	if (code === SUCCESS_EXIT_CODE || backlog_drive.HANDOFF_TOKENS.has(token)) return token
+
+	return ''
+}
+
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
 // failure exactly as it does for the parent that passes `--output` by hand.
 async function merge(issue: string, owner: string): Promise<string> {
 	const argv = ['run:merge', issue, '--owner', owner, ...(await output_argv(issue))]
 	const result = await josh_command.josh_run(argv, should_forward_stderr)
 
-	return result.out.split('\n', FIRST_LINE + 1)[FIRST_LINE] ?? ''
+	return merge_token(result.out, result.code)
 }
 
 async function launch(issue: string): Promise<boolean> {
@@ -310,7 +320,16 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const backlog_drive_cli = { USAGE, end_line, offer_argv, parse, resume_line, run, to_offer }
+const backlog_drive_cli = {
+	USAGE,
+	end_line,
+	merge_token,
+	offer_argv,
+	parse,
+	resume_line,
+	run,
+	to_offer,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

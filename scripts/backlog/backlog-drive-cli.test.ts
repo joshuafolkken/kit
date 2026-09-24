@@ -113,3 +113,16 @@ describe('backlog_drive_cli output', () => {
 		)
 	})
 })
+
+describe('backlog_drive_cli.merge_token', () => {
+	it('keeps a successful first line and a failed hand-back token', () => {
+		expect(backlog_drive_cli.merge_token('2600\n', 0)).toBe('2600')
+		expect(backlog_drive_cli.merge_token('retry\n', 1)).toBe('retry')
+	})
+
+	it('reads a crashed run:merge as no token rather than a collection', () => {
+		const out = '[ELIFECYCLE] Command failed with exit code 1.'
+
+		expect(backlog_drive_cli.merge_token(out, 1)).toBe('')
+	})
+})
