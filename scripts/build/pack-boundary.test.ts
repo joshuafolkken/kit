@@ -67,6 +67,11 @@ describe('the published package boundary', () => {
 		expect([...packed].some((file) => file.startsWith('scripts/time-runtime/'))).toBe(true)
 	})
 
+	it('ships both Codex project configuration files', () => {
+		expect(packed.has('.codex/config.toml')).toBe(true)
+		expect(packed.has('.codex/hooks.json')).toBe(true)
+	})
+
 	it('ships every distributed command script and its whole static import closure', () => {
 		const missing = [...import_closure.closure(distributed_seeds())]
 			.filter((file) => existsSync(file))

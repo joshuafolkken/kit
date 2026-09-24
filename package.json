@@ -38,6 +38,7 @@
 		".claude/skills",
 		".claude/.claude-plugin",
 		".claude-plugin",
+		".codex",
 		".vscode",
 		".github",
 		"CLAUDE.md",
