@@ -1,6 +1,7 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
@@ -16,6 +17,7 @@ import type { LaneInfo } from './lane-registry'
 // ends with the bare `fullrun #<N>` so the parent's liveness poll keeps matching the relaunched process.
 
 const { SUPERVISED_KEY } = run_ship_detach
+const OPENAI_PROVIDER = 'openai'
 
 type RelaunchResult = LaunchResult | { kind: 'rejected'; note: string }
 
@@ -47,7 +49,20 @@ function relaunch(
 	)
 }
 
-const lane_relaunch = { relaunch }
+// An OpenAI lane's process is started by its supervisor, never by a relaunch — both `run:cut` and the
+// `run:merge` cut fallback ask this one predicate (joshuafolkken/kit#2484).
+function is_openai_lane(lane: LaneInfo): boolean {
+	return lane.profile?.provider === OPENAI_PROVIDER
+}
+
+// The relaunch after a cut: the resume-specific prompt, not the record's bare `fullrun #<N>`
+// (joshuafolkken/kit#2022), so the successor goes straight to `run:cut --resume` without reading the
+// workflow-commands entry documents. Shared by `run:cut` and the `run:merge` fallback (joshuafolkken/kit#2484).
+function resume(lane: LaneInfo, phase: string, on_note: (note: string) => void): RelaunchResult {
+	return relaunch(lane, lane_child_invocation.resume_invocation(lane.issue), phase, on_note)
+}
+
+const lane_relaunch = { is_openai_lane, relaunch, resume }
 
 export type { RelaunchResult }
 export { lane_relaunch }

@@ -6,7 +6,10 @@ import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labe
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_reap } from '#scripts/lane/lane-reap'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { run_carry, type CarryChange, type CarryOwner, type RunCarry } from './run-carry'
+import { run_cut, type RunCut } from './run-cut'
 import { run_merge } from './run-merge'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
@@ -93,6 +96,17 @@ async function apply_carry(
 	}
 
 	return { kind: 'applied', carry: run_carry.apply_change(record.target, record.carry, change) }
+}
+
+// The carry record when this session may not act on it — the same ownership guard `apply_carry` asks —
+// or `undefined`. Asked before an action that counts nothing, like the cut fallback's relaunch, so a
+// stray session is refused rather than relaunching a lane it does not own (joshuafolkken/kit#2484).
+async function refused_carry(ctx: MergeContext): Promise<RunCarry | undefined> {
+	const record = await read_record()
+
+	if (record === undefined || !run_carry.is_count_refused(record.carry, ctx.owner)) return undefined
+
+	return record.carry
 }
 
 async function sync_main(): Promise<void> {
@@ -218,6 +232,53 @@ async function do_outage(ctx: MergeContext): Promise<OutageResult> {
 	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }
 }
 
+interface RelaunchableCut {
+	lane: LaneInfo
+	target: string
+	cut: RunCut
+}
+
+// The lane's cut the fallback may relaunch, or `undefined` (joshuafolkken/kit#2484). An OpenAI lane is
+// left out: its supervisor, not this command, starts the process after a standing cut.
+async function relaunchable_lane(child: string): Promise<LaneInfo | undefined> {
+	const lane = await lane_registry.find_open_lane(child)
+
+	return lane === undefined || lane_relaunch.is_openai_lane(lane) ? undefined : lane
+}
+
+async function relaunchable_cut(child: string): Promise<RelaunchableCut | undefined> {
+	const lane = await relaunchable_lane(child)
+
+	if (lane === undefined) return undefined
+
+	const carried = run_cut.lane_cut_sync(lane.directory)
+
+	if (carried === undefined || !run_cut.is_relaunchable(carried.cut, child)) return undefined
+
+	return { lane, ...carried }
+}
+
+async function has_resumable_cut(child: string): Promise<boolean> {
+	return (await relaunchable_cut(child)) !== undefined
+}
+
+// **The cutting child launches its own successor; this is only the fallback** (joshuafolkken/kit#2484).
+// `lane:await` wakes the parent once every process of the lane has gone, so a cut still unadopted then
+// means the successor never took it over. It is relaunched through the same `lane_relaunch` the cut uses,
+// once per cut — the record is marked first, so a second unadopted return is parked instead. Returns
+// whether a successor was started.
+async function resume_cut(child: string): Promise<boolean> {
+	const found = await relaunchable_cut(child)
+
+	if (found === undefined || !run_cut.mark_merge_relaunched(found.target, found.cut)) return false
+
+	const result = lane_relaunch.resume(found.lane, found.cut.phase, (note) => {
+		console.error(note)
+	})
+
+	return result.kind === 'launched'
+}
+
 // The hand-off check, asked at a merge alone. A subprocess that cannot measure exits non-zero, which
 // is read as `over` — "could not measure" is never "still cheap".
 async function is_over_budget(over: number): Promise<boolean> {
@@ -246,7 +307,10 @@ const run_merge_steps = {
 	do_failed,
 	do_merged,
 	do_outage,
+	has_resumable_cut,
 	is_over_budget,
+	refused_carry,
+	resume_cut,
 }
 
 export type { MergeContext, OutageResult }

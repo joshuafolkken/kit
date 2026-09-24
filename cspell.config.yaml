@@ -10,6 +10,10 @@ words:
   - Kore
   - Hang
   - Hant
+  # A lane child's cut no successor took over, and whether `run:merge` may start that successor itself
+  # (joshuafolkken/kit#2484).
+  - unadopted
+  - relaunchable
   # A Claude Code built-in agent type, `statusline-setup` — enumerated in the known-agent-types set the
   # review-subagent document rule checks against (joshuafolkken/kit#2297).
   - statusline

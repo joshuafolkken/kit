@@ -194,7 +194,7 @@ five lanes: the verdict was read once each at session entry, before the context 
 **0 times** while 33.9% of their requests ran past 200,000 tokens.
 
 So `pnpm josh rule:guard` **refuses an `Edit` / `Write`** while this checkout is a dispatched lane child
-whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N>` — a
+whose recent-context cost is over threshold, handing back `pnpm josh run:cut --impl <N> --handoff <path>` — a
 `PreToolUse` refusal lands *before* the edit, so the tree is at the state the previous edit left it. `cut`
 ends the turn, the rest leave this process implementing; a fresh process's `pnpm josh run:cut --resume
 <N>` then answers **`resume-impl`**, so it **skips the title, plan, hold claim and split assessment** and

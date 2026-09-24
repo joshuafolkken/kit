@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { git_command } from '#scripts/git/git-command'
-import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
@@ -84,6 +83,10 @@ function report_incomplete(cut_record: RunCut): number {
 // The `--handoff` file parsed but the assembled record would not fit the byte bound — the scalar fields
 // carry a handoff that fit alone past the cap (joshuafolkken/kit#2354).
 const HANDOFF_OVERFLOW_NOTE = '--handoff <path> would grow the cut record past its byte bound'
+// A setup or implementation cut resumes into implementation, and that resume refuses a record with no
+// instruction (`incomplete`) — so the cut is refused here instead of relaunching a successor that can
+// only stop (joshuafolkken/kit#2484).
+const HANDOFF_MISSING_NOTE = 'this cut resumes into implementation and needs --handoff <path>'
 
 function report_bad_handoff(note: string): number {
 	console.error(`${note}. Nothing was cut; write the handoff file and reissue.`)
@@ -180,12 +183,7 @@ function report_missing_supervisor(issue: string): number {
 // phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it.
 function relaunch(target: string, lane: LaneInfo, phase: string): number {
 	const notes: Array<string> = []
-	// The relaunched child is given a resume-specific prompt, not the record's bare `fullrun #<N>`
-	// (joshuafolkken/kit#2022), so it goes straight to `run:cut --resume` without reading the
-	// workflow-commands entry documents to learn it is a resume. The prompt still ends with
-	// `fullrun #<N>`, so the parent's liveness poll keeps matching the relaunched process.
-	const invocation = lane_child_invocation.resume_invocation(lane.issue)
-	const result = lane_relaunch.relaunch(lane, invocation, phase, (note) => {
+	const result = lane_relaunch.resume(lane, phase, (note) => {
 		notes.push(note)
 	})
 
@@ -208,12 +206,8 @@ function clear_expired(target: string): void {
 	if (run_cut.read_cut(target).kind === 'expired') run_cut.end_cut(target)
 }
 
-function is_openai_lane(lane: LaneInfo): boolean {
-	return lane.profile?.provider === 'openai'
-}
-
 function has_matching_supervisor(lane: LaneInfo, issue: string): boolean {
-	if (!is_openai_lane(lane)) return true
+	if (!lane_relaunch.is_openai_lane(lane)) return true
 
 	return openai_lane_supervisor.active(lane.directory)?.issue === issue
 }
@@ -239,6 +233,14 @@ async function emit_cut_event(request: CutRequest): Promise<void> {
 	)
 }
 
+// The note a cut record is refused with before it is written, or `undefined` when it may be written.
+function spec_refusal(spec: Parameters<typeof run_cut.begin_cut>[1]): string | undefined {
+	if (!run_cut.has_required_handoff(spec)) return HANDOFF_MISSING_NOTE
+	if (!run_cut.record_within_bound(spec)) return HANDOFF_OVERFLOW_NOTE
+
+	return undefined
+}
+
 async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): Promise<number> {
 	const loaded = run_cut_handoff.load_handoff(request.handoff_path, run_cut.MAX_HANDOFF_BYTES)
 	if (loaded.kind === 'bad') return report_bad_handoff(loaded.note)
@@ -250,12 +252,14 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 		handoff: loaded.handoff,
 	}
 
-	if (!run_cut.record_within_bound(spec)) return report_bad_handoff(HANDOFF_OVERFLOW_NOTE)
+	const spec_note = spec_refusal(spec)
+
+	if (spec_note !== undefined) return report_bad_handoff(spec_note)
 	if (run_cut.begin_cut(target, spec) === undefined) return report_cut_exists(target)
 
 	await emit_cut_event(request)
 
-	return is_openai_lane(lane)
+	return lane_relaunch.is_openai_lane(lane)
 		? report(CUT_VERDICT, SUCCESS_EXIT_CODE)
 		: relaunch(target, lane, request.phase)
 }

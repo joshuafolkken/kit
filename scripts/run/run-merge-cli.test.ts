@@ -16,6 +16,9 @@ const info_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
 const read_exit_mock = vi.hoisted(() => vi.fn())
 const is_outage_mock = vi.hoisted(() => vi.fn())
+const has_resumable_cut_mock = vi.hoisted(() => vi.fn())
+const resume_cut_mock = vi.hoisted(() => vi.fn())
+const refused_carry_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -39,7 +42,10 @@ vi.mock('./run-merge-steps', () => ({
 		do_failed: do_failed_mock,
 		do_merged: do_merged_mock,
 		do_outage: do_outage_mock,
+		has_resumable_cut: has_resumable_cut_mock,
 		is_over_budget: is_over_budget_mock,
+		refused_carry: refused_carry_mock,
+		resume_cut: resume_cut_mock,
 	},
 }))
 
@@ -67,7 +73,15 @@ function state_read(
 	return { kind: 'state', state: { state, labels, is_human_review } }
 }
 
+function reset_cut_mocks(): void {
+	has_resumable_cut_mock.mockReset().mockResolvedValue(false)
+	is_outage_mock.mockReset().mockReturnValue(false)
+	resume_cut_mock.mockReset().mockResolvedValue(true)
+	refused_carry_mock.mockReset().mockResolvedValue(undefined)
+}
+
 beforeEach(() => {
+	reset_cut_mocks()
 	read_issue_mock.mockReset()
 	do_merged_mock.mockReset().mockResolvedValue(undefined)
 	do_failed_mock.mockReset()
@@ -76,7 +90,7 @@ beforeEach(() => {
 	is_over_budget_mock.mockReset().mockResolvedValue(false)
 	emit_mock.mockReset().mockResolvedValue(undefined)
 	read_exit_mock.mockReset().mockReturnValue(undefined)
-	is_outage_mock.mockReset().mockReturnValue(false)
+
 	vi.spyOn(console, 'info').mockImplementation(info_mock.mockReset())
 })
 
@@ -139,11 +153,57 @@ describe('run_merge_cli.run — a failed child', () => {
 	})
 })
 
+// joshuafolkken/kit#2484: a child that ended its session with a cut its successor never adopted is
+// resumed in its own lane — not parked and not counted — while a child that simply stopped is parked.
+const PARKED_FAILURE = { carry: { failures: BELOW_GUARD }, is_parked: true, is_refused: false }
+const OUTPUT_ARGS = [...EPIC_ARGS, '--output', 'child.jsonl']
+
+describe('run_merge_cli.run — a child that ended on a cut', () => {
+	beforeEach(() => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
+		do_failed_mock.mockResolvedValue(PARKED_FAILURE)
+	})
+
+	it('resumes a cut child without parking it or counting a failure', async () => {
+		has_resumable_cut_mock.mockResolvedValue(true)
+
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
+		expect(resume_cut_mock).toHaveBeenCalledWith(CHILD)
+		expect(do_failed_mock).not.toHaveBeenCalled()
+		expect(ask_next_mock).not.toHaveBeenCalled()
+		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.RESUMED_TOKEN)
+		expect(emit_mock).toHaveBeenCalledWith('child-launch', `#${CHILD} resumed from its cut`)
+	})
+
+	it('resumes a cut child even when its exit record is an outage', async () => {
+		has_resumable_cut_mock.mockResolvedValue(true)
+		is_outage_mock.mockReturnValue(true)
+
+		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(SUCCESS)
+		expect(do_outage_mock).not.toHaveBeenCalled()
+		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.RESUMED_TOKEN)
+	})
+
+	it('parks the child as before when its successor could not be relaunched', async () => {
+		has_resumable_cut_mock.mockResolvedValue(true)
+		resume_cut_mock.mockResolvedValue(false)
+
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
+		expect(do_failed_mock).toHaveBeenCalledOnce()
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
+	})
+
+	it('still parks a child that stopped without a cut', async () => {
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
+		expect(resume_cut_mock).not.toHaveBeenCalled()
+		expect(do_failed_mock).toHaveBeenCalledOnce()
+		expect(info_mock).toHaveBeenCalledWith(NEXT)
+	})
+})
+
 // joshuafolkken/kit#2240: a child that could not reach the API is re-dispatched, not parked, and a run
 // of consecutive outages stops the run as an environment failure rather than the children's.
 describe('run_merge_cli.run — an API-outage child', () => {
-	const OUTAGE_ARGS = [...EPIC_ARGS, '--output', 'child.jsonl']
-
 	beforeEach(() => {
 		is_outage_mock.mockReturnValue(true)
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
@@ -152,7 +212,7 @@ describe('run_merge_cli.run — an API-outage child', () => {
 	it('re-dispatches an outage child instead of parking it', async () => {
 		do_outage_mock.mockResolvedValue({ carry: { outages: BELOW_GUARD }, is_refused: false })
 
-		expect(await run_merge_cli.run(OUTAGE_ARGS)).toBe(SUCCESS)
+		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(SUCCESS)
 		expect(do_outage_mock).toHaveBeenCalledOnce()
 		expect(do_failed_mock).not.toHaveBeenCalled()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
@@ -162,7 +222,7 @@ describe('run_merge_cli.run — an API-outage child', () => {
 	it('stops with the environment token when the outage guard trips', async () => {
 		do_outage_mock.mockResolvedValue({ carry: { outages: AT_GUARD }, is_refused: false })
 
-		expect(await run_merge_cli.run(OUTAGE_ARGS)).toBe(SUCCESS)
+		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(SUCCESS)
 		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.ENVIRONMENT_TOKEN)
 		expect(ask_next_mock).not.toHaveBeenCalled()
 	})
@@ -170,7 +230,7 @@ describe('run_merge_cli.run — an API-outage child', () => {
 	it('emits busy when the outage carry count is refused', async () => {
 		do_outage_mock.mockResolvedValue({ carry: { outages: 0, owner_pid: 99_999 }, is_refused: true })
 
-		expect(await run_merge_cli.run(OUTAGE_ARGS)).toBe(FAILURE)
+		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(FAILURE)
 		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
 	})
 })
@@ -214,6 +274,20 @@ describe('run_merge_cli.run — a carry ownership refusal', () => {
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
 		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
 		expect(ask_next_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2484: the cut fallback counts nothing, but relaunching is still the owner's act.
+describe('run_merge_cli.run — a cut fallback from a session that does not own the carry', () => {
+	it('refuses busy without relaunching or parking', async () => {
+		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
+		has_resumable_cut_mock.mockResolvedValue(true)
+		refused_carry_mock.mockResolvedValue({ failures: 0, owner_pid: 99_999 })
+
+		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
+		expect(resume_cut_mock).not.toHaveBeenCalled()
+		expect(do_failed_mock).not.toHaveBeenCalled()
+		expect(info_mock).toHaveBeenCalledWith(run_merge_cli.BUSY_TOKEN)
 	})
 })
 

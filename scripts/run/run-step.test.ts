@@ -109,7 +109,8 @@ describe('run_step.next_action — pre-implementation position', () => {
 })
 
 describe('run_step.next_action — the setup→implementation boundary', () => {
-	const SETUP_CUT_COMMAND = `pnpm josh run:cut ${ISSUE} --setup`
+	// The handoff is named because the resume refuses a setup cut without one (joshuafolkken/kit#2484).
+	const SETUP_CUT_COMMAND = `pnpm josh run:cut ${ISSUE} --setup --handoff <path>`
 
 	it('cuts a dispatched lane child once its plan is posted', () => {
 		expect(run_step.next_action(input({ last_event: KIND.PLAN, is_lane_child: true }))).toEqual({

@@ -17,7 +17,7 @@ derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<
 repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
 plan-posting step → **emit the plan event** so `run:step` can cut at the setup→implementation boundary:
 `pnpm josh run:event --append plan "planned #<N>"` (a no-op outside a run; in a dispatched lane child it
-is what makes the setup context droppable — `run:step` then prints `pnpm josh run:cut <N> --setup`, and
+is what makes the setup context droppable — `run:step` then prints `pnpm josh run:cut <N> --setup --handoff <path>`, and
 the setup-cut guard refuses the first implementation edit until the cut is taken, `scripts/rules/setup-cut.ts`)
 → implement → run the **verification gate** (the full procedure is `chain-rule.md`;
 in outline: refactor → `pnpm josh main:merge` → **a dispatched lane child hands the rest to

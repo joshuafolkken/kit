@@ -240,7 +240,9 @@ function pre_implementation_action(input: StepInput): StepAction {
 	const token = pre_verdict(input)
 
 	if (is_setup_cut_position(input, token)) {
-		return command(`pnpm josh run:cut ${input.issue_number} --setup`)
+		// The resume refuses a setup cut with no instruction, so the command names the handoff file the
+		// setup-cut guard tells the child to write (joshuafolkken/kit#2484).
+		return command(`pnpm josh run:cut ${input.issue_number} --setup --handoff <path>`)
 	}
 
 	return verdict(token)

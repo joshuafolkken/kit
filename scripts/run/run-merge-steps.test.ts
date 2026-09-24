@@ -5,8 +5,11 @@ import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-thresho
 import { git_stash } from '#scripts/git/git-stash'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { run_carry } from './run-carry'
+import { run_cut } from './run-cut'
 
 const add_label_mock = vi.hoisted(() => vi.fn())
 const remove_label_mock = vi.hoisted(() => vi.fn())
@@ -134,6 +137,14 @@ describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () =>
 		expect(remove_label_mock).not.toHaveBeenCalled()
 	})
 
+	it('refused_carry: returns the handed-off record, and nothing when there is no record', async () => {
+		expect(await run_merge_steps.refused_carry(CONTEXT)).toStrictEqual(HANDED_OFF_CARRY)
+
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
+
+		expect(await run_merge_steps.refused_carry(CONTEXT)).toBeUndefined()
+	})
+
 	it('do_merged: refuses an expired record whose budget was handed off', async () => {
 		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'expired', carry: HANDED_OFF_CARRY })
 
@@ -226,5 +237,74 @@ describe('run_merge_steps.do_merged — a lane directory that is no work tree', 
 
 		expect(status_read).not.toHaveBeenCalled()
 		expect(did_close(spies)).toBe(true)
+	})
+})
+
+const CUT_LANE = {
+	issue: CONTEXT.child,
+	branch: `${CONTEXT.child}-lane`,
+	directory: '/lanes/2070',
+	seat: undefined,
+	development_port: undefined,
+	preview_port: undefined,
+	output: undefined,
+	is_stranded: false,
+}
+const LANE_CUT = run_cut.fresh_cut(
+	{
+		issue: CONTEXT.child,
+		branch: CUT_LANE.branch,
+		phase: run_cut.SETUP_PHASE,
+		handoff: { instruction: 'go', completed: [], remaining: [], untouched: [] },
+	},
+	new Date(),
+)
+const CUT_TARGET = '/stub/cut.json'
+const OPENAI_LANE: LaneInfo = {
+	...CUT_LANE,
+	profile: { provider: 'openai', role: 'worker', model: 'gpt-5', effort: 'medium' },
+}
+
+// joshuafolkken/kit#2484: the fallback relaunch of a cut no successor adopted — through the same
+// `lane_relaunch` the cut uses, once per cut, and never for an OpenAI lane whose supervisor owns it.
+describe('run_merge_steps.resume_cut — the fallback relaunch', () => {
+	let relaunch: MockInstance<typeof lane_relaunch.resume>
+	let mark: MockInstance<typeof run_cut.mark_merge_relaunched>
+
+	beforeEach(() => {
+		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(CUT_LANE)
+		vi.spyOn(run_cut, 'lane_cut_sync').mockReturnValue({ target: CUT_TARGET, cut: LANE_CUT })
+		mark = vi.spyOn(run_cut, 'mark_merge_relaunched').mockReturnValue(true)
+		relaunch = vi.spyOn(lane_relaunch, 'resume').mockReturnValue({ kind: 'launched', pid: 1 })
+	})
+
+	it('reads an unadopted cut as resumable and relaunches it at its phase', async () => {
+		expect(await run_merge_steps.has_resumable_cut(CONTEXT.child)).toBe(true)
+		expect(await run_merge_steps.resume_cut(CONTEXT.child)).toBe(true)
+		expect(mark).toHaveBeenCalledOnce()
+		expect(relaunch.mock.calls[0]?.[1]).toBe(run_cut.SETUP_PHASE)
+	})
+
+	it('does not relaunch a cut the fallback already relaunched once', async () => {
+		vi.spyOn(run_cut, 'lane_cut_sync').mockReturnValue({
+			target: CUT_TARGET,
+			cut: { ...LANE_CUT, is_merge_relaunched: true },
+		})
+
+		expect(await run_merge_steps.has_resumable_cut(CONTEXT.child)).toBe(false)
+		expect(await run_merge_steps.resume_cut(CONTEXT.child)).toBe(false)
+		expect(relaunch).not.toHaveBeenCalled()
+	})
+
+	it('leaves an OpenAI lane to its supervisor', async () => {
+		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(OPENAI_LANE)
+
+		expect(await run_merge_steps.has_resumable_cut(CONTEXT.child)).toBe(false)
+	})
+
+	it('reports a relaunch that could not start', async () => {
+		relaunch.mockReturnValue({ kind: 'failed', note: 'no binary' })
+
+		expect(await run_merge_steps.resume_cut(CONTEXT.child)).toBe(false)
 	})
 })
