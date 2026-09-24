@@ -3,8 +3,19 @@ import { behavior_assertion } from './behavior-assertion'
 import { behavior_rules } from './behavior-rules'
 import { behavior_test_fixture } from './behavior-test-fixture'
 
-const { bash_block, bash_line, GIT_STATUS, GIT_COMMIT, GIT_ADD_DRY, JOSH_GIT } =
-	behavior_test_fixture
+const {
+	bash_block,
+	bash_line,
+	bash_result_line,
+	DENIED_BASH,
+	GIT_STATUS,
+	GIT_COMMIT,
+	GIT_ADD_DRY,
+	JOSH_GIT,
+	TOOL_ID,
+} = behavior_test_fixture
+const OTHER_TOOL_ID = 'tool-2'
+const EXECUTION_ERROR = 'fatal: unable to write index'
 
 describe('behavior_rules.is_index_mutation', () => {
 	it('flags direct staging and commit commands', () => {
@@ -52,6 +63,44 @@ describe('behavior_rules.command_of', () => {
 })
 
 describe('behavior_rules.index_mutation_assertion', () => {
+	it.each([GIT_COMMIT, 'git add .'])('ignores a denied Bash call: %s', (command) => {
+		const text = [bash_line(command), bash_result_line(TOOL_ID, true, DENIED_BASH)].join('\n')
+
+		const findings = behavior_rules.index_mutation_assertion.scan(
+			behavior_assertion.parse_transcript(text),
+		)
+
+		expect(findings).toEqual([])
+	})
+
+	it('still flags a call that failed after execution', () => {
+		const text = [bash_line(GIT_COMMIT), bash_result_line(TOOL_ID, true, EXECUTION_ERROR)].join(
+			'\n',
+		)
+
+		const findings = behavior_rules.index_mutation_assertion.scan(
+			behavior_assertion.parse_transcript(text),
+		)
+
+		expect(findings).toHaveLength(1)
+	})
+
+	it('only excludes the call paired with the denial', () => {
+		const text = [
+			bash_line(GIT_COMMIT, TOOL_ID),
+			bash_line('git add .', OTHER_TOOL_ID),
+			bash_result_line(OTHER_TOOL_ID, true, DENIED_BASH),
+		].join('\n')
+
+		const findings = behavior_rules.index_mutation_assertion.scan(
+			behavior_assertion.parse_transcript(text),
+		)
+
+		expect(findings.map((finding) => finding.detail)).toEqual([GIT_COMMIT])
+	})
+})
+
+describe('behavior_rules.index_mutation_assertion existing coverage', () => {
 	it('finds a direct commit and names the assertion and command', () => {
 		const lines = behavior_assertion.parse_transcript(bash_line(GIT_COMMIT))
 

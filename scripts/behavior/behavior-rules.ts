@@ -11,6 +11,8 @@ const BASH_TOOL = 'Bash'
 const TOOL_USE = 'tool_use'
 const COMMAND_KEY = 'command'
 const FIRST_POSITION_OFFSET = 1
+const TOOL_RESULT = 'tool_result'
+const DENIED_BASH_PREFIX = 'Permission to use Bash with command '
 
 // The git subcommands that stage or rewrite the index — the ones `CLAUDE.md` reserves for `pnpm josh
 // git` under "Never stage or mutate the git index on your own". An agent that runs one directly has
@@ -40,9 +42,9 @@ function is_dry_run(segment: string): boolean {
 
 const INDEX_ASSERTION_NAME = 'no-direct-git-index-mutation'
 
-// The Bash command a tool-use block ran, or `undefined` for every other block — a text block, a tool
-// result, or a call to any tool but `Bash`. Read through `json_value.is_record` so a malformed input
-// is treated as absent rather than throwing mid-scan.
+// The Bash command a tool-use block requested, or `undefined` for every other block — a text block,
+// a tool result, or a call to any tool but `Bash`. Read through `json_value.is_record` so a malformed
+// input is treated as absent rather than throwing mid-scan.
 function command_of(block: Block): string | undefined {
 	if (block.type !== TOOL_USE || block.name !== BASH_TOOL) return undefined
 	if (!json_value.is_record(block.input)) return undefined
@@ -62,10 +64,34 @@ function is_index_mutation(command: string): boolean {
 		.some((segment) => INDEX_MUTATION_HEAD.test(segment) && !is_dry_run(segment))
 }
 
+// An errored result alone may mean a command ran and failed. Only the permission layer's refusal
+// identifies a Bash call that never ran; the parser keeps the opening of that result's text.
+function is_denied_result(block: Block): boolean {
+	return (
+		block.type === TOOL_RESULT &&
+		block.result_id !== '' &&
+		block.is_error === true &&
+		block.error_text.startsWith(DENIED_BASH_PREFIX)
+	)
+}
+
+function denied_call_ids(lines: ReadonlyArray<TranscriptLine>): ReadonlySet<string> {
+	return new Set(
+		lines.flatMap((line) =>
+			line.blocks.filter((block) => is_denied_result(block)).map((block) => block.result_id),
+		),
+	)
+}
+
 // The direct index mutations one transcript line ran, each as a finding at that line's position. A
 // line is one assistant content block, so its position is a place a reader can open in the file.
-function line_mutations(line: TranscriptLine, index: number): ReadonlyArray<Finding> {
+function line_mutations(
+	line: TranscriptLine,
+	index: number,
+	denied_ids: ReadonlySet<string>,
+): ReadonlyArray<Finding> {
 	return line.blocks
+		.filter((block) => !denied_ids.has(block.id))
 		.map((block) => command_of(block))
 		.filter((command): command is string => command !== undefined && is_index_mutation(command))
 		.map((command) => ({
@@ -76,7 +102,9 @@ function line_mutations(line: TranscriptLine, index: number): ReadonlyArray<Find
 }
 
 function scan_index_mutation(lines: ReadonlyArray<TranscriptLine>): ReadonlyArray<Finding> {
-	return lines.flatMap((line, index) => line_mutations(line, index))
+	const denied_ids = denied_call_ids(lines)
+
+	return lines.flatMap((line, index) => line_mutations(line, index, denied_ids))
 }
 
 const index_mutation_assertion: Assertion = {
