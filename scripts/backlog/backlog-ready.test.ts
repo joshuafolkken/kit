@@ -1,6 +1,8 @@
+import { josh_command } from '#scripts/josh/josh-run'
 import type { RunCarry } from '#scripts/run/run-carry'
 import { run_event_stream, type RunEvent } from '#scripts/run/run-event-stream'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_headless } from '#scripts/run/run-headless'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
 
 // joshuafolkken/kit#2452: a parent woken five times relayed each progress line without asking for the
@@ -195,5 +197,31 @@ describe('backlog_ready.print_offer_hint', () => {
 
 		await backlog_ready.print_offer_hint(parent)
 		expect(info).toHaveBeenCalledWith(backlog_ready.OFFER_HINT)
+	})
+})
+
+// joshuafolkken/kit#2503: the arrival probe reads the pool bounded, with stderr piped; the pick-up read
+// is unchanged.
+describe('backlog_ready.read_backlog_next', () => {
+	const TIMEOUT_MS = 30_000
+	const BACKLOG_NEXT = 'backlog:next'
+	const ANSWER = { code: 0, out: '2445' }
+
+	beforeEach(() => {
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(undefined)
+	})
+
+	it('bounds the read and pipes stderr when given a timeout', async () => {
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue(ANSWER)
+
+		await expect(backlog_ready.read_backlog_next(TIMEOUT_MS)).resolves.toEqual(ANSWER)
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], false, TIMEOUT_MS)
+	})
+
+	it('keeps the pick-up read unbounded, with stderr forwarded', async () => {
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue(ANSWER)
+
+		await expect(backlog_ready.ready_issues()).resolves.toEqual(['2445'])
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], true, undefined)
 	})
 })

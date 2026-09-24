@@ -352,17 +352,19 @@ finding rather than an authorization — which is why a run parks with it and a 
 
 ## The loop
 
+**Run the loop as one background `pnpm josh backlog:drive --owner "$PPID" --active "$active"`** and
+end the turn (joshuafolkken/kit#2499); it runs all below. Its exit's first line is the wake:
+`merge <token> #N` → that token's `run:merge` row, `watch` → `run:step`, `window` → re-issue with
+its `resume:` flags, else (`stop`, `launch #N`, `offer`, bare `merge #N`) → "Where the run stops".
+
 **The loop's head is one command — `pnpm josh backlog:offer`** (joshuafolkken/kit#2162). It runs
 `backlog:next`, maps its answer to the budget word the table below fixes, runs `backlog:budget`, and
-returns the verdict with the issue numbers to start — the two turns the loop's head used to spend
-folded into one where the parent's context is largest, the same reasoning `run:merge` folded a merge
-event on. What follows is still the single source of both halves' contracts: `backlog:offer` is glue
-over them, so a change to what an answer *means* is a change here.
+returns the verdict with the issues to start. It stays both halves' contract source: what an answer
+*means* changes here.
 
 ```bash
 offer=$(pnpm josh backlog:offer --started "$started" --active "$active")   # alias: josh blo
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630)        # after #1630 merged
-offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after two
+offer=$(pnpm josh backlog:offer --started "$started" --active "$active" --exclude 1630,1631)   # after #1630, #1631 merged
 ```
 
 **The first line of standard output is the budget verdict; on `run`, the issue numbers to start
@@ -383,8 +385,7 @@ of it decide how the mapping is written:**
    `backlogrun` takes no `owner/repo#N` token.** A qualified token was implemented and withdrawn,
    because `--exclude` parses bare integers and feeding one back produces a usage error rather than
    an exclusion (joshuafolkken/kit#1630). Report the other repository's candidates in the run summary
-   and leave them to a session running there — the same one-session-per-repository shape
-   `backlogrun-lanes.md` → "Concurrency" already has.
+   and leave them to a session running there (`backlogrun-lanes.md` → "Concurrency").
 3. **The verdict words are `wait`, `stop`, `retry`, `error` and `none`** — `none` is `epic:next`'s
    `complete` under this command's spelling, and there is no `complete` here. **`retry` is the one
    with no `epic:next` counterpart**: it says GitHub did not answer, which is a statement about the

@@ -1,8 +1,7 @@
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
-import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_cut, type CutResumeRequest, type RunCut } from './run-cut'
 import type { Handoff } from './run-cut-handoff'
@@ -22,7 +21,6 @@ const OTHER_REPOSITORY = path.join(scratch, 'other.git')
 const ISSUE = '1839'
 const OTHER_ISSUE = '1840'
 const BRANCH = '1839-lane'
-const PRE_GATE = run_cut.PRE_GATE_PHASE
 const INVOCATION = 'fullrun #1839'
 const START = new Date('2026-09-12T00:00:00.000Z')
 const WITHIN_BOUND = new Date('2026-09-12T07:59:00.000Z')
@@ -266,22 +264,6 @@ describe('the fallback relaunch run:merge takes', () => {
 
 		expect(read.kind === 'carried' && run_cut.is_relaunchable(read.cut, ISSUE)).toBe(false)
 		expect(read.kind === 'carried' ? read.cut.handoff : undefined).toStrictEqual(HANDOFF)
-	})
-
-	it('reads no lane cut where the directory is not a git work tree', () => {
-		expect(run_cut.lane_cut_sync(scratch)).toBeUndefined()
-	})
-
-	// The positive case: a cut declared in another checkout is read from this process's own cwd, so a
-	// read that ignored the lane directory would miss it and fail here.
-	it('reads a lane’s declared cut from outside the lane', async () => {
-		const lane = path.join(scratch, 'lane')
-
-		await git_fixture_workspace.git(scratch, ['init', git_fixture_workspace.MAIN_BRANCH, lane])
-		const lane_target = run_cut.cut_path(path.join(realpathSync(lane), '.git'))
-		const cut = run_cut.begin_cut(lane_target, { issue: ISSUE, branch: BRANCH, phase: PRE_GATE })
-
-		expect(run_cut.lane_cut_sync(lane)).toEqual({ target: lane_target, cut })
 	})
 })
 

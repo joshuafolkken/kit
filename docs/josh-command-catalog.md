@@ -635,6 +635,16 @@ Say whether a backlogrun may start more work, keep watching, or finish
 
 ---
 
+### `josh backlog:drive` · `josh bld`
+
+> **Audience:** automation · **Side effects:** network
+
+`--owner <pid> [options]`
+
+Run a backlogrun parent loop without the model: collect finished children, ask backlog:offer, launch lanes, and hand back only a token that needs the parent
+
+---
+
 ### `josh backlog:next` · `josh bl`
 
 > **Audience:** automation · **Side effects:** network

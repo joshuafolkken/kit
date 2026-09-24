@@ -21,6 +21,13 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[options]', 'automation', ['network']],
 	},
+	'backlog:drive': {
+		script: 'scripts/backlog/backlog-drive-cli.ts',
+		description:
+			'Run a backlogrun parent loop without the model: collect finished children, ask backlog:offer, launch lanes, and hand back only a token that needs the parent',
+		category: 'AI tools',
+		reference: ['--owner <pid> [options]', 'automation', ['network']],
+	},
 	'backlog:plan': {
 		script: 'scripts/backlog/backlog-plan-cli.ts',
 		description:

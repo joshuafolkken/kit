@@ -57,4 +57,18 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], FORWARDED)
 		expect(result.err).toBe(reason)
 	})
+
+	it('bounds the subprocess when given a timeout, and reads the kill as a failure', async () => {
+		const timeout_ms = 30_000
+
+		stub(undefined, '')
+
+		const result = await josh_command.josh_run([BUDGET], false, timeout_ms)
+
+		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], {
+			...PIPED,
+			timeout: timeout_ms,
+		})
+		expect(result.code).toBe(FALLBACK_EXIT)
+	})
 })
