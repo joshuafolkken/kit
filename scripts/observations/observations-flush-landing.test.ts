@@ -181,6 +181,29 @@ describe('observations_flush — an earlier flush pull request still open', () =
 		expect(git_command.checkout_b).not.toHaveBeenCalled()
 	})
 
+	it('looks only at flush branches', async () => {
+		await flush_message()
+
+		expect(git_gh_command.pr_list_open_with_head_prefix).toHaveBeenCalledWith('observations/')
+	})
+})
+
+describe('observations_flush — the merge progress of an earlier auto-merge flush', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		on_default_branch()
+	})
+
+	it('defers rather than refusing when one merged between the listing and its read', async () => {
+		vi.mocked(git_gh_command.pr_list_open_with_head_prefix).mockResolvedValue([LANDING_PULL])
+		vi.mocked(git_pr_checks.read_merge_progress).mockResolvedValue('merged')
+
+		const message = await flush_message()
+
+		expect(message).toBe(observations_flush_landing.landing_flush_message([LANDING_PULL]))
+		expect(git_command.checkout_b).not.toHaveBeenCalled()
+	})
+
 	it('refuses by name when auto-merge is on but its checks failed, so it will never fire', async () => {
 		vi.mocked(git_gh_command.pr_list_open_with_head_prefix).mockResolvedValue([LANDING_PULL])
 		vi.mocked(git_pr_checks.read_merge_progress).mockResolvedValue('failed')
@@ -190,11 +213,5 @@ describe('observations_flush — an earlier flush pull request still open', () =
 		expect(message).toBe(observations_flush_landing.stuck_flush_message([LANDING_PULL]))
 		expect(git_pr_checks.read_merge_progress).toHaveBeenCalledWith(LANDING_PULL.head_ref)
 		expect(git_command.checkout_b).not.toHaveBeenCalled()
-	})
-
-	it('looks only at flush branches', async () => {
-		await flush_message()
-
-		expect(git_gh_command.pr_list_open_with_head_prefix).toHaveBeenCalledWith('observations/')
 	})
 })

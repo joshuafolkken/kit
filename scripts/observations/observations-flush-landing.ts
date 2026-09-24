@@ -52,11 +52,12 @@ function describe_pull(pull: OpenPull): string {
 }
 
 // **Landing means GitHub will merge it with nobody watching**: auto-merge is on and the merge gate has
-// not failed it — a red check or a conflict leaves auto-merge armed but never firing.
+// not failed it — a red check or a conflict leaves auto-merge armed but never firing. One that merged
+// between the listing and this read has landed, so it defers rather than reading as stuck.
 async function is_landing(pull: OpenPull): Promise<boolean> {
 	if (!pull.has_auto_merge) return false
 
-	return (await git_pr_checks.read_merge_progress(pull.head_ref)) === 'waiting'
+	return (await git_pr_checks.read_merge_progress(pull.head_ref)) !== 'failed'
 }
 
 function landing_flush_message(pulls: ReadonlyArray<OpenPull>): string {
