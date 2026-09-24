@@ -37,7 +37,7 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/document/edit-files-cli.ts',
 		description: 'Apply several content-addressed edits from a plan in one call',
 		category: 'AI tools',
-		reference: ['<plan-path>', 'automation', ['none']],
+		reference: ['<plan-path | ->', 'automation', ['none']],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
