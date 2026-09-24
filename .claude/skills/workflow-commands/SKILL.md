@@ -313,12 +313,13 @@ the title exists and **before** the `gh api … issues` call that creates the Is
 ```bash
 pnpm josh issue:scout "<title>"                                   # alias: josh isc
 pnpm josh issue:scout "<title>" --body "<one-line summary, citing #N where the work follows one>"
+pnpm josh issue:scout "<title>" --body-file <complete-draft.md>
 ```
 
-- **`Duplicates:` is read, not skimmed.** Open each candidate. When an **open** one covers the same
-  work, **do not file**: send a `confirmation` Telegram and stop with the command to run against the
-  existing Issue — "Please run `fullrun #<existing>` to execute this Issue." When none covers it, say
-  so in one line and carry on filing.
+- **`Duplicates:` is read, not skimmed.** Open each candidate and apply `issue-fold-existing.md`
+  before deciding to file. A complete duplicate of an **open** Issue stops with a `confirmation`
+  Telegram and "Please run `fullrun #<existing>` to execute this Issue." A compatible addition follows that file's fold path;
+  a separate deliverable follows the ordinary filing path. A title match alone never authorizes an edit.
 - **A candidate marked `(closed)` is a different answer.** The scan covers what closed recently as
   well as what is open, because the work most likely to be filed twice is the work that just finished.
   A closed candidate that covers the same work means **the work is already done** — so there is nothing

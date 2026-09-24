@@ -71,6 +71,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/fullrun-steps.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/into-target.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/issue-comments.md', bytes: 8192 },
+	{ path: '.claude/skills/workflow-commands/issue-fold-existing.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/needs-human-review.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/observation-filing.md', bytes: 28_672 },
 	// `pre-gate-cut.md` left this per-document budget in joshuafolkken/kit#2289: it became a point-of-use

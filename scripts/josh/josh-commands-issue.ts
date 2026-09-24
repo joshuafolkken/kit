@@ -45,6 +45,12 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<title>... [--not-separable] [--json]', 'automation', ['none']],
 	},
+	'issue:fold-existing': {
+		script: 'scripts/issue/issue-fold-existing-cli.ts',
+		description: 'Assess whether a complete draft can join an unstarted issue',
+		category: 'AI tools',
+		reference: ['<assessment.json>', 'automation', ['none']],
+	},
 	'issue:cite': {
 		script: 'scripts/issue/issue-cite-cli.ts',
 		description: 'Print the paste-ready number-link citation line for each issue, in one call',

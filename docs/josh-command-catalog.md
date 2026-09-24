@@ -905,6 +905,16 @@ Before a second filing: say whether findings from this session fold into one iss
 
 ---
 
+### `josh issue:fold-existing` · `josh isfe`
+
+> **Audience:** automation · **Side effects:** none
+
+`<assessment.json>`
+
+Assess whether a complete draft can join an unstarted issue
+
+---
+
 ### `josh issue:lint` · `josh iln`
 
 > **Audience:** automation · **Side effects:** files

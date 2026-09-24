@@ -950,13 +950,25 @@ Before an issue is filed, answer the two questions every filing asks: has this a
 ```bash
 pnpm josh issue:scout "Stop the gate re-running after every edit"
 pnpm josh issue:scout "<title>" --body "follows on from #1246"
+pnpm josh issue:scout "<title>" --body-file draft.md
 ```
 
 **Options:**
 
 - `--body "<text>"` — supply prose references (`#N`) so the epic half has a number to work from; without one it prints `Epic: not asked`.
+- `--body-file <path>` — 目的・要件・受け入れ条件を含む下書き全文を渡す。読み取り失敗時は候補なしとせず終了する。
 
-The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
+The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. 本文中で明示的に参照した Issue も、見出しが似ていなくても候補に出す。探索が不完全なときは `Duplicates: incomplete` と表示する。The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
+
+### `josh issue:fold-existing`
+
+既存 Issue と下書きの本文・コメント・状態・PR・依存関係を読んだ後、その判定記録から `duplicate` / `fold` / `separate` / `inspect` を返す。判定だけを行い、Issue は更新しない。
+
+```bash
+pnpm josh issue:fold-existing assessment.json --json
+```
+
+JSON には `content`（`duplicate` / `compatible` / `separate` / `unknown`）、`is_open`、`is_unstarted`、`has_pull_request`、`has_complete_read`、`has_dependency_conflict`、`is_separable`、`size_verdict`（`single` / `split`）、`existing_body`、`draft_body`、`verification` を入れる。不明な事実は省略し、`inspect` を得る。`fold` の場合だけ、出力 JSON の `body` に元の本文を保持した追記案が入る。元の本文・コメントが判定時から変わっていないことを再確認してから REST で更新し、`pnpm josh issue:read <N>` で再読する。`separate` は従来の起票経路へ戻る。
 
 ### `josh issue:fold`
 
