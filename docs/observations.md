@@ -327,3 +327,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | medium | prompts/collaboration-workflow/rule-delivery.md:52 | 2026-09-24 | #2510
 - rf:none | none | - | 2026-09-24 | #2510
 - rf:none | none | - | 2026-09-24 | #2545
+- rf:none | none | - | 2026-09-24 | #2549
+- rf:none | none | - | 2026-09-24 | #2549
