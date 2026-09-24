@@ -110,6 +110,29 @@ describe('backlog_arrival.start — what never wakes the parent', () => {
 	})
 })
 
+// Round 2 of the review: `backlog:next` exits 0 on `retry` and `error`, and a baseline read as empty
+// from either would wake the parent for the whole pool a minute later.
+describe('backlog_arrival.answered_issues', () => {
+	it('names the runnable issues of an answered read', () => {
+		expect(backlog_arrival.answered_issues({ code: 0, out: '2445\n2446' })).toEqual([
+			'2445',
+			'2446',
+		])
+	})
+
+	it('reads a --only run as an empty pool', () => {
+		expect(backlog_arrival.answered_issues(undefined)).toEqual([])
+	})
+
+	it.each([
+		{ code: 0, out: 'retry' },
+		{ code: 0, out: 'error' },
+		{ code: 1, out: '' },
+	])('throws on a read that did not answer: $out (exit $code)', (result) => {
+		expect(() => backlog_arrival.answered_issues(result)).toThrow('backlog:next')
+	})
+})
+
 describe('backlog_arrival.arrivals', () => {
 	it('names only the issues absent from the baseline', () => {
 		const reading = { issues: ['2445', '2493'], free_lanes: FREE }

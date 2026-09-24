@@ -1,5 +1,8 @@
+import type { JoshResult } from '#scripts/josh/josh-run'
 import { run_headless } from '#scripts/run/run-headless'
+import { backlog_next } from './backlog-next'
 import { backlog_ready, type ReadyPorts, type ReadyReading } from './backlog-ready'
+import { backlog_stalled } from './backlog-stalled'
 
 // The arrival probe a `backlogrun` parent's `--wait` watcher runs while children are in flight
 // (joshuafolkken/kit#2503). An issue opted in with `auto-ok` mid-run was picked up only when the parent
@@ -22,14 +25,37 @@ import { backlog_ready, type ReadyPorts, type ReadyReading } from './backlog-rea
 // **Every read is bounded.** The probe is awaited inside the watcher's tick loop, so a `gh` call that
 // hangs would otherwise freeze the loop — its `--hours` bound, its liveness ping and the exit that is
 // the parent's wake. A read past `READ_TIMEOUT_MS` is killed and counts as a failed read.
+//
+// **And strict.** `backlog:next` exits 0 on a `retry` (a transport failure) or an `error` verdict, which
+// the lenient pick-up read takes as an empty pool — here that empty baseline is the whole-pool wake the
+// paragraph above rules out, so either verdict, like a non-zero exit, is a read that did not answer.
 
 const PROBE_INTERVAL_MS = 60_000
 const READ_TIMEOUT_MS = 30_000
+const SUCCESS_EXIT_CODE = 0
 const NO_FREE = 0
 const NONE = 0
+const UNANSWERED: ReadonlySet<string> = new Set([
+	backlog_next.VERDICT_TOKENS.error,
+	backlog_next.VERDICT_TOKENS.retry,
+])
+
+// The runnable issues a `backlog:next` result names, or a throw where it did not answer. `undefined` is
+// a `--only` run, whose pool is empty by definition.
+function answered_issues(result: JoshResult | undefined): ReadonlyArray<string> {
+	if (result === undefined) return []
+
+	const lines = result.out.split('\n').map((line) => line.trim())
+
+	if (result.code !== SUCCESS_EXIT_CODE || lines.some((line) => UNANSWERED.has(line))) {
+		throw new Error('`backlog:next` did not answer')
+	}
+
+	return backlog_stalled.ready_tokens(result.out)
+}
 
 async function bounded_ready_issues(): Promise<ReadonlyArray<string>> {
-	return await backlog_ready.answered_ready_issues(READ_TIMEOUT_MS)
+	return answered_issues(await backlog_ready.read_backlog_next(READ_TIMEOUT_MS))
 }
 
 const ARRIVAL_PORTS: ReadyPorts = {
@@ -115,7 +141,7 @@ async function start(
 	return baseline === undefined ? INERT : probe_of(baseline, now_ms + PROBE_INTERVAL_MS, ports)
 }
 
-const backlog_arrival = { INERT, PROBE_INTERVAL_MS, arrivals, start }
+const backlog_arrival = { INERT, PROBE_INTERVAL_MS, answered_issues, arrivals, start }
 
 export type { ArrivalProbe }
 export { backlog_arrival }

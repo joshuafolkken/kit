@@ -19,7 +19,6 @@ import { backlog_stalled } from './backlog-stalled'
 
 const NO_FREE = 0
 const NONE = 0
-const SUCCESS_EXIT_CODE = 0
 
 // The line a woken parent reads. Kept distinct enough that the transcript scan below matches it and no
 // prose that merely mentions it: `ready #2445 #2446 · free lanes 4`.
@@ -69,8 +68,9 @@ function drains_pool(carry: RunCarry | undefined): boolean {
 	return carry === undefined || !run_invocation.has_only(carry.invocation)
 }
 
-// The `backlog:next` read both forms below make, or `undefined` for a `--only` run, which answers none
-// before paying for the network read.
+// The `backlog:next` read, or `undefined` for a `--only` run, which answers none before paying for the
+// network read. A bounded read (joshuafolkken/kit#2503) keeps stderr piped: the arrival probe reads once
+// a minute, and a forwarded refusal would fill the watcher's output.
 async function read_backlog_next(timeout_ms?: number): Promise<JoshResult | undefined> {
 	if (!drains_pool(await run_headless.current_carry())) return undefined
 
@@ -82,19 +82,6 @@ async function ready_issues(): Promise<ReadonlyArray<string>> {
 	const result = await read_backlog_next()
 
 	return result === undefined ? [] : backlog_stalled.ready_tokens(result.out)
-}
-
-// The same read, bounded and strict, for a caller that must tell a failed read from an empty pool
-// (joshuafolkken/kit#2503): the arrival probe, whose baseline read as empty would wake the parent for
-// the whole pool. A timeout or a non-zero exit throws; stderr stays piped, since the probe reads once a
-// minute and a forwarded refusal would fill the watcher's output.
-async function answered_ready_issues(timeout_ms: number): Promise<ReadonlyArray<string>> {
-	const result = await read_backlog_next(timeout_ms)
-
-	if (result === undefined) return []
-	if (result.code !== SUCCESS_EXIT_CODE) throw new Error('`backlog:next` did not answer')
-
-	return backlog_stalled.ready_tokens(result.out)
 }
 
 const DEFAULT_PORTS: ReadyPorts = { free_lane_count, ready_issues }
@@ -224,7 +211,7 @@ async function print_offer_hint(
 const backlog_ready = {
 	DEFAULT_PORTS,
 	OFFER_HINT,
-	answered_ready_issues,
+	read_backlog_next,
 	print_offer_hint,
 	free_lane_count,
 	has_dispatch_call,
