@@ -1285,11 +1285,11 @@ pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --re
 
 `--exclude` / `--repo` forward to `backlog:next`; `--started` / `--active` / `--merged` / `--running` / `--max` / `--idle` forward to `backlog:budget` (`--answer` is computed here). `--running` also decides `wait` (→ `blocked` with children in flight, else `exhausted`) and `--retries` decides `retry` (→ `blocked` below three, `unreadable` at the third). stdout is the verdict, then — on `run` — the issue numbers one per line; the new retry count is the last stderr line (`retries: <n>`) and in `--json`. Exit 1 from `backlog:next` maps to `unreadable`, never `none`.
 
-At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the run's event stream (once per drain, best-effort), so the next `run:step` fires the retrospective before the idle watch (joshuafolkken/kit#2335). A watch opened while children still merge is left unmarked.
+At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the event stream (once per drain, best-effort), so the next `run:step` fires the retrospective before the idle watch (joshuafolkken/kit#2335). A watch opened while children still merge is left unmarked.
 
 ### `josh backlog:drive`
 
-The `backlogrun` parent loop (`run:merge`, `backlog:offer`, `lane:launch`) as one wait. stdout: the hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `stop`, `window`), then `resume: <flags>`.
+The `backlogrun` parent loop (`run:merge`, `backlog:offer`, `lane:launch`) as one wait. stdout: hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `stop`, `window`), then `resume:` flags.
 
 ### `needs-human-review` — the opposite label
 
