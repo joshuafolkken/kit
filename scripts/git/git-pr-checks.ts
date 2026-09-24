@@ -1,8 +1,10 @@
 import { poll } from '#scripts/lib/poll'
+import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
 	describe_pr_failure,
 	evaluate_pr_state,
+	is_auto_merge_blocked,
 	is_review_decision_decisive,
 	type PrEvaluation,
 } from './git-pr-checks-eval'
@@ -312,7 +314,46 @@ async function wait_for_pr_success_default(
 	})
 }
 
+// Where a pull request GitHub merges on its own stands (joshuafolkken/kit#2497). `failed` is what
+// auto-merge never fires under — a red required check, a conflict, a requested change — so a wait on
+// it ends now rather than at the budget; a red check outside the required list is not among them
+// (`is_auto_merge_blocked`). A read that failed answers `waiting`, so a poll asks again.
+type MergeProgress = 'merged' | 'failed' | 'waiting'
+
+async function read_merge_progress(branch_name: string): Promise<MergeProgress> {
+	if (await git_gh_pr_auto_merge.pr_is_merged(branch_name)) return 'merged'
+
+	try {
+		const snapshot = await default_fetch_pr_state(branch_name)
+
+		return is_auto_merge_blocked(snapshot) ? 'failed' : 'waiting'
+	} catch {
+		return 'waiting'
+	}
+}
+
+// **The wait for a pull request GitHub merges on its own.** Once auto-merge is enabled, the merge gate
+// above is the wrong question: the merge lands the moment the checks pass, and a merged pull request
+// never reads as mergeable again, so `wait_for_pr_success` would run out its budget on one that is
+// already in. The budget is the gate's, so the two waits give up alike.
+async function wait_for_pr_merged(branch_name: string): Promise<MergeProgress> {
+	let progress: MergeProgress = 'waiting'
+
+	await poll.poll_until(
+		async () => {
+			progress = await read_merge_progress(branch_name)
+
+			return progress !== 'waiting'
+		},
+		{ attempts: CHECK_MAX_ATTEMPTS, interval_ms: CHECK_WAIT_INTERVAL_MS },
+	)
+
+	return progress
+}
+
 const git_pr_checks = {
+	read_merge_progress,
+	wait_for_pr_merged,
 	wait_for_pr_success: wait_for_pr_success_default,
 }
 
@@ -335,7 +376,7 @@ export {
 	MERGE_GATE_EVALUATOR,
 	SHOULD_ALWAYS_READ_REVIEW_DECISION,
 }
-export type { PrStateFetcher, PrStateEvaluator, ReviewDecisionPredicate }
+export type { MergeProgress, PrStateFetcher, PrStateEvaluator, ReviewDecisionPredicate }
 export {
 	collect_blocking_failures,
 	describe_pr_failure,

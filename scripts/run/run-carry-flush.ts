@@ -20,7 +20,9 @@ import { observation_ledger_home } from '#scripts/observations/observation-ledge
 //
 // **A failed flush is reported, never allowed to keep the record standing.** The lines stay on disk for
 // the next flush, while a record that outlived its run would make the next `--begin` read `busy` — so
-// `--end` clears the record before it flushes, and a flush killed mid-wait leaves only the lines.
+// `--end` clears the record before it flushes. A flush killed before its commit leaves only the lines
+// in the working tree; one killed after it leaves them on its pull request's branch, which GitHub's
+// auto-merge lands once the checks pass (joshuafolkken/kit#2497).
 
 const FLUSH_ARGV: ReadonlyArray<string> = ['observations:flush']
 const SUCCESS_EXIT_CODE = 0

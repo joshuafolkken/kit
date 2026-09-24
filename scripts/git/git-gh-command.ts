@@ -1,10 +1,12 @@
 import { git_gh_issue } from './git-gh-issue'
 import { git_gh_pr } from './git-gh-pr'
+import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_repo } from './git-gh-repo'
 import { git_pr_checks_watch } from './git-pr-checks-watch'
 
 const git_gh_command = {
 	...git_gh_pr,
+	...git_gh_pr_auto_merge,
 	pr_checks_watch: git_pr_checks_watch.pr_checks_watch,
 	...git_gh_issue,
 	...git_gh_repo,
