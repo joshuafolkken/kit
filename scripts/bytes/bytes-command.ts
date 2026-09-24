@@ -1,19 +1,11 @@
 #!/usr/bin/env tsx
 import { existsSync, statSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
 import { entry_read_budget } from '#scripts/document/entry-read-budget'
 
-// The repository-root-relative path resolved to an absolute one, keyed off this file's own location
-// rather than the process cwd — so a path typed the way the budget records it resolves the same from
-// any directory. This script is two levels below the root (`scripts/bytes/`), the same offset
-// `generate-catalog.ts` resolves its output by; it carries no test fixture into the shipped command.
-function package_file(relative_path: string): string {
-	return fileURLToPath(new URL(`../../${relative_path}`, import.meta.url))
-}
-
-// The repository root, the base `entry-read-budget.ts` measures each entry's total read against — the
-// same two-levels-up offset `package_file` resolves a document by.
+// The package root, resolved from this file rather than the caller's working directory.
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
 // `josh bytes` — the byte counterpart of `josh lines` (joshuafolkken/kit#2176). A mandated
@@ -47,8 +39,12 @@ interface DocumentStatus {
 	remaining: number
 }
 
-function status_of(relative_path: string, recorded: number): DocumentStatus {
-	const current = statSync(package_file(relative_path)).size
+function status_of(
+	relative_path: string,
+	recorded: number,
+	root: string = REPO_ROOT,
+): DocumentStatus {
+	const current = statSync(path.join(root, relative_path)).size
 	const remaining = document_byte_budget.remaining_bytes(recorded, current)
 
 	return { path: relative_path, current, recorded, remaining }
@@ -79,14 +75,14 @@ function normalized_path(argument: string): string {
 	return argument.startsWith('./') ? argument.slice('./'.length) : argument
 }
 
-function argument_row(argument: string): string {
+function argument_row(argument: string, root: string = REPO_ROOT): string {
 	const relative_path = normalized_path(argument)
 	const recorded = document_byte_budget.recorded_bytes_for(relative_path)
 
 	if (recorded === undefined) return `${relative_path}${ROW_GAP}${NOT_BUDGETED}`
-	if (!existsSync(package_file(relative_path))) return `${relative_path}${ROW_GAP}${NOT_A_FILE}`
+	if (!existsSync(path.join(root, relative_path))) return `${relative_path}${ROW_GAP}${NOT_A_FILE}`
 
-	return status_row(status_of(relative_path, recorded))
+	return status_row(status_of(relative_path, recorded, root))
 }
 
 // A document is "near its ceiling" once less than this is left before its recorded block ceiling —
@@ -99,10 +95,11 @@ const NEAR_CEILING_BYTES = 512
 // one that merely has little room left. A document freshly recorded to its block sits with the whole
 // block of headroom and is left out, so the scan surfaces what is moving toward its ceiling rather
 // than the whole budget.
-function near_ceiling_statuses(): ReadonlyArray<DocumentStatus> {
-	return document_byte_budget.DOCUMENT_BYTE_BUDGET.map((entry) =>
-		status_of(entry.path, entry.bytes),
+function near_ceiling_statuses(root: string = REPO_ROOT): ReadonlyArray<DocumentStatus> {
+	return document_byte_budget.DOCUMENT_BYTE_BUDGET.filter((entry) =>
+		existsSync(path.join(root, entry.path)),
 	)
+		.map((entry) => status_of(entry.path, entry.bytes, root))
 		.filter((status) => status.remaining < NEAR_CEILING_BYTES)
 		.toSorted((left, right) => left.remaining - right.remaining)
 }
