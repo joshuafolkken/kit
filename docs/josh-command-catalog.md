@@ -341,7 +341,7 @@ Merge origin default branch into the current branch
 
 _No arguments._
 
-Checkout default branch and pull latest (refuses inside a lane)
+Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane)
 
 ---
 
