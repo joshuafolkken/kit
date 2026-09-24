@@ -168,3 +168,17 @@ describe('merge_sonar_properties multicriteria edge cases', () => {
 		expect(result).toContain('sonar.issue.ignore.multicriteria=e1,e2,e3,e4,e5,e6,e7,e8\n')
 	})
 })
+
+describe('merge_sonar_properties template ID conflicts', () => {
+	it('does not reuse an ID assigned to another template criterion', () => {
+		const existing = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e5\nsonar.issue.ignore.multicriteria.e1.ruleKey=custom:rule\nsonar.issue.ignore.multicriteria.e1.resourceKey=custom/**\nsonar.issue.ignore.multicriteria.e5.ruleKey=template:A\nsonar.issue.ignore.multicriteria.e5.resourceKey=a/**\n`
+		const template = `${EXISTING}sonar.issue.ignore.multicriteria=e1,e5\nsonar.issue.ignore.multicriteria.e1.ruleKey=template:A\nsonar.issue.ignore.multicriteria.e1.resourceKey=a/**\nsonar.issue.ignore.multicriteria.e5.ruleKey=template:B\nsonar.issue.ignore.multicriteria.e5.resourceKey=b/**\n`
+		const result = init_logic.merge_sonar_properties(existing, template)
+
+		expect(result).toContain('sonar.issue.ignore.multicriteria=e1,e5,e6,e7\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e6.ruleKey=template:A\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e7.ruleKey=template:B\n')
+		expect(result).toContain('sonar.issue.ignore.multicriteria.e7.resourceKey=b/**\n')
+		expect(init_logic.merge_sonar_properties(result, template)).toBe(result)
+	})
+})

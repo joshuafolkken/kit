@@ -107,11 +107,7 @@ function allocate_criterion_id(used_ids: Set<string>): string {
 		if (numeric_id !== undefined) next_index = Math.max(next_index, Number(numeric_id) + 1)
 	}
 
-	const next_id = `e${next_index.toString()}`
-
-	used_ids.add(next_id)
-
-	return next_id
+	return `e${next_index.toString()}`
 }
 
 function rename_criterion(template: string, id: string, replacement_id: string): string {
@@ -141,13 +137,15 @@ function find_matching_criterion(
 function resolve_multicriteria_conflicts(existing: string, template: string): string {
 	const existing_ids = get_multicriteria_ids(existing)
 	const template_ids = get_multicriteria_ids(template)
-	const used_ids = new Set([...existing_ids, ...template_ids])
+	const reusable_ids = existing_ids.filter((id) => !template_ids.includes(id))
 	let resolved = template
 
 	for (const id of template_ids) {
 		if (!existing_ids.includes(id) || !has_criterion_conflict(existing, resolved, id)) continue
-		const matching_id = find_matching_criterion(existing, resolved, existing_ids, id)
-		const replacement_id = matching_id ?? allocate_criterion_id(used_ids)
+		const matching_id = find_matching_criterion(existing, resolved, reusable_ids, id)
+		const replacement_id =
+			matching_id ??
+			allocate_criterion_id(new Set([...existing_ids, ...get_multicriteria_ids(resolved)]))
 
 		resolved = rename_criterion(resolved, id, replacement_id)
 	}
