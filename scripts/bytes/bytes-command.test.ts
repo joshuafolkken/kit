@@ -1,3 +1,7 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { document_byte_budget } from '#scripts/document/document-byte-budget'
 import { describe, expect, it } from 'vitest'
 import { bytes_command } from './bytes-command'
 
@@ -5,6 +9,7 @@ const { argument_row, entry_row, entry_rows, near_ceiling_statuses } = bytes_com
 const { scan_lines, status_row, NOT_A_FILE, NOT_BUDGETED } = bytes_command
 
 const JOSH_COMMANDS = 'docs/josh-commands.md'
+const TEMP_PREFIX = 'kit-bytes-'
 
 describe('status_row — one budgeted document', () => {
 	it('names the headroom left when within the ceiling', () => {
@@ -47,12 +52,34 @@ describe('argument_row — a path handed on the command line', () => {
 	})
 
 	it('says no-file for a budgeted path the tree does not hold', () => {
-		// Every real budget entry exists, so the branch is exercised through the reason it prints.
-		expect(NOT_A_FILE).toContain('no file')
+		const package_root = mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX))
+
+		try {
+			expect(argument_row(JOSH_COMMANDS, package_root)).toContain(NOT_A_FILE)
+		} finally {
+			rmSync(package_root, { recursive: true, force: true })
+		}
 	})
 })
 
 describe('near_ceiling_statuses — the no-argument scan', () => {
+	it('skips documents absent from a published package without losing present ones', () => {
+		const package_root = mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX))
+		const document = path.join(package_root, JOSH_COMMANDS)
+		const recorded = document_byte_budget.recorded_bytes_for(JOSH_COMMANDS)
+
+		try {
+			expect(near_ceiling_statuses(package_root)).toStrictEqual([])
+			mkdirSync(path.dirname(document), { recursive: true })
+			writeFileSync(document, 'x'.repeat(recorded ?? 0))
+			expect(near_ceiling_statuses(package_root).map((status) => status.path)).toStrictEqual([
+				JOSH_COMMANDS,
+			])
+		} finally {
+			rmSync(package_root, { recursive: true, force: true })
+		}
+	})
+
 	it('reports only documents near their ceiling, least headroom first', () => {
 		const statuses = near_ceiling_statuses()
 		const headrooms = statuses.map((status) => status.remaining)
