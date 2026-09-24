@@ -57,6 +57,10 @@ const FIXED_NOTE =
 	'review fixes applied in place — recorded; the gate re-runs on the fixed tree and round 2 follows the commit.'
 const BLOCKING_NOTE =
 	'review found High/Medium it did not fix — recorded; fix them, then take the round-2 route (`chain-rule.md`).'
+const UNVERIFIED_OUTCOME: RoundOutcome = {
+	is_passing: false,
+	note: 'review fixes did not pass the scoped checks — recorded as unfixed; fix them, then take the round-2 route (`chain-rule.md`).',
+}
 const ROUND_TWO_CLEAN_NOTE = 'round 2 clean or Low-only — recorded; shipping on.'
 const ROUND_TWO_BLOCKING_NOTE =
 	'round 2 found High/Medium or edited the tree — recorded; round 2 is final: fix, push and gate it, then run followup (`chain-rule.md` step 4).'
@@ -79,7 +83,8 @@ function reviewer_prompt(brief_path: string, findings_path: string): string {
 		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
 		'Apply a fix only for a Medium finding whose fix is small and local — a one-function refactor, an',
 		'added test, an added guard; never fix a High or a change that reaches beyond one place, and never',
-		'commit, stage or push.',
+		'commit, stage or push. After any fix, run `pnpm josh lint:related && pnpm josh test:related` and',
+		'return only once both are green; revert a fix you cannot get green and report that finding unfixed.',
 		findings_instruction(findings_path, `, prefixing a finding you fixed with "${FIXED_PREFIX}"`),
 	].join(' ')
 }
@@ -159,6 +164,7 @@ function round_two_outcome(verdict: ScoredVerdict): RoundOutcome {
 
 const run_ship_review = {
 	FIXED_PREFIX,
+	UNVERIFIED_OUTCOME,
 	VERDICT,
 	read_verdict,
 	reviewer_prompt,

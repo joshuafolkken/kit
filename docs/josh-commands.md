@@ -1744,7 +1744,7 @@ A re-run resumes (joshuafolkken/kit#2426): a per-issue stage record, honored onl
 state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged
 as a `ship-stage` trace event.
 
-`--review` (#2427) runs review round 1 beside the gate. The round-1 reviewer fixes a small, local Medium in place and marks it `fixed ` in its findings (#2489); a High, an unfixed Medium or a refusal stops the ship. After the commit a `round-2` stage asks `review:round2 --round-1-closed` and, on `required`, runs the scoped pair, `review:brief --round 2`, a fresh read-only reviewer session over the fix delta, `review:attest --check` and `review:record` — anything but a clean or Low-only round 2 stops before `followup`.
+`--review` (#2427) runs review round 1 beside the gate, after any scoped check not yet green (#2500). The round-1 reviewer fixes a small, local Medium in place and marks it `fixed ` (#2489), counted once the scoped pair is green; a High, an unfixed Medium or a refusal stops the ship. After the commit a `round-2` stage asks `review:round2 --round-1-closed` and, on `required`, runs the scoped pair, `review:brief --round 2`, a fresh read-only reviewer, attest and record — anything but a clean or Low-only round 2 stops before `followup`.
 
 `--detach` (#2428; implied in a lane child, #2457): a supervisor; a stop emits `ship-stop` (`--log <N>`).
 

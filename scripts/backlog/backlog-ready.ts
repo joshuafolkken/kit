@@ -1,4 +1,4 @@
-import { josh_command } from '#scripts/josh/josh-run'
+import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import type { RunCarry } from '#scripts/run/run-carry'
@@ -68,14 +68,20 @@ function drains_pool(carry: RunCarry | undefined): boolean {
 	return carry === undefined || !run_invocation.has_only(carry.invocation)
 }
 
+// The `backlog:next` read, or `undefined` for a `--only` run, which answers none before paying for the
+// network read. A bounded read (joshuafolkken/kit#2503) keeps stderr piped: the arrival probe reads once
+// a minute, and a forwarded refusal would fill the watcher's output.
+async function read_backlog_next(timeout_ms?: number): Promise<JoshResult | undefined> {
+	if (!drains_pool(await run_headless.current_carry())) return undefined
+
+	return await josh_command.josh_run(['backlog:next'], timeout_ms === undefined, timeout_ms)
+}
+
 // The runnable issues for this checkout, read the way a loop reads them: `backlog:next`'s numeric lines.
-// A `--only` run answers none before paying for the network read.
 async function ready_issues(): Promise<ReadonlyArray<string>> {
-	if (!drains_pool(await run_headless.current_carry())) return []
+	const result = await read_backlog_next()
 
-	const result = await josh_command.josh_run(['backlog:next'], true)
-
-	return backlog_stalled.ready_tokens(result.out)
+	return result === undefined ? [] : backlog_stalled.ready_tokens(result.out)
 }
 
 const DEFAULT_PORTS: ReadyPorts = { free_lane_count, ready_issues }
@@ -205,6 +211,7 @@ async function print_offer_hint(
 const backlog_ready = {
 	DEFAULT_PORTS,
 	OFFER_HINT,
+	read_backlog_next,
 	print_offer_hint,
 	free_lane_count,
 	has_dispatch_call,
