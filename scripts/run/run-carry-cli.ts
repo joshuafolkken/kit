@@ -8,10 +8,9 @@ import {
 	type RunCarry,
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
+import { run_carry_flush } from './run-carry-flush'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
-import { run_headless } from './run-headless'
-import { run_relay_seat } from './run-relay-seat'
 import { run_stop_notify } from './run-stop-notify'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts
@@ -294,14 +293,6 @@ function blocked_count(
 	return undefined
 }
 
-// An attached session that cuts keeps the relay seat past the hand-off (joshuafolkken/kit#2480); a
-// headless successor's cut leaves it where it is, on the session a person is watching.
-function take_relay_seat(target: string, carry: RunCarry, request: CountRequest): void {
-	if (is_cut_count(request) && !run_headless.is_headless()) {
-		run_relay_seat.take(target, request.owner.pid, carry.started_at)
-	}
-}
-
 // A count against a record that is not there is `none` and exits non-zero: the loop believed it was
 // carrying a budget and it was not, and a silent zero would let the run keep its own tally instead. A
 // count against a record this session no longer owns is refused, and a cut past the cap carries on
@@ -322,7 +313,6 @@ async function count(
 
 	const carry = run_carry.apply_change(target, read.carry, request.change)
 
-	take_relay_seat(target, carry, request)
 	await record_retrospective(request)
 
 	return read.kind === 'expired'
@@ -333,7 +323,10 @@ async function count(
 // **A stop over a record that is still there pushes one ⏸️ confirmation before the record goes**
 // (joshuafolkken/kit#2136). `plan` is read from the record `--end` is about to remove, so the second
 // `--end` reads `none` and plans nothing — one stop never notifies twice. A clean `--end` passes no
-// reason and stays silent, because a completed run has its own notification.
+// reason and stays silent, because a completed run has its own notification. The batch's one ledger
+// flush rides the same read for the same reason (joshuafolkken/kit#2492, `run-carry-flush.ts`), and
+// runs last: it waits out a pull request's CI, so a flush cut short must find the record already gone
+// and the stop already announced.
 async function finish(
 	target: string,
 	stopped: string | undefined,
@@ -346,6 +339,8 @@ async function finish(
 	const notice = run_stop_notify.plan(read, stopped)
 
 	if (notice !== undefined) await run_stop_notify.announce(notice)
+
+	if (read.kind !== 'none') await run_carry_flush.flush_ledger()
 
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, SUCCESS_EXIT_CODE)
 

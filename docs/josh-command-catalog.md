@@ -1179,9 +1179,9 @@ Open a run in one call: claim the tree, read the budget, bundle the reads, decid
 
 > **Audience:** automation · **Side effects:** files
 
-`--append <kind> <text> | --from|--follow <n> | --last`
+`--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last`
 
-Append to or read the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --last)
+Append to, read or watch the run’s append-only event stream (--append <kind> <text> | --from|--follow <n> | --watch [<n>] | --last)
 
 ---
 

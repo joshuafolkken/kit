@@ -214,15 +214,17 @@ describe('josh run:wake --list — a person can see what is running', () => {
 	})
 })
 
-// joshuafolkken/kit#2207: after a cut the ambient surface is the run's event stream, followed from
-// `--list`, with `tail -F` on the raw stream named as a recovery path rather than the ambient one.
+// joshuafolkken/kit#2207, joshuafolkken/kit#2492: after a cut the ambient surface is the run's event
+// stream, watched from a pane of its own that `--list` names, with `tail -F` on the raw stream named as
+// a recovery path rather than the ambient one — never a follow for the conversation to relay.
 describe('josh run:wake --list — the ambient surface across the cut', () => {
-	it('names the follow reader and the stream to recover from across the cut', async () => {
+	it('names the watch pane and the stream to recover from across the cut', async () => {
 		write_carry(false)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
 
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
-		expect(errors.join('\n')).toContain('pnpm josh run:event --follow')
+		expect(errors.join('\n')).toContain('pnpm josh run:event --watch')
+		expect(errors.join('\n')).not.toContain('run:event --follow')
 		expect(errors.join('\n')).toContain(`tail -F ${event_target()}`)
 	})
 })

@@ -19,6 +19,9 @@ import { run_event_stream } from './run-event-stream'
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
 }))
+vi.mock('./run-carry-flush', () => ({
+	run_carry_flush: { flush_ledger: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)

@@ -61,7 +61,7 @@ describe('write_stop_decision — the stall check is wired', () => {
 	})
 })
 
-// A quiet world: no hold, no cut, no backlog, no relay — so the reply is all that is judged.
+// A quiet world: no hold, no cut, no backlog — so the reply is all that is judged.
 function quiet_world(): void {
 	vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
 	vi.spyOn(run_stranded_detect, 'run_stranded_check').mockResolvedValue(undefined)
