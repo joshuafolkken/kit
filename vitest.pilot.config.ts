@@ -15,6 +15,7 @@ export default defineConfig({
 		isolate: false,
 		testTimeout: TEST_TIMEOUT_MS,
 		globalSetup: ['./scripts/test/test-network-guard.ts', './scripts/test/test-state-guard.ts'],
+		setupFiles: ['./scripts/test/test-telegram-guard.ts'],
 		coverage: {
 			provider: 'v8',
 		},

@@ -10,7 +10,9 @@ import {
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shim_shell } from '#scripts/build/shim-shell'
+import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { test_repository_guard, type WriteGuard } from './test-repository-guard'
+import { GUARD_LOG_KEY } from './unit-guard-environment'
 
 // The unit suite must not reach the network, and until joshuafolkken/kit#1353 nothing said so out
 // loud. One test in `epic-bundle-cli.test.ts` mocked the listing read but not the per-issue relation
@@ -83,6 +85,15 @@ const GUARD_DIRECTORY = path.join(
 	PROJECT_ROOT,
 	'node_modules',
 	'.cache',
+	`${GUARD_PREFIX}${String(process.pid)}`,
+)
+// Where the run's host-shared records land instead of the real temp root (joshuafolkken/kit#2494,
+// `platform-temporary.ts`). **Beside the real root rather than inside `GUARD_DIRECTORY`**, because
+// some of those records are Unix sockets, and a socket path under a checkout's `node_modules/.cache`
+// runs past the 104-byte limit macOS puts on one. The platform root is resolved directly, not read
+// from `PLATFORM_TEMP_ROOT`, so a suite nested inside another's test does not nest its root.
+const TEMPORARY_ROOT = path.join(
+	platform_temporary.resolve_temporary_root(process.platform),
 	`${GUARD_PREFIX}${String(process.pid)}`,
 )
 // One record for both shims. Each line starts with the binary's own name, so a mixed run still says
@@ -372,10 +383,14 @@ function read_log(log_file: string): string | undefined {
 }
 
 // `globalSetup` runs before any worker is forked, so the workers inherit this `PATH` and every `gh`
-// and `git` they spawn — directly or through a CLI subprocess of their own — resolves to a shim.
-function arm(directory: string = GUARD_DIRECTORY): void {
+// and `git` they spawn — directly or through a CLI subprocess of their own — resolves to a shim. They
+// inherit the record's path for the in-process Telegram guard and the redirected temp root with it.
+function arm(directory: string = GUARD_DIRECTORY, temporary_root: string = TEMPORARY_ROOT): void {
 	install_shim(directory)
+	mkdirSync(temporary_root, { recursive: true })
 	process.env['PATH'] = `${directory}${path.delimiter}${process.env['PATH'] ?? ''}`
+	process.env[GUARD_LOG_KEY] = log_in(directory)
+	process.env[platform_temporary.TEMP_ROOT_KEY] = temporary_root
 }
 
 // Thrown rather than logged: a warning on a suite that already exited 0 is a warning nobody reads,
@@ -396,10 +411,18 @@ function disarm(directory: string = GUARD_DIRECTORY): void {
 }
 
 // Vitest's `globalSetup` contract: a named `setup` whose return value becomes the teardown.
+function teardown(): void {
+	try {
+		disarm()
+	} finally {
+		rmSync(TEMPORARY_ROOT, { recursive: true, force: true })
+	}
+}
+
 function setup(): () => void {
 	arm()
 
-	return disarm
+	return teardown
 }
 
 const test_network_guard = {
@@ -424,6 +447,7 @@ const test_network_guard = {
 	log_in,
 	resolve_binary,
 	shim_script,
+	TEMPORARY_ROOT,
 }
 
 export { setup, test_network_guard }

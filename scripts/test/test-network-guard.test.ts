@@ -1,9 +1,12 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
+import { run_event_stream } from '#scripts/run/run-event-stream'
 import { execaSync } from 'execa'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { test_network_guard } from './test-network-guard'
+import { GUARD_LOG_KEY } from './unit-guard-environment'
 
 // joshuafolkken/kit#1353. Every defect this guard can have fails *open*: a shim that cannot run, a
 // record that cannot be read and a clean run are indistinguishable from the outside, and each one
@@ -25,6 +28,7 @@ const FETCH_ARGUMENTS = ['fetch', 'origin']
 // A read that touches nothing outside the checkout, so it must reach the real binary.
 const LOCAL_ARGUMENTS = ['rev-parse', '--is-inside-work-tree']
 const RECORDED_FETCH = 'git fetch origin'
+const TEMPORARY_ROOT_NAME = 'records'
 // A name no `PATH` entry can hold, so the "not found" answer is exercised without depending on what
 // this machine happens to have installed.
 const ABSENT_BINARY = 'josh-no-such-binary-1515'
@@ -45,6 +49,27 @@ afterEach(() => {
 	for (const directory of directories) rmSync(directory, { recursive: true, force: true })
 	directories.length = 0
 })
+
+// `arm` writes to the worker's own environment, and a case that armed a scratch guard must hand the
+// rest of the worker back the real one — a leaked record path sends another test's findings nowhere.
+const ARMED_KEYS: ReadonlyArray<string> = ['PATH', GUARD_LOG_KEY, platform_temporary.TEMP_ROOT_KEY]
+
+function snapshot_environment(): Record<string, string | undefined> {
+	return Object.fromEntries(ARMED_KEYS.map((key) => [key, process.env[key]]))
+}
+
+function restore_environment(snapshot: Record<string, string | undefined>): void {
+	for (const [key, value] of Object.entries(snapshot)) {
+		if (value === undefined) Reflect.deleteProperty(process.env, key)
+		else process.env[key] = value
+	}
+}
+
+// A temp root inside a tracked scratch directory. `arm`'s default is the real run's root keyed on
+// this worker's pid, which nothing would remove.
+function scratch_temporary_root(): string {
+	return path.join(temporary_directory(), TEMPORARY_ROOT_NAME)
+}
 
 // A guard installed in a directory of its own, answering with that directory — the one thing every
 // call takes, since the shim and its record both live inside it.
@@ -208,16 +233,48 @@ describe('test_network_guard.disarm — the three answers it has to tell apart',
 
 describe('test_network_guard.arm — what the workers inherit', () => {
 	it('puts the shim in front of the real gh on PATH', () => {
-		const original = process.env['PATH']
+		const original = snapshot_environment()
 		const directory = temporary_directory()
 
 		try {
-			test_network_guard.arm(directory)
+			test_network_guard.arm(directory, scratch_temporary_root())
 
-			expect(process.env['PATH']).toBe(`${directory}${path.delimiter}${original ?? ''}`)
+			expect(process.env['PATH']).toBe(`${directory}${path.delimiter}${original['PATH'] ?? ''}`)
 		} finally {
-			process.env['PATH'] = original
+			restore_environment(original)
 		}
+	})
+
+	// joshuafolkken/kit#2494: the in-process Telegram guard has no baked-in path, so it reads the record
+	// from here, and the host-shared records follow the temp root it points at.
+	it('hands the workers the record and a temp root of their own', () => {
+		const original = snapshot_environment()
+		const directory = temporary_directory()
+		const temporary_root = scratch_temporary_root()
+
+		try {
+			test_network_guard.arm(directory, temporary_root)
+
+			expect(process.env[GUARD_LOG_KEY]).toBe(test_network_guard.log_in(directory))
+			expect(process.env[platform_temporary.TEMP_ROOT_KEY]).toBe(temporary_root)
+			expect(existsSync(temporary_root)).toBe(true)
+		} finally {
+			restore_environment(original)
+		}
+	})
+})
+
+// The run's own records — the run event stream the parent session relays among them — must land in
+// the armed temp root, never in the host's real one (joshuafolkken/kit#2494).
+describe('test_network_guard — the records this run writes', () => {
+	it('keys the run event stream under the armed temp root', () => {
+		const stream = run_event_stream.target_of(process.cwd())
+
+		expect(path.dirname(stream)).toBe(PLATFORM_TEMP_ROOT)
+		expect(path.basename(PLATFORM_TEMP_ROOT).startsWith(test_network_guard.GUARD_PREFIX)).toBe(true)
+		expect(path.dirname(PLATFORM_TEMP_ROOT)).toBe(
+			platform_temporary.resolve_temporary_root(process.platform),
+		)
 	})
 })
 

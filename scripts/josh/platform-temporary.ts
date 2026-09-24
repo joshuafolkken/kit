@@ -42,8 +42,25 @@ function resolve_temporary_root(
 	return can_write(POSIX_TEMP_ROOT) ? POSIX_TEMP_ROOT : tmpdir()
 }
 
-const PLATFORM_TEMP_ROOT = resolve_temporary_root(process.platform)
+// **An explicit root wins, and the unit suite is who sets one** (joshuafolkken/kit#2494). Every
+// record keyed here is shared by the whole host, so a unit test that drove a writer for real wrote
+// into the live run's records — progress lines for issues the run never touched, relayed to the
+// session watching it. The network guard's `arm` points this at a directory of its own before any
+// worker forks, so every process of one test run shares a root no real run reads, and `disarm`
+// removes it with the rest of the guard.
+const TEMP_ROOT_KEY = 'JOSH_TEMP_ROOT'
 
-const platform_temporary = { resolve_temporary_root, is_writable_directory }
+function temporary_root(override: string | undefined, platform: string): string {
+	return override === undefined || override === '' ? resolve_temporary_root(platform) : override
+}
+
+const PLATFORM_TEMP_ROOT = temporary_root(process.env[TEMP_ROOT_KEY], process.platform)
+
+const platform_temporary = {
+	TEMP_ROOT_KEY,
+	resolve_temporary_root,
+	is_writable_directory,
+	temporary_root,
+}
 
 export { platform_temporary, PLATFORM_TEMP_ROOT, POSIX_TEMP_ROOT }
