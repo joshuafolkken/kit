@@ -1554,7 +1554,7 @@ rather than continuing blind.
 
 The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while a `--setup` / `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
 
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`). `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
+**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or a `--setup` / `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
 
 ### `josh run:liveness`
 
@@ -1678,13 +1678,18 @@ or `already-done`) is left alone; an **outage** child (OPEN, unparked, exit reco
 reach the API — joshuafolkken/kit#2240) has its stale `in-progress` dropped but is **not** parked and
 **not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
 stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
+A **cut** child (OPEN, unparked, its lane holding a declared cut with its handoff that no successor
+adopted — joshuafolkken/kit#2484) is neither parked nor counted: its successor is relaunched in the same
+lane through the relaunch the cut itself uses, once per cut; a relaunch that cannot start, or a second
+unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
 `--output <path>` names the transcript the outage split reads; absent, it is off.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
 `over` (the merge crossed the shared 135,000 context threshold, so hand the lanes over and cut), `human-review` (the child stopped
 before its commit — stop), `stop` (failure guard), `environment` (the consecutive-outage guard tripped —
-the API is down), `retry` (unreadable), `busy` (refused count; exit 1).
+the API is down), `resumed` (a cut child's successor was relaunched — await that lane again), `retry`
+(unreadable), `busy` (refused count; exit 1).
 
 **Options:**
 

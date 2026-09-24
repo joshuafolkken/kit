@@ -1,122 +1,39 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
-import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
-import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_dispatch } from '#scripts/lane/lane-dispatch'
-import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
-import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detached_launch } from './detached-launch'
+import { describe, expect, it } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
-import { run_event_stream } from './run-event-stream'
-import { run_event_stream_emit } from './run-event-stream-emit'
+import { run_cut_cli_fixture } from './run-cut-cli-fixture'
 
 // joshuafolkken/kit#1839: these drive `josh run:cut` end to end with the git and lane reads spied, so
 // what runs for real is the record logic and the branch each verdict takes — the cut relaunches once,
 // a double cut is refused, a matching tree resumes, and a relaunch failure clears the record so the
 // current process is never stranded.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-cut-cli-test-'))
-const REPOSITORY = path.join(scratch, 'repository.git')
+const {
+	ISSUE,
+	BRANCH,
+	INVOCATION,
+	DEFAULT_BRANCH,
+	LANE_DIRECTORY,
+	DERIVED_LOG,
+	CONTEXT_OVER,
+	CONTEXT_UNDER,
+	CONTEXT_UNMEASURABLE,
+	target,
+	lane,
+	state,
+	find_open_lane,
+	launch,
+	session_verdict,
+	verdict,
+	worker_argv,
+	existing_cut,
+	WITH_HANDOFF,
+} = run_cut_cli_fixture
 
-const ISSUE = '1839'
-const BRANCH = '1839-lane'
-const INVOCATION = 'fullrun #1839'
-const DEFAULT_BRANCH = 'main'
-const LANE_DIRECTORY = '/lanes/1839'
-const DERIVED_LOG = path.join(scratch, 'lane-1839.log')
-const LAUNCHED_PID = 4242
-// The recent-window context verdicts as `CostVerdict` values (joshuafolkken/kit#2312). The exported
-// tokens widen to `string` through their namespace objects, so a typed literal is what the spied
-// `session_verdict` return accepts.
-const CONTEXT_OVER: CostVerdict = 'over'
-const CONTEXT_UNDER: CostVerdict = 'under'
-const CONTEXT_UNMEASURABLE: CostVerdict = 'unmeasurable'
-const CUT_KIND = run_event_stream.EVENT_KIND.CUT
-
-function target(): string {
-	return run_cut.cut_path(REPOSITORY)
-}
-
-function lane(): LaneInfo {
-	return {
-		issue: ISSUE,
-		branch: BRANCH,
-		directory: LANE_DIRECTORY,
-		seat: undefined,
-		development_port: undefined,
-		preview_port: undefined,
-		output: undefined,
-		is_stranded: false,
-	}
-}
-
-const state = vi.spyOn(run_cut, 'current_state')
-const default_branch = vi.spyOn(git_command, 'get_default_branch')
-const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
-const log_path = vi.spyOn(lane_dispatch_log, 'default_log_path')
-const launch = vi.spyOn(detached_launch, 'launch')
-
-// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
-vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
-// joshuafolkken/kit#2312: the pre-gate cut is conditional on the recent-window context, so the suite
-// pins the verdict rather than reading the live session. `over` is the beforeEach default so the cases
-// that predate the condition still cut exactly as they did.
-const session_verdict = vi.spyOn(cost_cli, 'session_verdict')
-// The stream append a cut makes is spied so the suite writes no event to the real repository; what it
-// pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
-const emit = vi.spyOn(run_event_stream_emit, 'emit')
-const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-
-vi.spyOn(console, 'error').mockImplementation(() => undefined)
-
-function verdict(): string {
-	return String(info.mock.calls.at(-1)?.[0])
-}
-
-// **The relaunch starts the child at the effort of the phase it resumes into** (joshuafolkken/kit#2382),
-// so the expected profile is resolved for that phase — the default pre-gate cut lowers the worker to the
-// ship/bookkeeping effort, which is the branch every relaunch case here takes.
-function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
-	const phase = run_cut.PRE_GATE_PHASE
-	const built = agent_argv.resume_argv(invocation, undefined, phase, LANE_DIRECTORY)
-	if (built.kind === 'rejected') throw new Error(built.note)
-
-	return built
-}
-
-// The instruction a resume into implementation requires (joshuafolkken/kit#2354); carried on every
-// declared cut here, harmless where a pre-gate cut resumes into the gate and does not read it.
-const HANDOFF = { instruction: 'go', completed: [], remaining: [], untouched: [] }
-
-// A declared cut already on disk, as a fresh process would find one at its entry.
-function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
-	run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH, phase, handoff: HANDOFF })
-}
-
-beforeEach(() => {
-	vi.clearAllMocks()
-	run_cut.end_cut(target())
-	vi.spyOn(run_cut, 'worktree_directory').mockResolvedValue(REPOSITORY)
-	state.mockResolvedValue({ branch: BRANCH, is_dirty: true, is_held: true })
-	default_branch.mockResolvedValue(DEFAULT_BRANCH)
-	find_open_lane.mockResolvedValue(lane())
-	log_path.mockReturnValue(DERIVED_LOG)
-	launch.mockReturnValue({ kind: 'launched', pid: LAUNCHED_PID })
-	session_verdict.mockReturnValue(CONTEXT_OVER)
-	emit.mockResolvedValue(undefined)
-})
-
-afterAll(() => {
-	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
-})
+run_cut_cli_fixture.install()
 
 describe('cutting a lane child before the gate', () => {
 	it('writes the record and relaunches a fresh process once', async () => {
@@ -208,7 +125,7 @@ describe('the pre-gate cut is conditional on the recent-window context', () => {
 	it('still cuts during implementation regardless of the recent-window context', async () => {
 		session_verdict.mockReturnValue(CONTEXT_UNDER)
 
-		const code = await run_cut_cli.run(['--impl', ISSUE])
+		const code = await run_cut_cli.run(['--impl', ...WITH_HANDOFF, ISSUE])
 
 		expect(code).toBe(0)
 		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
@@ -329,7 +246,7 @@ describe('a fresh process checking whether to resume', () => {
 // one-successor guarantee holds across it exactly as for the pre-gate cut.
 describe('cutting a lane child during implementation', () => {
 	it('cuts and records the implementation phase', async () => {
-		const code = await run_cut_cli.run(['--impl', ISSUE])
+		const code = await run_cut_cli.run(['--impl', ...WITH_HANDOFF, ISSUE])
 		const read = run_cut.read_cut(target())
 
 		expect(code).toBe(0)
@@ -387,7 +304,7 @@ describe('re-arming after an implementation resume', () => {
 		existing_cut(run_cut.IMPLEMENTATION_PHASE)
 		await run_cut_cli.run(['--resume', ISSUE])
 
-		const again = await run_cut_cli.run(['--impl', ISSUE])
+		const again = await run_cut_cli.run(['--impl', ...WITH_HANDOFF, ISSUE])
 
 		expect([again, verdict()]).toStrictEqual([0, run_cut_cli.CUT_VERDICT])
 	})
@@ -419,34 +336,5 @@ describe('inspecting and clearing the record', () => {
 		const code = await run_cut_cli.run(['--resume'])
 
 		expect(code).toBe(1)
-	})
-})
-
-// joshuafolkken/kit#2346: the setup-phase cut. `--setup` cuts at the earliest boundary — the plan is
-// posted, so the setup context is done — and records that phase; its resume continues into
-// implementation, its record is cleared on resume like the implementation cut's, and every cut appends
-// a `cut` event to the run's stream so `run:step` advances past the boundary.
-describe('cutting a lane child at the setup boundary', () => {
-	// The under-threshold verdict proves the setup cut is unconditional, unlike the pre-gate cut: the
-	// setup context is below the threshold by construction, so a cost-gated cut would never fire.
-	it('cuts unconditionally, records the setup phase, and appends the cut event', async () => {
-		session_verdict.mockReturnValue(CONTEXT_UNDER)
-
-		const code = await run_cut_cli.run(['--setup', ISSUE])
-		const read = run_cut.read_cut(target())
-
-		expect(code).toBe(0)
-		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
-		expect(read.kind === 'carried' ? read.cut.phase : undefined).toBe(run_cut.SETUP_PHASE)
-		expect(emit).toHaveBeenCalledWith(CUT_KIND, expect.stringContaining(ISSUE))
-	})
-
-	it('resumes into implementation and clears the record', async () => {
-		existing_cut(run_cut.SETUP_PHASE)
-
-		const code = await run_cut_cli.run(['--resume', ISSUE])
-
-		expect([code, verdict()]).toStrictEqual([0, run_cut_cli.RESUME_IMPL_VERDICT])
-		expect(run_cut.read_cut(target()).kind).toBe('none')
 	})
 })

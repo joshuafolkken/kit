@@ -289,20 +289,19 @@ single non-numeric line as the verdict.
    `pnpm josh lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (OPEN,
    `needs-decision` or `already-done`) is left alone and not counted; an **outage** child (OPEN, neither
    label, but the exit record shows it could not reach the API) has its stale `in-progress` dropped, is
-   **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable —
-   a run of consecutive outages trips its own guard and stops the run as an environment failure
+   **not** parked and **not** counted against the consecutive-failure guard, and stays re-dispatchable
    (joshuafolkken/kit#2240); a **failed** child (OPEN, neither label, not an outage) has its stale
    `in-progress` dropped, is parked with `needs-decision`, and is counted against the consecutive-failure
    guard. **A turn whose whole content is one read, or one two-line progress report, is the shape this
    collapses.**
 
    **Beyond the offer `epic:next` prints** (`run` becomes numbers; `wait` / `stop` / `complete` /
-   `error` pass through), the composite adds five verdict tokens: `over` — the merge crossed the budget,
+   `error` pass through), the composite adds six verdict tokens: `over` — the merge crossed the budget,
    so hand the lanes over and take the cut ("The hand-off" below); `human-review` — the child stopped
    before its commit, the run's own ending (SKILL.md → §2z), so stop; `stop` — the consecutive-failure
    guard tripped; `environment` — the consecutive-**outage** guard tripped, so the API is down and the
-   run stops as an environment failure rather than the children's (joshuafolkken/kit#2240); and `retry`
-   — the child's state could not be read, so re-read before deciding.
+   run stops as an environment failure rather than the children's (joshuafolkken/kit#2240); `resumed` —
+   an unadopted cut was relaunched; `lane:await <N>` it again (joshuafolkken/kit#2484); and `retry` — the child's state could not be read, so re-read it.
 
    **The counters are the carry record's, and the epic progress comment is generated from it** (see "The
    counters live in the record" below). **The hand-off check is folded into the merge branch of the one
@@ -379,10 +378,9 @@ on the default branch, and the epic's state on GitHub is complete.
 only the parent's between children** — the pre-gate cut fires only once implementation is done, so it
 never caps the thinking a child accumulates while implementing. The child measures its own per-request
 context with **this command** at the shared `CONTEXT_CUT_THRESHOLD`, 135_000, and cuts with
-`pnpm josh run:cut --impl <N>`. **The measurement and threshold are single-sourced**:
+`pnpm josh run:cut --impl <N> --handoff <path>`. **The measurement and threshold are single-sourced**:
 `cost_verdict.per_request_cost` is what both seams compare, and `cost --cut` selects the same constant
-for the parent and child. The boundary and the resume are `pre-gate-cut.md` → "The
-implementation-phase cut", its single source.
+for both. The boundary and the resume: `pre-gate-cut.md` → "The implementation-phase cut".
 
 **A merge is not by itself a safe seam, because another lane may still be running.** The reference to
 where each unit writes lives in the lane, so a session that never dispatched the child can poll it and

@@ -9,7 +9,7 @@ import { run_ending } from './run-ending'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_issue_number } from './run-issue-number'
-import { run_merge, type ChildOutcome } from './run-merge'
+import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event (joshuafolkken/kit#2024).
@@ -38,6 +38,9 @@ const STOP_TOKEN = 'stop'
 // can say the environment failed rather than the children.
 const ENVIRONMENT_TOKEN = 'environment'
 const RETRY_TOKEN = 'retry'
+// The child's cut was resumed in its own lane (joshuafolkken/kit#2484): the parent awaits that lane
+// again, and offers no child in its place.
+const RESUMED_TOKEN = 'resumed'
 const PARK_FAILURE_NOTE = 'The failed child could not be parked with needs-decision; stopping.'
 // The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
 const DIGITS = /^\d+$/u
@@ -186,11 +189,18 @@ function read_is_outage(output: string | undefined): boolean {
 	return api_outage.is_outage(run_ending.read_exit(output))
 }
 
+async function read_signals(ctx: MergeContext): Promise<EndingSignals> {
+	return {
+		is_outage: read_is_outage(ctx.output),
+		is_cut: await run_merge_steps.has_resumable_cut(ctx.child),
+	}
+}
+
 function outcome_of(
 	read: Awaited<ReturnType<typeof issue_state_cli.read_issue>>,
-	is_outage: boolean,
+	signals: EndingSignals,
 ): ChildOutcome {
-	return read.kind === 'state' ? run_merge.classify_child(read.state, is_outage) : 'unresolved'
+	return read.kind === 'state' ? run_merge.classify_child(read.state, signals) : 'unresolved'
 }
 
 // A refused count means this session is not the carry record's owner, so the whole operation is
@@ -258,6 +268,26 @@ async function on_outage(ctx: MergeContext): Promise<number> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
 
+// A child that ended its session with a cut no successor adopted (joshuafolkken/kit#2484): its successor
+// is relaunched, nothing is counted and nothing is parked, and `resumed` tells the parent to await the
+// same lane again rather than dispatch into it. A successor that could not be started — or a cut the
+// fallback already relaunched once — is the failed child it would otherwise have been. A session that
+// does not own the carry record is refused `busy` before anything is relaunched or marked.
+async function on_cut(ctx: MergeContext): Promise<number> {
+	const refused = await run_merge_steps.refused_carry(ctx)
+
+	if (refused !== undefined) return report_count_refused(refused)
+
+	if (!(await run_merge_steps.resume_cut(ctx.child))) return await on_failed(ctx)
+
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
+		`#${ctx.child} resumed from its cut`,
+	)
+
+	return emit(RESUMED_TOKEN, SUCCESS_EXIT_CODE)
+}
+
 async function on_parked(ctx: MergeContext): Promise<number> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
@@ -274,6 +304,7 @@ async function on_unresolved(): Promise<number> {
 }
 
 const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<number>>> = {
+	cut: on_cut,
 	failed: on_failed,
 	'human-review': on_human_review,
 	merged: on_merged,
@@ -293,7 +324,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
 
-	return await HANDLERS[outcome_of(read, read_is_outage(ctx.output))](ctx)
+	return await HANDLERS[outcome_of(read, await read_signals(ctx))](ctx)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -305,6 +336,7 @@ const run_merge_cli = {
 	ENVIRONMENT_TOKEN,
 	HUMAN_REVIEW_TOKEN,
 	OVER_TOKEN,
+	RESUMED_TOKEN,
 	RETRY_TOKEN,
 	STOP_TOKEN,
 	USAGE,
