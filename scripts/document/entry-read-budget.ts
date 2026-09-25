@@ -76,10 +76,10 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#2353 wired the watcher-guard note into `backlogrun-progress.md` (read by the three
 	// planning entries): kickoff has no headroom, so the addition was offset by tightening that file's
 	// heartbeat prose, keeping every entry within its existing block.
-	{ entry: 'kickoff', bytes: 266_240 },
-	{ entry: 'fullrun', bytes: 266_240 },
-	{ entry: 'halfrun', bytes: 266_240 },
-	{ entry: 'backlogrun', bytes: 270_336 },
+	{ entry: 'kickoff', bytes: 262_144 },
+	{ entry: 'fullrun', bytes: 258_048 },
+	{ entry: 'halfrun', bytes: 258_048 },
+	{ entry: 'backlogrun', bytes: 266_240 },
 	{ entry: LANE_CHILD, bytes: 86_016 },
 ]
 

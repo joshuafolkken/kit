@@ -171,116 +171,43 @@ pnpm josh delegate <step>   # → delegate | keep ; the reason on stderr
 pnpm josh delegate --list   # the enumeration, and what was rejected and why
 ```
 
-**Never decide it yourself.** "This one is simple enough for the cheap tier" is a judgement made under
-cost pressure, and cost pressure resolves it toward *cheap enough* exactly when a mistake is most
-likely — the same reason `pnpm josh review:brief --level-only` takes the review level off an agent's hands.
+**Never decide it yourself. Anything not on the list is `keep`.** A step earns its place by naming
+**how a wrong result is caught** cheaply in the parent tier, not merely by being unlikely to fail.
+`pnpm josh delegate --list` names both delegatable and rejected steps; a rejected step either has no
+verifier or lets a wrong result propagate too far. The command distinguishes `kept deliberately`
+from `kept by default`. `docs/josh-commands.md` → "`josh delegate`" carries the full enumeration.
 
-**Anything not on the list is `keep`.** A step nobody classified must not be delegated because nobody
-said it could not be — the default is the rule, not a fallback. A missed entry costs money, and a
-wrong `delegate` costs correctness, quietly.
+**The mechanism is not the unit.** `pnpm josh delegate` covers a run step, a file-disjoint Step 0
+implementation unit (`pnpm josh fanout`), and `epic-child` — an epic's child and a named issue of a
+`backlogrun` alike. Do not add a second batch-child mechanism. Read `backlogrun-child.md` → "Each child
+runs in a delegated unit" at child dispatch; `backlogrun-steps.md` → "Named issues run first, in order"
+applies to named issues. `docs/josh-commands.md` → "`josh fanout`" carries file-disjoint dispatch.
 
-**A step earns its place by naming how a wrong result is caught** — by something that runs in the
-parent tier and costs less than redoing the step. "Unlikely to be wrong" is not that. Three
-conditions: (1) the step can be verified without being redone, (2) a wrong result is *caught* by that
-verification, and (3) the row exists on the enumeration — meeting the first two is not membership
-until someone adds it.
-
-**A candidate is rejected on one of two arms, and both are recorded.** One arm **names no verifier**
-at all: a notification body, a decision-log comment and a status read each ship their mistakes with
-nothing left to disagree with them. The other arm has a verifier and is kept anyway, because **a wrong
-result propagates too far** to be worth catching after the fact — a wrong root cause produces a fix
-that passes the gate, a wrong design is paid for by every step after it, a missed split widens one
-Issue into a batch nobody authorized, and a cheaper review finds less. `--list` shows both groups as
-**rejected** rather than absent, and `pnpm josh delegate <step>` answers `kept deliberately` for a
-step that was weighed and `kept by default` for one nobody considered.
-
-**The mechanism is not the unit** — how it is delegated is separate from what is delegated. The
-units are one step of a run (`gate-fix`, `survey`), the writing of one file-disjoint Step 0 unit
-(`implementation-unit`, fanned out when `pnpm josh fanout` reads them disjoint —
-`docs/josh-commands.md` → "`josh fanout`") and one whole child of a batch
-(`epic-child`) — an epic's child and a named issue of a `backlogrun` alike. **They share one
-mechanism** — one enumeration, one command, one verifier requirement; building a second is the clone
-`CLAUDE.md` prohibits, so **no second row like `backlogrun-child` is added**. **A batch entry point
-that does not delegate is the defect**: the per-issue procedure is `backlogrun-child.md` → "Each child runs in a
-delegated unit", which `backlogrun-steps.md` → "Named issues run first, in order" applies to a named issue.
-
-**`followup-filing` is a third unit — one whole sub-procedure of a run.** The late-run follow-up
-filing chain — `issue:scout` → file the Issue → `epic:bundle` → `epic --add` — is expensive because of
-the large context it runs in at a run's tail, not the step count. A fresh unit runs the same chain at a
-small context, handed the finding text the review round cap already composed. Its verifier is
-`epic-child`'s exactly — the parent reads the filed Issue from GitHub with `pnpm josh issue:state
-<new>`, not the unit's summary, so a follow-up reported filed but not created is still absent. The
-point of use is that branch-2 filing.
-
-**`epic-child`'s verifier is not the child's own completion report.** The parent reads the child's
-state from GitHub — `pnpm josh issue:state <N>`, the moment the unit returns — because a child reported
-done whose pull request never merged is still open.
-
-**Reading that state is not the same as reading `CLOSED` and calling every other answer a failure.**
-That is why the command prints a `human_review:` line beside the state: **one open answer is the run's
-own ending rather than an unfinished child**. A child stopped by `needs-human-review` comes back open
-**by design** (§2z) — its `in-progress` stays on, and it is never counted against the
-consecutive-failure guard. Read as a failure there, the parent strips that label, releases the
-repository, and hands the next child a `git switch main && git pull` on top of that uncommitted work.
-The classification belongs to the per-entry procedure: `backlogrun-child.md` → "Each child runs in a delegated
-unit", which `backlogrun-steps.md` → "Named issues run first, in order" applies to a named issue. The
-enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in readable form by
-`docs/josh-commands.md` → "`josh delegate`".
+**`followup-filing` delegates the late review-finding filing chain** with the parent's finding text;
+the parent verifies the new Issue using `pnpm josh issue:state <new>`. For `epic-child`, the parent
+likewise verifies `pnpm josh issue:state <N>` after the unit returns. Read `human_review:` too: an open
+`needs-human-review` child is the authorized stop (§2z), not a failed child. The per-entry
+classification lives in `backlogrun-child.md` → "Each child runs in a delegated unit".
 
 ### The pre-implementation reading — what goes to a unit, and from which file
 
-**The investigation in front of an implementation is reading, and reading is what a delegated unit is
-for.** **The line is what the file is for, not how large it is.** Reading to understand the Issue's
-subject goes to the unit; reading a file this run is about to edit stays in the main line, because the
-main line cannot issue an `Edit` against text it does not hold.
+**Delegate reading that explains the Issue's subject; keep reading files this run will edit in the
+main line.** The unit returns conclusions with `file:line` citations, never the file text. It may run
+a temporary probe script and return its output.
 
-**What comes back is the conclusion plus the `file:line` citations that support it — never the file
-text.** A throwaway probe script is written, run and deleted inside the unit, which returns its output
-alone.
+**The threshold is 3 files, and it is a count, not a forecast.** When the next read reaches it,
+delegate the unread investigation. Brief the unit on what was already read; do not re-read it there.
+**A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard` counts
+unedited files and refuses the threshold read. `pnpm josh delegate --list` prints the threshold.
+`docs/josh-commands.md` → "`josh investigation:guard`" carries the command's counting details.
 
-**The threshold is 3 files, and it is a count, not a forecast: the read that takes the count of files
-the run will not edit up to it is where the reading goes to a unit of its own.** The ones below it stay
-in the main line, and **the unit is not sent back over them** — the brief carries what the main line
-already concluded, and the unit reads on from where the count tripped. **Counting is what removes the
-judgement**: the reads are counted as they are made, so a small investigation never trips it.
-`pnpm josh delegate --list` prints the count.
+**The main line does not idle while the unit reads:** read files this run will edit, then verify the
+unit's cited lines. Independent investigations launch together; a brief that needs another unit's
+answer waits for that answer.
 
-**A delegation resets the counter rather than spending it, and `pnpm josh investigation:guard` is what
-counts.** The counting happens in a `PreToolUse` hook that reads the transcript, and the read that
-reaches the threshold is **refused** rather than commented on. A delegation clears the pending set,
-three more unedited files rebuild it, and the refusal fires again; **one refusal per accumulation**
-keeps a false positive costing a single round trip. A refusal re-arms on another accumulation as well
-as on a delegation, so a run that ignored its one refusal is spoken to again. **The guard refuses
-nothing inside a delegated unit** (a read-only unit has no `Agent` tool to dispatch with), and a file
-this run **edits is never counted, before the edit or after it**. `docs/josh-commands.md` →
-"`josh investigation:guard`" carries which shell commands count as reading and the
-`JOSH_INVESTIGATION_GUARD` off-switch.
-
-**The main line does not idle while the unit reads.** A delegated unit is a command that takes
-minutes, and §2h already says what runs beside one: the work that writes nothing the unit's result
-depends on. Here that work is named rather than judged — **read the files this run is about to edit**,
-which stay in the main line by definition and are needed before the first `Edit` either way. Start the
-unit, read those, then read what it returned.
-
-**And when the investigation needs more than one unit, they go out in a single fan-out turn — not one
-after another.** This is the turn-batching principle (§2h) reaching the `Agent` launches the
-round-trip batcher never sees. **The condition is independence, and it is read from the questions
-rather than assumed**: before dispatching, ask of each brief whether it could have been written at the
-*start* of the investigation — the ones that could go out together, and only a brief that genuinely
-cannot be written until an earlier unit has answered waits for that answer. Enforcement is not
-implemented (the launches are minutes apart and independence between two free-text briefs exposes no
-mechanical target), so the rule is carried in prose and the run-timing measurement shows whether it held.
-
-**Where the Issue already names the location, the reading is not delegated at all.** A body or a
-comment that names the file, the function or the rule has done the unit's job, and the reading that
-follows it is reading of a file the run is about to edit. The threshold and the verification path are
-unchanged: what comes back from a unit is still the conclusion plus its `file:line` citations, and the
-parent still opens those lines.
-
-**It is not `survey`, and it is not `diagnosis`.** `survey` reports *where* something appears and is
-checked by one `grep`; this reports *how the subject works* and is checked by opening the lines it
-cited. `diagnosis` stays **kept**: the unit reports what the code does, and what that means and what to
-change is the main line's.
+**When the Issue already names the file, function or rule, read that edit target in the main line.**
+It is not `survey`, and it is not `diagnosis`: the unit describes how the subject works;
+the main line decides what that means and what to change.
 
 ## 2c. The `owner/repo#` prefix — which repository the run acts on
 

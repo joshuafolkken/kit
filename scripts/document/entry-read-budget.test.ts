@@ -81,6 +81,22 @@ const PRE_2294_CEILING: ReadonlyMap<string, number> = new Map([
 	['lane-child', 143_360],
 ])
 
+// #2584 removes repeated delegation explanations from the shared workflow entry. Keep the measured
+// saving on each entry that reads that section; the lane child already omits it.
+const PRE_2584_ENTRY_BYTES: ReadonlyMap<string, number> = new Map([
+	['kickoff', 265_242],
+	['fullrun', 263_797],
+	['halfrun', 263_389],
+	['backlogrun', 268_867],
+])
+const MIN_2584_SAVING_BYTES = 5000
+
+describe('the #2584 startup-read reduction is held', () => {
+	it.each([...PRE_2584_ENTRY_BYTES])('%s saves at least five kilobytes', (entry, previous) => {
+		expect(previous - entry_total_bytes(ROOT, entry)).toBeGreaterThanOrEqual(MIN_2584_SAVING_BYTES)
+	})
+})
+
 describe('the first downward ratchet move (joshuafolkken/kit#2294) is held', () => {
 	it.each(ENTRY_READ_BUDGET)('$entry stays below its pre-#2294 ceiling', ({ entry, bytes }) => {
 		const previous = PRE_2294_CEILING.get(entry)
