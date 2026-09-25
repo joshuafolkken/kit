@@ -145,7 +145,7 @@ describe('entry_read_set — backlogrun reads its child files at the point of us
 	const ENTRY = 'backlogrun'
 	const SPLIT = SPLIT_FILE
 	const FULLRUN_FILE = 'fullrun.md'
-	const PER_ENTRY: ReadonlyArray<string> = [FULLRUN_FILE, SPLIT]
+	const PER_ENTRY: ReadonlyArray<string> = [FULLRUN_FILE, SPLIT, 'delegation.md', 'issue-scout.md']
 	const IMPLEMENTING_AND_PLAN: ReadonlyArray<string> = [SECTION_CITER, 'halfrun', PLAN_ONLY]
 
 	// The parent orchestrates and never implements: a dispatched child reads both inside its own
@@ -174,11 +174,11 @@ describe('entry_read_set — backlogrun reads its child files at the point of us
 		},
 	)
 
-	it('classifies the child files as point-of-use for backlogrun and no other entry', () => {
+	it('classifies backlogrun child files and the shared deferred decisions', () => {
 		const classified = [...(entry_read_set.POINT_OF_USE_BY_ENTRY.get(ENTRY) ?? [])]
 
 		expect(classified.toSorted(alphabetical)).toStrictEqual([...PER_ENTRY].toSorted(alphabetical))
-		expect(entry_read_set.POINT_OF_USE_BY_ENTRY.has(SECTION_CITER)).toBe(false)
+		expect(entry_read_set.POINT_OF_USE_BY_ENTRY.has(SECTION_CITER)).toBe(true)
 	})
 
 	// The saving is not a disappearance: the cost report still accounts for what the child reads later.

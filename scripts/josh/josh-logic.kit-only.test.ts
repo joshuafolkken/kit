@@ -18,8 +18,9 @@ describe('format_help hides kit-only commands from a consumer', () => {
 		expect(josh_logic.format_help(true, true)).not.toContain(EVAL_LINE)
 	})
 
-	it('keeps cost in a consumer listing', () => {
-		expect(josh_logic.format_help(false, true)).toContain(COST_LINE)
+	it('keeps cost in a consumer detailed listing', () => {
+		expect(josh_logic.format_help(true, true)).toContain(COST_LINE)
+		expect(josh_logic.format_help(false, true)).not.toContain(COST_LINE)
 	})
 })
 

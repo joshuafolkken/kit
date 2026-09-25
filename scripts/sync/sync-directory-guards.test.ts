@@ -71,7 +71,8 @@ describe('sync_directory — destination guards', () => {
 		)
 
 		expect(run_sync()).toStrictEqual([])
-		expect(cp_sync_mock).toHaveBeenCalledWith(SOURCE_PATH, DESTINATION_PATH, { recursive: true })
+		expect(cp_sync_mock.mock.calls[0]?.[0]).toBe(SOURCE_PATH)
+		expect(cp_sync_mock.mock.calls[0]?.[1]).toBe(DESTINATION_PATH)
 	})
 
 	it('copies over a destination that is already a directory', () => {

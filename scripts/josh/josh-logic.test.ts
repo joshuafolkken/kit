@@ -24,23 +24,23 @@ const UNKNOWN_CMD = 'not-a-command'
 const USAGE_LINE = 'Usage: josh <command>'
 const ALL_HINT = "Run 'josh --all'"
 
-// The default help lists the day-to-day commands; the maintenance ones show only under `--all`
-// (joshuafolkken/kit#1928). These entries are the ones expected in the DEFAULT listing, so no
-// maintenance command and no removed command appears here.
+// These representative developer commands appear in the default listing.
 const EXPECTED_COMMAND_ENTRIES: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
 	['Development', ['gate', 'lint', 'lines', 'format', 'cspell:dot', 'test:unit', 'test', 'check']],
 	['Project', ['init', 'sync']],
-	['Workflow', ['git', 'pr', 'followup', 'notify', 'main:sync', 'main:merge']],
-	['Versioning', ['bump', 'version']],
-	['Maintenance', ['overrides', 'audit', 'latest', 'latest:corepack', 'latest:update']],
-	['AI tools', ['epic', 'epic:check']],
+	['Workflow', ['git', 'pr', 'main:sync', 'main:merge']],
+	['Versioning', ['version']],
+	['Maintenance', ['doctor', 'audit']],
+	['AI tools', ['rule:value']],
 ]
 
-// Commands the default help hides and `--all` reveals, one per audience-split category.
-const MAINTENANCE_ONLY_COMMANDS: ReadonlyArray<string> = [
+// Commands the default help hides and `--all` reveals across non-developer audiences.
+const DETAIL_ONLY_COMMANDS: ReadonlyArray<string> = [
 	'prevent-main-commit',
 	CHECK_COMMIT_MESSAGE_CMD,
 	'eval',
+	'bump',
+	'followup',
 ]
 
 const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>(
@@ -76,9 +76,12 @@ describe('COMMAND_MAP', () => {
 	})
 })
 
-// Every category, including `Git hooks`, whose commands are all maintenance-only and so absent from
-// the default help's category order (joshuafolkken/kit#1928).
-const VALID_CATEGORIES: ReadonlyArray<string> = [...EXPECTED_CATEGORY_ORDER, 'Git hooks']
+// AI tools and Git hooks have no developer-facing commands.
+const VALID_CATEGORIES: ReadonlyArray<string> = [
+	...EXPECTED_CATEGORY_ORDER,
+	'Git hooks',
+	'AI tools',
+]
 
 describe('COMMAND_MAP category', () => {
 	it('each entry has a valid category', () => {
@@ -119,17 +122,17 @@ describe('josh_logic.format_help', () => {
 })
 
 describe('josh_logic.format_help audience split', () => {
-	it('hides maintenance commands and points at --all by default', () => {
+	it('hides non-developer commands and points at --all by default', () => {
 		const help = josh_logic.format_help()
 
-		for (const cmd of MAINTENANCE_ONLY_COMMANDS) expect(help).not.toContain(cmd)
+		for (const cmd of DETAIL_ONLY_COMMANDS) expect(help).not.toContain(cmd)
 		expect(help).toContain(ALL_HINT)
 	})
 
-	it('lists maintenance commands and drops the --all hint under --all', () => {
+	it('lists non-developer commands and drops the --all hint under --all', () => {
 		const help = josh_logic.format_help(true)
 
-		for (const cmd of MAINTENANCE_ONLY_COMMANDS) expect(help).toContain(cmd)
+		for (const cmd of DETAIL_ONLY_COMMANDS) expect(help).toContain(cmd)
 		expect(help).not.toContain(ALL_HINT)
 	})
 
@@ -153,6 +156,7 @@ describe('josh_logic.format_unknown_command', () => {
 
 		expect(reported).not.toContain(josh_logic.format_help())
 		expect(reported).toContain("Run 'josh --help'")
+		expect(reported).toContain("'josh --all' for the full list")
 		expect(reported.split('\n')).toHaveLength(1)
 	})
 

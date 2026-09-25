@@ -58,6 +58,8 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 	'backlogrun-lanes.md',
 	'backlogrun-progress.md',
 	'backlogrun-steps.md',
+	'delegation.md',
+	'issue-scout.md',
 	'latest-gate.md',
 	'retrospective.md',
 ])

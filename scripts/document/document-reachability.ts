@@ -60,7 +60,13 @@ function resident_documents(root: string): Set<string> {
 }
 
 function point_of_use_documents(): Set<string> {
-	return new Set([...entry_read_set.POINT_OF_USE_FILES].map((name) => workflow_path(name)))
+	const per_entry = [...entry_read_set.POINT_OF_USE_BY_ENTRY.values()].flatMap((files) => [
+		...files,
+	])
+
+	return new Set(
+		[...entry_read_set.POINT_OF_USE_FILES, ...per_entry].map((name) => workflow_path(name)),
+	)
 }
 
 function label_of(
