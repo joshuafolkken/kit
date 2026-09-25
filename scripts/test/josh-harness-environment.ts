@@ -84,13 +84,13 @@ const PROJECT_FIELDS = {
 type FixtureFile = readonly [string, string]
 
 const TOOLCHAIN_FILES: ReadonlyArray<FixtureFile> = [
-	['.gitignore', 'node_modules\n.*cache\n.tsbuildinfo\n'],
-	['.prettierignore', '*.json\n'],
+	['.gitignore', 'node_modules\n.*cache\n.tsbuildinfo\npnpm-lock.yaml\n'],
+	['.prettierignore', '*.json\npnpm-lock.yaml\n'],
 	['.prettierrc', json_file({ semi: false, singleQuote: true, useTabs: true })],
 	[
 		'cspell.config.yaml',
 		// `package.json` is skipped because its `josh` script carries this checkout's absolute paths.
-		'words:\n  - joshuafolkken\nignorePaths:\n  - .git\n  - node_modules\n  - .tsbuildinfo\n  - .*cache\n  - package.json\n',
+		'words:\n  - joshuafolkken\nignorePaths:\n  - .git\n  - node_modules\n  - .tsbuildinfo\n  - .*cache\n  - package.json\n  - pnpm-lock.yaml\n',
 	],
 	['eslint.config.js', 'export default [{}]\n'],
 	[

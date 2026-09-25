@@ -122,6 +122,18 @@ describe('overrides_check.read_overrides_from_package', () => {
 	})
 })
 
+describe('overrides_check.read_overrides', () => {
+	it('ignores package.json overrides during effective resolution', () => {
+		const sources = {
+			package_json: '{"pnpm":{"overrides":{"react":"^18.0.0"}}}',
+			workspace_yaml: 'overrides:\n  svelte: ^5.55.7\n',
+		}
+
+		expect(overrides_check.read_overrides(sources)).toEqual({ svelte: '^5.55.7' })
+		expect(overrides_check.describe_sources(sources)).toContain('ignored by pnpm')
+	})
+})
+
 describe('overrides_check.extract_overridden_package_names', () => {
 	it('extracts packages with >= lower-bound constraints', () => {
 		const overrides = make_overrides([[CAPPED_PKG_KEY, CAPPED_PKG_VALUE]])

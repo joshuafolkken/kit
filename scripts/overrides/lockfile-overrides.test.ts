@@ -84,7 +84,7 @@ describe('lockfile_overrides.find_specifier_mismatches — entries it cannot dec
 	)
 })
 
-// pnpm 11 writes pnpm-lock.yaml as a multi-document stream; reading only the first document would
+// pnpm 12 writes pnpm-lock.yaml as a multi-document stream; reading only the first document would
 // miss the dependency graph entirely and report a clean bill on any desync.
 describe('lockfile_overrides.find_specifier_mismatches — multi-document lockfile', () => {
 	const MULTI_DOCUMENT = [
@@ -95,8 +95,8 @@ describe('lockfile_overrides.find_specifier_mismatches — multi-document lockfi
 		'  .:',
 		'    packageManagerDependencies:',
 		'      pnpm:',
-		'        specifier: 11.18.0',
-		'        version: 11.18.0',
+		'        specifier: 12.6.0',
+		'        version: 12.6.0',
 		'',
 		'---',
 		make_lockfile(RAW_MANIFEST_RANGE),

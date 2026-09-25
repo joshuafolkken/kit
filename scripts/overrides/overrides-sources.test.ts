@@ -37,24 +37,23 @@ describe('overrides_check.read_overrides_from_workspace', () => {
 	})
 })
 
-describe('overrides_check.read_overrides — both locations', () => {
+describe('overrides_check.read_overrides — effective workspace entries', () => {
 	it('finds workspace overrides when package.json has no pnpm field', () => {
 		const sources = make_sources(PACKAGE_JSON_WITHOUT_PNPM, WORKSPACE_YAML)
 
 		expect(Object.keys(overrides_check.read_overrides(sources))).toHaveLength(2)
 	})
 
-	it('merges entries from both files', () => {
+	it('ignores package.json entries while reading workspace overrides', () => {
 		const sources = make_sources(PACKAGE_JSON_WITH_OVERRIDES, WORKSPACE_YAML)
 
 		expect(overrides_check.read_overrides(sources)).toStrictEqual({
-			react: '^18.0.0',
 			svelte: '^5.55.7',
 			devalue: '^5.8.1',
 		})
 	})
 
-	it('lets the workspace entry win a key collision', () => {
+	it('uses the workspace entry when an ignored package entry has the same key', () => {
 		const sources = make_sources('{"pnpm":{"overrides":{"svelte":"^4"}}}', WORKSPACE_YAML)
 
 		expect(overrides_check.read_overrides(sources)).toStrictEqual({
@@ -85,12 +84,12 @@ describe('overrides_check.describe_sources', () => {
 		expect(summary).toBe('2 from pnpm-workspace.yaml')
 	})
 
-	it('lists both files when both contribute', () => {
+	it('distinguishes ignored package declarations from effective workspace entries', () => {
 		const summary = overrides_check.describe_sources(
 			make_sources(PACKAGE_JSON_WITH_OVERRIDES, WORKSPACE_YAML),
 		)
 
-		expect(summary).toBe('2 from pnpm-workspace.yaml, 1 from package.json')
+		expect(summary).toBe('2 from pnpm-workspace.yaml, 1 from package.json (ignored by pnpm)')
 	})
 
 	it('names both files it read when nothing was found', () => {

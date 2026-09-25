@@ -115,9 +115,9 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<�
 
 overrides に設定された制約は、**セキュリティ・互換性・動作保証のために意図的に追加されたもの**である。
 
-**overrides は 2 箇所に置かれ、片方だけを見ても答えにならない。** pnpm 11 は `pnpm-workspace.yaml` の `overrides:` ブロックを読む（kit と app-kit の overrides は実際にここにある）。`package.json` の `pnpm.overrides` は旧来の置き場所である。**`pnpm.overrides` が空、あるいはそもそも `pnpm` フィールドが無いことは、そのプロジェクトに overrides が無いことの証拠にはならない** — app-kit の `package.json` には `pnpm` フィールドが一切無いが、`pnpm-workspace.yaml` には実際の override が存在する。`package.json` しか見ずに「保護すべき overrides は無い」と結論してはならない。それはルールが検出すべき状態そのもので合格を報告する振る舞いであり、しかも点検が空振りしたという信号を一切残さない（kit #740）。
+**実効のある overrides は `pnpm-workspace.yaml` に置く。** pnpm 11 と 12 は `package.json` の旧 `pnpm.overrides` を無視する（pnpm 12.6.0 で実測）。両ファイルの既存宣言を点検して意図しない変更を防ぐが、旧欄を有効な override と数えてはならない。**`pnpm.overrides` が空、あるいは `pnpm` フィールドが無いことは、そのプロジェクトに overrides が無いことの証拠にはならない。** app-kit でも実効のある設定は workspace 側にある（kit #740）。
 
 - **確認は「実行するコマンド」であって「到達する結論」ではない。** `josh latest` / `pnpm update --latest` などの依存更新コマンドの実行後は、`git diff -- pnpm-workspace.yaml package.json` を実行し、`overrides:` ブロックと `pnpm.overrides` の双方が無傷であることを確認する
-- `josh latest` は overrides の判定を自分で出力する（最後の overrides 行が `✔ overrides unchanged (<n> from <file>)`、変化していれば `⚠ overrides changed` 警告）。`pnpm josh overrides` は保存済みスナップショットと両ファイルを比較する。**実際に出力された行を引用して報告する**こと — 推測した判定を書いてはならない
+- `josh latest` は overrides の判定を自分で出力する（最後の overrides 行が `✔ overrides unchanged (<n> from <file>)`、変化していれば `⚠ overrides changed` 警告）。`pnpm josh overrides` は実効のある workspace 設定をスナップショットと比較し、無視される package 側の宣言も報告する。**実際に出力された行を引用して報告する**こと — 推測した判定を書いてはならない
 - overrides が自動的に変更・削除された場合は、**理由を調査してから**ユーザーに報告し、明示的な承認なしに変更してはならない
 - 例: `"esbuild@<=0.24.2": ">=0.25.0"` などのバージョン制約は、Workers ビルド互換性やパッケージの動作保証のために入れてある場合がある

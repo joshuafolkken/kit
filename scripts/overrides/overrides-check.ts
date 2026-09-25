@@ -2,8 +2,7 @@
 /**
  * Check dependency overrides for unexpected changes.
  *
- * Reads both locations pnpm honours — `overrides:` in pnpm-workspace.yaml (pnpm 11) and
- * `pnpm.overrides` in package.json (legacy) — so an empty one is never mistaken for "no overrides".
+ * Checks effective overrides in pnpm-workspace.yaml and reports ignored package.json entries.
  *
  * Usage:
  *   tsx scripts/overrides/overrides-check.ts --save      # save current overrides as snapshot

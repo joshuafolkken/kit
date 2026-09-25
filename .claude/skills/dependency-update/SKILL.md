@@ -14,15 +14,13 @@ a Dependabot merge, or any other command that can rewrite dependency versions.
 The canonical extended reference is `prompts/collaboration-workflow/operating-rules.md` → the overrides protection
 section; this skill is the operational procedure, and the two must agree.
 
-## 1. Overrides live in two files — check both
+## 1. Effective overrides live in the workspace — inspect both files
 
-**Overrides live in two files, and one of them alone is not the project's answer.** pnpm 11 reads
-them from the `overrides:` block in **`pnpm-workspace.yaml`** — where kit's and app-kit's overrides
-actually live — while `pnpm.overrides` in **`package.json`** is the legacy location. **An absent or
-empty `pnpm.overrides` is not evidence that the project has no overrides**: app-kit's `package.json`
-has no `pnpm` field at all, yet a real override sits in its `pnpm-workspace.yaml`. Never conclude
-"there is nothing to protect" from one file — a verdict that names only `package.json` has not
-checked anything, and it reports success in exactly the state the rule exists to detect.
+**pnpm 11 and 12 read effective overrides only from `pnpm-workspace.yaml`.** The old
+`pnpm.overrides` field in **`package.json` is ignored**, as verified with pnpm 12.6.0. Inspect both
+files to preserve any existing declarations, but do not count the package field as an effective
+override. An absent or empty package field says nothing about workspace overrides: app-kit's
+`package.json` has no `pnpm` field, while its workspace has a real override.
 
 ## 2. The check is a command you run, not a conclusion you reach
 
@@ -34,13 +32,14 @@ or any dependency-update command, verify the overrides in both `pnpm-workspace.y
 git diff -- pnpm-workspace.yaml package.json
 ```
 
-and confirm the `overrides:` block in `pnpm-workspace.yaml` and `pnpm.overrides` in `package.json`
-are both untouched, **and** that `devDependencies` versions still respect the overrides. If any entry
-was removed, modified, or bumped past an override, restore it immediately.
+and confirm the effective `overrides:` block in `pnpm-workspace.yaml` and any historical
+`pnpm.overrides` declarations in `package.json` are untouched, **and** that `devDependencies`
+versions still respect the effective overrides. If any entry was removed, modified, or bumped past
+an override, restore it immediately.
 
 `josh latest` prints its own verdict as its last overrides line (`✔ overrides unchanged (<n> from
-<file>)`, or a `⚠ overrides changed` warning), and `pnpm josh overrides` compares both files against
-a saved snapshot — **quote what one of them printed rather than a verdict you inferred.**
+<file>)`, or a `⚠ overrides changed` warning), and `pnpm josh overrides` compares effective workspace
+entries against a saved snapshot and reports ignored package entries — **quote what one printed.**
 
 ## 3. `devEngines` — the one expected change
 
