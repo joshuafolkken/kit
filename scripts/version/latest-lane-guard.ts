@@ -11,7 +11,7 @@ import { lane_paths, type LaneEnvironment } from '#scripts/lane/lane-paths'
 // to the child and the eslint cache key (`hashFiles('pnpm-lock.yaml')`) misses. `backlogrun-lanes.md`
 // and `backlogrun-child.md` both forbid it in prose; this module is what stops it. It is the single
 // source of both the `skip` reason `latest:scope` prints in a lane and the refusal `josh latest`
-// prints, and it fronts the `josh latest` chain as `josh latest:guard` so corepack never mutates
+// prints, and it fronts the `josh latest` chain as `josh latest:guard` so the pnpm bump never mutates
 // `package.json` before the refusal is reached.
 const STAMP_NOTE =
 	'the josh latest stamp is keyed to the project root, so a fresh lane has no record and always reads as stale'
@@ -27,7 +27,7 @@ function is_lane(cwd: string = process.cwd(), environment: LaneEnvironment = pro
 }
 
 // `josh latest:guard` — the head of the `josh latest` chain. It exits non-zero inside a lane so the
-// `&&`-joined steps after it (corepack, the dependency update, the audit) never run, and stays silent
+// `&&`-joined steps after it (the pnpm bump, the dependency update, the audit) never run, and stays silent
 // in the primary checkout so the chain proceeds.
 function main(): void {
 	if (!is_lane()) return

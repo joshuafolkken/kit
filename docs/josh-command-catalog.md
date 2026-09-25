@@ -501,7 +501,7 @@ Update pnpm, dependencies, and run security audit
 
 _No arguments._
 
-Update pnpm via corepack to the latest release on the current major
+Update pnpm on the current major while preserving the integrity pin
 
 ---
 
