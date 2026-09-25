@@ -453,9 +453,10 @@ jobs:
       # load-bearing. !cancelled() rather than the implicit success(): a bare outcome check is
       # ANDed with success(), so a hiccup in one of these steps would skip the rest — including
       # the retry, withholding the release over the diagnostics — while a superseded run being
-      # cancelled by the concurrency group above should not start a second suite. The retry flag
-      # keeps a pull request out of the chain entirely: nothing is renamed there, so the report
-      # and log the run publishes stay the ones its single attempt produced.
+      # cancelled by the concurrency group above should not start a second suite.
+      # For a pull request, the retry chain starts only when the preview server crashed;
+      # otherwise its report and log stay from the single attempt. A default-branch push
+      # retries regardless of the crash check.
       #
       # This step never fails the job: it exists to save evidence, and a move that does not happen
       # is announced instead, because the retry below will overwrite what was left behind.

@@ -394,7 +394,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/sync/template-source-logic.test.ts',
 	'scripts/sync/template-source-parity.test.ts',
 	'scripts/sync/templates-contents.test.ts',
-	'scripts/sync/workflow-content.test.ts',
 	'scripts/sync/workflow-pin-logic.test.ts',
 	'scripts/sync/workflow-pin-packaging.test.ts',
 	'scripts/test/http-fault-injection.test.ts',
