@@ -350,3 +350,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/init/init-logic-deploy-vps.ts:2 | 2026-09-25 | #2388
 - rf:bug-risks | medium | scripts/init/init-logic-deploy-vps.ts:35 | 2026-09-25 | #2388
 - rf:none | none | - | 2026-09-25 | #2578
+- rf:none | none | - | 2026-09-25 | #2582
+- rf:none | none | - | 2026-09-25 | #2584
