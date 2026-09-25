@@ -74,10 +74,10 @@ describe('fix_gh_packages_logic.parse_npmrc_auth_token', () => {
 	})
 })
 
-const SELF_MANAGEMENT_PKG_KEY = '@pnpm/exe@11.1.3'
-const PNPM_11_MULTI_DOC_LOCKFILE =
+const SELF_MANAGEMENT_PKG_KEY = 'pnpm@12.6.0'
+const PNPM_12_MULTI_DOC_LOCKFILE =
 	`lockfileVersion: '9.0'\n\n` +
-	`importers:\n  .:\n    packageManagerDependencies:\n      '@pnpm/exe':\n        specifier: 11.1.3\n\n` +
+	`importers:\n  .:\n    packageManagerDependencies:\n      pnpm:\n        specifier: 12.6.0\n        version: 12.6.0\n\n` +
 	`packages:\n\n  '${SELF_MANAGEMENT_PKG_KEY}':\n    resolution:\n      integrity: sha512-self-management\n\nsnapshots: {}\n` +
 	`---\n` +
 	`lockfileVersion: '9.0'\n\n` +
@@ -92,14 +92,14 @@ describe('fix_gh_packages_logic.parse_lockfile_packages', () => {
 		expect(Object.keys(result)).toContain(PKG_KEY)
 	})
 
-	it('parses a pnpm 11 multi-document lockfile without throwing', () => {
+	it('parses a pnpm 12 multi-document lockfile without throwing', () => {
 		expect(() =>
-			fix_gh_packages_logic.parse_lockfile_packages(PNPM_11_MULTI_DOC_LOCKFILE),
+			fix_gh_packages_logic.parse_lockfile_packages(PNPM_12_MULTI_DOC_LOCKFILE),
 		).not.toThrow()
 	})
 
 	it('merges packages from every document in a multi-document lockfile', () => {
-		const result = fix_gh_packages_logic.parse_lockfile_packages(PNPM_11_MULTI_DOC_LOCKFILE)
+		const result = fix_gh_packages_logic.parse_lockfile_packages(PNPM_12_MULTI_DOC_LOCKFILE)
 
 		expect(Object.keys(result)).toContain(PKG_KEY)
 		expect(Object.keys(result)).toContain(SELF_MANAGEMENT_PKG_KEY)

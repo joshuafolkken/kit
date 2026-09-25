@@ -8,7 +8,7 @@ allowBuilds:
   '@joshuafolkken/kit': false # project postinstall handles lefthook install
 
 # Skip the install-time supply-chain re-verification of the already-committed, reviewed lockfile.
-# pnpm 11.5 pairs `minimum-release-age` with a pre-install metadata re-fetch; on clean CI boxes
+# Since pnpm 11.5, `minimum-release-age` can trigger a pre-install metadata re-fetch; on clean CI boxes
 # (e.g. Cloudflare Workers Builds) it can't authenticate private @joshuafolkken/* GitHub Packages,
 # producing a false ERR_PNPM_TARBALL_URL_MISMATCH. minimum-release-age still applies at resolution
 # time, so age protection is preserved — only the per-install re-check of a trusted lockfile is skipped.

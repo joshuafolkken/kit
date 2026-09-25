@@ -8,21 +8,27 @@ import { latest_corepack } from './latest-corepack'
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
 
-const PACKAGE_JSON_V11 = '{"packageManager":"pnpm@11.4.0+sha512.abc"}'
-const PACKAGE_JSON_V11_SHORT = '{"packageManager":"pnpm@11"}'
+const PACKAGE_JSON_V12 = '{"packageManager":"pnpm@12.4.0+sha512.abc"}'
+const PACKAGE_JSON_V12_SHORT = '{"packageManager":"pnpm@12"}'
 const PACKAGE_JSON_NO_PM = '{"name":"kit"}'
-const PIN_V11_20 = '11.20.0'
-const TARGET_BELOW_PIN = 'pnpm@11.19.0'
-const TARGET_AT_PIN = 'pnpm@11.20.0'
+const PIN_V12_5 = '12.5.0'
+const TARGET_BELOW_PIN = 'pnpm@12.4.2'
+const TARGET_AT_PIN = 'pnpm@12.5.0'
 const FALLBACK_TARGET = 'pnpm@latest'
+
+describe('latest_corepack.extract_pnpm_major', () => {
+	it('selects pnpm 12 from the adopted pin', () => {
+		expect(latest_corepack.extract_pnpm_major(PACKAGE_JSON_V12)).toBe('12')
+	})
+})
 
 describe('latest_corepack.extract_pinned_version', () => {
 	it('extracts the full version without the integrity suffix', () => {
-		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V11)).toBe('11.4.0')
+		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V12)).toBe('12.4.0')
 	})
 
 	it('returns undefined for a bare-major shorthand pin', () => {
-		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V11_SHORT)).toBeUndefined()
+		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V12_SHORT)).toBeUndefined()
 	})
 
 	it('returns undefined when the packageManager pin is absent', () => {
@@ -32,15 +38,15 @@ describe('latest_corepack.extract_pinned_version', () => {
 
 describe('latest_corepack.is_target_not_newer_than_pin', () => {
 	it('flags a registry answer below the pin as not newer', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_BELOW_PIN, PIN_V11_20)).toBe(true)
+		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_BELOW_PIN, PIN_V12_5)).toBe(true)
 	})
 
 	it('flags an answer equal to the pin as not newer', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, PIN_V11_20)).toBe(true)
+		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, PIN_V12_5)).toBe(true)
 	})
 
 	it('lets a genuinely newer answer through', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, '11.19.0')).toBe(false)
+		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, '12.4.2')).toBe(false)
 	})
 
 	it('does not apply without a comparable pin', () => {
@@ -48,7 +54,7 @@ describe('latest_corepack.is_target_not_newer_than_pin', () => {
 	})
 
 	it('does not apply to the pnpm@latest fallback target', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(FALLBACK_TARGET, PIN_V11_20)).toBe(false)
+		expect(latest_corepack.is_target_not_newer_than_pin(FALLBACK_TARGET, PIN_V12_5)).toBe(false)
 	})
 })
 
@@ -57,7 +63,7 @@ describe('latest_corepack.notify_skipped_bump', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		latest_corepack.notify_skipped_bump(TARGET_AT_PIN, PIN_V11_20)
+		latest_corepack.notify_skipped_bump(TARGET_AT_PIN, PIN_V12_5)
 
 		expect(info).toHaveBeenCalledOnce()
 		expect(warn).not.toHaveBeenCalled()
@@ -69,7 +75,7 @@ describe('latest_corepack.notify_skipped_bump', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		latest_corepack.notify_skipped_bump(TARGET_BELOW_PIN, PIN_V11_20)
+		latest_corepack.notify_skipped_bump(TARGET_BELOW_PIN, PIN_V12_5)
 
 		expect(warn).toHaveBeenCalledOnce()
 		expect(info).not.toHaveBeenCalled()

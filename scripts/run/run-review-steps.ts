@@ -1,11 +1,10 @@
-import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
-import { resolve_tsx_runner } from '#scripts/josh/josh-logic'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
@@ -17,10 +16,10 @@ import { run_review, type GateState, type ReviewTiming, type TimingStart } from 
 // one command leaves it running in the background, read back the state the join waits on from the
 // stamps a real `josh gate` writes, and keep the four timestamps the overlap is measured from.
 
-// The gate is launched through the same tsx runner the dispatcher itself resolves, never a `.bin` shim
-// whose pnpm-generated store path a later bump prunes (`josh-logic.ts` → `resolve_tsx_runner`). The
-// entry is joined onto the checkout root so a lane worktree runs its own `josh`, not another checkout's.
-const JOSH_ENTRY = path.join('scripts', 'josh', 'josh.ts')
+// Resolve `josh` through the target checkout's package script. Consumer lanes have no source entry.
+const PNPM = 'pnpm'
+const DIRECTORY_FLAG = '--dir'
+const JOSH_SCRIPT = 'josh'
 const GATE_LOG_PREFIX = 'josh-run-review-gate-log-'
 const TIMING_PREFIX = 'josh-run-review-timing-'
 
@@ -44,17 +43,20 @@ function timing_path(target: string = PROJECT_ROOT): string {
 // shell string — `detached_launch.launch` refuses one carrying anything a command line has no business
 // holding, and there is no shell on the path to escape from.
 function gate_argv(root: string): LaunchArgv {
-	const runner = resolve_tsx_runner()
-
 	return {
-		command: runner.executable,
-		args: [...runner.leading_arguments, path.join(root, JOSH_ENTRY), GATE_COMMAND],
+		command: PNPM,
+		args: [DIRECTORY_FLAG, root, JOSH_SCRIPT, GATE_COMMAND],
 	}
 }
 
 function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
 	return detached_launch.launch(
-		{ argv: gate_argv(root), cwd: root, log_path: gate_log_path(root) },
+		{
+			argv: gate_argv(root),
+			cwd: root,
+			log_path: gate_log_path(root),
+			env: git_location_environment.location_free_environment(),
+		},
 		(note) => process.stderr.write(`${note}\n`),
 	)
 }

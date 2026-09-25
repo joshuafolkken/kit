@@ -30,7 +30,7 @@ const lockfile_document_schema = z.looseObject({
 	packages: z.record(z.string(), lockfile_package_schema).optional(),
 })
 
-// pnpm 11 writes pnpm-lock.yaml as a multi-document YAML stream (the @pnpm/exe
+// pnpm 11 and 12 write pnpm-lock.yaml as a multi-document YAML stream (the pnpm
 // self-management document precedes the project document). load() only accepts a
 // single document and throws, so parse every document and merge their packages.
 function parse_lockfile_packages(raw: string): Record<string, LockfilePackage> {

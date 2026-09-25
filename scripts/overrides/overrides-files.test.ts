@@ -42,12 +42,12 @@ describe('overrides_files.read_current_overrides', () => {
 		expect(overrides_files.read_current_overrides()).toStrictEqual({ svelte: '^5.55.7' })
 	})
 
-	it('falls back to package.json when pnpm-workspace.yaml is absent', () => {
+	it('ignores package.json overrides when pnpm-workspace.yaml is absent', () => {
 		fs_mock.state.files = make_files([
 			[PACKAGE_JSON_PATH, '{"pnpm":{"overrides":{"react":"^18.0.0"}}}'],
 		])
 
-		expect(overrides_files.read_current_overrides()).toStrictEqual({ react: '^18.0.0' })
+		expect(overrides_files.read_current_overrides()).toStrictEqual({})
 	})
 
 	it('returns an empty record when neither file exists', () => {

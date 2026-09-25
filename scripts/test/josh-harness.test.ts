@@ -4,8 +4,9 @@ import { git_location_environment } from '#scripts/git/git-location-environment'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_carry } from '#scripts/run/run-carry'
+import { run_review_steps } from '#scripts/run/run-review-steps'
 import { execaSync } from 'execa'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { josh_harness, type EnvironmentKind, type JoshEnvironment } from './josh-harness'
 
 // Real subprocesses in real directories: each spawn pays a tsx cold start, and the gate scenario runs
@@ -17,6 +18,7 @@ const MARKER_WAIT_MS = 60_000
 
 const LEDGER = path.join('docs', 'observations.md')
 const GATE_GREEN = 'Gate green'
+const GATE_PASSED = 'verification gate passed'
 const RECORD = 'review:record'
 const SETUP_FAILED = 'setup failed'
 const DECOY_DIRECTORY = 'decoy-bin'
@@ -76,6 +78,27 @@ function run_only_driver(kind: string): void {
 	expect(result.exit_code, `${result.stdout}\n${result.stderr}`).toBe(0)
 	expect(result.stdout).toContain('stop')
 	expect(run_carry.read_carry(target).kind).toBe('none')
+}
+
+function prepare_consumer_gate(consumer: JoshEnvironment, kit: JoshEnvironment): void {
+	writeFileSync(path.join(consumer.root, 'change.md'), '# Change\n', 'utf8')
+	writeFileSync(path.join(kit.root, 'change.md'), '# Change\n', 'utf8')
+	expect(josh_harness.run(consumer, ['lint:related']).exit_code).toBe(0)
+	expect(josh_harness.run(consumer, ['test:related']).exit_code).toBe(0)
+}
+
+function launch_gate_from_hook(
+	kit: JoshEnvironment,
+	consumer: JoshEnvironment,
+): ReturnType<typeof run_review_steps.launch_gate> {
+	try {
+		vi.stubEnv('GIT_DIR', path.join(kit.root, '.git'))
+		vi.stubEnv('GIT_WORK_TREE', kit.root)
+
+		return run_review_steps.launch_gate(consumer.root)
+	} finally {
+		vi.unstubAllEnvs()
+	}
 }
 
 beforeAll(async () => {
@@ -166,6 +189,35 @@ describe('josh harness — scenarios from past defects', () => {
 			expect(existsSync(path.join(lane.root, LEDGER))).toBe(false)
 		},
 		SCENARIO_TIMEOUT_MS,
+	)
+})
+
+describe('josh harness — detached consumer gate (#2573)', () => {
+	it(
+		'uses the consumer script when the lane has no kit source entry',
+		async () => {
+			const consumer = environment('consumer')
+			const kit = environment('kit')
+
+			expect(existsSync(path.join(consumer.root, 'scripts', 'josh', 'josh.ts'))).toBe(false)
+			prepare_consumer_gate(consumer, kit)
+			const launched = launch_gate_from_hook(kit, consumer)
+
+			const log_path = run_review_steps.gate_log_path(consumer.root)
+			const is_finished = await josh_harness.wait_for(
+				() =>
+					existsSync(log_path) &&
+					/verification gate passed|verification gate failed|ELIFECYCLE/u.test(
+						readFileSync(log_path, 'utf8'),
+					),
+				GATE_TIMEOUT_MS,
+			)
+
+			expect(launched.kind).toBe('launched')
+			expect(is_finished, readFileSync(log_path, 'utf8')).toBe(true)
+			expect(readFileSync(log_path, 'utf8')).toContain(GATE_PASSED)
+		},
+		GATE_TIMEOUT_MS,
 	)
 })
 

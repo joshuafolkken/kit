@@ -13,8 +13,8 @@ const OLD_DEPLOY_VPS_CONTENT = `    script: |
         npm install -g pnpm@10.24.0 || curl -fsSL https://get.pnpm.io/install.sh | sh -
       fi
 `
-const PNPM11_INSTALL = 'npm install -g pnpm@11.0.6'
-const VERSION_CHECK_MARKER = '[ "$PNPM_MAJOR" -lt 11 ]'
+const PNPM12_INSTALL = 'npm install -g pnpm@12.6.0'
+const VERSION_CHECK_MARKER = '[ "$PNPM_MINOR" -lt 1 ]'
 
 beforeEach(() => {
 	mkdirSync(path.join(TEST_DIR, 'dest'), { recursive: true })
@@ -38,16 +38,16 @@ describe('sync_deploy_vps', () => {
 
 		const result = readFileSync(DEPLOY_VPS_DEST, 'utf8')
 
-		expect(result).toContain(PNPM11_INSTALL)
+		expect(result).toContain(PNPM12_INSTALL)
 		expect(result).toContain(VERSION_CHECK_MARKER)
 	})
 
-	it('logs unchanged when file already uses pnpm@11 with version check', () => {
+	it('logs unchanged when file already uses pnpm@12 with version check', () => {
 		const already_patched = OLD_DEPLOY_VPS_CONTENT.replaceAll(
 			'if ! command -v pnpm &> /dev/null; then',
 			() =>
-				`PNPM_MAJOR=$(pnpm --version 2>/dev/null | cut -d. -f1 || echo "0")\n      if ! command -v pnpm &> /dev/null || ${VERSION_CHECK_MARKER}; then`,
-		).replaceAll('pnpm@10.24.0', () => 'pnpm@11.0.6')
+				`PNPM_VERSION=$(pnpm --version 2>/dev/null || echo "0.0.0")\n      PNPM_MAJOR=$(echo "$PNPM_VERSION" | cut -d. -f1)\n      PNPM_MINOR=$(echo "$PNPM_VERSION" | cut -d. -f2)\n      if [ "$PNPM_MAJOR" -lt 12 ] || { [ "$PNPM_MAJOR" -eq 12 ] && ${VERSION_CHECK_MARKER}; }; then`,
+		).replaceAll('pnpm@10.24.0', () => 'pnpm@12.6.0')
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})

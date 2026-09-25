@@ -78,7 +78,7 @@ describe('overrides-check — invalid snapshot JSON', () => {
 describe('overrides-check — valid snapshot matches current', () => {
 	it('does not call process.exit when overrides match snapshot', () => {
 		fs_mock.state.snapshot_content = REACT_18_SNAPSHOT
-		fs_mock.state.package_json = '{"pnpm":{"overrides":{"react":"^18.0.0"}}}'
+		fs_mock.state.workspace_yaml = 'overrides:\n  react: ^18.0.0\n'
 
 		expect(() => {
 			run_overrides_check(false)
@@ -89,7 +89,18 @@ describe('overrides-check — valid snapshot matches current', () => {
 describe('overrides-check — snapshot differs from current', () => {
 	it('calls process.exit(1) when overrides do not match snapshot', () => {
 		fs_mock.state.snapshot_content = REACT_18_SNAPSHOT
-		fs_mock.state.package_json = '{"pnpm":{"overrides":{"react":"^19.0.0"}}}'
+		fs_mock.state.workspace_yaml = 'overrides:\n  react: ^19.0.0\n'
+
+		expect(() => {
+			run_overrides_check(false)
+		}).toThrow(PROCESS_EXIT_CALLED)
+	})
+})
+
+describe('overrides-check — ignored package.json field', () => {
+	it('does not accept a package.json override as a replacement for a workspace override', () => {
+		fs_mock.state.snapshot_content = REACT_18_SNAPSHOT
+		fs_mock.state.package_json = '{"pnpm":{"overrides":{"react":"^18.0.0"}}}'
 
 		expect(() => {
 			run_overrides_check(false)
