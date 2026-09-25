@@ -1,25 +1,32 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, type readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { file_content } from './file-content'
 
+const read_file_sync_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('node:fs', async (import_original) => ({
+	...(await import_original<{ readFileSync: typeof readFileSync }>()),
+	readFileSync: read_file_sync_mock,
+}))
+
+const actual_fs = await vi.importActual<{ readFileSync: typeof readFileSync }>('node:fs')
 const ROOT = mkdtempSync(path.join(tmpdir(), 'sync-content-'))
 const DESTINATION = path.join(ROOT, 'file.txt')
-const WRITE_ONLY_MODE = 0o200
-const READ_WRITE_MODE = 0o600
 const NEW_CONTENT = 'new content'
 
 afterEach(() => {
-	chmodSync(DESTINATION, READ_WRITE_MODE)
 	rmSync(DESTINATION)
+	read_file_sync_mock.mockReset()
 })
 
-it('updates a write-only destination when its previous content cannot be compared', () => {
+it.each(['EACCES', 'EPERM'])('writes when reading the destination fails with %s', (code) => {
 	writeFileSync(DESTINATION, 'old content')
-	chmodSync(DESTINATION, WRITE_ONLY_MODE)
+	read_file_sync_mock.mockImplementation(() => {
+		throw Object.assign(new Error('read denied'), { code })
+	})
 
 	expect(file_content.write_text_if_changed(DESTINATION, NEW_CONTENT)).toBe(true)
-	chmodSync(DESTINATION, READ_WRITE_MODE)
-	expect(readFileSync(DESTINATION, 'utf8')).toBe(NEW_CONTENT)
+	expect(actual_fs.readFileSync(DESTINATION, 'utf8')).toBe(NEW_CONTENT)
 })
