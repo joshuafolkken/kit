@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { sync } from './sync'
 
 function read_workflow(relative_path: string): string {
 	return readFileSync(fileURLToPath(new URL(relative_path, import.meta.url)), 'utf8')
@@ -56,5 +59,26 @@ describe('templates/workflows/ci.yml — checkout credential hygiene', () => {
 
 		expect(checkout_count).toBeGreaterThan(0)
 		expect(persist_count).toBe(checkout_count)
+	})
+})
+
+describe('templates/workflows/ci.yml — pull request E2E retry explanation', () => {
+	it('keeps the crash-only explanation after syncing the workflow', () => {
+		const template_path = fileURLToPath(new URL(CI_TEMPLATE_PATH, import.meta.url))
+		const temporary_directory = mkdtempSync(path.join(tmpdir(), 'workflow-retry-comment-'))
+		const workflow_destination = path.join(temporary_directory, '.github', 'workflows', 'ci.yml')
+
+		try {
+			sync.sync_file_mapping(template_path, workflow_destination)
+			const synced_workflow = readFileSync(workflow_destination, 'utf8')
+
+			expect(synced_workflow).toContain(
+				'For a pull request, the retry chain starts only when the preview server crashed;',
+			)
+			expect(synced_workflow).toContain("steps.e2e_retry_check.outputs.crashed == 'true'")
+			expect(synced_workflow).not.toContain('keeps a pull request out of the chain entirely')
+		} finally {
+			rmSync(temporary_directory, { recursive: true, force: true })
+		}
 	})
 })
