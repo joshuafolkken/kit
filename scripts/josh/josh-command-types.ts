@@ -57,8 +57,8 @@ interface CommandEntry {
 	// A command that only makes sense inside the kit repository itself — the rule-compliance eval and
 	// the run measurements that analyze kit's own development. It is dropped from a consumer's
 	// `josh --help` and refused with guidance when run in a consumer project, so a distributed help
-	// listing carries only what a consumer can run (joshuafolkken/kit#1988). Distinct from the
-	// maintenance set in `josh-logic.ts`, which only splits `--help` from `--all` inside kit.
+	// listing carries only what a consumer can run (joshuafolkken/kit#1988). The audience in
+	// `reference` separately decides whether the command appears in the default listing.
 	is_kit_only?: boolean
 }
 
