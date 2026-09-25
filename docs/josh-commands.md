@@ -830,10 +830,10 @@ Tripwire hashes live in `.template-source-manifest.json` (kit-internal, not dist
 
 ### `josh latest`
 
-Update pnpm via corepack, update all dependencies to latest, and run a security audit.
+Update pnpm with its self-update command, update all dependencies to latest, and run a security audit.
 
 ```bash
-pnpm josh latest            # full update (corepack + update + audit)
+pnpm josh latest            # full update (pnpm + update + audit)
 pnpm josh latest:corepack   # update pnpm only
 pnpm josh latest:update     # update dependencies only
 pnpm josh latest:scope      # → required | skip — does this run have to update?
@@ -851,7 +851,7 @@ Fronts the `josh latest` chain and refuses inside a lane; a lane's per-root stam
 
 #### `josh latest:corepack`
 
-Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`), staying within `devEngines`. It temporarily widens the exact `devEngines` pin so corepack's `devEngines` validation accepts a newer patch, then realigns `devEngines.packageManager.version` byte-for-byte (integrity suffix included) with the `packageManager` pin. If the registry can't answer, the pnpm bump is skipped with a notice and nothing is widened.
+Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`, or from `devEngines.packageManager.version` when that is the only pin). The command name is retained for compatibility. With an existing `packageManager` pin, it obtains the release integrity value, runs `pnpm self-update`, then restores the integrity suffix and aligns `devEngines.packageManager.version` byte-for-byte with `packageManager`. Without that pin, it adds a verified pin and checks that the selected pnpm version starts. If the registry cannot answer or that version cannot start, the bump is skipped; existing `devEngines` drift may still be aligned to `packageManager`.
 
 #### `josh latest:update`
 

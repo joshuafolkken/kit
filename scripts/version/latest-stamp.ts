@@ -4,7 +4,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 // When `josh latest` last finished in this checkout, and whether that is recent enough to skip
 // (joshuafolkken/kit#1215).
 //
-// `josh latest` is a network-bound chain — corepack, every dependency, `ranges`, `pnpm audit` — that
+// `josh latest` is a network-bound chain — pnpm update, every dependency, `ranges`, `pnpm audit` — that
 // took 60–120 seconds at the head of every `fullrun` / `halfrun` and of every child a batch ran, and
 // running it several times in one day barely changes its answer. `queue` and `epicrun` had already
 // hoisted it to the head of a batch by hand; what had no rule at all was a standalone run, which is
