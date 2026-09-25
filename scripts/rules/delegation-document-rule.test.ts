@@ -7,18 +7,17 @@ import { describe, expect, it } from 'vitest'
 // rule the tool will not — and the direction that matters is a document promising `delegate` for
 // something the command keeps.
 //
-// joshuafolkken/kit#1959: the rule's history and measurement moved out of the always-read skill —
-// joshuafolkken/kit#1925 trims SKILL.md and queue.md down to rules, and deletes the delegation.md
-// pointer stub. So this suite no longer pins issue-number stories, the measured cost, or the pointer
-// body; the rule's presence is held by the code-versus-policy table equality, the delegation_policy
-// verdicts, the rule sentences the command reference keeps, and the §2b anchor in
-// `document-markers.test.ts`.
+// joshuafolkken/kit#1959 moved rule history and measurement out of the always-read skill.
+// The on-demand delegation procedure now lives in delegation.md; this suite pins its routing and
+// policy while leaving issue-number stories and measured costs outside the assertions.
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
+const DELEGATION_DOC = '.claude/skills/workflow-commands/delegation.md'
 const COMMAND_DOC = 'docs/josh-commands.md'
-// The skill is the rule; `docs/` is the command's own reference and carries the enumeration a person
-// reads. Both must route the decision to the command rather than to judgement.
-const RULE_DOCS: ReadonlyArray<string> = [SKILL, COMMAND_DOC]
+// The skill routes readers to the on-demand procedure; `docs/` is the command reference and carries
+// the enumeration a person reads. All three must route the decision to the command.
+const RULE_DOCS: ReadonlyArray<string> = [DELEGATION_DOC, COMMAND_DOC]
+const ROUTING_DOCS: ReadonlyArray<string> = [SKILL, DELEGATION_DOC, COMMAND_DOC]
 const COMMAND = 'pnpm josh delegate'
 // The verdict the command gives a step that was weighed and kept, and the words the prose uses for
 // it. One literal, so a rename in `delegation-policy.ts` fails the document assertion too.
@@ -26,15 +25,15 @@ const KEPT_DELIBERATELY = 'kept deliberately'
 // The case title shared by the marker-presence suites below.
 const CARRIES_CASE = 'carries %j'
 
-describe.each(RULE_DOCS)('%s — routes the decision to the command', (document_path) => {
+describe.each(ROUTING_DOCS)('%s — routes the decision to the command', (document_path) => {
 	const content = read_repo_file(document_path)
 
 	it('names the command', () => {
 		expect(content).toContain(COMMAND)
 	})
+})
 
-	// The direction of the default is the safety argument; a document that omits it reads as though
-	// an unlisted step were a judgement call.
+describe.each(RULE_DOCS)('%s — keeps unlisted steps in the main line', (document_path) => {
 	it('states that anything unlisted is kept', () => {
 		expect(read_unwrapped(document_path)).toContain('not on the list is `keep`')
 	})
@@ -167,7 +166,7 @@ describe.each(RULE_DOCS)('%s — separates the mechanism from the unit', (docume
 const EPIC_CHILD = 'epic-child'
 
 const BATCH_UNIT_MARKERS: ReadonlyArray<[string, string]> = [
-	[SKILL, "an epic's child and a named issue of a `backlogrun` alike"],
+	[DELEGATION_DOC, "an epic's child and a named issue of a `backlogrun` alike"],
 	[COMMAND_DOC, 'One row covers both batch entry points'],
 ]
 

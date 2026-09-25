@@ -128,7 +128,7 @@ procedure.
 | `pnpm josh issue:state <N>` answers `human_review: yes` | Implement and gate, then stop before the commit | §2z → `needs-human-review.md` |
 | Under `backlogrun`, a stop that would end a batch, or a named non-epic item | Park one child and continue; run a named non-epic item as a `fullrun` | `backlogrun-park.md` → "park and continue"; `backlogrun-child.md` → "When `#N` is not an epic" |
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
-| First call of `fullrun` / `halfrun` (not `kickoff`) | Claim the tree: `pnpm josh run:hold`, ahead of the split assessment and a `new` entry's filing | §2f → `working-tree-hold.md` |
+| First call of `fullrun` / `halfrun` (not `kickoff`) | Claim the tree: `fullrun #N` starts with `pnpm josh run:entry <N>` (which runs the hold); `fullrun new` and `halfrun` use `pnpm josh run:hold` | §2f → `working-tree-hold.md` |
 | Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops with a `confirmation` Telegram and the resume command, then `pnpm josh run:release` | `backlogrun-progress.md` → "The hand-off" (shared 135,000 threshold) |
 | Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
 | Another Issue here must land first | A prerequisite is a dependency, not a park (the third of four mid-run discoveries) | §2d → `prerequisite.md` |
@@ -160,54 +160,17 @@ reaches it. `into-target.md` is the single source.
 
 ## 2b. Delegating a step to a cheaper tier
 
-Designing, assessing a split and reviewing are judgement; applying a fix the gate has already named is
-not. Delegation is the correction: the steps whose answer is already decided go to a cheaper execution
-tier, and the judgement stays where it is.
-
-**Ask before delegating any step of a run**, and use what it answers:
-
-```bash
-pnpm josh delegate <step>   # → delegate | keep ; the reason on stderr
-pnpm josh delegate --list   # the enumeration, and what was rejected and why
-```
-
-**Never decide it yourself. Anything not on the list is `keep`.** A step earns its place by naming
-**how a wrong result is caught** cheaply in the parent tier, not merely by being unlikely to fail.
-`pnpm josh delegate --list` names both delegatable and rejected steps; a rejected step either has no
-verifier or lets a wrong result propagate too far. The command distinguishes `kept deliberately`
-from `kept by default`. `docs/josh-commands.md` → "`josh delegate`" carries the full enumeration.
-
-**The mechanism is not the unit.** `pnpm josh delegate` covers a run step, a file-disjoint Step 0
-implementation unit (`pnpm josh fanout`), and `epic-child` — an epic's child and a named issue of a
-`backlogrun` alike. Do not add a second batch-child mechanism. Read `backlogrun-child.md` → "Each child
-runs in a delegated unit" at child dispatch; `backlogrun-steps.md` → "Named issues run first, in order"
-applies to named issues. `docs/josh-commands.md` → "`josh fanout`" carries file-disjoint dispatch.
-
-**`followup-filing` delegates the late review-finding filing chain** with the parent's finding text;
-the parent verifies the new Issue using `pnpm josh issue:state <new>`. For `epic-child`, the parent
-likewise verifies `pnpm josh issue:state <N>` after the unit returns. Read `human_review:` too: an open
-`needs-human-review` child is the authorized stop (§2z), not a failed child. The per-entry
-classification lives in `backlogrun-child.md` → "Each child runs in a delegated unit".
+**Before delegating any run step, ask `pnpm josh delegate <step>`; never decide eligibility yourself.**
+Read `delegation.md` at the first delegation decision for its units and verification rules. An item
+absent from the enumeration stays in the main line. A dispatched `epic-child` that returns open with
+`human_review: yes` is an authorized stop, not a failed child (§2z).
 
 ### The pre-implementation reading — what goes to a unit, and from which file
 
-**Delegate reading that explains the Issue's subject; keep reading files this run will edit in the
-main line.** The unit returns conclusions with `file:line` citations, never the file text. It may run
-a temporary probe script and return its output.
-
-**The threshold is 3 files, and it is a count, not a forecast.** When the next read reaches it,
-delegate the unread investigation. Brief the unit on what was already read; do not re-read it there.
-**A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard` counts
-unedited files and refuses the threshold read. `pnpm josh delegate --list` prints the threshold.
-`docs/josh-commands.md` → "`josh investigation:guard`" carries the command's counting details.
-
-**The main line does not idle while the unit reads:** read files this run will edit, then verify the
-unit's cited lines. Independent investigations launch together; a brief that needs another unit's
-answer waits for that answer.
-
-**When the Issue already names the file, function or rule, read that edit target in the main line.**
-It is not `survey`, and it is not `diagnosis`: the unit describes how the subject works;
-the main line decides what that means and what to change.
+**When the next pre-implementation read would reach 3 files this run will not edit, delegate the
+unread investigation before that read.** Keep edit-target reads in the main line. The full procedure
+and the `file:line` verification are in `delegation.md` → "The pre-implementation reading"; the
+threshold is counted by `pnpm josh investigation:guard`.
 
 ## 2c. The `owner/repo#` prefix — which repository the run acts on
 
@@ -234,54 +197,18 @@ refuses the second `gh api … issues` call until it has.
 
 ## 2e. Before filing a new Issue — `pnpm josh issue:scout`
 
-**Every filing asks two questions before it happens, and one command answers both.** Run it the moment
-the title exists and **before** the `gh api … issues` call that creates the Issue:
-
-```bash
-pnpm josh issue:scout "<title>"                                   # alias: josh isc
-pnpm josh issue:scout "<title>" --body "<one-line summary, citing #N where the work follows one>"
-pnpm josh issue:scout "<title>" --body-file <complete-draft.md>
-```
-
-- **`Duplicates:` is read, not skimmed.** Open each candidate and apply `issue-fold-existing.md`
-  before deciding to file. A complete duplicate of an **open** Issue stops with a `confirmation`
-  Telegram and "Please run `fullrun #<existing>` to execute this Issue." A compatible addition follows that file's fold path;
-  a separate deliverable follows the ordinary filing path. A title match alone never authorizes an edit.
-- **A candidate marked `(closed)` is a different answer.** The scan covers what closed recently as
-  well as what is open, because the work most likely to be filed twice is the work that just finished.
-  A closed candidate that covers the same work means **the work is already done** — so there is nothing
-  to run. Verify it against the merged code, then take the exit in §2g → "When the work turns out to be
-  already merged". A closed candidate that does *not* cover the work is noted in one line and the
-  filing carries on.
-- **`none` is an answer.** The command reports no candidate rather than the closest miss.
-- **`Epic:` front-loads the placement.** Its recommendation is `epic:bundle`'s, which makes
-  `add_to_epic` / `create_epic` Tier A and `ask` a stop, in exactly the reading §2a's `into <target>`
-  suffix would have given by hand. Where the user typed `into <target>`, that naming wins.
-- **`Epic: not asked` is not `Epic: none`.** The epic half decides from the issue numbers the summary
-  names, so a title-only call gives it nothing. **Pass `--body` whenever the work follows an existing
-  Issue** — one line citing `#N` is enough, and naming the epic itself (`part of epic #<E>`) is
-  answered with that epic.
-- **It does not replace `epic:bundle`, which still runs after the filing.** This one answers about an
-  Issue that does not exist yet, from a title; that one answers about an Issue that does. Both calls
-  happen — the scout before the `issues` call, `epic:bundle` after it.
-- **Every filing route runs it, not only a `new` entry point, and `pnpm josh rule:guard` refuses a
-  filing the run has not scouted** (`prompts/collaboration-workflow/rule-delivery.md`) — the trigger is
-  the `gh api … issues` call, never which keyword started the run, so §2d's prerequisite, §2i's
-  observation and the review round cap's branch-2 filing all go through it.
-- **A `#N` entry point does not run it *for the Issue it was handed*.** `fullrun #N` / `halfrun #N` /
-  `kickoff #N` are given an Issue that already exists. That says nothing about an Issue such a run goes
-  on to file later, which the bullet above covers.
-- **The split path files each child through the same step.** The epic itself is not scouted: it is
-  created over children that were, and `epic:bundle` places it afterwards.
-
-Full behavior, the thresholds and why the duplicate half compares titles rather than bodies:
-`docs/josh-commands.md` → "`josh issue:scout`".
+**Before every new Issue is filed, run `pnpm josh issue:scout <title>` and read its duplicate and epic
+answers.** This applies inside every workflow, including observations and review follow-ups. The
+guard refuses a filing without it. Read `issue-scout.md` at that point for the duplicate, closed-Issue
+and epic decisions; `issue-fold-existing.md` handles a compatible duplicate. `docs/josh-commands.md`
+→ "`josh issue:scout`" defines the command's output.
 
 ## 2f. The working-tree hold — one run per tree
 
 **Trigger:** the first call of `fullrun` and `halfrun` alike — before the title is normalized, before
-`git switch main`, and before a `new` entry files its Issue. **Then:** `pnpm josh run:hold [<N>]`
-claims the tree; `hold` continues, `busy` and `unknown` both stop with a `confirmation` Telegram
+`git switch main`, and before a `new` entry files its Issue. **Then:** `fullrun #N` first runs
+`pnpm josh run:entry <N>`, which includes the tree claim; `fullrun new` and `halfrun` first run
+`pnpm josh run:hold [<N>]`. `hold` continues; `busy` and `unknown` stop with a `confirmation` Telegram
 carrying what stderr printed. **`kickoff` is exempt** (it edits nothing). A stop that leaves the tree
 clean releases explicitly with `pnpm josh run:release [<N>]`; a `halfrun` or `needs-human-review` stop
 keeps the hold; `pnpm josh followup` releases a merged run. The answer table, the per-child rule and
@@ -309,64 +236,18 @@ parent-wake half at `backlogrun-progress.md` → "The parent keeps no clock of i
 
 ## 2i. An observation worth filing is filed without asking
 
-**A run that judges something worth filing files it, and does not ask.** The three routes in §2d all
-cover work that changes what the run does — an upstream defect stops it, a split replaces it, a
-prerequisite goes in front of it. **A plain observation changes none of that**: the Issue in hand is
-untouched, and what the run holds is a finding it would be a loss to forget. Handing it over is wrong
-twice: filing into a first-party repository is **Tier A** and already settled, and stopping for an
-answer under `backlogrun` parks the run without saying so.
-
-- **File it, without asking, the moment you judge it worth filing.** **The trigger is the judgement,
-  not the run's progress**; the `Stop` hook sends back an offer to file. A **first-party** target — its
-  owner equal to this session's repository owner, decided by `pnpm josh repo:party` rather than by
-  judgement — is Tier A. **A third-party target is Tier C and is never
-  filed** (`CLAUDE.md` → "Third-party repositories are Tier C").
-- **It carries no `route:` label of its own.** `route:tier-a` means a filing the run is *blocked by*,
-  and an observation blocks nothing. Where one of the interrupt tests is met the filing takes
-  `route:interrupt`; otherwise it takes neither.
-- **Both ceilings apply to this route.** §2d's **10 Issues per run** counts this filing too, and so
-  does the backlog **WIP cap** — an observation that does not block the run is *discretionary*, so with
-  more than 30 open Issues in the target repository, close one first, and nothing honestly closable
-  means do not file (`prompts/collaboration-workflow/wip-cap.md`).
-- **Run `pnpm josh issue:scout "<title>"` before the `gh api … issues` call** (§2e).
-- **When this is the run's second filing, run `pnpm josh issue:fold` first.** Several findings from one
-  session fold into one Issue by default — the filing-time counterpart to the split assessment, reading
-  the same two questions (`split-assessment.md` → "The same two questions decide the filing-time fold").
-  `pnpm josh rule:guard` refuses the second `gh api … issues` call until it is folded; the first filing
-  asks nothing.
-- **Run `pnpm josh epic:bundle <new>` on what was filed.** An Issue no epic tracks is one `epic:next` never offers. **Where that epic's root carries `auto-ok` the filing joins
-  the backlog's pool** (`backlogrun-steps.md` → "What one invocation approves").
-- **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent. Name what was filed in the completion report.
-
-**What stays a judgement is whether it is worth filing, not whether to ask.** An observation nobody
-would act on is not filed at all — dropping it costs nothing, and the WIP cap makes dropping the
-default at the margin.
-
-**The procedure is `observation-filing.md`, and it is read the moment you judge something worth filing
-— in full, in the same turn, before the `gh api … issues` call.** It carries the depth test and its
-table, the depth labels and their provisioning commands, the depth-0 share, the ledger's five-field
-grammar and its commit path, the promotion on a second sighting, and what a delegated child does
-instead. The four things above are the rule; that file is how each one is carried out, and it is the
-single source of every one of them.
+**When a first-party observation is worth filing, file it without asking and continue the run.**
+Read `observation-filing.md` in full before filing: it decides the depth test, filing ceilings, labels,
+second-filing fold, ledger fallback and delegated-child handoff. Use `pnpm josh repo:party` to decide
+first-party status, then run `pnpm josh issue:scout` before filing (§2e). A third-party target remains
+Tier C (`CLAUDE.md`).
 
 ## 2j. The end-of-run retrospective — read when `run:step` prints it
 
-**Trigger:** `pnpm josh run:step` prints the retrospective step, which it does at the stop position of a
-run that drained its backlog and is not a dispatched lane child (a batch runs one at its own end, never
-a child's — the `release:scope` precedent). It is kit-only: `run:step` prints it only in the kit
-repository, so a consumer run never reaches this step. It fires once per invocation: the carry record
-holds whether it has run, so a run resumed after a session cut does not repeat it, and `run:carry --end`
-removes the record so it cannot leak into the next invocation. **When it fires is the run driver's, not
-this skill's** — the rule lives in `run:step`'s state transitions, so nothing here decides ordering.
-
-**Then:** run the command `run:step` prints for the digest, weigh it, file the improvements worth
-carrying into the next run — at most two, each through `pnpm josh issue:scout` then
-`pnpm josh epic:bundle` like any other filing — stack the rest in the observation ledger, and close with
-`pnpm josh run:carry --retrospective --owner "$PPID"` so the step is not printed again. **The procedure
-is `retrospective.md`, read in full at that trigger** — it carries what the digest's four sections mean,
-how the top two are selected rather than rationed, the `auto-ok` carve-out that lets the next run pick
-them up (`backlogrun-steps.md` is that rule's single source), and why a retrospective that finds nothing
-worth carrying files nothing.
+**When `pnpm josh run:step` prints the retrospective step, read `retrospective.md` in full and run the
+digest it names once.** File up to two worthwhile improvements through `issue:scout` and
+`epic:bundle`, stack the rest in the observation ledger, and close the step with the command described
+there. A dispatched lane child never runs the retrospective.
 
 ## 3. What stays resident, and what is read from here
 

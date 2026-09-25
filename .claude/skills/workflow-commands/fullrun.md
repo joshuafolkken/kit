@@ -20,9 +20,10 @@ below are the detail behind each fact (`run:entry` reuses their own logic, it do
 single sources). Step 2 — the `in-progress` label — stays its own call, applied the moment the folded
 call reports `hold`.
 
-1. **Claim the working tree — first, before anything else.** `pnpm josh run:hold <N>` (bare
-   `pnpm josh run:hold` for `fullrun new`), ahead of the title, `git switch main` and a `new` entry's
-   filing. `hold` continues; `busy` / `unknown` stop with a `confirmation` Telegram carrying stderr.
+1. **Claim the working tree — first, before anything else.** For `fullrun #N`, first run the folded
+   `pnpm josh run:entry <N>` above; it calls `run:hold` as its first step. For `fullrun new`, call
+   bare `pnpm josh run:hold`, ahead of the title and filing. `hold` continues; `busy` / `unknown` stop
+   with a `confirmation` Telegram carrying stderr.
    `working-tree-hold.md` is the single source; a cross-repository target resolves its checkout from
    `pnpm josh doctor` first (`target-repository.md`).
 2. **Apply `in-progress` the moment `run:hold` answered `hold`** — a `#N` counts as holding its lane
