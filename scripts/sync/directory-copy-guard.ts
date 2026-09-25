@@ -1,6 +1,7 @@
 import { cpSync, lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
+import { file_content } from './file-content'
 
 // `josh init` and `josh sync` both copy a distributed directory with `cpSync`, and both have to
 // answer the same question first: is this copy one that `cpSync` will refuse? The answer lives here
@@ -75,6 +76,12 @@ function is_transformable(candidate_path: string): boolean {
 	return candidate_path.endsWith(TRANSFORMED_EXTENSION) && is_regular_file(candidate_path)
 }
 
+function transform_copied_file(file_path: string): void {
+	const content = readFileSync(file_path, 'utf8')
+	const transformed = transform_copied_content(file_path, content)
+	if (transformed !== content) writeFileSync(file_path, transformed)
+}
+
 // The walk reads the SOURCE listing and rewrites the matching destination paths, never the
 // destination's own listing. The copy merges rather than prunes, so a consumer's own notes sit
 // beside the distributed files — walking the destination would rewrite those too, silently editing
@@ -85,11 +92,49 @@ function transform_copied_tree(source_path: string, destination_path: string): v
 	for (const entry of entries) {
 		if (!is_transformable(path.join(source_path, entry))) continue
 
-		const file_path = path.join(destination_path, entry)
-		const content = readFileSync(file_path, 'utf8')
-
-		writeFileSync(file_path, transform_copied_content(file_path, content))
+		transform_copied_file(path.join(destination_path, entry))
 	}
+}
+
+function should_copy_entry(source_path: string, destination_path: string): boolean {
+	if (!is_regular_file(source_path)) return true
+
+	if (classify_path(destination_path) === 'directory') {
+		throw new Error('destination is a directory where the package has a file')
+	}
+
+	const source_content = readFileSync(source_path)
+	const content = source_path.endsWith(TRANSFORMED_EXTENSION)
+		? transform_copied_content(destination_path, source_content.toString('utf8'))
+		: source_content
+
+	return !file_content.is_same_file_content(destination_path, content)
+}
+
+function is_changed_entry(source_entry: string, destination_entry: string, root: string): boolean {
+	if (source_entry === root) return false
+	if (is_regular_file(source_entry)) return true
+
+	return classify_path(destination_entry) === 'absent'
+}
+
+function copy_directory(source_path: string, destination_path: string): boolean {
+	let did_change = false
+
+	cpSync(source_path, destination_path, {
+		recursive: true,
+		filter: (source_entry, destination_entry) => {
+			const should_copy = should_copy_entry(source_entry, destination_entry)
+
+			if (should_copy && is_changed_entry(source_entry, destination_entry, source_path)) {
+				did_change = true
+			}
+
+			return should_copy
+		},
+	})
+
+	return did_change
 }
 
 // The guards above answer what can be known before the copy; this one answers what the copy itself
@@ -109,9 +154,15 @@ function failure_message(prefix: string, error: unknown): string {
 // the directory was replaced and names the fix, which is to run the sync again once the cause of
 // the read or write error is gone. There is no rollback: a temp-directory swap would not survive
 // the permission and I/O errors that are the realistic throws here either.
-function copy_directory_failure(source_path: string, destination_path: string): string | undefined {
+function copy_directory_failure(
+	source_path: string,
+	destination_path: string,
+	on_copy?: (did_change: boolean) => void,
+): string | undefined {
+	let did_change = false
+
 	try {
-		cpSync(source_path, destination_path, { recursive: true })
+		did_change ||= copy_directory(source_path, destination_path)
 	} catch (error) {
 		return failure_message('copy failed', error)
 	}
@@ -121,6 +172,8 @@ function copy_directory_failure(source_path: string, destination_path: string): 
 	} catch (error) {
 		return failure_message('copied but left partly un-rewritten — re-run the sync', error)
 	}
+
+	on_copy?.(did_change)
 
 	return undefined
 }
