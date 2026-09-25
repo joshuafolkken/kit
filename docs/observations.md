@@ -352,3 +352,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:none | none | - | 2026-09-25 | #2578
 - rf:none | none | - | 2026-09-25 | #2582
 - rf:none | none | - | 2026-09-25 | #2584
+- rf:bug-risks | medium | scripts/sync/file-content.ts | 2026-09-25 | #2583
+- rf:tests | medium | scripts/sync/file-content.test.ts | 2026-09-25 | #2583
