@@ -13,6 +13,7 @@ import { sonar_file } from '#scripts/security/sonar-file'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
+import { file_content } from './file-content'
 import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
 import { skill_migration, type MigrationResult } from './skill-migration'
 import { sync_configs } from './sync-configs'
@@ -25,11 +26,13 @@ const CLAUDE_MD_FILENAME = 'CLAUDE.md'
 const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
 const CODEX_HOOKS_FILE = '.codex/hooks.json'
 
-function sync_ai_file(source_path: string, destination_path: string): void {
-	mkdirSync(path.dirname(destination_path), { recursive: true })
+function sync_ai_file(source_path: string, destination_path: string): boolean {
 	const content = readFileSync(source_path, 'utf8')
 
-	writeFileSync(destination_path, transform_copied_content(destination_path, content))
+	return file_content.write_text_if_changed(
+		destination_path,
+		transform_copied_content(destination_path, content),
+	)
 }
 
 // Both copied hook files must run against the consumer's installed bundle. When sync is run from a
@@ -50,8 +53,12 @@ function should_skip_hook_file(filename: string): boolean {
 
 function sync_file(filename: string): void {
 	if (should_skip_hook_file(filename)) return
-	sync_ai_file(path.join(PACKAGE_DIR, filename), path.join(PROJECT_ROOT, filename))
-	console.info(`  ✔ synced    ${filename}`)
+	const did_change = sync_ai_file(
+		path.join(PACKAGE_DIR, filename),
+		path.join(PROJECT_ROOT, filename),
+	)
+
+	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${filename}`)
 }
 
 function sync_file_mapping(source_path: string, destination_path: string): void {
@@ -64,32 +71,33 @@ function sync_file_mapping(source_path: string, destination_path: string): void 
 	// Routed through sync_ai_file rather than cpSync: templates/workflows/ci.yml is a mapped
 	// file, so a byte copy would hand the consumer the template's own action pins. The pins
 	// have to be resolved from .github/workflows at write time (joshuafolkken/kit#747).
-	sync_ai_file(source_path, destination_path)
-	console.info(`  ✔ synced    ${path.basename(destination_path)}`)
+	const did_change = sync_ai_file(source_path, destination_path)
+
+	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${path.basename(destination_path)}`)
 }
 
 function sync_workspace_yaml(
 	template_path: string,
 	destination_path: string,
 	is_force = false,
-): void {
+): boolean {
 	const template = readFileSync(template_path, 'utf8')
 	const existing =
 		!is_force && existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
 	const merged = init_logic.merge_workspace_yaml(existing, template)
 
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, merged)
+	return file_content.write_text_if_changed(destination_path, merged)
 }
 
 function sync_ai_copy_file(filename: string, is_force: boolean): void {
 	if (filename === WORKSPACE_YAML) {
-		sync_workspace_yaml(
+		const did_change = sync_workspace_yaml(
 			path.join(PACKAGE_DIR, WORKSPACE_YAML),
 			path.join(PROJECT_ROOT, WORKSPACE_YAML),
 			is_force,
 		)
-		console.info(`  ✔ synced    ${WORKSPACE_YAML}`)
+
+		console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${WORKSPACE_YAML}`)
 
 		return
 	}
@@ -99,26 +107,25 @@ function sync_ai_copy_file(filename: string, is_force: boolean): void {
 
 // The reason this directory was not synced, or nothing when it was. Both halves answer the same
 // question — what stops the copy — so the caller has one line to print either way.
-function directory_sync_failure(directory_name: string): string | undefined {
+function directory_sync_failure(
+	directory_name: string,
+	on_copy: (did_change: boolean) => void,
+): string | undefined {
 	const source_path = path.join(PACKAGE_DIR, directory_name)
 	const destination_path = path.join(PROJECT_ROOT, directory_name)
 
 	return (
 		directory_copy_blocker(source_path, destination_path) ??
-		copy_directory_failure(source_path, destination_path)
+		copy_directory_failure(source_path, destination_path, on_copy)
 	)
 }
 
 function sync_directory(directory_name: string): void {
-	const failure = directory_sync_failure(directory_name)
+	const failure = directory_sync_failure(directory_name, (did_change) => {
+		console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${directory_name}/`)
+	})
 
-	if (failure !== undefined) {
-		console.warn(`  ⚠ skipped   ${directory_name}/ (${failure})`)
-
-		return
-	}
-
-	console.info(`  ✔ synced    ${directory_name}/`)
+	if (failure !== undefined) console.warn(`  ⚠ skipped   ${directory_name}/ (${failure})`)
 }
 
 function did_migrate_prettierrc(destination_path: string): boolean {
