@@ -354,3 +354,7 @@ dropping either side destroys exactly what it exists to record.
 - rf:none | none | - | 2026-09-25 | #2584
 - rf:bug-risks | medium | scripts/sync/file-content.ts | 2026-09-25 | #2583
 - rf:tests | medium | scripts/sync/file-content.test.ts | 2026-09-25 | #2583
+- rf:bug-risks | medium | scripts/version/latest-corepack.ts:300 | 2026-09-25 | #2391
+- rf:bug-risks | medium | templates/workflows/ci.yml:126 | 2026-09-25 | #2391
+- rf:comments | medium | docs/josh-commands.md:854 | 2026-09-25 | #2391
+- rf:bug-risks | medium | templates/workflows/ci.yml:126 | 2026-09-25 | #2391
