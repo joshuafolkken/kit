@@ -64,7 +64,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'latest:corepack': {
 		script: 'scripts/version/latest-corepack.ts',
-		description: 'Update pnpm via corepack to the latest release on the current major',
+		description: 'Update pnpm on the current major while preserving the integrity pin',
 		category: 'Maintenance',
 		reference: ['', 'maintainer', ['files', 'network']],
 	},

@@ -29,6 +29,9 @@ const PACKAGE_JSON_V11 = '{"packageManager":"pnpm@11.4.0+sha512.abc"}'
 const PACKAGE_JSON_V11_SHORT = '{"packageManager":"pnpm@11"}'
 const PACKAGE_JSON_NO_PM = '{"name":"kit"}'
 const REGISTRY_V11 = '11.19.0'
+const TARGET_V12_7 = 'pnpm@12.7.0'
+const PNPM_COMMAND = 'pnpm'
+const SELF_UPDATE_COMMAND = 'self-update'
 const SAFE_CHAIN_NOTICE =
 	'ℹ Safe-chain: Some package versions were suppressed due to minimum age requirement.'
 
@@ -49,7 +52,6 @@ describe('latest_corepack.extract_pnpm_major', () => {
 // The kit#766 floor's pure-comparison suites live in latest-corepack-floor.test.ts; this
 // file keeps the query, resolve, corepack, and main() arrangements.
 
-const FALLBACK_TARGET = 'pnpm@latest'
 const TIMES_JSON_V11_OLD = `{"created":"2019-01-01T00:00:00.000Z","${REGISTRY_V11}":"${AGED_PUBLISH}"}`
 
 describe('latest_corepack.extract_times_json', () => {
@@ -112,9 +114,27 @@ describe('latest_corepack.resolve_corepack_target', () => {
 		expect(latest_corepack.resolve_corepack_target('11')).toBe(`pnpm@${REGISTRY_V11}`)
 	})
 
-	it('falls back to pnpm@latest without querying when the major is unknown', () => {
-		expect(latest_corepack.resolve_corepack_target(undefined)).toBe(FALLBACK_TARGET)
-		expect(mocked_execa_sync).not.toHaveBeenCalled()
+	it('resolves the exact latest version when the major is unknown', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, '"12.7.0"'))
+
+		expect(latest_corepack.resolve_corepack_target(undefined)).toBe(TARGET_V12_7)
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			PNPM_COMMAND,
+			['view', PNPM_COMMAND, 'version', '--json'],
+			expect.objectContaining({ reject: false }),
+		)
+	})
+
+	it('skips an invalid latest version from the registry', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, '"broken"'))
+
+		expect(latest_corepack.resolve_corepack_target(undefined)).toBeUndefined()
+	})
+
+	it('ignores a safe-chain notice after the latest version', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, '"12.7.0"\nSafe-chain notice'))
+
+		expect(latest_corepack.resolve_corepack_target(undefined)).toBe(TARGET_V12_7)
 	})
 
 	it('returns undefined when the registry cannot answer', () => {
@@ -126,62 +146,36 @@ describe('latest_corepack.resolve_corepack_target', () => {
 
 const COREPACK_TARGET_V11 = `pnpm@${REGISTRY_V11}`
 
-describe('latest_corepack.run_corepack', () => {
-	it('returns 0 when corepack succeeds', () => {
+describe('latest_corepack.run_pnpm_update', () => {
+	it('returns 0 when pnpm self-update succeeds', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
 
-		expect(latest_corepack.run_corepack(COREPACK_TARGET_V11)).toBe(0)
+		expect(latest_corepack.run_pnpm_update(COREPACK_TARGET_V11)).toBe(0)
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			PNPM_COMMAND,
+			[SELF_UPDATE_COMMAND, REGISTRY_V11],
+			expect.objectContaining({ reject: false }),
+		)
 	})
 
-	it('returns the non-zero exit code from corepack', () => {
+	it('returns the non-zero exit code from pnpm', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(1))
 
-		expect(latest_corepack.run_corepack(COREPACK_TARGET_V11)).toBe(1)
+		expect(latest_corepack.run_pnpm_update(COREPACK_TARGET_V11)).toBe(1)
 	})
 
 	it('falls back to 1 when exitCode is undefined', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
 
-		expect(latest_corepack.run_corepack(COREPACK_TARGET_V11)).toBe(1)
+		expect(latest_corepack.run_pnpm_update(COREPACK_TARGET_V11)).toBe(1)
 	})
 })
 
 const PIN_V11_5_0 = '11.5.0+sha512.abc'
-const MAJOR_V11 = '11'
 const PACKAGE_JSON_WITH_ENGINES = build_package_manager_manifest(`pnpm@${PIN_V11_5_0}`, '11.5.0')
-const PACKAGE_JSON_WIDENED = build_package_manager_manifest(`pnpm@${PIN_V11_5_0}`, MAJOR_V11)
 // The same manifest with the two fields already byte-identical: the state the alignment
 // closing main() converges on, so a run over it must not write at all.
 const PACKAGE_JSON_ALIGNED = build_package_manager_manifest(`pnpm@${PIN_V11_5_0}`, PIN_V11_5_0)
-
-describe('latest_corepack.did_widen_development_engines', () => {
-	it('widens the devEngines pin to the bare major before the bump', () => {
-		const is_widened = latest_corepack.did_widen_development_engines(
-			PACKAGE_JSON_WITH_ENGINES,
-			'11',
-		)
-
-		expect(is_widened).toBe(true)
-		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON_PATH, PACKAGE_JSON_WIDENED)
-	})
-
-	it('does not touch the file when the major is undefined', () => {
-		const is_widened = latest_corepack.did_widen_development_engines(
-			PACKAGE_JSON_WITH_ENGINES,
-			undefined,
-		)
-
-		expect(is_widened).toBe(false)
-		expect(mocked_write_file_sync).not.toHaveBeenCalled()
-	})
-
-	it('does not touch the file when devEngines.packageManager is absent', () => {
-		const is_widened = latest_corepack.did_widen_development_engines(PACKAGE_JSON_NO_PM, '11')
-
-		expect(is_widened).toBe(false)
-		expect(mocked_write_file_sync).not.toHaveBeenCalled()
-	})
-})
 
 describe('latest_corepack.restore_package_json', () => {
 	it('writes the original content back to package.json', () => {
@@ -198,8 +192,13 @@ describe('latest_corepack.restore_package_json', () => {
 	})
 })
 
-const PACKAGE_JSON_BUMPED = build_package_manager_manifest('pnpm@11.5.2+sha512.abc', MAJOR_V11)
-const WIDEN_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WIDENED]
+const PACKAGE_JSON_BUMPED = build_package_manager_manifest('pnpm@11.5.2', '11.5.2')
+const REGISTRY_INTEGRITY = `sha512-${Buffer.alloc(64, 1).toString('base64')}`
+const PINNED_INTEGRITY = `sha512.${Buffer.alloc(64, 1).toString('hex')}`
+const PACKAGE_JSON_WITH_INTEGRITY = build_package_manager_manifest(
+	`pnpm@11.5.2+${PINNED_INTEGRITY}`,
+	`11.5.2+${PINNED_INTEGRITY}`,
+)
 const RESTORE_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WITH_ENGINES]
 // 11.5.2 aged past any window; 11.6.0 published in the far future stays quarantined, so the
 // selection exercises the native age filter on the main path too.
@@ -223,52 +222,89 @@ function silence_console(): void {
 // Reads arrive in main's order: package.json, then .npmrc (quarantine window), then the
 // re-read taken by the alignment that closes main() — `on_disk` is what the file holds at
 // that point, the bumped manifest on success and the restored one on a skip.
-function arrange_resolved_registry(corepack_exit_code: number, on_disk: string): void {
+function arrange_resolved_registry(update_exit_code: number, on_disk: string): void {
 	mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_WITH_ENGINES)
 	mocked_read_file_sync.mockReturnValueOnce(NPMRC_AGE_1440)
 	mocked_read_file_sync.mockReturnValueOnce(on_disk)
+	mocked_read_file_sync.mockReturnValueOnce(
+		update_exit_code === 0 ? PACKAGE_JSON_WITH_INTEGRITY : on_disk,
+	)
 	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, VIEW_STDOUT))
-	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(corepack_exit_code))
+	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, JSON.stringify(REGISTRY_INTEGRITY)))
+	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(update_exit_code))
 }
 
+describe('latest_corepack.main without packageManager', () => {
+	it('adds a verified pin when packageManager is absent', () => {
+		silence_console()
+		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_NO_PM)
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, '"12.7.0"'))
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, JSON.stringify(REGISTRY_INTEGRITY)))
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, '12.7.0'))
+
+		latest_corepack.main()
+
+		const written = mocked_write_file_sync.mock.calls[0]?.[1]
+
+		expect(written).toContain(`"packageManager": "pnpm@12.7.0+${PINNED_INTEGRITY}"`)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(3)
+		vi.restoreAllMocks()
+	})
+
+	it('restores the manifest when the newly pinned version cannot start', () => {
+		silence_console()
+		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_NO_PM)
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, '"12.7.0"'))
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, JSON.stringify(REGISTRY_INTEGRITY)))
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(1, ''))
+
+		latest_corepack.main()
+
+		expect(mocked_write_file_sync).toHaveBeenLastCalledWith(PACKAGE_JSON_PATH, PACKAGE_JSON_NO_PM)
+		vi.restoreAllMocks()
+	})
+})
+
 describe('latest_corepack.main', () => {
-	it('invokes corepack with the registry-resolved exact version, never a dist-tag', () => {
+	it('invokes pnpm self-update with the registry-resolved exact version', () => {
 		silence_console()
 		arrange_resolved_registry(0, PACKAGE_JSON_BUMPED)
 
 		latest_corepack.main()
 
 		expect(mocked_execa_sync).toHaveBeenLastCalledWith(
-			'corepack',
-			['use', 'pnpm@11.5.2'],
+			PNPM_COMMAND,
+			[SELF_UPDATE_COMMAND, '11.5.2'],
 			expect.objectContaining({ reject: false }),
 		)
 
 		vi.restoreAllMocks()
 	})
 
-	it('widens the devEngines pin before invoking corepack (the regression guard)', () => {
+	it('obtains integrity before invoking pnpm self-update', () => {
 		silence_console()
 		arrange_resolved_registry(0, PACKAGE_JSON_BUMPED)
 
 		latest_corepack.main()
 
-		expect(mocked_write_file_sync.mock.calls[0]).toEqual(WIDEN_CALL)
-		expect(invocation_order(mocked_write_file_sync, 0)).toBeLessThan(
-			invocation_order(mocked_execa_sync, 1),
+		expect(invocation_order(mocked_execa_sync, 1)).toBeLessThan(
+			invocation_order(mocked_execa_sync, 2),
+		)
+		expect(mocked_write_file_sync).toHaveBeenCalledWith(
+			PACKAGE_JSON_PATH,
+			PACKAGE_JSON_WITH_INTEGRITY,
 		)
 
 		vi.restoreAllMocks()
 	})
 
-	it('restores the original package.json when corepack skips the bump', () => {
+	it('restores the original package.json when pnpm skips the bump', () => {
 		silence_console()
 		arrange_resolved_registry(1, PACKAGE_JSON_WITH_ENGINES)
 
 		latest_corepack.main()
 
-		expect(mocked_write_file_sync.mock.calls[0]).toEqual(WIDEN_CALL)
-		expect(mocked_write_file_sync.mock.calls[1]).toEqual(RESTORE_CALL)
+		expect(mocked_write_file_sync.mock.calls[0]).toEqual(RESTORE_CALL)
 
 		vi.restoreAllMocks()
 	})
@@ -284,7 +320,7 @@ describe('latest_corepack.main alignment', () => {
 
 		latest_corepack.main()
 
-		expect(mocked_write_file_sync.mock.calls[2]).toEqual([PACKAGE_JSON_PATH, PACKAGE_JSON_ALIGNED])
+		expect(mocked_write_file_sync.mock.calls[1]).toEqual([PACKAGE_JSON_PATH, PACKAGE_JSON_ALIGNED])
 
 		vi.restoreAllMocks()
 	})
@@ -303,7 +339,7 @@ describe('latest_corepack.main skip handling', () => {
 	// pin. The run must be a no-op, not a downgrade. The .npmrc read receives the
 	// package.json content and parses to no quarantine, which is exactly the point: the
 	// floor holds regardless of what the age filter did.
-	it('skips without invoking corepack when the registry answers below the pin', () => {
+	it('skips without invoking pnpm self-update when the registry answers below the pin', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
 		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_AHEAD_OF_REGISTRY)
@@ -354,7 +390,7 @@ describe('latest_corepack.main skip handling', () => {
 })
 
 describe('latest_corepack.did_warn_skip', () => {
-	it('warns and reports a skip when corepack exits non-zero', () => {
+	it('warns and reports a skip when pnpm exits non-zero', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
 		expect(latest_corepack.did_warn_skip(1)).toBe(true)
@@ -363,7 +399,7 @@ describe('latest_corepack.did_warn_skip', () => {
 		warn.mockRestore()
 	})
 
-	it('stays silent and reports no skip when corepack succeeds', () => {
+	it('stays silent and reports no skip when pnpm succeeds', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
 		expect(latest_corepack.did_warn_skip(0)).toBe(false)

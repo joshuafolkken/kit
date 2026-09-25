@@ -102,7 +102,7 @@ node -v
 pnpm -v
 ```
 
-If pnpm is older than 11, upgrade via Corepack: `corepack prepare pnpm@latest --activate`.
+If pnpm is older than 11, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
 
 ## `josh sync` reports config drift
 

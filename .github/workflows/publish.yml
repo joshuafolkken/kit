@@ -20,10 +20,17 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@joshuafolkken'
 
-      # Install pnpm via Corepack instead of pnpm/action-setup: its self-installer
-      # crashes on newer pnpm releases with "Cannot use 'in' operator to search for
-      # 'integrity' in undefined" (#662).
-      - run: corepack enable
+      - name: Resolve pnpm version
+        id: pnpm-version
+        run: |
+          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : '') ?? ''")
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          version: ${{ steps.pnpm-version.outputs.version }}
+          install: false
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
 

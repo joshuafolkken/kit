@@ -120,11 +120,18 @@ jobs:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
-      # Install pnpm via Corepack (driven by the packageManager pin) instead of
-      # pnpm/action-setup: its self-installer crashes on newer pnpm releases with
-      # "Cannot use 'in' operator to search for 'integrity' in undefined" (#662).
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Resolve pnpm version
+        id: pnpm-version
+        run: |
+          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : '') ?? ''")
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          version: ${{ steps.pnpm-version.outputs.version }}
+          install: false
 
       - name: Resolve pnpm store path
         run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
@@ -353,11 +360,18 @@ jobs:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
 
-      # Install pnpm via Corepack (driven by the packageManager pin) instead of
-      # pnpm/action-setup: its self-installer crashes on newer pnpm releases with
-      # "Cannot use 'in' operator to search for 'integrity' in undefined" (#662).
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Resolve pnpm version
+        id: pnpm-version
+        run: |
+          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : '') ?? ''")
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          version: ${{ steps.pnpm-version.outputs.version }}
+          install: false
 
       - name: Resolve pnpm store path
         run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
