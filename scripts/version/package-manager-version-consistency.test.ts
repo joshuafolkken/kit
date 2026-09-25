@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import semver from 'semver'
 import { describe, expect, it } from 'vitest'
 import { package_manager_version } from './package-manager-version'
 
@@ -28,5 +29,13 @@ describe('package.json packageManager / devEngines version consistency', () => {
 
 		expect(package_manager_pin).toBeDefined()
 		expect(PACKAGE_JSON.devEngines.packageManager.version).toBe(package_manager_pin)
+	})
+
+	it('pins a supported pnpm 12 release', () => {
+		const package_manager_pin = package_manager_version.extract_pnpm_pin(
+			PACKAGE_JSON.packageManager,
+		)
+
+		expect(semver.satisfies(package_manager_pin ?? '', '>=12.1.0 <13')).toBe(true)
 	})
 })

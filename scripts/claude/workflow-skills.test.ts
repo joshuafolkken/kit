@@ -215,8 +215,8 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 
 	it.each([
 		'git diff -- pnpm-workspace.yaml package.json',
-		"**Overrides live in two files, and one of them alone is not the project's answer.**",
-		'quote what one of them printed rather than a verdict you inferred',
+		'**pnpm 11 and 12 read effective overrides only from `pnpm-workspace.yaml`.**',
+		'**quote what one printed.**',
 		'the `josh latest` lockstep pnpm bump is expected, NOT a violation',
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)

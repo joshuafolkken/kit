@@ -10,7 +10,7 @@ import { init_logic_workspace } from './init-logic-workspace'
 import { init_logic_yaml_merge } from './init-logic-yaml-merge'
 
 const DEV_ENGINES_VALUE = {
-	packageManager: { name: 'pnpm', version: '>=11.0.0-0', onFail: 'error' },
+	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'error' },
 }
 
 // The `@joshuafolkken:registry` mapping stays — it is a registry mapping, not a credential,

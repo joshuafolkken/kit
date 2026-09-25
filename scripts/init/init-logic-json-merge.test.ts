@@ -280,7 +280,7 @@ describe('init_logic_json_merge.merge_development_dependencies', () => {
 
 const DEV_ENGINES_KEY = 'devEngines'
 const DEV_ENGINES_VALUE = {
-	packageManager: { name: 'pnpm', version: '>=11.0.0-0', onFail: 'error' },
+	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'error' },
 }
 
 describe('init_logic_json_merge.merge_development_engines', () => {

@@ -15,7 +15,7 @@ const package_with_deps_schema = z.object({
 	devDependencies: optional_string_record_schema,
 })
 
-// pnpm 11 reads workspace-level settings — `overrides` among them — from pnpm-workspace.yaml.
+// pnpm 11+ reads workspace-level settings — `overrides` among them — from pnpm-workspace.yaml.
 // Loose so the unrelated keys that share the file (`allowBuilds`, `minimumReleaseAgeExclude`, …)
 // pass through untouched.
 const workspace_overrides_schema = z.looseObject({

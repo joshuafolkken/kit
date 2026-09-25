@@ -782,7 +782,7 @@ pnpm josh overrides           # verify overrides unchanged
 pnpm josh overrides --save    # snapshot current merged overrides
 ```
 
-Reads **both** locations — the `overrides:` block in `pnpm-workspace.yaml` and legacy `pnpm.overrides` in `package.json` — merging them (a workspace entry wins a key collision) and printing where they came from. An empty `pnpm.overrides` is never treated as "no overrides".
+Checks effective overrides from `pnpm-workspace.yaml` against a saved snapshot and reports ignored `pnpm.overrides` entries in `package.json` separately. pnpm 11 and 12 do not apply the package field. An empty `pnpm.overrides` is never treated as "no overrides" without reading the workspace.
 
 **Options:**
 
@@ -855,7 +855,7 @@ Updates pnpm and pins `packageManager` to the newest release on the project's **
 
 #### `josh latest:update`
 
-Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (overrides read from both `pnpm-workspace.yaml` and `package.json`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`.
+Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`.
 
 ---
 

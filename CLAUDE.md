@@ -89,7 +89,7 @@ Read from a `.env` file at the project root by the AI scripts, `josh port` and `
 
 ### Dependency overrides (`pnpm-workspace.yaml` / `package.json`)
 
-- **Overrides live in two files, and one of them alone is not the project's answer.** pnpm 11 reads them from the `overrides:` block in **`pnpm-workspace.yaml`**; `pnpm.overrides` in **`package.json`** is the legacy location. **An absent or empty `pnpm.overrides` is not evidence that the project has no overrides.**
+- **Effective overrides live in `pnpm-workspace.yaml`.** pnpm 11 and 12 ignore `pnpm.overrides` in `package.json` (verified with pnpm 12.6.0). Check both files for existing declarations, but never count the ignored package field as an effective override. **An absent or empty `pnpm.overrides` is not evidence that the project has no overrides.**
 - **NEVER** remove or modify entries in **either** location without explicit user approval.
 - **NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation. It pins the development toolchain (e.g. pnpm version); silently changing it can break CI or other contributors' environments.
 - **The check is a command you run, not a conclusion you reach.** After `pnpm update`, `josh latest`, or any dependency-update command, **load the `dependency-update` skill** and follow its procedure before reporting anything about the pins.
