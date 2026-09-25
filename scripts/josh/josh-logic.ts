@@ -90,27 +90,7 @@ function read_package_version(): string {
 
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`
 const USAGE = 'Usage: josh <command> [options]'
-const ALL_HINT = "Run 'josh --all' to also list kit-maintenance commands."
-
-// The help splits by audience: `josh --help` shows the commands a kit user runs day to day, and
-// `josh --all` adds the kit-maintenance ones below (joshuafolkken/kit#1928). These are the
-// maintenance set — publishing, propagating and reconciling kit itself, plus the git-hook internals
-// that lefthook invokes rather than a person. Membership lives here, one reviewable list, rather than
-// as a flag threaded through every command entry.
-const MAINTENANCE_COMMANDS: ReadonlySet<string> = new Set([
-	'release',
-	'release:scope',
-	'propagate',
-	'reconcile-templates',
-	'audit:provision',
-	'eval',
-	'secretlint-scan',
-	'prevent-main-commit',
-	'check-commit-message',
-	'pre-push-unit',
-	'reserved-run',
-	'pre-commit-type-check',
-])
+const ALL_HINT = "Run 'josh --all' to list every available command."
 
 function build_alias_lookup(): Map<string, string> {
 	const lookup = new Map<string, string>()
@@ -141,17 +121,11 @@ function format_category_section(
 	return [`${category}:`, ...lines].join('\n')
 }
 
-// A consumer never sees a kit-only command; inside kit the maintenance split (`--help` vs `--all`) is
-// all that hides anything (joshuafolkken/kit#1988).
-function is_visible_command(
-	cmd: string,
-	entry: CommandEntry,
-	is_all: boolean,
-	is_consumer: boolean,
-): boolean {
+// The command reference owns the audience decision for both kit and consumer help.
+function is_visible_command(entry: CommandEntry, is_all: boolean, is_consumer: boolean): boolean {
 	if (is_consumer && kit_only.is_kit_only(entry)) return false
 
-	return is_all || !MAINTENANCE_COMMANDS.has(cmd)
+	return is_all || entry.reference[1] === 'developer'
 }
 
 function collect_visible(
@@ -163,7 +137,7 @@ function collect_visible(
 	)
 
 	for (const [cmd, entry] of Object.entries(COMMAND_MAP)) {
-		if (is_visible_command(cmd, entry, is_all, is_consumer)) {
+		if (is_visible_command(entry, is_all, is_consumer)) {
 			by_category.get(entry.category)?.push([cmd, entry])
 		}
 	}
@@ -171,9 +145,7 @@ function collect_visible(
 	return by_category
 }
 
-// `josh --help` lists the day-to-day commands; `josh --all` adds the kit-maintenance ones. A category
-// left empty once the maintenance commands are filtered out is dropped rather than printed as a bare
-// heading (joshuafolkken/kit#1928).
+// A category left empty after audience filtering is dropped rather than printed as a bare heading.
 function format_help(is_all = false, is_consumer = false): string {
 	const by_category = collect_visible(is_all, is_consumer)
 	const alias_lookup = build_alias_lookup()
@@ -202,7 +174,7 @@ function format_unknown_command(cmd: string): string {
 	const suggestion = command_suggest.closest_command(cmd, all_command_names())
 	const hint = suggestion === undefined ? '' : ` Did you mean '${suggestion}'?`
 
-	return `Unknown command: ${cmd}.${hint} Run 'josh --help' to list commands.`
+	return `Unknown command: ${cmd}.${hint} Run 'josh --help' for common commands or 'josh --all' for the full list.`
 }
 
 // A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and

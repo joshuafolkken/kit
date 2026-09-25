@@ -8,8 +8,8 @@ const ARGV_OFFSET = 2
 // routing that path to stderr for #825 would otherwise have left `josh --help` printing nothing a
 // pipe could read.
 const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
-// `josh --all` (and `josh --help --all`) lists the kit-maintenance commands the default help hides
-// (joshuafolkken/kit#1928). A bare `--all` in the command slot is a help request, not a command.
+// `josh --all` (and `josh --help --all`) lists every command available in this checkout.
+// A bare `--all` in the command slot is a help request, not a command.
 const ALL_FLAG = '--all'
 
 function print_help(is_all: boolean, is_consumer: boolean): void {

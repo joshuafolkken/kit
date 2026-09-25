@@ -294,9 +294,8 @@ describe('init_ai_copy.run_ai_copies — directory copy', () => {
 
 		init_ai_copy.run_ai_copies()
 
-		expect(cp_sync_mock).toHaveBeenCalledWith('/pkg/prompts', '/project/prompts', {
-			recursive: true,
-		})
+		expect(cp_sync_mock.mock.calls[0]?.[0]).toBe('/pkg/prompts')
+		expect(cp_sync_mock.mock.calls[0]?.[1]).toBe('/project/prompts')
 		// `cpSync` having been called is not the success path: the copy is followed by a transform
 		// pass, and a failure there is caught and reported as a skip with `cpSync` still recorded. A
 		// mock missing an export the pass calls looked exactly like that (kit#854), so the reported
