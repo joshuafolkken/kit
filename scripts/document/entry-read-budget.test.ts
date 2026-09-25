@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { document_byte_budget } from './document-byte-budget'
 import { entry_read_budget } from './entry-read-budget'
+import { entry_read_set } from './entry-read-set'
 import { read_set_cli } from './read-set-cli'
 
 const { ENTRY_READ_BUDGET, entry_total_bytes, over_budget_message, stale_budget_message } =
@@ -80,6 +81,32 @@ const PRE_2294_CEILING: ReadonlyMap<string, number> = new Map([
 	['backlogrun', 274_432],
 	['lane-child', 143_360],
 ])
+
+// #2584 removes repeated delegation explanations from the shared workflow entry. Keep the measured
+// saving on each entry that reads that section; the lane child already omits it.
+const PRE_2584_ENTRY_BYTES: ReadonlyMap<string, number> = new Map([
+	['kickoff', 265_242],
+	['fullrun', 263_797],
+	['halfrun', 263_389],
+	['backlogrun', 268_867],
+])
+const MIN_2584_SAVING_BYTES = 5000
+const PRE_DEFERRED_FULLRUN_TOKENS = 12_849
+const MIN_DEFERRED_START_SAVING_TOKENS = 3000
+
+describe('the #2584 startup-read reduction is held', () => {
+	it.each([...PRE_2584_ENTRY_BYTES])('%s saves at least five kilobytes', (entry, previous) => {
+		expect(previous - entry_total_bytes(ROOT, entry)).toBeGreaterThanOrEqual(MIN_2584_SAVING_BYTES)
+	})
+
+	it('defers at least three thousand fullrun startup tokens', () => {
+		const current = entry_read_set.costed(ROOT, 'fullrun').scoped.tokens
+
+		expect(PRE_DEFERRED_FULLRUN_TOKENS - current).toBeGreaterThanOrEqual(
+			MIN_DEFERRED_START_SAVING_TOKENS,
+		)
+	})
+})
 
 describe('the first downward ratchet move (joshuafolkken/kit#2294) is held', () => {
 	it.each(ENTRY_READ_BUDGET)('$entry stays below its pre-#2294 ceiling', ({ entry, bytes }) => {

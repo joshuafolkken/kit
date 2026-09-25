@@ -11,8 +11,23 @@ the one that does reads it in full, in the same turn, before it files.
 **The trigger is the judgement, not the run's progress** — an ended run, a `kickoff` and a mid-talk
 turn all file; an offer to file is sent back by the `Stop` hook (joshuafolkken/kit#2422).
 
-**Nothing was deferred and nothing was summarized to buy that.** The text below is §2i's, sentence
-for sentence, and every marker suite that pinned one of these sentences now pins it here.
+**A run that judges something worth filing files it, and does not ask.** An upstream defect stops the
+run, a split replaces it, and a prerequisite goes in front of it (`SKILL.md` → §2d). An ordinary
+observation changes none of those: it carries no `route:` label, causes no stash or park, and the run
+continues. A first-party target is Tier A, decided by `pnpm josh repo:party`; a third-party target is
+Tier C (`CLAUDE.md`). Name what was filed in the completion report. An observation nobody would act
+on is dropped rather than filed.
+
+**The filing ceilings still apply.** Count this filing in the ten-Issue limit for the run. An
+observation is discretionary, so above 30 open Issues in the target repository, close one first or do
+not file (`prompts/collaboration-workflow/wip-cap.md`). Before the `gh api … issues` call, run
+`pnpm josh issue:scout "<title>"` (`issue-scout.md`). When it is the second filing of the run, run
+`pnpm josh issue:fold` first; the guard refuses that filing without the fold
+(`split-assessment.md` → "The same two questions decide the filing-time fold"). After filing, run
+`pnpm josh epic:bundle <new>` so the Issue is offered by its epic; an `auto-ok` epic adds it to the
+backlog pool (`backlogrun-steps.md` → "What one invocation approves").
+
+The detail below is read at the filing decision, and the marker suite pins the rules here.
 
 ### The depth test — a discretionary filing cites the product work it blocked
 
@@ -332,4 +347,3 @@ fire once on the run that filed fifteen.
 **This file is the single source of every procedure above**, and `SKILL.md` → §2i is the single
 source of the rule they carry out; nothing under `prompts/collaboration-workflow/` restates either
 (joshuafolkken/kit#1649, joshuafolkken/kit#1797).
-

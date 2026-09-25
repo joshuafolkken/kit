@@ -52,13 +52,17 @@ const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 
 // **A file an entry names but reads only later — point-of-use for that entry, an entry read for
 // another** (joshuafolkken/kit#2161). The global set above cannot express this, because a file
-// dropped there leaves *every* entry's read. `backlogrun`'s parent orchestrates and never
-// implements: a dispatched child reads `fullrun.md` and `split-assessment.md` inside its own
-// delegated `fullrun` unit (`backlogrun-child.md`), so the parent pays for neither at its entry —
-// while `fullrun`, `halfrun` and `kickoff` each read them at theirs. Keyed by entry keyword; an entry
-// the map does not name drops nothing beyond the global set.
+// dropped there leaves *every* entry's read. The four ordinary entries read the decision documents
+// only when delegation or filing arises; the lane child omits their SKILL.md sections. `backlogrun`'s
+// parent additionally reads `fullrun.md` and `split-assessment.md` inside a dispatched child, while
+// `fullrun`, `halfrun` and `kickoff` read them at their own entries.
+const DEFERRED_DECISIONS: ReadonlySet<string> = new Set(['delegation.md', 'issue-scout.md'])
+
 const POINT_OF_USE_BY_ENTRY: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-	['backlogrun', new Set(['fullrun.md', 'split-assessment.md'])],
+	['kickoff', DEFERRED_DECISIONS],
+	['fullrun', DEFERRED_DECISIONS],
+	['halfrun', DEFERRED_DECISIONS],
+	['backlogrun', new Set([...DEFERRED_DECISIONS, 'fullrun.md', 'split-assessment.md'])],
 ])
 
 const NO_PER_ENTRY_FILES: ReadonlySet<string> = new Set()
@@ -70,8 +74,7 @@ function is_point_of_use(entry: string, file: string): boolean {
 	return (POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES).has(file)
 }
 
-// The global point-of-use files plus the ones this entry names in its own row — for `backlogrun`,
-// `fullrun.md` and `split-assessment.md`, so the report accounts for what the child reads later.
+// The global point-of-use files plus the ones this entry names in its own row.
 function point_of_use_files(entry: string): Array<string> {
 	return [...POINT_OF_USE_FILES, ...(POINT_OF_USE_BY_ENTRY.get(entry) ?? NO_PER_ENTRY_FILES)]
 }

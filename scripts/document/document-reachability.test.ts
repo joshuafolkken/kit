@@ -34,16 +34,26 @@ describe('document reachability — where each agent-read document sits on the e
 
 		expect(covered_documents()).toEqual(expect.arrayContaining([...RESIDENT_BASE]))
 	})
+})
 
+describe('document reachability — deferred documents', () => {
 	// Point-of-use is not re-listed here — it is the distinction `entry_read_set` already draws, so a
 	// document named in a trigger table but read only when its command runs stays point-of-use.
 	it('labels exactly the point-of-use documents point-of-use', () => {
-		const point_of_use = documents_labelled('point-of-use', agent_read_documents()).map((one) =>
+		const corpus = agent_read_documents()
+		const point_of_use = documents_labelled('point-of-use', corpus).map((one) =>
 			one.split('/').at(-1),
+		)
+		const resident = new Set(
+			documents_labelled('resident', corpus).map((one) => one.split('/').at(-1)),
+		)
+		const per_entry = [...entry_read_set.POINT_OF_USE_BY_ENTRY.values()].flatMap((one) => [...one])
+		const expected = [...new Set([...entry_read_set.POINT_OF_USE_FILES, ...per_entry])].filter(
+			(name) => !resident.has(name),
 		)
 
 		expect(sorted(point_of_use.filter((one): one is string => one !== undefined))).toEqual(
-			sorted([...entry_read_set.POINT_OF_USE_FILES]),
+			sorted(expected),
 		)
 	})
 
