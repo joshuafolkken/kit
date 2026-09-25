@@ -4,6 +4,7 @@ import { git_location_environment } from '#scripts/git/git-location-environment'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_carry } from '#scripts/run/run-carry'
+import { run_review_steps } from '#scripts/run/run-review-steps'
 import { execaSync } from 'execa'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { josh_harness, type EnvironmentKind, type JoshEnvironment } from './josh-harness'
@@ -17,6 +18,7 @@ const MARKER_WAIT_MS = 60_000
 
 const LEDGER = path.join('docs', 'observations.md')
 const GATE_GREEN = 'Gate green'
+const GATE_PASSED = 'verification gate passed'
 const RECORD = 'review:record'
 const SETUP_FAILED = 'setup failed'
 const DECOY_DIRECTORY = 'decoy-bin'
@@ -166,6 +168,34 @@ describe('josh harness — scenarios from past defects', () => {
 			expect(existsSync(path.join(lane.root, LEDGER))).toBe(false)
 		},
 		SCENARIO_TIMEOUT_MS,
+	)
+})
+
+describe('josh harness — detached consumer gate (#2573)', () => {
+	it(
+		'uses the consumer script when the lane has no kit source entry',
+		async () => {
+			const consumer = environment('consumer')
+
+			expect(existsSync(path.join(consumer.root, 'scripts', 'josh', 'josh.ts'))).toBe(false)
+			expect(josh_harness.run(consumer, ['lint:related']).exit_code).toBe(0)
+			expect(josh_harness.run(consumer, ['test:related']).exit_code).toBe(0)
+			const launched = run_review_steps.launch_gate(consumer.root)
+			const log_path = run_review_steps.gate_log_path(consumer.root)
+			const is_finished = await josh_harness.wait_for(
+				() =>
+					existsSync(log_path) &&
+					/verification gate passed|verification gate failed|ELIFECYCLE/u.test(
+						readFileSync(log_path, 'utf8'),
+					),
+				GATE_TIMEOUT_MS,
+			)
+
+			expect(launched.kind).toBe('launched')
+			expect(is_finished, readFileSync(log_path, 'utf8')).toBe(true)
+			expect(readFileSync(log_path, 'utf8')).toContain(GATE_PASSED)
+		},
+		GATE_TIMEOUT_MS,
 	)
 })
 
