@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
@@ -50,7 +51,12 @@ function gate_argv(root: string): LaunchArgv {
 
 function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
 	return detached_launch.launch(
-		{ argv: gate_argv(root), cwd: root, log_path: gate_log_path(root) },
+		{
+			argv: gate_argv(root),
+			cwd: root,
+			log_path: gate_log_path(root),
+			env: git_location_environment.location_free_environment(),
+		},
 		(note) => process.stderr.write(`${note}\n`),
 	)
 }
