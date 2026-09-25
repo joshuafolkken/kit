@@ -20,6 +20,10 @@ const CASES = [
 	{ path: ci_yml_fixture.TEMPLATE_CI_YML, jobs: ['checks', E2E_JOB] },
 	{ path: '.github/workflows/publish.yml', jobs: ['publish'] },
 ]
+const RESOLVER_CASES = [
+	{ path: ci_yml_fixture.RUNTIME_CI_YML, job: STATIC_CHECKS_JOB },
+	{ path: ci_yml_fixture.TEMPLATE_CI_YML, job: 'checks' },
+]
 type Steps = NonNullable<NonNullable<ReturnType<typeof ci_yml_fixture.find_job>>['steps']>
 
 function required_steps(workflow_path: string, job_name: string): Steps {
@@ -98,16 +102,23 @@ describe.each([
 	})
 })
 
-it.each([
-	{ path: ci_yml_fixture.RUNTIME_CI_YML, job: STATIC_CHECKS_JOB },
-	{ path: ci_yml_fixture.TEMPLATE_CI_YML, job: 'checks' },
-])('uses devEngines when packageManager is absent in $path', ({ path: workflow_path, job }) => {
-	const manifest = {
-		devEngines: { packageManager: { name: 'pnpm', version: '11.4.0+sha512.abc' } },
-	}
+it.each(RESOLVER_CASES)(
+	'uses devEngines when packageManager is absent in $path',
+	({ path: workflow_path, job }) => {
+		const manifest = {
+			devEngines: { packageManager: { name: 'pnpm', version: '11.4.0+sha512.abc' } },
+		}
 
-	expect(run_resolver(workflow_path, job, manifest)).toBe('version=11.4.0\n')
-})
+		expect(run_resolver(workflow_path, job, manifest)).toBe('version=11.4.0\n')
+	},
+)
+
+it.each(RESOLVER_CASES)(
+	'uses the latest pnpm when no version is declared in $path',
+	({ path: workflow_path, job }) => {
+		expect(run_resolver(workflow_path, job, { name: 'consumer' })).toBe('version=latest\n')
+	},
+)
 
 describe('Node 26 smoke job', () => {
 	it('installs pnpm and runs it with Node 26', () => {

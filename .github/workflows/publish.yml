@@ -23,7 +23,7 @@ jobs:
       - name: Resolve pnpm version
         id: pnpm-version
         run: |
-          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : '') ?? ''")
+          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
