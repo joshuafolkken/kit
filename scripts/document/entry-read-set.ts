@@ -101,22 +101,18 @@ interface ReadSetCost {
 	scoped: Cost
 }
 
-// **Resolved against the consumer's tree first, then against the package's own copy.** Before the
-// plugin migration a consumer received the skill bodies copied under its own `.claude/skills/`, so
-// the project path was the only one that could exist. Now the bodies ship in the package and load as
-// the `kit` plugin — they are no longer copied into the consumer's tree — so `josh doc:section
-// fullrun.md` and `josh read:set` fall back to `node_modules/@joshuafolkken/kit/.claude/skills/…`.
-// In the kit repo the project path always exists, so the fallback fires only at a consumer, and the
-// last branch keeps the original path when neither exists so a missing file reports against the tree
-// the caller named (joshuafolkken/kit#1879).
+// **Use the running package's skill before a consumer's legacy copy.** Old copied skill bodies
+// can remain after the plugin migration, including when josh is installed globally. Reading them
+// would measure old instructions against the package's current budget. A fixture without a project
+// manifest keeps its own skill tree, so tests can supply alternate documents.
 function document_path(root: string, name: string): string {
 	const in_project = path.join(root, SKILL_DIRECTORY, name)
-
-	if (existsSync(in_project)) return in_project
-
 	const in_package = path.join(PACKAGE_DIR, SKILL_DIRECTORY, name)
+	const project_manifest = path.join(root, 'package.json')
 
-	return existsSync(in_package) ? in_package : in_project
+	if (root !== '' && existsSync(project_manifest) && existsSync(in_package)) return in_package
+
+	return existsSync(in_project) ? in_project : in_package
 }
 
 function read_document(root: string, name: string): string {
