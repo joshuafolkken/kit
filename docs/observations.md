@@ -376,3 +376,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | medium | docs/troubleshooting.md:41 | 2026-09-26 | #2194
 - rf:comments | medium | README.md:11 | 2026-09-26 | #2194
 - rf:none | none | - | 2026-09-26 | #2194
+- rf:bug-risks | medium | scripts/init/hook-command-rewrite.test.ts | 2026-09-26 | #2610
+- rf:tests | medium | scripts/init/hook-command-rewrite.test.ts | 2026-09-26 | #2610
+- rf:none | none | - | 2026-09-26 | #2610
