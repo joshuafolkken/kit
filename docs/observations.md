@@ -379,3 +379,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/init/hook-command-rewrite.test.ts | 2026-09-26 | #2610
 - rf:tests | medium | scripts/init/hook-command-rewrite.test.ts | 2026-09-26 | #2610
 - rf:none | none | - | 2026-09-26 | #2610
+- rf:bug-risks | medium | scripts/registry-migration/migrate.ts | 2026-09-26 | #2604
+- rf:bug-risks | medium | scripts/registry-migration/migrate-logic.ts | 2026-09-26 | #2604
+- rf:none | none | - | 2026-09-26 | #2604
