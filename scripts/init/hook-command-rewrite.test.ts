@@ -185,7 +185,7 @@ describe('apply_hook_command_rewrite_for_destination', () => {
 describe('the distributed settings.json a consumer receives', () => {
 	it('runs no hook command through pnpm', () => {
 		for (const command of consumer_hook_commands()) {
-			expect(command).not.toMatch(/(?:^|; )pnpm (?:josh|exec)/u)
+			expect(command).not.toMatch(/\bpnpm (?:josh|exec)\b/u)
 		}
 	})
 
