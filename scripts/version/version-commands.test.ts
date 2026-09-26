@@ -78,12 +78,19 @@ describe('version_commands.run_all_upgrade_commands', () => {
 	})
 
 	it('surfaces a non-zero exit code while still running every command', () => {
+		const error_spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
 		mocked_execa_sync
 			.mockReturnValueOnce(fake_sync_result(3))
 			.mockReturnValueOnce(fake_sync_result(0))
 
 		expect(version_commands.run_all_upgrade_commands(['a', 'b'])).toBe(3)
 		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
+		expect(error_spy).toHaveBeenCalledWith(
+			expect.stringContaining('successful steps remain applied'),
+		)
+		expect(error_spy).toHaveBeenCalledWith(expect.stringContaining('Failed: a'))
+		error_spy.mockRestore()
 	})
 })
 

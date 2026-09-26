@@ -18,7 +18,7 @@
 		"josh": "dist/josh.js"
 	},
 	"scripts": {
-		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci",
+		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci",
 		"prepare": "(command -v lefthook >/dev/null 2>&1 && { lefthook install || echo 'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything' >&2; } || true)",
 		"build": "tsx scripts/build/build-bin.ts && tsx scripts/build/build-hooks.ts && tsx scripts/build/build-version.ts && tsx scripts/build/build-config-merge.ts && tsx scripts/build/build-managed-marker.ts && tsx scripts/build/build-self-sync-guard.ts && tsx scripts/build/build-claude-md.ts",
 		"prepack": "tsx scripts/version/publishable-range-check.ts && tsx scripts/build/build-bin.ts && tsx scripts/build/build-hooks.ts && tsx scripts/build/build-version.ts && tsx scripts/build/build-config-merge.ts && tsx scripts/build/build-managed-marker.ts && tsx scripts/build/build-self-sync-guard.ts && tsx scripts/build/build-claude-md.ts",

@@ -1,0 +1,6 @@
+safe-chain:
+  npm:
+    minimumPackageAgeExclusions:
+      - vite
+      - '@types/node'
+      - tsx
