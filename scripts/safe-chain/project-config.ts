@@ -27,7 +27,16 @@ function trim_block_end(lines: ReadonlyArray<string>, start: number, end: number
 }
 
 function find_block_end(lines: ReadonlyArray<string>, start: number): number {
-	const relative = lines.slice(start + 1).findIndex((line) => !is_block_line(line))
+	const remaining = lines.slice(start + 1)
+	const relative = remaining.findIndex((line, index) => {
+		if (is_block_line(line)) return false
+		if (!line.startsWith('#')) return true
+		const next = remaining
+			.slice(index + 1)
+			.find((candidate) => candidate.trim() !== '' && !candidate.startsWith('#'))
+
+		return next === undefined || !is_block_line(next)
+	})
 	const end = relative === -1 ? lines.length : start + 1 + relative
 
 	return trim_block_end(lines, start, end)
@@ -40,6 +49,14 @@ function append_block(existing: string, block: string): string {
 	return `${prefix}\n${block}`
 }
 
+function preserve_anchor(block: string, key_line: string): string {
+	const anchor = /(?:^|\s)(&[^\s#]+)/u.exec(key_line)?.[1]
+	if (!anchor) return block
+	const header = 'safe-chain:'
+
+	return `${header} ${anchor}${block.slice(header.length)}`
+}
+
 function replace_safe_chain_block(existing: string, safe_chain: Record<string, unknown>): string {
 	const block = dump({ 'safe-chain': safe_chain }, { lineWidth: -1 })
 	const lines = existing.split('\n')
@@ -47,11 +64,12 @@ function replace_safe_chain_block(existing: string, safe_chain: Record<string, u
 		/^(?:safe-chain|'safe-chain'|"safe-chain")\s*:/u.test(line),
 	)
 	if (start === -1) return append_block(existing, block)
+	const replacement = preserve_anchor(block, lines[start] ?? '')
 	const end = find_block_end(lines, start)
 	const prefix = lines.slice(0, start).join('\n')
 	const suffix = lines.slice(end).join('\n')
 
-	return `${prefix}${prefix ? '\n' : ''}${block}${suffix}`
+	return `${prefix}${prefix ? '\n' : ''}${replacement}${suffix}`
 }
 
 function merge_project_config(existing: string, workspace: string): string {

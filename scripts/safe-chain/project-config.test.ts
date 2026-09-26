@@ -8,6 +8,7 @@ import { project_config } from './project-config'
 const WORKSPACE =
 	"minimumReleaseAgeExclude:\n  - vite\n  - '@types/node'\n  - tsx\n  - '@joshuafolkken/kit'\n"
 const EXPECTED_EXCLUSIONS = ['vite', '@types/node', 'tsx', '@joshuafolkken/kit']
+const REGISTRY = 'registry.example.com'
 
 function exclusions(content: string): unknown {
 	const aikido = yaml_document.parse_yaml(content)
@@ -29,7 +30,7 @@ describe('project_config.merge_project_config', () => {
 	it('preserves unrelated Aikido settings and replaces stale age exclusions', () => {
 		const unrelated = '# Keep this comment and anchor\nother-tool: &other\n  enabled: true\n\n'
 		const suffix = 'another-tool: *other\n'
-		const existing = `${unrelated}safe-chain:\n  npm:\n    customRegistries:\n      - registry.example.com\n    minimumPackageAgeExclusions:\n      - old\n${suffix}`
+		const existing = `${unrelated}safe-chain:\n  npm:\n    customRegistries:\n      - ${REGISTRY}\n    minimumPackageAgeExclusions:\n      - old\n${suffix}`
 		const result = project_config.merge_project_config(existing, WORKSPACE)
 		const parsed = yaml_document.parse_yaml(result)
 
@@ -37,7 +38,7 @@ describe('project_config.merge_project_config', () => {
 		expect(result.endsWith(suffix)).toBe(true)
 		expect(parsed['other-tool']).toEqual({ enabled: true })
 		expect(parsed['safe-chain']).toMatchObject({
-			npm: { customRegistries: ['registry.example.com'] },
+			npm: { customRegistries: [REGISTRY] },
 		})
 		expect(exclusions(result)).toEqual(EXPECTED_EXCLUSIONS)
 	})
@@ -53,6 +54,32 @@ describe('project_config.merge_project_config', () => {
 		const result = project_config.merge_project_config(existing, WORKSPACE)
 
 		expect(result.match(/safe-chain/gu)).toHaveLength(1)
+		expect(exclusions(result)).toEqual(EXPECTED_EXCLUSIONS)
+	})
+})
+
+describe('project_config.merge_project_config — YAML structure', () => {
+	it('keeps a safe-chain anchor referenced by another setting', () => {
+		const existing =
+			'safe-chain: &scanner\n  npm:\n    minimumPackageAgeExclusions:\n      - old\nother-tool: *scanner\n'
+		const result = project_config.merge_project_config(existing, WORKSPACE)
+		const parsed = yaml_document.parse_yaml(result)
+
+		expect(result).toContain('safe-chain: &scanner')
+		expect(parsed['other-tool']).toEqual(parsed['safe-chain'])
+		expect(exclusions(result)).toEqual(EXPECTED_EXCLUSIONS)
+	})
+
+	it('absorbs a column-zero comment between safe-chain settings', () => {
+		const existing =
+			'safe-chain:\n  npm:\n    minimumPackageAgeExclusions:\n      - old\n# explanation\n    customRegistries:\n      - registry.example.com\nother-tool: true\n'
+		const result = project_config.merge_project_config(existing, WORKSPACE)
+		const parsed = yaml_document.parse_yaml(result)
+
+		expect(parsed['safe-chain']).toMatchObject({
+			npm: { customRegistries: [REGISTRY] },
+		})
+		expect(parsed['other-tool']).toBe(true)
 		expect(exclusions(result)).toEqual(EXPECTED_EXCLUSIONS)
 	})
 })
