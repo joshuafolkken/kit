@@ -358,3 +358,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | templates/workflows/ci.yml:126 | 2026-09-25 | #2391
 - rf:comments | medium | docs/josh-commands.md:854 | 2026-09-25 | #2391
 - rf:bug-risks | medium | templates/workflows/ci.yml:126 | 2026-09-25 | #2391
+- rf:bug-risks | medium | scripts/document/entry-read-set.ts:113 | 2026-09-26 | #2595
+- rf:none | none | - | 2026-09-26 | #2595
