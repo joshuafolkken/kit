@@ -265,6 +265,16 @@ Carry the published release into every consumer repository next to this one
 
 ---
 
+### `josh registry:migrate` · `josh rmi`
+
+> **Audience:** developer · **Side effects:** files, network, processes
+
+_No arguments._
+
+Migrate a kit-only project from GitHub Packages to public npm
+
+---
+
 ### `josh sonar:hotspots` · `josh shs`
 
 > **Audience:** automation · **Side effects:** network

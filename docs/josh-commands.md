@@ -407,6 +407,16 @@ pnpm josh init   # create/merge config files
 
 See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 
+### `josh registry:migrate`
+
+Migrate an existing kit-only project from GitHub Packages to public npm. Prints the current registry and proposed change, checks locked scoped packages and their exact versions, then updates the project `.npmrc` and lockfile. It leaves user-level configuration untouched and restores both project files if dependency resolution fails.
+
+```bash
+pnpm josh registry:migrate
+```
+
+**Output / exit codes:** exits non-zero without changing settings when another scoped package is installed, a version is unavailable on public npm, configuration is ambiguous, or the resolved lockfile still points to GitHub Packages. Re-running a completed migration is a no-op. See [authentication.md](./authentication.md) for the setup being replaced.
+
 ### `josh sync`
 
 Overwrite managed files with the latest versions from the package. Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, workflow templates, and other managed files. Also realigns `devEngines.packageManager.version` with the `packageManager` pin so the two never drift.

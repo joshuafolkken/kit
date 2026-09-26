@@ -17,6 +17,12 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Project',
 		reference: ['', 'developer', ['files']],
 	},
+	'registry:migrate': {
+		script: 'scripts/registry-migration/migrate.ts',
+		description: 'Migrate a kit-only project from GitHub Packages to public npm',
+		category: 'Project',
+		reference: ['', 'developer', ['files', 'network', 'processes']],
+	},
 	'sync:scope': {
 		script: 'scripts/sync/managed-config-scope-cli.ts',
 		description: 'Say whether this change touches a file josh sync distributes',

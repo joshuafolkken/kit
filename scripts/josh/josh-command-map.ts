@@ -54,6 +54,7 @@ const ALIASES: Record<string, string> = {
 	pt: 'port',
 	i: 'init',
 	sy: 'sync',
+	rmi: 'registry:migrate',
 	sys: 'sync:scope',
 	g: 'git',
 	gp: 'pr',
