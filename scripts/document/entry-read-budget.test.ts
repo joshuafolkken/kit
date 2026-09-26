@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -25,6 +25,12 @@ describe('consumer resident document', () => {
 
 			try {
 				writeFileSync(path.join(consumer, 'CLAUDE.md'), 'consumer rules'.repeat(10_000))
+				writeFileSync(path.join(consumer, 'package.json'), '{}')
+				const skill_directory = path.join(consumer, '.claude', 'skills', 'workflow-commands')
+
+				mkdirSync(skill_directory, { recursive: true })
+				writeFileSync(path.join(skill_directory, 'SKILL.md'), 'stale consumer instructions')
+				writeFileSync(path.join(skill_directory, 'fullrun.md'), 'stale fullrun instructions')
 				expect(entry_total_bytes(consumer, entry)).toBe(entry_total_bytes(ROOT, entry))
 			} finally {
 				rmSync(consumer, { recursive: true, force: true })
