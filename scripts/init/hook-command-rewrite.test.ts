@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { hook_command_bootstrap } from './hook-command-bootstrap'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { transform_copied_content } from './init-copy-content'
 
@@ -14,6 +16,9 @@ const SESSION_LANG_COMMAND = '{"command": "pnpm josh session:lang"}'
 // A kit-side fallback-form command: prefers the built bundle, drops to `pnpm josh` when it is absent.
 const KIT_FALLBACK_FORM =
 	'{"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi"}'
+const PRETOOL_SOURCE = '{"command": "pnpm josh pretool:guard"}'
+const INSTALL_NOTICE = 'run pnpm install, then reread CLAUDE.md'
+const CONSUMER_JOSH_COMMAND = 'node ./node_modules/@joshuafolkken/kit/dist/josh.js'
 
 function consumer_hook_commands(): ReadonlyArray<string> {
 	const transformed = transform_copied_content(
@@ -32,11 +37,10 @@ function consumer_hook_commands(): ReadonlyArray<string> {
 
 describe('rewrite_hook_commands', () => {
 	it('replaces a pnpm josh hook command with the node bundle invocation', () => {
-		const rewritten = rewrite_hook_commands('{"command": "pnpm josh pretool:guard"}')
+		const rewritten = rewrite_hook_commands(PRETOOL_SOURCE)
 
-		expect(rewritten).toBe(
-			'{"command": "node ./node_modules/@joshuafolkken/kit/dist/josh.js pretool:guard"}',
-		)
+		expect(rewritten).toContain(INSTALL_NOTICE)
+		expect(rewritten).toContain(`${CONSUMER_JOSH_COMMAND} pretool:guard`)
 	})
 
 	it('leaves an echo reminder untouched', () => {
@@ -55,9 +59,13 @@ describe('rewrite_hook_commands', () => {
 	// Both are rebased onto the installed package, so a consumer's fallback is the dispatcher bundle
 	// rather than a pnpm launch (joshuafolkken/kit#2023).
 	it('rebases both the bundle path and the pnpm fallback of a fallback-form command', () => {
-		expect(rewrite_hook_commands(KIT_FALLBACK_FORM)).toBe(
-			'{"command": "if [ -f ./node_modules/@joshuafolkken/kit/dist/hooks/pretool-guard.js ]; then node ./node_modules/@joshuafolkken/kit/dist/hooks/pretool-guard.js; else node ./node_modules/@joshuafolkken/kit/dist/josh.js pretool:guard; fi"}',
+		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+
+		expect(rewritten).toContain(INSTALL_NOTICE)
+		expect(rewritten).toContain(
+			'node ./node_modules/@joshuafolkken/kit/dist/hooks/pretool-guard.js',
 		)
+		expect(rewritten).toContain(CONSUMER_JOSH_COMMAND)
 	})
 
 	// The rebased bundle path still contains `dist/hooks/`, so a blind rerun would rewrite it onto
@@ -66,6 +74,50 @@ describe('rewrite_hook_commands', () => {
 		const once = rewrite_hook_commands(KIT_FALLBACK_FORM)
 
 		expect(rewrite_hook_commands(once)).toBe(once)
+	})
+})
+
+describe('bootstrap without installed dependencies', () => {
+	it('initializes the temporary checkout when GIT_DIR points elsewhere', () => {
+		const foreign_root = mkdtempSync(path.join(tmpdir(), 'kit-hook-foreign-'))
+
+		vi.stubEnv('GIT_DIR', path.join(foreign_root, '.git'))
+
+		try {
+			const result = hook_command_bootstrap.run_in_temporary_checkout(
+				'test -d .git && git rev-parse --is-inside-work-tree',
+			)
+
+			expect(result.status).toBe(0)
+			expect(result.stdout.trim()).toBe('true')
+		} finally {
+			vi.unstubAllEnvs()
+
+			rmSync(foreign_root, { recursive: true, force: true })
+		}
+	})
+
+	it.each([SETTINGS_DESTINATION, CODEX_HOOKS_DESTINATION])(
+		'lets bootstrap proceed with a clear notice when %s has no installed kit',
+		(destination) => {
+			const rewritten = transform_copied_content(destination, PRETOOL_SOURCE)
+			const { command } = JSON.parse(rewritten) as { command: string }
+			const result = hook_command_bootstrap.run_in_temporary_checkout(command)
+
+			expect(result.status).toBe(0)
+			expect(result.stderr).toContain(INSTALL_NOTICE)
+			expect(result.stderr).not.toContain('Cannot find module')
+		},
+	)
+
+	it('runs a present hook bundle even if the dispatcher is missing', () => {
+		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const { command } = JSON.parse(rewritten) as { command: string }
+		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true)
+
+		expect(result.status).toBe(0)
+		expect(result.stdout).toBe('guard ran')
+		expect(result.stderr).not.toContain(INSTALL_NOTICE)
 	})
 })
 
@@ -102,7 +154,7 @@ describe('apply_hook_command_rewrite_for_destination', () => {
 	it('rewrites only the consumer .claude/settings.json destination', () => {
 		expect(
 			apply_hook_command_rewrite_for_destination(SETTINGS_DESTINATION, SESSION_LANG_COMMAND),
-		).toContain('node ./node_modules/@joshuafolkken/kit/dist/josh.js session:lang')
+		).toContain(`${CONSUMER_JOSH_COMMAND} session:lang`)
 	})
 
 	it('leaves any other destination unchanged', () => {
@@ -117,7 +169,9 @@ describe('apply_hook_command_rewrite_for_destination', () => {
 // transform, so a hook added later that forgets the bundle is caught here.
 describe('the distributed settings.json a consumer receives', () => {
 	it('runs no hook command through pnpm', () => {
-		for (const command of consumer_hook_commands()) expect(command).not.toContain('pnpm')
+		for (const command of consumer_hook_commands()) {
+			expect(command).not.toMatch(/\bpnpm (?:josh|exec)\b/u)
+		}
 	})
 
 	it('invokes every josh subcommand through the node bundle', () => {
@@ -126,7 +180,7 @@ describe('the distributed settings.json a consumer receives', () => {
 		expect(josh_hooks.length).toBeGreaterThan(0)
 
 		for (const command of josh_hooks) {
-			expect(command).toContain('node ./node_modules/@joshuafolkken/kit/dist/josh.js ')
+			expect(command).toContain(`${CONSUMER_JOSH_COMMAND} `)
 		}
 	})
 

@@ -281,8 +281,8 @@ describe('get_ai_copy_directories', () => {
 })
 
 describe('get_npmrc_lines', () => {
-	it('includes the GitHub Packages registry mapping', () => {
-		expect(init_logic.get_npmrc_lines()).toContain(
+	it('omits the GitHub Packages registry mapping for new projects', () => {
+		expect(init_logic.get_npmrc_lines()).not.toContain(
 			'@joshuafolkken:registry=https://npm.pkg.github.com',
 		)
 	})

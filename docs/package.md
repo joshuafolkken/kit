@@ -4,17 +4,15 @@ Add `@joshuafolkken/kit` as a devDependency so a project can consume its ESLint 
 
 This is independent of the [global `josh` CLI](./cli.md) — most projects want both, but the package alone is enough to consume configs.
 
-## 1. Authenticate
+## 1. Install
 
-One-time GitHub Packages setup — see [authentication.md](./authentication.md). For a project dependency, the token line goes in your `~/.npmrc` and only the scoped registry mapping goes in the repo's `./.npmrc` (safe to commit — it holds no credential).
-
-## 2. Install
+The public npm registry serves `@joshuafolkken/kit` without a GitHub token or project `.npmrc` mapping. Existing projects with a `@joshuafolkken` mapping to GitHub Packages keep using it; see [authentication.md](./authentication.md) until those projects migrate.
 
 ```bash
 pnpm add -D @joshuafolkken/kit
 ```
 
-## 3. Initialize
+## 2. Initialize
 
 Run once after installing — creates or merges all config files:
 
@@ -30,7 +28,7 @@ pnpm exec josh sync
 
 See [sync.md](./sync.md) for what `sync` overwrites and why. A project-local `josh` is available via `pnpm josh …` after installation, so the CLI works even without the global install.
 
-## 4. Config entry points
+## 3. Config entry points
 
 The package exposes config presets for direct import:
 
@@ -53,6 +51,8 @@ A package-name-parameterized implementation of the `version` (show) and `version
 commands, so a consuming package (e.g. `@joshuafolkken/game-kit`, `@joshuafolkken/app-kit`) drives
 both commands through kit instead of copying the scripts. Each consumer's thin CLI wrapper passes
 only its own package name + GitHub Packages versions endpoint:
+
+Kit's own `josh version` and `josh version --upgrade` still read the GitHub Packages versions API during dual publishing. `josh latest` resolves dependency updates with pnpm using the registry configured by the current project; a new kit-only project uses public npm, while an existing project with a GitHub Packages scope mapping continues to use GitHub Packages.
 
 ```ts
 // scripts/version/version-check.ts (consumer)

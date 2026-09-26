@@ -17,11 +17,11 @@ const ESLINT_PACKAGE_PREFIX = `${KIT_PACKAGE_PATH_PREFIX}eslint/`
 const GITHUB_REPO_BLOB_BASE = 'https://github.com/joshuafolkken/kit/blob/main/'
 const GITHUB_REPO_TREE_BASE = 'https://github.com/joshuafolkken/kit/tree/main/'
 
-// The single line a consumer's CLAUDE.md carries: an import of kit's published, already
-// path-transformed rules. The consumer's own additions sit below it. Distributed at publish time via
-// dist/CLAUDE.md (build-claude-md.ts) rather than byte-copied at sync time, so a package update alone
-// keeps the rules current (joshuafolkken/kit#1878).
+// The consumer imports kit's published, already path-transformed rules. A tracked bootstrap note
+// remains readable before installation, while the rule body stays in the package (kit#1878).
 const CLAUDE_MD_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
+const CLAUDE_MD_BOOTSTRAP =
+	'> Fresh checkout: if kit is not installed, run `pnpm install` first, then reread this file before doing any other work.'
 
 // A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
 // open. A distributed document that writes a directory set as `prompts/**` means "anything beneath
@@ -79,15 +79,18 @@ function transform_distributed_paths(content: string): string {
 	return transform_documentation_paths(with_tests)
 }
 
-// The consumer CLAUDE.md is one @import of kit's published rules plus whatever the project adds below
-// it. Ensure the import line is present without disturbing those additions: an absent file becomes
-// the line alone, a file already carrying it is returned untouched, and any other file keeps all its
-// content with the import prepended. The substring check makes it idempotent.
+// Keep the bootstrap note ahead of the import so an agent can read it in a fresh checkout. Preserve
+// project additions and update older one-line files without duplicating either line.
 function ensure_claude_md_import(existing: string | undefined): string {
-	if (existing === undefined) return `${CLAUDE_MD_IMPORT_LINE}\n`
-	if (existing.includes(CLAUDE_MD_IMPORT_LINE)) return existing
+	if (existing === undefined) return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n`
 
-	return `${CLAUDE_MD_IMPORT_LINE}\n\n${existing}`
+	if (existing.includes(CLAUDE_MD_IMPORT_LINE)) {
+		if (existing.includes(CLAUDE_MD_BOOTSTRAP)) return existing
+
+		return `${CLAUDE_MD_BOOTSTRAP}\n\n${existing}`
+	}
+
+	return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n\n${existing}`
 }
 
 const distributed_paths = {
