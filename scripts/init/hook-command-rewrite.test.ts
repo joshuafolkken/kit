@@ -1,10 +1,10 @@
-import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { hook_command_bootstrap } from './hook-command-bootstrap'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { transform_copied_content } from './init-copy-content'
 
@@ -19,40 +19,6 @@ const KIT_FALLBACK_FORM =
 const PRETOOL_SOURCE = '{"command": "pnpm josh pretool:guard"}'
 const INSTALL_NOTICE = 'run pnpm install, then reread CLAUDE.md'
 const CONSUMER_JOSH_COMMAND = 'node ./node_modules/@joshuafolkken/kit/dist/josh.js'
-
-interface HookResult {
-	status: number | null
-	stdout: string
-	stderr: string
-}
-
-function create_partial_install(temporary_root: string): void {
-	const package_root = path.join(temporary_root, 'node_modules/@joshuafolkken/kit')
-	const hook_path = path.join(package_root, 'dist/hooks/pretool-guard.js')
-
-	mkdirSync(path.dirname(hook_path), { recursive: true })
-	writeFileSync(path.join(package_root, 'package.json'), '{}')
-	writeFileSync(hook_path, "process.stdout.write('guard ran')")
-}
-
-function run_in_temporary_checkout(command: string, is_partial_install = false): HookResult {
-	const temporary_root = mkdtempSync(path.join(tmpdir(), 'kit-hook-bootstrap-'))
-
-	try {
-		spawnSync('git', ['init', '-q'], { cwd: temporary_root })
-
-		if (is_partial_install) create_partial_install(temporary_root)
-
-		const { status, stdout, stderr } = spawnSync('sh', ['-c', command], {
-			cwd: temporary_root,
-			encoding: 'utf8',
-		})
-
-		return { status, stdout, stderr }
-	} finally {
-		rmSync(temporary_root, { recursive: true, force: true })
-	}
-}
 
 function consumer_hook_commands(): ReadonlyArray<string> {
 	const transformed = transform_copied_content(
@@ -112,12 +78,31 @@ describe('rewrite_hook_commands', () => {
 })
 
 describe('bootstrap without installed dependencies', () => {
+	it('initializes the temporary checkout when GIT_DIR points elsewhere', () => {
+		const foreign_root = mkdtempSync(path.join(tmpdir(), 'kit-hook-foreign-'))
+
+		vi.stubEnv('GIT_DIR', path.join(foreign_root, '.git'))
+
+		try {
+			const result = hook_command_bootstrap.run_in_temporary_checkout(
+				'test -d .git && git rev-parse --is-inside-work-tree',
+			)
+
+			expect(result.status).toBe(0)
+			expect(result.stdout.trim()).toBe('true')
+		} finally {
+			vi.unstubAllEnvs()
+
+			rmSync(foreign_root, { recursive: true, force: true })
+		}
+	})
+
 	it.each([SETTINGS_DESTINATION, CODEX_HOOKS_DESTINATION])(
 		'lets bootstrap proceed with a clear notice when %s has no installed kit',
 		(destination) => {
 			const rewritten = transform_copied_content(destination, PRETOOL_SOURCE)
 			const { command } = JSON.parse(rewritten) as { command: string }
-			const result = run_in_temporary_checkout(command)
+			const result = hook_command_bootstrap.run_in_temporary_checkout(command)
 
 			expect(result.status).toBe(0)
 			expect(result.stderr).toContain(INSTALL_NOTICE)
@@ -128,7 +113,7 @@ describe('bootstrap without installed dependencies', () => {
 	it('runs a present hook bundle even if the dispatcher is missing', () => {
 		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
 		const { command } = JSON.parse(rewritten) as { command: string }
-		const result = run_in_temporary_checkout(command, true)
+		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true)
 
 		expect(result.status).toBe(0)
 		expect(result.stdout).toBe('guard ran')
