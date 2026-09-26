@@ -1,6 +1,6 @@
-# Authenticate with GitHub Packages
+# Existing GitHub Packages authentication
 
-`@joshuafolkken/kit` is published to GitHub Packages, which requires authentication **even for public packages**. Both [cli.md](./cli.md) (the global `josh` CLI) and [package.md](./package.md) (using the kit as a project dependency) link here for this one-time setup.
+New installations of `@joshuafolkken/kit` use the public npm registry and need no GitHub token or `.npmrc` mapping. The steps below apply to existing projects that still route `@joshuafolkken` packages to GitHub Packages, including projects using other packages in the same scope. GitHub Packages requires authentication even for public packages.
 
 ## 1. Get a token from the `gh` CLI
 
@@ -43,22 +43,22 @@ That value is a real secret and does not refresh on rotation — re-run the comm
 
 > **Why not the project `.npmrc`?** Since pnpm 11.6, environment variables are **not** expanded in registry credentials read from a project `.npmrc` **by default**, because that file is committed and the expansion could leak the token to an attacker-controlled registry. A token line there is ignored with an `Ignored project-level auth setting` warning on every command, so `josh init` / `josh sync` do not write it. They do not remove one either: pnpm's `npmrcAuthFile` setting re-enables expansion for a file the project declares trusted, which is a supported arrangement on a builder with no user-level npmrc — see [§4(d)](#4-build-platforms-with-no-user-level-npmrc).
 
-**GitHub Actions needs no extra step**: `actions/setup-node` with `registry-url: 'https://npm.pkg.github.com'` writes the same placeholder line into a user-level npmrc for the job, which pnpm does expand — supply `NODE_AUTH_TOKEN` to the install step and it works. Any other build environment does need a step: see [§4](#4-build-platforms-with-no-user-level-npmrc).
+**The kit CI template also supports existing GitHub Packages consumers**: it writes the same placeholder line to a user-level npmrc and supplies `NODE_AUTH_TOKEN` to the install step. It leaves the default registry on public npm, so a new kit-only project installs without GitHub routing. Other build environments may need a credential step: see [§4](#4-build-platforms-with-no-user-level-npmrc).
 
 ## 3. Configure the project `.npmrc`
 
-A project that consumes the kit as a devDependency also needs the scoped **registry mapping** — a routing rule, not a credential, which pnpm still honors from a project file. `josh init` writes it for you; to add it by hand:
+An existing project that still consumes packages from GitHub Packages needs the scoped **registry mapping** — a routing rule, not a credential, which pnpm still honors from a project file. New `josh init` runs no longer add this mapping. Keep an existing mapping or add it manually when another `@joshuafolkken/*` dependency still comes from GitHub Packages:
 
 ```bash
 REGISTRY='@joshuafolkken:registry=https://npm.pkg.github.com'
 grep -qxF "$REGISTRY" .npmrc 2>/dev/null || echo "$REGISTRY" >> .npmrc
 ```
 
-Commit that file — it holds no secret. Without the mapping, `pnpm` tries the public npm registry for `@joshuafolkken/*` and fails. Installing only the global `josh` CLI (per [cli.md](./cli.md))? Put the same line in `~/.npmrc` and skip this section.
+Commit that file — it holds no secret. The mapping routes every `@joshuafolkken/*` package to GitHub Packages. Kit alone is available from public npm without it. Installing only the global `josh` CLI (per [cli.md](./cli.md))? Keep the line in `~/.npmrc` only while using the GitHub Packages copy.
 
 ## 4. Build platforms with no user-level npmrc
 
-A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no `actions/setup-node` to write one for the job, so the project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: every kit workflow job that installs dependencies calls setup-node with `registry-url` first, so Actions always has the credential restored for it — the one environment that can fail is the one no check exercises.
+A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no kit CI authentication step, so an existing project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: the kit CI template supplies GitHub Packages credentials for existing projects, while another builder may not.
 
 Supply the credential from a source pnpm reads. Any one of the four below is enough — pick the one your platform allows. Each needs the token itself in the platform's secret store, never in a committed file.
 
@@ -107,6 +107,6 @@ Unlike (b) and (c), this needs no build step of your own, so it also works on a 
 
 ## Next
 
-- Installing the global CLI? Return to [cli.md §2](./cli.md#2-install-globally).
-- Adding the kit to an existing project? Return to [package.md §2](./package.md#2-install).
+- Installing the global CLI? Return to [cli.md §1](./cli.md#1-install-globally).
+- Adding the kit to an existing project? Return to [package.md §1](./package.md#1-install).
 - Hitting `401`/`403` or `ERR_PNPM_FETCH`? See [troubleshooting.md](./troubleshooting.md).

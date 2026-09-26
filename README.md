@@ -8,12 +8,10 @@ Shared toolchain config and CLI for TypeScript projects — ESLint, Prettier, Ty
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) with [pnpm](https://pnpm.io/)
-- [gh CLI](https://cli.github.com/) — required for GitHub Packages authentication. Install via `brew install gh` (macOS), `winget install GitHub.cli` (Windows), or see the [gh installation docs](https://github.com/cli/cli#installation).
 
 ## Quick start
 
 ```bash
-gh auth login --scopes read:packages   # see docs/authentication.md for the full setup
 pnpm add -g @joshuafolkken/kit          # install the josh CLI globally
 josh help
 ```
@@ -25,9 +23,10 @@ Using the kit inside a project? See [docs/package.md](./docs/package.md).
 | Guide                                           | What it covers                                                                   |
 | ----------------------------------------------- | -------------------------------------------------------------------------------- |
 | [why.md](./docs/why.md)                         | Why kit exists — the AI-development problems it solves, for practitioners        |
-| [authentication.md](./docs/authentication.md)   | One-time GitHub Packages auth — `gh` token, `NODE_AUTH_TOKEN`, `.npmrc`          |
+| [authentication.md](./docs/authentication.md)   | GitHub Packages auth for existing projects                                       |
 | [cli.md](./docs/cli.md)                         | Install and use the global `josh` CLI                                            |
 | [package.md](./docs/package.md)                 | Use the kit as a project devDependency — configs, prompts, scripts, `josh init`  |
+| [publishing.md](./docs/publishing.md)           | First public npm release and trusted publishing setup                            |
 | [josh-commands.md](./docs/josh-commands.md)     | Full `josh` CLI command reference                                                |
 | [overview.md](./docs/overview.md)               | What the kit provides and how it works                                           |
 | [troubleshooting.md](./docs/troubleshooting.md) | `401`/`404` auth errors, `josh: command not found`, stale shim, version mismatch |
