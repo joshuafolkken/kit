@@ -72,10 +72,8 @@ function point_of_use_text(file: string, heading: string): string {
 	return text.replaceAll(/\s+/gu, ' ')
 }
 
-// joshuafolkken/kit#1879: the skill bodies are no longer copied into a consumer's tree — they ship as
-// the `kit` plugin — so `josh doc:section` and `josh read:set` resolve a bare filename against the
-// package's own copy when the project has no skill tree. In the kit repo the project path always
-// exists, so the fallback never fires here.
+// The package skill remains available when the project has no local skill tree. The consumer
+// precedence regression is covered by entry-read-budget.test.ts with a stale local copy.
 describe('entry_read_set.document_path — consumer fallback', () => {
 	it('resolves against the project when the project has the file', () => {
 		expect(entry_read_set.document_path(ROOT, BACKLOGRUN)).toBe(
