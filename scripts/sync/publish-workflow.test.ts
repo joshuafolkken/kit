@@ -101,6 +101,7 @@ describe('installation guidance', () => {
 
 		expect(content).toContain('pnpm add -g @joshuafolkken/kit')
 		expect(content).not.toContain('gh auth login --scopes read:packages')
+		expect(content).toContain('gh CLI](https://cli.github.com/) for `josh version`')
 	})
 
 	it.each(['docs/cli.md', PACKAGE_GUIDE])(
@@ -146,6 +147,7 @@ describe('registry error guidance', () => {
 		const content = readFileSync(TROUBLESHOOTING_GUIDE, 'utf8')
 
 		expect(content).toContain('For a new kit-only install, public npm is the expected registry')
+		expect(content).toContain('https://registry.npmjs.org/@joshuafolkken%2fkit/<version>')
 		expect(content).toContain('For an existing project intentionally using GitHub Packages')
 	})
 })

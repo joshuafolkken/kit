@@ -38,7 +38,7 @@ Since pnpm 11.6, environment variables are not expanded in registry credentials 
 
 Check which registry the install uses before changing `.npmrc`.
 
-- For a new kit-only install, public npm is the expected registry. Check `https://registry.npmjs.org/@joshuafolkken%2fkit` directly. If it returns `404`, the package or requested version has not been published there yet; adding a GitHub Packages mapping does not fix public npm publication.
+- For a new kit-only install, public npm is the expected registry. Check `https://registry.npmjs.org/@joshuafolkken%2fkit` for the package, then check `https://registry.npmjs.org/@joshuafolkken%2fkit/<version>` for the exact version requested (replace `<version>`). The package URL can return `200` while an unpublished version returns `404`. Adding a GitHub Packages mapping does not fix public npm publication.
 - For an existing project intentionally using GitHub Packages, confirm its `.npmrc` still contains the mapping. See §3 of [authentication.md](./authentication.md) if it is missing:
   ```ini
   @joshuafolkken:registry=https://npm.pkg.github.com

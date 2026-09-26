@@ -8,6 +8,7 @@ Shared toolchain config and CLI for TypeScript projects — ESLint, Prettier, Ty
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) with [pnpm](https://pnpm.io/)
+- [gh CLI](https://cli.github.com/) for `josh version` and existing GitHub Packages consumers. It is not required to install kit from public npm; see [authentication.md](./docs/authentication.md) for setup when needed.
 
 ## Quick start
 
