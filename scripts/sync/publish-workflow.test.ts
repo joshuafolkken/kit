@@ -133,11 +133,16 @@ describe('installation guidance', () => {
 		expect(content).toContain('./cli.md#3-migrating-from-older-versions')
 		expect(content).toContain('kit CI template writes a GitHub Packages credential placeholder')
 	})
+})
 
+describe('publishing guidance', () => {
 	it('documents direct publishing and a public-registry verification', () => {
 		const content = readFileSync('docs/publishing.md', 'utf8')
 
 		expect(content).toContain('direct `npm publish`')
+		expect(content).toContain('two-factor authentication')
+		expect(content).toContain('pnpm pkg delete publishConfig')
+		expect(content).toContain("'--@joshuafolkken:registry=https://registry.npmjs.org'")
 		expect(content).toContain('https://registry.npmjs.org/@joshuafolkken%2fkit')
 	})
 })
