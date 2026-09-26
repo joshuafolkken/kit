@@ -375,3 +375,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | medium | docs/troubleshooting.md:39 | 2026-09-26 | #2194
 - rf:comments | medium | docs/troubleshooting.md:41 | 2026-09-26 | #2194
 - rf:comments | medium | README.md:11 | 2026-09-26 | #2194
+- rf:none | none | - | 2026-09-26 | #2194
