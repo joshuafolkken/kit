@@ -6,6 +6,8 @@ Install `@joshuafolkken/kit` globally to run `josh` from any directory, independ
 
 The public npm registry serves `@joshuafolkken/kit` without a GitHub token or registry mapping. If your existing `~/.npmrc` maps `@joshuafolkken` to GitHub Packages, that mapping still takes precedence; see [authentication.md](./authentication.md) for the existing setup until you migrate it.
 
+For an existing project that installs only `@joshuafolkken/kit`, run `pnpm josh registry:migrate` inside that project. It reports the current routing and planned change, checks the locked kit version on public npm, and updates the project `.npmrc` and lockfile. It leaves `~/.npmrc` untouched. If another scoped package is installed or resolution still points to GitHub Packages, it stops and explains why.
+
 pnpm requires a one-time setup before any global install — it registers `PNPM_HOME` and appends it to your `PATH` via your shell rc file:
 
 ```bash

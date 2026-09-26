@@ -2,6 +2,8 @@
 
 New installations of `@joshuafolkken/kit` use the public npm registry and need no GitHub token or `.npmrc` mapping. The steps below apply to existing projects that still route `@joshuafolkken` packages to GitHub Packages, including projects using other packages in the same scope. GitHub Packages requires authentication even for public packages.
 
+To migrate an existing kit-only project, run `pnpm josh registry:migrate` from its root. The command shows the current and proposed registry, checks every locked scoped package version on public npm, then updates the project `.npmrc` and lockfile only if the result resolves from public npm. It restores both files if the install check fails. It never edits the user-level `~/.npmrc`; a project mapping overrides a user mapping. Keep GitHub Packages routing when `app-kit`, `game-kit`, `config`, or another scoped package remains unpublished on npm. If the command reports a missing lockfile, run `pnpm install` with the current registry first and retry.
+
 ## 1. Get a token from the `gh` CLI
 
 The token comes from the [gh CLI](https://cli.github.com/). If you haven't already:
