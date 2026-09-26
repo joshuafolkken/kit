@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Standard shell command used to create a temporary publication directory.
+  - mktemp
+  # npm's CLI option for selecting the registry-auth configuration file.
+  - userconfig
   # `josh issue:fold-existing` short command alias (joshuafolkken/kit#2553).
   - isfe
   # git's `for-each-ref` modifier that removes leading path components (joshuafolkken/kit#2504).

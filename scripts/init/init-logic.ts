@@ -13,15 +13,9 @@ const DEV_ENGINES_VALUE = {
 	packageManager: { name: 'pnpm', version: '>=12.1.0', onFail: 'error' },
 }
 
-// The `@joshuafolkken:registry` mapping stays — it is a registry mapping, not a credential,
-// and pnpm honors it from a project .npmrc unconditionally. The matching `_authToken` line is
-// deliberately absent: by default pnpm >= 11.6 refuses to expand environment variables in
-// credentials read from a project .npmrc (the file is committed, so expansion could leak the
-// token to an attacker-controlled registry), so distributing the line would only add an
-// `Ignored project-level auth setting` warning on every command. Not distributing it is not the
-// same as removing it — see merge_npmrc.
+// New projects resolve kit from public npm. Existing registry and auth lines remain untouched
+// by merge_npmrc so consumers of other GitHub Packages can migrate separately.
 const NPMRC_LINES: ReadonlyArray<string> = [
-	'@joshuafolkken:registry=https://npm.pkg.github.com',
 	'engine-strict=true',
 	'minimum-release-age=1440',
 	'confirmModulesPurge=false',

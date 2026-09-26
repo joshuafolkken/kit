@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Common errors when installing or using `@joshuafolkken/kit`, and how to fix them. Most install-time failures trace back to the [authentication setup](./authentication.md).
+Common errors when installing or using `@joshuafolkken/kit`, and how to fix them. New installs use public npm; [GitHub Packages authentication](./authentication.md) applies to existing projects that still route this scope there.
 
 ## `pnpm install` fails with `401 Unauthorized` / `403 Forbidden`
 
@@ -21,7 +21,7 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 
 ## `401` on a deploy build (Cloudflare, Vercel, Docker) while CI is green
 
-The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no `actions/setup-node` step, so nothing supplies the credential once the project `.npmrc` carries only the registry mapping. CI cannot reproduce it — every workflow job that installs dependencies calls setup-node with `registry-url` first, which writes the credential for that job — so the failure surfaces first at deploy time.
+The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no kit CI authentication step, so nothing supplies the credential once an existing project `.npmrc` carries only the registry mapping. CI cannot reproduce it — the kit CI template writes a GitHub Packages credential placeholder before dependency installation — so the failure surfaces first at deploy time.
 
 - Give the builder a credential from a source pnpm reads: see [§4 of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc).
 - Restoring `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` to the project `.npmrc` fixes nothing **on its own** — pnpm ignores that line by default (next section). It becomes the credential only together with `npmrcAuthFile`, which is option (d) of that section.
@@ -36,15 +36,14 @@ Since pnpm 11.6, environment variables are not expanded in registry credentials 
 
 ## `ERR_PNPM_FETCH_404` — package not found
 
-`pnpm` tried the **public npm registry** instead of GitHub Packages. The scoped registry line is missing from `.npmrc`.
+Check which registry the install uses before changing `.npmrc`.
 
-- Re-run §3 of [authentication.md](./authentication.md) in the right location (`~/.npmrc` for a global `josh` install, the project root for a devDependency).
-- Confirm the file contains the registry mapping:
+- For a new kit-only install, public npm is the expected registry. Check `https://registry.npmjs.org/@joshuafolkken%2fkit` for the package, then check `https://registry.npmjs.org/@joshuafolkken%2fkit/<version>` for the exact version requested (replace `<version>`). The package URL can return `200` while an unpublished version returns `404`. Adding a GitHub Packages mapping does not fix public npm publication.
+- For an existing project intentionally using GitHub Packages, confirm its `.npmrc` still contains the mapping. See §3 of [authentication.md](./authentication.md) if it is missing:
   ```ini
   @joshuafolkken:registry=https://npm.pkg.github.com
   ```
-- A project `.npmrc` shadows `~/.npmrc`. If you have both, make sure the project one also carries the scoped registry line.
-- The credential is a separate concern and belongs in `~/.npmrc` — a `404` means routing, a `401`/`403` means auth.
+- A project `.npmrc` shadows `~/.npmrc`. Check both when an existing project unexpectedly changes registry. A GitHub Packages `401`/`403` points to its separate credential setup.
 
 ## `josh: command not found` after `pnpm add -g`
 
@@ -74,7 +73,7 @@ rm -f ~/.local/bin/josh
 which josh   # should now resolve to the pnpm global bin
 ```
 
-If the shim reappears after every `pnpm install`, a project pinned `< 0.200.0` is regenerating it — upgrade that project to `>= 0.200.0`. See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor) and [cli.md §4](./cli.md#4-migrating-from-older-versions).
+If the shim reappears after every `pnpm install`, a project pinned `< 0.200.0` is regenerating it — upgrade that project to `>= 0.200.0`. See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor) and [cli.md §3](./cli.md#3-migrating-from-older-versions).
 
 ## `josh <command>` fails with `MODULE_NOT_FOUND` pointing at a pnpm store path
 
