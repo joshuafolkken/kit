@@ -102,6 +102,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rh": "run:hold",
     "rl": "report:lint",
     "rmg": "run:merge",
+    "rmi": "registry:migrate",
     "rn": "run:next",
     "rp": "run:prep",
     "rpy": "repo:party",
@@ -784,6 +785,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "",
       "automation",
       [
+        "processes",
+      ],
+    ],
+    "registry:migrate": [
+      "",
+      "developer",
+      [
+        "files",
+        "network",
         "processes",
       ],
     ],
