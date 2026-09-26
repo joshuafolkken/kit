@@ -58,6 +58,16 @@ function scoped_versions(lockfile: string): ReadonlyArray<readonly [string, stri
 		)
 }
 
+function is_github_tarball(value: string): boolean {
+	try {
+		const url = new URL(value)
+
+		return url.protocol === 'https:' && url.hostname === 'npm.pkg.github.com'
+	} catch {
+		return false
+	}
+}
+
 function github_tarballs(lockfile: string): ReadonlyArray<string> {
 	const packages = fix_gh_packages_logic.parse_lockfile_packages(lockfile)
 
@@ -65,7 +75,8 @@ function github_tarballs(lockfile: string): ReadonlyArray<string> {
 		.filter(
 			([key, entry]) =>
 				key.startsWith(`${SCOPE}/`) &&
-				entry.resolution?.tarball?.includes('npm.pkg.github.com') === true,
+				entry.resolution?.tarball !== undefined &&
+				is_github_tarball(entry.resolution.tarball),
 		)
 		.map(([key]) => key)
 }

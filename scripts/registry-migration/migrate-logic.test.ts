@@ -26,7 +26,7 @@ describe('registry migration planning', () => {
 	})
 
 	it('replaces a CRLF mapping without changing its line endings', () => {
-		const original = GH.replace('\n', '\r\n')
+		const original = `${GH.trimEnd()}\r\n`
 		const plan = migrate_logic.plan(original, '', LOCKFILE)
 
 		expect(plan.content).toBe(`${NPM_MAPPING}\r\n`)
@@ -37,6 +37,15 @@ describe('registry migration planning', () => {
 
 		expect(migrate_logic.plan(GH, '', lockfile).blocked).toContain('@joshuafolkken/game-kit')
 		expect(migrate_logic.github_tarballs(LOCKFILE)).toEqual(['@joshuafolkken/kit@1.2.3'])
+	})
+
+	it('does not mistake a URL with GitHub in its path for the GitHub registry', () => {
+		const lockfile = LOCKFILE.replace(
+			'https://npm.pkg.github.com/download/',
+			'https://example.com/npm.pkg.github.com/',
+		)
+
+		expect(migrate_logic.github_tarballs(lockfile)).toEqual([])
 	})
 })
 

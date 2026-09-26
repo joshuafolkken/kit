@@ -22,6 +22,16 @@ const version_schema = z.looseObject({
 	dist: z.looseObject({ integrity: z.string(), tarball: z.string() }),
 })
 
+function is_public_npm_url(value: string): boolean {
+	try {
+		const url = new URL(value)
+
+		return url.origin === 'https://registry.npmjs.org' && url.username === '' && url.password === ''
+	} catch {
+		return false
+	}
+}
+
 interface VersionCheck {
 	missing: ReadonlyArray<string>
 	integrities: ReadonlyMap<string, string>
@@ -161,7 +171,7 @@ async function verify_resolution(
 	}
 
 	const actual = await dependencies.effective_registry(context.cwd)
-	if (!actual.startsWith(PUBLIC_REGISTRY)) throw new Error(`effective registry is ${actual}`)
+	if (!is_public_npm_url(actual)) throw new Error(`effective registry is ${actual}`)
 	const lockfile = read_file(context.lockfile_path)
 	const old_tarballs = migrate_logic.github_tarballs(lockfile)
 	if (old_tarballs.length > 0) throw new Error(`GitHub tarballs remain: ${old_tarballs.join(', ')}`)
@@ -233,7 +243,7 @@ async function fetch_version(name: string, version: string): Promise<string | un
 
 	if (!response.ok) return undefined
 	const parsed = version_schema.safeParse(await response.json())
-	if (!parsed.success || !parsed.data.dist.tarball.startsWith(PUBLIC_REGISTRY)) return undefined
+	if (!parsed.success || !is_public_npm_url(parsed.data.dist.tarball)) return undefined
 
 	return parsed.data.dist.integrity
 }

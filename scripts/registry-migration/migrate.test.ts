@@ -97,6 +97,19 @@ describe('registry migration refusals', () => {
 })
 
 describe('registry migration rollback', () => {
+	it('rejects a registry whose host only begins with the public host', async () => {
+		const root = fixture()
+		const adapters = dependencies()
+
+		adapters.effective_registry = vi
+			.fn()
+			.mockResolvedValue('https://registry.npmjs.org.example.com/')
+		const result = await registry_migration.migrate(root, adapters)
+
+		expect(result).toContain(RESTORED)
+		expect(readFileSync(path.join(root, NPMRC_PATH), 'utf8')).toBe(GH)
+	})
+
 	it('restores an unrelated workspace config written by pnpm', async () => {
 		const root = fixture()
 		const adapters = dependencies()
