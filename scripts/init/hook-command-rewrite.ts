@@ -21,6 +21,9 @@ const BUNDLE_INVOCATION = `node ${claude_plugin_config.MARKETPLACE_PATH}/dist/jo
 // The per-hook bundle directory a fresh clone builds, and where it lives inside the installed package.
 const HOOK_BUNDLE_DIR = `${hook_launch.HOOK_DIST_DIR}/`
 const CONSUMER_HOOK_BUNDLE_DIR = `${claude_plugin_config.MARKETPLACE_PATH}/${HOOK_BUNDLE_DIR}`
+const CONSUMER_PACKAGE_MANIFEST = `${claude_plugin_config.MARKETPLACE_PATH}/package.json`
+const MISSING_INSTALL_NOTICE = 'kit hooks inactive: run pnpm install, then reread CLAUDE.md'
+const MISSING_INSTALL_GUARD = `if [ ! -f ${CONSUMER_PACKAGE_MANIFEST} ]; then echo '${MISSING_INSTALL_NOTICE}' >&2; exit 0; fi; `
 const CODEX_ADAPTER_BUNDLE = `node ${CONSUMER_HOOK_BUNDLE_DIR}codex-hook-adapter.js`
 const CODEX_HOOKS_DESTINATION = '.codex/hooks.json'
 const CODEX_ROOT_PREFIX = String.raw`cd \"$(git rev-parse --show-toplevel)\" && `
@@ -43,11 +46,16 @@ function rebase_bundle_directory(value: string): string {
 // independent whichever order they run. The fallback rewrite is idempotent too (`BUNDLE_INVOCATION`
 // holds no `pnpm josh `), so the whole rewrite is safe to run more than once.
 function rewrite_command_value(value: string): string {
-	return rebase_bundle_directory(value)
+	const rewritten = rebase_bundle_directory(value)
 		.split(PNPM_JOSH_PREFIX)
 		.join(BUNDLE_INVOCATION)
 		.split(CODEX_ADAPTER_SOURCE)
 		.join(CODEX_ADAPTER_BUNDLE)
+
+	if (!rewritten.includes(claude_plugin_config.MARKETPLACE_PATH)) return rewritten
+	if (rewritten.includes(MISSING_INSTALL_GUARD)) return rewritten
+
+	return `${MISSING_INSTALL_GUARD}${rewritten}`
 }
 
 function rewrite_hook_commands(content: string, is_codex = false): string {

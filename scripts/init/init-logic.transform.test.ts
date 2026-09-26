@@ -128,22 +128,32 @@ describe('transform_distributed_paths unbundled references', () => {
 
 describe('ensure_claude_md_import', () => {
 	const IMPORT_LINE = init_logic.CLAUDE_MD_IMPORT_LINE
+	const INSTALL_GUIDANCE = 'run `pnpm install` first'
+	const PROJECT_RULES = '## Project rules\n- do the thing\n'
 
-	it('writes the one-line import when the consumer has no file', () => {
-		expect(init_logic.ensure_claude_md_import(undefined)).toBe(`${IMPORT_LINE}\n`)
+	it('provides install guidance and the canonical import without dependencies', () => {
+		const result = init_logic.ensure_claude_md_import(undefined)
+
+		expect(result).toContain(`${IMPORT_LINE}\n`)
+		expect(result).toContain(INSTALL_GUIDANCE)
+		expect(result.indexOf('Fresh checkout')).toBeLessThan(result.indexOf(IMPORT_LINE))
 	})
 
-	it('leaves a file that already carries the import untouched', () => {
-		const existing = `${IMPORT_LINE}\n\n## Project rules\n- do the thing\n`
+	it('upgrades a file that already carries the import without losing project rules', () => {
+		const existing = `${IMPORT_LINE}\n\n${PROJECT_RULES}`
+		const result = init_logic.ensure_claude_md_import(existing)
 
-		expect(init_logic.ensure_claude_md_import(existing)).toBe(existing)
+		expect(result).toContain(INSTALL_GUIDANCE)
+		expect(result).toContain(PROJECT_RULES)
+		expect(result.match(/@node_modules\/@joshuafolkken\/kit\/dist\/CLAUDE\.md/gu)).toHaveLength(1)
 	})
 
 	it('prepends the import while preserving project-specific additions', () => {
-		const additions = '## Project rules\n- do the thing\n'
+		const additions = PROJECT_RULES
 		const result = init_logic.ensure_claude_md_import(additions)
 
-		expect(result).toBe(`${IMPORT_LINE}\n\n${additions}`)
+		expect(result).toContain(`${IMPORT_LINE}\n`)
+		expect(result).toContain(INSTALL_GUIDANCE)
 		expect(result).toContain(additions)
 	})
 

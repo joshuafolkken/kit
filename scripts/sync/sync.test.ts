@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
@@ -302,14 +303,18 @@ const NO_REFERENCES_CONTENT = 'no references here\n'
 
 const CLAUDE_MD_DEST = path.join(TEST_DIR, 'dest', 'CLAUDE.md')
 const CLAUDE_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
+const INSTALL_GUIDANCE = 'run `pnpm install` first'
 
 // CLAUDE.md is distributed by import, not byte-copied (joshuafolkken/kit#1878): `josh sync` ensures
 // the one-line import is present while never disturbing a consumer's own additions below it.
 describe('sync_claude_md', () => {
-	it('writes the one-line import when the consumer has no CLAUDE.md', () => {
+	it('writes the import and bootstrap guidance when the consumer has no CLAUDE.md', () => {
 		sync.sync_claude_md(CLAUDE_MD_DEST)
 
-		expect(readFileSync(CLAUDE_MD_DEST, 'utf8')).toBe(`${CLAUDE_IMPORT_LINE}\n`)
+		const result = readFileSync(CLAUDE_MD_DEST, 'utf8')
+
+		expect(result).toContain(`${CLAUDE_IMPORT_LINE}\n`)
+		expect(result).toContain(INSTALL_GUIDANCE)
 	})
 
 	it('prepends the import while preserving project-specific additions', () => {
@@ -320,11 +325,13 @@ describe('sync_claude_md', () => {
 
 		const result = readFileSync(CLAUDE_MD_DEST, 'utf8')
 
-		expect(result).toBe(`${CLAUDE_IMPORT_LINE}\n\n${additions}`)
+		expect(result).toContain(`${CLAUDE_IMPORT_LINE}\n`)
+		expect(result).toContain(INSTALL_GUIDANCE)
+		expect(result).toContain(additions)
 	})
 
-	it('leaves a file already carrying the import unchanged', () => {
-		const content = `${CLAUDE_IMPORT_LINE}\n\n## Project rules\n`
+	it('leaves a file already carrying the import and guidance unchanged', () => {
+		const content = init_logic.ensure_claude_md_import('## Project rules\n')
 
 		writeFileSync(CLAUDE_MD_DEST, content)
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {

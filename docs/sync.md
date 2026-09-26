@@ -655,7 +655,7 @@ The AI files kit distributes carry backtick path references that must resolve in
 `docs/`                      →  `https://github.com/joshuafolkken/kit/tree/main/docs/`  (not bundled)
 ```
 
-Bundled directories (`prompts/`, `eslint/`) point into `node_modules`; paths the package does not ship (tests, `docs/`) become full GitHub URLs, since a consumer never receives them. Globs such as `` `prompts/**` `` are left alone. **`CLAUDE.md` itself is no longer byte-copied** ([#1878](https://github.com/joshuafolkken/kit/issues/1878)): the package ships the transformed copy at `dist/CLAUDE.md`, and a consumer's `CLAUDE.md` is a one-line `@import` of it plus the project's own additions — so `josh sync` only ensures that import line is present, never overwriting the additions, and a package update keeps the rules current on its own.
+Bundled directories (`prompts/`, `eslint/`) point into `node_modules`; paths the package does not ship (tests, `docs/`) become full GitHub URLs, since a consumer never receives them. Globs such as `` `prompts/**` `` are left alone. **`CLAUDE.md` itself is no longer byte-copied** ([#1878](https://github.com/joshuafolkken/kit/issues/1878)): the package ships the transformed copy at `dist/CLAUDE.md`. The consumer's tracked `CLAUDE.md` begins with a bootstrap instruction to install dependencies and reread the file if kit is absent, then imports the package rules and carries the project's own additions. `josh sync` ensures that instruction and import are present without overwriting the additions, and a package update keeps the rules current on its own.
 
 ## Refused inside the distribution package's own repository
 
