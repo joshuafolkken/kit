@@ -204,10 +204,19 @@ function run_upgrade_command(command: string): number {
 // succeed) so a failure on either target is surfaced without aborting the remaining upgrades.
 function run_all_upgrade_commands(commands: ReadonlyArray<string>): number {
 	let exit_code = 0
+	const failed_commands: Array<string> = []
 
 	for (const command of commands) {
 		const code = run_upgrade_command(command)
-		if (code !== 0) exit_code = code
+		if (code === 0) continue
+		exit_code = code
+		failed_commands.push(command)
+	}
+
+	if (failed_commands.length > 0) {
+		console.error(
+			`Upgrade incomplete; successful steps remain applied. Failed: ${failed_commands.join(', ')}`,
+		)
 	}
 
 	return exit_code

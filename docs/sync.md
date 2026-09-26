@@ -566,6 +566,10 @@ The Codex project files are managed by kit. Sync overwrites both files, and rewr
 
 `pnpm-workspace.yaml` is **merged**, not overwritten. Your existing file is the base: all top-level keys it already has (user-added keys like `packages:`, and any value you already set on a managed key) are preserved as-is. Kit-managed keys the template introduces (`minimumReleaseAgeExclude`, `allowBuilds`, `overrides`, `trustLockfile`) are appended only when missing.
 
+`josh init` and `josh sync` also copy that project's `minimumReleaseAgeExclude` entries into `.aikido` → `safe-chain.npm.minimumPackageAgeExclusions`. The workspace list is the source: add or remove age exceptions there, then run `josh sync`. Other top-level `.aikido` sections are kept byte-for-byte; an existing `safe-chain` section is serialized again when its exclusion list changes. Safe Chain 1.5.15 or newer reads this project setting. Older installed shims, including 1.2.2 and the former CI pin 1.5.1, ignore it; update the Safe Chain installation used by your shell. Kit's distributed CI now sets up 1.5.20, the latest version outside Safe Chain's 48-hour window when this change was made. Malware scanning and the age limit for packages outside the exclusion list remain active.
+
+If `josh version --upgrade` fails during project re-resolution, its final error lists the failed command and notes that successful steps remain applied. Check both versions before retrying. A Safe Chain minimum-age message despite a `.aikido` exclusion usually means the shell still uses an older Safe Chain shim (`safe-chain --version`).
+
 `trustLockfile: true` skips the install-time supply-chain re-verification introduced in pnpm 11.5 and retained in pnpm 12. Without it, clean CI environments (e.g. Cloudflare Workers Builds) that cannot authenticate private `@joshuafolkken/*` GitHub Packages hit a false `ERR_PNPM_TARBALL_URL_MISMATCH`. `minimum-release-age` still applies at resolution time, so age-based supply-chain protection is preserved.
 
 ### File mappings (overwritten if source exists)
