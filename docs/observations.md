@@ -382,3 +382,9 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/registry-migration/migrate.ts | 2026-09-26 | #2604
 - rf:bug-risks | medium | scripts/registry-migration/migrate-logic.ts | 2026-09-26 | #2604
 - rf:none | none | - | 2026-09-26 | #2604
+- rf:bug-risks | medium | scripts/init/init.ts | 2026-09-26 | #2618
+- rf:bug-risks | medium | scripts/safe-chain/project-config.ts | 2026-09-26 | #2618
+- rf:tests | medium | scripts/safe-chain/project-config.test.ts | 2026-09-26 | #2618
+- rf:comments | medium | docs/sync.md | 2026-09-26 | #2618
+- rf:bug-risks | medium | scripts/safe-chain/project-config.ts | 2026-09-26 | #2618
+- rf:bug-risks | medium | scripts/safe-chain/project-config.ts | 2026-09-26 | #2618
