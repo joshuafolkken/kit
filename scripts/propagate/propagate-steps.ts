@@ -29,6 +29,8 @@ const VERIFY_SCRIPT = `pnpm josh ${GATE_COMMAND}`
 // The commands the release-independent spawning steps run inside the target's own directory. The
 // upgrade and the sync are not here: both are per toolkit, so they are built from the plan instead.
 const STEP_COMMANDS: Readonly<Record<string, ReadonlyArray<string>>> = {
+	[propagate_run.STEP_LINT_RELATED]: ['pnpm', 'josh', 'lint:related'],
+	[propagate_run.STEP_TEST_RELATED]: ['pnpm', 'josh', 'test:related'],
 	[propagate_run.STEP_VERIFY]: ['sh', '-c', VERIFY_SCRIPT],
 }
 

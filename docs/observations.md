@@ -388,3 +388,7 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | medium | docs/sync.md | 2026-09-26 | #2618
 - rf:bug-risks | medium | scripts/safe-chain/project-config.ts | 2026-09-26 | #2618
 - rf:bug-risks | medium | scripts/safe-chain/project-config.ts | 2026-09-26 | #2618
+- rf:tests | medium | scripts/version/version-check-cli.test.ts | 2026-09-27 | #2617
+- rf:none | none | - | 2026-09-27 | #2617
+- rf:none | none | - | 2026-09-27 | #2624
+- rf:none | none | - | 2026-09-27 | #2624
