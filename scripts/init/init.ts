@@ -12,6 +12,7 @@ import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
+import { z } from 'zod'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic } from './init-logic'
@@ -93,6 +94,25 @@ function get_kit_self_dependency(): Record<string, string> {
 	return { [KIT_PACKAGE_NAME]: version }
 }
 
+function get_eslint_development_dependencies(): Record<string, string> {
+	const manifest = z
+		.object({
+			peerDependencies: z.record(z.string(), z.string()),
+			devDependencies: z.record(z.string(), z.string()),
+		})
+		.parse(init_actions.read_package_json(PACKAGE_JSON))
+	const entries = Object.keys(manifest.peerDependencies)
+		.filter((name) => name !== '@playwright/test')
+		.map((name): [string, string] => {
+			const version = manifest.devDependencies[name]
+			if (version === undefined) throw new Error(`Missing development version for ${name}`)
+
+			return [name, version]
+		})
+
+	return Object.fromEntries(entries)
+}
+
 function apply_dependency_merges(content: string): string {
 	const migrated = init_logic.strip_managed_postinstall(content)
 	const merged = init_logic.merge_package_scripts(
@@ -100,7 +120,11 @@ function apply_dependency_merges(content: string): string {
 		init_logic.get_suggested_scripts_for_content(migrated),
 	)
 	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
-	const with_secretlint = init_logic.merge_secretlint_development_deps(with_prettier)
+	const with_eslint = init_logic.merge_development_dependencies(
+		with_prettier,
+		get_eslint_development_dependencies(),
+	)
+	const with_secretlint = init_logic.merge_secretlint_development_deps(with_eslint)
 
 	return init_logic.merge_development_dependencies(with_secretlint, get_kit_self_dependency())
 }

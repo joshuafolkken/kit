@@ -173,18 +173,67 @@ importers:
 
   .:
     dependencies:
+      '@playwright/test':
+        specifier: '>=1.0.0'
+        version: 1.63.0
+      execa:
+        specifier: ^10.0.1
+        version: 10.0.1
+      js-yaml:
+        specifier: ^5.4.2
+        version: 5.4.2
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
+      ora:
+        specifier: ^9.4.1
+        version: 9.4.1
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
+      strip-json-comments:
+        specifier: ^5.0.3
+        version: 5.0.3
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@actions/expressions':
+        specifier: ^0.3.61
+        version: 0.3.61
       '@eslint/compat':
         specifier: ^2.1.1
         version: 2.1.1(eslint@10.11.0(supports-color@10.2.2))
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.11.0(supports-color@10.2.2))
-      '@playwright/test':
-        specifier: '>=1.0.0'
-        version: 1.63.0
+      '@ianvs/prettier-plugin-sort-imports':
+        specifier: ^4.7.1
+        version: 4.7.1(prettier@3.9.9)(supports-color@10.2.2)
+      '@secretlint/secretlint-rule-preset-recommend':
+        specifier: ^13.0.6
+        version: 13.0.6
       '@stylistic/eslint-plugin':
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.11.0(supports-color@10.2.2))
+      '@types/node':
+        specifier: ^26.6.3
+        version: 26.6.3
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
+      cspell:
+        specifier: ^10.3.4
+        version: 10.3.4
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      eslint:
+        specifier: ^10.11.0
+        version: 10.11.0(supports-color@10.2.2)
       eslint-config-prettier:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.11.0(supports-color@10.2.2))
@@ -206,64 +255,9 @@ importers:
       eslint_d:
         specifier: ^15.0.3
         version: 15.0.3
-      execa:
-        specifier: ^10.0.1
-        version: 10.0.1
       globals:
         specifier: ^17.12.0
         version: 17.12.0
-      js-yaml:
-        specifier: ^5.4.2
-        version: 5.4.2
-      jsonc-parser:
-        specifier: ^3.3.1
-        version: 3.3.1
-      ora:
-        specifier: ^9.4.1
-        version: 9.4.1
-      semver:
-        specifier: ^7.8.5
-        version: 7.8.5
-      strip-json-comments:
-        specifier: ^5.0.3
-        version: 5.0.3
-      svelte:
-        specifier: ^5.55.7
-        version: 5.57.1(@typescript-eslint/types@8.70.1)
-      tsx:
-        specifier: ^4.23.15
-        version: 4.23.15
-      typescript-eslint:
-        specifier: ^8.70.1
-        version: 8.70.1(eslint@10.11.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      zod:
-        specifier: ^4.6.5
-        version: 4.6.5
-    devDependencies:
-      '@actions/expressions':
-        specifier: ^0.3.61
-        version: 0.3.61
-      '@ianvs/prettier-plugin-sort-imports':
-        specifier: ^4.7.1
-        version: 4.7.1(prettier@3.9.9)(supports-color@10.2.2)
-      '@secretlint/secretlint-rule-preset-recommend':
-        specifier: ^13.0.6
-        version: 13.0.6
-      '@types/node':
-        specifier: ^26.6.3
-        version: 26.6.3
-      '@types/semver':
-        specifier: ^7.8.0
-        version: 7.8.0
-      cspell:
-        specifier: ^10.3.4
-        version: 10.3.4
-      esbuild:
-        specifier: ^0.28.2
-        version: 0.28.2
-      eslint:
-        specifier: ^10.11.0
-        version: 10.11.0(supports-color@10.2.2)
       lefthook:
         specifier: ^2.1.14
         version: 2.1.14
@@ -288,6 +282,9 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      typescript-eslint:
+        specifier: ^8.70.1
+        version: 8.70.1(eslint@10.11.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       vitest:
         specifier: ^5.0.2
         version: 5.0.2(@types/node@26.6.3)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))

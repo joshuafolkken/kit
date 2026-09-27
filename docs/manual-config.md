@@ -2,6 +2,8 @@
 
 Use individual configs directly if you prefer not to use `josh init`:
 
+Install the optional ESLint dependencies listed in [package.md](./package.md#1-install) before importing the ESLint preset. A kit-only installation does not include them. The same preset import works before and after this change.
+
 ```js
 // eslint.config.js
 import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
@@ -11,6 +13,8 @@ import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 // prettier.config.js
 import { config } from '@joshuafolkken/kit/prettier'
 ```
+
+For Svelte formatting, also install `prettier-plugin-svelte` and `svelte` in the project. The kit package itself does not require Svelte.
 
 ```jsonc
 // tsconfig.json

@@ -129,8 +129,11 @@ All other toolchain tasks are available as `pnpm josh <command>` subcommands —
 | `@ianvs/prettier-plugin-sort-imports` | `^4.7.1`                                                                                                  |
 | `prettier-plugin-svelte`              | `^4.1.1`                                                                                                  |
 | `prettier-plugin-tailwindcss`         | `^0.8.0`                                                                                                  |
+| ESLint and its preset peers           | versions from kit's own development dependencies; see [package.md](./package.md#1-install)                |
 
 The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries back the kit prettier preset (`@joshuafolkken/kit/prettier`), whose `plugins[]` references all three by name. prettier resolves plugins from the **consumer** project rather than transitively through the kit, so every project that uses the preset must declare them locally — otherwise `prettier`/`josh lint` fails with `Cannot find package`.
+
+The ESLint preset likewise resolves ESLint and its plugins from the consumer project. `josh init` now adds them alongside the generated ESLint config; existing projects upgrading kit without rerunning init can use the migration command in [package.md](./package.md#1-install). The minimal `static` profile and conditional Web tooling are tracked in [#2195](https://github.com/joshuafolkken/kit/issues/2195).
 
 ### Available `pnpm josh` subcommands
 
