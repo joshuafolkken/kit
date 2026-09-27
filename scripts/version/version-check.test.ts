@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { version_check_arguments } from './version-check-arguments'
 import { version_check_logic } from './version-check-logic'
 import { create_version_command_config } from './version-command-config'
 
 const is_local = true
 const is_global = false
+const UPGRADE_FLAG = '--upgrade'
 
 const KIT_CONFIG = create_version_command_config({
 	package_name: '@joshuafolkken/kit',
@@ -21,5 +23,12 @@ describe('version_check_logic.format_update_command', () => {
 		expect(version_check_logic.format_update_command('2.0.0', is_global, KIT_CONFIG)).toBe(
 			'pnpm add -g @joshuafolkken/kit@2.0.0',
 		)
+	})
+})
+
+describe('version-check arguments', () => {
+	it('accepts the version display and upgrade arguments', () => {
+		expect(version_check_arguments.validate([])).toBeUndefined()
+		expect(version_check_arguments.validate([UPGRADE_FLAG])).toBeUndefined()
 	})
 })
