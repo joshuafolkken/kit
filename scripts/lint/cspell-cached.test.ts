@@ -1,3 +1,4 @@
+import { project_checks } from '#scripts/gate/project-checks'
 import { CSPELL_CACHE_FILE, CSPELL_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { buffered_process } from '#scripts/lib/buffered-process'
@@ -26,7 +27,26 @@ const run_process = vi.mocked(buffered_process.run_buffered_process)
 const is_process_failed = vi.mocked(buffered_process.is_process_failed)
 
 beforeEach(() => {
+	vi.restoreAllMocks()
 	vi.clearAllMocks()
+})
+
+test('skips static cspell without configuration and names the reason', async () => {
+	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+	vi.spyOn(project_checks, 'has_config').mockReturnValue(false)
+	const output = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+	expect(await cspell_cached.run()).toBe(PASS)
+	expect(output).toHaveBeenCalledWith(expect.stringContaining('no cspell configuration'))
+	expect(run_process).not.toHaveBeenCalled()
+})
+
+test('runs static cspell after configuration and CLI are installed', async () => {
+	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+	vi.spyOn(project_checks, 'has_config').mockReturnValue(true)
+	vi.spyOn(project_checks, 'has_bin').mockReturnValue(true)
+	expect(await cspell_cached.run()).toBe(PASS)
+	expect(run_process).toHaveBeenCalledWith(CSPELL_ARGS)
 })
 
 test('runs cspell through its shared cache immediately around the process', async () => {

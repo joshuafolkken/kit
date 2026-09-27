@@ -116,7 +116,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/review-rubric.md', bytes: 20_480 },
 	{ path: 'prompts/review.md', bytes: 20_480 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
-	{ path: 'prompts/testing-guide.md', bytes: 20_480 },
+	{ path: 'prompts/testing-guide.md', bytes: 24_576 },
 ]
 
 // The recorded ceiling for one path, or undefined when it carries no budget entry.

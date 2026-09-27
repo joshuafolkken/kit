@@ -11,6 +11,8 @@ const DOC_FILE = 'docs/x.md'
 const SATISFIED = 'satisfied'
 const EXEMPT = 'exempt'
 const PROMPT_DOC = 'prompts/review.md'
+const STATIC_HTML = 'index.html'
+const STATIC_CSS = 'site.css'
 
 describe('test_declared_logic.verdict_for', () => {
 	it('is required when a runtime file changed with no test beside it', () => {
@@ -66,5 +68,16 @@ describe('test_declared_logic classification', () => {
 	it('treats a prompts markdown file as exempt but a scripts .ts as runtime', () => {
 		expect(test_declared_logic.is_exempt(PROMPT_DOC)).toBe(true)
 		expect(test_declared_logic.is_runtime('scripts/prompts.ts')).toBe(true)
+	})
+})
+
+describe('static HTML and CSS changes', () => {
+	it('exempts HTML and CSS only under the static profile', () => {
+		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS], true)).toBe(EXEMPT)
+		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS], false)).toBe('required')
+	})
+
+	it.each(['app.js', 'app.ts', 'app.tsx'])('still requires a test for %s', (file) => {
+		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS, file], true)).toBe('required')
 	})
 })

@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Python virtual-environment directory names excluded from project file discovery.
+  - venv
   # Standard shell command used to create a temporary publication directory.
   - mktemp
   # npm's CLI option for selecting the registry-auth configuration file.

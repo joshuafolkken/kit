@@ -108,6 +108,7 @@ For every code modification, in order:
 
    - **Tests are required for ALL code changes** (bug fixes, timing/animation fixes and refactors included): bug fix → regression test; UI/animation/timing → E2E for the observable change; logic/utility → unit; refactor → tests pinning existing behavior BEFORE the change (`prompts/refactoring.md`).
    - **Non-runtime updates (pre-approved manual-only exception)**: a change touching no executable runtime code path may proceed with manual verification — declare it in Step 0 and state why. It covers docs, non-executable config, editor/IDE files, and cosmetic asset swaps with no selector/path change; the mechanically exempt (`*.md`, `.editorconfig`, `.idea/**`, `.vscode/**`, `prompts/**`) are recognized by the command below, and the rest stay the exemption a person declares. A test infeasible for a runtime change needs its reason stated and user approval.
+   - **static の HTML/CSS 例外:** `package.json` に `josh.profile: static` が記録され、変更が HTML/CSS だけなら自動テストの代わりにブラウザーで表示を確認する。対象ページを開き、想定する画面幅でレイアウト・リンク・HTML 内の操作を確認し、観察結果を報告する。HTML/CSS と同時に変更した場合も、JavaScript と TypeScript のファイルには自動テストが必要。`pnpm josh test:declared` はこの場合だけ理由を添えて `exempt` と表示する。
    - **The commit stage answers this mechanically**: `pnpm josh test:declared` prints `required` / `exempt` / `satisfied` from the changed paths, and a runtime change with no test is refused at `pnpm josh git -y` on `required` — add the declared test or declare the non-runtime exception, then reissue (`prompts/collaboration-workflow/rule-delivery.md`).
    - **Read a target's line headroom before editing: `pnpm josh lines <path>`** — near the limit, `Target` carries the splitting plan.
 
@@ -121,6 +122,7 @@ For every code modification, in order:
 Run the full verification set **in order**; do not skip, reorder, or report completion on a failed or skipped step without the user agreeing. Inside a `fullrun` / `backlogrun` the gate runs beside the review and the merge chain (`workflow-commands` skill → §2, `prompts/review.md`).
 
 0. **Test gate** — no tests added? Continue only under the non-runtime exception (Step 0) or explicit approval; otherwise stop and add tests.
+   static プロファイルの HTML/CSS だけの変更には、Step 0 の手動ブラウザー確認を適用できる。
 1. **Refactor** — `prompts/refactoring.md`, until no high/medium items remain.
 2. **`pnpm josh gate`** — lint, type check, spell check and unit tests concurrently. One gate per run; while implementing re-run a single check by name (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`).
 3. **Self-review** — a subagent runs `/code-review` per `prompts/review.md` (never a main-line `Skill` load); level from the changed paths, at most two rounds, high/medium findings resolved. `prompts/review.md` → "Review round cap".
