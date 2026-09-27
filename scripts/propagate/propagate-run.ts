@@ -13,6 +13,8 @@ import type { PropagateTarget } from './propagate-targets'
 const STEP_PRECHECK = 'working tree check'
 const STEP_UPGRADE = 'josh vu'
 const STEP_SYNC = 'josh sync'
+const STEP_LINT_RELATED = 'related lint check'
+const STEP_TEST_RELATED = 'related test check'
 const STEP_VERIFY = 'verification gate'
 const STEP_ISSUE = 'open issue'
 const STEP_PR = 'josh git'
@@ -23,6 +25,8 @@ const STEP_ORDER: ReadonlyArray<string> = [
 	STEP_PRECHECK,
 	STEP_UPGRADE,
 	STEP_SYNC,
+	STEP_LINT_RELATED,
+	STEP_TEST_RELATED,
 	STEP_VERIFY,
 	STEP_ISSUE,
 	STEP_PR,
@@ -187,6 +191,8 @@ const propagate_run = {
 	STEP_ISSUE,
 	STEP_UPGRADE,
 	STEP_SYNC,
+	STEP_LINT_RELATED,
+	STEP_TEST_RELATED,
 	STEP_VERIFY,
 	STEP_PR,
 	STEP_ORDER,
