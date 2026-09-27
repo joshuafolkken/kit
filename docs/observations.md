@@ -396,3 +396,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/test/test-declared-logic.ts | 2026-09-27 | #2196
 - rf:bug-risks | medium | scripts/gate/project-checks.ts | 2026-09-27 | #2196
 - rf:bug-risks | medium | scripts/gate/verification-gate.ts | 2026-09-27 | #2196
+- rf:tests | low | scripts/package/optional-eslint.test.ts | 2026-09-27 | #2627
+- rf:tests | medium | scripts/package/optional-eslint.test.ts | 2026-09-27 | #2627
