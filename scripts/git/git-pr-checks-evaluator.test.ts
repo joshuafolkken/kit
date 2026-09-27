@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { check_runs_pages, status_pages } from './git-gh-pr-fixture'
+import { to_status_check_rollup } from './git-gh-pr-rollup'
 import { MERGE_GATE_EVALUATOR, wait_for_pr_success, type PrStateEvaluator } from './git-pr-checks'
 import { describe_pr_failure, evaluate_pr_state } from './git-pr-checks-eval'
 import { make_pr_snapshot } from './git-pr-checks-fixture'
-import type { PrStateSnapshot } from './git-pr-checks-parse'
+import { parse_pr_state_snapshot, type PrStateSnapshot } from './git-pr-checks-parse'
 
 // The poll loop used to hard-code the merge gate's verdict. `gh pr checks --watch` asked a weaker
 // question — have the checks finished? — so the watch that replaced it needs its own
@@ -37,6 +39,39 @@ describe('MERGE_GATE_EVALUATOR', () => {
 	it('is the merge gate’s own verdict and message', () => {
 		expect(MERGE_GATE_EVALUATOR.evaluate).toBe(evaluate_pr_state)
 		expect(MERGE_GATE_EVALUATOR.describe).toBe(describe_pr_failure)
+	})
+
+	it.each([
+		['completed', 'success', 'success'],
+		['completed', 'failure', 'failure'],
+	] as const)(
+		'uses the latest classification rerun when it is %s and %s',
+		(status, conclusion, expected) => {
+			const check_runs_json = check_runs_pages([
+				{ id: 1, name: 'Checks', status: 'completed', conclusion: 'failure' },
+				{ id: 2, name: 'Checks', status, conclusion },
+				{ id: 3, name: 'SonarQube', status: 'completed', conclusion: 'success' },
+			])
+			const rollup = to_status_check_rollup({ check_runs_json, status_json: status_pages([]) })
+			const snapshot = parse_pr_state_snapshot(
+				JSON.stringify({ statusCheckRollup: rollup, mergeStateStatus: 'CLEAN' }),
+			)
+
+			expect(evaluate_pr_state(snapshot)).toBe(expected)
+		},
+	)
+
+	it('waits while the latest required check rerun is in progress', () => {
+		const check_runs_json = check_runs_pages([
+			{ id: 1, name: 'SonarQube', status: 'completed', conclusion: 'failure' },
+			{ id: 2, name: 'SonarQube', status: 'in_progress' },
+		])
+		const rollup = to_status_check_rollup({ check_runs_json, status_json: status_pages([]) })
+		const snapshot = parse_pr_state_snapshot(
+			JSON.stringify({ statusCheckRollup: rollup, mergeStateStatus: 'CLEAN' }),
+		)
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
 	})
 })
 
