@@ -10,6 +10,9 @@ const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
 const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
 const GITHUB_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
+const DISPATCH_TAG = '${{ github.event.client_payload.tag }}'
+const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
+const CHECKOUT_ACTION = 'actions/checkout@'
 const MANIFEST_SCHEMA = z.object({
 	repository: z.object({ url: z.string() }),
 	publishConfig: z.unknown().optional(),
@@ -26,8 +29,29 @@ const JOB_SCHEMA = z.object({
 	steps: z.array(STEP_SCHEMA),
 })
 const JOBS_SCHEMA = z.object({ 'publish-github': JOB_SCHEMA, 'publish-npm': JOB_SCHEMA })
+const PRODUCTION_JOB_SCHEMA = z.object({
+	needs: z.array(z.string()),
+	uses: z.string(),
+	with: z.object({ tag: z.string() }),
+})
+const RELEASE_JOB_SCHEMA = z.object({
+	needs: z.array(z.string()),
+	permissions: PERMISSIONS_SCHEMA,
+	concurrency: z.unknown().optional(),
+	steps: z.array(STEP_SCHEMA),
+})
 const WORKFLOW_SCHEMA = z.object({
 	jobs: JOBS_SCHEMA,
+})
+const RELEASE_WORKFLOW_SCHEMA = z.object({
+	concurrency: z.object({
+		group: z.string(),
+		queue: z.string(),
+	}),
+	jobs: z.object({
+		'update-production': PRODUCTION_JOB_SCHEMA,
+		'create-release': RELEASE_JOB_SCHEMA,
+	}),
 })
 type TemplateSteps = NonNullable<NonNullable<ReturnType<typeof ci_yml_fixture.find_job>>['steps']>
 
@@ -51,10 +75,10 @@ describe('release tag checkout', () => {
 		'publishes the dispatched release tag in %s',
 		(job_name: 'publish-github' | 'publish-npm') => {
 			const checkout = read_workflow().jobs[job_name].steps.find((step) =>
-				step.uses?.startsWith('actions/checkout@'),
+				step.uses?.startsWith(CHECKOUT_ACTION),
 			)
 
-			expect(checkout?.with?.['ref']).toBe('${{ github.event.client_payload.tag }}')
+			expect(checkout?.with?.['ref']).toBe(DISPATCH_TAG)
 		},
 	)
 })
@@ -92,6 +116,49 @@ describe('dual registry publishing', () => {
 		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish kit.tgz --access public')
 		expect(commands).toContain('--registry https://registry.npmjs.org')
 		expect(commands).toContain('--userconfig /dev/null')
+	})
+})
+
+describe('GitHub Release job ordering', () => {
+	it('waits for both registries before updating production and waits for all three before publishing', () => {
+		const workflow = RELEASE_WORKFLOW_SCHEMA.parse(load(readFileSync(WORKFLOW_PATH, 'utf8')))
+
+		expect(workflow.jobs['update-production'].needs).toEqual(PUBLISH_JOB_NAMES)
+		expect(workflow.jobs['create-release'].needs).toEqual([
+			...PUBLISH_JOB_NAMES,
+			'update-production',
+		])
+	})
+
+	it('passes the dispatch tag to production and checks out the same tag for the release', () => {
+		const workflow = RELEASE_WORKFLOW_SCHEMA.parse(load(readFileSync(WORKFLOW_PATH, 'utf8')))
+		const production = workflow.jobs['update-production']
+		const release = workflow.jobs['create-release']
+		const checkout = release.steps.find((step) => step.uses?.startsWith(CHECKOUT_ACTION))
+		const publish = release.steps.find((step) => step.run?.includes('github-release-cli.ts'))
+
+		expect(production.uses).toBe(PRODUCTION_WORKFLOW)
+		expect(production.with.tag).toBe(DISPATCH_TAG)
+		expect(checkout?.with?.['ref']).toBe(production.with.tag)
+		expect(publish).toBeDefined()
+		expect(release.permissions['contents']).toBe('write')
+	})
+
+	it('queues every tag for the entire publication pipeline', () => {
+		const workflow = RELEASE_WORKFLOW_SCHEMA.parse(load(readFileSync(WORKFLOW_PATH, 'utf8')))
+
+		expect(workflow.concurrency).toEqual({
+			group: 'github-release',
+			queue: 'max',
+		})
+		expect(workflow.jobs['create-release'].concurrency).toBeUndefined()
+	})
+
+	it('prevents the independent production dispatch from running in kit', () => {
+		const production = readFileSync('.github/workflows/production.yml', 'utf8')
+
+		expect(production).toContain("github.repository != 'joshuafolkken/kit' || inputs.tag != ''")
+		expect(production).toContain('REF_NAME: ${{ inputs.tag || github.event.client_payload.tag }}')
 	})
 })
 
