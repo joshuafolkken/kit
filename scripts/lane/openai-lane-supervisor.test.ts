@@ -10,6 +10,7 @@ import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launc
 import { run_cut } from '#scripts/run/run-cut'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
+import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
 const ISSUE = '2084'
@@ -20,6 +21,7 @@ const lane_directory = path.join(scratch, 'lane')
 const target = run_cut.cut_path(repository)
 const profile = agent_role_profile.OPENAI_PROFILES.worker
 const RESUME_PROMPT = 'run:cut --resume 2084'
+const SHIP_SUCCESS = 'ship-success'
 const EPHEMERAL_FLAG = '--ephemeral'
 
 const launch = vi.spyOn(detached_launch, 'launch_attached')
@@ -27,6 +29,8 @@ const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const diagnostic = vi.spyOn(agent_diagnostics, 'check')
 const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 const common_directory = path.join(scratch, 'repository with spaces', '.git')
+const ship_current = vi.spyOn(openai_lane_ship, 'current')
+const ship_wait = vi.spyOn(openai_lane_ship, 'wait_for_ship')
 
 function lane(): LaneInfo {
 	return {
@@ -69,6 +73,8 @@ beforeEach(() => {
 	diagnostic.mockReturnValue({ kind: 'ready' })
 	resolve_common_directory.mockReturnValue(undefined)
 	launch.mockResolvedValue({ kind: 'completed', pid: 9001, exit_code: 0 })
+	ship_current.mockResolvedValue(undefined)
+	ship_wait.mockResolvedValue('none')
 })
 
 afterAll(() => {
@@ -157,6 +163,29 @@ describe('OpenAI lane supervisor recovery', () => {
 
 		expect(await supervise('failure')).toBe(1)
 		expect(run_cut.read_cut(target).kind).toBe('carried')
+	})
+})
+
+describe('OpenAI lane supervisor detached ship completion', () => {
+	it('waits for a successful detached ship before completing the lane', async () => {
+		ship_wait.mockResolvedValue('success')
+		expect(await supervise(SHIP_SUCCESS)).toBe(0)
+		expect(ship_wait).toHaveBeenCalledWith(ISSUE, undefined)
+		expect(launch).toHaveBeenCalledTimes(1)
+	})
+
+	it('relaunches the same lane after a detached ship gate fails', async () => {
+		ship_wait.mockResolvedValueOnce('failed').mockResolvedValueOnce('none')
+		expect(await supervise('ship-failed')).toBe(0)
+		expect(launch).toHaveBeenCalledTimes(2)
+		expect(launched_request(1).argv.args.at(-1)).toContain('ship supervisor stopped')
+		expect(launched_request(1).cwd).toBe(lane_directory)
+	})
+
+	it('leaves the lane available for diagnosis after an abnormal ship exit', async () => {
+		ship_wait.mockResolvedValue('abnormal')
+		expect(await supervise('ship-abnormal')).toBe(1)
+		expect(launch).toHaveBeenCalledTimes(1)
 	})
 })
 

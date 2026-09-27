@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_ship_detach } from '#scripts/run/run-ship-detach'
+import { describe, expect, it, vi } from 'vitest'
 import { lane_await, type AwaitState, type CheckConfig } from './lane-await'
 
 // joshuafolkken/kit#2113. The re-confirm guard is the invariant being tested: a process that
@@ -26,6 +28,18 @@ function config(is_running: () => boolean): CheckConfig {
 }
 
 describe('check_issue -- running / disappearance states', () => {
+	it('counts the detached ship as running after its child command disappears', () => {
+		const repository = vi.spyOn(git_common_directory, 'repository').mockReturnValue(process.cwd())
+		const ship = vi.spyOn(run_ship_detach, 'read_result').mockReturnValue({
+			launch_id: 'active',
+			result: 'running',
+		})
+
+		expect(lane_await.is_process_running_default(ISSUE)).toBe(true)
+		expect(ship).toHaveBeenCalledWith(process.cwd(), ISSUE)
+		repository.mockRestore()
+		ship.mockRestore()
+	})
 	it('returns undefined while the process is running', () => {
 		const state = make_state({ appeared: true })
 

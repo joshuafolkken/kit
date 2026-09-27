@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_ship_detach } from '#scripts/run/run-ship-detach'
 import { lane_child_invocation } from './lane-child-invocation'
 
 // Detached lane children are not harness-tracked processes, so their completion fires no
@@ -49,7 +51,12 @@ function is_process_running_default(issue: string): boolean {
 	const pattern = lane_child_invocation.process_pattern(issue)
 	const result = spawnSync('pgrep', ['-f', pattern], { encoding: 'utf8' })
 
-	return result.status === PROCESS_FOUND
+	if (result.status === PROCESS_FOUND) return true
+	const repository = git_common_directory.repository(process.cwd())
+
+	return (
+		repository !== undefined && run_ship_detach.read_result(repository, issue)?.result === 'running'
+	)
 }
 
 function make_initial_state(): AwaitState {

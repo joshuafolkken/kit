@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const review_mock = vi.hoisted(() => vi.fn())
 const round_two_mock = vi.hoisted(() => vi.fn())
+const repository_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 // A fresh ship: nothing recorded and nothing committed, pushed or merged. The resume paths are pinned in
@@ -15,6 +16,7 @@ vi.mock('./run-ship-probe', () => ({
 			is_merged: false,
 		}),
 		record_target: vi.fn().mockResolvedValue(undefined),
+		repository_directory: repository_mock,
 	},
 }))
 vi.mock('./run-event-stream-emit', () => ({ run_event_stream_emit: { emit: vi.fn() } }))
@@ -52,6 +54,7 @@ function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
 beforeEach(() => {
 	// Outside a supervisor, so a gate the detached supervisor runs never reads these ships as supervised.
 	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '')
+	repository_mock.mockReset().mockResolvedValue(process.cwd())
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	review_mock.mockReset().mockResolvedValue({ code: OK, out: 'review clean' })
 	round_two_mock.mockReset().mockResolvedValue({ code: OK, out: 'round 2 not due' })
@@ -60,6 +63,18 @@ beforeEach(() => {
 		info_lines.push(line)
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+describe('run_ship_cli.run — supervised completion', () => {
+	it.each([OK, FAILED])('records the supervisor result for exit code %s', async (code) => {
+		vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '1')
+		josh_run_mock.mockResolvedValueOnce({ code, out: 'gate result' })
+		const mark = vi.spyOn(run_ship_detach, 'mark_result').mockResolvedValue(undefined)
+
+		expect(await run_ship_cli.run([TITLE])).toBe(code)
+		expect(mark).toHaveBeenCalledWith(process.cwd(), NUMBER, code)
+		mark.mockRestore()
+	})
 })
 
 describe('run_ship_cli.run — folds the four ship steps into one call', () => {

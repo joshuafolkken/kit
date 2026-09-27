@@ -33,6 +33,14 @@ function resolve(cwd: string): string | undefined {
 	}
 }
 
-const git_common_directory = { resolve, select_linked }
+function repository(cwd: string): string | undefined {
+	try {
+		return read_directories(cwd)[COMMON_GIT_DIRECTORY]
+	} catch {
+		return undefined
+	}
+}
+
+const git_common_directory = { repository, resolve, select_linked }
 
 export { git_common_directory }
