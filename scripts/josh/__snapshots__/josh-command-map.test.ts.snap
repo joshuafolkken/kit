@@ -77,6 +77,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "obf": "observations:flush",
     "ol": "oracle:list",
     "ov": "overrides",
+    "pf": "profile",
     "pg": "propagate",
     "pks": "pkg:scout",
     "pm": "prevent-main-commit",
@@ -131,6 +132,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "sl": "session:lang",
     "sp": "stash:pop",
     "ss": "secretlint-scan",
+    "st": "start",
     "sy": "sync",
     "sys": "sync:scope",
     "t": "test",
@@ -445,7 +447,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "init": [
-      "",
+      "[--profile static|node]",
       "developer",
       [
         "files",
@@ -743,6 +745,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "profile": [
+      "[--profile static|node]",
+      "developer",
+      [
+        "files",
       ],
     ],
     "propagate": [
@@ -1073,6 +1082,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "start": [
+      "[--profile static|node]",
+      "developer",
+      [
+        "files",
+        "git",
+        "network",
       ],
     ],
     "stash:pop": [

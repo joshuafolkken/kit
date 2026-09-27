@@ -1,10 +1,45 @@
 # josh init — Detailed Behavior
 
-`josh init` sets up a new project with all the toolchain config files managed by `@joshuafolkken/kit`. Run it once after installing the package.
+`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`.
 
 ```bash
 pnpm josh init
+
+# Override the automatic decision for this run
+pnpm josh init --profile static
 ```
+
+## Project profiles
+
+`josh profile` prints the selected profile and its reason, for example `profile: static (no package.json)`. The profiles are `static` (minimal settings for a project without a Node development toolchain) and `node` (the existing Node toolchain). An `index.html` file does not decide the profile: Vite projects normally have one.
+
+| Priority | Condition                                                    | Profile             |
+| -------- | ------------------------------------------------------------ | ------------------- |
+| 1        | `--profile static` or `--profile node`                       | The requested value |
+| 2        | `package.json` contains `josh.profile`                       | The recorded value  |
+| 3        | No `package.json`                                            | `static`            |
+| 4        | Dependencies, dev dependencies, or a `build` or `dev` script | `node`              |
+| 5        | Metadata-only `package.json`                                 | `static`            |
+
+`josh init` records the first decision in `package.json` as `josh.profile`. Re-running it keeps that profile even after dependencies are added. Pass `--profile` to change the recorded value deliberately. Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
+
+| Setting or tool                                                                     | `static`                                                                                                   | `node`                                    |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `package.json`, `josh` script, kit dependency                                       | Always                                                                                                     | Existing package scripts and dependencies |
+| Prettier config, Prettier dependency, `.prettierignore`                             | When HTML, CSS, or JavaScript exists                                                                       | Always                                    |
+| `tsconfig.json`                                                                     | When TypeScript exists, without SvelteKit exclusions                                                       | Always                                    |
+| VS Code extensions                                                                  | Code Spell Checker, Material Icon Theme, Error Lens, Claude Code, GitHub Theme; add Prettier for Web files | Existing recommendations                  |
+| VS Code save formatting                                                             | HTML, CSS, and JavaScript only when Web files exist                                                        | Existing settings                         |
+| Short AI instructions and pointers                                                  | Always                                                                                                     | Existing full instructions                |
+| `.gitignore`, `.gitattributes`                                                      | When Git exists                                                                                            | When Git exists                           |
+| GitHub files                                                                        | When a GitHub origin exists                                                                                | When a GitHub origin exists               |
+| ESLint, cspell CLI config, Playwright, Lefthook, secretlint, external MCP and hooks | Not installed by default                                                                                   | Existing behavior                         |
+
+VS Code extensions are recommendations, not automatic installs. Code Spell Checker is not part of the initial CLI verification gate. Existing VS Code settings and added extension recommendations are preserved when initialization runs again. The `static` Prettier preset needs no Svelte or Tailwind plugins.
+
+The static Web profile writes `prettier.config.mjs`, which loads under either CommonJS or ESM package settings. Its `.prettierignore` keeps generated files out of formatting without excluding a site's `static/` source directory. A Git-free node project does not receive kit's Git and GitHub `prepare` commands.
+
+To add Git later, run `git init`, then run `josh init` again to add Git files without changing the recorded profile. After adding a GitHub origin, run `josh init` again for GitHub files. `josh start` is an optional entry for the GitHub Issue workflow; `josh init` is the entry for a local project without Git.
 
 ## Refused inside the package's own repository
 
@@ -33,7 +68,7 @@ in an empty directory anywhere else scaffolds exactly as before.
 
 ## Config files
 
-Each file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
+The following table describes the `node` profile. The profile table above lists the smaller `static` set. Each selected file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
 
 | File                      | If missing                                                                                                                            | If exists                                                                                                                             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -101,7 +136,7 @@ These files have no merge strategy. If they already exist, `josh init` prints th
 
 ## Package scripts
 
-`josh init` adds these scripts to your `package.json`:
+The `node` profile adds these scripts to your `package.json`; the `static` profile adds only `josh`:
 
 | Script       | Command                                                                                                                                             |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -121,7 +156,7 @@ All other toolchain tasks are available as `pnpm josh <command>` subcommands —
 
 ## Dependencies
 
-`josh init` adds the packages the generated config needs to `devDependencies`. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
+The `node` profile adds the packages below to `devDependencies`. The `static` profile adds kit and, when Web files exist, Prettier. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
 
 | Package                               | Version                                                                                                   |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -157,7 +192,7 @@ Retired scripts (previously managed, now removed): `git`, `git:followup`, `teleg
 
 ## AI files
 
-The following files are **copied from the package** on first run. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
+The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md

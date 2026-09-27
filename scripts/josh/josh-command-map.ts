@@ -53,6 +53,8 @@ const ALIASES: Record<string, string> = {
 	c: 'check',
 	pt: 'port',
 	i: 'init',
+	pf: 'profile',
+	st: 'start',
 	sy: 'sync',
 	rmi: 'registry:migrate',
 	sys: 'sync:scope',

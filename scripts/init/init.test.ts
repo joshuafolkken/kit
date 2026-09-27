@@ -40,8 +40,8 @@ describe('skip messages', () => {
 		expect(AI_COPY_SOURCE).not.toContain('pnpm sync')
 	})
 
-	it('contain josh sync in file skip message', () => {
-		expect(AI_COPY_SOURCE).toContain('run josh sync to update')
+	it('does not suggest sync for a skipped file', () => {
+		expect(AI_COPY_SOURCE).toContain('(already exists)')
 	})
 
 	it('contain josh sync in summary tip message', () => {

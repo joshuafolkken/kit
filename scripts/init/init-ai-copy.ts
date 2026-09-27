@@ -12,9 +12,31 @@ import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { init_sonar } from './init-sonar'
+import type { ProjectShape } from './project-profile'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const CLAUDE_MD_FILENAME = 'CLAUDE.md'
+const STATIC_CLAUDE_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.static.md'
+const PRETTIER_IGNORE = '.prettierignore'
+const GIT_ATTRIBUTES = '.gitattributes'
+const CODE_OF_CONDUCT = 'CODE_OF_CONDUCT.md'
+const SECURITY_MD = 'SECURITY.md'
+const STATIC_AI_FILES = [
+	'AGENTS.md',
+	'GEMINI.md',
+	PRETTIER_IGNORE,
+	GIT_ATTRIBUTES,
+	CODE_OF_CONDUCT,
+	SECURITY_MD,
+]
+const GITHUB_FILES = new Set([CODE_OF_CONDUCT, SECURITY_MD])
+const STATIC_POINTER_MAPPING = { src: 'templates/cursorrules.static', dest: '.cursorrules' }
+const PULL_REQUEST_TEMPLATE = '.github/pull_request_template.md'
+const RELEASE_CONFIG = '.github/release.yml'
+const STATIC_GITHUB_MAPPINGS = [
+	{ src: PULL_REQUEST_TEMPLATE, dest: PULL_REQUEST_TEMPLATE },
+	{ src: RELEASE_CONFIG, dest: RELEASE_CONFIG },
+]
 
 // Whether the existing file is a workflow that carries no header. A read failure answers "no": the
 // point is to warn, and a warning is not worth failing a command that used to open nothing.
@@ -59,7 +81,7 @@ function did_skip_copy_if_absent(
 	label: string,
 ): boolean {
 	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${label} (already exists — run josh sync to update)`)
+		console.info(`  ⏭ skipped   ${label} (already exists)`)
 		did_warn_unstamped_workflow(destination_path, label)
 
 		return true
@@ -89,8 +111,12 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 	return false
 }
 
-function did_skip_ai_file_copy(filename: string): boolean {
-	const source_path = package_path(filename)
+function did_skip_ai_file_copy(filename: string, shape?: ProjectShape): boolean {
+	const source_path = package_path(
+		filename === PRETTIER_IGNORE && shape?.profile === 'static'
+			? 'templates/prettierignore.static'
+			: filename,
+	)
 	const destination_path = path.join(PROJECT_ROOT, filename)
 
 	if (filename === WORKSPACE_YAML) {
@@ -183,16 +209,21 @@ function did_skip_ai_directory_copy(directory_name: string): boolean {
 // AI file — leaves an existing one untouched so a consumer's additions are never disturbed. `josh sync`
 // is what ensures the import line on an existing file (sync.ts). CLAUDE.md is no longer byte-copied
 // (joshuafolkken/kit#1878), so it is handled here rather than through AI_COPY_FILES.
-function did_skip_claude_md_import(): boolean {
+function did_skip_claude_md_import(shape?: ProjectShape): boolean {
 	const destination_path = path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME)
 
 	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${CLAUDE_MD_FILENAME} (already exists — run josh sync to update)`)
+		console.info(`  ⏭ skipped   ${CLAUDE_MD_FILENAME} (already exists)`)
 
 		return true
 	}
 
-	writeFileSync(destination_path, init_logic.ensure_claude_md_import(undefined))
+	const content =
+		shape?.profile === 'static'
+			? `> If kit is not installed, run \`pnpm install\` first.\n\n${STATIC_CLAUDE_IMPORT}\n`
+			: init_logic.ensure_claude_md_import(undefined)
+
+	writeFileSync(destination_path, content)
 	console.info(`  ✔ created   ${CLAUDE_MD_FILENAME}`)
 
 	return false
@@ -201,14 +232,69 @@ function did_skip_claude_md_import(): boolean {
 // Returns the repository name resolved for the Sonar config, so `josh init` can reuse it for the
 // security-updates report instead of spawning a second `gh repo view` (joshuafolkken/kit#805).
 // Resolving it here rather than in the caller keeps every AI-file write ahead of the network call.
-function run_ai_copies(): string | undefined {
-	const did_skip_claude_md = did_skip_claude_md_import()
-	const file_skips = init_logic
-		.get_ai_copy_files()
-		.map((filename) => did_skip_ai_file_copy(filename))
-	const mapping_skips = init_logic
-		.get_ai_copy_file_mappings()
-		.map(({ src: source, dest: destination }) => did_skip_ai_file_mapping(source, destination))
+function should_copy_git_file(filename: string, shape?: ProjectShape): boolean {
+	if (shape?.has_git !== false) return true
+
+	return (
+		filename !== GIT_ATTRIBUTES &&
+		!filename.startsWith('.claude/') &&
+		!filename.startsWith('.codex/')
+	)
+}
+
+function should_copy_github_file(filename: string, shape?: ProjectShape): boolean {
+	if (shape?.has_github !== false) return true
+
+	return !GITHUB_FILES.has(filename) && !filename.startsWith('.github/')
+}
+
+function should_copy_static_file(filename: string, shape?: ProjectShape): boolean {
+	if (filename !== PRETTIER_IGNORE || shape?.profile !== 'static') return true
+
+	return shape.has_web
+}
+
+function should_copy_ai_file(filename: string, shape?: ProjectShape): boolean {
+	return (
+		should_copy_git_file(filename, shape) &&
+		should_copy_github_file(filename, shape) &&
+		should_copy_static_file(filename, shape)
+	)
+}
+
+function ai_files(shape?: ProjectShape): ReadonlyArray<string> {
+	const files = shape?.profile === 'static' ? STATIC_AI_FILES : init_logic.get_ai_copy_files()
+
+	return files.filter((filename) => should_copy_ai_file(filename, shape))
+}
+
+function ai_mapping_skips(shape?: ProjectShape): ReadonlyArray<boolean> {
+	const mappings =
+		shape?.profile === 'static'
+			? [STATIC_POINTER_MAPPING, ...(shape.has_github ? STATIC_GITHUB_MAPPINGS : [])]
+			: init_logic.get_ai_copy_file_mappings()
+
+	return mappings
+		.filter(({ dest }) => shape?.has_github !== false || !dest.startsWith('.github/'))
+		.map(({ src, dest }) => did_skip_ai_file_mapping(src, dest))
+}
+
+function repository_name(shape?: ProjectShape): string | undefined {
+	if (shape?.has_github === false || shape?.profile === 'static') return undefined
+
+	return gh_spawn.get_repo_name_with_owner()
+}
+
+function report_sync_hint(has_skips: boolean, shape?: ProjectShape): void {
+	if (!has_skips || shape?.profile === 'static') return
+
+	console.info('\n  💡 Run `josh sync` to overwrite skipped AI files with the latest version.')
+}
+
+function run_ai_copies(shape?: ProjectShape): string | undefined {
+	const did_skip_claude_md = did_skip_claude_md_import(shape)
+	const file_skips = ai_files(shape).map((filename) => did_skip_ai_file_copy(filename, shape))
+	const mapping_skips = ai_mapping_skips(shape)
 	const directory_skips = init_logic
 		.get_ai_copy_directories()
 		.map((directory_name) => did_skip_ai_directory_copy(directory_name))
@@ -216,13 +302,11 @@ function run_ai_copies(): string | undefined {
 		Boolean,
 	)
 
-	const name_with_owner = gh_spawn.get_repo_name_with_owner()
+	const name_with_owner = repository_name(shape)
 
-	init_sonar.copy_sonar_with_template(name_with_owner)
+	if (shape?.profile !== 'static') init_sonar.copy_sonar_with_template(name_with_owner)
 
-	if (has_skips) {
-		console.info('\n  💡 Run `josh sync` to overwrite skipped AI files with the latest version.')
-	}
+	report_sync_hint(has_skips, shape)
 
 	return name_with_owner
 }
@@ -230,6 +314,7 @@ function run_ai_copies(): string | undefined {
 const init_ai_copy = {
 	copy_ai_file,
 	run_ai_copies,
+	ai_files,
 }
 
 export { init_ai_copy }

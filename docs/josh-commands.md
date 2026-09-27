@@ -395,9 +395,21 @@ The assign-then-run shape [`josh port`](#josh-port)'s scripts use: a failed subs
 
 Commands for setting up and maintaining a project.
 
+### `josh profile`
+
+Show the project profile and reason. A saved `josh.profile` takes precedence; `--profile` overrides it.
+
+```bash
+pnpm josh profile
+```
+
+### `josh start`
+
+Start GitHub Issue setup; requires Git and a GitHub origin.
+
 ### `josh init`
 
-Initialize config files in a new project — creates or merges all managed config files, and reports two repository settings (Dependabot security updates, Allow auto-merge) that back the files it writes.
+Initialize project config, selecting a profile and reporting applicable repository settings.
 
 ```bash
 pnpm josh init   # create/merge config files

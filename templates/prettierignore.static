@@ -1,0 +1,12 @@
+# Dependencies and generated files
+node_modules/
+dist/
+build/
+.pnpm-store/
+
+# Package manager lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
