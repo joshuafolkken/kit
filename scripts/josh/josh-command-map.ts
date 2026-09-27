@@ -60,6 +60,7 @@ const ALIASES: Record<string, string> = {
 	sys: 'sync:scope',
 	g: 'git',
 	gp: 'pr',
+	prc: 'pr:classification',
 	fu: 'followup',
 	nf: 'notify',
 	obf: 'observations:flush',
