@@ -3,6 +3,22 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const EXPECTED_COUNT = 275
+const OTHER_LABEL = 'other-change'
+const EXPECTED_TOTAL = 1104
+const EXPECTED_HISTORY_HASH = '4bfb0abe08e5ff7e6c5a8afeb31f67b529c51b71f740524bb2be52792c525a7c'
+const EXPECTED_CATEGORIES = {
+	'breaking-change': 14,
+	enhancement: 458,
+	bugfix: 413,
+	[OTHER_LABEL]: 208,
+	'ignore-for-release': 11,
+}
+const ADDITIONAL_MERGES = [
+	{ number: 2650, sha: '0683a385fe14164dca37c7a71f4e877c8005530e', category: OTHER_LABEL },
+	{ number: 2651, sha: '8738742abd4dee95f4c94fda977f52b884da3c94', category: OTHER_LABEL },
+	{ number: 2652, sha: 'df7f1dbb1e23ef154a99e20449086dcb43634c29', category: OTHER_LABEL },
+	{ number: 2657, sha: '01eb8610556d27a5a0f60726d133561916dba9b3', category: OTHER_LABEL },
+]
 const EXPECTED_EXCLUDED_PR_NUMBERS = [349, 352, 364, 379, 385, 531, 675, 756, 758, 763]
 const AUDITS = [
 	{
@@ -28,7 +44,6 @@ const REASON_COLUMN = 5
 const EVIDENCE_COLUMN = 6
 const COLUMN_COUNT = 8
 const IGNORE_LABEL = 'ignore-for-release'
-const OTHER_LABEL = 'other-change'
 const BREAKING_LABEL = 'breaking-change'
 const NO_ISSUE_MARKER = '元 Issue なし'
 const CATEGORIES = new Set([BREAKING_LABEL, 'enhancement', 'bugfix', OTHER_LABEL, IGNORE_LABEL])
@@ -39,6 +54,54 @@ function read_audit(issue: number): Array<Array<string>> {
 		.split('\n')
 		.map((line) => line.split('\t'))
 }
+
+const COMBINED_ROWS = AUDITS.flatMap((audit) => read_audit(audit.issue).slice(1))
+const COMBINED_MERGES = [
+	...COMBINED_ROWS.map((row) => ({ number: Number(row.at(0)), sha: row.at(1) ?? '' })),
+	...ADDITIONAL_MERGES,
+]
+
+it('covers the complete bounded first-parent merge history once', () => {
+	const entries = COMBINED_MERGES.toSorted((left, right) => left.number - right.number)
+	const digest = createHash('sha256')
+		.update(`${entries.map((entry) => [entry.number, entry.sha].join(' ')).join('\n')}\n`)
+		.digest('hex')
+
+	expect(entries).toHaveLength(EXPECTED_TOTAL)
+	expect(new Set(entries.map((entry) => entry.number)).size).toBe(EXPECTED_TOTAL)
+	expect(digest).toBe(EXPECTED_HISTORY_HASH)
+})
+
+it('matches the recorded categories and release-notes preview', () => {
+	const categories = [
+		...COMBINED_ROWS.map((row) => row.at(CATEGORY_COLUMN)),
+		...ADDITIONAL_MERGES.map((merge) => merge.category),
+	]
+	const counts = Object.fromEntries(
+		Object.keys(EXPECTED_CATEGORIES).map((category) => [
+			category,
+			categories.filter((value) => value === category).length,
+		]),
+	)
+
+	expect(counts).toEqual(EXPECTED_CATEGORIES)
+	expect(categories.length - (counts[IGNORE_LABEL] ?? 0)).toBe(1093)
+})
+
+it('keeps the published summary in sync with the audit', () => {
+	const report = readFileSync('docs/release-classification-audit.md', 'utf8').replaceAll(
+		/\s+/gu,
+		' ',
+	)
+
+	for (const [category, count] of Object.entries(EXPECTED_CATEGORIES)) {
+		const release_count = category === IGNORE_LABEL ? 0 : count
+
+		expect(report).toContain(`(\`${category}\`) | ${String(count)} | ${String(release_count)} |`)
+	}
+
+	expect(report).toContain('| 合計 | 1,104 | 1,093 |')
+})
 
 for (const audit of AUDITS) {
 	const [header, ...rows] = read_audit(audit.issue)
