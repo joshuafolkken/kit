@@ -13,6 +13,10 @@ const AUDITS = [
 		issue: 2647,
 		history_hash: 'c99da85278e3d90b86ebde878ae7580211760a0545e845e7439928c54f67a4ab',
 	},
+	{
+		issue: 2648,
+		history_hash: 'f6ec2428edccde04608818902bffce6ad1f11c79b2487b72ed1998851e46844b',
+	},
 ]
 const CATEGORY_COLUMN = 2
 const FILES_COLUMN = 4
@@ -21,7 +25,9 @@ const EVIDENCE_COLUMN = 6
 const COLUMN_COUNT = 8
 const IGNORE_LABEL = 'ignore-for-release'
 const OTHER_LABEL = 'other-change'
-const CATEGORIES = new Set(['breaking-change', 'enhancement', 'bugfix', OTHER_LABEL, IGNORE_LABEL])
+const BREAKING_LABEL = 'breaking-change'
+const NO_ISSUE_MARKER = '元 Issue なし'
+const CATEGORIES = new Set([BREAKING_LABEL, 'enhancement', 'bugfix', OTHER_LABEL, IGNORE_LABEL])
 
 function read_audit(issue: number): Array<Array<string>> {
 	return readFileSync(`docs/release-classification-audit-${String(issue)}.tsv`, 'utf8')
@@ -95,6 +101,25 @@ describe('release classification audit #2647 exceptions', () => {
 
 		expect(update?.at(CATEGORY_COLUMN)).toBe(OTHER_LABEL)
 		expect(update?.at(3)).toBe('')
-		expect(update?.at(EVIDENCE_COLUMN)).toContain('元 Issue なし')
+		expect(update?.at(EVIDENCE_COLUMN)).toContain(NO_ISSUE_MARKER)
+	})
+})
+
+describe('release classification audit #2648 exceptions', () => {
+	const rows = read_audit(2648).slice(1)
+	const no_issue = rows.filter((row) => !row.at(3))
+
+	it('records release and observation PRs without inventing linked issues', () => {
+		expect(no_issue).toHaveLength(14)
+		expect(no_issue.every((row) => row.at(EVIDENCE_COLUMN)?.includes(NO_ISSUE_MARKER))).toBe(true)
+		expect(no_issue.find((row) => row.at(0) === '2104')?.at(CATEGORY_COLUMN)).toBe(OTHER_LABEL)
+	})
+
+	it('identifies removed public commands as breaking changes', () => {
+		const breaking = rows.filter((row) => row.at(CATEGORY_COLUMN) === BREAKING_LABEL)
+
+		expect(
+			breaking.map((row) => Number(row.at(0))).toSorted((left, right) => left - right),
+		).toEqual([1967, 1971, 1994, 1998, 2006, 2007, 2039, 2040])
 	})
 })
