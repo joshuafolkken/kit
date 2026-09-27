@@ -2,6 +2,12 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Terms quoted from PR and Issue evidence in the third historical release audit.
+  - redispatch
+  - dedupe
+  - unscored
+  - hardlink
+  - pageouts
   # Names and established technical terms quoted in the historical release audit.
   - execa
   - Threlte
