@@ -17,6 +17,10 @@ const AUDITS = [
 		issue: 2648,
 		history_hash: 'f6ec2428edccde04608818902bffce6ad1f11c79b2487b72ed1998851e46844b',
 	},
+	{
+		issue: 2649,
+		history_hash: 'b4d6b9e1739743805946cc91fb8e3b8df76571a01b202f03f3378ef5de60c5b8',
+	},
 ]
 const CATEGORY_COLUMN = 2
 const FILES_COLUMN = 4
@@ -70,7 +74,7 @@ for (const audit of AUDITS) {
 			for (const row of rows) {
 				expect(row).toHaveLength(COLUMN_COUNT)
 				expect(CATEGORIES.has(row.at(CATEGORY_COLUMN) ?? '')).toBe(true)
-				expect(row.at(FILES_COLUMN)).toBeTruthy()
+				if (audit.issue !== 2649 || row.at(0) !== '2520') expect(row.at(FILES_COLUMN)).toBeTruthy()
 				expect(row.at(REASON_COLUMN)).toBeTruthy()
 				expect(row.at(EVIDENCE_COLUMN)).toBeTruthy()
 			}
@@ -89,6 +93,7 @@ describe('release classification audit #2646 exceptions', () => {
 			excluded.map((row) => Number(row.at(0))).toSorted((left, right) => left - right),
 		).toEqual(EXPECTED_EXCLUDED_PR_NUMBERS)
 		expect(excluded.every((row) => row.at(REASON_COLUMN)?.includes('PR #'))).toBe(true)
+		expect(excluded.every((row) => Boolean(row.at(FILES_COLUMN)))).toBe(true)
 		expect(mismatched_issue?.at(REASON_COLUMN)).toContain('closes #295')
 	})
 })
@@ -121,5 +126,26 @@ describe('release classification audit #2648 exceptions', () => {
 		expect(
 			breaking.map((row) => Number(row.at(0))).toSorted((left, right) => left - right),
 		).toEqual([1967, 1971, 1994, 1998, 2006, 2007, 2039, 2040])
+	})
+})
+
+describe('release classification audit #2649 exceptions', () => {
+	const rows = read_audit(2649).slice(1)
+
+	it('excludes the merge with no first-parent changes', () => {
+		const excluded = rows.filter((row) => row.at(CATEGORY_COLUMN) === IGNORE_LABEL)
+
+		expect(excluded.map((row) => row.at(0))).toEqual(['2520'])
+		expect(excluded[0]?.at(FILES_COLUMN)).toBe('')
+		expect(excluded[0]?.at(REASON_COLUMN)).toContain('差分が空')
+	})
+
+	it('records issue-free automated PRs and consumer-facing breaking changes', () => {
+		const no_issue = rows.filter((row) => !row.at(3))
+		const breaking = rows.filter((row) => row.at(CATEGORY_COLUMN) === BREAKING_LABEL)
+
+		expect(no_issue).toHaveLength(59)
+		expect(no_issue.every((row) => row.at(EVIDENCE_COLUMN)?.includes(NO_ISSUE_MARKER))).toBe(true)
+		expect(breaking.map((row) => row.at(0))).toEqual(['2635', '2576'])
 	})
 })
