@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { project_checks } from '#scripts/gate/project-checks'
 import { ESLINT_CACHE_FILE, ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import {
@@ -29,6 +30,38 @@ function write_output(result: BufferedProcessResult): void {
 	if (result.output) process.stdout.write(result.output)
 }
 
+function skipped(check: string, reason: string): BufferedProcessResult {
+	return { output: `${project_checks.skip_notice(check, reason)}\n`, exit_code: 0, elapsed_ms: 0 }
+}
+
+async function run_static_prettier(directory: string): Promise<BufferedProcessResult> {
+	if (!project_checks.has_files(directory, project_checks.WEB_FILES)) {
+		return skipped('prettier', 'no HTML, CSS or JavaScript files were found')
+	}
+
+	if (!project_checks.has_bin(directory, 'prettier')) {
+		return skipped('prettier', 'prettier is not installed')
+	}
+
+	return await buffered_process.run_buffered_process(PRETTIER_ARGS)
+}
+
+async function run_static_eslint(directory: string): Promise<BufferedProcessResult> {
+	if (!project_checks.has_files(directory, project_checks.SCRIPT_FILES)) {
+		return skipped('eslint', 'no JavaScript or TypeScript files were found')
+	}
+
+	if (!project_checks.has_config(directory, project_checks.ESLINT_CONFIGS)) {
+		return skipped('eslint', 'no ESLint configuration was found')
+	}
+
+	if (!project_checks.has_bin(directory, 'eslint')) {
+		return skipped('eslint', 'eslint is not installed')
+	}
+
+	return await run_eslint(ESLINT_ARGS, ESLINT_CACHE_FILE)
+}
+
 function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcessResult): number {
 	return buffered_process.is_process_failed(prettier) || buffered_process.is_process_failed(eslint)
 		? FAIL_EXIT_CODE
@@ -55,7 +88,17 @@ async function run_lint_checks(
 }
 
 async function run_lint_parallel_checks(): Promise<number> {
-	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS)
+	const directory = process.cwd()
+	if (!project_checks.is_static(directory)) return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS)
+	const [prettier, eslint] = await Promise.all([
+		run_static_prettier(directory),
+		run_static_eslint(directory),
+	])
+
+	write_output(prettier)
+	write_output(eslint)
+
+	return lint_exit_code(prettier, eslint)
 }
 
 // `process.exitCode` rather than `process.exit()`: both reports are buffered and written here in

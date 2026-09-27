@@ -16,6 +16,7 @@ const { FAIL_ICON, PASS_ICON } = status_icons
 interface GateStep {
 	label: string
 	command_args: ReadonlyArray<string>
+	skip_reason?: string
 }
 
 interface GateStepResult extends BufferedProcessResult {

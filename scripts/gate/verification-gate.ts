@@ -14,6 +14,7 @@ import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { gate_report, type GateStep, type GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
+import { project_checks } from './project-checks'
 import { scoped_green, type ScopedSources } from './scoped-green'
 import { type_check_step } from './type-check-step'
 
@@ -65,9 +66,14 @@ async function build_gate_step(
 		}
 	}
 
+	const command_args = await type_check_step.resolve_type_check_args(start_directory)
+	const skip_reason =
+		command_args[0] === JOSH ? project_checks.type_check_skip_reason(start_directory) : undefined
+
 	return {
 		label: check.label,
-		command_args: await type_check_step.resolve_type_check_args(start_directory),
+		command_args,
+		...(skip_reason !== undefined && { skip_reason }),
 	}
 }
 
@@ -81,6 +87,16 @@ async function build_gate_steps(
 }
 
 async function run_gate_step(step: GateStep): Promise<GateStepResult> {
+	if (step.skip_reason !== undefined) {
+		return {
+			label: step.label,
+			command: step.command_args.join(' '),
+			output: project_checks.skip_notice('check', step.skip_reason),
+			exit_code: 0,
+			elapsed_ms: 0,
+		}
+	}
+
 	const result = await buffered_process.run_buffered_process(step.command_args)
 
 	return { label: step.label, command: step.command_args.join(' '), ...result }

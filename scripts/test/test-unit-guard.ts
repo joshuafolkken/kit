@@ -3,7 +3,9 @@ import { existsSync, globSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
+import { project_checks } from '#scripts/gate/project-checks'
 import { execa } from 'execa'
+import { SKIP_MARKER } from './skip-marker'
 import { unit_worker_share } from './unit-worker-share'
 
 const PNPM = 'pnpm'
@@ -19,10 +21,10 @@ const NODE_MODULES = 'node_modules'
 // - **`vitest` absent is the young project.** `josh init` installs no vitest and writes no
 //   `test:unit` script, so a freshly-bootstrapped project always lands here — which is the case the
 //   skip was written for, and it keeps it.
-// - **`vitest` present is the project declaring that it runs unit tests.** Zero matching files
-//   there is a broken state rather than a young one — a mis-scoped glob, or a suite that was
-//   deleted — and reporting it as a passing check hands `pnpm josh followup`, which reads
-//   only the exit code, a verification that verified nothing. That half fails.
+// - **`vitest` present is the node project's declaration that it runs unit tests.** Zero matching
+//   files there is a broken state — a mis-scoped glob, or a deleted suite — and fails. A static
+//   project may carry vitest as an unused dependency without declaring a unit suite; zero files
+//   there are reported as skipped, never as a test pass.
 //
 // Rejected: leaving both halves green — joshuafolkken/kit#1216's `--verbose` makes the zero count
 // *readable* in the CI log, but nobody reads a green log and the merge gate reads only pass/fail;
@@ -35,25 +37,29 @@ const NODE_MODULES = 'node_modules'
 // `@playwright/test` is not one: it is an optional peer dependency that vitest's browser mode also
 // needs, so a project can legitimately have it installed with no `*.e2e.{ts,js}` file at all.
 const SKIP_ACTION = 'skip-missing-package'
+const SKIP_NO_TESTS_ACTION = 'skip-no-tests'
 const FAIL_ACTION = 'fail-no-tests'
 
-type GuardAction = 'run' | typeof SKIP_ACTION | typeof FAIL_ACTION
+type GuardAction = 'run' | typeof SKIP_ACTION | typeof SKIP_NO_TESTS_ACTION | typeof FAIL_ACTION
 
 // The word the gate looks for to know a passing step did not actually run. Exported and reused on
 // both sides rather than matched by eye: joshuafolkken/kit#967 stopped printing a passing check's
 // body, and without this a gate that skipped the whole unit suite printed the same five lines as one
 // that ran it.
-const SKIP_MARKER = '— skipping'
-
 const SKIP_REASON = 'vitest is not installed'
+const SKIP_NO_TESTS_REASON = 'no unit test files were found in this static project'
 const FAIL_REASON =
 	'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing'
 
-function resolve_guard_action(is_installed: boolean, has_tests: boolean): GuardAction {
+function resolve_guard_action(
+	is_installed: boolean,
+	has_tests: boolean,
+	is_static = false,
+): GuardAction {
 	if (!is_installed) return SKIP_ACTION
-	if (!has_tests) return FAIL_ACTION
+	if (has_tests) return 'run'
 
-	return 'run'
+	return is_static ? SKIP_NO_TESTS_ACTION : FAIL_ACTION
 }
 
 function is_vitest_installed(project_directory: string): boolean {
@@ -132,7 +138,9 @@ function report_no_run(action: Exclude<GuardAction, 'run'>, command_label: strin
 		return FAIL_EXIT_CODE
 	}
 
-	console.info(`josh ${command_label}: ${SKIP_REASON} ${SKIP_MARKER} vitest unit tests.`)
+	const reason = action === SKIP_NO_TESTS_ACTION ? SKIP_NO_TESTS_REASON : SKIP_REASON
+
+	console.info(`josh ${command_label}: ${reason} ${SKIP_MARKER} vitest unit tests.`)
 
 	return 0
 }
@@ -149,7 +157,11 @@ async function run_guarded_vitest(
 ): Promise<number> {
 	const is_installed = is_vitest_installed(project_directory)
 	const has_tests = has_unit_tests(project_directory)
-	const action = resolve_guard_action(is_installed, has_tests)
+	const action = resolve_guard_action(
+		is_installed,
+		has_tests,
+		project_checks.is_static(project_directory),
+	)
 
 	if (action !== 'run') return report_no_run(action, command_label)
 	if (announcement !== undefined) process.stdout.write(`${announcement}\n`)

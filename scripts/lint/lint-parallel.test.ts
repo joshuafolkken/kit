@@ -1,3 +1,4 @@
+import { project_checks } from '#scripts/gate/project-checks'
 import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -34,6 +35,7 @@ function mock_exit_codes(prettier_code: number, eslint_code: number): void {
 }
 
 beforeEach(() => {
+	vi.restoreAllMocks()
 	vi.clearAllMocks()
 })
 
@@ -93,5 +95,42 @@ describe('run_lint_checks', () => {
 
 		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(prettier_args)
 		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(eslint_args)
+	})
+})
+
+function static_project(): void {
+	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+	vi.spyOn(project_checks, 'has_files').mockReturnValue(true)
+	vi.spyOn(project_checks, 'has_config').mockReturnValue(false)
+	vi.spyOn(project_checks, 'has_bin').mockReturnValue(true)
+}
+
+describe('static project lint', () => {
+	it('runs Prettier for HTML without configuration while skipping ESLint', async () => {
+		static_project()
+		mocked_execa.mockResolvedValue(fake_result(0))
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_parallel_checks()).toBe(0)
+		expect(mocked_execa).toHaveBeenCalledOnce()
+		expect(stdout).toHaveBeenCalledWith(expect.stringContaining('no ESLint configuration'))
+	})
+
+	it('skips Prettier when no web file exists', async () => {
+		static_project()
+		vi.spyOn(project_checks, 'has_files').mockReturnValue(false)
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_parallel_checks()).toBe(0)
+		expect(mocked_execa).not.toHaveBeenCalled()
+		expect(stdout).toHaveBeenCalledWith(expect.stringContaining('no HTML, CSS or JavaScript'))
+	})
+
+	it('runs ESLint after its configuration is added', async () => {
+		static_project()
+		vi.spyOn(project_checks, 'has_config').mockReturnValue(true)
+		mock_exit_codes(0, 0)
+		expect(await run_lint_parallel_checks()).toBe(0)
+		expect(mocked_execa).toHaveBeenCalledTimes(2)
 	})
 })

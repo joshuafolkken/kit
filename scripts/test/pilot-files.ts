@@ -399,7 +399,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/test/http-fault-injection.test.ts',
 	'scripts/test/pilot-config.test.ts',
 	'scripts/test/pilot-files.test.ts',
-	'scripts/test/test-declared-changed.test.ts',
 	'scripts/test/test-declared-document-rule.test.ts',
 	'scripts/test/test-declared-logic.test.ts',
 	'scripts/test/test-declared-match.test.ts',

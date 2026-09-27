@@ -14,6 +14,7 @@ const mocked_execa = vi.mocked(execa)
 type ExecaResult = Awaited<ReturnType<typeof execa>>
 
 const UNIT_TEST_BASENAME = 'sample.test.ts'
+const PACKAGE_JSON = 'package.json'
 const COVERAGE_FLAG = '--coverage'
 const UNIT_FILE = path.join('src', UNIT_TEST_BASENAME)
 const OUTER_SEED = '7'
@@ -80,7 +81,7 @@ function add_vitest_package(): void {
 	const package_directory = path.join(ctx.project_directory, 'node_modules', 'vitest')
 
 	mkdirSync(package_directory, { recursive: true })
-	writeFileSync(path.join(package_directory, 'package.json'), '{}')
+	writeFileSync(path.join(package_directory, PACKAGE_JSON), '{}')
 }
 
 function add_unit_file(relative_path: string): void {
@@ -103,6 +104,10 @@ describe('test_unit_guard.resolve_guard_action', () => {
 
 	it('runs when the package and unit tests are both present', () => {
 		expect(test_unit_guard.resolve_guard_action(true, true)).toBe('run')
+	})
+
+	it('skips zero tests in a static project even if vitest is installed', () => {
+		expect(test_unit_guard.resolve_guard_action(true, false, true)).toBe('skip-no-tests')
 	})
 })
 
@@ -157,6 +162,7 @@ describe('test_unit_guard.run_guarded_unit — the non-running paths', () => {
 		expect(exit_code).toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()
 		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('not installed'))
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(test_unit_guard.SKIP_MARKER))
 	})
 
 	// joshuafolkken/kit#1224: the merge gate reads only the exit code, so a unit check that ran
@@ -181,6 +187,19 @@ describe('test_unit_guard.run_guarded_unit — the non-running paths', () => {
 		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
 
 		expect(error_spy).not.toHaveBeenCalledWith(expect.stringContaining(test_unit_guard.SKIP_MARKER))
+	})
+})
+
+describe('static project without unit tests', () => {
+	it('reports a skipped check even if vitest is installed', async () => {
+		add_vitest_package()
+		writeFileSync(path.join(ctx.project_directory, PACKAGE_JSON), '{"josh":{"profile":"static"}}')
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await test_unit_guard.run_guarded_unit(ctx.project_directory, [])).toBe(0)
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('no unit test files'))
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(test_unit_guard.SKIP_MARKER))
+		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 })
 
