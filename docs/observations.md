@@ -392,3 +392,7 @@ dropping either side destroys exactly what it exists to record.
 - rf:none | none | - | 2026-09-27 | #2617
 - rf:none | none | - | 2026-09-27 | #2624
 - rf:none | none | - | 2026-09-27 | #2624
+- rf:bug-risks | medium | scripts/gate/project-checks.ts | 2026-09-27 | #2196
+- rf:bug-risks | medium | scripts/test/test-declared-logic.ts | 2026-09-27 | #2196
+- rf:bug-risks | medium | scripts/gate/project-checks.ts | 2026-09-27 | #2196
+- rf:bug-risks | medium | scripts/gate/verification-gate.ts | 2026-09-27 | #2196
