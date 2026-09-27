@@ -11,6 +11,8 @@ import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_issue_number } from './run-issue-number'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
+import { run_ship_detach } from './run-ship-detach'
+import { run_ship_probe } from './run-ship-probe'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event (joshuafolkken/kit#2024).
 // The parent's context is the largest and its per-turn cost the highest, and the event was two turns:
@@ -324,6 +326,10 @@ async function on_unresolved(): Promise<MergeVerdict> {
 	return emit(RETRY_TOKEN, FAILURE_EXIT_CODE)
 }
 
+async function on_shipping(): Promise<MergeVerdict> {
+	return emit(RESUMED_TOKEN, SUCCESS_EXIT_CODE)
+}
+
 const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<MergeVerdict>>> = {
 	cut: on_cut,
 	failed: on_failed,
@@ -333,11 +339,24 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	parked: on_parked,
 	split: on_skipped,
 	unresolved: on_unresolved,
+	shipping: on_shipping,
+}
+
+async function is_ship_running(child: string): Promise<boolean> {
+	const repository = await run_ship_probe.repository_directory()
+
+	return (
+		repository !== undefined && run_ship_detach.read_result(repository, child)?.result === 'running'
+	)
 }
 
 // The whole merge event for one returned child, in-process: read its state, classify it, and run the
 // handler. The CLI prints the token; `backlog:drive` branches on the outcome (joshuafolkken/kit#2508).
 async function merge_child(ctx: MergeContext): Promise<MergeResult> {
+	if (await is_ship_running(ctx.child)) {
+		return { outcome: 'shipping', ...(await on_shipping()) }
+	}
+
 	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
 	const outcome = outcome_of(read, await read_signals(ctx))
 

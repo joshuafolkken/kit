@@ -253,7 +253,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/josh/kit-only.test.ts',
 	'scripts/josh/platform-temporary.test.ts',
 	'scripts/josh/process-identity.test.ts',
-	'scripts/lane/lane-await.test.ts',
 	'scripts/lane/lane-capacity.test.ts',
 	'scripts/lane/lane-child-invocation.test.ts',
 	'scripts/lane/lane-child-marker.test.ts',

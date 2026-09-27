@@ -392,6 +392,16 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
+async function record_supervised_result(
+	args: ShipArguments,
+	sections: ReadonlyArray<ShipSection>,
+): Promise<void> {
+	if (!run_ship_detach.is_supervised()) return
+	const repository = await run_ship_probe.repository_directory()
+	if (repository === undefined) return
+	await run_ship_detach.mark_result(repository, args.number, run_ship.exit_code(sections))
+}
+
 async function run_ship_command(args: ShipArguments): Promise<number> {
 	if (should_detach(args)) {
 		if (!args.is_detach) console.error(LANE_CHILD_DETACH_NOTE)
@@ -401,6 +411,7 @@ async function run_ship_command(args: ShipArguments): Promise<number> {
 
 	const sections = await ship(args)
 
+	await record_supervised_result(args, sections)
 	console.info(run_ship.format_report(sections))
 
 	return run_ship.exit_code(sections)

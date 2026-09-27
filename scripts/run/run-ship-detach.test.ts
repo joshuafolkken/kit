@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -45,6 +46,10 @@ function request(
 
 function pid_path(repository: string): string {
 	return stamp_file.stamp_path(`josh-ship-pid-${NUMBER}-`, repository)
+}
+
+function result_path(repository: string): string {
+	return stamp_file.stamp_path(`josh-ship-result-${NUMBER}-`, repository)
 }
 
 beforeEach(() => {
@@ -96,7 +101,11 @@ describe('run_ship_detach.detach', () => {
 	it('refuses a second supervisor while the recorded one is alive', async () => {
 		const target = request()
 
-		stamp_file.write_text_stamp(pid_path(target.repository), String(process.pid))
+		stamp_file.replace_stamp(result_path(target.repository), {
+			pid: process.pid,
+			process_start: process_identity.own_start(),
+			launch_id: 'running',
+		})
 
 		const result = await run_ship_detach.detach(target)
 
@@ -116,11 +125,104 @@ describe('run_ship_detach.detach', () => {
 
 	it('answers failed and records no launch when the process could not start', async () => {
 		launch_mock.mockReturnValue({ kind: 'failed', note: START_NOTE })
+		const target = request()
 
-		const result = await run_ship_detach.detach(request())
+		const result = await run_ship_detach.detach(target)
 
 		expect(result).toEqual({ verdict: run_ship_detach.FAILED, note: START_NOTE })
 		expect(emit_mock).not.toHaveBeenCalled()
+		expect(run_ship_detach.read_result(target.repository, NUMBER)).toBeUndefined()
+	})
+})
+
+describe('detached ship result', () => {
+	it('treats a pending launch from a dead parent as abnormal', () => {
+		const target = request()
+
+		stamp_file.replace_stamp(result_path(target.repository), {
+			launcher_pid: DEAD_PID,
+			launch_id: 'pending',
+		})
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
+	})
+})
+
+describe('detached ship supervisor identity', () => {
+	it('does not mistake a reused pid for the original supervisor', () => {
+		const target = request()
+
+		stamp_file.replace_stamp(result_path(target.repository), {
+			pid: process.pid,
+			process_start: 'stale-start',
+			launch_id: 'stopped',
+		})
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
+	})
+
+	it('keeps a live supervisor running even after its gate reports failure', () => {
+		const target = request()
+
+		stamp_file.replace_stamp(result_path(target.repository), {
+			pid: process.pid,
+			launch_id: 'live',
+			result: 'failed',
+		})
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('running')
+	})
+
+	it.each(['success', 'failed', 'abnormal'] as const)(
+		'distinguishes a stopped supervisor: %s',
+		(result) => {
+			const target = request()
+
+			stamp_file.replace_stamp(result_path(target.repository), {
+				pid: DEAD_PID,
+				launch_id: result,
+				...(result !== 'abnormal' && { result }),
+			})
+
+			expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe(result)
+		},
+	)
+})
+
+describe('detached ship result ownership', () => {
+	it('records the result only for the supervisor holding the launch identity', async () => {
+		const target = request()
+
+		stamp_file.replace_stamp(result_path(target.repository), {
+			pid: DEAD_PID,
+			launch_id: 'current',
+		})
+		vi.stubEnv(run_ship_detach.LAUNCH_ID_KEY, 'older')
+		await run_ship_detach.mark_result(target.repository, NUMBER, 1)
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
+		vi.stubEnv(run_ship_detach.LAUNCH_ID_KEY, 'current')
+		await run_ship_detach.mark_result(target.repository, NUMBER, 1)
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('failed')
+		vi.unstubAllEnvs()
+	})
+
+	it('keeps an immediate supervisor result after the launch record receives its pid', async () => {
+		const target = request()
+		let result_written: Promise<void> | undefined
+
+		launch_mock.mockImplementation((launch_request: { env: Record<string, string> }) => {
+			vi.stubEnv(run_ship_detach.LAUNCH_ID_KEY, launch_request.env[run_ship_detach.LAUNCH_ID_KEY])
+			result_written = run_ship_detach.mark_result(target.repository, NUMBER, 1)
+
+			return { kind: 'launched', pid: DEAD_PID }
+		})
+
+		await run_ship_detach.detach(target)
+		await result_written
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('failed')
+
+		vi.unstubAllEnvs()
 	})
 })
 

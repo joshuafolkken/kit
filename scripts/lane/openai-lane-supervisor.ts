@@ -12,6 +12,7 @@ import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
+import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decision'
 
 const OWNER_PREFIX = 'josh-openai-lane-supervisor-'
@@ -187,10 +188,17 @@ async function standing_cut(issue: string): Promise<RunCut | undefined> {
 	return read_cut.kind === 'carried' && handed_off(read_cut.cut, issue) ? read_cut.cut : undefined
 }
 
-function child_argv(lane: LaneInfo, profile: AgentProfile, is_resume: boolean): LaunchArgv {
-	const invocation = is_resume
-		? lane_child_invocation.resume_invocation(lane.issue)
-		: lane_child_invocation.child_invocation(lane.issue)
+function child_argv(
+	lane: LaneInfo,
+	profile: AgentProfile,
+	is_resume: boolean,
+	override?: string,
+): LaunchArgv {
+	const invocation =
+		override ??
+		(is_resume
+			? lane_child_invocation.resume_invocation(lane.issue)
+			: lane_child_invocation.child_invocation(lane.issue))
 	const built = agent_argv.with_profile_in(invocation, profile, lane.directory)
 	if (built.kind === 'rejected') throw new Error(built.note)
 
@@ -209,6 +217,11 @@ interface Generation {
 	lane: LaneInfo
 	owner: SupervisorOwner
 	profile: AgentProfile
+	invocation?: string
+}
+
+function completion_code(result: ChildResult, ship: string): number {
+	return ship === 'abnormal' || result.kind === 'abnormal' ? 1 : 0
 }
 
 function record_child(generation: Generation, child_pid: number): void {
@@ -239,7 +252,7 @@ async function run_child(generation: Generation): Promise<ChildResult> {
 	const { lane, profile, is_resume } = generation
 	const result = await detached_launch.launch_attached(
 		{
-			argv: child_argv(lane, profile, is_resume),
+			argv: child_argv(lane, profile, is_resume, generation.invocation),
 			cwd: lane.directory,
 			log_path: lane_dispatch_log.default_log_path(lane),
 			profile,
@@ -257,6 +270,7 @@ async function run_child(generation: Generation): Promise<ChildResult> {
 }
 
 async function run_generations(generation: Generation): Promise<number> {
+	const prior = await openai_lane_ship.current(generation.lane.issue)
 	const result = await run_child(generation)
 	if (result.kind === LAUNCH_FAILED_KIND) return 1
 
@@ -264,9 +278,18 @@ async function run_generations(generation: Generation): Promise<number> {
 		return await run_generations({ ...generation, epoch: generation.epoch + 1, is_resume: true })
 	}
 
-	if (result.kind === 'abnormal') return 1
+	const ship = await openai_lane_ship.wait_for_ship(generation.lane.issue, prior?.launch_id)
 
-	return 0
+	if (ship === 'failed') {
+		return await run_generations({
+			...generation,
+			epoch: generation.epoch + 1,
+			is_resume: false,
+			invocation: lane_child_invocation.ship_stop_invocation(generation.lane.issue),
+		})
+	}
+
+	return completion_code(result, ship)
 }
 
 async function wait_for_inherited_child(
