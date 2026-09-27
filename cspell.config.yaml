@@ -9,6 +9,9 @@ words:
   - toggleable
   - webapps
   - lockfiles
+  - iwasakishinya
+  - rescanning
+  - codegen
   # VS Code extension publisher and extension identifiers in the static profile.
   - pkief
   - usernamehw
