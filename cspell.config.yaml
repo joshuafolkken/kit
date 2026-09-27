@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # GitHub Release API field used to select the commit for generated notes.
+  - commitish
   # Names and technical terms quoted in the fourth historical release audit.
   - SQSCANGHA
   - undici
