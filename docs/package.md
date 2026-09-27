@@ -12,6 +12,18 @@ The public npm registry serves `@joshuafolkken/kit` without a GitHub token or pr
 pnpm add -D @joshuafolkken/kit
 ```
 
+The package-only installation provides the shared CLI and common configuration without installing ESLint or Svelte. ESLint is an optional feature: its published preset stays at `@joshuafolkken/kit/eslint/vanilla`, but the project using that preset must also install ESLint and its plugins. `josh init` adds those development dependencies for the config it generates. For a package-only project, skip initialization and import only the common entry points you need.
+
+Existing projects that already import the kit ESLint preset must add its peer packages when upgrading from a version that bundled them:
+
+```bash
+pnpm add -D eslint@^10.11.0 typescript@^6.0.3 typescript-eslint@^8.70.1 @eslint/compat@^2.1.1 @eslint/js@^10.0.1 @stylistic/eslint-plugin@^5.10.0 eslint-config-prettier@^10.1.8 eslint-import-resolver-typescript@^4.4.5 eslint-plugin-import-x@^4.17.1 eslint-plugin-promise@^7.3.0 eslint-plugin-sonarjs@^4.2.1 eslint-plugin-unicorn@^76.0.0 globals@^17.12.0
+```
+
+Keep the existing `@joshuafolkken/kit/eslint/vanilla` import. The ESLint version moves to 10 because the current `@eslint/js` preset requires it. `eslint_d` is no longer installed by kit; the edit hook falls back to the project's ESLint executable when the daemon is absent. Projects that want the daemon can add `eslint_d` directly.
+
+Kit no longer declares a Svelte peer. Projects using `@joshuafolkken/kit/prettier` for `.svelte` files must install `prettier-plugin-svelte` and its Svelte peer in the project, alongside the other plugins listed in [init.md](./init.md#dependencies). A project that only installs kit does not need either package.
+
 ## 2. Initialize
 
 Run once after installing — creates or merges all config files:
@@ -34,7 +46,7 @@ The package exposes config presets for direct import:
 
 | Use             | Reference                                                           |
 | --------------- | ------------------------------------------------------------------- |
-| ESLint config   | `@joshuafolkken/kit/eslint/vanilla`                                 |
+| ESLint config   | `@joshuafolkken/kit/eslint/vanilla` (optional peers required)       |
 | Prettier        | `@joshuafolkken/kit/prettier`                                       |
 | tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/base.json`              |
 | Scripts         | `tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts` |

@@ -425,6 +425,9 @@ jobs:
       - name: Run unit tests
         run: pnpm josh test:unit
 
+      - name: Verify optional ESLint consumer install
+        run: pnpm exec tsx scripts/package/verify-optional-eslint-install.ts
+
   # **The required status check. `Checks` is a name the branch ruleset already requires, and this job
   # is what keeps that name meaning what it meant** (joshuafolkken/kit#1226) — every check the single
   # `Checks` job used to run has passed. It runs no checks itself; it reads the two halves' results.
