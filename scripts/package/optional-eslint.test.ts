@@ -1,16 +1,20 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { execaSync } from 'execa'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
 const ROOT = process.cwd()
 const SCRATCH = mkdtempSync(path.join(os.tmpdir(), 'kit-optional-eslint-'))
 const PNPM = 'pnpm'
 const DIR_FLAG = '--dir'
 const IGNORE_SCRIPTS_FLAG = '--ignore-scripts'
+const PACKAGE_NAME = '@joshuafolkken/kit'
+const require = createRequire(import.meta.url)
 const MANIFEST = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
 	version: string
+	dependencies: Record<string, string>
 	devDependencies: Record<string, string>
 	peerDependencies: Record<string, string>
 	peerDependenciesMeta: Record<string, { optional: boolean }>
@@ -32,12 +36,36 @@ const SVELTE_PROBE = [
 	'console.log(output)',
 ].join('\n')
 const TARBALL = path.join(SCRATCH, `joshuafolkken-kit-${MANIFEST.version}.tgz`)
+const PRETTIER_PACKAGES = [
+	'prettier',
+	'@ianvs/prettier-plugin-sort-imports',
+	'prettier-plugin-tailwindcss',
+	'prettier-plugin-svelte',
+]
 
-function add_packages(directory: string, packages: ReadonlyArray<string>): void {
-	mkdirSync(directory, { recursive: true })
-	execaSync(PNPM, ['add', DIR_FLAG, directory, '--offline', IGNORE_SCRIPTS_FLAG, ...packages], {
-		cwd: ROOT,
-	})
+function extract_kit(directory: string): void {
+	const target = path.join(directory, 'node_modules', PACKAGE_NAME)
+
+	mkdirSync(target, { recursive: true })
+	execaSync('tar', ['-xzf', TARBALL, '-C', target, '--strip-components=1'])
+}
+
+function link_package(
+	directory: string,
+	name: string,
+	source = path.join(ROOT, 'node_modules', name),
+): void {
+	const target = path.join(directory, 'node_modules', name)
+
+	mkdirSync(path.dirname(target), { recursive: true })
+	symlinkSync(source, target, 'dir')
+}
+
+function link_svelte_peer(directory: string): void {
+	const plugin_path = require.resolve('prettier-plugin-svelte/package.json')
+	const svelte_path = require.resolve('svelte/package.json', { paths: [path.dirname(plugin_path)] })
+
+	link_package(directory, 'svelte', path.dirname(svelte_path))
 }
 
 function installed_names(directory: string): Set<string> {
@@ -57,13 +85,6 @@ function installed_names(directory: string): Set<string> {
 	collect(project.dependencies)
 
 	return names
-}
-
-function package_spec(name: string): string {
-	const version = MANIFEST.devDependencies[name]
-	if (version === undefined) throw new Error(`Missing development version for ${name}`)
-
-	return `${name}@${version}`
 }
 
 beforeAll(() => {
@@ -86,47 +107,46 @@ afterAll(() => {
 
 vi.setConfig({ testTimeout: 60_000 })
 
-describe('published kit optional ESLint installation', () => {
-	it('keeps ESLint and Svelte out of a minimal installation', () => {
-		const directory = path.join(SCRATCH, 'minimal')
+it('keeps ESLint and Svelte out of a minimal installation', () => {
+	const directory = path.join(SCRATCH, 'minimal')
 
-		add_packages(directory, [TARBALL])
-		const names = installed_names(directory)
+	execaSync(
+		PNPM,
+		['--filter', PACKAGE_NAME, 'deploy', '--prod', '--offline', IGNORE_SCRIPTS_FLAG, directory],
+		{ cwd: ROOT },
+	)
+	const { stdout } = execaSync('tar', ['-xOzf', TARBALL, 'package/package.json'])
+	const packed = JSON.parse(stdout) as { dependencies: Record<string, string> }
 
-		expect([...names].filter((name) => /eslint|svelte/u.test(name))).toEqual([])
-	})
+	const names = installed_names(directory)
 
-	it('resolves the public config against an opted-in consumer and runs ESLint', () => {
-		const directory = path.join(SCRATCH, 'eslint')
-		const peers = ESLINT_PACKAGES.map((name) => package_spec(name))
+	expect(packed.dependencies).toEqual(MANIFEST.dependencies)
+	expect([...names].filter((name) => /eslint|svelte/u.test(name))).toEqual([])
+})
 
-		add_packages(directory, [TARBALL, ...peers])
-		writeFileSync(path.join(directory, '.gitignore'), '')
-		const config_path = path.join(directory, 'lint-probe.mjs')
+it('resolves the public config against an opted-in consumer and runs ESLint', () => {
+	const directory = path.join(SCRATCH, 'eslint')
 
-		writeFileSync(config_path, LINT_PROBE)
-		execaSync(process.execPath, [config_path], { cwd: directory })
-		expect(ESLINT_PACKAGES.every((name) => MANIFEST.peerDependenciesMeta[name]?.optional)).toBe(
-			true,
-		)
-	})
+	extract_kit(directory)
+	for (const name of ESLINT_PACKAGES) link_package(directory, name)
+	writeFileSync(path.join(directory, '.gitignore'), '')
+	const config_path = path.join(directory, 'lint-probe.mjs')
 
-	it('formats Svelte when its plugin and peer are explicitly installed', () => {
-		const directory = path.join(SCRATCH, 'svelte')
-		const packages = [
-			'prettier@^3.9.9',
-			'@ianvs/prettier-plugin-sort-imports@^4.7.1',
-			'prettier-plugin-tailwindcss@^0.8.1',
-			'prettier-plugin-svelte@^4.1.1',
-			'svelte@^5.55.7',
-		]
+	writeFileSync(config_path, LINT_PROBE)
+	execaSync(process.execPath, [config_path], { cwd: directory })
+	expect(ESLINT_PACKAGES.every((name) => MANIFEST.peerDependenciesMeta[name]?.optional)).toBe(true)
+})
 
-		add_packages(directory, [TARBALL, ...packages])
-		const probe_path = path.join(directory, 'svelte-probe.mjs')
+it('formats Svelte when its plugin and peer are explicitly installed', () => {
+	const directory = path.join(SCRATCH, 'svelte')
 
-		writeFileSync(probe_path, SVELTE_PROBE)
-		const { stdout } = execaSync(process.execPath, [probe_path], { cwd: directory })
+	extract_kit(directory)
+	for (const name of PRETTIER_PACKAGES) link_package(directory, name)
+	link_svelte_peer(directory)
+	const probe_path = path.join(directory, 'svelte-probe.mjs')
 
-		expect(stdout).toContain('<h1>{answer}</h1>')
-	})
+	writeFileSync(probe_path, SVELTE_PROBE)
+	const { stdout } = execaSync(process.execPath, [probe_path], { cwd: directory })
+
+	expect(stdout).toContain('<h1>{answer}</h1>')
 })
