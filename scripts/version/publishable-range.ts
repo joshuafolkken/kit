@@ -9,9 +9,9 @@ import semver from 'semver'
 // The check asks the registry through that same filtered view instead of modelling the policy:
 // `pnpm view <name>@<range> version` prints no version and exits non-zero
 // (ERR_PNPM_PACKAGE_NOT_FOUND) exactly when nothing visible satisfies the range. Modelling would
-// mean guessing safe-chain's threshold, and `minimumReleaseAgeExclude` cannot stand in for it —
-// that list governs pnpm's own `minimum-release-age`, and safe-chain has no knowledge of it, which
-// is precisely what made the original failure surprising.
+// mean guessing safe-chain's threshold. `josh init` / `josh sync` now mirror
+// `minimumReleaseAgeExclude` into Safe Chain's .aikido project config (kit #2618), but older
+// installed shims ignore it and published ranges must still be checked against their filtered view.
 
 interface PublishedRange {
 	name: string

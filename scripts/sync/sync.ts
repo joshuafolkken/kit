@@ -8,6 +8,7 @@ import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { plugin_install_hint_module } from '#scripts/init/plugin-install-hint'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import { project_config } from '#scripts/safe-chain/project-config'
 import { security_updates } from '#scripts/security/security-updates'
 import { sonar_file } from '#scripts/security/sonar-file'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
@@ -367,6 +368,7 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 
 function sync_project_artifacts(is_force: boolean): void {
 	sync_ai_copy_all(is_force)
+	project_config.sync_project_config(PROJECT_ROOT)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
 	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))

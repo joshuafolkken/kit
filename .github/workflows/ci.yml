@@ -307,7 +307,7 @@ jobs:
             ${{ runner.os }}-cspell-cache-
 
       - name: Setup safe-chain
-        run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
+        run: pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci
 
       - name: Install dependencies
         env:
@@ -406,7 +406,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Setup safe-chain
-        run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
+        run: pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci
 
       - name: Install dependencies
         env:
@@ -615,7 +615,7 @@ jobs:
             ${{ runner.os }}-build-cache-e2e-
 
       - name: Setup safe-chain
-        run: pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci
+        run: pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci
 
       - name: Install dependencies
         env:

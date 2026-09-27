@@ -6,6 +6,7 @@ import { resolve_local_bin } from '#scripts/build/local-bin'
 import { doctor_io } from '#scripts/doctor/doctor-io'
 import { package_version_schema, with_package_manager_schema } from '#scripts/lib/schemas'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import { project_config } from '#scripts/safe-chain/project-config'
 import { security_updates } from '#scripts/security/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sync } from '#scripts/sync/sync'
@@ -203,6 +204,7 @@ function main(): void {
 	merge_project_package_json()
 
 	run_ai_file_actions()
+	project_config.sync_project_config(PROJECT_ROOT)
 	console.info('\n✅ Done.\n')
 }
 
