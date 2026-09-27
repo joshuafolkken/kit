@@ -249,9 +249,19 @@ Upgrade every installed @joshuafolkken toolkit here and open the pull request
 
 > **Audience:** developer · **Side effects:** files, processes
 
-_No arguments._
+`[--profile static|node]`
 
 Initialize config in a new project
+
+---
+
+### `josh profile` · `josh pf`
+
+> **Audience:** developer · **Side effects:** files
+
+`[--profile static|node]`
+
+Show the project profile and the reason for it
 
 ---
 
@@ -282,6 +292,16 @@ Migrate a kit-only project from GitHub Packages to public npm
 `<PR>`
 
 Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
+
+---
+
+### `josh start` · `josh st`
+
+> **Audience:** developer · **Side effects:** files, git, network
+
+`[--profile static|node]`
+
+Initialize a project for the GitHub Issue workflow
 
 ---
 

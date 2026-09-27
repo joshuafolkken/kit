@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { init_actions, type FileAction } from './init-actions'
+import type { ProjectShape } from './project-profile'
 
 const GITIGNORE = '.gitignore'
 const NPMRC = '.npmrc'
 const ESLINT = 'eslint.config.js'
 const PRETTIER = 'prettier.config.js'
+const STATIC_PRETTIER = 'prettier.config.mjs'
 const PLAYWRIGHT = 'playwright.config.ts'
 const TSCONFIG = 'tsconfig.json'
 const CSPELL = 'cspell.config.yaml'
@@ -112,5 +114,77 @@ describe('init_actions vscode settings distribution', () => {
 
 		expect(content).not.toContain('sonarlint')
 		expect(content).toContain('editor.formatOnSave')
+	})
+})
+
+function shape(overrides: Partial<ProjectShape> = {}): ProjectShape {
+	return {
+		profile: 'static',
+		reason: 'test',
+		has_web: false,
+		has_typescript: false,
+		has_git: false,
+		has_github: false,
+		...overrides,
+	}
+}
+
+function merge_action(
+	actions: ReadonlyArray<FileAction>,
+	destination: string,
+	content: string,
+): string {
+	const action = actions.find((candidate) => candidate.dest === destination)
+
+	return action?.merge?.(content) ?? ''
+}
+
+describe('static profile file actions', () => {
+	it('keeps a Web-free, Git-free project minimal', () => {
+		const destinations = init_actions.build_file_actions(shape()).map((action) => action.dest)
+
+		expect(destinations).toEqual([VSCODE_EXTENSIONS])
+	})
+
+	it('adds Web formatting without Svelte or Playwright tooling', () => {
+		const actions = init_actions.build_file_actions(shape({ has_web: true }))
+		const destinations = actions.map((action) => action.dest)
+
+		expect(destinations).toEqual([STATIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS])
+		expect(actions.find((action) => action.dest === STATIC_PRETTIER)?.create()).toContain(
+			'prettier/static',
+		)
+	})
+})
+
+describe('static profile merge and optional settings', () => {
+	it('merges recommendations and preserves existing formatters', () => {
+		const actions = init_actions.build_file_actions(shape({ has_web: true }))
+		const extensions = merge_action(
+			actions,
+			VSCODE_EXTENSIONS,
+			'{"recommendations":["custom.extension"]}',
+		)
+		const settings = merge_action(
+			actions,
+			VSCODE_SETTINGS,
+			'{"[python]":{"editor.defaultFormatter":"python"}}',
+		)
+
+		expect(extensions).toContain('custom.extension')
+		expect(settings).toContain('python')
+	})
+
+	it('separates Git and TypeScript from the profile', () => {
+		const destinations = init_actions
+			.build_file_actions(
+				shape({
+					has_git: true,
+					has_typescript: true,
+				}),
+			)
+			.map((action) => action.dest)
+
+		expect(destinations).toEqual([GITIGNORE, TSCONFIG, VSCODE_EXTENSIONS])
 	})
 })

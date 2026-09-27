@@ -1,0 +1,52 @@
+import { json_format } from '#scripts/config-merge/json-format'
+import { z } from 'zod'
+import { init_logic } from './init-logic'
+import type { ProjectShape } from './project-profile'
+
+const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
+const record_schema = z.record(z.string(), z.unknown())
+
+function is_record(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+interface StaticVersions {
+	kit: string
+	prettier: string
+}
+
+function initial_manifest(): string {
+	return json_format.format_json({ private: true })
+}
+
+function with_recorded_profile(content: string, profile: ProjectShape['profile']): string {
+	const parsed: unknown = JSON.parse(content)
+	const manifest = record_schema.parse(parsed)
+	const existing = manifest['josh']
+	const josh = is_record(existing) ? existing : {}
+
+	manifest['josh'] = { ...josh, profile }
+
+	return json_format.format_json(manifest)
+}
+
+function merge_static_manifest(
+	content: string,
+	shape: ProjectShape,
+	versions: StaticVersions,
+): string {
+	const with_profile = with_recorded_profile(content, shape.profile)
+	const with_script = init_logic.merge_package_scripts(with_profile, { josh: 'josh' })
+	const with_kit = init_logic.merge_development_dependencies(with_script, {
+		[KIT_PACKAGE_NAME]: versions.kit,
+	})
+	const with_prettier = shape.has_web
+		? init_logic.merge_development_dependencies(with_kit, { prettier: versions.prettier })
+		: with_kit
+
+	return init_logic.sort_package_json_keys(with_prettier)
+}
+
+const init_static = { initial_manifest, with_recorded_profile, merge_static_manifest }
+export { init_static }
+export type { StaticVersions }

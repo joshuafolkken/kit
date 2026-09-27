@@ -16,6 +16,7 @@ import {
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
+import { run_github_prerequisite } from './run-github-prerequisite'
 
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
@@ -235,6 +236,15 @@ async function run_script_entry(
 	return spawn_script_entry(entry, script_path, script_arguments)
 }
 
+function github_prerequisite_exit(resolved: string, is_consumer: boolean): number | undefined {
+	if (!is_consumer) return undefined
+	const prerequisite = run_github_prerequisite.explanation(process.cwd(), resolved)
+	if (prerequisite === undefined) return undefined
+	console.error(prerequisite)
+
+	return USAGE_ERROR_EXIT_CODE
+}
+
 // The exit a command answers with before it runs, or `undefined` to go ahead: a consumer is refused a
 // kit-only command with guidance, and a composite command rejects extra arguments
 // (joshuafolkken/kit#1988).
@@ -249,6 +259,9 @@ function pre_dispatch_exit(
 
 		return USAGE_ERROR_EXIT_CODE
 	}
+
+	const prerequisite_exit = github_prerequisite_exit(resolved, is_consumer)
+	if (prerequisite_exit !== undefined) return prerequisite_exit
 
 	const rejection = composite_arguments.reject_extra_arguments(
 		resolved,

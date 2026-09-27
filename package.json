@@ -90,6 +90,10 @@
 			"types": "./prettier/index.d.ts",
 			"default": "./prettier/index.js"
 		},
+		"./prettier/static": {
+			"types": "./prettier/static.d.ts",
+			"default": "./prettier/static.js"
+		},
 		"./tsconfig/base": {
 			"types": "./tsconfig/base.json",
 			"default": "./tsconfig/base.json"
