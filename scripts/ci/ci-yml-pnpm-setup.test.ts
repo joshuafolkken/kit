@@ -18,7 +18,10 @@ const CASES = [
 		jobs: [STATIC_CHECKS_JOB, 'unit', E2E_JOB, NODE_26_JOB],
 	},
 	{ path: ci_yml_fixture.TEMPLATE_CI_YML, jobs: ['checks', E2E_JOB] },
-	{ path: '.github/workflows/publish.yml', jobs: ['publish-github', 'publish-npm'] },
+	{
+		path: '.github/workflows/publish.yml',
+		jobs: ['publish-github', 'publish-npm', 'create-release'],
+	},
 ]
 const RESOLVER_CASES = [
 	{ path: ci_yml_fixture.RUNTIME_CI_YML, job: STATIC_CHECKS_JOB },
