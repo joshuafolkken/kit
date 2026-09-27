@@ -113,6 +113,7 @@ const project_checks = {
 	has_config,
 	has_files,
 	is_static,
+	project_root,
 	skip_notice,
 	type_check_skip_reason,
 }
