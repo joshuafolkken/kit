@@ -538,6 +538,10 @@ pnpm josh git -y --skip-commit --skip-push  # open the PR without committing/pus
 
 Related: [`josh followup`](#josh-followup), [`josh pr`](#josh-pr).
 
+### `josh pr:classification`
+
+Use one label (see PR template). Bots may omit it; label changes rerun CI.
+
 ### `josh pr`
 
 Create the pull request for the current issue branch — a recovery/standalone counterpart to `josh git` for when the branch is already committed and pushed. It derives the issue number and title from the branch name (`<N>-<slug>`) and generates the `closes #N` line.

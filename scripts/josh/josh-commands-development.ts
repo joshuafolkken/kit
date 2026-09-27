@@ -14,6 +14,12 @@ const PATH_ARGUMENTS = '<path...>'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
+	'pr:classification': {
+		script: 'scripts/ci/pr-classification.ts',
+		description: 'Require one release classification on a pull request',
+		category: 'Development',
+		reference: ['', 'automation', ['none']],
+	},
 	[GATE_COMMAND]: {
 		script: 'scripts/gate/verification-gate.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',

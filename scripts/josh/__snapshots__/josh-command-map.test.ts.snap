@@ -82,6 +82,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "pks": "pkg:scout",
     "pm": "prevent-main-commit",
     "ppu": "pre-push-unit",
+    "prc": "pr:classification",
     "pt": "port",
     "ptc": "pre-commit-type-check",
     "ptg": "pretool:guard",
@@ -717,6 +718,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "network",
+      ],
+    ],
+    "pr:classification": [
+      "",
+      "automation",
+      [
+        "none",
       ],
     ],
     "pre-commit-type-check": [

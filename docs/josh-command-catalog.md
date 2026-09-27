@@ -135,6 +135,16 @@ Print the PORT_SEED-resolved dev or preview port
 
 ---
 
+### `josh pr:classification` · `josh prc`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Require one release classification on a pull request
+
+---
+
 ### `josh pretool:guard` · `josh ptg`
 
 > **Audience:** automation · **Side effects:** none
