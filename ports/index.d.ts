@@ -7,6 +7,7 @@ declare const PROJECT_ENVIRONMENT_KEYS: ReadonlySet<string>
 
 declare const ports: {
 	load_environment_file: (directory?: string) => boolean
+	resolve_project_directory: (directory: string) => string
 	resolve_seed: (environment?: PortEnvironment) => number
 	resolve_lane: (environment?: PortEnvironment) => number
 	resolve_development_port: (environment?: PortEnvironment) => number
