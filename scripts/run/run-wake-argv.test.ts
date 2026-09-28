@@ -1,6 +1,8 @@
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { describe, expect, it, vi } from 'vitest'
+import { detached_launch } from './detached-launch'
+import { run_wake_driver } from './run-wake-driver'
 import { run_wake_session } from './run-wake-session'
 
 // joshuafolkken/kit#1719. What the supervisor spawns is the one place it could widen what may be run,
@@ -12,6 +14,8 @@ const NO_WATCH_INVOCATION = 'backlogrun --idle 0'
 const ONE_FLAG_INVOCATION = 'backlogrun --max 5'
 const BARE_INVOCATION = 'backlogrun'
 const NAMED_INVOCATION = 'backlogrun #1762 #1749'
+const NAMED_EPIC = 'backlogrun #2663 --only'
+const REMAINING_CHILD = '#2668 remains'
 const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
 
 // The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
@@ -137,5 +141,42 @@ describe('run_wake_session.wake_argv — a named-issue backlogrun', () => {
 	// carry — waking on either would launch a session that cannot claim the record.
 	it.each(['backlogrun kit#1749', 'backlogrun #0'])('refuses %s', (invocation) => {
 		expect(run_wake_session.wake_argv(invocation)).toBeUndefined()
+	})
+})
+
+describe('run_wake_session.wake_argv — a judgment handoff', () => {
+	it('launches a named epic continuation with its driver result and resume instruction', () => {
+		const result = run_wake_driver.driver_result(
+			'epic #2663\nresume: --owner 83431 --only',
+			{ kind: 'none' },
+			REMAINING_CHILD,
+		)
+
+		expect(result.kind).toBe('judgment')
+		if (result.kind !== 'judgment') return
+
+		const built = run_wake_session.wake_argv(NAMED_EPIC, undefined, undefined, {
+			id: 'session',
+			material: result.material,
+		})
+
+		expect(built?.kind).toBe('argv')
+		if (built?.kind !== 'argv') return
+
+		expect(detached_launch.is_safe_argv(built.argv)).toBe(true)
+		expect(built.argv.args.at(-1)).toContain(NAMED_EPIC)
+		expect(built.argv.args.at(-1)).toContain(REMAINING_CHILD)
+		expect(built.argv.args.at(-1)).toContain('resume: --owner 83431 --only')
+	})
+
+	it.each(['\t', '\r', '\u{0}'])('keeps a %s in handoff material out of a launch', (unsafe) => {
+		const built = run_wake_session.wake_argv(NAMED_EPIC, undefined, undefined, {
+			id: 'session',
+			material: `resume: --owner 83431${unsafe}--only`,
+		})
+
+		expect(built?.kind).toBe('argv')
+		if (built?.kind !== 'argv') return
+		expect(detached_launch.is_safe_argv(built.argv)).toBe(false)
 	})
 })

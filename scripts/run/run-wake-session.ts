@@ -105,7 +105,9 @@ function wake_argv(
 	const matched = safe_invocation(invocation)
 	if (matched === undefined) return undefined
 	const prompt =
-		typeof session === 'object' ? `${matched}\n\nDriver handoff:\n${session.material}` : matched
+		typeof session === 'object'
+			? `${matched} | Driver handoff: ${session.material.replaceAll('\n', ' | ')}`
+			: matched
 	const session_id = typeof session === 'object' ? session.id : session
 
 	return profile === undefined
