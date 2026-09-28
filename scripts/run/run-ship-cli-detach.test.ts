@@ -30,6 +30,7 @@ vi.mock('./run-ship-detach', () => ({
 		read_log: read_log_mock,
 		is_supervised: is_supervised_mock,
 		mark_result: mark_result_mock,
+		claim_identity: vi.fn(),
 	},
 }))
 vi.mock('./run-ship-return', () => ({ run_ship_return: { return_control: return_mock } }))

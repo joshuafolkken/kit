@@ -166,6 +166,7 @@ describe('detached ship supervisor identity', () => {
 
 		stamp_file.replace_stamp(result_path(target.repository), {
 			pid: process.pid,
+			process_start: process_identity.own_start(),
 			launch_id: 'live',
 			result: 'failed',
 		})
@@ -187,6 +188,107 @@ describe('detached ship supervisor identity', () => {
 			expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe(result)
 		},
 	)
+})
+
+const CLAIM_WINDOW_MS = 120_000
+const EXPIRED_OFFSET_MS = CLAIM_WINDOW_MS + 1
+
+function write_bare_pid(repository: string, launched_at: number): void {
+	stamp_file.replace_stamp(result_path(repository), {
+		pid: process.pid,
+		launch_id: 'bare',
+		launched_at,
+	})
+}
+
+function restore_identity_stubs(): void {
+	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
+}
+
+// joshuafolkken/kit#2642: a start time the launcher could not read, and one the probe cannot read for a
+// moment, are neither a stopped supervisor nor a confirmed one.
+describe('detached ship identity that cannot be verified', () => {
+	afterEach(restore_identity_stubs)
+
+	it('stops believing a bare pid once the claim window has passed', () => {
+		const target = request()
+
+		write_bare_pid(target.repository, Date.now() - EXPIRED_OFFSET_MS)
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
+	})
+
+	it('believes a live bare pid inside the claim window', () => {
+		const target = request()
+
+		write_bare_pid(target.repository, Date.now())
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('running')
+	})
+
+	it('does not believe a bare pid recorded with no launch time', () => {
+		const target = request()
+
+		stamp_file.replace_stamp(result_path(target.repository), { pid: process.pid, launch_id: 'old' })
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
+	})
+
+	it('keeps a supervisor running and refuses a second one while its start cannot be read', async () => {
+		const target = request()
+
+		stamp_file.replace_stamp(result_path(target.repository), {
+			pid: process.pid,
+			process_start: 'proc:1',
+			launch_id: 'live',
+		})
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('running')
+		const detached = await run_ship_detach.detach(target)
+
+		expect(detached.verdict).toBe(run_ship_detach.BUSY)
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_detach.claim_identity', () => {
+	afterEach(restore_identity_stubs)
+
+	it('lets the supervisor claim a bare pid record with its own identity', async () => {
+		const target = request()
+
+		write_bare_pid(target.repository, Date.now() - EXPIRED_OFFSET_MS)
+		vi.stubEnv(run_ship_detach.LAUNCH_ID_KEY, 'bare')
+		await run_ship_detach.claim_identity(target.repository, NUMBER)
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)).toEqual({
+			launch_id: 'bare',
+			result: 'running',
+		})
+	})
+
+	it('leaves a record from another launch unclaimed', async () => {
+		const target = request()
+
+		write_bare_pid(target.repository, Date.now() - EXPIRED_OFFSET_MS)
+		vi.stubEnv(run_ship_detach.LAUNCH_ID_KEY, 'another')
+		await run_ship_detach.claim_identity(target.repository, NUMBER)
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
+	})
+
+	it('keeps the launcher identity when the supervisor cannot name its own start', async () => {
+		const target = request()
+
+		write_bare_pid(target.repository, Date.now())
+		vi.stubEnv(run_ship_detach.LAUNCH_ID_KEY, 'bare')
+		vi.spyOn(process_identity, 'own_fields').mockReturnValue({ pid: DEAD_PID })
+		await run_ship_detach.claim_identity(target.repository, NUMBER)
+
+		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('running')
+	})
 })
 
 describe('detached ship result ownership', () => {

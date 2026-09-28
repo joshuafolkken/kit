@@ -70,10 +70,44 @@ describe('run_ship_cli.run — supervised completion', () => {
 		vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '1')
 		josh_run_mock.mockResolvedValueOnce({ code, out: 'gate result' })
 		const mark = vi.spyOn(run_ship_detach, 'mark_result').mockResolvedValue(undefined)
+		const claim = vi.spyOn(run_ship_detach, 'claim_identity').mockResolvedValue(undefined)
 
 		expect(await run_ship_cli.run([TITLE])).toBe(code)
 		expect(mark).toHaveBeenCalledWith(process.cwd(), NUMBER, code)
 		mark.mockRestore()
+		claim.mockRestore()
+	})
+
+	// joshuafolkken/kit#2642: the supervisor names itself before any stage, so a launcher that could not
+	// read its start time never leaves a bare pid to be believed.
+	it('claims the supervisor identity before the first stage runs', async () => {
+		vi.stubEnv(run_ship_detach.SUPERVISED_KEY, '1')
+		const calls: Array<string> = []
+		const claim = vi.spyOn(run_ship_detach, 'claim_identity').mockImplementation(async () => {
+			calls.push('claim')
+		})
+		const mark = vi.spyOn(run_ship_detach, 'mark_result').mockResolvedValue(undefined)
+
+		josh_run_mock.mockImplementation(async () => {
+			calls.push('stage')
+
+			return { code: OK, out: '' }
+		})
+		await run_ship_cli.run([TITLE])
+
+		expect(claim).toHaveBeenCalledWith(process.cwd(), NUMBER)
+		expect(calls[0]).toBe('claim')
+		claim.mockRestore()
+		mark.mockRestore()
+	})
+
+	it('claims nothing outside a supervisor', async () => {
+		const claim = vi.spyOn(run_ship_detach, 'claim_identity')
+
+		await run_ship_cli.run([TITLE])
+
+		expect(claim).not.toHaveBeenCalled()
+		claim.mockRestore()
 	})
 })
 
