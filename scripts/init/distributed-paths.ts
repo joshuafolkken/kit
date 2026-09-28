@@ -20,8 +20,10 @@ const GITHUB_REPO_TREE_BASE = 'https://github.com/joshuafolkken/kit/tree/main/'
 // The consumer imports kit's published, already path-transformed rules. A tracked bootstrap note
 // remains readable before installation, while the rule body stays in the package (kit#1878).
 const CLAUDE_MD_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
-const CLAUDE_MD_BOOTSTRAP =
+const OLD_CLAUDE_MD_BOOTSTRAP =
 	'> Fresh checkout: if kit is not installed, run `pnpm install` first, then reread this file before doing any other work.'
+const CLAUDE_MD_BOOTSTRAP =
+	'> Fresh checkout: before `pnpm install`, run `pnpm config get "@joshuafolkken:registry"` from the project root to check the effective registry, including user-level settings. If it points to GitHub Packages, [set up authentication](https://github.com/joshuafolkken/kit/blob/main/docs/authentication.md#1-get-a-token-from-the-gh-cli) first. Then run `pnpm install` and reread this file before doing any other work.'
 
 // A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
 // open. A distributed document that writes a directory set as `prompts/**` means "anything beneath
@@ -84,13 +86,15 @@ function transform_distributed_paths(content: string): string {
 function ensure_claude_md_import(existing: string | undefined): string {
 	if (existing === undefined) return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n`
 
-	if (existing.includes(CLAUDE_MD_IMPORT_LINE)) {
-		if (existing.includes(CLAUDE_MD_BOOTSTRAP)) return existing
+	const updated = existing.replace(OLD_CLAUDE_MD_BOOTSTRAP, () => CLAUDE_MD_BOOTSTRAP)
 
-		return `${CLAUDE_MD_BOOTSTRAP}\n\n${existing}`
+	if (updated.includes(CLAUDE_MD_IMPORT_LINE)) {
+		if (updated.includes(CLAUDE_MD_BOOTSTRAP)) return updated
+
+		return `${CLAUDE_MD_BOOTSTRAP}\n\n${updated}`
 	}
 
-	return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n\n${existing}`
+	return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n\n${updated}`
 }
 
 const distributed_paths = {

@@ -40,8 +40,8 @@ describe('skip messages', () => {
 		expect(AI_COPY_SOURCE).not.toContain('pnpm sync')
 	})
 
-	it('contain josh sync in file skip message', () => {
-		expect(AI_COPY_SOURCE).toContain('run josh sync to update')
+	it('does not suggest sync for a skipped file', () => {
+		expect(AI_COPY_SOURCE).toContain('(already exists)')
 	})
 
 	it('contain josh sync in summary tip message', () => {
@@ -90,6 +90,10 @@ const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const KIT_PACKAGE_JSON_PATH = fileURLToPath(new URL('../../package.json', import.meta.url))
 const KIT_VERSION = (JSON.parse(readFileSync(KIT_PACKAGE_JSON_PATH, 'utf8')) as { version: string })
 	.version
+const KIT_MANIFEST = JSON.parse(readFileSync(KIT_PACKAGE_JSON_PATH, 'utf8')) as {
+	peerDependencies: Record<string, string>
+	devDependencies: Record<string, string>
+}
 
 function merge_development_dependencies(content: string): Record<string, string> {
 	const merged = init.apply_package_json_merges(content)
@@ -114,6 +118,21 @@ describe('apply_package_json_merges', () => {
 		expect(deps['@ianvs/prettier-plugin-sort-imports']).toBe('^4.7.1')
 		expect(deps['prettier-plugin-svelte']).toBe('^4.1.1')
 		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
+	})
+
+	it('adds every public ESLint peer from the kit development versions', () => {
+		const deps = merge_development_dependencies('{}\n')
+		const peers = Object.keys(KIT_MANIFEST.peerDependencies).filter(
+			(name) => name !== '@playwright/test',
+		)
+
+		for (const name of peers) expect(deps[name]).toBe(KIT_MANIFEST.devDependencies[name])
+	})
+
+	it('preserves an existing ESLint version during migration', () => {
+		const existing = JSON.stringify({ devDependencies: { eslint: '^10.0.0' } })
+
+		expect(merge_development_dependencies(existing)['eslint']).toBe('^10.0.0')
 	})
 
 	// The pre-commit secretlint rule shipped in lefthook/base.yml resolves both packages

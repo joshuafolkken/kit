@@ -2,9 +2,18 @@ name: Release to Production
 on:
   repository_dispatch:
     types: [new-tag-created]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 
 jobs:
   update-branch:
+    if: github.repository != 'joshuafolkken/kit' || inputs.tag != ''
+    concurrency:
+      group: production-update
+      queue: max
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,7 +33,7 @@ jobs:
           # repository_dispatch always runs on the default branch, so the event ref
           # resolves to that branch, not the released tag. Use the tag carried in the
           # dispatch payload (set by auto-tag.yml) as the merge source instead.
-          REF_NAME: ${{ github.event.client_payload.tag }}
+          REF_NAME: ${{ inputs.tag || github.event.client_payload.tag }}
         run: |
           if [ -z "$REF_NAME" ]; then
             echo "::error::new-tag-created dispatch carried no tag payload; aborting." >&2

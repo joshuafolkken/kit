@@ -1,12 +1,7 @@
+import { config as static_config } from './static.js'
+
 export const config = {
-	useTabs: true,
-	singleQuote: true,
-	trailingComma: 'all',
-	printWidth: 100,
-	semi: false,
-	arrowParens: 'always',
-	bracketSpacing: true,
-	endOfLine: 'lf',
+	...static_config,
 	plugins: [
 		'@ianvs/prettier-plugin-sort-imports',
 		'prettier-plugin-svelte',

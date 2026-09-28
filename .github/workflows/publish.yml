@@ -1,4 +1,5 @@
 name: Publish
+run-name: Publish ${{ github.event.client_payload.tag }}
 
 on:
   repository_dispatch:
@@ -6,6 +7,9 @@ on:
 
 jobs:
   publish-github:
+    concurrency:
+      group: package-publish
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -36,11 +40,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - run: pnpm publish --no-git-checks --tag latest --registry https://npm.pkg.github.com
+      - name: Select GitHub Packages tag
+        id: publish-tag
+        run: |
+          version=$(node -p "require('./package.json').version")
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://npm.pkg.github.com)
+          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: pnpm publish --no-git-checks --tag ${{ steps.publish-tag.outputs.tag }} --registry https://npm.pkg.github.com
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-npm:
+    concurrency:
+      group: package-publish
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -72,5 +89,58 @@ jobs:
 
       - run: pnpm pack --out "$RUNNER_TEMP/kit.tgz"
 
+      - name: Select npm tag
+        id: publish-tag
+        run: |
+          version=$(node -p "require('./package.json').version")
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
+          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       - name: Publish to npm
-        run: cd "$RUNNER_TEMP" && npm publish kit.tgz --access public --tag latest --registry https://registry.npmjs.org --userconfig /dev/null
+        run: cd "$RUNNER_TEMP" && npm publish kit.tgz --access public --tag ${{ steps.publish-tag.outputs.tag }} --registry https://registry.npmjs.org --userconfig /dev/null
+
+  update-production:
+    needs: [publish-github, publish-npm]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/production.yml
+    with:
+      tag: ${{ github.event.client_payload.tag }}
+
+  create-release:
+    needs: [publish-github, publish-npm, update-production]
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.client_payload.tag }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Resolve pnpm version
+        id: pnpm-version
+        run: |
+          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          version: ${{ steps.pnpm-version.outputs.version }}
+          install: false
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Publish GitHub Release
+        run: pnpm exec tsx scripts/release/github-release-cli.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.client_payload.tag }}

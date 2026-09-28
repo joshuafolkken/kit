@@ -7,6 +7,7 @@ const is_supervised_mock = vi.hoisted(() => vi.fn())
 const return_mock = vi.hoisted(() => vi.fn())
 const repository_mock = vi.hoisted(() => vi.fn())
 const is_lane_child_mock = vi.hoisted(() => vi.fn())
+const mark_result_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
@@ -28,6 +29,8 @@ vi.mock('./run-ship-detach', () => ({
 		detach: detach_mock,
 		read_log: read_log_mock,
 		is_supervised: is_supervised_mock,
+		mark_result: mark_result_mock,
+		claim_identity: vi.fn(),
 	},
 }))
 vi.mock('./run-ship-return', () => ({ run_ship_return: { return_control: return_mock } }))
@@ -63,6 +66,10 @@ beforeEach(() => {
 		info_lines.push(line)
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+beforeEach(() => {
+	mark_result_mock.mockReset()
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {

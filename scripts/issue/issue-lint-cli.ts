@@ -2,6 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { behavior_change_lint } from './behavior-change-lint'
+import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 
 // `josh issue:lint <path>` — read an Issue body from a file and print `ok`, or every template problem
@@ -13,6 +14,7 @@ import { issue_lint } from './issue-lint'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const OK_MESSAGE = 'ok'
+const NO_LABELS = 'none'
 const USAGE = 'Usage: josh issue:lint <path-to-issue-body>'
 
 // Every problem a body has: the four base template headings it lacks, then the behavior-change
@@ -20,12 +22,17 @@ const USAGE = 'Usage: josh issue:lint <path-to-issue-body>'
 function problems(body: string): ReadonlyArray<string> {
 	const missing = issue_lint.missing_headings(body).map((heading) => `missing heading: ${heading}`)
 
-	return [...missing, ...behavior_change_lint.problems(body)]
+	return [
+		...missing,
+		...behavior_change_lint.problems(body),
+		...issue_classification.problems(body),
+	]
 }
 
-function report(found: ReadonlyArray<string>): number {
+function report(found: ReadonlyArray<string>, body: string): number {
 	if (found.length === 0) {
 		console.info(OK_MESSAGE)
+		console.info(`labels: ${issue_classification.required_labels(body).join(', ') || NO_LABELS}`)
 
 		return SUCCESS_EXIT_CODE
 	}
@@ -44,7 +51,7 @@ async function run(body_path: string | undefined): Promise<number> {
 
 	const body = await readFile(body_path, 'utf8')
 
-	return report(problems(body))
+	return report(problems(body), body)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

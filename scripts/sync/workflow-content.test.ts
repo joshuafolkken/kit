@@ -32,10 +32,10 @@ describe('auto-tag.yml — remote tag awareness', () => {
 })
 
 describe('production.yml — release merge source', () => {
-	it('binds REF_NAME to the dispatched tag payload, not github.ref_name', () => {
+	it('binds REF_NAME to the reusable input or dispatched tag payload, not github.ref_name', () => {
 		const content = read_workflow(PRODUCTION_PATH)
 
-		expect(content).toContain('REF_NAME: ${{ github.event.client_payload.tag }}')
+		expect(content).toContain('REF_NAME: ${{ inputs.tag || github.event.client_payload.tag }}')
 		expect(content).not.toContain('github.ref_name')
 	})
 

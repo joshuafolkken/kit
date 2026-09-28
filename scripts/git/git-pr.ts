@@ -1,3 +1,4 @@
+import { pr_classification, type ReleaseClassification } from '#scripts/ci/pr-classification'
 import { animation_helpers, type AnimationOptions } from './animation-helpers'
 import { git_gh_command } from './git-gh-command'
 import type { IssueInfo } from './git-issue'
@@ -12,7 +13,11 @@ import { pr_info_schema } from './schemas'
 // in the same instant the pull request was created it can answer nothing, and `pr_get_url` folds
 // "not there yet" and "the read failed" into the same `undefined`. The five-second sleep used to
 // cover that gap incidentally.
-async function create_pr(title: string, body: string): Promise<string | undefined> {
+async function create_pr(
+	title: string,
+	body: string,
+	label: ReleaseClassification,
+): Promise<string | undefined> {
 	const config: AnimationOptions<string> = {
 		icon_selector: () => '✅',
 		error_message: 'Failed to create PR',
@@ -22,7 +27,7 @@ async function create_pr(title: string, body: string): Promise<string | undefine
 	try {
 		return await animation_helpers.execute_with_animation(
 			'Creating pull request...',
-			async () => await git_gh_command.pr_create(title, body),
+			async () => await git_gh_command.pr_create(title, body, label),
 			config,
 		)
 	} catch (error) {
@@ -72,8 +77,13 @@ async function report_open_pr(branch_name: string, created_url?: string): Promis
 
 const PR_STATE_MERGED = 'MERGED'
 
-async function create_and_report(title: string, body: string, branch_name: string): Promise<void> {
-	const created_url = await create_pr(title, body)
+async function create_and_report(
+	title: string,
+	body: string,
+	branch_name: string,
+	label: ReleaseClassification,
+): Promise<void> {
+	const created_url = await create_pr(title, body, label)
 
 	await report_open_pr(branch_name, created_url)
 }
@@ -113,7 +123,9 @@ async function report_existing_pr(
 	body: string,
 	branch_name: string,
 	should_replace_body: boolean,
+	label: ReleaseClassification,
 ): Promise<void> {
+	await git_gh_command.pr_ensure_classification(branch_name, label)
 	if (should_replace_body) await git_gh_command.pr_update_body(branch_name, body)
 
 	await report_open_pr(branch_name)
@@ -123,35 +135,36 @@ async function handle_existing_pr(
 	title: string,
 	body: string,
 	branch_name: string,
-	should_replace_body: boolean,
+	options: { label: ReleaseClassification; should_replace_body: boolean },
 ): Promise<void> {
 	const pr_state_result = await get_pr_state_safe(branch_name)
 
 	if (is_pr_state_merged(pr_state_result)) {
 		git_pr_messages.display_merged_pr_message()
-		await create_and_report(title, body, branch_name)
+		await create_and_report(title, body, branch_name, options.label)
 
 		return
 	}
 
-	await report_existing_pr(body, branch_name, should_replace_body)
+	await report_existing_pr(body, branch_name, options.should_replace_body, options.label)
 }
 
 async function create(
 	title: string,
 	body: string,
 	branch_name: string,
-	should_replace_body = false,
+	options: { label: ReleaseClassification; should_replace_body?: boolean },
 ): Promise<void> {
+	const { label, should_replace_body = false } = options
 	const has_pr = await git_gh_command.pr_exists(branch_name)
 
 	if (!has_pr) {
-		await create_and_report(title, body, branch_name)
+		await create_and_report(title, body, branch_name, label)
 
 		return
 	}
 
-	await handle_existing_pr(title, body, branch_name, should_replace_body)
+	await handle_existing_pr(title, body, branch_name, { label, should_replace_body })
 }
 
 function build_title(issue_info: IssueInfo): string {
@@ -166,11 +179,47 @@ function build_body(issue_info: IssueInfo, extra_body?: string): string {
 	return `${closes}\n\n${extra_body}`
 }
 
-async function create_with_issue_info(issue_info: IssueInfo, extra_body?: string): Promise<void> {
-	const title = build_title(issue_info)
-	const body = build_body(issue_info, extra_body)
+async function existing_pr_label(branch_name: string): Promise<ReleaseClassification | undefined> {
+	if (!(await git_gh_command.pr_exists(branch_name))) return undefined
+	if (is_pr_state_merged(await get_pr_state_safe(branch_name))) return undefined
 
-	await create(title, body, issue_info.branch_name, extra_body !== undefined)
+	return await git_gh_command.pr_get_classification(branch_name)
+}
+
+async function create_for_issue(
+	issue_info: IssueInfo,
+	extra_body: string | undefined,
+	label: ReleaseClassification,
+): Promise<void> {
+	await create(
+		build_title(issue_info),
+		build_body(issue_info, extra_body),
+		issue_info.branch_name,
+		{
+			label,
+			should_replace_body: extra_body !== undefined,
+		},
+	)
+}
+
+async function create_with_issue_info(issue_info: IssueInfo, extra_body?: string): Promise<void> {
+	const existing_label = await existing_pr_label(issue_info.branch_name)
+
+	if (existing_label !== undefined) {
+		await create_for_issue(issue_info, extra_body, existing_label)
+
+		return
+	}
+
+	const issue_json = await git_gh_command.issue_view_json(issue_info.number, 'labels,body')
+
+	if (issue_json === undefined) {
+		throw new Error(`Could not read issue #${issue_info.number} for release classification`)
+	}
+
+	const label = pr_classification.select_issue_classification(issue_json)
+
+	await create_for_issue(issue_info, extra_body, label)
 }
 
 const git_pr = {

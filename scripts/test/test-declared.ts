@@ -2,6 +2,7 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { project_checks } from '#scripts/gate/project-checks'
 import { test_declared_changed } from './test-declared-changed'
 import { test_declared_logic, type Verdict } from './test-declared-logic'
 import { test_declared_match, type MatchResult } from './test-declared-match'
@@ -76,24 +77,35 @@ function typed_runtime_file(path: string): string {
 }
 
 // The word is stdout so a caller can read it alone; the reason — which files, and why — is stderr.
-function detail_for(verdict: Verdict, paths: ReadonlyArray<string>): string {
+function exempt_detail(paths: ReadonlyArray<string>, is_static: boolean): string {
+	const exempt = test_declared_logic.exempt_files(paths, is_static)
+	const has_visual = is_static && exempt.some((path) => /\.(?:html|css)$/u.test(path))
+	const instruction = has_visual ? ' — confirm the rendered page in a browser' : ''
+
+	return `exempt paths: ${exempt.join(', ')}${instruction}`
+}
+
+function detail_for(verdict: Verdict, paths: ReadonlyArray<string>, is_static = false): string {
 	if (verdict === 'required') {
-		const typed = test_declared_logic.runtime_files(paths).map((path) => typed_runtime_file(path))
+		const typed = test_declared_logic
+			.runtime_files(paths, is_static)
+			.map((path) => typed_runtime_file(path))
 
 		return `runtime files with no test: ${typed.join(', ')}`
 	}
 
-	if (verdict === 'exempt') {
-		return `exempt paths: ${test_declared_logic.exempt_files(paths).join(', ')}`
-	}
+	if (verdict === 'exempt') return exempt_detail(paths, is_static)
 
 	return 'a test file changed'
 }
 
-function report(paths: ReadonlyArray<string>): { detail: string; verdict: Verdict } {
-	const verdict = test_declared_logic.verdict_for(paths)
+function report(
+	paths: ReadonlyArray<string>,
+	is_static: boolean = project_checks.is_static(process.cwd()),
+): { detail: string; verdict: Verdict } {
+	const verdict = test_declared_logic.verdict_for(paths, is_static)
 
-	return { detail: detail_for(verdict, paths), verdict }
+	return { detail: detail_for(verdict, paths, is_static), verdict }
 }
 
 function run(): void {

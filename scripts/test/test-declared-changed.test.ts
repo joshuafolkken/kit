@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { project_checks } from '#scripts/gate/project-checks'
+import { describe, expect, it, vi } from 'vitest'
 import { test_declared_changed } from './test-declared-changed'
 
 // joshuafolkken/kit#2118: the sync reader parses `git status --porcelain`, so the two non-trivial
@@ -28,6 +29,12 @@ describe('test_declared_changed.path_of', () => {
 })
 
 describe('test_declared_changed.current_verdict', () => {
+	it('reads the recorded static profile for HTML-only changes', () => {
+		const profile = vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+
+		expect(test_declared_changed.current_verdict(['index.html'])).toBe('exempt')
+		profile.mockRestore()
+	})
 	it('passes the injected paths through to the verdict', () => {
 		expect(test_declared_changed.current_verdict([RUNTIME_FILE])).toBe('required')
 		expect(test_declared_changed.current_verdict([SATISFIED_FILE])).toBe('satisfied')

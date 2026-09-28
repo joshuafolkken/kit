@@ -19,6 +19,7 @@ import { release_worktree } from './release-worktree'
 const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
+const IGNORE_FOR_RELEASE_LABEL = 'ignore-for-release'
 
 function branch_name_for(version: string): string {
 	return `release/v${version}`
@@ -96,9 +97,13 @@ async function commit_release(plan: ReleasePlan): Promise<void> {
 	await git_command.add_path(PACKAGE_JSON)
 	await git_command.commit(commit_message(plan.next_version))
 	await git_command.push()
-	console.info(
-		await git_gh_command.pr_create(commit_message(plan.next_version), pull_request_body(plan)),
+	const pr_url = await git_gh_command.pr_create(
+		commit_message(plan.next_version),
+		pull_request_body(plan),
+		IGNORE_FOR_RELEASE_LABEL,
 	)
+
+	console.info(pr_url)
 }
 
 async function merge_and_tag(plan: ReleasePlan, branch_name: string): Promise<number> {

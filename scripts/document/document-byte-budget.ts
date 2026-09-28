@@ -95,7 +95,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 8192 },
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 24_576 },
+	// #2662 adds the feature and compatibility declarations to the canonical filing procedure.
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 28_672 },
 	{ path: 'prompts/collaboration-workflow/latest-first.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/no-clones.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 24_576 },
@@ -116,7 +117,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/review-rubric.md', bytes: 20_480 },
 	{ path: 'prompts/review.md', bytes: 20_480 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
-	{ path: 'prompts/testing-guide.md', bytes: 20_480 },
+	{ path: 'prompts/testing-guide.md', bytes: 24_576 },
 ]
 
 // The recorded ceiling for one path, or undefined when it carries no budget entry.

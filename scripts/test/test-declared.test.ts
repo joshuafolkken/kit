@@ -9,6 +9,12 @@ const RUNTIME_FILE = 'scripts/foo.ts'
 const UNIT_TEST_FILE = 'scripts/foo.test.ts'
 
 describe('test_declared.report', () => {
+	it('explains manual browser confirmation for static HTML and CSS', () => {
+		const result = test_declared.report(['index.html', 'site.css'], true)
+
+		expect(result.verdict).toBe('exempt')
+		expect(result.detail).toContain('confirm the rendered page in a browser')
+	})
 	it('reports required and names the untested runtime files on the detail', () => {
 		const { detail, verdict } = test_declared.report([RUNTIME_FILE])
 

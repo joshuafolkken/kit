@@ -13,6 +13,12 @@ describe('linked worktree Git common directory', () => {
 		expect(git_common_directory.resolve(process.cwd())).toBe(expected)
 	})
 
+	it('finds the same repository from either a primary or linked checkout', async () => {
+		const [, common] = await git_command.git_directories()
+
+		expect(git_common_directory.repository(process.cwd())).toBe(common)
+	})
+
 	it('selects only the common directory of a linked worktree', () => {
 		expect(git_common_directory.select_linked([WORKTREE_DIRECTORY, COMMON_DIRECTORY])).toBe(
 			COMMON_DIRECTORY,

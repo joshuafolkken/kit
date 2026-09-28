@@ -1,4 +1,6 @@
+import { pr_classification, type ReleaseClassification } from '#scripts/ci/pr-classification'
 import { poll } from '#scripts/lib/poll'
+import { z } from 'zod'
 import { git_command } from './git-command'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
@@ -46,6 +48,44 @@ const MERGE_UNCONFIRMED_MESSAGE =
 	'gh api could not read the pull request back after the merge request failed'
 const MERGE_READ_BACK_ATTEMPTS = 3
 const MERGE_READ_BACK_INTERVAL_MS = 1000
+const PR_NUMBER_PATTERN = /\/pull\/([1-9]\d*)$/u
+const LABELS_SEGMENT = '/labels'
+const PR_LABELS = z.array(z.object({ name: z.string() }))
+
+async function add_pr_classification(number: string, label: ReleaseClassification): Promise<void> {
+	await git_gh_exec.exec_gh_api({
+		path: `${git_gh_api_path.issue_api_path(number)}${LABELS_SEGMENT}`,
+		body: JSON.stringify({ labels: [label] }),
+	})
+}
+
+async function pr_get_classification(
+	branch_name: string,
+): Promise<ReleaseClassification | undefined> {
+	const number = await require_pr_number(branch_name)
+	const response = await git_gh_exec.exec_gh_api({
+		path: `${git_gh_api_path.issue_api_path(String(number))}${LABELS_SEGMENT}`,
+	})
+	const names = PR_LABELS.parse(JSON.parse(response)).map((label) => label.name.toLowerCase())
+	const selected = names.filter((name) => pr_classification.is_classification(name))
+	if (selected.length === 0) return undefined
+
+	const error = pr_classification.classification_error(names, 'human')
+	if (error !== undefined) throw new Error(error)
+
+	return selected[0]
+}
+
+async function pr_ensure_classification(
+	branch_name: string,
+	label: ReleaseClassification,
+): Promise<void> {
+	if ((await pr_get_classification(branch_name)) !== undefined) return
+
+	const number = await require_pr_number(branch_name)
+
+	await add_pr_classification(String(number), label)
+}
 
 // **`head` is required and `gh pr create` never asked for it.** The CLI inferred it from the current
 // branch; REST does not, and a request without it is a 422. The branch is read from git rather than
@@ -64,7 +104,7 @@ const MERGE_READ_BACK_INTERVAL_MS = 1000
 // `to_gh_error` appends stdout (joshuafolkken/kit#1029); the `already exists` match itself is
 // unchanged, because both wordings contain it and the 422 carries no machine-readable code for the
 // case (`"code":"custom"`).
-async function pr_create(title: string, body: string): Promise<string> {
+async function post_pull_request(title: string, body: string): Promise<string> {
 	const base = await git_command.get_default_branch()
 	const head = await git_command.branch()
 
@@ -79,6 +119,24 @@ async function pr_create(title: string, body: string): Promise<string> {
 	} catch (error) {
 		return git_gh_helpers.handle_pr_create_error(error)
 	}
+}
+
+async function pr_create(
+	title: string,
+	body: string,
+	label: ReleaseClassification,
+): Promise<string> {
+	const classification_error = pr_classification.classification_error([label], 'human')
+	if (classification_error !== undefined) throw new Error(classification_error)
+
+	const url = await post_pull_request(title, body)
+	const number = PR_NUMBER_PATTERN.exec(url)?.[1]
+
+	if (number === undefined) throw new Error(`Could not identify the created pull request: ${url}`)
+
+	await add_pr_classification(number, label)
+
+	return url
 }
 
 // **`gh pr checkout` does use GraphQL** — one `POST /graphql` to resolve the pull request, measured
@@ -210,6 +268,8 @@ const git_gh_pr = {
 	...git_gh_pr_read,
 	...git_gh_pr_snapshot,
 	pr_create,
+	pr_get_classification,
+	pr_ensure_classification,
 	pr_checkout,
 	pr_comment,
 	pr_merge,

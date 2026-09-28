@@ -8,9 +8,11 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { run_cut } from '#scripts/run/run-cut'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
+import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
+import { openai_review_broker } from './openai-review-broker'
 
 const ISSUE = '2084'
 const BRANCH = '2084-lane'
@@ -20,6 +22,7 @@ const lane_directory = path.join(scratch, 'lane')
 const target = run_cut.cut_path(repository)
 const profile = agent_role_profile.OPENAI_PROFILES.worker
 const RESUME_PROMPT = 'run:cut --resume 2084'
+const SHIP_SUCCESS = 'ship-success'
 const EPHEMERAL_FLAG = '--ephemeral'
 
 const launch = vi.spyOn(detached_launch, 'launch_attached')
@@ -27,6 +30,9 @@ const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const diagnostic = vi.spyOn(agent_diagnostics, 'check')
 const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 const common_directory = path.join(scratch, 'repository with spaces', '.git')
+const ship_current = vi.spyOn(openai_lane_ship, 'current')
+const ship_wait = vi.spyOn(openai_lane_ship, 'wait_for_ship')
+const with_server = vi.spyOn(openai_review_broker, 'with_server')
 
 function lane(): LaneInfo {
 	return {
@@ -60,6 +66,12 @@ async function supervise(nonce: string): Promise<number> {
 	return await openai_lane_supervisor.supervise(lane(), profile, nonce)
 }
 
+function reset_ship(): void {
+	ship_current.mockResolvedValue(undefined)
+	ship_wait.mockResolvedValue('none')
+	with_server.mockImplementation(async (_lane, run) => await run())
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	run_cut.end_cut(target)
@@ -69,11 +81,17 @@ beforeEach(() => {
 	diagnostic.mockReturnValue({ kind: 'ready' })
 	resolve_common_directory.mockReturnValue(undefined)
 	launch.mockResolvedValue({ kind: 'completed', pid: 9001, exit_code: 0 })
+	reset_ship()
 })
 
 afterAll(() => {
 	vi.restoreAllMocks()
 	rmSync(scratch, { force: true, recursive: true })
+})
+
+test('starts the review broker around the supervised lane', async () => {
+	expect(await supervise('review-broker')).toBe(0)
+	expect(with_server).toHaveBeenCalledWith(lane(), expect.any(Function))
 })
 
 describe('OpenAI lane supervisor generations', () => {
@@ -157,6 +175,29 @@ describe('OpenAI lane supervisor recovery', () => {
 
 		expect(await supervise('failure')).toBe(1)
 		expect(run_cut.read_cut(target).kind).toBe('carried')
+	})
+})
+
+describe('OpenAI lane supervisor detached ship completion', () => {
+	it('waits for a successful detached ship before completing the lane', async () => {
+		ship_wait.mockResolvedValue('success')
+		expect(await supervise(SHIP_SUCCESS)).toBe(0)
+		expect(ship_wait).toHaveBeenCalledWith(ISSUE, undefined)
+		expect(launch).toHaveBeenCalledTimes(1)
+	})
+
+	it('relaunches the same lane after a detached ship gate fails', async () => {
+		ship_wait.mockResolvedValueOnce('failed').mockResolvedValueOnce('none')
+		expect(await supervise('ship-failed')).toBe(0)
+		expect(launch).toHaveBeenCalledTimes(2)
+		expect(launched_request(1).argv.args.at(-1)).toContain('ship supervisor stopped')
+		expect(launched_request(1).cwd).toBe(lane_directory)
+	})
+
+	it('leaves the lane available for diagnosis after an abnormal ship exit', async () => {
+		ship_wait.mockResolvedValue('abnormal')
+		expect(await supervise('ship-abnormal')).toBe(1)
+		expect(launch).toHaveBeenCalledTimes(1)
 	})
 })
 

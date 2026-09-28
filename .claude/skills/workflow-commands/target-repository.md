@@ -41,7 +41,7 @@ backlogrun joshuafolkken/kit#858 --only
   never clone. The one exception is the split path's epic, since `pnpm josh epic` only writes the
   repository it runs in — run it in that repository's checkout, or fall back to `gh api
   repos/<owner/repo>/labels …` followed by `gh api repos/<owner/repo>/issues -f title="<epic-title>" -f
-  'labels[]=epic' -f body="<body>"`, and report that `epic:check` could not be run. The promote arm has
+  'labels[]=epic' -F body=@<body-file>`, and report that `epic:check` could not be run. The promote arm has
   no such fallback: with no checkout there, file the children and stop.
 - **The implementing entries require a checkout and never create one — when the target is another
   repository.** A prefix naming the session's own repository changes nothing (`fullrun kit#412` in the

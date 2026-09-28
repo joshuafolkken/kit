@@ -255,7 +255,7 @@ async function push_and_open(branch_name: string): Promise<string> {
 	try {
 		await git_command.push()
 
-		return await git_gh_command.pr_create(COMMIT_MESSAGE, pull_request_body())
+		return await git_gh_command.pr_create(COMMIT_MESSAGE, pull_request_body(), 'ignore-for-release')
 	} catch (error) {
 		throw new Error(stranded_branch_message(branch_name, message_of(error)), { cause: error })
 	}

@@ -9,6 +9,7 @@ import { filing_cap } from './filing-cap'
 import { gh_api } from './gh-api'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
+import { issue_bug_label_rule } from './issue-bug-label'
 import { issue_fold } from './issue-fold'
 import { issue_scout } from './issue-scout'
 import { josh_git_bare } from './josh-git-bare'
@@ -536,6 +537,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// `issue-fold` have each had their turn. The non-overlapping firing point (`pkg:scout` on a package
 	// add) claims a command no row above matches.
 	...oracle_consulted.ROWS,
+	issue_bug_label_rule.ROW,
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that

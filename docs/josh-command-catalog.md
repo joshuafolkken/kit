@@ -135,6 +135,16 @@ Print the PORT_SEED-resolved dev or preview port
 
 ---
 
+### `josh pr:classification` · `josh prc`
+
+> **Audience:** automation · **Side effects:** none
+
+_No arguments._
+
+Require one release classification on a pull request
+
+---
+
 ### `josh pretool:guard` · `josh ptg`
 
 > **Audience:** automation · **Side effects:** none
@@ -249,9 +259,19 @@ Upgrade every installed @joshuafolkken toolkit here and open the pull request
 
 > **Audience:** developer · **Side effects:** files, processes
 
-_No arguments._
+`[--profile static|node]`
 
 Initialize config in a new project
+
+---
+
+### `josh profile` · `josh pf`
+
+> **Audience:** developer · **Side effects:** files
+
+`[--profile static|node]`
+
+Show the project profile and the reason for it
 
 ---
 
@@ -282,6 +302,16 @@ Migrate a kit-only project from GitHub Packages to public npm
 `<PR>`
 
 Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition
+
+---
+
+### `josh start` · `josh st`
+
+> **Audience:** developer · **Side effects:** files, git, network
+
+`[--profile static|node]`
+
+Initialize a project for the GitHub Issue workflow
 
 ---
 

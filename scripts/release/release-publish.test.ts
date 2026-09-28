@@ -15,6 +15,8 @@ vi.mock('./release-worktree', () => ({
 vi.mock('#scripts/version/bump-version', () => ({ write_version: vi.fn() }))
 
 const BRANCH = 'release/v1.2.0'
+const PR_NUMBER = 123
+const IGNORE_LABEL = 'ignore-for-release'
 const WORKTREE_DIR = '/repo/.kit-lanes/release'
 const THREE = 3
 const PUBLISH_PLAN: ReleasePlan = {
@@ -41,7 +43,9 @@ function arrange_commit(): void {
 	vi.spyOn(git_command, 'add_path').mockResolvedValue(undefined)
 	vi.spyOn(git_command, 'commit').mockResolvedValue(undefined)
 	vi.spyOn(git_command, 'push').mockResolvedValue(undefined)
-	vi.spyOn(git_gh_command, 'pr_create').mockResolvedValue('created')
+	vi.spyOn(git_gh_command, 'pr_create').mockResolvedValue(
+		`https://github.com/joshuafolkken/kit/pull/${String(PR_NUMBER)}`,
+	)
 }
 
 function arrange_merge(): void {
@@ -107,6 +111,29 @@ describe('release_publish.is_release_branch_taken', () => {
 })
 
 describe('release_publish.publish', () => {
+	it('classifies its pull request before waiting for CI', async () => {
+		arrange_publish()
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
+			release_publish.commit_message(PUBLISH_PLAN.next_version),
+			release_publish.pull_request_body(PUBLISH_PLAN),
+			IGNORE_LABEL,
+		)
+		expect(vi.mocked(git_gh_command.pr_create).mock.invocationCallOrder[0]).toBeLessThan(
+			vi.mocked(git_pr_checks.wait_for_pr_success).mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('does not wait for CI when the classification label cannot be applied', async () => {
+		arrange_publish()
+		vi.mocked(git_gh_command.pr_create).mockRejectedValue(new Error(IGNORE_LABEL))
+
+		await expect(release_publish.publish(PUBLISH_PLAN)).rejects.toThrow(IGNORE_LABEL)
+		expect(git_pr_checks.wait_for_pr_success).not.toHaveBeenCalled()
+	})
+
 	// The whole release happens in a work tree cut for it, and it is removed on the way out — so a
 	// successful release leaves no work tree and no local release branch behind (joshuafolkken/kit#2411).
 	it('removes the work tree and its branch after a successful release', async () => {

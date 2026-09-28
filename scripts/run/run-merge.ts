@@ -45,7 +45,15 @@ const ONE = 1
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `unresolved`  — the state could not be read; re-read before deciding.
 type ChildOutcome =
-	'merged' | 'human-review' | 'parked' | 'split' | 'cut' | 'outage' | 'failed' | 'unresolved'
+	| 'merged'
+	| 'human-review'
+	| 'parked'
+	| 'split'
+	| 'cut'
+	| 'outage'
+	| 'failed'
+	| 'unresolved'
+	| 'shipping'
 
 // What the CLI read beside the GitHub state: whether the exit record is an API outage, and whether the
 // lane holds a cut its successor never adopted.

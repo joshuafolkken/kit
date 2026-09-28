@@ -72,6 +72,7 @@ test('tells an epic judgment session how to advance the named carry', () => {
 	expect(result).toMatchObject({ kind: 'judgment' })
 	if (result.kind !== 'judgment') return
 	expect(result.material).toContain('run:carry --done <epic-number> --owner "$PPID"')
+	expect(result.material).toContain('Follow backlogrun-steps.md named epic procedure')
 })
 
 test('does not take a live owner over on supervisor restart', async () => {

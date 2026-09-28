@@ -29,6 +29,8 @@ backlog pool (`backlogrun-steps.md` → "What one invocation approves").
 
 The detail below is read at the filing decision, and the marker suite pins the rules here.
 
+Before filing an observation, run `pnpm josh issue:lint <body-file>` and apply every label in its `labels:` answer at creation; `prompts/collaboration-workflow/issue-template.md` is the single source. Keep the depth label.
+
 ### The depth test — a discretionary filing cites the product work it blocked
 
 **A run that has just spent an hour inside the workflow tooling files findings about the workflow
@@ -55,7 +57,7 @@ cap's branch-2 filing all pass through a `gh api … issues` call, and the depth
 beside whatever `route:` label that call already carries.
 
 ```bash
-gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:1' -f body="<body>"
+gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:1' -F body=@<body-file>
 gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue already filed
 ```
 

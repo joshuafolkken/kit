@@ -2,6 +2,36 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # GitHub Release API field used to select the commit for generated notes.
+  - commitish
+  # Names and technical terms quoted in the fourth historical release audit.
+  - SQSCANGHA
+  - undici
+  - Zenn
+  - unfiled
+  - thomasleplus
+  # Terms quoted from PR and Issue evidence in the third historical release audit.
+  - redispatch
+  - dedupe
+  - unscored
+  - hardlink
+  - pageouts
+  # Names and established technical terms quoted in the historical release audit.
+  - execa
+  - Threlte
+  - sveltejs
+  - toggleable
+  - webapps
+  - lockfiles
+  - iwasakishinya
+  - rescanning
+  - codegen
+  # VS Code extension publisher and extension identifiers in the static profile.
+  - pkief
+  - usernamehw
+  - errorlens
+  # Python virtual-environment directory names excluded from project file discovery.
+  - venv
   # Standard shell command used to create a temporary publication directory.
   - mktemp
   # npm's CLI option for selecting the registry-auth configuration file.

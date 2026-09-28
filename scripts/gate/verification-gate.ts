@@ -10,12 +10,13 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { core_budget } from './core-budget'
-import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
+import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_report, type GateStep, type GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
+import { build_gate_step, build_gate_steps, UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_tree, type GateTree } from './gate-tree'
+import { project_checks } from './project-checks'
 import { scoped_green, type ScopedSources } from './scoped-green'
-import { type_check_step } from './type-check-step'
 
 // joshuafolkken/kit#914: the completion gate's four checks are independent and share no mutable
 // state, yet every entry point ran them one after another — paid again on every `epicrun` child,
@@ -33,55 +34,25 @@ import { type_check_step } from './type-check-step'
 // `process.argv` is [runner, script, ...arguments].
 const FIRST_ARGUMENT_INDEX = 2
 
-const JOSH = 'josh'
-const { GATE_CHECKS, TYPE_CHECK_LABEL, UNIT_LABEL } = gate_plan
+const { GATE_CHECKS } = gate_plan
 
 const GATE_TARGETS: ReadonlyArray<string> = GATE_CHECKS.map((check) => check.target)
 
-// vitest's own flag, appended to the sub-command rather than set in `vitest.config.ts`: the config
-// is one project's, and the number this carries is a property of the machine the gate is running
-// on (joshuafolkken/kit#1258). `josh test:unit` forwards what it is given straight to
-// `vitest run`, so nothing between here and vitest has to know about it.
-const UNIT_WORKER_FLAG = '--maxWorkers'
-
-function unit_worker_args(check: GateCheck, plan: GatePlan): ReadonlyArray<string> {
-	if (check.label !== UNIT_LABEL || plan.unit_worker_cap === undefined) return []
-
-	return [`${UNIT_WORKER_FLAG}=${String(plan.unit_worker_cap)}`]
-}
-
-// Only the type check is resolved per project (joshuafolkken/kit#934) — a SvelteKit project
-// type-checks through its own toolkit, not through `tsc --noEmit`. Resolving inside the step keeps
-// the probe concurrent with the other three checks rather than delaying every one of them.
-async function build_gate_step(
-	check: GateCheck,
-	start_directory: string,
-	plan: GatePlan = gate_plan.resolve_gate_plan(),
-): Promise<GateStep> {
-	if (check.label !== TYPE_CHECK_LABEL) {
+async function run_gate_step(step: GateStep): Promise<GateStepResult> {
+	if (step.skip_reason !== undefined) {
 		return {
-			label: check.label,
-			command_args: [JOSH, check.target, ...unit_worker_args(check, plan)],
+			label: step.label,
+			command: step.command_args.join(' '),
+			output: project_checks.skip_notice('check', step.skip_reason),
+			exit_code: 0,
+			elapsed_ms: 0,
 		}
 	}
 
-	return {
-		label: check.label,
-		command_args: await type_check_step.resolve_type_check_args(start_directory),
-	}
-}
-
-async function build_gate_steps(
-	start_directory: string,
-	plan: GatePlan = gate_plan.resolve_gate_plan(),
-): Promise<ReadonlyArray<GateStep>> {
-	return await Promise.all(
-		plan.checks.map(async (check) => await build_gate_step(check, start_directory, plan)),
+	const result = await buffered_process.run_buffered_process(
+		step.command_args,
+		step.cwd === undefined ? {} : { cwd: step.cwd },
 	)
-}
-
-async function run_gate_step(step: GateStep): Promise<GateStepResult> {
-	const result = await buffered_process.run_buffered_process(step.command_args)
 
 	return { label: step.label, command: step.command_args.join(' '), ...result }
 }
