@@ -20,6 +20,8 @@ function input(overrides: Partial<StepInput>): StepInput {
 		is_consumer: false,
 		is_retrospective_enabled: true,
 		has_changes: false,
+		has_completion_callback: true,
+		is_at_cut_cap: false,
 		...overrides,
 	}
 }
@@ -165,9 +167,37 @@ describe('run_step.next_action — event-driven position', () => {
 	it('answers a wait verdict after a child launch', () => {
 		expect(run_step.next_action(input({ last_event: KIND.CHILD_LAUNCH })).line).toBe(run_step.WAIT)
 	})
+})
 
-	// joshuafolkken/kit#2428: the detached supervisor carries the run, so the agent has nothing to do
-	// until it stops — and a lane child waits too, rather than being pointed at a parent-only step.
+// joshuafolkken/kit#2653: a parent the completion does not wake hands off rather than polling.
+describe('run_step.next_action — the hand-off at a child launch', () => {
+	it('hands a carried parent without a completion callback off right after a child launch', () => {
+		const action = run_step.next_action(
+			input({
+				last_event: KIND.CHILD_LAUNCH,
+				carry_kind: 'carried',
+				has_completion_callback: false,
+			}),
+		)
+
+		expect(action).toEqual({ kind: 'command', line: run_step.HAND_OFF_COMMAND })
+	})
+
+	it.each<Partial<StepInput>>([
+		{ carry_kind: 'carried', has_completion_callback: true },
+		{ carry_kind: 'carried', has_completion_callback: false, is_lane_child: true },
+		{ carry_kind: 'none', has_completion_callback: false },
+		{ carry_kind: 'carried', has_completion_callback: false, is_at_cut_cap: true },
+	])('still waits after a child launch with nothing to hand off (%o)', (overrides) => {
+		const action = run_step.next_action(input({ last_event: KIND.CHILD_LAUNCH, ...overrides }))
+
+		expect(action).toEqual({ kind: 'verdict', line: run_step.WAIT })
+	})
+})
+
+// joshuafolkken/kit#2428: the detached supervisor carries the run, so the agent has nothing to do
+// until it stops — and a lane child waits too, rather than being pointed at a parent-only step.
+describe('run_step.next_action — the detached ship supervisor', () => {
 	it.each([false, true])(
 		'waits while a detached ship supervisor carries the run (lane: %s)',
 		(is_lane_child) => {

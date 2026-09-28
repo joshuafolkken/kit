@@ -70,6 +70,27 @@ describe('invoking session detection', () => {
 	})
 })
 
+// joshuafolkken/kit#2653: a Codex session is not re-invoked when its background command completes.
+describe('completion callback detection', () => {
+	it('answers no for a Codex session and yes for a Claude Code one', () => {
+		expect(agent_role_profile.has_completion_callback(OPENAI_ENV)).toBe(false)
+		expect(agent_role_profile.has_completion_callback(ANTHROPIC_ENV)).toBe(true)
+	})
+
+	it('answers no for a handed Codex mark', () => {
+		const environment = { [agent_role_profile.HANDED_PROVIDER_KEY]: 'openai' }
+
+		expect(agent_role_profile.has_completion_callback(environment)).toBe(false)
+	})
+
+	it('keeps the callback for a session it cannot resolve', () => {
+		expect(agent_role_profile.has_completion_callback({})).toBe(true)
+		expect(agent_role_profile.has_completion_callback({ ...ANTHROPIC_ENV, ...OPENAI_ENV })).toBe(
+			true,
+		)
+	})
+})
+
 // joshuafolkken/kit#2456: a detached supervisor has the parent-session keys stripped, so the provider
 // the launching session resolved travels as a mark instead.
 describe('the handed provider mark', () => {

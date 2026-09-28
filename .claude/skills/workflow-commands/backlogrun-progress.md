@@ -213,7 +213,7 @@ single non-numeric line as the verdict.
    `lane:await` watches local process presence and exits when any named child confirms-complete,
    waking the parent at the actual completion rather than at the next heartbeat interval. **The
    re-confirm delay and poll interval are the command's, not the agent's** — pass only the issue
-   numbers.
+   numbers. Without that wake (Codex), hand off instead — "A parent without a completion callback".
 
    **A `lane:await` wake is a confirmed-gone process, so classify the ending at once — do not wait out
    the silent-unit window** (joshuafolkken/kit#2277). `lane:await` exits only after the child's process
@@ -375,6 +375,11 @@ the check could not answer, and take `over`'s branch at that child.
 only moment where **this** child's work is all written down: the PR is merged, the working tree is clean
 on the default branch, and the epic's state on GitHub is complete.
 
+### A parent without a completion callback hands off at its first dispatch
+
+**A finished command never re-invokes a Codex parent, so after a dispatch `run:step` prints the `--cut`
+below the cut cap, `wait` at it** (joshuafolkken/kit#2653): dispatch the wave, run it, end the turn.
+
 ### The lane child reuses this measurement mid-implementation
 
 **The same `pnpm josh cost --over` measurement bounds a lane child's context _during_ implementation, not
@@ -534,20 +539,16 @@ to untangle**: `epic:next` detects it and exits with an error.
 ### The parent keeps no clock of its own — the watcher's exit is the wake
 
 **After hand-off, the supervisor's driver owns the mechanical clock.** `backlog:drive` polls lane
-completion and the backlog inside the detached process, without waking an AI parent. The historical
-parent-turn instructions below apply only while an AI session is handling a returned judgment branch;
-they do not schedule the supervisor's normal loop. `run:progress --wait` remains the source of human
-heartbeat lines, and `run:report` remains the final report source.
+completion and the backlog inside the detached process, without waking an AI parent; the parent-turn
+instructions below apply only to a returned judgment branch. `run:progress --wait` stays the heartbeat
+source and `run:report` the final report.
 
-**The numbers above are floors between asks, not a timer the parent sets.** A parent that sets one spends
-a turn per tick at the point its context is largest — the exact cost `run:progress` was built to remove.
-The watcher took the *reporting* out of the parent; the parent must not go on keeping the clock anyway,
-or the two run side by side and the run pays for both.
+**The numbers above are floors between asks, not a timer the parent sets** — one tick per turn, at the
+largest context, is the cost `run:progress` removed.
 
 The driver checks lane completion every five seconds and makes a new backlog offer no sooner than one
-minute after the previous offer, except after collecting a child. These waits cost no AI turns.
-The progress watcher keeps reporting on its own interval; a judgment session may still receive its
-exit as a prompt to act. The bounds above continue to apply to both processes.
+minute after the previous offer, except after collecting a child — waits that cost no AI turns. The
+watcher reports on its own interval, and a judgment session may take its exit as a prompt to act.
 
 #### The wake exists only while something is in flight
 

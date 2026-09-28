@@ -1670,7 +1670,8 @@ Prints the run's next single action, computed from the event stream (`run:event`
 (`run:carry`) and the issue state (`run:prep`) — never the conversation
 (joshuafolkken/kit#2248). It lifts `run:next`'s fold from an _event_ to a whole _run_, printing one
 line: a runnable command for a phase that has one (`followup` after a PR opens, `run:merge <N>` after a
-merge, `backlog:next` after a park, `run:cut --resume <N>` after a cut), a fixed verdict otherwise
+merge, `backlog:next` after a park, `run:cut --resume <N>` after a cut, `run:carry --cut` after a
+Codex parent's dispatch below the cut cap — joshuafolkken/kit#2653), a fixed verdict otherwise
 (`implement`, `human-review`, `update-deps`, `already-done`, `wait`, `stop`, `unknown`), or a `decide:`
 line for the one Tier-B point it surfaces — a spent whole-run budget. It dispatches rather than
 re-decides: a merged child's outcome stays `run:merge`'s, the next issue `backlog:next`'s. `run:next`

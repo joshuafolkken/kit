@@ -31,6 +31,8 @@ const DEFAULTS: StepInput = {
 	// golden keeps exercising the retrospective positions it documents. The off path is unit-tested.
 	is_retrospective_enabled: true,
 	has_changes: false,
+	has_completion_callback: true,
+	is_at_cut_cap: false,
 }
 
 // One turn of a run: `label` names the position the run has reached in words, and `at` is the change

@@ -1,4 +1,5 @@
 import type { IssueState } from '#scripts/issue/issue-state'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrepParts } from './run-prep'
 import { run_step } from './run-step'
@@ -9,6 +10,7 @@ const to_parts_mock = vi.hoisted(() => vi.fn())
 const repo_directory_mock = vi.hoisted(() => vi.fn())
 const read_carry_mock = vi.hoisted(() => vi.fn())
 const read_events_mock = vi.hoisted(() => vi.fn())
+const cut_cap_mock = vi.hoisted(() => vi.fn(() => false))
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
 // Hoisted so the mock's EVENT_KIND and the stale-event regression test name the one kind once
@@ -27,6 +29,7 @@ vi.mock('./run-carry', () => ({
 		carry_path: (directory: string) => `${directory}/carry`,
 		retrospective_done_of: (read: { carry?: { retrospective?: boolean } }) =>
 			read.carry?.retrospective === true,
+		is_at_cut_cap: cut_cap_mock,
 	},
 }))
 
@@ -129,6 +132,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 describe('run_step_cli.run', () => {
@@ -172,6 +176,42 @@ describe('run_step_cli.run', () => {
 
 		expect(await run_step_cli.run([])).toBe(FAILURE)
 		expect(gather_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2653: the completion callback is read off the session's own environment.
+function stub_session(key: string): void {
+	for (const parent_key of agent_session_environment.PARENT_SESSION_KEYS) {
+		vi.stubEnv(parent_key, '')
+	}
+
+	vi.stubEnv('CODEX_THREAD_ID', '')
+	vi.stubEnv(key, 'session')
+}
+
+describe('run_step_cli.run — the completion callback', () => {
+	it.each([
+		['CODEX_THREAD_ID', run_step.HAND_OFF_COMMAND],
+		['CLAUDE_CODE_SESSION_ID', run_step.WAIT],
+	])('answers a %s parent that launched a child with %s', async (key, line) => {
+		stub_session(key)
+		read_carry_mock.mockReturnValue(carried())
+		read_events_mock.mockReturnValue([stream_event(STALE_KIND, RUN_START)])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).toBe(line)
+	})
+
+	it('keeps a Codex parent at the cut cap waiting rather than printing a refused cut', async () => {
+		stub_session('CODEX_THREAD_ID')
+		cut_cap_mock.mockReturnValueOnce(true)
+		read_carry_mock.mockReturnValue(carried())
+		read_events_mock.mockReturnValue([stream_event(STALE_KIND, RUN_START)])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).toBe(run_step.WAIT)
 	})
 })
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { find_package_directory } from '#scripts/josh/josh-logic'
@@ -29,6 +30,7 @@ const RETROSPECTIVE_ENV_KEY = 'JOSH_RETROSPECTIVE'
 interface RunReads {
 	carry_kind: CarryRead['kind']
 	is_retrospective_done: boolean
+	is_at_cut_cap: boolean
 	last_event: string | undefined
 }
 
@@ -36,7 +38,12 @@ interface RunReads {
 // directory that cannot be read leaves the position unknowable, which `next_action` answers `unknown`.
 function read_run(directory: string | undefined, issue_number: string): RunReads {
 	if (directory === undefined) {
-		return { carry_kind: 'unreadable', is_retrospective_done: false, last_event: undefined }
+		return {
+			carry_kind: 'unreadable',
+			is_retrospective_done: false,
+			is_at_cut_cap: false,
+			last_event: undefined,
+		}
 	}
 
 	const carry = run_carry.read_carry(run_carry.carry_path(directory))
@@ -55,6 +62,7 @@ function read_run(directory: string | undefined, issue_number: string): RunReads
 	return {
 		carry_kind: carry.kind,
 		is_retrospective_done: run_carry.retrospective_done_of(carry),
+		is_at_cut_cap: carry.kind === 'carried' && run_carry.is_at_cut_cap(carry.carry),
 		last_event: last?.kind,
 	}
 }
@@ -72,10 +80,12 @@ async function gather(issue_number: string): Promise<StepInput> {
 		last_event: run_reads.last_event,
 		carry_kind: run_reads.carry_kind,
 		is_retrospective_done: run_reads.is_retrospective_done,
+		is_at_cut_cap: run_reads.is_at_cut_cap,
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
 		is_retrospective_enabled: hook_decision.is_switch_opt_in(RETROSPECTIVE_ENV_KEY),
 		has_changes: parts.has_changes,
+		has_completion_callback: agent_role_profile.has_completion_callback(),
 	}
 }
 
