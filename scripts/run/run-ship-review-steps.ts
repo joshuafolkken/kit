@@ -1,10 +1,12 @@
-import { agent_argv } from '#scripts/agent/agent-argv'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_argv, type AgentArgv } from '#scripts/agent/agent-argv'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { openai_review_broker } from '#scripts/lane/openai-review-broker'
 import { detached_launch } from './detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 
@@ -41,12 +43,6 @@ const ATTEST_CHECK = ['review:attest', '--check']
 const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed']
 const ROUND_TWO_BRIEF = ['review:brief', '--round', '2']
 const ROUND_TWO_REQUIRED = 'required'
-const BRIEF_PREFIX = 'josh-ship-review-brief-'
-const FINDINGS_PREFIX = 'josh-ship-review-findings-'
-const LOG_PREFIX = 'josh-ship-review-log-'
-const BRIEF_SUFFIX = '.md'
-const FINDINGS_SUFFIX = '.txt'
-const LOG_SUFFIX = '.log'
 const FIXED_JOIN_NOTE =
 	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate stage re-runs it.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
@@ -59,11 +55,7 @@ function failure(out: string): JoshResult {
 }
 
 function paths(root: string = PROJECT_ROOT): { brief: string; findings: string; log: string } {
-	return {
-		brief: stamp_file.stamp_path(BRIEF_PREFIX, root, BRIEF_SUFFIX),
-		findings: stamp_file.stamp_path(FINDINGS_PREFIX, root, FINDINGS_SUFFIX),
-		log: stamp_file.stamp_path(LOG_PREFIX, root, LOG_SUFFIX),
-	}
+	return openai_review_broker.review_paths(root)
 }
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
@@ -77,12 +69,12 @@ function note(text: string): void {
 // Under the reviewer profile — the same model and effort (`JOSH_REVIEWER_*` included) the chain's
 // subagent is given — and waited on, so the join below runs only once the review has finished. Each
 // call is its own process, so round 2 is a fresh session by construction.
-async function run_session(prompt: string, log_path: string): Promise<JoshResult> {
-	const built = agent_argv.resolve_in(prompt, agent_role_profile.REVIEWER, PROJECT_ROOT)
-
-	if (built.kind === 'rejected') return failure(`reviewer profile rejected: ${built.note}`)
-
-	const request = { argv: built.argv, cwd: PROJECT_ROOT, log_path, profile: built.profile }
+async function run_direct_session(
+	argv: AgentArgv,
+	profile: AgentProfile,
+	log_path: string,
+): Promise<JoshResult> {
+	const request = { argv, cwd: PROJECT_ROOT, log_path, profile }
 	const result = await detached_launch.launch_attached(request, note)
 
 	if (result.kind === 'failed') return failure(`reviewer could not start: ${result.note}`)
@@ -91,15 +83,38 @@ async function run_session(prompt: string, log_path: string): Promise<JoshResult
 	return { code: SUCCESS_EXIT_CODE, out: '' }
 }
 
+async function run_session(
+	prompt: string,
+	log_path: string,
+	issue: string,
+	round: '1' | '2',
+): Promise<JoshResult> {
+	const built = agent_argv.resolve_in(prompt, agent_role_profile.REVIEWER, PROJECT_ROOT)
+	if (built.kind === 'rejected') return failure(`reviewer profile rejected: ${built.note}`)
+
+	if (built.profile.provider !== 'openai' || !lane_child_marker.is_child_of(PROJECT_ROOT)) {
+		return await run_direct_session(built.argv, built.profile, log_path)
+	}
+
+	const is_success = await openai_review_broker.request(PROJECT_ROOT, issue, round)
+
+	return is_success ? { code: SUCCESS_EXIT_CODE, out: '' } : failure('isolated reviewer failed')
+}
+
 // The brief goes to a file and the previous round's findings are removed, so a reviewer that writes
 // nothing reads as unfinished rather than as the last round's verdict.
-async function launch_reviewer(brief: string, prompt_of: PromptOf): Promise<JoshResult> {
+async function launch_reviewer(
+	brief: string,
+	prompt_of: PromptOf,
+	issue: string,
+	round: '1' | '2',
+): Promise<JoshResult> {
 	const target = paths()
 
 	stamp_file.write_text_stamp(target.brief, brief)
 	stamp_file.remove_stamp(target.findings)
 
-	return await run_session(prompt_of(target.brief, target.findings), target.log)
+	return await run_session(prompt_of(target.brief, target.findings), target.log, issue, round)
 }
 
 function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
@@ -150,7 +165,12 @@ async function run_phases(phases: ReadonlyArray<Phase>): Promise<JoshResult> {
 }
 
 // A brief-minting command, then a reviewer handed what it printed.
-function reviewed(open: ReadonlyArray<string>, prompt_of: PromptOf): ReadonlyArray<Phase> {
+function reviewed(
+	open: ReadonlyArray<string>,
+	prompt_of: PromptOf,
+	issue: string,
+	round: '1' | '2',
+): ReadonlyArray<Phase> {
 	const opened = { brief: '' }
 
 	return [
@@ -161,7 +181,7 @@ function reviewed(open: ReadonlyArray<string>, prompt_of: PromptOf): ReadonlyArr
 
 			return result
 		},
-		async () => await launch_reviewer(opened.brief, prompt_of),
+		async () => await launch_reviewer(opened.brief, prompt_of, issue, round),
 	]
 }
 
@@ -195,7 +215,7 @@ async function round_one_record(issue: string): Promise<JoshResult> {
 async function review_stage(issue: string): Promise<JoshResult> {
 	return await run_phases([
 		scoped_pair,
-		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt),
+		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt, issue, '1'),
 		join_gate,
 		async () => await josh(ATTEST_CHECK),
 		async () => await round_one_record(issue),
@@ -216,7 +236,7 @@ async function round_two_stage(issue: string): Promise<JoshResult> {
 
 	return await run_phases([
 		scoped_pair,
-		...reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt),
+		...reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, '2'),
 		async () => await josh(ATTEST_CHECK),
 		async () => await record_and_route(issue, run_ship_review.round_two_outcome),
 	])
