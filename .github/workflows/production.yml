@@ -11,6 +11,9 @@ on:
 jobs:
   update-branch:
     if: github.repository != 'joshuafolkken/kit' || inputs.tag != ''
+    concurrency:
+      group: production-update
+      queue: max
     runs-on: ubuntu-latest
     permissions:
       contents: write

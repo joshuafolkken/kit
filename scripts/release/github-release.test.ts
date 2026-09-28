@@ -7,6 +7,15 @@ const TOKEN = 'test-token'
 const NOT_FOUND_MESSAGE = 'HTTP 404'
 const CONNECTION_ERROR = 'connection lost'
 const NOTES = { name: TAG, body: '## Changes\n- One change' }
+const CONFIG_PATH = '.github/release.yml'
+
+function note_request(tag: string, previous: string): string {
+	return JSON.stringify({
+		tag_name: tag,
+		previous_tag_name: previous,
+		configuration_file_path: CONFIG_PATH,
+	})
+}
 
 function response(status: number, body: unknown): Response {
 	return Response.json(body, { status })
@@ -36,7 +45,7 @@ describe('GitHub Release notes', () => {
 				JSON.stringify({
 					tag_name: TAG,
 					previous_tag_name: previous_tag,
-					configuration_file_path: '.github/release.yml',
+					configuration_file_path: CONFIG_PATH,
 				}),
 			)
 			expect(request.mock.calls[3]?.[1].body).toBe(
@@ -57,6 +66,94 @@ it('does not duplicate an existing release', async () => {
 
 	expect(await github_release.publish(request, TOKEN, TAG)).toBe('already-published')
 	expect(request).toHaveBeenCalledTimes(1)
+})
+
+it('publishes reversed tags in version order using the prior release for notes', async () => {
+	const earlier_request = vi
+		.fn()
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(response(200, { tag_name: PREVIOUS_TAG }))
+		.mockResolvedValueOnce(response(200, NOTES))
+		.mockResolvedValueOnce(response(201, { tag_name: TAG }))
+	const later_request = vi
+		.fn()
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(response(200, { workflow_runs: [] }))
+		.mockResolvedValueOnce(response(200, { tag_name: TAG }))
+		.mockResolvedValueOnce(response(200, { name: 'v1.889.0', body: 'Changes' }))
+		.mockResolvedValueOnce(response(201, { tag_name: 'v1.889.0' }))
+
+	async function publish_earlier(): Promise<void> {
+		expect(await github_release.publish(earlier_request, TOKEN, TAG)).toBe(
+			`published ${TAG} from ${PREVIOUS_TAG}`,
+		)
+	}
+
+	expect(
+		await github_release.publish(later_request, TOKEN, 'v1.889.0', {
+			tags: ['v1.883.0', TAG, 'v1.889.0'],
+			wait: publish_earlier,
+		}),
+	).toBe(`published v1.889.0 from ${TAG}`)
+	expect(earlier_request.mock.calls[2]?.[1]).toHaveProperty('body', note_request(TAG, PREVIOUS_TAG))
+	expect(later_request.mock.calls[4]?.[1]).toHaveProperty('body', note_request('v1.889.0', TAG))
+})
+
+it('skips a lower tag whose package publication failed', async () => {
+	const request = vi
+		.fn()
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(
+			response(200, { workflow_runs: [{ id: 42, display_title: `Publish ${TAG}` }] }),
+		)
+		.mockResolvedValueOnce(
+			response(200, {
+				jobs: [{ name: 'publish-npm', status: 'completed', conclusion: 'failure' }],
+			}),
+		)
+		.mockResolvedValueOnce(response(200, { tag_name: PREVIOUS_TAG }))
+		.mockResolvedValueOnce(response(200, { name: 'v1.889.0', body: 'Changes' }))
+		.mockResolvedValueOnce(response(201, { tag_name: 'v1.889.0' }))
+
+	expect(await github_release.publish(request, TOKEN, 'v1.889.0', { tags: [TAG] })).toBe(
+		`published v1.889.0 from ${PREVIOUS_TAG}`,
+	)
+	expect(request.mock.calls[5]?.[1]).toHaveProperty('body', note_request('v1.889.0', PREVIOUS_TAG))
+})
+
+it('waits for the nearest lower tag when several newer tags exist', async () => {
+	const request = vi
+		.fn()
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(response(200, { tag_name: 'v1.889.0' }))
+		.mockResolvedValueOnce(response(200, { name: 'v1.890.0', body: 'Changes' }))
+		.mockResolvedValueOnce(response(201, { tag_name: 'v1.890.0' }))
+
+	expect(
+		await github_release.publish(request, TOKEN, 'v1.890.0', {
+			tags: [TAG, 'v1.889.0', 'v1.890.0'],
+		}),
+	).toBe('published v1.890.0 from v1.889.0')
+	expect(request.mock.calls[1]?.[0]).toMatch(/\/tags\/v1\.889\.0$/u)
+})
+
+it('does not publish the later tag when waiting for the earlier release fails', async () => {
+	const request = vi
+		.fn()
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(missing_response())
+		.mockResolvedValueOnce(response(200, { workflow_runs: [] }))
+	const wait = vi.fn().mockRejectedValue(new Error(CONNECTION_ERROR))
+
+	await expect(
+		github_release.publish(request, TOKEN, 'v1.889.0', {
+			tags: [TAG],
+			wait,
+		}),
+	).rejects.toThrow(CONNECTION_ERROR)
+	expect(request).toHaveBeenCalledTimes(3)
 })
 
 describe('GitHub Release failures', () => {
