@@ -68,10 +68,11 @@ Issue には次の要素を必ず含める。
   ```
 
 - **不具合修正の Issue は `- 種別: 不具合` を宣言する。** 同じ位置（`## 背景` の直下）に置く。この宣言がある Issue では、`pnpm josh git -y` が追加・変更したテストを修正前のツリー（merge-base）に当てて `pnpm josh test:red` で実行し、1 本も赤にならない（`green`）ときはコミットを拒否する。修正前でも緑の回帰テストは、報告された症状を再現していないためである（joshuafolkken/kit#2448）。回帰テストは、利用者が症状を見たのと同じ粒度で書く
+- **起票時の `bug` ラベルは本文の宣言から決める。** `pnpm josh issue:lint <本文ファイル>` の後、同じファイルを `gh api …/issues -F body=@<本文ファイル>` で送る。`labels: bug` なら `-f 'labels[]=bug'` を同じ作成呼び出しに追加し、`labels: none` なら追加しない。`depth`・`route` は併記する。`bugfix` は PR のリリース分類であり、Issue の `bug` の代わりにしない
 - **`## 発火点`** には、その規則が破れる瞬間に最初に呼ばれるツールコール名を 1 つ書く。名前は `prompts/collaboration-workflow/rule-delivery.md` の配送表に載る、フックで配送可能なツール（`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`）と突き合わせる。**表に無い名前**（そもそもツールコール名でない）と**不一致**（既知のツールだが配送できない）は区別して印字され、joshuafolkken/kit#2201 の「規則は正しいが名指ししたコールが実際に破れるコールの 1 つ後ろ」を起票時に検出する
 - **`## ベースライン`** は **「コマンド + 値」** で書く。``- `<測定コマンド>` → <現在の値>`` の形に限り、自然文だけの測定説明は受け付けない（再実行できないため）。マージ後に `pnpm josh measure:rerun` が同じコマンドをやり直し、**before / after の対**を印字する。値が動かなかったとき、反証された前提として `docs/observations.md` に 1 行追記される（既存の append-only 台帳をそのまま使い、第 2 の台帳は作らない）
 - **`## 再現`** は **「コマンド + 実際の出力」** で書く。コマンドを backtick、出力をフェンス（``` または ~~~）で囲む。自然文の「確認した」は再実行できないため受け付けない（`## ベースライン` と同じ理由）。読みだけの起票を起票時に弾くためである
-- **検査は `pnpm josh issue:lint <path>` が行う。** 対象判定・3 見出しの有無・発火点の配送可否・ベースラインが「コマンド + 値」か・再現が「コマンド + 実際の出力」かを、起票前の本文ファイルにまとめて検査する（未リントの起票は `pnpm josh rule:guard` が拒否する）
+- **検査は `pnpm josh issue:lint <path>` が行う。** 対象判定・3 見出しの有無・発火点の配送可否・ベースラインが「コマンド + 値」か・再現が「コマンド + 実際の出力」かと、起票時に必要な分類ラベルを、起票前の本文ファイルからまとめて答える（未リントの起票は `pnpm josh rule:guard` が拒否する）
 
 ### 起票元へのバックリンク（`## Origin` / `## Upstream issues`）
 
@@ -130,7 +131,7 @@ pnpm josh epic "<epic-title>" <N1> <N2> --origin <owner/repo#N>
 
 1. 子 Issue を全て作成し、番号 `<N1> <N2> ...` を控える
 2. `epic` ラベルを用意する（未作成なら `gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent 2>/dev/null || true`）
-3. epic を作成し、番号 `<E>` を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>" --jq .number`（`--jq` を落とすと Issue の JSON 全体が出る。そこには `id` も含まれるが、**控えるのは `number` である** — `id` はデータベース id で、手順 4 が要求する値ではあっても epic の番号ではない）
+3. epic を作成し、番号 `<E>` を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file> --jq .number`（`--jq` を落とすと Issue の JSON 全体が出る。そこには `id` も含まれるが、**控えるのは `number` である** — `id` はデータベース id で、手順 4 が要求する値ではあっても epic の番号ではない）
 4. 実行順序が**ある場合のみ**、子 Issue に依存関係を付与する（後述の理由により**作成後の独立ステップ**として行う）:
 
    ```bash

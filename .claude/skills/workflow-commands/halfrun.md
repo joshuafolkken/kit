@@ -1,5 +1,7 @@
 # `halfrun` — the manifest (implement + verify, stop before commit)
 
+When this run files a new Issue, run `pnpm josh issue:lint <body-file>` and apply its `labels: bug` answer at creation with `-f 'labels[]=bug'`; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification. Keep the existing `depth` and `route` labels.
+
 `halfrun` sits between `kickoff` (plan only) and `fullrun` (full execution with auto-merge). It
 implements the change and runs the full verification gate, then **stops before commit** — nothing is
 committed, pushed, or opened as a PR — so the user manually verifies the change (typically by exercising
@@ -52,7 +54,7 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → **run `pnpm josh
 issue:scout "<title>" [--body "<summary>"]` before creating the Issue** (`SKILL.md` → §2e) → create the
-Issue (`gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -f body="<body>"`,
+Issue (`gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -F body=@<body-file>`,
 body per `prompts/collaboration-workflow/issue-template.md`) → add `in-progress` → post the agreed plan → stash
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes"`, popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →

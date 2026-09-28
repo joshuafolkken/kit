@@ -7,6 +7,8 @@ the run is at, and the sections below carry that step in full.
 
 ## The `fullrun #N` step list
 
+Use `pnpm josh issue:lint` and `prompts/collaboration-workflow/issue-template.md` for filings.
+
 **Add `in-progress` the moment `run:hold` answered `hold`** (create if missing:
 `gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is
 actively in progress" --silent 2>/dev/null || true`, then `gh api
@@ -49,8 +51,8 @@ completion notification, then merges; if blockers are found it exits non-zero �
 `kickoff new` + `fullrun #N` in one run. Steps: (1) Derive an English title, or use the provided one.
 **(1a) Run `pnpm josh issue:scout "<title>" [--body "<summary>"]` before creating the Issue** — a
 candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` → §2e).
-(2) Create Issue: `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -f
-body="<body>"` (body per `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3) Add
+(2) Create Issue: `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -F
+body=@<body-file>` (per `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3) Add
 `in-progress` (as above). (4) Post the agreed plan in the session language: fill the body if blank,
 otherwise add a comment. (5) If the working tree already has staged or modified files,
 `git stash push -m "fullrun new: pre-existing changes"` first. (6) `git switch main && git pull`. (7)

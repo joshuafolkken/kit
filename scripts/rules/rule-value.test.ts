@@ -272,6 +272,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			'worktree-mutation',
 			'file-body',
 			'poll-loop',
+			'issue-bug-label',
 			INVESTIGATION,
 		])
 	})
