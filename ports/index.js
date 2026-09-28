@@ -247,6 +247,7 @@ function load_environment_file(directory = process.cwd()) {
 
 const ports = {
 	load_environment_file,
+	resolve_project_directory,
 	resolve_seed,
 	resolve_lane,
 	resolve_development_port,

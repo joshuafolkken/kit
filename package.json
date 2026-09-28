@@ -86,6 +86,10 @@
 			"types": "./ports/index.d.ts",
 			"default": "./ports/index.js"
 		},
+		"./web-server": {
+			"types": "./ports/web-server.d.ts",
+			"default": "./ports/web-server.js"
+		},
 		"./prettier": {
 			"types": "./prettier/index.d.ts",
 			"default": "./prettier/index.js"

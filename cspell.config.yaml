@@ -4,6 +4,10 @@ import:
 words:
   # GitHub Release API field used to select the commit for generated notes.
   - commitish
+  # package.json lifecycle hook names the webServer command library chains (#2392).
+  - postdev
+  - predev
+  - prepreview
   # Names and technical terms quoted in the fourth historical release audit.
   - SQSCANGHA
   - undici

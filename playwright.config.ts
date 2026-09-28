@@ -1,5 +1,6 @@
 import { environment_flags } from '@joshuafolkken/kit/env'
 import { ports } from '@joshuafolkken/kit/ports'
+import { web_server } from '@joshuafolkken/kit/web-server'
 import { defineConfig, devices, type ReporterDescription } from '@playwright/test'
 
 // Both ports come from kit's single definition (`@joshuafolkken/kit/ports`), offset by the personal
@@ -17,7 +18,7 @@ import { defineConfig, devices, type ReporterDescription } from '@playwright/tes
 // the file, and a project with no `.env` is untouched.
 //
 // The working directory is the anchor, and the loader ascends from it to the project root — the
-// same root `pnpm run` hands the `webServer` command, so both sides name one file from anywhere
+// same root `node --run` hands the `webServer` command, so both sides name one file from anywhere
 // inside the project. The one layout that escapes that is a run whose working directory sits in a
 // *different* package from this config, as `playwright test --config ../../playwright.config.ts`
 // does in a workspace: Playwright would default `webServer.cwd` to this file's directory while the
@@ -31,13 +32,6 @@ const PREVIEW_PORT = ports.resolve_preview_port()
 
 const CI_TIMEOUT = 120_000
 const LOCAL_TIMEOUT = 30_000
-// pnpm 11.27.1+ places a script it runs without a controlling terminal in its own process group, so
-// Playwright's default teardown — SIGKILL to the webServer's group — no longer reaches the `vite dev`
-// / `preview` child: it survives holding Playwright's stdio pipes open, and Playwright blocks forever
-// on the `close` event (#2386). SIGTERM, unlike SIGKILL, is relayed by that pnpm to the child, so a
-// graceful shutdown lets the server exit and the pipes close. The timeout must stay well above the
-// observed ~40ms shutdown, or Playwright falls back to killProcess() (SIGKILL) and the hang returns.
-const SHUTDOWN_TIMEOUT = 10_000
 const CI_TEST_TIMEOUT = 30_000
 const ACTION_TIMEOUT = 10_000
 const NAV_TIMEOUT = 30_000
@@ -74,7 +68,7 @@ const IS_CI = environment_flags.is_ci_enabled(process.env['CI'])
 // run whose report is unreachable unless the developer already knows `playwright show-report`.
 // (`CI/1` in the Playwright user agent and the MCP headless force share the same root cause.)
 // Deleting the variable once this config has judged the run local is what makes every downstream
-// reader agree with that verdict, the `pnpm run dev` child process included: leaving `CI=0` set for
+// reader agree with that verdict, the `dev` script's child process included: leaving `CI=0` set for
 // the child would only re-introduce the same bare-truthiness bug one process down. The guard is
 // what keeps this safe — a real provider value such as `CI=woodpecker` is never touched, and the
 // deletion cannot fire on the CI branch.
@@ -91,24 +85,22 @@ if (!IS_CI) delete process.env['CI']
 // application; a seed reduces how often a foreign server is on the port at all.
 const IS_REUSE_ENABLED = environment_flags.is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])
 
-// Both branches share one shutdown policy — see SHUTDOWN_TIMEOUT for why SIGTERM rather than the
-// SIGKILL default. `as const` keeps the signal a literal so it satisfies Playwright's signal union.
-const GRACEFUL_SHUTDOWN = { signal: 'SIGTERM', timeout: SHUTDOWN_TIMEOUT } as const
-
+// The scripts run through `node --run` rather than `pnpm run`, so the server stays in the process
+// group Playwright signals on teardown and its default SIGKILL reaches it directly — no package
+// manager relays the signal, and no graceful-shutdown timeout has to be tuned around one (#2392).
+// Each script's `pre` hook is chained in explicitly, since `node --run` does not run it.
 const web_server_config = IS_CI
 	? {
-			command: 'pnpm run build && pnpm run preview',
+			command: web_server.script_command(['build', 'preview']),
 			port: PREVIEW_PORT,
 			timeout: CI_TIMEOUT,
 			reuseExistingServer: IS_REUSE_ENABLED,
-			gracefulShutdown: GRACEFUL_SHUTDOWN,
 		}
 	: {
-			command: 'pnpm run dev',
+			command: web_server.script_command(['dev']),
 			port: DEV_PORT,
 			timeout: LOCAL_TIMEOUT,
 			reuseExistingServer: IS_REUSE_ENABLED,
-			gracefulShutdown: GRACEFUL_SHUTDOWN,
 		}
 
 const env_config: EnvConfig = IS_CI

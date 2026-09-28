@@ -56,7 +56,7 @@ describe('generate_playwright_config', () => {
 
 	it('runs build before preview in CI webServer command', () => {
 		expect(init_logic.generate_playwright_config()).toContain(
-			"command: 'pnpm run build && pnpm run preview'",
+			"command: web_server.script_command(['build', 'preview'])",
 		)
 	})
 

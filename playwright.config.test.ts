@@ -15,16 +15,10 @@ const DISABLING_VALUES = ['0', 'false', '', 'off', 'no', 'FALSE', 'Off', ' 0 ', 
 const CI_VALUES = ['true', '1', 'yes', 'on', 'woodpecker', ' TRUE ']
 const NOT_CI_VALUES = ['0', 'false', 'no', 'off', '', ' FALSE ', '  ']
 
-const DEV_COMMAND = 'pnpm run dev'
-const PREVIEW_COMMAND = 'pnpm run build && pnpm run preview'
+const DEV_COMMAND = 'node --run dev'
+const PREVIEW_COMMAND = 'node --run build && node --run preview'
 const DEV_PORT = 5173
 const PREVIEW_PORT = 4173
-
-const SHUTDOWN_SIGNAL = 'SIGTERM'
-const EXPECTED_SHUTDOWN_TIMEOUT = 10_000
-// SIGTERM from ~40ms shutdown; the window must stay wide enough that Playwright never falls back to
-// its SIGKILL killProcess() path, which is the hang this config exists to avoid.
-const MIN_SHUTDOWN_TIMEOUT = 1000
 
 async function load_max_failures(ci: string | undefined): Promise<number | undefined> {
 	const { maxFailures: max_failures } = await playwright_config_fixture.import_config(ci, undefined)
@@ -127,28 +121,22 @@ describe('playwright.config CI env normalization', () => {
 	})
 })
 
-// Regression guard for #2386: pnpm 11.27.1+ puts a terminal-less script in its own process group, so
-// Playwright's default SIGKILL teardown no longer reaches the `vite dev` / `preview` child — it
-// survives holding the stdio pipes open and Playwright blocks forever on `close`. A SIGTERM graceful
-// shutdown is relayed to the child so it exits; both branches must carry it, with a timeout wide
-// enough that Playwright never falls back to the SIGKILL killProcess() path.
-describe.each(REUSE_BRANCHES)('playwright.config webServer gracefulShutdown $label', ({ ci }) => {
-	it('requests a SIGTERM graceful shutdown', async () => {
+// Regression guard for #2386 / #2392: pnpm 11.27.1+ puts a terminal-less script in its own process
+// group, so Playwright's teardown reached pnpm alone and the server survived holding the stdio pipes
+// open. #2386 relied on pnpm relaying a SIGTERM graceful shutdown; #2392 removes pnpm from the chain
+// instead, so the server shares Playwright's process group and the default SIGKILL reaches it. Both
+// branches must therefore start without a package manager and carry no relay-tuned shutdown.
+describe.each(REUSE_BRANCHES)('playwright.config webServer teardown $label', ({ ci }) => {
+	it('starts the server without pnpm in between', async () => {
 		const web_server = await playwright_config_fixture.load_web_server(ci, undefined)
 
-		expect(web_server.gracefulShutdown?.signal).toBe(SHUTDOWN_SIGNAL)
+		expect(web_server.command).not.toContain('pnpm')
 	})
 
-	it('pins the shutdown timeout to the configured value', async () => {
+	it('relies on the default teardown instead of a graceful shutdown', async () => {
 		const web_server = await playwright_config_fixture.load_web_server(ci, undefined)
 
-		expect(web_server.gracefulShutdown?.timeout).toBe(EXPECTED_SHUTDOWN_TIMEOUT)
-	})
-
-	it('keeps the timeout well above the shutdown time to avoid the SIGKILL fallback', async () => {
-		const web_server = await playwright_config_fixture.load_web_server(ci, undefined)
-
-		expect(web_server.gracefulShutdown?.timeout).toBeGreaterThanOrEqual(MIN_SHUTDOWN_TIMEOUT)
+		expect(web_server.gracefulShutdown).toBeUndefined()
 	})
 })
 
