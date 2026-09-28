@@ -430,3 +430,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/issue/markdown-section.ts:38 | 2026-09-28 | #2668
 - rf:project-conventions | medium | docs/josh-commands.md:1067 | 2026-09-28 | #2668
 - rf:project-conventions | medium | docs/josh-commands.md:1067 | 2026-09-28 | #2668
+- rf:none | none | - | 2026-09-28 | #2683
