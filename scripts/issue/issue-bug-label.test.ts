@@ -16,4 +16,10 @@ describe('issue_bug_label', () => {
 
 		expect(issue_bug_label.is_bug_fix(body)).toBe(false)
 	})
+
+	it('ignores bug declarations inside fenced examples', () => {
+		const body = '## 背景\n\n```md\n- 種別: 不具合\n```\n'
+
+		expect(issue_bug_label.is_bug_fix(body)).toBe(false)
+	})
 })

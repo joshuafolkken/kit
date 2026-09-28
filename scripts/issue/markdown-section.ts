@@ -15,8 +15,41 @@ function is_the_heading(line: string, heading: string): boolean {
 // Whether some body line, trimmed, is exactly `text`. Both linters ask this — of a `## heading` and of
 // the behavior-change declaration line — so the trim-and-match lives here rather than being written in
 // each. A required token mentioned inside a sentence is not the token, so only an exact line matches.
+function next_fence(line: string, fence: string): string | undefined {
+	const marker = /^ {0,3}(`{3,}|~{3,})/u.exec(line)?.[1]
+
+	if (fence === '') return marker
+	const closing = new RegExp(
+		String.raw`^ {0,3}${fence.charAt(0)}{${String(fence.length)},}\s*$`,
+		'u',
+	)
+
+	if (closing.test(line)) return ''
+
+	return undefined
+}
+
+function unfenced_lines(body: string): ReadonlyArray<string> {
+	let fence = ''
+	const visible: Array<string> = []
+
+	for (const line of body.split('\n')) {
+		const next = next_fence(line, fence)
+		const visible_line = line.replace(/^(?: {4}|\t).*/u, '')
+
+		visible.push(next === undefined && fence === '' ? visible_line : '')
+		fence = next ?? fence
+	}
+
+	return visible
+}
+
+function has_unfenced_line(body: string, text: string): boolean {
+	return unfenced_lines(body).some((line) => line.trim() === text)
+}
+
 function has_line(body: string, text: string): boolean {
-	return body.split('\n').some((line) => line.trim() === text)
+	return has_unfenced_line(body, text)
 }
 
 // The lines between `heading` and the next `## ` heading, trimmed of the heading line itself; an empty
@@ -24,16 +57,17 @@ function has_line(body: string, text: string): boolean {
 // only a line that is exactly the heading opens the section.
 function section_lines(body: string, heading: string): ReadonlyArray<string> {
 	const lines = body.split('\n')
-	const start = lines.findIndex((line) => is_the_heading(line, heading))
+	const visible = unfenced_lines(body)
+	const start = visible.findIndex((line) => is_the_heading(line, heading))
 
 	if (start === -1) return []
 
 	const rest = lines.slice(start + 1)
-	const end = rest.findIndex((line) => is_heading(line))
+	const end = visible.slice(start + 1).findIndex((line) => is_heading(line))
 
 	return end === -1 ? rest : rest.slice(0, end)
 }
 
-const markdown_section = { section_lines, is_heading, has_line }
+const markdown_section = { section_lines, is_heading, has_line, has_unfenced_line }
 
 export { markdown_section }
