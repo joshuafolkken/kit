@@ -47,13 +47,13 @@ split is found.
   title. **(1a) Run `pnpm josh issue:scout "<title>" [--body "<summary>"]` before creating the Issue** —
   a candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` →
   §2e). (2) Create Issue: `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>'
-  -f body="<body>"` (body per `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3)
+  -F body=@<body-file>` (body per `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3)
   Post the plan in the session language, using the same body/comment logic as `kickoff #<N>`. (4) Send
   Telegram notification. (5) **Stop** — do not implement. **Multi-issue split path**: (1) For each
   independent deliverable, derive a focused English title, **run `pnpm josh issue:scout "<sub-title>"`
   on it** (`SKILL.md` → §2e), and create a separate Issue with the `route:split` label: `gh api
   repos/{owner}/{repo}/issues -f title="<sub-title>" -f 'labels[]=route:split' -f 'labels[]=depth:<n>'
-  -f body="<body>"`. Capture each Issue number. **When the split is filed into a repository other than
+  -F body=@<body-file>`. Capture each Issue number. **When the split is filed into a repository other than
   the one this session is running in**, every child body gets the `## Origin` backlink described in the
   cross-package rule the AI documents keep resident, the epic body carries the same link as prose or a
   plain bullet (never as a checkbox row, which would disable its auto-close), and the originating Issue
@@ -66,7 +66,7 @@ split is found.
   josh epic:check <E>`. Only where `josh` is unavailable, fall back to the manual procedure: ensure the
   label exists (`gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks
   a batch of child issues from one split" --silent 2>/dev/null || true`), then create the epic with `gh
-  api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>"`. Its body
+  api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file>`. Its body
   follows the epic format in `prompts/collaboration-workflow/issue-template.md` — split rationale,
   dependencies, the `backlogrun` command, and a child task list in task-list syntax (`- [ ] #N`). The epic
   exists as the **non-closing home for the split rationale**. When the children have no required order,

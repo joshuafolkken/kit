@@ -195,7 +195,7 @@ Only branch 2 files an Issue. What follows applies to that branch.
 issues` call until it is folded; the first filing asks nothing.
 
   1. File the follow-up Issue referencing the current one, tagged `route:review-cap`. Run `pnpm josh issue:lint <body-file>` first and apply the label procedure in `prompts/collaboration-workflow/issue-template.md`:
-     `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:review-cap' -f 'labels[]=depth:<n>' -f body="<body referencing the current Issue>"`.
+     `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:review-cap' -f 'labels[]=depth:<n>' -F body=@<body-file>`.
   2. Run `pnpm josh epic:bundle <new>` — **before the current Issue closes.** The candidate search reads
      open issues only, so once the parent has closed the command answers `none` permanently.
   3. Act on its answer. **`epic:bundle` recommends and writes nothing**, so acting means running the

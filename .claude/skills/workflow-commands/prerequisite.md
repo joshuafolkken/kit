@@ -28,7 +28,7 @@ the table** — the label means a filing the run is *blocked by*, so the observa
 Before that call, run `pnpm josh issue:lint <body-file>` and apply its `labels: bug` answer at creation with `-f 'labels[]=bug'`; `prompts/collaboration-workflow/issue-template.md` is the single source. Keep `route:tier-a` and `depth`.
 
 ```bash
-gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f 'labels[]=depth:<n>' -f body="<body>"
+gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f 'labels[]=depth:<n>' -F body=@<body-file>
 ```
 
 Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the

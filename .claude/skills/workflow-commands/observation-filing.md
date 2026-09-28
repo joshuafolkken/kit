@@ -57,7 +57,7 @@ cap's branch-2 filing all pass through a `gh api … issues` call, and the depth
 beside whatever `route:` label that call already carries.
 
 ```bash
-gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:1' -f body="<body>"
+gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:1' -F body=@<body-file>
 gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue already filed
 ```
 

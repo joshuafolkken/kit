@@ -11,7 +11,8 @@ import { rule_delivery } from './rule-guard'
 const work = mkdtempSync(path.join(tmpdir(), 'issue-bug-label-rule-'))
 const body = path.join(work, 'body.md')
 const BUG_BODY = '## 背景\n\n- 種別: 不具合\n'
-const FILING = 'gh api repos/joshuafolkken/kit/issues -f title=x'
+const OTHER_BODY = '## 背景\n\n- 種別: 振る舞い変更\n'
+const FILING = `gh api repos/joshuafolkken/kit/issues -f title=x -F body=@${body}`
 const harness = delivered_rules_harness.create_harness('issue-bug-label-guard-')
 const lint = time_transcript_fixture.josh_call_line(
 	1,
@@ -36,19 +37,39 @@ describe('filing a declared bug issue', () => {
 
 		expect(
 			issue_bug_label_rule.needs_bug_label(
-				"gh api repos/o/r/issues -f title=x -f 'labels[]=route:split' -f 'labels[]=depth:1' -f 'labels[]=bug'",
+				`${FILING} -f 'labels[]=route:split' -f 'labels[]=depth:1' -f 'labels[]=bug'`,
 				lint,
 			),
 		).toBe(false)
 	})
 
 	it('accepts an issue that does not declare a bug', () => {
-		writeFileSync(body, '## 背景\n\n- 種別: 振る舞い変更\n')
+		writeFileSync(body, OTHER_BODY)
 
 		expect(issue_bug_label_rule.needs_bug_label(FILING, lint)).toBe(false)
 	})
 
-	it('refuses the unlabeled filing through rule delivery after lint', () => {
+	it('refuses when a different body is submitted after lint', () => {
+		writeFileSync(body, OTHER_BODY)
+
+		expect(
+			issue_bug_label_rule.needs_bug_label(
+				'gh api repos/o/r/issues -f title=x -f body="- 種別: 不具合"',
+				lint,
+			),
+		).toBe(true)
+	})
+
+	it('ignores a fake label flag inside the title', () => {
+		writeFileSync(body, BUG_BODY)
+		const command = `${FILING} -f "title=example -f labels[]=bug"`
+
+		expect(issue_bug_label_rule.needs_bug_label(command, lint)).toBe(true)
+	})
+})
+
+describe('issue-bug-label delivery', () => {
+	it('refuses the unlabeled filing after lint', () => {
 		writeFileSync(body, BUG_BODY)
 		const history = [scouted_tail(), lint].join('\n')
 		const payload = harness.payload_of('missing-label', FILING, 'Bash', history)

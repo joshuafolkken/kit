@@ -1,16 +1,17 @@
 import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { BUG_LABEL } from '#scripts/git/issue-labels'
 import { issue_bug_label } from '#scripts/issue/issue-bug-label'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
+import { issue_filing_args } from './issue-filing-args'
 import { shell_segments } from './shell-segments'
 import { tail_commands } from './tail-commands'
 
 const LINT_NAMES = new Set(['issue:lint'])
 const LINT_PATH = /\b(?:issue:lint|iln)\s+(?:'([^']+)'|"([^"]+)"|(\S+))/u
-const BUG_FIELD = /(?:^|\s)(?:-f|-F|--field|--raw-field)\s+['"]?labels\[\]=bug(?:['"]|\s|$)/u
-const BUG_OPTION = /(?:^|\s)(?:-l|--label)\s+['"]?bug(?:['"]|\s|$)/u
 
 function lint_argument(segment: string): string | undefined {
 	const [, single_quoted, double_quoted, bare] = LINT_PATH.exec(segment) ?? []
@@ -27,22 +28,31 @@ function latest_lint_path(tail: string): string | undefined {
 	return lint === undefined ? undefined : lint_argument(lint)
 }
 
-function declares_bug(path: string | undefined): boolean {
-	if (path === undefined) return false
-
+function linted_body(body_path: string): string | undefined {
 	try {
-		return issue_bug_label.is_bug_fix(readFileSync(path, 'utf8'))
+		return readFileSync(body_path, 'utf8')
 	} catch {
-		return false
+		return undefined
 	}
 }
 
-function has_bug_label(command: string): boolean {
-	return BUG_FIELD.test(command) || BUG_OPTION.test(command)
+function matches_linted_file(command: string, lint_path: string): boolean {
+	const filing_path = issue_filing_args.body_file(command)
+
+	return filing_path !== undefined && path.resolve(filing_path) === path.resolve(lint_path)
 }
 
 function needs_bug_label(command: string, tail: string): boolean {
-	return declares_bug(latest_lint_path(tail)) && !has_bug_label(command)
+	const lint_path = latest_lint_path(tail)
+
+	if (lint_path === undefined) return false
+	const body = linted_body(lint_path)
+
+	if (body === undefined) return false
+
+	if (!matches_linted_file(command, lint_path)) return true
+
+	return issue_bug_label.is_bug_fix(body) && !issue_filing_args.has_label(command, BUG_LABEL)
 }
 
 function decide(call: { input: unknown }, run: GuardRun): boolean {
@@ -53,9 +63,10 @@ function decide(call: { input: unknown }, run: GuardRun): boolean {
 }
 
 const ISSUE_BUG_LABEL_REASON =
-	'⛔ bug label missing: the body most recently checked by `pnpm josh issue:lint` declares ' +
-	"`- 種別: 不具合`, but this filing omits `bug`. Add `-f 'labels[]=bug'` to the same " +
-	'creation call, then reissue it. See `prompts/collaboration-workflow/issue-template.md`.'
+	'⛔ bug filing mismatch: use the exact body file checked by `pnpm josh issue:lint` in this ' +
+	'creation call (`-F body=@<path>` or `gh issue create --body-file <path>`) and include the ' +
+	"`bug` label (`-f 'labels[]=bug'` or `--label bug`). See " +
+	'`prompts/collaboration-workflow/issue-template.md`.'
 
 const ROW = {
 	id: 'issue-bug-label',
@@ -64,6 +75,6 @@ const ROW = {
 	decide,
 }
 
-const issue_bug_label_rule = { ROW, has_bug_label, latest_lint_path, needs_bug_label }
+const issue_bug_label_rule = { ROW, latest_lint_path, needs_bug_label }
 
 export { issue_bug_label_rule }
