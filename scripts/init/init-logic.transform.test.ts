@@ -128,7 +128,7 @@ describe('transform_distributed_paths unbundled references', () => {
 
 describe('ensure_claude_md_import', () => {
 	const IMPORT_LINE = init_logic.CLAUDE_MD_IMPORT_LINE
-	const INSTALL_GUIDANCE = 'run `pnpm install` first'
+	const INSTALL_GUIDANCE = 'Then run `pnpm install` and reread this file'
 	const PROJECT_RULES = '## Project rules\n- do the thing\n'
 
 	it('provides install guidance and the canonical import without dependencies', () => {
@@ -136,6 +136,9 @@ describe('ensure_claude_md_import', () => {
 
 		expect(result).toContain(`${IMPORT_LINE}\n`)
 		expect(result).toContain(INSTALL_GUIDANCE)
+		expect(result).toContain('pnpm config get "@joshuafolkken:registry"')
+		expect(result).toContain('including user-level settings')
+		expect(result).toContain('docs/authentication.md#1-get-a-token-from-the-gh-cli')
 		expect(result.indexOf('Fresh checkout')).toBeLessThan(result.indexOf(IMPORT_LINE))
 	})
 
@@ -158,9 +161,23 @@ describe('ensure_claude_md_import', () => {
 	})
 
 	it('is idempotent across repeated syncs', () => {
-		const once = init_logic.ensure_claude_md_import('## Project rules\n')
+		const once = init_logic.ensure_claude_md_import(PROJECT_RULES)
 
 		expect(init_logic.ensure_claude_md_import(once)).toBe(once)
+	})
+})
+
+describe('legacy checkout guidance', () => {
+	it('replaces the old checkout note without duplicating it', () => {
+		const old_note =
+			'> Fresh checkout: if kit is not installed, run `pnpm install` first, then reread this file before doing any other work.'
+		const existing = `${old_note}\n\n@node_modules/@joshuafolkken/kit/dist/CLAUDE.md\n\n## Project rules\n`
+		const result = init_logic.ensure_claude_md_import(existing)
+
+		expect(result).not.toContain(old_note)
+		expect(result.match(/Fresh checkout:/gu)).toHaveLength(1)
+		expect(result).toContain('## Project rules')
+		expect(init_logic.ensure_claude_md_import(result)).toBe(result)
 	})
 })
 

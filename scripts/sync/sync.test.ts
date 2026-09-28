@@ -303,7 +303,7 @@ const NO_REFERENCES_CONTENT = 'no references here\n'
 
 const CLAUDE_MD_DEST = path.join(TEST_DIR, 'dest', 'CLAUDE.md')
 const CLAUDE_IMPORT_LINE = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
-const INSTALL_GUIDANCE = 'run `pnpm install` first'
+const INSTALL_GUIDANCE = 'Then run `pnpm install` and reread this file'
 
 // CLAUDE.md is distributed by import, not byte-copied (joshuafolkken/kit#1878): `josh sync` ensures
 // the one-line import is present while never disturbing a consumer's own additions below it.
