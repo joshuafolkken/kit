@@ -149,6 +149,8 @@ describe('detached ship result', () => {
 })
 
 describe('detached ship supervisor identity', () => {
+	afterEach(() => vi.restoreAllMocks())
+
 	it('does not mistake a reused pid for the original supervisor', () => {
 		const target = request()
 
@@ -157,6 +159,7 @@ describe('detached ship supervisor identity', () => {
 			process_start: 'stale-start',
 			launch_id: 'stopped',
 		})
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(false)
 
 		expect(run_ship_detach.read_result(target.repository, NUMBER)?.result).toBe('abnormal')
 	})

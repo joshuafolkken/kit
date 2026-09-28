@@ -52,6 +52,7 @@ const ISSUE_CLOSING = 'closes #42'
 const FULL_BODY = `${ISSUE_CLOSING}\n\n${EXTRA_BODY}`
 const BUGFIX = 'bugfix'
 const ENHANCEMENT = 'enhancement'
+const BREAKING = 'breaking-change'
 const FAKE_ISSUE_INFO = {
 	title: 'My feature',
 	number: '42',
@@ -111,6 +112,16 @@ describe('git_pr.create_with_issue_info — build_body behavior', () => {
 			BUGFIX,
 		)
 	})
+})
+
+it('opens one breaking-change PR for an enhancement that breaks compatibility', async () => {
+	vi.mocked(git_gh_command.issue_view_json).mockResolvedValue(
+		JSON.stringify({ labels: [{ name: ENHANCEMENT }, { name: BREAKING }], body: '' }),
+	)
+
+	await git_pr.create_with_issue_info(FAKE_ISSUE_INFO)
+
+	expect(git_gh_command.pr_create).toHaveBeenCalledWith(FAKE_ISSUE_COMMIT, ISSUE_CLOSING, BREAKING)
 })
 
 // joshuafolkken/kit#2446: a rerun carrying the live-execution evidence must reach the pull request the

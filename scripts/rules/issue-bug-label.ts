@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { BUG_LABEL } from '#scripts/git/issue-labels'
-import { issue_bug_label } from '#scripts/issue/issue-bug-label'
+import { issue_classification } from '#scripts/issue/issue-classification'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_shell } from '#scripts/time-runtime/time-shell'
@@ -42,7 +41,7 @@ function matches_linted_file(command: string, lint_path: string): boolean {
 	return filing_path !== undefined && path.resolve(filing_path) === path.resolve(lint_path)
 }
 
-function needs_bug_label(command: string, tail: string): boolean {
+function needs_classification_labels(command: string, tail: string): boolean {
 	const lint_path = latest_lint_path(tail)
 
 	if (lint_path === undefined) return false
@@ -50,31 +49,37 @@ function needs_bug_label(command: string, tail: string): boolean {
 
 	if (body === undefined) return false
 
-	if (!matches_linted_file(command, lint_path)) return true
+	if (!matches_linted_file(command, lint_path) || issue_classification.problems(body).length > 0) {
+		return true
+	}
 
-	return issue_bug_label.is_bug_fix(body) && !issue_filing_args.has_label(command, BUG_LABEL)
+	const expected = issue_classification.required_labels(body)
+
+	return issue_classification.CLASSIFICATION_LABELS.some(
+		(label) => expected.includes(label) !== issue_filing_args.has_label(command, label),
+	)
 }
 
 function decide(call: { input: unknown }, run: GuardRun): boolean {
 	const command = time_shell.bash_command(call.input)
 	const tail = time_density_hook.read_tail(run.transcript)
 
-	return needs_bug_label(command, tail)
+	return needs_classification_labels(command, tail)
 }
 
-const ISSUE_BUG_LABEL_REASON =
-	'⛔ bug filing mismatch: use the exact body file checked by `pnpm josh issue:lint` in this ' +
-	'creation call (`-F body=@<path>` or `gh issue create --body-file <path>`) and include the ' +
-	"`bug` label (`-f 'labels[]=bug'` or `--label bug`). See " +
+const ISSUE_CLASSIFICATION_REASON =
+	'⛔ issue classification mismatch: use the exact body file checked by `pnpm josh issue:lint` ' +
+	'in this creation call (`-F body=@<path>` or `gh issue create --body-file <path>`) and ' +
+	'apply exactly the `labels:` it reports (`bug`, `enhancement`, `breaking-change`). See ' +
 	'`prompts/collaboration-workflow/issue-template.md`.'
 
 const ROW = {
 	id: 'issue-bug-label',
 	is_trigger: bash_triggers.on_bash_command(bash_triggers.is_issue_filing),
-	reason: ISSUE_BUG_LABEL_REASON,
+	reason: ISSUE_CLASSIFICATION_REASON,
 	decide,
 }
 
-const issue_bug_label_rule = { ROW, latest_lint_path, needs_bug_label }
+const issue_bug_label_rule = { ROW, latest_lint_path, needs_classification_labels }
 
 export { issue_bug_label_rule }

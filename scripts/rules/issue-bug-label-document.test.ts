@@ -1,5 +1,5 @@
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
-import { BUG_LABEL } from '#scripts/git/issue-labels'
+import { BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL } from '#scripts/git/issue-labels'
 import { describe, expect, it } from 'vitest'
 
 const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
@@ -21,7 +21,15 @@ describe('bug labels at issue filing', () => {
 		const template = read_repo_file(ISSUE_TEMPLATE)
 
 		expect(template).toContain('- 種別: 不具合')
-		expect(template).toContain(`labels[]=${BUG_LABEL}`)
+
+		for (const label of [BUG_LABEL, ENHANCEMENT_LABEL, BREAKING_CHANGE_LABEL]) {
+			expect(template).toContain(`labels[]=${label}`)
+		}
+
+		expect(template).toContain('- 目的: 機能追加')
+		expect(template).toContain('- 目的: 機能改善')
+		expect(template).toContain('- 互換性: 破壊的変更')
+
 		expect(template).toContain(ISSUE_LINT)
 	})
 
@@ -30,5 +38,6 @@ describe('bug labels at issue filing', () => {
 
 		expect(content).toContain(ISSUE_LINT)
 		expect(content).toContain(ISSUE_TEMPLATE)
+		expect(content).toContain('labels:')
 	})
 })

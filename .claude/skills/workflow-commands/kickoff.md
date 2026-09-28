@@ -81,4 +81,4 @@ split is found.
   creation call. (3) Send Telegram notification listing all created issues. (4) Present the command
   `backlogrun #<E> --only`. (5) **Stop** — do not implement.
 
-Before filing, run `pnpm josh issue:lint <body-file>` and follow `prompts/collaboration-workflow/issue-template.md` for labels.
+Before filing, run `pnpm josh issue:lint <body-file>` and apply every label in its `labels:` answer at creation, following `prompts/collaboration-workflow/issue-template.md` for classification.
