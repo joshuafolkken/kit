@@ -147,13 +147,17 @@ describe('git_gh_command.pr_create — PR_ALREADY_EXISTS error handling', () => 
 	it('throws PR_ALREADY_EXISTS when the failure says a pull request already exists', async () => {
 		mocked_api.mockRejectedValue(new Error('a pull request already exists for this branch'))
 
-		await expect(git_gh_command.pr_create(PR_TITLE, PR_BODY)).rejects.toThrow('PR_ALREADY_EXISTS')
+		await expect(git_gh_command.pr_create(PR_TITLE, PR_BODY, 'bugfix')).rejects.toThrow(
+			'PR_ALREADY_EXISTS',
+		)
 	})
 
 	it('rethrows original error when error is unrelated to existing PR', async () => {
 		mocked_api.mockRejectedValue(new Error(NETWORK_ERROR))
 
-		await expect(git_gh_command.pr_create(PR_TITLE, PR_BODY)).rejects.toThrow(NETWORK_ERROR)
+		await expect(git_gh_command.pr_create(PR_TITLE, PR_BODY, 'bugfix')).rejects.toThrow(
+			NETWORK_ERROR,
+		)
 	})
 })
 
@@ -162,7 +166,7 @@ describe('git_gh_command.pr_create — the REST request', () => {
 		mocked_get_default_branch.mockResolvedValue('develop')
 		mocked_api.mockResolvedValue(GITHUB_PR_URL)
 
-		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
+		await git_gh_command.pr_create(PR_TITLE, PR_BODY, 'bugfix')
 
 		expect(created_pull_body()).toMatchObject({ base: 'develop' })
 	})
@@ -171,7 +175,7 @@ describe('git_gh_command.pr_create — the REST request', () => {
 	it('names the current branch as the head the CLI used to infer', async () => {
 		mocked_api.mockResolvedValue(GITHUB_PR_URL)
 
-		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
+		await git_gh_command.pr_create(PR_TITLE, PR_BODY, 'bugfix')
 
 		expect(created_pull_body()).toMatchObject({ head: HEAD_BRANCH })
 	})
@@ -181,7 +185,7 @@ describe('git_gh_command.pr_create — the REST request', () => {
 	it('carries the title and body verbatim and runs no gh subcommand', async () => {
 		mocked_api.mockResolvedValue(GITHUB_PR_URL)
 
-		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
+		await git_gh_command.pr_create(PR_TITLE, PR_BODY, 'bugfix')
 
 		expect(created_pull_body()).toMatchObject({ title: PR_TITLE, body: PR_BODY })
 		expect(mocked_exec).not.toHaveBeenCalled()

@@ -57,6 +57,11 @@ const CREATED_URL = 'https://github.com/joshuafolkken/kit/pull/1045'
 const COMMENT_URL = `${CREATED_URL}#issuecomment-5464738049`
 const TITLE = 'Write pull requests through REST #1029'
 const BODY = 'closes #1029\n\n- one\n- two'
+const BUGFIX = 'bugfix'
+const PR_LABELS_PATH = `${REPO_PATH}/issues/1045/labels`
+const EXISTING_PR_LABELS_PATH = `${REPO_PATH}/issues/${String(PR_NUMBER)}/labels`
+const CHOOSE_ERROR = 'Choose one release classification'
+const RATE_LIMITED_MESSAGE = 'rate limited'
 
 // The duplicate-head answer, exactly as the live API gave it on the throwaway pull request: `gh`
 // writes this JSON to **stdout** and only `gh: Validation Failed (HTTP 422)` to stderr, and
@@ -75,6 +80,7 @@ const NOT_FOUND = 'gh: Not Found (HTTP 404)'
 function write_extra(): Record<string, string> {
 	return {
 		[PULLS_PATH]: CREATED_URL,
+		[PR_LABELS_PATH]: '[]',
 		[PR_COMMENTS_PATH]: COMMENT_URL,
 		[PR_MERGE_PATH]: '{"sha":"b0d386c","merged":true}',
 	}
@@ -109,9 +115,79 @@ beforeEach(() => {
 	mocked_git.branch.mockResolvedValue(PR_BRANCH)
 })
 
+describe('pr_create classification', () => {
+	it('adds exactly one release label before reporting the created pull request', async () => {
+		await git_gh_pr.pr_create(TITLE, BODY, BUGFIX)
+
+		expect(parsed_body(PR_LABELS_PATH)).toStrictEqual({ labels: [BUGFIX] })
+		expect(request_to(PR_LABELS_PATH).path).toBe(PR_LABELS_PATH)
+	})
+
+	it('reports a failed label write instead of reporting a classified pull request', async () => {
+		mocked_api.mockImplementation(
+			gh_api_routes({
+				...write_routes(),
+				[PR_LABELS_PATH]: async () => {
+					throw new Error(RATE_LIMITED_MESSAGE)
+				},
+			}),
+		)
+
+		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).rejects.toThrow(RATE_LIMITED_MESSAGE)
+	})
+
+	it('refuses an unrecognized classification before posting the pull request', async () => {
+		await expect(git_gh_pr.pr_create(TITLE, BODY, 'bug' as never)).rejects.toThrow(CHOOSE_ERROR)
+
+		expect(requests()).not.toContainEqual(expect.objectContaining({ path: PULLS_PATH }))
+	})
+})
+
+describe('existing pull request classification', () => {
+	it('adds a missing classification to the existing pull request', async () => {
+		mocked_api.mockImplementation(
+			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: '[]' }),
+		)
+
+		await git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)
+
+		const write = requests().find(
+			(request) => request.path === EXISTING_PR_LABELS_PATH && request.body !== undefined,
+		)
+
+		expect(write?.body).toBe(JSON.stringify({ labels: [BUGFIX] }))
+	})
+
+	it('reuses an existing classification without writing another label', async () => {
+		mocked_api.mockImplementation(
+			gh_api_routes({
+				...write_routes(),
+				[EXISTING_PR_LABELS_PATH]: JSON.stringify([{ name: BUGFIX }]),
+			}),
+		)
+
+		await git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)
+
+		expect(requests().filter((request) => request.path === EXISTING_PR_LABELS_PATH)).toHaveLength(1)
+	})
+
+	it('recognizes an existing classification regardless of case', async () => {
+		const uppercase_label = BUGFIX.toUpperCase()
+
+		mocked_api.mockImplementation(
+			gh_api_routes({
+				...write_routes(),
+				[EXISTING_PR_LABELS_PATH]: JSON.stringify([{ name: uppercase_label }]),
+			}),
+		)
+
+		await expect(git_gh_pr.pr_get_classification(PR_BRANCH)).resolves.toBe(BUGFIX)
+	})
+})
+
 describe('pr_create', () => {
 	it('posts the pull request collection through gh api', async () => {
-		await git_gh_pr.pr_create(TITLE, BODY)
+		await git_gh_pr.pr_create(TITLE, BODY, BUGFIX)
 
 		expect(request_to(PULLS_PATH).method).toBeUndefined()
 		expect(request_to(PULLS_PATH).jq_filter).toBe(HTML_URL_FILTER)
@@ -120,7 +196,7 @@ describe('pr_create', () => {
 	// `gh pr create` inferred the head from the current branch and REST does not: a request without
 	// it is a 422, so the branch is read from git and sent.
 	it('sends the current branch as head and the default branch as base', async () => {
-		await git_gh_pr.pr_create(TITLE, BODY)
+		await git_gh_pr.pr_create(TITLE, BODY, BUGFIX)
 
 		expect(parsed_body(PULLS_PATH)).toStrictEqual({
 			title: TITLE,
@@ -133,7 +209,7 @@ describe('pr_create', () => {
 	// `git-pr.ts` displays what this returns, so the shape `gh pr create` printed is rebuilt from the
 	// response's `html_url`.
 	it('answers the browser URL of the created pull request', async () => {
-		await expect(git_gh_pr.pr_create(TITLE, BODY)).resolves.toBe(CREATED_URL)
+		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).resolves.toBe(CREATED_URL)
 	})
 
 	// The branch → number memo the reads share is sound because a pull request's number never changes
@@ -141,7 +217,7 @@ describe('pr_create', () => {
 	// A memo left standing would keep answering with the merged one (joshuafolkken/kit#1027).
 	it('re-resolves the branch afterwards, dropping the branch to number memo', async () => {
 		await git_gh_pr.pr_get_number(PR_BRANCH)
-		await git_gh_pr.pr_create(TITLE, BODY)
+		await git_gh_pr.pr_create(TITLE, BODY, BUGFIX)
 		await git_gh_pr.pr_get_number(PR_BRANCH)
 
 		expect(lookup_calls()).toBe(2)
@@ -153,13 +229,13 @@ describe('pr_create', () => {
 	it('reports PR_ALREADY_EXISTS for the REST 422 on a duplicate head', async () => {
 		mocked_api.mockRejectedValueOnce(new Error(DUPLICATE_MESSAGE))
 
-		await expect(git_gh_pr.pr_create(TITLE, BODY)).rejects.toThrow(PR_ALREADY_EXISTS)
+		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).rejects.toThrow(PR_ALREADY_EXISTS)
 	})
 
 	it('rethrows any other failure unchanged', async () => {
 		mocked_api.mockRejectedValueOnce(new Error(NOT_FOUND))
 
-		await expect(git_gh_pr.pr_create(TITLE, BODY)).rejects.toThrow(NOT_FOUND)
+		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).rejects.toThrow(NOT_FOUND)
 	})
 })
 
