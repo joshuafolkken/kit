@@ -1064,7 +1064,7 @@ Check an issue body file against the template's four required headings — `## �
 pnpm josh issue:lint /tmp/issue-body.md
 ```
 
-Prints `ok` and required labels when headings and exactly one `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1. For `labels: bug`, add `-f 'labels[]=bug'` when filing; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples (joshuafolkken/kit#2123).
+Prints `ok` and required labels when headings and either `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1. For `labels: bug`, add `-f 'labels[]=bug'` when filing; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples (joshuafolkken/kit#2123).
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現` (joshuafolkken/kit#2212, joshuafolkken/kit#2353). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun) re-runs the baseline.
 
