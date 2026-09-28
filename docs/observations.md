@@ -402,3 +402,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | medium | scripts/rules/issue-bug-label-document.test.ts:28 | 2026-09-28 | #2661
 - rf:bug-risks | medium | scripts/rules/issue-bug-label.ts:44 | 2026-09-28 | #2661
 - rf:bug-risks | medium | scripts/rules/issue-bug-label.ts:40 | 2026-09-28 | #2661
+- rf:security | high | scripts/agent/codex-agent-argv.ts:83 | 2026-09-28 | #2654
