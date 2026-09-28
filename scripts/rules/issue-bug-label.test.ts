@@ -12,7 +12,7 @@ import { rule_delivery } from './rule-guard'
 const work = mkdtempSync(path.join(tmpdir(), 'issue-bug-label-rule-'))
 const body = path.join(work, 'body.md')
 const BUG_BODY = '## 背景\n\n- 種別: 不具合\n'
-const OTHER_BODY = '## 背景\n\n- 種別: 振る舞い変更\n'
+const OTHER_BODY = '## 背景\n\n- 種別: 非不具合\n- 種別: 振る舞い変更\n'
 const BREAKING_DECLARATION = '- 互換性: 破壊的変更'
 const ENHANCEMENT_LABEL = 'enhancement'
 const FILING = `gh api repos/joshuafolkken/kit/issues -f title=x -F body=@${body}`
@@ -110,6 +110,14 @@ describe('filing an enhancement or breaking change issue', () => {
 		const filing = `${FILING} -f 'labels[]=bug' -f 'labels[]=enhancement'`
 
 		expect(issue_bug_label_rule.needs_classification_labels(filing, lint)).toBe(true)
+	})
+})
+
+describe('filing without a bug decision', () => {
+	it('refuses an unclassified filing even after lint was called', () => {
+		writeFileSync(body, '## 背景\n\n配布済みフックが実行されない。\n')
+
+		expect(issue_bug_label_rule.needs_classification_labels(FILING, lint)).toBe(true)
 	})
 })
 

@@ -1058,13 +1058,13 @@ pnpm josh pkg:scout "date formatting" --size 5
 
 ### `josh issue:lint`
 
-Check an issue body written to a file against the template's four required headings — `## 背景`, `## 現象`, `## 期待結果`, `## 受け入れ条件` (the single source is `prompts/collaboration-workflow/issue-template.md`). It reads a path rather than stdin so a body can be linted before the `gh api … issues` call that files it.
+Check an issue body file against the template's four required headings — `## 背景`, `## 現象`, `## 期待結果`, `## 受け入れ条件` — and its bug classification (source: `prompts/collaboration-workflow/issue-template.md`). Run this before filing.
 
 ```bash
 pnpm josh issue:lint /tmp/issue-body.md
 ```
 
-Prints `ok` and `labels: bug` or `labels: none` when headings are present, or each missing heading (exit 1). `labels: bug` means `- 種別: 不具合` was declared: add `-f 'labels[]=bug'` when filing. A heading must stand alone on its line. This is the mechanical half of the template check (joshuafolkken/kit#2123).
+Prints `ok` and required labels when headings and either `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1. For `labels: bug`, add `-f 'labels[]=bug'` when filing; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples (joshuafolkken/kit#2123).
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現` (joshuafolkken/kit#2212, joshuafolkken/kit#2353). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun) re-runs the baseline.
 
@@ -1081,7 +1081,7 @@ pnpm josh defect:rate --days 30
 
 - `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
 
-**Behavior:** the numerator is the issues filed in the window that declare `- 種別: 不具合` or carry `route:interrupt`; the denominator is the issues closed as completed in the window that declare `- 種別: 振る舞い変更`. The defect declaration is not yet in the issue template and no filing lint enforces it, so a defect filed without it counts only through `route:interrupt`. A window with no completed behavior change prints `n/a` rather than a number. The search API serves at most 1000 results; when a window exceeds it the counts are printed as lower bounds, and an unreadable search exits 1 without a rate. `backlog:next` reads the same measurement to decide whether to offer defects first (joshuafolkken/kit#2455).
+**Behavior:** the numerator is issues filed in the window with `- 種別: 不具合` or `route:interrupt`; the denominator is completed issues with `- 種別: 振る舞い変更`. Filing lint now requires an explicit bug decision; older undeclared defects count only through `route:interrupt`. With no completed behavior change, prints `n/a`. The search API returns at most 1000 results; beyond that the counts are lower bounds. An unreadable search exits 1. `backlog:next` uses this rate to prioritize defects (joshuafolkken/kit#2455).
 
 ### `josh issue:backlinks`
 
