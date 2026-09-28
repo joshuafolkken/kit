@@ -27,7 +27,8 @@ const MISSING_INSTALL_NOTICE = 'kit hooks inactive: run pnpm install, then rerea
 const MISSING_INSTALL_GUARD = `if [ ! -f ${CONSUMER_PACKAGE_MANIFEST} ]; then echo '${MISSING_INSTALL_NOTICE}' >&2; exit 0; fi; `
 const CODEX_ADAPTER_BUNDLE = `node ${CONSUMER_HOOK_BUNDLE_DIR}codex-hook-adapter.js`
 const CODEX_HOOKS_DESTINATION = '.codex/hooks.json'
-const PROJECT_ROOT_PREFIX = String.raw`unset ${GIT_LOCATION_VARIABLES.join(' ')}; cd \"$(git rev-parse --show-toplevel)\" && `
+const GIT_UNSET_OPTIONS = GIT_LOCATION_VARIABLES.map((name) => `-u ${name}`).join(' ')
+const PROJECT_ROOT_PREFIX = String.raw`if project_root=\"$(env ${GIT_UNSET_OPTIONS} git rev-parse --show-toplevel 2>/dev/null)\"; then unset ${GIT_LOCATION_VARIABLES.join(' ')}; else project_root=\"$(git rev-parse --show-toplevel)\" || exit 1; fi; cd \"$project_root\" && `
 // Capture the value of every `"command"` field, escapes and all, so the rewrites below touch command
 // values alone — never an echo reminder's prose or a `"description"` that merely mentions the string.
 const COMMAND_FIELD = /("command":\s*")((?:[^"\\]|\\.)*)(")/gu

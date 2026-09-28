@@ -148,7 +148,7 @@ describe('installed hook from a project subdirectory', () => {
 
 		try {
 			const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
-				GIT_WORK_TREE: foreign_root,
+				git_overrides: { GIT_WORK_TREE: foreign_root },
 			})
 
 			expect(result.status).toBe(0)
@@ -157,6 +157,18 @@ describe('installed hook from a project subdirectory', () => {
 		} finally {
 			rmSync(foreign_root, { recursive: true, force: true })
 		}
+	})
+
+	it('runs the hook bundle when Git metadata is outside the work tree', () => {
+		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const { command } = JSON.parse(rewritten) as { command: string }
+		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
+			is_external_git: true,
+		})
+
+		expect(result.status).toBe(0)
+		expect(result.stdout).toBe(GUARD_OUTPUT)
+		expect(result.stderr).not.toContain(INSTALL_NOTICE)
 	})
 })
 
