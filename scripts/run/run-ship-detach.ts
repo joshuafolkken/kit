@@ -23,6 +23,14 @@ import { run_event_stream_emit } from './run-event-stream-emit'
 // **One supervisor per issue.** The launched pid is kept beside the stage record, and a second detach
 // while that process is alive is refused `busy`: two supervisors would race each other's commit and
 // merge, which the resume record (`run-ship-stage.ts`) orders but cannot serialize.
+//
+// **The supervisor names itself once it starts** (joshuafolkken/kit#2642). The launcher reads the child's
+// start time from outside, which a sandbox that refuses `ps` cannot answer; a pid with no start time
+// would then be believed for as long as any process holds that number. The supervisor therefore claims
+// the record with its own identity — whose socket beacon answers where `ps` cannot — and a record still
+// carrying a bare pid is believed only for the claim window after its launch. A recorded start time the
+// probe cannot momentarily read is the opposite case: the pid is alive and was verified once, so it is
+// kept running rather than read as a crash that would license a second supervisor.
 
 const LOG_PREFIX = 'josh-ship-log-'
 const PID_PREFIX = 'josh-ship-pid-'
@@ -42,15 +50,18 @@ const SUPERVISED_VALUE = '1'
 const LAUNCHED = 'launched'
 const BUSY = 'busy'
 const FAILED = 'failed'
-const NO_SIGNAL = 0
 const RESULT_PREFIX = 'josh-ship-result-'
 const RECORD_POLL_MS = 25
 const RECORD_WAIT_ATTEMPTS = 200
+// How long a bare launched pid is believed before the supervisor must have claimed the record: far above
+// a `pnpm josh ship` start-up, far below the lifetime a reused pid could otherwise be believed for.
+const CLAIM_WINDOW_MS = 120_000
 type ShipResult = 'running' | 'success' | 'failed' | 'abnormal'
 
 interface ShipRecord {
 	pid?: number | undefined
 	process_start?: string | undefined
+	launched_at?: number | undefined
 	launcher_pid?: number | undefined
 	launcher_start?: string | undefined
 	launch_id: string
@@ -60,6 +71,7 @@ interface ShipRecord {
 const ship_record_schema = z.object({
 	pid: z.number().int().positive().optional(),
 	process_start: z.string().optional(),
+	launched_at: z.number().optional(),
 	launcher_pid: z.number().int().positive().optional(),
 	launcher_start: z.string().optional(),
 	launch_id: z.string(),
@@ -95,16 +107,6 @@ function log_path(repository: string, number: string): string {
 	return stamp_file.stamp_path(`${LOG_PREFIX}${number}${KEY_SEPARATOR}`, repository, LOG_SUFFIX)
 }
 
-function is_alive(pid: number): boolean {
-	try {
-		process.kill(pid, NO_SIGNAL)
-
-		return true
-	} catch (error) {
-		return error instanceof Error && 'code' in error && error.code === 'EPERM'
-	}
-}
-
 function result_path(repository: string, number: string): string {
 	return stamp_file.stamp_path(`${RESULT_PREFIX}${number}${KEY_SEPARATOR}`, repository)
 }
@@ -129,6 +131,7 @@ function record_launch(request: DetachRequest, pid: number, launch_id: string): 
 	stamp_file.replace_stamp(result_path(request.repository, request.number), {
 		pid,
 		launch_id,
+		launched_at: Date.now(),
 		...(process_start !== undefined && { process_start }),
 	})
 }
@@ -141,10 +144,16 @@ function supervisor_environment(launch_id: string): Record<string, string | unde
 	}
 }
 
-function has_live_identity(pid: number, process_start: string | undefined): boolean {
-	const is_same = process_identity.is_same_process(pid, process_start)
+function is_within_claim_window(record: ShipRecord): boolean {
+	return record.launched_at !== undefined && Date.now() - record.launched_at < CLAIM_WINDOW_MS
+}
 
-	return is_same === true || (is_same === undefined && process_start === undefined && is_alive(pid))
+function has_live_identity(pid: number, record: ShipRecord): boolean {
+	if (record.process_start === undefined) {
+		return is_within_claim_window(record) && process_identity.is_live_pid(pid)
+	}
+
+	return process_identity.is_same_process(pid, record.process_start) !== false
 }
 
 function result_of(record: ShipRecord): ShipResult {
@@ -154,7 +163,7 @@ function result_of(record: ShipRecord): ShipResult {
 		return is_launcher === false ? 'abnormal' : 'running'
 	}
 
-	if (has_live_identity(record.pid, record.process_start)) return 'running'
+	if (has_live_identity(record.pid, record)) return 'running'
 
 	return record.result ?? 'abnormal'
 }
@@ -193,14 +202,28 @@ async function ready_record(repository: string, number: string): Promise<ShipRec
 	return undefined
 }
 
-async function mark_result(repository: string, number: string, code: number): Promise<void> {
+async function update_record(
+	repository: string,
+	number: string,
+	fields: Partial<ShipRecord>,
+): Promise<void> {
 	const record = await ready_record(repository, number)
 	if (record === undefined) return
 
-	stamp_file.replace_stamp(result_path(repository, number), {
-		...record,
-		result: code === 0 ? 'success' : 'failed',
-	})
+	stamp_file.replace_stamp(result_path(repository, number), { ...record, ...fields })
+}
+
+async function mark_result(repository: string, number: string, code: number): Promise<void> {
+	await update_record(repository, number, { result: code === 0 ? 'success' : 'failed' })
+}
+
+// A supervisor that cannot name its own start either (no probe and no beacon) leaves the launcher's
+// identity in place rather than pairing its own pid with the launcher-read start of another process.
+async function claim_identity(repository: string, number: string): Promise<void> {
+	const own = process_identity.own_fields()
+	if (own.process_start === undefined) return
+
+	await update_record(repository, number, own)
 }
 
 function failed_launch(request: DetachRequest, note: string): DetachResult {
@@ -327,6 +350,7 @@ const run_ship_detach = {
 	FAILED,
 	LAUNCHED,
 	LAUNCH_ID_KEY,
+	claim_identity,
 	mark_result,
 	read_result,
 	SUPERVISED_KEY,
