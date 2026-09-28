@@ -410,3 +410,11 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/init/hook-command-rewrite.ts:29 | 2026-09-28 | #2637
 - rf:none | none | - | 2026-09-28 | #2660
 - rf:bug-risks | medium | scripts/init/hook-command-rewrite.ts:30 | 2026-09-28 | #2637
+- rf:bug-risks | medium | scripts/lane/openai-review-broker.ts:212 | 2026-09-28 | #2654
+- rf:bug-risks | medium | scripts/lane/openai-review-broker.ts:108 | 2026-09-28 | #2654
+- rf:tests | low | scripts/lane/openai-review-broker.test.ts:101 | 2026-09-28 | #2654
+- rf:security | medium | scripts/lane/openai-review-broker.ts:253 | 2026-09-28 | #2654
+- rf:tests | medium | scripts/lane/openai-review-broker.test.ts:81 | 2026-09-28 | #2654
+- rf:tests | medium | scripts/lane/openai-lane-supervisor.test.ts:92 | 2026-09-28 | #2654
+- rf:project-conventions | low | scripts/lane/openai-review-broker.ts:246 | 2026-09-28 | #2654
+- rf:bug-risks | medium | scripts/lane/openai-review-broker.ts:55 | 2026-09-28 | #2654
