@@ -12,6 +12,7 @@ const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
 const GITHUB_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
 const DISPATCH_TAG = '${{ github.event.client_payload.tag }}'
 const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
+const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const CHECKOUT_ACTION = 'actions/checkout@'
 const MANIFEST_SCHEMA = z.object({
 	repository: z.object({ url: z.string() }),
@@ -25,6 +26,7 @@ const STEP_SCHEMA = z.looseObject({
 })
 const JOB_SCHEMA = z.object({
 	needs: z.unknown().optional(),
+	concurrency: z.object({ group: z.string(), queue: z.string() }),
 	permissions: PERMISSIONS_SCHEMA,
 	steps: z.array(STEP_SCHEMA),
 })
@@ -44,11 +46,10 @@ const WORKFLOW_SCHEMA = z.object({
 	jobs: JOBS_SCHEMA,
 })
 const RELEASE_WORKFLOW_SCHEMA = z.object({
-	concurrency: z.object({
-		group: z.string(),
-		queue: z.string(),
-	}),
+	concurrency: z.unknown().optional(),
 	jobs: z.object({
+		'publish-github': JOB_SCHEMA,
+		'publish-npm': JOB_SCHEMA,
 		'update-production': PRODUCTION_JOB_SCHEMA,
 		'create-release': RELEASE_JOB_SCHEMA,
 	}),
@@ -143,22 +144,46 @@ describe('GitHub Release job ordering', () => {
 		expect(publish).toBeDefined()
 		expect(release.permissions['contents']).toBe('write')
 	})
+})
 
-	it('queues every tag for the entire publication pipeline', () => {
+describe('release workflow concurrency', () => {
+	it('allows release jobs to wait without blocking earlier package jobs', () => {
 		const workflow = RELEASE_WORKFLOW_SCHEMA.parse(load(readFileSync(WORKFLOW_PATH, 'utf8')))
+		const expected = { group: PACKAGE_PUBLISH_GROUP, queue: 'max' }
 
-		expect(workflow.concurrency).toEqual({
-			group: 'github-release',
-			queue: 'max',
-		})
+		expect(workflow.concurrency).toBeUndefined()
+		expect(workflow.jobs['publish-github'].concurrency).toEqual(expected)
+		expect(workflow.jobs['publish-npm'].concurrency).toEqual(expected)
 		expect(workflow.jobs['create-release'].concurrency).toBeUndefined()
+
+		const checkout = workflow.jobs['create-release'].steps.find((step) =>
+			step.uses?.startsWith(CHECKOUT_ACTION),
+		)
+
+		expect(checkout?.with?.['fetch-depth']).toBe(0)
+		expect(workflow.jobs['create-release'].permissions['actions']).toBe('read')
 	})
+
+	it.each(PUBLISH_JOB_NAMES)(
+		'selects the registry tag while %s holds the publish queue',
+		(job_name) => {
+			const job = read_workflow().jobs[job_name]
+			const commands = job.steps.map((step) => step.run ?? '').join('\n')
+
+			expect(job.concurrency.group).toBe(PACKAGE_PUBLISH_GROUP)
+			expect(commands).toContain('dist-tags.latest')
+			expect(commands).toContain('publish-tag-cli.ts')
+			expect(commands).toContain('--tag ${{ steps.publish-tag.outputs.tag }}')
+			expect(commands).not.toContain('--tag latest')
+		},
+	)
 
 	it('prevents the independent production dispatch from running in kit', () => {
 		const production = readFileSync('.github/workflows/production.yml', 'utf8')
 
 		expect(production).toContain("github.repository != 'joshuafolkken/kit' || inputs.tag != ''")
 		expect(production).toContain('REF_NAME: ${{ inputs.tag || github.event.client_payload.tag }}')
+		expect(production).toContain('group: production-update')
 	})
 })
 
