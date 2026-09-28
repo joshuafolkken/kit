@@ -48,8 +48,10 @@ const FAKE_ISSUE_COMMIT = 'My feature #42'
 const FAKE_PR_URL = 'https://github.com/owner/repo/pull/1'
 const CREATED_PR_URL = 'https://github.com/owner/repo/pull/2'
 const EXTRA_BODY = 'Some description'
-const FULL_BODY = `closes #42\n\n${EXTRA_BODY}`
+const ISSUE_CLOSING = 'closes #42'
+const FULL_BODY = `${ISSUE_CLOSING}\n\n${EXTRA_BODY}`
 const BUGFIX = 'bugfix'
+const ENHANCEMENT = 'enhancement'
 const FAKE_ISSUE_INFO = {
 	title: 'My feature',
 	number: '42',
@@ -95,7 +97,7 @@ describe('git_pr.create_with_issue_info — build_body behavior', () => {
 
 		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(
 			FAKE_ISSUE_COMMIT,
-			'closes #42',
+			ISSUE_CLOSING,
 			BUGFIX,
 		)
 	})
@@ -150,6 +152,25 @@ describe('git_pr.create_with_issue_info — a pull request that is already open'
 
 		expect(git_gh_command.issue_view_json).not.toHaveBeenCalled()
 		expect(git_gh_command.pr_update_body).toHaveBeenCalledWith(BRANCH, FULL_BODY)
+	})
+})
+
+describe('git_pr.create_with_issue_info — a merged pull request', () => {
+	it('uses the current issue classification after the previous pull request merged', async () => {
+		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
+		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'MERGED' }))
+		vi.mocked(git_gh_command.issue_view_json).mockResolvedValue(
+			JSON.stringify({ labels: [], body: `- リリース分類: ${ENHANCEMENT}` }),
+		)
+
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO)
+
+		expect(git_gh_command.pr_get_classification).not.toHaveBeenCalled()
+		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
+			FAKE_ISSUE_COMMIT,
+			ISSUE_CLOSING,
+			ENHANCEMENT,
+		)
 	})
 })
 

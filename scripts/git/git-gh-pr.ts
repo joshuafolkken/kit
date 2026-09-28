@@ -66,7 +66,7 @@ async function pr_get_classification(
 	const response = await git_gh_exec.exec_gh_api({
 		path: `${git_gh_api_path.issue_api_path(String(number))}${LABELS_SEGMENT}`,
 	})
-	const names = PR_LABELS.parse(JSON.parse(response)).map((label) => label.name)
+	const names = PR_LABELS.parse(JSON.parse(response)).map((label) => label.name.toLowerCase())
 	const selected = names.filter((name) => pr_classification.is_classification(name))
 	if (selected.length === 0) return undefined
 

@@ -181,6 +181,7 @@ function build_body(issue_info: IssueInfo, extra_body?: string): string {
 
 async function existing_pr_label(branch_name: string): Promise<ReleaseClassification | undefined> {
 	if (!(await git_gh_command.pr_exists(branch_name))) return undefined
+	if (is_pr_state_merged(await get_pr_state_safe(branch_name))) return undefined
 
 	return await git_gh_command.pr_get_classification(branch_name)
 }

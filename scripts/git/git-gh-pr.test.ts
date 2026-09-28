@@ -170,6 +170,19 @@ describe('existing pull request classification', () => {
 
 		expect(requests().filter((request) => request.path === EXISTING_PR_LABELS_PATH)).toHaveLength(1)
 	})
+
+	it('recognizes an existing classification regardless of case', async () => {
+		const uppercase_label = BUGFIX.toUpperCase()
+
+		mocked_api.mockImplementation(
+			gh_api_routes({
+				...write_routes(),
+				[EXISTING_PR_LABELS_PATH]: JSON.stringify([{ name: uppercase_label }]),
+			}),
+		)
+
+		await expect(git_gh_pr.pr_get_classification(PR_BRANCH)).resolves.toBe(BUGFIX)
+	})
 })
 
 describe('pr_create', () => {
