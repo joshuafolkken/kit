@@ -3,18 +3,20 @@ import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { execaSync } from 'execa'
+import { loadAll } from 'js-yaml'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { production_dependency_graph, type Lockfile } from './production-dependency-graph'
 
 const ROOT = process.cwd()
 const SCRATCH = mkdtempSync(path.join(os.tmpdir(), 'kit-optional-eslint-'))
 const PNPM = 'pnpm'
-const DIR_FLAG = '--dir'
 const IGNORE_SCRIPTS_FLAG = '--ignore-scripts'
 const PACKAGE_NAME = '@joshuafolkken/kit'
 const require = createRequire(import.meta.url)
 const MANIFEST = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
 	version: string
 	dependencies: Record<string, string>
+	optionalDependencies?: Record<string, string>
 	devDependencies: Record<string, string>
 	peerDependencies: Record<string, string>
 	peerDependenciesMeta: Record<string, { optional: boolean }>
@@ -68,25 +70,6 @@ function link_svelte_peer(directory: string): void {
 	link_package(directory, 'svelte', path.dirname(svelte_path))
 }
 
-function installed_names(directory: string): Set<string> {
-	const { stdout } = execaSync(PNPM, ['list', DIR_FLAG, directory, '--depth', 'Infinity', '--json'])
-	const names = new Set<string>()
-	const [project] = JSON.parse(stdout) as Array<{ dependencies: Record<string, unknown> }>
-	if (project === undefined) throw new Error('pnpm returned no project dependency tree')
-
-	function collect(dependencies: Record<string, unknown>): void {
-		for (const [name, entry] of Object.entries(dependencies)) {
-			names.add(name)
-			const child = entry as { dependencies?: Record<string, unknown> }
-			if (child.dependencies) collect(child.dependencies)
-		}
-	}
-
-	collect(project.dependencies)
-
-	return names
-}
-
 beforeAll(() => {
 	const { stdout } = execaSync(
 		PNPM,
@@ -108,21 +91,67 @@ afterAll(() => {
 vi.setConfig({ testTimeout: 60_000 })
 
 it('keeps ESLint and Svelte out of a minimal installation', () => {
-	const directory = path.join(SCRATCH, 'minimal')
-
-	execaSync(
-		PNPM,
-		['--filter', PACKAGE_NAME, 'deploy', '--prod', '--offline', IGNORE_SCRIPTS_FLAG, directory],
-		{ cwd: ROOT },
-	)
 	const { stdout } = execaSync('tar', ['-xOzf', TARBALL, 'package/package.json'])
-	const packed = JSON.parse(stdout) as { dependencies: Record<string, string> }
+	const packed = JSON.parse(stdout) as {
+		dependencies: Record<string, string>
+		optionalDependencies?: Record<string, string>
+	}
+	const lockfile_text = readFileSync(path.join(ROOT, 'pnpm-lock.yaml'), 'utf8')
+	const lockfile = loadAll(lockfile_text).at(-1) as Lockfile
 
-	const names = installed_names(directory)
+	const names = production_dependency_graph.names(
+		lockfile,
+		packed.dependencies,
+		packed.optionalDependencies ?? {},
+	)
 
 	expect(packed.dependencies).toEqual(MANIFEST.dependencies)
+	expect(packed.optionalDependencies).toEqual(MANIFEST.optionalDependencies)
 	expect([...names].filter((name) => /eslint|svelte/u.test(name))).toEqual([])
 })
+
+it.each(['eslint', 'svelte'])(
+	'finds an optional %s dependency in the production graph',
+	(name: string) => {
+		const root_key = '.'
+		const package_key = 'demo@1.0.0'
+		const peer_key = `${name}@1.0.0`
+		const lockfile: Lockfile = {
+			importers: {
+				[root_key]: { dependencies: { demo: { specifier: '1.0.0', version: '1.0.0' } } },
+			},
+			snapshots: {
+				[package_key]: { optionalDependencies: { [name]: '1.0.0' } },
+				[peer_key]: {},
+			},
+		}
+
+		expect(
+			[...production_dependency_graph.names(lockfile, { demo: '1.0.0' })].filter((entry) =>
+				/eslint|svelte/u.test(entry),
+			),
+		).toEqual([name])
+	},
+)
+
+it.each(['eslint', 'svelte'])(
+	'finds a root optional %s dependency in the production graph',
+	(name: string) => {
+		const root_key = '.'
+		const peer_key = `${name}@1.0.0`
+		const lockfile: Lockfile = {
+			importers: {
+				[root_key]: {
+					dependencies: {},
+					optionalDependencies: { [name]: { specifier: '1.0.0', version: '1.0.0' } },
+				},
+			},
+			snapshots: { [peer_key]: {} },
+		}
+
+		expect(production_dependency_graph.names(lockfile, {}, { [name]: '1.0.0' })).toContain(name)
+	},
+)
 
 it('resolves the public config against an opted-in consumer and runs ESLint', () => {
 	const directory = path.join(SCRATCH, 'eslint')
