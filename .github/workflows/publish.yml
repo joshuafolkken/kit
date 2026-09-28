@@ -44,7 +44,7 @@ jobs:
         id: publish-tag
         run: |
           version=$(node -p "require('./package.json').version")
-          latest=$(npm view @joshuafolkken/kit dist-tags.latest --registry https://npm.pkg.github.com)
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://npm.pkg.github.com)
           tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
         env:
@@ -93,7 +93,7 @@ jobs:
         id: publish-tag
         run: |
           version=$(node -p "require('./package.json').version")
-          latest=$(npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
+          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
           tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$latest")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 

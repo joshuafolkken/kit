@@ -187,6 +187,20 @@ describe('release workflow concurrency', () => {
 	})
 })
 
+describe('registry dist-tag lookup', () => {
+	it.each(PUBLISH_JOB_NAMES)(
+		'runs the dist-tag lookup outside the repository in %s so npm skips devEngines',
+		(job_name) => {
+			const lines = read_workflow()
+				.jobs[job_name].steps.flatMap((step) => (step.run ?? '').split('\n'))
+				.filter((line) => line.includes('npm view'))
+
+			expect(lines.length).toBeGreaterThan(0)
+			for (const line of lines) expect(line).toContain('cd "$RUNNER_TEMP" && npm view')
+		},
+	)
+})
+
 describe('installation guidance', () => {
 	it('starts the README without GitHub Packages authentication', () => {
 		const content = readFileSync('README.md', 'utf8')
