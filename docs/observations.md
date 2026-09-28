@@ -418,3 +418,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | medium | scripts/lane/openai-lane-supervisor.test.ts:92 | 2026-09-28 | #2654
 - rf:project-conventions | low | scripts/lane/openai-review-broker.ts:246 | 2026-09-28 | #2654
 - rf:bug-risks | medium | scripts/lane/openai-review-broker.ts:55 | 2026-09-28 | #2654
+- rf:bug-risks | low | scripts/run/run-ship-detach.ts:156 | 2026-09-28 | #2642
+- rf:bug-risks | low | scripts/run/run-ship-detach.ts:224 | 2026-09-28 | #2642
+- rf:tests | low | scripts/run/run-ship-detach.test.ts:193 | 2026-09-28 | #2642
