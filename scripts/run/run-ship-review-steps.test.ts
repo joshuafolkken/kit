@@ -4,6 +4,7 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const resolve_in_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn())
+const is_child_mock = vi.hoisted(() => vi.fn())
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -19,9 +20,14 @@ vi.mock('#scripts/gate/gate-tree', () => ({
 	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
 }))
 vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: missing_mock } }))
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: is_child_mock },
+}))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 const { run_ship_review } = await import('./run-ship-review')
+const { openai_review_broker } = await import('#scripts/lane/openai-review-broker')
+const broker_request = vi.spyOn(openai_review_broker, 'request')
 
 // joshuafolkken/kit#2427: the supervised round-1 review — open, launch, join, attest, record — and each
 // branch that hands control back to the agent.
@@ -75,11 +81,46 @@ beforeEach(() => {
 	josh_run_mock.mockReset()
 	answer_with(undefined)
 	launch_mock.mockReset().mockResolvedValue({ ...COMPLETED, exit_code: OK })
-	resolve_in_mock.mockReset().mockReturnValue({ kind: 'argv', argv: ARGV, profile: undefined })
+	resolve_in_mock.mockReset().mockReturnValue({
+		kind: 'argv',
+		argv: ARGV,
+		profile: { provider: 'anthropic', role: 'reviewer', model: 'claude-opus-5-5', effort: 'high' },
+	})
 	missing_mock.mockReset().mockReturnValue([])
+	is_child_mock.mockReset().mockReturnValue(false)
+	broker_request.mockReset().mockResolvedValue(false)
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
 	stamps.write_text_stamp.mockClear()
 	stamps.remove_stamp.mockClear()
+})
+
+describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
+	it('uses the registered reviewer broker instead of a nested Codex launch', async () => {
+		resolve_in_mock.mockReturnValue({
+			kind: 'argv',
+			argv: ARGV,
+			profile: { provider: 'openai', role: 'reviewer', model: 'gpt-6-sol', effort: 'high' },
+		})
+		is_child_mock.mockReturnValue(true)
+		broker_request.mockResolvedValue(true)
+
+		expect(await stage_code()).toBe(OK)
+		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, '1')
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it('stops before attestation when the isolated reviewer is unavailable', async () => {
+		resolve_in_mock.mockReturnValue({
+			kind: 'argv',
+			argv: ARGV,
+			profile: { provider: 'openai', role: 'reviewer', model: 'gpt-6-sol', effort: 'high' },
+		})
+		is_child_mock.mockReturnValue(true)
+
+		expect(await stage_code()).toBe(FAILED)
+		expect(commands()).toStrictEqual([OPEN])
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_ship_review_steps.review_stage — the clean path', () => {

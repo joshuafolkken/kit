@@ -14,6 +14,7 @@ import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
 import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decision'
+import { openai_review_broker } from './openai-review-broker'
 
 const OWNER_PREFIX = 'josh-openai-lane-supervisor-'
 const STATE_PREFIX = 'josh-openai-lane-supervisor-state-'
@@ -331,7 +332,10 @@ async function supervise(lane: LaneInfo, profile: AgentProfile, nonce: string): 
 	try {
 		if (!(await openai_lane_supervisor_decision.is_approved(lane.directory, nonce))) return 0
 
-		return await run_claimed(lane, profile, owner)
+		return await openai_review_broker.with_server(
+			lane,
+			async () => await run_claimed(lane, profile, owner),
+		)
 	} finally {
 		release(lane.directory, nonce)
 	}
