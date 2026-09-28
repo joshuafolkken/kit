@@ -111,3 +111,31 @@ describe('init_logic_workspace.merge_workspace_yaml — deprecated key removal',
 		expect(result).not.toContain(DEPRECATED_KEY)
 	})
 })
+
+// joshuafolkken/kit#2693: `pnpm add -D @joshuafolkken/kit` before `josh init` leaves pnpm's
+// placeholder for esbuild, which fails every later install until it is answered.
+describe('init_logic_workspace.merge_workspace_yaml — pnpm build placeholders', () => {
+	const BUILD_TEMPLATE = "allowBuilds:\n  esbuild: true\n  '@scope/tool': false\n"
+
+	it('answers a placeholder the template decides', () => {
+		const existing = 'allowBuilds:\n  esbuild: set this to true or false\n'
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(
+			'allowBuilds:\n  esbuild: true\n',
+		)
+	})
+
+	it('matches a quoted scoped package name', () => {
+		const existing = "allowBuilds:\n  '@scope/tool': set this to true or false\n"
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(
+			"allowBuilds:\n  '@scope/tool': false\n",
+		)
+	})
+
+	it('leaves a placeholder the template does not decide, and a user answer, untouched', () => {
+		const existing = 'allowBuilds:\n  esbuild: false\n  other: set this to true or false\n'
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(existing)
+	})
+})

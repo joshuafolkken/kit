@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs'
 import path from 'node:path'
 import { repo_origin } from '#scripts/discovery/repo-origin'
+import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { execaSync } from 'execa'
 
 type ProjectProfile = 'static' | 'node'
@@ -52,10 +53,6 @@ function read_manifest(root: string): Record<string, unknown> | undefined {
 	return parsed as Record<string, unknown>
 }
 
-function has_entries(value: unknown): boolean {
-	return typeof value === 'object' && value !== null && Object.keys(value).length > 0
-}
-
 function is_record(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -70,8 +67,20 @@ function has_build_script(value: unknown): boolean {
 	return is_record(value) && ('build' in value || 'dev' in value)
 }
 
+// kit itself is not evidence of a Node toolchain: `pnpm add -D @joshuafolkken/kit` before
+// `josh init` is the documented order, and it must still leave an `index.html` site static
+// (joshuafolkken/kit#2693).
+function has_project_dependencies(value: unknown): boolean {
+	if (!is_record(value)) return false
+
+	return Object.keys(value).some((name) => name !== KIT_PACKAGE_NAME)
+}
+
 function inferred_profile(manifest: Record<string, unknown>): ProfileResult {
-	if (has_entries(manifest['dependencies']) || has_entries(manifest['devDependencies'])) {
+	if (
+		has_project_dependencies(manifest['dependencies']) ||
+		has_project_dependencies(manifest['devDependencies'])
+	) {
 		return { profile: 'node', reason: 'package dependencies' }
 	}
 

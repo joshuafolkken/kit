@@ -77,6 +77,26 @@ describe('project_checks type-check readiness', () => {
 	})
 })
 
+describe('project_checks eslint readiness', () => {
+	it('skips absent ESLint on a static project and enables it once files and tools arrive', () => {
+		const root = fixture()
+
+		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
+		expect(project_checks.eslint_skip_reason(root)).toContain('no JavaScript or TypeScript')
+		writeFileSync(path.join(root, 'site.js'), '')
+		expect(project_checks.eslint_skip_reason(root)).toContain('no ESLint configuration')
+		writeFileSync(path.join(root, 'eslint.config.js'), '')
+		expect(project_checks.eslint_skip_reason(root)).toContain('eslint is not installed')
+		mkdirSync(path.join(root, NODE_MODULES, '.bin'), { recursive: true })
+		writeFileSync(path.join(root, NODE_MODULES, '.bin', 'eslint'), '')
+		expect(project_checks.eslint_skip_reason(root)).toBeUndefined()
+	})
+
+	it('never skips ESLint on a node project', () => {
+		expect(project_checks.eslint_skip_reason(fixture())).toBeUndefined()
+	})
+})
+
 describe('project_checks optional configuration', () => {
 	it('finds later ESLint and cspell configuration from a subdirectory', () => {
 		const root = fixture()

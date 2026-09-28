@@ -1,10 +1,4 @@
-import {
-	ESLINT_CACHE_FLAGS,
-	GATE_COMMAND,
-	PE,
-	TS_CACHE_FLAGS,
-	type CommandEntry,
-} from './josh-command-types'
+import { GATE_COMMAND, PE, TS_CACHE_FLAGS, type CommandEntry } from './josh-command-types'
 
 const FILE_ARGUMENTS = '[files...]'
 const REQUIRED_FILE_ARGUMENTS = '<files...>'
@@ -66,14 +60,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['none']],
 	},
 	format: {
-		// prettier first here, unlike `format:edited`, and deliberately: `eslint --fix` exits 1
-		// whenever a non-autofixable error remains, so putting it first behind `&&` would mean one
-		// unused variable anywhere in the tree stops prettier from running at all.
-		shell: [
-			'sh',
-			'-c',
-			`pnpm exec prettier --write . && pnpm exec eslint . --fix ${ESLINT_CACHE_FLAGS.join(' ')}`,
-		],
+		script: 'scripts/lint/format.ts',
 		description: 'Format code with prettier and eslint',
 		category: 'Development',
 		reference: ['', 'developer', ['files', 'processes']],

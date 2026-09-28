@@ -8,6 +8,8 @@ words:
   - postdev
   - predev
   - prepreview
+  # pnpm's .pnpmfile.mjs hook file that strips kit-only lifecycle scripts at pack time (#2693).
+  - pnpmfile
   # Names and technical terms quoted in the fourth historical release audit.
   - SQSCANGHA
   - undici

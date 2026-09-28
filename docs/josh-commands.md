@@ -101,7 +101,7 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh format`
 
-Format code with prettier and eslint.
+Format code with prettier and eslint. A `static` project skips ESLint for the reason `josh lint` prints.
 
 ```bash
 pnpm josh format
