@@ -398,3 +398,7 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/gate/verification-gate.ts | 2026-09-27 | #2196
 - rf:tests | low | scripts/package/optional-eslint.test.ts | 2026-09-27 | #2627
 - rf:tests | medium | scripts/package/optional-eslint.test.ts | 2026-09-27 | #2627
+- rf:bug-risks | medium | scripts/issue/issue-lint-cli.ts:31 | 2026-09-28 | #2661
+- rf:tests | medium | scripts/rules/issue-bug-label-document.test.ts:28 | 2026-09-28 | #2661
+- rf:bug-risks | medium | scripts/rules/issue-bug-label.ts:44 | 2026-09-28 | #2661
+- rf:bug-risks | medium | scripts/rules/issue-bug-label.ts:40 | 2026-09-28 | #2661
