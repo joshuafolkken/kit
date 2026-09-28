@@ -422,3 +422,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | low | scripts/run/run-ship-detach.ts:224 | 2026-09-28 | #2642
 - rf:tests | low | scripts/run/run-ship-detach.test.ts:193 | 2026-09-28 | #2642
 - k:wake-launch-refused-as-unsafe | d1 | 2026-09-28 | pnpm josh run:wake | The backlogrun #2654 supervisor's launch was refused as carrying characters not safe to execute after backlog:budget, so the drained run never reached run:carry --end and its standing record answered mismatch to the next backlogrun
+- rf:bug-risks | medium | scripts/ci/pr-classification.ts | 2026-09-28 | #2662
+- rf:none | none | - | 2026-09-28 | #2662
