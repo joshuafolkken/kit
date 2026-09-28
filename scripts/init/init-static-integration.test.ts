@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { init_logic } from './init-logic'
 
 const paths_mock = vi.hoisted(() => ({ root: '', package_dir: '' }))
 
@@ -130,6 +131,7 @@ describe('Git-free Web and node initialization', () => {
 		expect(settings).toContain('python')
 		expect(manifest).toContain('"prettier"')
 		expect(manifest).toContain(STATIC_PROFILE_ENTRY)
+		expect(manifest).toContain(`"preinstall": ${JSON.stringify(init_logic.SAFE_CHAIN_CMD)}`)
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 })
