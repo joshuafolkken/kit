@@ -102,6 +102,17 @@ function type_check_skip_reason(directory: string): string | undefined {
 	return undefined
 }
 
+// Shared by `josh lint` and `josh format`, so a static project without ESLint is skipped for the
+// same reason by both (joshuafolkken/kit#2693).
+function eslint_skip_reason(directory: string): string | undefined {
+	if (!is_static(directory)) return undefined
+	if (!has_files(directory, SCRIPT_FILES)) return 'no JavaScript or TypeScript files were found'
+	if (!has_config(directory, ESLINT_CONFIGS)) return 'no ESLint configuration was found'
+	if (!has_bin(directory, 'eslint')) return 'eslint is not installed'
+
+	return undefined
+}
+
 const project_checks = {
 	CSPELL_CONFIGS,
 	ESLINT_CONFIGS,
@@ -109,6 +120,7 @@ const project_checks = {
 	TYPE_CONFIGS,
 	TYPE_FILES,
 	WEB_FILES,
+	eslint_skip_reason,
 	has_bin,
 	has_config,
 	has_files,

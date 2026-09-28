@@ -113,7 +113,7 @@ describe('composite_arguments.reject_extra_arguments', () => {
 // (joshuafolkken/kit#1535). `main:merge` left it the same way and for the same kind of reason — it
 // has to name a merge strategy `git pull` could not decide on its own (joshuafolkken/kit#1659) — and
 // refuses extra arguments from inside `scripts/git/main-merge.ts`.
-const EXPECTED_COMPOSITES: ReadonlyArray<string> = ['format', 'latest', TEST_CMD]
+const EXPECTED_COMPOSITES: ReadonlyArray<string> = ['latest', TEST_CMD]
 
 function collect_composite_entries(): Array<[string, CommandEntry]> {
 	return Object.entries(COMMAND_MAP).filter(([, entry]) =>

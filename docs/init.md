@@ -13,15 +13,15 @@ pnpm josh init --profile static
 
 `josh profile` prints the selected profile and its reason, for example `profile: static (no package.json)`. The profiles are `static` (minimal settings for a project without a Node development toolchain) and `node` (the existing Node toolchain). An `index.html` file does not decide the profile: Vite projects normally have one.
 
-| Priority | Condition                                                    | Profile             |
-| -------- | ------------------------------------------------------------ | ------------------- |
-| 1        | `--profile static` or `--profile node`                       | The requested value |
-| 2        | `package.json` contains `josh.profile`                       | The recorded value  |
-| 3        | No `package.json`                                            | `static`            |
-| 4        | Dependencies, dev dependencies, or a `build` or `dev` script | `node`              |
-| 5        | Metadata-only `package.json`                                 | `static`            |
+| Priority | Condition                                                 | Profile             |
+| -------- | --------------------------------------------------------- | ------------------- |
+| 1        | `--profile static` or `--profile node`                    | The requested value |
+| 2        | `package.json` contains `josh.profile`                    | The recorded value  |
+| 3        | No `package.json`                                         | `static`            |
+| 4        | Dependencies other than kit, or a `build` or `dev` script | `node`              |
+| 5        | Metadata-only `package.json`                              | `static`            |
 
-`josh init` records the first decision in `package.json` as `josh.profile`. Re-running it keeps that profile even after dependencies are added. Pass `--profile` to change the recorded value deliberately. Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
+kit itself does not count as a dependency, so `pnpm add -D @joshuafolkken/kit` before `josh init` still selects `static` for an `index.html` site. `josh init` records the first decision in `package.json` as `josh.profile`. Re-running it keeps that profile even after dependencies are added. Pass `--profile` to change the recorded value deliberately. Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
 
 | Setting or tool                                                                     | `static`                                                                                                   | `node`                                    |
 | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -175,7 +175,7 @@ The ESLint preset likewise resolves ESLint and its plugins from the consumer pro
 | Command              | Runs                                                                                                                                                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `lint`               | `prettier --check .` then `eslint . --cache --cache-strategy content`                                                                                    |
-| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`                                                                              |
+| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`; a `static` project without ESLint skips it with a reason, as `lint` does    |
 | `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`                                                                          |
 | `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file)                                                                   |
 | `lefthook:install`   | `lefthook install`                                                                                                                                       |
@@ -192,7 +192,7 @@ Retired scripts (previously managed, now removed): `git`, `git:followup`, `teleg
 
 ## AI files
 
-The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
+The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves only esbuild's build script (kit's CLI runs on tsx, which depends on esbuild, and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md

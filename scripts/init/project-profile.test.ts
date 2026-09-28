@@ -1,10 +1,13 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { afterAll, describe, expect, it } from 'vitest'
 import { project_profile } from './project-profile'
 
 const roots: Array<string> = []
+const INDEX_HTML = 'index.html'
+const INDEX_CONTENT = '<h1>hello</h1>'
 
 function fixture(manifest?: Record<string, unknown>): string {
 	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-profile-'))
@@ -39,10 +42,24 @@ describe('project profile', () => {
 	it('selects static without a package manifest', () => {
 		expect(project_profile.resolve_profile(fixture()).profile).toBe('static')
 	})
+	it('selects static when kit is the only dependency', () => {
+		const root = fixture({ devDependencies: { [KIT_PACKAGE_NAME]: '^1' } })
+
+		writeFileSync(path.join(root, INDEX_HTML), INDEX_CONTENT)
+		expect(project_profile.inspect_project(root).profile).toBe('static')
+	})
+	it('selects node when a dependency other than kit is present', () => {
+		const root = fixture({ devDependencies: { [KIT_PACKAGE_NAME]: '^1', vite: '^1' } })
+
+		expect(project_profile.resolve_profile(root)).toEqual({
+			profile: 'node',
+			reason: 'package dependencies',
+		})
+	})
 	it('selects node for a Vite project even with index.html', () => {
 		const root = fixture({ devDependencies: { vite: '^1' } })
 
-		writeFileSync(path.join(root, 'index.html'), '<h1>hello</h1>')
+		writeFileSync(path.join(root, INDEX_HTML), INDEX_CONTENT)
 		expect(project_profile.inspect_project(root).profile).toBe('node')
 	})
 })
