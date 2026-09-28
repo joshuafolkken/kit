@@ -46,7 +46,6 @@ function arrange_commit(): void {
 	vi.spyOn(git_gh_command, 'pr_create').mockResolvedValue(
 		`https://github.com/joshuafolkken/kit/pull/${String(PR_NUMBER)}`,
 	)
-	vi.spyOn(git_gh_command, 'issue_add_label').mockResolvedValue(true)
 }
 
 function arrange_merge(): void {
@@ -117,15 +116,19 @@ describe('release_publish.publish', () => {
 
 		await release_publish.publish(PUBLISH_PLAN)
 
-		expect(git_gh_command.issue_add_label).toHaveBeenCalledWith(String(PR_NUMBER), IGNORE_LABEL)
-		expect(vi.mocked(git_gh_command.issue_add_label).mock.invocationCallOrder[0]).toBeLessThan(
+		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
+			release_publish.commit_message(PUBLISH_PLAN.next_version),
+			release_publish.pull_request_body(PUBLISH_PLAN),
+			IGNORE_LABEL,
+		)
+		expect(vi.mocked(git_gh_command.pr_create).mock.invocationCallOrder[0]).toBeLessThan(
 			vi.mocked(git_pr_checks.wait_for_pr_success).mock.invocationCallOrder[0] ?? 0,
 		)
 	})
 
 	it('does not wait for CI when the classification label cannot be applied', async () => {
 		arrange_publish()
-		vi.mocked(git_gh_command.issue_add_label).mockResolvedValue(false)
+		vi.mocked(git_gh_command.pr_create).mockRejectedValue(new Error(IGNORE_LABEL))
 
 		await expect(release_publish.publish(PUBLISH_PLAN)).rejects.toThrow(IGNORE_LABEL)
 		expect(git_pr_checks.wait_for_pr_success).not.toHaveBeenCalled()

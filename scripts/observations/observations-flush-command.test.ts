@@ -154,6 +154,7 @@ describe('observations_flush — the success path command sequence', () => {
 		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
 			observations_flush.COMMIT_MESSAGE,
 			observations_flush.pull_request_body(),
+			'ignore-for-release',
 		)
 	})
 })

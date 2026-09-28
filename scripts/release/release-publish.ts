@@ -20,7 +20,6 @@ const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const IGNORE_FOR_RELEASE_LABEL = 'ignore-for-release'
-const PR_NUMBER_PATTERN = /\/pull\/([1-9]\d*)$/u
 
 function branch_name_for(version: string): string {
 	return `release/v${version}`
@@ -101,15 +100,10 @@ async function commit_release(plan: ReleasePlan): Promise<void> {
 	const pr_url = await git_gh_command.pr_create(
 		commit_message(plan.next_version),
 		pull_request_body(plan),
+		IGNORE_FOR_RELEASE_LABEL,
 	)
 
 	console.info(pr_url)
-
-	const pr_number = PR_NUMBER_PATTERN.exec(pr_url)?.[1]
-	if (!pr_number) throw new Error(`Could not identify the release pull request: ${pr_url}`)
-
-	const has_label = await git_gh_command.issue_add_label(pr_number, IGNORE_FOR_RELEASE_LABEL)
-	if (!has_label) throw new Error(`Could not apply ${IGNORE_FOR_RELEASE_LABEL} to ${pr_url}`)
 }
 
 async function merge_and_tag(plan: ReleasePlan, branch_name: string): Promise<number> {

@@ -13,7 +13,10 @@ vi.mock('./git-gh-command', () => ({
 		pr_checks_watch: vi.fn(),
 		pr_get_url: vi.fn(),
 		pr_view: vi.fn(),
+		pr_get_classification: vi.fn(),
+		pr_ensure_classification: vi.fn(),
 		pr_update_body: vi.fn(),
+		issue_view_json: vi.fn(),
 	},
 }))
 
@@ -46,6 +49,7 @@ const FAKE_PR_URL = 'https://github.com/owner/repo/pull/1'
 const CREATED_PR_URL = 'https://github.com/owner/repo/pull/2'
 const EXTRA_BODY = 'Some description'
 const FULL_BODY = `closes #42\n\n${EXTRA_BODY}`
+const BUGFIX = 'bugfix'
 const FAKE_ISSUE_INFO = {
 	title: 'My feature',
 	number: '42',
@@ -61,22 +65,49 @@ beforeEach(() => {
 	)
 	vi.mocked(git_gh_command.pr_create).mockResolvedValue(CREATED_PR_URL)
 	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(FAKE_PR_URL)
+	vi.mocked(git_gh_command.issue_view_json).mockResolvedValue(
+		JSON.stringify({ labels: [{ name: 'bug' }], body: '' }),
+	)
 })
 
 describe('git_pr.create_with_issue_info — build_body behavior', () => {
+	it('does not open a pull request when the issue has no classification', async () => {
+		vi.mocked(git_gh_command.issue_view_json).mockResolvedValue(
+			JSON.stringify({ labels: [], body: '' }),
+		)
+
+		await expect(git_pr.create_with_issue_info(FAKE_ISSUE_INFO)).rejects.toThrow(
+			'Choose one release classification',
+		)
+		expect(git_gh_command.pr_create).not.toHaveBeenCalled()
+	})
+
+	it('does not open a pull request when the issue cannot be read', async () => {
+		vi.mocked(git_gh_command.issue_view_json).mockResolvedValue(undefined)
+
+		await expect(git_pr.create_with_issue_info(FAKE_ISSUE_INFO)).rejects.toThrow(
+			'Could not read issue',
+		)
+		expect(git_gh_command.pr_create).not.toHaveBeenCalled()
+	})
 	it('passes only closes #N when no extra_body supplied', async () => {
 		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO)
 
 		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(
 			FAKE_ISSUE_COMMIT,
 			'closes #42',
+			BUGFIX,
 		)
 	})
 
 	it('prepends closes #N to extra_body when extra_body is supplied', async () => {
 		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, EXTRA_BODY)
 
-		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(FAKE_ISSUE_COMMIT, FULL_BODY)
+		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(
+			FAKE_ISSUE_COMMIT,
+			FULL_BODY,
+			BUGFIX,
+		)
 	})
 })
 
@@ -86,6 +117,7 @@ describe('git_pr.create_with_issue_info — a pull request that is already open'
 	beforeEach(() => {
 		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
 		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'OPEN' }))
+		vi.mocked(git_gh_command.pr_get_classification).mockResolvedValue(BUGFIX)
 	})
 
 	it('writes a supplied body onto the open pull request', async () => {
@@ -100,6 +132,25 @@ describe('git_pr.create_with_issue_info — a pull request that is already open'
 
 		expect(vi.mocked(git_gh_command.pr_update_body)).not.toHaveBeenCalled()
 	})
+
+	it('repairs a missing classification on a rerun', async () => {
+		vi.mocked(git_gh_command.pr_get_classification).mockResolvedValue(undefined)
+
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO)
+
+		expect(git_gh_command.pr_ensure_classification).toHaveBeenCalledWith(BRANCH, BUGFIX)
+	})
+
+	it('updates an already classified pull request without an issue declaration', async () => {
+		vi.mocked(git_gh_command.issue_view_json).mockResolvedValue(
+			JSON.stringify({ labels: [], body: '' }),
+		)
+
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, EXTRA_BODY)
+
+		expect(git_gh_command.issue_view_json).not.toHaveBeenCalled()
+		expect(git_gh_command.pr_update_body).toHaveBeenCalledWith(BRANCH, FULL_BODY)
+	})
 })
 
 // joshuafolkken/kit#1232. The command used to sleep five seconds and then watch the rollup on a
@@ -107,7 +158,7 @@ describe('git_pr.create_with_issue_info — a pull request that is already open'
 // These assertions pin that the wait is gone from every path, not only the freshly-created one.
 describe('git_pr.create — returns as soon as the pull request is open', () => {
 	it('does not watch the checks after creating the PR', async () => {
-		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX })
 
 		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
 	})
@@ -116,7 +167,7 @@ describe('git_pr.create — returns as soon as the pull request is open', () => 
 		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
 		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'OPEN' }))
 
-		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX })
 
 		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
 		expect(vi.mocked(git_gh_command.pr_create)).not.toHaveBeenCalled()
@@ -127,17 +178,17 @@ describe('git_pr.create — returns as soon as the pull request is open', () => 
 		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
 		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'MERGED' }))
 
-		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX })
 
 		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
-		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(PR_TITLE, PR_BODY)
+		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(PR_TITLE, PR_BODY, BUGFIX)
 	})
 
 	it('does not watch the checks when the PR state cannot be read', async () => {
 		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
 		vi.mocked(git_gh_command.pr_view).mockResolvedValue('')
 
-		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX })
 
 		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
 		expect(vi.mocked(git_pr_messages.display_pr_opened_message)).toHaveBeenCalledOnce()
@@ -149,7 +200,7 @@ describe('git_pr.create — returns as soon as the pull request is open', () => 
 // (joshuafolkken/kit#1232).
 describe('git_pr.create — where the reported URL comes from', () => {
 	it('reports the URL the create call answered with, without re-reading it', async () => {
-		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX })
 
 		expect(vi.mocked(git_pr_messages.display_pr_url)).toHaveBeenCalledWith(CREATED_PR_URL)
 		expect(vi.mocked(git_gh_command.pr_get_url)).not.toHaveBeenCalled()
@@ -161,7 +212,7 @@ describe('git_pr.create — where the reported URL comes from', () => {
 		vi.mocked(git_pr_error.is_pr_already_exists_error).mockReturnValueOnce(true)
 		vi.mocked(git_gh_command.pr_create).mockRejectedValueOnce(new Error('already exists'))
 
-		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX })
 
 		expect(vi.mocked(git_pr_messages.display_pr_exists_message)).toHaveBeenCalledOnce()
 		expect(vi.mocked(git_pr_messages.display_pr_url)).toHaveBeenCalledWith(FAKE_PR_URL)
