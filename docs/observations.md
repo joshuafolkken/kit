@@ -403,3 +403,10 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/rules/issue-bug-label.ts:44 | 2026-09-28 | #2661
 - rf:bug-risks | medium | scripts/rules/issue-bug-label.ts:40 | 2026-09-28 | #2661
 - rf:security | high | scripts/agent/codex-agent-argv.ts:83 | 2026-09-28 | #2654
+- rf:bug-risks | medium | scripts/init/distributed-paths.ts:26 | 2026-09-28 | #2638
+- rf:none | none | - | 2026-09-28 | #2638
+- rf:bug-risks | medium | scripts/release/github-release.ts | 2026-09-28 | #2660
+- rf:bug-risks | medium | .github/workflows/publish.yml | 2026-09-28 | #2660
+- rf:bug-risks | medium | scripts/init/hook-command-rewrite.ts:29 | 2026-09-28 | #2637
+- rf:none | none | - | 2026-09-28 | #2660
+- rf:bug-risks | medium | scripts/init/hook-command-rewrite.ts:30 | 2026-09-28 | #2637
