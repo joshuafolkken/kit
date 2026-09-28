@@ -1,3 +1,4 @@
+import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 import { claude_plugin_config } from './claude-plugin-config'
 import { hook_launch } from './hook-launch'
 
@@ -15,7 +16,7 @@ import { hook_launch } from './hook-launch'
 
 const PNPM_JOSH_PREFIX = 'pnpm josh '
 const CODEX_ADAPTER_SOURCE = 'pnpm exec tsx scripts/hooks/codex-hook-adapter.ts'
-// Relative to the consumer's project root, which is the working directory a Claude Code hook runs in.
+// Relative to the consumer's project root, which hook commands select before using this path.
 // The path is the plugin marketplace's `node_modules` location plus the built entry `bin.josh` names.
 const BUNDLE_INVOCATION = `node ${claude_plugin_config.MARKETPLACE_PATH}/dist/josh.js `
 // The per-hook bundle directory a fresh clone builds, and where it lives inside the installed package.
@@ -26,7 +27,8 @@ const MISSING_INSTALL_NOTICE = 'kit hooks inactive: run pnpm install, then rerea
 const MISSING_INSTALL_GUARD = `if [ ! -f ${CONSUMER_PACKAGE_MANIFEST} ]; then echo '${MISSING_INSTALL_NOTICE}' >&2; exit 0; fi; `
 const CODEX_ADAPTER_BUNDLE = `node ${CONSUMER_HOOK_BUNDLE_DIR}codex-hook-adapter.js`
 const CODEX_HOOKS_DESTINATION = '.codex/hooks.json'
-const CODEX_ROOT_PREFIX = String.raw`cd \"$(git rev-parse --show-toplevel)\" && `
+const GIT_UNSET_OPTIONS = GIT_LOCATION_VARIABLES.map((name) => `-u ${name}`).join(' ')
+const PROJECT_ROOT_PREFIX = String.raw`if project_root=\"$(env ${GIT_UNSET_OPTIONS} git rev-parse --show-toplevel 2>/dev/null)\"; then unset ${GIT_LOCATION_VARIABLES.join(' ')}; else project_root=\"$(git rev-parse --show-toplevel)\" || exit 1; fi; cd \"$project_root\" && `
 // Capture the value of every `"command"` field, escapes and all, so the rewrites below touch command
 // values alone — never an echo reminder's prose or a `"description"` that merely mentions the string.
 const COMMAND_FIELD = /("command":\s*")((?:[^"\\]|\\.)*)(")/gu
@@ -61,7 +63,9 @@ function rewrite_command_value(value: string): string {
 function rewrite_hook_commands(content: string, is_codex = false): string {
 	return content.replaceAll(COMMAND_FIELD, (_match, open: string, value: string, close: string) => {
 		const rewritten = rewrite_command_value(value)
-		const prefix = is_codex && !rewritten.startsWith(CODEX_ROOT_PREFIX) ? CODEX_ROOT_PREFIX : ''
+		const should_select_root = is_codex || rewritten.includes(claude_plugin_config.MARKETPLACE_PATH)
+		const prefix =
+			should_select_root && !rewritten.startsWith(PROJECT_ROOT_PREFIX) ? PROJECT_ROOT_PREFIX : ''
 
 		return `${open}${prefix}${rewritten}${close}`
 	})

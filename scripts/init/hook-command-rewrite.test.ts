@@ -18,7 +18,10 @@ const KIT_FALLBACK_FORM =
 	'{"command": "if [ -f dist/hooks/pretool-guard.js ]; then node dist/hooks/pretool-guard.js; else pnpm josh pretool:guard; fi"}'
 const PRETOOL_SOURCE = '{"command": "pnpm josh pretool:guard"}'
 const INSTALL_NOTICE = 'run pnpm install, then reread CLAUDE.md'
+const GUARD_OUTPUT = 'guard ran'
+const FOREIGN_DIRECTORY_PREFIX = 'kit-hook-foreign-'
 const CONSUMER_JOSH_COMMAND = 'node ./node_modules/@joshuafolkken/kit/dist/josh.js'
+const ROOT_COMMAND = 'git rev-parse --show-toplevel'
 
 function consumer_hook_commands(): ReadonlyArray<string> {
 	const transformed = transform_copied_content(
@@ -28,7 +31,13 @@ function consumer_hook_commands(): ReadonlyArray<string> {
 	const { hooks } = JSON.parse(transformed) as ReturnType<
 		typeof claude_settings_fixture.load_settings
 	>
-	const events = [hooks.SessionStart, hooks.UserPromptSubmit, hooks.PreToolUse, hooks.PostToolUse]
+	const events = [
+		hooks.SessionStart,
+		hooks.UserPromptSubmit,
+		hooks.PreToolUse,
+		hooks.PostToolUse,
+		hooks.Stop,
+	]
 
 	return events
 		.flatMap((matchers) => matchers ?? [])
@@ -79,7 +88,7 @@ describe('rewrite_hook_commands', () => {
 
 describe('bootstrap without installed dependencies', () => {
 	it('initializes the temporary checkout when GIT_DIR points elsewhere', () => {
-		const foreign_root = mkdtempSync(path.join(tmpdir(), 'kit-hook-foreign-'))
+		const foreign_root = mkdtempSync(path.join(tmpdir(), FOREIGN_DIRECTORY_PREFIX))
 
 		vi.stubEnv('GIT_DIR', path.join(foreign_root, '.git'))
 
@@ -116,7 +125,49 @@ describe('bootstrap without installed dependencies', () => {
 		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true)
 
 		expect(result.status).toBe(0)
-		expect(result.stdout).toBe('guard ran')
+		expect(result.stdout).toBe(GUARD_OUTPUT)
+		expect(result.stderr).not.toContain(INSTALL_NOTICE)
+	})
+})
+
+describe('installed hook from a project subdirectory', () => {
+	it('runs the hook bundle instead of reporting an inactive installation', () => {
+		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const { command } = JSON.parse(rewritten) as { command: string }
+		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true)
+
+		expect(result.status).toBe(0)
+		expect(result.stdout).toBe(GUARD_OUTPUT)
+		expect(result.stderr).not.toContain(INSTALL_NOTICE)
+	})
+
+	it('runs the hook bundle when Git points to another work tree', () => {
+		const foreign_root = mkdtempSync(path.join(tmpdir(), FOREIGN_DIRECTORY_PREFIX))
+		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const { command } = JSON.parse(rewritten) as { command: string }
+
+		try {
+			const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
+				git_overrides: { GIT_WORK_TREE: foreign_root },
+			})
+
+			expect(result.status).toBe(0)
+			expect(result.stdout).toBe(GUARD_OUTPUT)
+			expect(result.stderr).not.toContain(INSTALL_NOTICE)
+		} finally {
+			rmSync(foreign_root, { recursive: true, force: true })
+		}
+	})
+
+	it('runs the hook bundle when Git metadata is outside the work tree', () => {
+		const rewritten = rewrite_hook_commands(KIT_FALLBACK_FORM)
+		const { command } = JSON.parse(rewritten) as { command: string }
+		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
+			is_external_git: true,
+		})
+
+		expect(result.status).toBe(0)
+		expect(result.stdout).toBe(GUARD_OUTPUT)
 		expect(result.stderr).not.toContain(INSTALL_NOTICE)
 	})
 })
@@ -135,7 +186,7 @@ describe('apply_hook_command_rewrite_for_destination', () => {
 		expect(commands).toHaveLength(2)
 
 		for (const command of commands) {
-			expect(command).toContain('git rev-parse --show-toplevel')
+			expect(command).toContain(ROOT_COMMAND)
 			expect(command).toContain(
 				'node ./node_modules/@joshuafolkken/kit/dist/hooks/codex-hook-adapter.js',
 			)
@@ -181,6 +232,13 @@ describe('the distributed settings.json a consumer receives', () => {
 
 		for (const command of josh_hooks) {
 			expect(command).toContain(`${CONSUMER_JOSH_COMMAND} `)
+		}
+	})
+
+	it('starts every installed hook command from the project root', () => {
+		for (const command of consumer_hook_commands()) {
+			if (!command.includes('node_modules/@joshuafolkken/kit')) continue
+			expect(command).toContain(ROOT_COMMAND)
 		}
 	})
 
