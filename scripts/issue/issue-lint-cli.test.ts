@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 
 const TEMP_PATHS: Array<string> = []
-const VALID_BODY = '## 背景\n\n## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
+const VALID_BODY = '## 背景\n\n'
+const REQUIRED_SECTIONS = '## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
+const ENHANCEMENT_OUTPUT = 'labels: enhancement'
 
 afterEach(async () => {
 	vi.restoreAllMocks()
@@ -20,6 +22,13 @@ afterEach(async () => {
 describe('issue:lint label output', () => {
 	it.each([
 		{ body: `${VALID_BODY}- 種別: 不具合\n`, expected: 'labels: bug' },
+		{ body: `${VALID_BODY}- 目的: 機能追加\n`, expected: ENHANCEMENT_OUTPUT },
+		{ body: `${VALID_BODY}- 目的: 機能改善\n`, expected: ENHANCEMENT_OUTPUT },
+		{ body: `${VALID_BODY}- 互換性: 破壊的変更\n`, expected: 'labels: breaking-change' },
+		{
+			body: `${VALID_BODY}- 目的: 機能改善\n- 互換性: 破壊的変更\n`,
+			expected: 'labels: enhancement, breaking-change',
+		},
 		{ body: VALID_BODY, expected: 'labels: none' },
 	])('prints $expected for the issue body', async ({ body, expected }) => {
 		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-label-'))
@@ -27,10 +36,26 @@ describe('issue:lint label output', () => {
 		TEMP_PATHS.push(directory)
 		const body_path = path.join(directory, 'issue.md')
 
-		await writeFile(body_path, body)
+		await writeFile(body_path, `${body}${REQUIRED_SECTIONS}`)
 		const report = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 		expect(await issue_lint_cli.run(body_path)).toBe(0)
 		expect(report).toHaveBeenCalledWith(expected)
+	})
+
+	it('rejects conflicting bug and enhancement declarations', async () => {
+		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-conflict-'))
+
+		TEMP_PATHS.push(directory)
+		const body_path = path.join(directory, 'issue.md')
+
+		await writeFile(
+			body_path,
+			`${VALID_BODY}- 種別: 不具合\n- 目的: 機能改善\n${REQUIRED_SECTIONS}`,
+		)
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await issue_lint_cli.run(body_path)).toBe(1)
+		expect(report).toHaveBeenCalledWith('✖ bug and enhancement declarations cannot be combined')
 	})
 })

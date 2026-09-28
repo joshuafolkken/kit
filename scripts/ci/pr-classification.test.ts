@@ -34,6 +34,24 @@ describe('issue release classification', () => {
 
 		expect(pr_classification.select_issue_classification(issue)).toBe(BREAKING)
 	})
+
+	it('selects breaking change for an enhancement that breaks compatibility', () => {
+		const issue = JSON.stringify({
+			labels: [{ name: ENHANCEMENT }, { name: BREAKING }],
+			body: '- 目的: 機能改善\n- 互換性: 破壊的変更',
+		})
+
+		expect(pr_classification.select_issue_classification(issue)).toBe(BREAKING)
+	})
+
+	it('keeps breaking change when a paired issue has an old enhancement declaration', () => {
+		const issue = JSON.stringify({
+			labels: [{ name: ENHANCEMENT }, { name: BREAKING }],
+			body: `- リリース分類: ${ENHANCEMENT}`,
+		})
+
+		expect(pr_classification.select_issue_classification(issue)).toBe(BREAKING)
+	})
 })
 
 describe('issue release classification refusals', () => {

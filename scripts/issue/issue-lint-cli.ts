@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { behavior_change_lint } from './behavior-change-lint'
-import { issue_bug_label } from './issue-bug-label'
+import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 
 // `josh issue:lint <path>` — read an Issue body from a file and print `ok`, or every template problem
@@ -22,13 +22,17 @@ const USAGE = 'Usage: josh issue:lint <path-to-issue-body>'
 function problems(body: string): ReadonlyArray<string> {
 	const missing = issue_lint.missing_headings(body).map((heading) => `missing heading: ${heading}`)
 
-	return [...missing, ...behavior_change_lint.problems(body)]
+	return [
+		...missing,
+		...behavior_change_lint.problems(body),
+		...issue_classification.problems(body),
+	]
 }
 
 function report(found: ReadonlyArray<string>, body: string): number {
 	if (found.length === 0) {
 		console.info(OK_MESSAGE)
-		console.info(`labels: ${issue_bug_label.labels_for(body, []).join(', ') || NO_LABELS}`)
+		console.info(`labels: ${issue_classification.required_labels(body).join(', ') || NO_LABELS}`)
 
 		return SUCCESS_EXIT_CODE
 	}

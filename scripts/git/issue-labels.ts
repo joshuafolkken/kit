@@ -3,6 +3,8 @@
 // fail silently — an epic filtered on the wrong name is simply never closed or never excluded.
 const EPIC_LABEL = 'epic'
 const BUG_LABEL = 'bug'
+const ENHANCEMENT_LABEL = 'enhancement'
+const BREAKING_CHANGE_LABEL = 'breaking-change'
 const IN_PROGRESS_LABEL = 'in-progress'
 // Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
@@ -239,6 +241,8 @@ const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
 const ALL_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
 	BUG_LABEL,
+	ENHANCEMENT_LABEL,
+	BREAKING_CHANGE_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	AUTO_OK_LABEL,
@@ -259,12 +263,14 @@ export {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	BUG_LABEL,
+	BREAKING_CHANGE_LABEL,
 	depth_label_of,
 	DEPTH_0_LABEL,
 	DEPTH_1_LABEL,
 	DEPTH_2_LABEL,
 	DEPTH_LABEL_ORDER,
 	DEPTH_LABELS,
+	ENHANCEMENT_LABEL,
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,
 	has_any_label,

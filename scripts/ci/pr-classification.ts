@@ -43,13 +43,21 @@ function is_classification(value: string): value is ReleaseClassification {
 	return CLASSIFICATION_SET.has(value)
 }
 
+function release_candidates(
+	candidates: ReadonlyArray<ReleaseClassification>,
+): ReadonlyArray<ReleaseClassification> {
+	if (!candidates.includes(BREAKING)) return candidates
+
+	return candidates.filter((candidate) => candidate !== 'enhancement')
+}
+
 function issue_candidates(issue_json: string): ReadonlyArray<ReleaseClassification> {
 	const issue = z
 		.object({ labels: z.array(LABEL), body: z.string().nullable() })
 		.parse(JSON.parse(issue_json))
 	const names = issue.labels.map((label) => label.name.toLowerCase())
 	const declared = [...(issue.body ?? '').matchAll(DECLARATION)].map((match) => match[1] ?? '')
-	const candidates = [...names, ...declared].filter(is_classification)
+	const candidates = [...release_candidates([...names, ...declared].filter(is_classification))]
 	const unknown = declared.filter((value) => !is_classification(value))
 
 	if (unknown.length > 0) throw new Error(`Unknown release classification: ${unknown.join(', ')}`)

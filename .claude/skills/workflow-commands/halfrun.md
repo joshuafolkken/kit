@@ -1,6 +1,6 @@
 # `halfrun` — the manifest (implement + verify, stop before commit)
 
-When this run files a new Issue, run `pnpm josh issue:lint <body-file>` and apply its `labels: bug` answer at creation with `-f 'labels[]=bug'`; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification. Keep the existing `depth` and `route` labels.
+When this run files a new Issue, run `pnpm josh issue:lint <body-file>` and apply every label in its `labels:` answer at creation; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification. Keep the existing `depth` and `route` labels.
 
 `halfrun` sits between `kickoff` (plan only) and `fullrun` (full execution with auto-merge). It
 implements the change and runs the full verification gate, then **stops before commit** — nothing is
