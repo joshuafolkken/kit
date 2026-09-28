@@ -25,6 +25,8 @@ stays countable by filing route afterwards. **This paragraph belongs to the prer
 the table** — the label means a filing the run is *blocked by*, so the observation row carries no
 `route:` label of its own (§2i):
 
+Before that call, run `pnpm josh issue:lint <body-file>` and apply its `labels: bug` answer at creation with `-f 'labels[]=bug'`; `prompts/collaboration-workflow/issue-template.md` is the single source. Keep `route:tier-a` and `depth`.
+
 ```bash
 gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f 'labels[]=depth:<n>' -f body="<body>"
 ```

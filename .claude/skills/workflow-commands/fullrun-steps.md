@@ -7,6 +7,8 @@ the run is at, and the sections below carry that step in full.
 
 ## The `fullrun #N` step list
 
+Use `pnpm josh issue:lint` and `prompts/collaboration-workflow/issue-template.md` for filings.
+
 **Add `in-progress` the moment `run:hold` answered `hold`** (create if missing:
 `gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is
 actively in progress" --silent 2>/dev/null || true`, then `gh api

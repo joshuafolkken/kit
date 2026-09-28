@@ -69,7 +69,7 @@ gh api "repos/{owner}/{repo}/issues?state=open&per_page=100" --paginate \
 
 #### 該当したときの手順
 
-1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。
+1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。起票前に `pnpm josh issue:lint <body-file>` を実行し、`prompts/collaboration-workflow/issue-template.md` のラベル手順を適用する。
 
    ```bash
    gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:interrupt' -f 'labels[]=depth:<n>' -f body="<body>"

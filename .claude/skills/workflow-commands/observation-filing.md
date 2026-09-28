@@ -29,6 +29,8 @@ backlog pool (`backlogrun-steps.md` → "What one invocation approves").
 
 The detail below is read at the filing decision, and the marker suite pins the rules here.
 
+Before filing an observation, run `pnpm josh issue:lint <body-file>` and apply its `labels: bug` answer at creation with `-f 'labels[]=bug'`; `prompts/collaboration-workflow/issue-template.md` is the single source. Keep the depth label.
+
 ### The depth test — a discretionary filing cites the product work it blocked
 
 **A run that has just spent an hour inside the workflow tooling files findings about the workflow

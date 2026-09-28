@@ -80,3 +80,5 @@ split is found.
   **database id**, not its issue number; a failure here is non-fatal). Never fold the relation into the
   creation call. (3) Send Telegram notification listing all created issues. (4) Present the command
   `backlogrun #<E> --only`. (5) **Stop** — do not implement.
+
+Before filing, run `pnpm josh issue:lint <body-file>` and follow `prompts/collaboration-workflow/issue-template.md` for labels.

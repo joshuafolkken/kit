@@ -1,4 +1,4 @@
-import { markdown_section } from '#scripts/issue/markdown-section'
+import { issue_bug_label } from '#scripts/issue/issue-bug-label'
 import { z } from 'zod'
 import { test_declared_logic } from './test-declared-logic'
 
@@ -16,14 +16,14 @@ type RedVerdict = 'red' | 'green' | 'no-test'
 // The declaration a bug-fix Issue carries under its background heading, in the same slot as the
 // behavior-change declaration (`behavior-change-lint.ts`). Read from the declaration, never inferred,
 // so an Issue that does not declare itself a bug is never held to it.
-const BUG_DECLARATION_LINE = '- 種別: 不具合'
+const { BUG_DECLARATION_LINE } = issue_bug_label
 
 // Only a Vitest file can be run against the pre-fix tree here — an `*.e2e.ts` needs a served app, so it
 // is left to the CI E2E job rather than counted as a test this command ran.
 const UNIT_TEST_SUFFIX = '.test.ts'
 
 function is_bug_fix(body: string): boolean {
-	return markdown_section.has_line(body, BUG_DECLARATION_LINE)
+	return issue_bug_label.is_bug_fix(body)
 }
 
 // The changed paths that are Vitest files, in the order they were given.

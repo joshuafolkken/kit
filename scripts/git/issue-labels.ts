@@ -2,6 +2,7 @@
 // labeler and the next-issues display all key on these exact strings, and a drifted copy would
 // fail silently — an epic filtered on the wrong name is simply never closed or never excluded.
 const EPIC_LABEL = 'epic'
+const BUG_LABEL = 'bug'
 const IN_PROGRESS_LABEL = 'in-progress'
 // Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
@@ -237,6 +238,7 @@ const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
 
 const ALL_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
+	BUG_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	AUTO_OK_LABEL,
@@ -256,6 +258,7 @@ export {
 	ALL_LABELS,
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
+	BUG_LABEL,
 	depth_label_of,
 	DEPTH_0_LABEL,
 	DEPTH_1_LABEL,

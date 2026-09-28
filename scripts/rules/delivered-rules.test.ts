@@ -42,11 +42,10 @@ const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const ISSUE_SCOUT = 'issue-scout'
 const FILING_CAP_ID = 'filing-cap'
-// A filing is claimed by five filing rows — the WIP cap, the scout gate, the per-run cap, the fold
-// gate (joshuafolkken/kit#2119, joshuafolkken/kit#2213) and the `issue:lint` oracle-consulted row
-// (joshuafolkken/kit#2324); a filing whose body also carries a backtick adds `shell-body`.
-const FILING_RULE_COUNT = 5
-const FILING_WITH_BODY_RULE_COUNT = 6
+// A filing is claimed by six rows: WIP, scout, cap, fold, issue:lint, and the bug-label check.
+// A filing whose body also carries a backtick adds `shell-body`.
+const FILING_RULE_COUNT = 6
+const FILING_WITH_BODY_RULE_COUNT = 7
 const NOW_MS = 1_700_000_000_000
 // Later than any turn the transcript fixture can carry, so the batching guard's recorded refusal
 // covers the whole open sequence whatever wall clock the fixture used — the state where it has
@@ -442,12 +441,12 @@ describe('DELIVERED_RULES — trigger overlap', () => {
 		expect(rules_claiming(command)).toBe(1)
 	})
 
-	// **A filing is the deliberate overlap: five rows claim it** (joshuafolkken/kit#2119,
+	// **A filing is the deliberate overlap: six rows claim it** (joshuafolkken/kit#2119,
 	// joshuafolkken/kit#2213, joshuafolkken/kit#2324) — the WIP cap, the scout gate, the per-run cap, the
-	// fold gate and the `issue:lint` oracle-consulted row — resolved by the reissue chain rather than by
+	// fold gate, the `issue:lint` oracle-consulted row, and bug-label check — resolved by the reissue chain rather than by
 	// a single winner, so the claim count is asserted rather than the exactly-one invariant above.
 	it.each([FILING_COMMAND, FILING_API_COMMAND])(
-		'is claimed by the five filing rules: %j',
+		'is claimed by the six filing rules: %j',
 		(command) => {
 			expect(rules_claiming(command)).toBe(FILING_RULE_COUNT)
 		},
@@ -455,7 +454,7 @@ describe('DELIVERED_RULES — trigger overlap', () => {
 
 	// **The overlap order, asserted rather than assumed** (joshuafolkken/kit#1198,
 	// joshuafolkken/kit#2119, joshuafolkken/kit#2324). A filing whose body carries a backtick is claimed
-	// by six rows; with the run already scouted the scout gate and the cap stand down, and the fold gate
+	// by seven rows; with the run already scouted the scout gate and the cap stand down, and the fold gate
 	// stands down on a first filing, so `wip-cap` is delivered first and `shell-body` on the reissue —
 	// the `issue:lint` oracle row is last and would deliver only on a further reissue. The stamps are
 	// keyed per `id`, so nothing is lost by losing the race.
