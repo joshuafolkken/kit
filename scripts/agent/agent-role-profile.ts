@@ -201,6 +201,16 @@ function resolve_provider(environment: AgentEnvironment = process.env): Provider
 	return detected_provider(environment) ?? handed_provider(environment)
 }
 
+// Whether this session is woken when a background command it started completes
+// (joshuafolkken/kit#2653). Claude Code re-invokes the session at the completion; a Codex session is not
+// re-invoked, so a parent there can only wait by polling, each poll a model call over its whole context.
+// Only a resolved Codex session answers no — an unresolved one keeps the behavior it had before.
+function has_completion_callback(environment: AgentEnvironment = process.env): boolean {
+	const selected = resolve_provider(environment)
+
+	return selected.kind !== 'provider' || selected.provider !== OPENAI_PROVIDER
+}
+
 // The mark a detached launch sets on its child: the provider this session resolved, or nothing when it
 // resolved none — the child then fails the same way this session would have.
 function handoff_environment(
@@ -309,6 +319,7 @@ const agent_role_profile = {
 	WORKER,
 	describe,
 	handoff_environment,
+	has_completion_callback,
 	is_safe_value,
 	parse,
 	phase_effort,
