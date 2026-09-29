@@ -545,3 +545,17 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | low | scripts/safe-chain/project-config.ts | 2026-09-29 | #2743
 - rf:bug-risks | medium | docs/tutorial.md | 2026-09-29 | #2745
 - rf:none | none | - | 2026-09-29 | #2745
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-cli.ts | 2026-09-29 | #2750
+- rf:tests | medium | scripts/backlog/backlog-drive-cli.ts | 2026-09-29 | #2750
+- rf:tests | medium | scripts/backlog/backlog-drive.test.ts | 2026-09-29 | #2750
+- rf:tests | low | scripts/run/run-retrospective-switch.test.ts | 2026-09-29 | #2750
+- rf:tests | low | scripts/backlog/backlog-drive-cli.ts | 2026-09-29 | #2750
+- rf:bug-risks | high | scripts/init/start-steps.ts:67 | 2026-09-29 | #2197
+- rf:tests | medium | scripts/init/start-steps.test.ts:91 | 2026-09-29 | #2197
+- rf:bug-risks | low | scripts/init/start-steps.ts:84 | 2026-09-29 | #2197
+- rf:project-conventions | low | scripts/git/issue-labels.ts:167 | 2026-09-29 | #2197
+- rf:project-conventions | low | scripts/init/start-steps.ts:17 | 2026-09-29 | #2197
+- rf:bug-risks | low | scripts/init/start-prompt.ts:26 | 2026-09-29 | #2197
+- rf:tests | low | scripts/init/init-static-integration.test.ts:217 | 2026-09-29 | #2197
+- rf:bug-risks | medium | scripts/init/start-plan.ts:71 | 2026-09-29 | #2197
+- rf:project-conventions | low | scripts/init/start-steps.ts:67 | 2026-09-29 | #2197
