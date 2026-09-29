@@ -158,6 +158,14 @@ describe('init_logic_workspace.merge_workspace_yaml — missing build approvals'
 		)
 	})
 
+	it('indents the added approvals to match the existing entries', () => {
+		const existing = 'allowBuilds:\n    esbuild: true\n'
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, KIT_TEMPLATE)).toBe(
+			'allowBuilds:\n    esbuild: true\n    lefthook: true\n    unrs-resolver: true\n',
+		)
+	})
+
 	it('leaves a flow-style allowBuilds whole rather than appending block lines to it', () => {
 		const existing = 'allowBuilds: { esbuild: true }\n'
 

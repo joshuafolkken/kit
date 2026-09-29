@@ -93,11 +93,25 @@ function build_entry_keys(block: string): Set<string> {
 // (joshuafolkken/kit#2710). Entries the project already answered keep their value.
 // Only a block mapping can take appended entry lines; a flow map (`allowBuilds: { … }`) is left whole.
 const BLOCK_MAPPING_HEADER_PATTERN = /^allowBuilds:[ \t]*(?:#[^\n]*)?(?:\n|$)/u
+const LEADING_INDENT_PATTERN = /^[ \t]+/u
+
+// Appended lines take the indent of the block's own entries: a mapping whose items start at
+// different columns is invalid YAML, so a four-space block must not gain two-space lines.
+function block_entry_indent(block: string): string | undefined {
+	const entry = block.split('\n').find((line) => build_entry_key(line) !== undefined)
+
+	return entry === undefined ? undefined : LEADING_INDENT_PATTERN.exec(entry)?.[0]
+}
+
+function reindent(line: string, indent: string | undefined): string {
+	return indent === undefined ? line : line.replace(LEADING_INDENT_PATTERN, () => indent)
+}
 
 function add_missing_build_entries(existing: string, template: string): string {
 	const block = extract_yaml_block(existing, 'allowBuilds')
 	if (!BLOCK_MAPPING_HEADER_PATTERN.test(block)) return existing
 	const present = build_entry_keys(block)
+	const indent = block_entry_indent(block)
 	const missing = extract_yaml_block(template, 'allowBuilds')
 		.split('\n')
 		.filter((line) => {
@@ -105,6 +119,7 @@ function add_missing_build_entries(existing: string, template: string): string {
 
 			return key !== undefined && !present.has(key)
 		})
+		.map((line) => reindent(line, indent))
 	if (missing.length === 0) return existing
 
 	return existing.replace(block, () => [block, ...missing].join('\n'))
