@@ -5,6 +5,7 @@ import {
 	MIGRATION_CLAIM_SUFFIX,
 	OBSERVATION_LEDGER_PATH,
 } from './observation-ledger'
+import { observation_ledger_line } from './observation-ledger-line'
 
 // Moves the ledger's lines from the path it had before joshuafolkken/kit#2724 to the one it has now
 // (`observation-ledger.ts` carries why both are recognized). Changing the constant alone split the
@@ -27,6 +28,7 @@ import {
 
 const NEWLINE = '\n'
 const NO_SIGNAL = 0
+const NO_SUCH_PROCESS = 'ESRCH'
 
 function claim_path(legacy: string): string {
 	return `${legacy}.${String(process.pid)}${MIGRATION_CLAIM_SUFFIX}`
@@ -42,13 +44,15 @@ function claim(from: string, to: string): boolean {
 	}
 }
 
+// Only `ESRCH` means the process is gone; `EPERM` means it runs under another user, and its claim is
+// still its own.
 function is_alive(pid: number): boolean {
 	try {
 		process.kill(pid, NO_SIGNAL)
 
 		return true
-	} catch {
-		return false
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== NO_SUCH_PROCESS
 	}
 }
 
@@ -79,10 +83,32 @@ function terminated(content: string): string {
 	return content.length === 0 || content.endsWith(NEWLINE) ? content : `${content}${NEWLINE}`
 }
 
+function read_or_undefined(file_path: string): string | undefined {
+	try {
+		return readFileSync(file_path, 'utf8')
+	} catch {
+		return undefined
+	}
+}
+
+// What of the claimed file goes to the ledger's tail: all of it, verbatim, when there is no ledger yet,
+// and otherwise only the lines the ledger does not already hold. **The old file can come back after
+// its lines were moved** — `git restore`, `git reset --hard` or a stash without `-u` restores a
+// tracked old ledger beside the untracked new one — and copying it whole again would repeat every line
+// in the history, which the digest reads as every observation recurring.
+function carried(content: string, ledger: string | undefined): string {
+	if (ledger === undefined) return terminated(content)
+
+	const lines = content.split(NEWLINE).filter((line) => line.length > 0)
+	const missing = observation_ledger_line.missing_lines(lines, ledger)
+
+	return missing.length === 0 ? '' : `${missing.join(NEWLINE)}${NEWLINE}`
+}
+
 // Moves one claimed file's lines to the tail of the ledger, then removes the claim.
 function absorb(claimed: string, target: string): void {
 	mkdirSync(path.dirname(target), { recursive: true })
-	appendFileSync(target, terminated(readFileSync(claimed, 'utf8')), 'utf8')
+	appendFileSync(target, carried(readFileSync(claimed, 'utf8'), read_or_undefined(target)), 'utf8')
 	rmSync(claimed)
 }
 

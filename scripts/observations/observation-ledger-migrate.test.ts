@@ -83,6 +83,20 @@ describe('observation_ledger_migrate.migrate — the old ledger', () => {
 	})
 })
 
+// `git restore` or a stash without `-u` brings a tracked old ledger back beside the moved new one.
+describe('observation_ledger_migrate.migrate — an old ledger restored after the move', () => {
+	it('appends only the lines the new ledger does not already hold', () => {
+		const root = fresh_root()
+
+		write(root, OBSERVATION_LEDGER_PATH, `${OLD_LINE}\n${NEW_LINE}\n`)
+		write(root, LEGACY_OBSERVATION_LEDGER_PATH, `${OLD_LINE}\n${STRANDED_LINE}\n`)
+
+		observation_ledger_migrate.migrate(root)
+
+		expect(read(root, OBSERVATION_LEDGER_PATH)).toBe(`${OLD_LINE}\n${NEW_LINE}\n${STRANDED_LINE}\n`)
+	})
+})
+
 describe('observation_ledger_migrate.migrate — an interrupted migration', () => {
 	it('absorbs a claim whose process is gone, so its lines are not stranded', () => {
 		const root = fresh_root()

@@ -71,10 +71,9 @@ function stash_verdict(facts: StashFacts, merged: ReadonlySet<string>): Verdict 
 // The ledger lines a stash would carry away with it, less those the ledger already holds — the same
 // line appended twice would read as a recurrence to the observation digest, which counts repeats.
 function ledger_carry(added: ReadonlyArray<string>, ledger: string): Array<string> {
-	const present = new Set(ledger.split(LINE_SEPARATOR))
 	const entries = added.filter((line) => observation_ledger_line.is_ledger_entry_line(line))
 
-	return [...new Set(entries)].filter((line) => !present.has(line))
+	return observation_ledger_line.missing_lines([...new Set(entries)], ledger)
 }
 
 function format_outcome(outcome: Outcome): string {
