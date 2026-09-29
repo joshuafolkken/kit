@@ -9,6 +9,9 @@ const GIT_COMMAND_UNIX = '/usr/bin/git'
 // here rather than beside either of them because `status` and `worktree_list` now sit in different
 // modules (joshuafolkken/kit#1640) and a copy in each is a second answer to one question.
 const PORCELAIN_FLAG = '--porcelain'
+// The untracked-files mode every porcelain status reading passes (`git-command.ts` carries why it is
+// passed and why it is `all`), shared so `run-carry-flush.ts`'s own reading cannot drift from it.
+const UNTRACKED_FILES_FLAG = '--untracked-files=all'
 
 function get_git_command(): string {
 	if (platform() === 'win32') {
@@ -37,5 +40,6 @@ export {
 	UNTRACKED_FILE_PREFIX,
 	SEPARATOR_LINE,
 	PORCELAIN_FLAG,
+	UNTRACKED_FILES_FLAG,
 	git_utilities,
 }

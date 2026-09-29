@@ -60,7 +60,7 @@ describe('the status reading names its untracked-files mode', () => {
 
 		await git_command.status()
 
-		expect(execa_mock.state.last_arguments).toContain('--untracked-files=normal')
+		expect(execa_mock.state.last_arguments).toContain('--untracked-files=all')
 	})
 })
 

@@ -176,7 +176,7 @@ joshuafolkken/kit#1726 is the worked case: its own body says the depth test woul
 and it was filed anyway, because **discarding it was the only alternative on offer**
 (joshuafolkken/kit#1728).
 
-- **The destination is `docs/observations.md` in the repository the observation is about** — the same
+- **The destination is `docs/maintainers/observations.md` in the repository the observation is about** — the same
   repository the Issue would have been filed into. **The count and the append are both run in that
   repository's checkout**, resolved the way §2c (`target-repository.md`) resolves any cross-repository target, and the file is
   created on the first append where that repository has none. **The subject decides, never the
@@ -230,7 +230,7 @@ watched. **A missing file is not a count of zero, though** — there `grep` exit
 number at all, so an empty answer means create the ledger, never that this is a first sighting.
 
 ```bash
-grep -c '^- k:<slug> |' <that repository's checkout>/docs/observations.md || true
+grep -c '^- k:<slug> |' <that repository's checkout>/docs/maintainers/observations.md || true
 ```
 
 Free-text comparison is what the key exists to replace, so two lines that read alike under different
@@ -255,7 +255,7 @@ that is empty on every other machine**, and every sighting was a first one, whic
 joshuafolkken/kit#1728 created the ledger to end.
 
 - **An ordinary run never commits the ledger, and that is enforced rather than remembered.**
-  `pnpm josh git` stages with `docs/observations.md` excluded, in the one staging step every entry
+  `pnpm josh git` stages with `docs/maintainers/observations.md` excluded, in the one staging step every entry
   point goes through (`scripts/git/git-staging.ts`), so a `fullrun` in the primary checkout **cannot**
   carry a ledger line into an Issue that has nothing to do with it. It is not a rule a run has to
   remember at the commit — a run that had to would be the run that forgets.

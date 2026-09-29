@@ -48,6 +48,11 @@ vi.mock('#scripts/git/git-pr-checks', () => ({
 	},
 }))
 vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
+// The migration moves real files; unmocked from the repository root it would move this checkout's own
+// ledger (joshuafolkken/kit#2724).
+vi.mock('./observation-ledger-migrate', () => ({
+	observation_ledger_migrate: { migrate: vi.fn() },
+}))
 
 const NO_COMMITS = 0
 const SUCCESS_EXIT_CODE = 0

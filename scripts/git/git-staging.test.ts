@@ -1,4 +1,7 @@
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import {
+	LEGACY_OBSERVATION_LEDGER_PATH,
+	OBSERVATION_LEDGER_PATH,
+} from '#scripts/observations/observation-ledger'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_command } from './git-command'
 import { git_prompt } from './git-prompt'
@@ -109,7 +112,10 @@ describe('git_staging.check_and_confirm_staging — the observation ledger', () 
 
 		await git_staging.check_and_confirm_staging(true)
 
-		expect(git_command.add_tracked).toHaveBeenCalledWith([OBSERVATION_LEDGER_PATH])
+		expect(git_command.add_tracked).toHaveBeenCalledWith([
+			OBSERVATION_LEDGER_PATH,
+			LEGACY_OBSERVATION_LEDGER_PATH,
+		])
 	})
 
 	// Without this line the ledger alone in the tree produces `Failed to commit changes` from git's
@@ -130,6 +136,7 @@ describe('git_staging.check_and_confirm_staging — the observation ledger', () 
 		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
 		vi.mocked(git_status.list_untracked_files).mockReturnValueOnce([
 			OBSERVATION_LEDGER_PATH,
+			LEGACY_OBSERVATION_LEDGER_PATH,
 			UNTRACKED_DOC_FILE,
 		])
 

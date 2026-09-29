@@ -1,8 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_stash } from '#scripts/git/git-stash'
 import { stash_sweep_lock } from '#scripts/git/stash-sweep-lock'
+import {
+	OBSERVATION_LEDGER_PATH as LEDGER_FILE,
+	LEGACY_OBSERVATION_LEDGER_PATH as LEGACY_LEDGER_FILE,
+} from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_tidy_stashes } from './run-tidy-stashes'
@@ -24,9 +29,9 @@ vi.mock('#scripts/git/stash-sweep-lock', () => ({
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-tidy-stashes-test-'))
 const LEDGER = path.join(scratch, 'observations.md')
-const LEDGER_FILE = 'docs/observations.md'
 const EXISTING_LINE = '- k:old | d1 | 2026-09-01 | x | already recorded'
 const NEW_LINE = '- k:lane-seat | d1 | 2026-09-29 | lane | a merged lane held a seat'
+const OTHER_NEW_LINE = '- k:other | d1 | 2026-09-29 | lane | appended at the new path'
 const MERGED_ENTRY = { selector: 'a'.repeat(40), subject: 'On main: backlogrun: parked #2583' }
 const MIXED_ENTRY = {
 	selector: 'b'.repeat(40),
@@ -92,6 +97,18 @@ describe('run_tidy_stashes.tidy_stashes — the ledger carry and failures', () =
 		expect(git_stash.added_lines).toHaveBeenCalledWith(MERGED_ENTRY.selector, LEDGER_FILE)
 	})
 
+	// joshuafolkken/kit#2724: an entry cut before the move holds its lines at the old path.
+	it('carries the lines of both ledger paths an entry touches', async () => {
+		vi.mocked(git_stash.changed_paths).mockResolvedValue([LEGACY_LEDGER_FILE, LEDGER_FILE])
+		vi.mocked(git_stash.added_lines).mockImplementation(async (_hash, file_path) => [
+			file_path === LEGACY_LEDGER_FILE ? NEW_LINE : OTHER_NEW_LINE,
+		])
+
+		await run_tidy_stashes.tidy_stashes(is_merged)
+
+		expect(readFileSync(LEDGER, 'utf8')).toBe(`${EXISTING_LINE}\n${NEW_LINE}\n${OTHER_NEW_LINE}\n`)
+	})
+
 	it('keeps the entry and drops nothing when the carry fails', async () => {
 		vi.mocked(git_stash.changed_paths).mockRejectedValue(new Error('bad object'))
 
@@ -110,6 +127,25 @@ describe('run_tidy_stashes.tidy_stashes — the ledger carry and failures', () =
 			kind: 'keep',
 			reason: 'already dropped by another run',
 		})
+	})
+})
+
+// joshuafolkken/kit#2724: the duplicate check reads the ledger after the migration, not the empty new
+// path before it — otherwise a line both the old ledger and the stash hold is carried twice.
+describe('run_tidy_stashes.tidy_stashes — a primary checkout whose ledger is still at the old path', () => {
+	it('carries no line the not-yet-migrated old ledger already holds', async () => {
+		const root = mkdtempSync(path.join(scratch, 'primary-'))
+
+		mkdirSync(path.join(root, 'docs'), { recursive: true })
+		writeFileSync(path.join(root, LEGACY_LEDGER_FILE), `${NEW_LINE}\n`)
+		vi.mocked(observation_ledger_home.ledger_path).mockRestore()
+		vi.spyOn(repo_discovery, 'main_worktree').mockReturnValue(root)
+		vi.mocked(git_stash.changed_paths).mockResolvedValue([LEGACY_LEDGER_FILE])
+		vi.mocked(git_stash.added_lines).mockResolvedValue([NEW_LINE])
+
+		await run_tidy_stashes.tidy_stashes(is_merged)
+
+		expect(readFileSync(path.join(root, LEDGER_FILE), 'utf8')).toBe(`${NEW_LINE}\n`)
 	})
 })
 
