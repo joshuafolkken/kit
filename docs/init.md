@@ -136,7 +136,7 @@ These files have no merge strategy. If they already exist, `josh init` prints th
 
 ## Package scripts
 
-The `node` profile adds these scripts to your `package.json`; the `static` profile adds only `josh`:
+The `node` profile adds these scripts to your `package.json`; the `static` profile adds `preinstall` and `josh` — the same safe-chain guard as `node`, so installing kit and Prettier from npm is scanned for malicious packages and too-new releases:
 
 | Script       | Command                                                                                                                                             |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |

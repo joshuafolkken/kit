@@ -451,6 +451,7 @@ const init_logic = {
 	strip_kit_only_vscode_settings,
 	strip_kit_only_vscode_settings_content,
 	VSCODE_EXTENSIONS_FILENAME,
+	SAFE_CHAIN_CMD,
 	GUARDED_LEFTHOOK_CMD,
 	upgrade_prepare_lefthook_warning,
 	get_npmrc_lines,

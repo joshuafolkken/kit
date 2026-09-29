@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { init_logic } from './init-logic'
 import { init_static } from './init-static'
 import type { ProjectShape } from './project-profile'
 
@@ -14,7 +15,7 @@ const VERSIONS = { kit: '1.0.0', prettier: '^3.0.0' }
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 
 describe('static project manifest', () => {
-	it('creates a manifest and records the profile without lifecycle scripts', () => {
+	it('creates a manifest with the safe-chain preinstall and no Git lifecycle scripts', () => {
 		const initial = init_static.initial_manifest()
 		const result = JSON.parse(init_static.merge_static_manifest(initial, SHAPE, VERSIONS)) as {
 			josh: { profile: string }
@@ -23,8 +24,18 @@ describe('static project manifest', () => {
 		}
 
 		expect(result.josh.profile).toBe('static')
-		expect(result.scripts).toEqual({ josh: 'josh' })
+		expect(result.scripts).toEqual({ preinstall: init_logic.SAFE_CHAIN_CMD, josh: 'josh' })
 		expect(result.devDependencies).toEqual({ [KIT_PACKAGE_NAME]: '1.0.0' })
+	})
+
+	it('keeps an existing preinstall and stays idempotent on rerun', () => {
+		const existing = '{"scripts":{"preinstall":"npx only-allow pnpm"}}'
+		const once = init_static.merge_static_manifest(existing, SHAPE, VERSIONS)
+		const twice = init_static.merge_static_manifest(once, SHAPE, VERSIONS)
+		const result = JSON.parse(once) as { scripts: Record<string, string> }
+
+		expect(result.scripts['preinstall']).toBe('npx only-allow pnpm')
+		expect(twice).toBe(once)
 	})
 
 	it('adds Prettier only when a Web file exists and remains idempotent', () => {
