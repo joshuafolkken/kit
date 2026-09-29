@@ -59,7 +59,7 @@ describe('ci_installer_pin.fetch_installer_sha256', () => {
 		expect(ci_installer_pin.fetch_installer_sha256('2.0.0')).toBe(INSTALLER_SHA)
 		expect(execa_sync_mock).toHaveBeenCalledWith(
 			'curl',
-			['-fsSL', ci_installer_pin.installer_url('2.0.0')],
+			['--proto', '=https', '-fsSL', ci_installer_pin.installer_url('2.0.0')],
 			expect.objectContaining({ encoding: 'buffer', stripFinalNewline: false, reject: false }),
 		)
 	})

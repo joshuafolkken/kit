@@ -316,7 +316,7 @@ jobs:
       - name: Setup safe-chain
         run: |
           installer="$RUNNER_TEMP/install-safe-chain.sh"
-          curl -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
+          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
           echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
           sh "$installer" --ci
 
@@ -423,7 +423,7 @@ jobs:
       - name: Setup safe-chain
         run: |
           installer="$RUNNER_TEMP/install-safe-chain.sh"
-          curl -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
+          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
           echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
           sh "$installer" --ci
 
@@ -639,7 +639,7 @@ jobs:
       - name: Setup safe-chain
         run: |
           installer="$RUNNER_TEMP/install-safe-chain.sh"
-          curl -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
+          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
           echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
           sh "$installer" --ci
 

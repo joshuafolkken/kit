@@ -31,6 +31,12 @@ describe.each(WORKFLOWS)('safe-chain setup in %s', (relative_path) => {
 		}
 	})
 
+	it('refuses to follow the release redirect onto anything but HTTPS', () => {
+		for (const run of safe_chain_steps(relative_path)) {
+			expect(run).toContain("curl --proto '=https' -fsSL")
+		}
+	})
+
 	it('never sets safe-chain up through pnpm dlx', () => {
 		expect(ci_yml_fixture.read_workflow(relative_path)).not.toContain('safe-chain setup-ci')
 		expect(ci_yml_fixture.read_workflow(relative_path)).not.toMatch(

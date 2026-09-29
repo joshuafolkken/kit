@@ -34,7 +34,8 @@ function rewrite_pin(content: string, pin: InstallerPin): string {
 }
 
 function fetch_installer_sha256(version: string): string | undefined {
-	const result = execaSync('curl', ['-fsSL', installer_url(version)], {
+	// `--proto =https` keeps the release redirect from being followed onto plain HTTP.
+	const result = execaSync('curl', ['--proto', '=https', '-fsSL', installer_url(version)], {
 		encoding: 'buffer',
 		// The hash is of the file as published; execa would otherwise drop its trailing newline.
 		stripFinalNewline: false,
