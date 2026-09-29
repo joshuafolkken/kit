@@ -17,6 +17,9 @@ vi.mock('./run-preflight', () => ({
 	run_preflight: { CLEAN_VERDICT: 'clean', check: vi.fn() },
 }))
 
+// The sweep a successful claim runs reads git and GitHub; `run-hold-cli-tidy.test.ts` pins the call.
+vi.mock('./run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+
 const git_directories = vi.mocked(git_command.git_directories)
 const git_status = vi.mocked(git_command.status)
 const preflight_check = vi.mocked(run_preflight.check)

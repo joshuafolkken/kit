@@ -75,3 +75,28 @@ describe('stash_orphans.format_report — what a person reads', () => {
 		expect(report).toContain('pnpm josh stash:pop')
 	})
 })
+
+// joshuafolkken/kit#2701: `run:tidy` drops an entry only when every issue it names is merged, so it
+// needs all of them — not only the owner `issue_of` reads.
+describe('stash_orphans.issues_named — every issue a subject names', () => {
+	it.each([
+		['On main: backlogrun: paused #2600 for prerequisite #2601', ['2600', '2601']],
+		['On main: run:hold reclaimed before #2583', ['2583']],
+		['On 2584-lane: 2584: uncommitted work at lane:close', ['2584']],
+		['2370: uncommitted work at already-done', ['2370']],
+		['On 2584-lane: backlogrun: parked #2584', ['2584']],
+	])('reads %j as %j', (subject, issues) => {
+		expect(stash_orphans.issues_named(subject)).toStrictEqual(issues)
+	})
+
+	it('reads a WIP entry by its branch alone, never by the commit subject', () => {
+		expect(
+			stash_orphans.issues_named('WIP on 2583-lane: abc123 Merge pull request #2700'),
+		).toStrictEqual(['2583'])
+		expect(stash_orphans.issues_named('WIP on main: abc123 Fix a thing #2700')).toStrictEqual([])
+	})
+
+	it('names nothing for a message with no number', () => {
+		expect(stash_orphans.issues_named('On main: scratch work')).toStrictEqual([])
+	})
+})

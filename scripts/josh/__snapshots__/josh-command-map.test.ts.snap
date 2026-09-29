@@ -116,6 +116,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rsp": "run:step",
     "rst": "run:status",
     "rt": "reconcile-templates",
+    "rtd": "run:tidy",
     "rtl": "run:tail",
     "rtr": "retrospective",
     "rug": "rule:guard",
@@ -1039,6 +1040,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "git",
         "network",
+      ],
+    ],
+    "run:tidy": [
+      "",
+      "automation",
+      [
+        "git",
+        "network",
+        "files",
       ],
     ],
     "run:wake": [

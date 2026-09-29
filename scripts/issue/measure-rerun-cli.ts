@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { execSync } from 'node:child_process'
-import { appendFile, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { baseline_measure, type Baseline } from './baseline-measure'
@@ -47,7 +47,7 @@ async function append_ledger(lines: ReadonlyArray<string>): Promise<void> {
 	// (joshuafolkken/kit#2419).
 	const ledger_path = observation_ledger_home.ledger_path()
 
-	await appendFile(ledger_path, `${lines.join('\n')}\n`, 'utf8')
+	await observation_ledger_home.append(ledger_path, lines)
 	console.info(`Recorded ${String(lines.length)} refuted premise(s) in ${ledger_path}.`)
 }
 

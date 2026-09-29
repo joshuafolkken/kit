@@ -111,16 +111,17 @@ written.
 **Running unattended gets harder, not easier, and that is the honest trade.** Many lanes make the
 overlap between children real, and every overlap that becomes a conflict costs the child that loses the
 race a resolution, a re-run gate and a review ("Conflicts are not predicted" below), and parks it
-outright under that section's four conditions. The run finishes more work per hour **and** spends more
-of each child's budget on merge races. Do not report the first without the second.
+outright under that section's four conditions. Report the throughput gain only with its merge-race
+cost.
 
 ### Once per repository, before the first lane opens
 
 In the **primary checkout**, in this order, and never again per lane:
 
-1. `git switch main && git pull` — every lane is branched from this ref.
+1. `git switch main && git pull` — every lane branches from this ref.
 2. `pnpm josh latest:scope`, and the update on `required` — "`josh latest` runs once per session" above.
 3. `pnpm josh lane:prune` — closes the lanes an interruption left registered without a work tree.
+4. `pnpm josh run:tidy` — sweeps merged lanes and stashes (as `run:hold` does).
 
 **`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there** — the command
 enforces it: `latest:scope` answers `skip` in a lane and `pnpm josh latest` refuses outright, fronted
