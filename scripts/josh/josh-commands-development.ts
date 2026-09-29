@@ -22,7 +22,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	lint: {
 		script: 'scripts/lint/lint-parallel.ts',
-		description: 'Check code with prettier and eslint',
+		description: 'Check code with prettier and eslint (skips a tool a static project lacks)',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 	},
@@ -61,7 +61,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	format: {
 		script: 'scripts/lint/format.ts',
-		description: 'Format code with prettier and eslint',
+		description: 'Format code with prettier and eslint (skips a tool a static project lacks)',
 		category: 'Development',
 		reference: ['', 'developer', ['files', 'processes']],
 	},
@@ -183,7 +183,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	check: {
 		script: 'scripts/gate/type-check-command.ts',
-		description: 'Type-check TypeScript project (skips a static project with nothing to check)',
+		description: 'Type-check with tsc (skips a static project with no TypeScript to check)',
 		category: 'Development',
 		reference: ['[arguments...]', 'developer', ['processes']],
 	},

@@ -1,5 +1,7 @@
 # josh CLI — Command Reference
 
+The full reference for every `josh` command; look a command up here rather than reading top to bottom. Commands that need Node tooling (ESLint, `tsc`, Vitest, Playwright) skip in a `static` project and say why.
+
 See also: [Command Catalog](josh-command-catalog.md) — auto-generated from the command map (command name, aliases, synopsis, audience, side effects).
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal.
@@ -1972,7 +1974,7 @@ its recorded model (a model the floor table does not name is not version-checked
 dispatched lane takes the new default. `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
 only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
-evaluation procedure](./backlogrun-worker-evaluation.md).
+evaluation procedure](./maintainers/backlogrun-worker-evaluation.md).
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 

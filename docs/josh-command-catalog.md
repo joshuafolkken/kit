@@ -41,7 +41,7 @@ Print an agent-read document's byte size against its ceiling and the headroom le
 
 `[arguments...]`
 
-Type-check TypeScript project (skips a static project with nothing to check)
+Type-check with tsc (skips a static project with no TypeScript to check)
 
 ---
 
@@ -71,7 +71,7 @@ Report whether the preview server crashed during a failed E2E attempt (CI)
 
 _No arguments._
 
-Format code with prettier and eslint
+Format code with prettier and eslint (skips a tool a static project lacks)
 
 ---
 
@@ -111,7 +111,7 @@ Print a file's code lines against the max-lines limit and the headroom left
 
 _No arguments._
 
-Check code with prettier and eslint
+Check code with prettier and eslint (skips a tool a static project lacks)
 
 ---
 

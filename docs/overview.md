@@ -1,36 +1,32 @@
 # @joshuafolkken/kit — Overview
 
-`@joshuafolkken/kit` is a shared toolchain for TypeScript projects. Install it once and get a consistent, opinionated development environment: linting, formatting, type-checking, git hooks, spell-checking, VS Code settings, and AI assistant files — all wired together. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
+For anyone deciding whether kit fits their project: what it sets up for each profile, and how it works. `@joshuafolkken/kit` sets up a repository for AI-assisted development: AI assistant rules, formatting and Git settings for any project, plus the full lint, type-check, test and hook toolchain for Node projects. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
 
 ## What it provides
 
-| Area           | Tool                     | What ships                                                                          |
-| -------------- | ------------------------ | ----------------------------------------------------------------------------------- |
-| Linting        | ESLint                   | Vanilla config via `create_vanilla_config`                                          |
-| Formatting     | Prettier                 | Shared config with import sorting                                                   |
-| Type-checking  | TypeScript               | `base.json` tsconfig preset                                                         |
-| Git hooks      | Lefthook                 | Pre-commit lint + pre-push checks                                                   |
-| Spell-checking | cspell                   | Shared word list and ignore rules                                                   |
-| Editor         | VS Code                  | Extension recommendations and workspace settings                                    |
-| AI assistants  | Claude / Gemini / Cursor | `CLAUDE.md` (the rules), `AGENTS.md` / `GEMINI.md` (pointers to it), `.cursorrules` |
-| CI/CD          | GitHub Actions           | Workflow templates for CI, tagging, and SonarQube                                   |
-| Security       | SonarQube + `pnpm audit` | `sonar-project.properties` template + audit script                                  |
+`josh init` picks a profile from the project ([init.md](./init.md#project-profiles) has the rules): `static` for a project without Node tooling (an `index.html` site, or Python, Rust and other languages), `node` for a JavaScript / TypeScript project with npm dependencies.
+
+| Area           | Tool                     | `static`                                                                          | `node`                                             |
+| -------------- | ------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------- |
+| AI assistants  | Claude / Gemini / Cursor | Short `CLAUDE.md` rules, `AGENTS.md` / `GEMINI.md` pointing at it, `.cursorrules` | The full rules in the same files                   |
+| Editor         | VS Code                  | Extension recommendations; save formatting when HTML, CSS or JS files exist       | Extension recommendations and workspace settings   |
+| Git            | —                        | `.gitignore` / `.gitattributes` when Git exists                                   | same                                               |
+| Formatting     | Prettier                 | Only when HTML, CSS or JS files exist                                             | Shared config with import sorting                  |
+| Linting        | ESLint                   | —                                                                                 | Vanilla config via `create_vanilla_config`         |
+| Type-checking  | TypeScript               | `tsconfig.json` only when TypeScript files exist                                  | `base.json` tsconfig preset                        |
+| Tests          | Vitest / Playwright      | —                                                                                 | Run when installed and test files exist            |
+| Git hooks      | Lefthook                 | —                                                                                 | Pre-commit lint + pre-push checks                  |
+| Spell-checking | cspell                   | —                                                                                 | Shared word list and ignore rules                  |
+| CI/CD          | GitHub Actions           | No workflows; PR template and release-notes config when a GitHub origin exists    | Workflow templates for CI, tagging, and SonarQube  |
+| Security       | SonarQube + `pnpm audit` | —                                                                                 | `sonar-project.properties` template + audit script |
+
+In a `static` project, `josh gate`, `josh lint` and the other checks skip each tool that has nothing to run and print the reason. kit ships no linter or test runner for languages other than JavaScript and TypeScript.
 
 ## How it works
 
-1. **Install** — add the package to your project as a dev dependency.
-2. **Init** — run `josh init` once. It creates or merges all config files, copies AI files, adds recommended `package.json` scripts, and installs git hooks.
+1. **Install** — [getting-started.md](./getting-started.md) for `static`, [package.md](./package.md) for `node`.
+2. **Init** — run `josh init` once. It creates or merges the config files for the profile, copies AI files, and on `node` adds recommended `package.json` scripts and installs git hooks.
 3. **Sync** — run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files.
 4. **josh CLI** — a single `josh` binary (available as `pnpm josh` after init) gives you git workflow helpers, version management, security auditing, and more.
 
-## Quick links
-
-- [josh commands](./josh-commands.md) — full CLI reference
-- [josh init](./init.md) — what `josh init` creates and merges
-- [josh sync](./sync.md) — what `josh sync` overwrites and why
-- [scripts-ai](./scripts-ai.md) — Telegram env vars and AI workflow commands
-- [authentication](./authentication.md) — one-time GitHub Packages auth setup
-- [cli](./cli.md) — install and use the global `josh` CLI
-- [package](./package.md) — use the kit as a project devDependency
-- [cloud session](./cloud-session.md) — network policy, osv-scanner, `gh`, and lane limits in an agent container
-- [troubleshooting](./troubleshooting.md) — common install and usage errors
+The full list of guides is in the [README](../README.md#documentation).
