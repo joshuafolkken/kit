@@ -1,0 +1,25 @@
+# Run the backlog unattended
+
+## When to use it
+
+You have several Issues, or an epic, that an agent may implement and merge without you watching each one. `backlogrun` is the keyword for that; [Run Issues with the workflow keywords](./run-issues.md) covers the single-Issue keywords.
+
+## Steps
+
+1. Opt Issues in by adding the `auto-ok` label yourself — only a person applies it. Adding it to an epic's root opts in every descendant ([`josh backlog:next`](../josh-commands.md#josh-backlognext)). Create the label once per repository as [`josh auto-ok:next`](../josh-commands.md#josh-auto-oknext) shows.
+2. For an epic, check it before running: [`josh epic:audit`](../josh-commands.md#josh-epicaudit) reports contradictions between its children, and [`josh epic:next`](../josh-commands.md#josh-epicnext) shows which are runnable.
+3. Type `backlogrun` to drain the opted-in backlog in dependency order, `backlogrun #N1 #N2` to run named Issues first (they need no label), or `backlogrun #E --only` to run one epic's children and stop.
+4. Put `needs-human-review` on any Issue that must not be committed without you: the run implements and verifies it, then stops before the commit ([the label](../josh-commands.md#needs-human-review--the-opposite-label)).
+
+The run's budgets — the idle watch, the child limit and the whole-run bound — are described in [the two budgets](../../.claude/skills/workflow-commands/backlogrun-steps.md#the-two-budgets).
+
+## Check it worked
+
+- `josh backlog:next` answers `none` once nothing opted in is left.
+- Each finished Issue is closed with a merged pull request and a notification.
+
+## Common failures
+
+- An Issue is never picked up: it lacks `auto-ok` and is not under an opted-in epic, or it waits on an open dependency (`josh backlog:next` answers `wait`).
+- The run stops early: it stops at 30 children, 10 filed Issues or 3 consecutive child failures, and on a `needs-human-review` Issue ([where the run stops](../../.claude/skills/workflow-commands/backlogrun-steps.md#where-the-run-stops)).
+- The session was cut part-way: see [Recover a stopped run](./recover-a-run.md).

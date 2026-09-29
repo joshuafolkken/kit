@@ -30,6 +30,7 @@ It needs [Node.js](https://nodejs.org/) 22.19.0 or later with [pnpm](https://pnp
 - [package.md](./docs/package.md) — add kit to a Node project (`node`)
 - [cli.md](./docs/cli.md) — install the global `josh` command
 - [overview.md](./docs/overview.md) — what kit sets up and how it works
+- [how-to.md](./docs/how-to.md) — step-by-step guides by task: update, release, run Issues, fix a failing gate
 - [why.md](./docs/why.md) — the problems kit exists to solve
 
 **Commands and configuration**
@@ -38,6 +39,7 @@ It needs [Node.js](https://nodejs.org/) 22.19.0 or later with [pnpm](https://pnp
 - [init.md](./docs/init.md) — what `josh init` creates, per profile
 - [sync.md](./docs/sync.md) — what `josh sync` updates after an upgrade
 - [manual-config.md](./docs/manual-config.md) — use the presets without `josh init`
+- [package-api.md](./docs/package-api.md) — the config presets and libraries the package exports
 
 **AI workflow and operations**
 
