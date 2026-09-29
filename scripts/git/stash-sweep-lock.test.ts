@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -55,6 +55,19 @@ describe('stash_sweep_lock.with_lock', () => {
 
 		expect(result).toBe(DONE)
 		expect(existsSync(LOCK)).toBe(false)
+	})
+
+	it('keeps a lock another sweep claimed after this one judged the old record stale', () => {
+		const fresh = JSON.stringify({ pid: process.ppid })
+
+		writeFileSync(LOCK, JSON.stringify({ pid: DEAD_PID }))
+		stash_sweep_lock.clear_stale(LOCK, () => {
+			writeFileSync(LOCK, fresh)
+
+			return true
+		})
+
+		expect(readFileSync(LOCK, 'utf8')).toBe(fresh)
 	})
 
 	it('releases the lock when the work throws', async () => {

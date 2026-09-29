@@ -155,7 +155,10 @@ async function added_lines(hash: string, file: string, directory?: string): Prom
 }
 
 // The position is resolved from the hash immediately before the drop, so an entry pushed since the
-// read cannot be dropped in its place; an entry already gone answers `false` rather than throwing.
+// sweep's read cannot be dropped in its place; an entry already gone answers `false` rather than
+// throwing. Sweeps are serialized by `stash-sweep-lock`, but a plain `git stash push` or `pop` from
+// another command landing between the resolve and the drop still shifts the position — that window is
+// the length of two local git calls.
 async function drop_by_hash(hash: string, directory?: string): Promise<boolean> {
 	const raw = await git_spawn.read(git_args(directory, ['stash', 'list', HASH_POSITION_FORMAT]))
 	const entry = parse_entries(raw).find((candidate) => candidate.selector === hash)

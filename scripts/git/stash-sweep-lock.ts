@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { linkSync, renameSync, rmSync } from 'node:fs'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -24,9 +26,9 @@ function lock_path(cwd: string = process.cwd()): string {
 	return stamp_file.stamp_path(LOCK_PREFIX, git_common_directory.repository(cwd) ?? cwd)
 }
 
-function read_owner(target: string): LockOwner | undefined {
-	const raw = stamp_file.read_stamp_text(target)
+type IsGone = (owner: LockOwner) => boolean
 
+function parse_owner(raw: string | undefined): LockOwner | undefined {
 	if (raw === undefined) return undefined
 
 	try {
@@ -36,20 +38,61 @@ function read_owner(target: string): LockOwner | undefined {
 	}
 }
 
+function read_owner(target: string): LockOwner | undefined {
+	return parse_owner(stamp_file.read_stamp_text(target))
+}
+
+function is_owner_gone(owner: LockOwner): boolean {
+	return process_identity.is_same_process(owner.pid, owner.process_start) === false
+}
+
+// Put back a record that turned out not to be the stale one. `linkSync` refuses an existing path, so
+// a lock someone claimed in the meantime is never overwritten.
+function restore(aside: string, target: string): void {
+	try {
+		linkSync(aside, target)
+	} catch {
+		// Another claim already holds the path; the record set aside is dropped below.
+	}
+}
+
+// The record's text when its owner is certainly gone, else `undefined`.
+function stale_record(target: string, is_gone: IsGone): string | undefined {
+	const raw = stamp_file.read_stamp_text(target)
+	const owner = parse_owner(raw)
+
+	return owner !== undefined && is_gone(owner) ? raw : undefined
+}
+
+// The path the record was moved to, or `undefined` when another sweep moved it first.
+function move_aside(target: string): string | undefined {
+	const aside = `${target}.${String(process.pid)}.${randomUUID()}`
+
+	try {
+		renameSync(target, aside)
+
+		return aside
+	} catch {
+		return undefined
+	}
+}
+
 // A record whose process is certainly gone is a crashed sweep's, and is cleared before the claim; an
 // unreadable record or an uncertain answer is left in place, since clearing a live holder's lock is the
-// very race the lock exists to close.
-function clear_stale(target: string): void {
-	const owner = read_owner(target)
+// very race the lock exists to close. **The clear is a rename, then a compare**: two sweeps can both
+// judge the same record stale, and the slower one's plain remove would delete the lock the faster one
+// had just claimed. Renaming moves exactly one file aside atomically, and only a record byte-identical
+// to the one judged stale is discarded — any other is a fresh claim and goes back.
+function clear_stale(target: string, is_gone: IsGone = is_owner_gone): void {
+	const raw = stale_record(target, is_gone)
 
-	if (
-		owner === undefined ||
-		process_identity.is_same_process(owner.pid, owner.process_start) !== false
-	) {
-		return
-	}
+	if (raw === undefined) return
 
-	stamp_file.remove_stamp(target)
+	const aside = move_aside(target)
+
+	if (aside === undefined) return
+	if (stamp_file.read_stamp_text(aside) !== raw) restore(aside, target)
+	rmSync(aside, { force: true })
 }
 
 function claim(target: string): boolean {
@@ -93,6 +136,6 @@ async function with_lock<T>(
 	}
 }
 
-const stash_sweep_lock = { lock_path, with_lock }
+const stash_sweep_lock = { clear_stale, lock_path, with_lock }
 
 export { stash_sweep_lock }
