@@ -413,7 +413,7 @@ pnpm exec josh start                                    # asks for the profile a
 pnpm exec josh start --yes --github --profile static    # unattended, including the GitHub repository
 ```
 
-**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything and says which of the two is missing.
+**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything.
 
 **Steps**, printed as `[n/N]` while they run:
 
@@ -425,9 +425,9 @@ pnpm exec josh start --yes --github --profile static    # unattended, including 
 
 **Options:** `--profile static|node` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults without asking, but is **not** consent to create a repository or push: without `--github` an unattended run stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
 
-**Existing state:** a directory with a GitHub origin gets only the setup and the missing labels — no commit, repository or push. A Git repository with commits on a branch other than `main` is refused before any change.
+**Existing state:** a directory with a GitHub origin gets only the setup and the missing labels — no commit, repository or push. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
 
-**Output / exit codes:** exits 0 when the workflow is ready. A failed step exits 1 and prints the step it stopped at, the steps already completed and the cause, so you can finish by hand or re-run after fixing the cause.
+**Output / exit codes:** exits 0 when the workflow is ready. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
 
 ### `josh init`
 
