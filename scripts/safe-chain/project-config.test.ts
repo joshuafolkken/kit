@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { release_age } from '#scripts/version/release-age'
 import { yaml_document } from '#scripts/yaml/yaml-document'
 import { describe, expect, it } from 'vitest'
 import { project_config } from './project-config'
@@ -9,15 +10,34 @@ const WORKSPACE =
 	"minimumReleaseAgeExclude:\n  - vite\n  - '@types/node'\n  - tsx\n  - '@joshuafolkken/kit'\n"
 const EXPECTED_EXCLUSIONS = ['vite', '@types/node', 'tsx', '@joshuafolkken/kit']
 const REGISTRY = 'registry.example.com'
+const NPMRC_DAY = 'minimum-release-age=1440\n'
+const NPMRC_PARTIAL_HOUR = 'minimum-release-age=1470\n'
+const NPMRC_OPT_OUT = 'minimum-release-age=0\n'
+const DAY_HOURS = 24
+const MINUTES_PER_HOUR = 60
+const WORKSPACE_FILE = 'pnpm-workspace.yaml'
+const AIKIDO_FILE = '.aikido'
+
+function read_safe_chain(content: string): Record<string, unknown> {
+	const safe_chain = yaml_document.parse_yaml(content)['safe-chain']
+	if (!yaml_document.is_mapping_document(safe_chain)) throw new Error('safe-chain missing')
+
+	return safe_chain
+}
+
+function read_kit_file(name: string): string {
+	return readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8')
+}
 
 function exclusions(content: string): unknown {
-	const aikido = yaml_document.parse_yaml(content)
-	const safe_chain = aikido['safe-chain']
-	if (!yaml_document.is_mapping_document(safe_chain)) throw new Error('safe-chain missing')
-	const { npm } = safe_chain
+	const { npm } = read_safe_chain(content)
 	if (!yaml_document.is_mapping_document(npm)) throw new Error('safe-chain.npm missing')
 
 	return npm['minimumPackageAgeExclusions']
+}
+
+function age_hours(content: string): unknown {
+	return read_safe_chain(content)['minimumPackageAgeHours']
 }
 
 describe('project_config.merge_project_config', () => {
@@ -58,6 +78,45 @@ describe('project_config.merge_project_config', () => {
 	})
 })
 
+describe('project_config.merge_project_config — minimum package age', () => {
+	it('converts the .npmrc window from minutes to whole hours', () => {
+		const result = project_config.merge_project_config('', WORKSPACE, NPMRC_DAY)
+
+		expect(age_hours(result)).toBe(DAY_HOURS)
+	})
+
+	it('floors a partial hour so Safe Chain is never stricter than pnpm', () => {
+		const result = project_config.merge_project_config('', WORKSPACE, NPMRC_PARTIAL_HOUR)
+
+		expect(age_hours(result)).toBe(DAY_HOURS)
+	})
+
+	it('writes 0 for an explicit opt-out, replacing an earlier synchronized age', () => {
+		const existing = project_config.merge_project_config('', WORKSPACE, NPMRC_DAY)
+		const result = project_config.merge_project_config(existing, WORKSPACE, NPMRC_OPT_OUT)
+
+		expect(age_hours(result)).toBe(0)
+	})
+
+	it('writes no age when .npmrc declares no window', () => {
+		const result = project_config.merge_project_config('', WORKSPACE, 'engine-strict=true\n')
+
+		expect(age_hours(result)).toBeUndefined()
+	})
+
+	it('replaces a stale age and is stable once synchronized', () => {
+		const existing = project_config.merge_project_config(
+			'',
+			WORKSPACE,
+			'minimum-release-age=2880\n',
+		)
+		const result = project_config.merge_project_config(existing, WORKSPACE, NPMRC_DAY)
+
+		expect(age_hours(result)).toBe(DAY_HOURS)
+		expect(project_config.merge_project_config(result, WORKSPACE, NPMRC_DAY)).toBe(result)
+	})
+})
+
 describe('project_config.merge_project_config — YAML structure', () => {
 	it('keeps a safe-chain anchor referenced by another setting', () => {
 		const existing =
@@ -86,19 +145,27 @@ describe('project_config.merge_project_config — YAML structure', () => {
 
 describe('kit project configuration', () => {
 	it('matches the kit workspace exclusion list', () => {
-		const workspace = readFileSync(new URL('../../pnpm-workspace.yaml', import.meta.url), 'utf8')
-		const aikido = readFileSync(new URL('../../.aikido', import.meta.url), 'utf8')
+		const workspace = read_kit_file(WORKSPACE_FILE)
+		const aikido = read_kit_file(AIKIDO_FILE)
 		const source = yaml_document.parse_yaml(workspace)
 
 		expect(exclusions(aikido)).toEqual(source['minimumReleaseAgeExclude'])
+	})
+
+	it('matches the Safe Chain minimum age to the .npmrc window', () => {
+		const minutes = release_age.parse_minimum_release_age(read_kit_file('.npmrc'))
+		const aikido = read_kit_file(AIKIDO_FILE)
+
+		expect(minutes).toBeGreaterThan(0)
+		expect(age_hours(aikido)).toBe(Math.floor(minutes / MINUTES_PER_HOUR))
 	})
 })
 
 describe('project_config.sync_project_config', () => {
 	it('creates and updates the project config from a consumer workspace', () => {
 		const root = mkdtempSync(path.join(tmpdir(), 'safe-chain-config-'))
-		const workspace_path = path.join(root, 'pnpm-workspace.yaml')
-		const config_path = path.join(root, '.aikido')
+		const workspace_path = path.join(root, WORKSPACE_FILE)
+		const config_path = path.join(root, AIKIDO_FILE)
 
 		try {
 			writeFileSync(workspace_path, WORKSPACE)

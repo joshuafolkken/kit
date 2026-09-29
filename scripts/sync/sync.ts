@@ -371,7 +371,6 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 
 function sync_project_artifacts(is_force: boolean): void {
 	sync_ai_copy_all(is_force)
-	project_config.sync_project_config(PROJECT_ROOT)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
 	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
@@ -382,6 +381,9 @@ function sync_project_artifacts(is_force: boolean): void {
 
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
+	// After `sync_config_files`, which may add the `.npmrc` window `.aikido`'s age is derived from
+	// (joshuafolkken/kit#2743).
+	project_config.sync_project_config(PROJECT_ROOT)
 	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)
 }
