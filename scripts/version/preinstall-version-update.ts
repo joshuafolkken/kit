@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { ci_installer_pin } from '#scripts/safe-chain/ci-installer-pin'
 import { execaSync } from 'execa'
 
 const SAFE_CHAIN_PKG = '@aikidosec/safe-chain'
@@ -72,6 +73,7 @@ function sync(package_json_path: string): void {
 	}
 
 	write_if_updated(package_json_path, info.content, info.current_version, latest)
+	ci_installer_pin.sync(latest)
 }
 
 const preinstall_version_update = {

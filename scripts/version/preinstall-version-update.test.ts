@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const execa_sync_mock = vi.hoisted(() => vi.fn())
 const read_mock = vi.hoisted(() => vi.fn())
 const write_mock = vi.hoisted(() => vi.fn())
+const ci_pin_sync_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 vi.mock('node:fs', () => ({ readFileSync: read_mock, writeFileSync: write_mock }))
+vi.mock('#scripts/safe-chain/ci-installer-pin', () => ({
+	ci_installer_pin: { sync: ci_pin_sync_mock },
+}))
 
 const { preinstall_version_update } = await import('./preinstall-version-update')
 
@@ -22,6 +26,7 @@ beforeEach(() => {
 	execa_sync_mock.mockReset()
 	read_mock.mockReset()
 	write_mock.mockReset()
+	ci_pin_sync_mock.mockReset()
 })
 
 describe('preinstall_version_update.extract_pinned_version', () => {
@@ -100,5 +105,20 @@ describe('preinstall_version_update.sync — write case', () => {
 			expect.stringContaining('@aikidosec/safe-chain@2.0.0'),
 			'utf8',
 		)
+	})
+
+	// joshuafolkken/kit#2711: the CI workflows install the same release, so they move with it.
+	it('hands the fetched release to the CI installer pin', () => {
+		read_mock.mockReturnValue(PKG_WITH_SAFE_CHAIN)
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '2.0.0\n' })
+		preinstall_version_update.sync(PACKAGE_JSON_PATH)
+		expect(ci_pin_sync_mock).toHaveBeenCalledWith('2.0.0')
+	})
+
+	it('still hands the release to the CI pin when package.json is already current', () => {
+		read_mock.mockReturnValue(PKG_WITH_SAFE_CHAIN)
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '1.5.1\n' })
+		preinstall_version_update.sync(PACKAGE_JSON_PATH)
+		expect(ci_pin_sync_mock).toHaveBeenCalledWith('1.5.1')
 	})
 })
