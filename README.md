@@ -34,6 +34,7 @@ It needs [Node.js](https://nodejs.org/) 22.19.0 or later with [pnpm](https://pnp
 
 - [getting-started.md](./docs/getting-started.md) — first install for an `index.html` site or a non-Node project (`static`)
 - [package.md](./docs/package.md) — add kit to a Node project (`node`)
+- [tutorial.md](./docs/tutorial.md) — your first change with an agent, from Issue to merge
 - [how-to.md](./docs/how-to.md) — step-by-step guides by task: update, release, run Issues, fix a failing gate
 
 **Understand kit**

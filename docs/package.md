@@ -53,6 +53,7 @@ The config presets (ESLint, Prettier, tsconfig) and the libraries kit exports â€
 
 ## Next
 
+- Make your first change with an agent, from Issue to merge: [tutorial.md](./tutorial.md).
 - Task guides: [how-to.md](./how-to.md).
 - Full command reference: [josh-commands.md](./josh-commands.md).
 - Want `josh` available everywhere? Install the [global CLI](./cli.md).

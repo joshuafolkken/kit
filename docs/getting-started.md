@@ -92,6 +92,11 @@ Re-running `pnpm exec josh init` later leaves the files unchanged.
 
 Open `index.html` in a browser and check the layout, links and any interaction at the screen widths you care about. kit does not require an automated browser test for each HTML change.
 
+## Next
+
+- Make your first change with an agent, from Issue to merge: [tutorial.md](./tutorial.md).
+- Task guides: [how-to.md](./how-to.md).
+
 ## Verifying this guide
 
 The guide is checked by running steps 2–5 in a fresh container with no Git, no `~/.npmrc` and no Node.js. `buildpack-deps:bookworm-curl` is a Debian image with curl and without Git. The pnpm installer reads `SHELL` to pick the profile it edits, and a container does not set it:
