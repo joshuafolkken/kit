@@ -529,3 +529,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | low | docs/package-api.md | 2026-09-29 | #2713
 - rf:bug-risks | medium | docs/how-to/run-in-the-cloud.md:12 | 2026-09-29 | #2713
 - rf:none | none | - | 2026-09-29 | #2725
+- rf:bug-risks | medium | README.md | 2026-09-29 | #2730
+- rf:none | none | - | 2026-09-29 | #2730
