@@ -126,5 +126,11 @@ act, so the run continues rather than stalling — the sanctioned boundary disti
 turn-end this section forbids. The boundary, its two commands and the resume verification are the
 `pre-gate-cut.md` skill document, its single source.
 
+**A headless lane child (`claude -p`) is where "a background command re-invokes the run" does not
+hold: its background Bash tasks are killed when its turn ends** (joshuafolkken/kit#2704). It hands the
+gate-to-merge region to `pnpm josh ship --detach` instead (`chain-rule.md` step 0); `pnpm josh
+rule:guard` refuses a backgrounded `josh gate` / `git` / `followup` there, and the `Stop` hook sends a
+child with a task still running back to wait rather than to notify.
+
 The operational section above is the single source of the rule. `followup.md`, `chain-rule.md` and
 `backlogrun-progress.md` → "Progress while the run is quiet" route here for it rather than restating it.

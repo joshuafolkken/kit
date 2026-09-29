@@ -264,6 +264,7 @@ describe('rule_value.measure — rules nothing can score', () => {
 			FILING_CAP_ID,
 			'raw-field-body',
 			'test-declared',
+			'lane-background',
 			'lane-interactive-ask',
 			'lane-carry-conflict',
 			'lane-switch-main',
