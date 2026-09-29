@@ -13,7 +13,13 @@ const SHAPE: ProjectShape = {
 	has_github: false,
 }
 const SELF_RUN_REFUSAL = 'Refusing to sync'
-const NO_GIT = { has_git: false, has_github: false, branch: undefined, has_commits: false }
+const NO_GIT = {
+	has_git: false,
+	has_github: false,
+	has_origin: false,
+	branch: undefined,
+	has_commits: false,
+}
 
 beforeEach(() => {
 	vi.restoreAllMocks()

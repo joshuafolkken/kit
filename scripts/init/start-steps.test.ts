@@ -72,12 +72,16 @@ describe('the kit source repository guard', () => {
 })
 
 describe('reading the Git state', () => {
-	it('reads the branch and whether HEAD exists', () => {
-		mocked_execa.mockReturnValueOnce(result(0, 'main\n')).mockReturnValueOnce(result(1))
+	it('reads the origin, the branch and whether HEAD exists', () => {
+		mocked_execa
+			.mockReturnValueOnce(result(0))
+			.mockReturnValueOnce(result(0, 'main\n'))
+			.mockReturnValueOnce(result(1))
 
 		expect(start_steps.read_git_state(ROOT, SHAPE)).toStrictEqual({
 			has_git: true,
 			has_github: false,
+			has_origin: true,
 			branch: 'main',
 			has_commits: false,
 		})

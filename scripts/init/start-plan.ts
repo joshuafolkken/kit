@@ -14,6 +14,7 @@ type StartStep = 'git_init' | 'initialize' | 'commit' | 'repository' | 'labels'
 interface GitState {
 	has_git: boolean
 	has_github: boolean
+	has_origin: boolean
 	branch: string | undefined
 	has_commits: boolean
 }
@@ -66,9 +67,18 @@ function existing_git_steps(state: GitState): StepPlan {
 	return { steps: ['initialize', 'repository', 'labels'], refusal: undefined }
 }
 
-// An existing GitHub origin is never replaced or pushed to: only the additive steps run.
+// An existing GitHub origin is never replaced or pushed to: only the additive steps run. Any other
+// origin is refused here, before the first write — `gh repo create --remote origin` cannot add a
+// remote that already exists, so the run would otherwise fail after initializing the directory.
 function plan_steps(state: GitState): StepPlan {
 	if (state.has_github) return { steps: ['initialize', 'labels'], refusal: undefined }
+
+	if (state.has_origin) {
+		return refused(
+			'josh start creates the GitHub repository as origin, but this repository already has an origin that is not on GitHub. Remove or rename it, or run josh init to set up without GitHub.',
+		)
+	}
+
 	if (state.has_git) return existing_git_steps(state)
 
 	return { steps: FULL_STEPS, refusal: undefined }

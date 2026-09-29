@@ -4,6 +4,7 @@ import { start_plan, type GitState, type StartOptions } from './start-plan'
 const NO_GIT: GitState = {
 	has_git: false,
 	has_github: false,
+	has_origin: false,
 	branch: undefined,
 	has_commits: false,
 }
@@ -64,6 +65,13 @@ describe('the steps josh start plans in an existing Git repository', () => {
 
 		expect(plan.steps).toStrictEqual([])
 		expect(plan.refusal).toContain('on dev')
+	})
+
+	it('refuses an origin that is not on GitHub before changing anything', () => {
+		const plan = start_plan.plan_steps({ ...NO_GIT, has_git: true, has_origin: true })
+
+		expect(plan.steps).toStrictEqual([])
+		expect(plan.refusal).toContain('not on GitHub')
 	})
 })
 

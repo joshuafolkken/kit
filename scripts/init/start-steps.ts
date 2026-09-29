@@ -45,11 +45,16 @@ function run(command: string, args: ReadonlyArray<string>, root: string): void {
 
 function read_git_state(root: string, shape: ProjectShape): GitState {
 	const { has_git, has_github } = shape
-	if (!has_git) return { has_git, has_github, branch: undefined, has_commits: false }
+
+	if (!has_git) {
+		return { has_git, has_github, has_origin: false, branch: undefined, has_commits: false }
+	}
+
+	const has_origin = succeeds('git', ['remote', 'get-url', 'origin'], root)
 	const branch = read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
 	const has_commits = succeeds('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], root)
 
-	return { has_git, has_github, branch, has_commits }
+	return { has_git, has_github, has_origin, branch, has_commits }
 }
 
 // Every step talks to GitHub, so the CLI is checked before the first write rather than at the step
