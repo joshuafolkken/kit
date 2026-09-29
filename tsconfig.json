@@ -2,7 +2,6 @@
 	"extends": "./tsconfig/base.json",
 	"compilerOptions": {
 		"target": "ES2022",
-		"module": "ESNext",
 		"lib": ["ES2023"],
 		"types": ["node"],
 		"allowJs": true
