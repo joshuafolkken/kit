@@ -516,3 +516,12 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | docs/overview.md | 2026-09-29 | #2702
 - rf:bug-risks | low | docs/overview.md | 2026-09-29 | #2702
 - rf:none | none | - | 2026-09-29 | #2702
+- rf:bug-risks | medium | scripts/run/run-tidy-stashes.ts | 2026-09-29 | #2724
+- rf:bug-risks | medium | scripts/observations/observation-ledger-home.ts | 2026-09-29 | #2724
+- rf:bug-risks | medium | scripts/observations/observation-ledger-migrate.ts | 2026-09-29 | #2724
+- rf:tests | medium | scripts/run/run-tidy-stashes.test.ts | 2026-09-29 | #2724
+- rf:comments | low | scripts/git/git-command.ts | 2026-09-29 | #2724
+- rf:tests | low | scripts/observations/observation-ledger-migrate.test.ts | 2026-09-29 | #2724
+- rf:bug-risks | high | scripts/observations/observation-ledger-migrate.ts | 2026-09-29 | #2724
+- rf:bug-risks | medium | scripts/observations/observation-ledger-home.ts | 2026-09-29 | #2724
+- rf:bug-risks | low | scripts/observations/observation-ledger-migrate.ts | 2026-09-29 | #2724
