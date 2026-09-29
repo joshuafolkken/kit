@@ -1,3 +1,6 @@
+import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
+
+const PREINSTALL_KEY = 'preinstall'
 const JF_PREFIX = 'jf-'
 const JOSH_PREFIX = 'josh '
 
@@ -47,9 +50,15 @@ function migrate_jf_value(value: string): string {
 	return `${JOSH_PREFIX}${value.slice(JF_PREFIX.length)}`
 }
 
+function migrate_script(key: string, value: string): string {
+	const migrated = migrate_jf_value(value)
+
+	return key === PREINSTALL_KEY ? safe_chain_preinstall.migrate_preinstall(migrated) : migrated
+}
+
 function apply_jf_migrations(scripts: Record<string, string>): Record<string, string> {
 	return Object.fromEntries(
-		Object.entries(scripts).map(([key, value]) => [key, migrate_jf_value(value)]),
+		Object.entries(scripts).map(([key, value]) => [key, migrate_script(key, value)]),
 	)
 }
 
