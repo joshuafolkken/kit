@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 const WORKFLOW_PATH = '.github/workflows/publish.yml'
 const PACKAGE_GUIDE = 'docs/package.md'
+const PACKAGE_API_REFERENCE = 'docs/package-api.md'
 const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
 const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
@@ -228,7 +229,7 @@ describe('installation guidance', () => {
 	})
 
 	it('identifies the registry used by kit version checks', () => {
-		const content = readFileSync(PACKAGE_GUIDE, 'utf8')
+		const content = readFileSync(PACKAGE_API_REFERENCE, 'utf8')
 
 		expect(content).toContain('GitHub Packages versions API')
 	})
