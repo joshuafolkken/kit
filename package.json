@@ -121,9 +121,9 @@
 		}
 	},
 	"peerDependencies": {
-		"@playwright/test": ">=1.0.0",
 		"@eslint/compat": "^2.1.1",
 		"@eslint/js": "^10.0.1",
+		"@playwright/test": ">=1.0.0",
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"eslint": "^10.0.0",
 		"eslint-config-prettier": "^10.1.8",
@@ -189,7 +189,7 @@
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"@types/node": "^26.6.3",
 		"@types/semver": "^7.8.0",
-		"cspell": "^10.3.4",
+		"cspell": "^10.3.5",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.11.0",
 		"eslint-config-prettier": "^10.1.8",
@@ -208,8 +208,8 @@
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.6",
 		"typescript": "^6.0.3",
-		"vitest": "^5.0.2",
-		"typescript-eslint": "^8.70.1"
+		"typescript-eslint": "^8.70.1",
+		"vitest": "^5.0.2"
 	},
 	"dependencies": {
 		"execa": "^10.0.1",

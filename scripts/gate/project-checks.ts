@@ -102,6 +102,17 @@ function type_check_skip_reason(directory: string): string | undefined {
 	return undefined
 }
 
+// Shared by `josh lint` and `josh format`, so a static project without Web files — a Python or Rust
+// project, which `josh init` gives no Prettier — is skipped for the same reason by both
+// (joshuafolkken/kit#2606).
+function prettier_skip_reason(directory: string): string | undefined {
+	if (!is_static(directory)) return undefined
+	if (!has_files(directory, WEB_FILES)) return 'no HTML, CSS or JavaScript files were found'
+	if (!has_bin(directory, 'prettier')) return 'prettier is not installed'
+
+	return undefined
+}
+
 // Shared by `josh lint` and `josh format`, so a static project without ESLint is skipped for the
 // same reason by both (joshuafolkken/kit#2693).
 function eslint_skip_reason(directory: string): string | undefined {
@@ -125,6 +136,7 @@ const project_checks = {
 	has_config,
 	has_files,
 	is_static,
+	prettier_skip_reason,
 	project_root,
 	skip_notice,
 	type_check_skip_reason,
