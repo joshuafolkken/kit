@@ -110,6 +110,49 @@ describe('to_status_check_rollup — apps', () => {
 	})
 })
 
+// GitHub decides a name by its newest check suite, not its newest check run — both orders were
+// observed on this repository's own pull requests (joshuafolkken/kit#2700).
+describe('to_status_check_rollup — check suites', () => {
+	// PR #2698: the cancelled suite was the newer one, and its jobs had been created first.
+	it('keeps a cancelled run from the newer suite over a later success from an older one', () => {
+		const cancelled_newer_suite = {
+			...FAILED_RUN,
+			conclusion: 'cancelled',
+			check_suite: { id: 200 },
+		}
+		const success_older_suite = { ...RETRIED_RUN, check_suite: { id: 100 } }
+		const merged = merge(
+			check_runs_pages([cancelled_newer_suite, success_older_suite]),
+			status_pages([]),
+		)
+
+		expect(merged).toStrictEqual([cancelled_newer_suite])
+	})
+
+	// PR #2717: the cancelled suite was the older one, and GitHub read the pull request CLEAN.
+	it('drops a cancelled run from an older suite once a newer suite reports', () => {
+		const cancelled_older_suite = {
+			...FAILED_RUN,
+			conclusion: 'cancelled',
+			check_suite: { id: 100 },
+		}
+		const success_newer_suite = { ...RETRIED_RUN, check_suite: { id: 200 } }
+		const merged = merge(
+			check_runs_pages([cancelled_older_suite, success_newer_suite]),
+			status_pages([]),
+		)
+
+		expect(merged).toStrictEqual([success_newer_suite])
+	})
+
+	it('ranks by run id within the same suite', () => {
+		const old_run = { ...FAILED_RUN, check_suite: { id: 100 } }
+		const rerun = { ...RETRIED_RUN, check_suite: { id: 100 } }
+
+		expect(merge(check_runs_pages([rerun, old_run]), status_pages([]))).toStrictEqual([rerun])
+	})
+})
+
 describe('to_status_check_rollup — order', () => {
 	// The check runs first, then the status contexts — the order `gh` answered in.
 	it('puts the check runs before the status contexts', () => {
