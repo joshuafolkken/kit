@@ -13,6 +13,7 @@ import { issue_bug_label_rule } from './issue-bug-label'
 import { issue_fold } from './issue-fold'
 import { issue_scout } from './issue-scout'
 import { josh_git_bare } from './josh-git-bare'
+import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
@@ -360,6 +361,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// verdict is `required`; in the hermetic non-repo suite the git read fails to `exempt`, so
 	// `test-declared` claims nothing and the "exactly one rule" invariant over `run-tail`'s fixture holds.
 	test_declared_commit.ROW,
+	// **The long-running josh command a lane child backgrounds and loses** (joshuafolkken/kit#2704). A
+	// headless child's background tasks die with its turn, so a backgrounded `josh gate` / `git` /
+	// `followup` is killed before it reports; this refuses the launch and hands back `josh ship
+	// --detach`, whose supervisor outlives the turn. **Listed before `run-tail`, whose push it claims in
+	// a child**: that row answers a foreground push with "reissue it backgrounded", the reissue this row
+	// refuses, so a child is sent to the detached ship on its first refusal instead of through both.
+	// Outside a child it claims nothing. A backgrounded bare `josh git` also trips `josh-git-bare`
+	// below; this row wins, and `ship --detach` satisfies both. It fires on every occurrence.
+	lane_background.ROW,
 	// **The one row whose trigger reads a field of the input beside the command**, so it supplies its
 	// own tool-name check rather than going through `on_bash_command`: a push step already issued with
 	// `run_in_background` is the rule obeyed, and refusing it would charge a run for doing the right

@@ -8,6 +8,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { filing_cap } from '#scripts/rules/filing-cap'
+import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
@@ -76,6 +77,7 @@ async function build_context(
 		headless_waiting: await run_headless.must_keep_waiting(),
 		headless_refusals: stop_rules.count_headless_refusals(tail),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
+		background_pending: lane_background.pending_background_ids(tail).length > 0,
 		session_lang: session_lang(),
 	}
 }
