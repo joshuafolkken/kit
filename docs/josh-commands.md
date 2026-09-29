@@ -602,7 +602,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 ### `josh observations:flush`
 
-Commit the observation ledger (`docs/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. It is the ledger's only commit path — `josh git` excludes the ledger from staging.
+Commit the observation ledger (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. It is the ledger's only commit path — `josh git` excludes the ledger from staging.
 
 ```bash
 pnpm josh observations:flush
@@ -620,13 +620,13 @@ Re-run a behavior-change Issue's declared baseline after it merges and print the
 pnpm josh measure:rerun /tmp/issue-body.md
 ```
 
-**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
+**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](#josh-issuelint).
 
 ### `josh review:record`
 
-Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the observation ledger (`docs/observations.md`) — the same append-only file the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the observation ledger (`docs/maintainers/observations.md`) — the same append-only file the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
 
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
@@ -1546,7 +1546,7 @@ pnpm josh run:tidy
 ```
 
 - **Lanes:** closes a lane whose issue was closed by a merge, whose work tree has no uncommitted change, whose branch has no commit that no remote reaches, and that no live run holds — then releases its run record.
-- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches `docs/observations.md` has its ledger lines appended to the primary checkout's ledger first, less those already there.
+- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches `docs/maintainers/observations.md` has its ledger lines appended to the primary checkout's ledger first, less those already there.
 - **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits.
 
 "Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.

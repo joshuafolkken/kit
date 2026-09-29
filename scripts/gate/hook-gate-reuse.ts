@@ -53,7 +53,7 @@ function is_force_requested(force_environment: string): boolean {
 // nothing" for "git could not be asked". Every predicate below treats the two differently.
 //
 // **The observation ledger is dropped from the reading, and it is the one line that may be**
-// (joshuafolkken/kit#1756). Since that issue `pnpm josh git` excludes `docs/observations.md` from
+// (joshuafolkken/kit#1756). Since that issue `pnpm josh git` excludes the ledger from
 // what it stages, so a parent's appended line sits modified-but-never-staged for the whole interval
 // between the append and the next `pnpm josh observations:flush` — and every condition below reads a
 // non-empty status as "this operation carries a tree no check has read". Left in, one ledger line

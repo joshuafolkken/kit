@@ -3,7 +3,7 @@ import { git_stash, type StashEntry } from '#scripts/git/git-stash'
 import { stash_orphans } from '#scripts/git/stash-orphans'
 import { stash_sweep_lock } from '#scripts/git/stash-sweep-lock'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { run_tidy, type Outcome, type Verdict } from './run-tidy'
 import type { IsMerged } from './run-tidy-lanes'
@@ -26,14 +26,32 @@ async function read_ledger(ledger_path: string): Promise<string> {
 	}
 }
 
+// An entry cut before joshuafolkken/kit#2724 holds its lines at the ledger's old path, so the lines of
+// every ledger path it touches are carried to the current ledger.
+async function added_ledger_lines(
+	hash: string,
+	ledger_paths: ReadonlyArray<string>,
+): Promise<Array<string>> {
+	const added: Array<string> = []
+
+	for (const ledger_path of ledger_paths) {
+		const lines = await git_stash.added_lines(hash, ledger_path)
+
+		added.push(...lines)
+	}
+
+	return added
+}
+
 // How many ledger lines went into the primary checkout's ledger before the drop.
 async function carry_ledger(hash: string): Promise<number> {
-	const paths = await git_stash.changed_paths(hash)
+	const changed = await git_stash.changed_paths(hash)
+	const ledger_paths = changed.filter((file_path) => observation_ledger.is_ledger_path(file_path))
 
-	if (!paths.includes(OBSERVATION_LEDGER_PATH)) return 0
+	if (ledger_paths.length === 0) return 0
 
 	const ledger_path = observation_ledger_home.ledger_path()
-	const added = await git_stash.added_lines(hash, OBSERVATION_LEDGER_PATH)
+	const added = await added_ledger_lines(hash, ledger_paths)
 	const carried = run_tidy.ledger_carry(added, await read_ledger(ledger_path))
 
 	await observation_ledger_home.append(ledger_path, carried)

@@ -4,6 +4,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { observation_ledger, OBSERVATION_LEDGER_PATH } from './observation-ledger'
 import { observation_ledger_line, type BrokenLine } from './observation-ledger-line'
+import { observation_ledger_migrate } from './observation-ledger-migrate'
 import { observations_flush_landing } from './observations-flush-landing'
 
 // The commit path the observation ledger did not have (joshuafolkken/kit#1756). The parent session
@@ -78,7 +79,9 @@ function has_ledger_change(status_output: string): boolean {
 }
 
 function other_changed_paths(status_output: string): ReadonlyArray<string> {
-	return status_paths(status_output).filter((file_path) => file_path !== OBSERVATION_LEDGER_PATH)
+	return status_paths(status_output).filter(
+		(file_path) => !observation_ledger.is_ledger_path(file_path),
+	)
 }
 
 function message_of(error: unknown): string {
@@ -295,9 +298,21 @@ function rejection_message(
 	return roll_back_failure_message(branch_name, reason, roll_back_reason)
 }
 
+// **Every ledger path the status names is staged, not the one constant** (joshuafolkken/kit#2724).
+// After a migration the change is the new file together with the old one's deletion, and a commit
+// holding only the first would leave the deletion behind as a change no later flush could tell apart
+// from a fresh append.
+async function stage_ledger(): Promise<void> {
+	const ledger_paths = observation_ledger.ledger_paths(await git_command.status())
+
+	for (const file_path of ledger_paths) {
+		await git_command.add_path(file_path)
+	}
+}
+
 async function commit_ledger(branch_name: string, default_branch: string): Promise<void> {
 	try {
-		await git_command.add_path(OBSERVATION_LEDGER_PATH)
+		await stage_ledger()
 		await git_command.commit(COMMIT_MESSAGE)
 	} catch (error) {
 		const roll_back_reason = await roll_back(branch_name, default_branch)
@@ -316,7 +331,7 @@ async function open_pull_request(branch_name: string, default_branch: string): P
 }
 
 // **The checkout goes back to the default branch only on the way that merged.** A `finally` here
-// would check the default branch out after a red check too — and `docs/observations.md` would then
+// would check the default branch out after a red check too — and the ledger would then
 // revert to main's content, leaving the appended lines on a branch nothing in this checkout points
 // at any more. The next flush would read `has_ledger_change` as false and report `clean`, which is
 // the silent loss the refusals above exist to prevent. Left on the branch, the refusal fires.
@@ -359,12 +374,28 @@ function broken_lines_message(broken: ReadonlyArray<BrokenLine>): string {
 // **A malformed line is refused before a branch is cut, not after.** The ledger path was collected
 // without a line ever being parsed (joshuafolkken/kit#2123), so a broken append could ride a flush
 // through; validating here keeps the committed ledger to its grammar.
+//
+// **A ledger that is not there has no line to break** — the change the status saw is then its
+// deletion, and a flush commits that like any other change to it.
+async function read_ledger(): Promise<string> {
+	try {
+		return await readFile(OBSERVATION_LEDGER_PATH, 'utf8')
+	} catch {
+		return ''
+	}
+}
+
 async function refuse_broken_ledger(): Promise<void> {
-	const broken = observation_ledger_line.broken_ledger_lines(
-		await readFile(OBSERVATION_LEDGER_PATH, 'utf8'),
-	)
+	const broken = observation_ledger_line.broken_ledger_lines(await read_ledger())
 
 	if (broken.length > 0) throw new Error(broken_lines_message(broken))
+}
+
+// Lines still on the ledger's old path are moved before anything is validated or staged
+// (joshuafolkken/kit#2724), so the flush commits the move and the lines together.
+async function prepare_ledger(): Promise<void> {
+	observation_ledger_migrate.migrate(process.cwd())
+	await refuse_broken_ledger()
 }
 
 // **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
@@ -382,7 +413,7 @@ async function flush(now: Date): Promise<string> {
 
 	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
 
-	await refuse_broken_ledger()
+	await prepare_ledger()
 
 	const deferred = await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
 	if (deferred !== undefined) return deferred

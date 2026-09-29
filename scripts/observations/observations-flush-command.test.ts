@@ -3,7 +3,8 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_pr_checks } from '#scripts/git/git-pr-checks'
 import { main_sync } from '#scripts/git/main-sync'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import { LEGACY_OBSERVATION_LEDGER_PATH, OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import { observation_ledger_migrate } from './observation-ledger-migrate'
 import { observations_flush } from './observations-flush'
 import {
 	DEFAULT_BRANCH,
@@ -63,6 +64,11 @@ vi.mock('#scripts/git/git-pr-checks', () => ({
 	},
 }))
 vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
+// The migration moves real files, so it is mocked like git: run unmocked from the repository root, it
+// would move this checkout's own ledger.
+vi.mock('./observation-ledger-migrate', () => ({
+	observation_ledger_migrate: { migrate: vi.fn() },
+}))
 
 const HOOK_REJECTION = 'cspell found an unknown word'
 const CHECKOUT_FAILURE = 'index.lock exists'
@@ -156,6 +162,21 @@ describe('observations_flush — the success path command sequence', () => {
 			observations_flush.pull_request_body(),
 			'ignore-for-release',
 		)
+	})
+
+	// joshuafolkken/kit#2724: a migration leaves the new file and the old one's deletion, and both go in.
+	it('migrates the old ledger first and stages every ledger path the status then names', async () => {
+		vi.mocked(git_command.status).mockResolvedValue(
+			[` D ${LEGACY_OBSERVATION_LEDGER_PATH}`, `?? ${OBSERVATION_LEDGER_PATH}`].join('\n'),
+		)
+
+		await observations_flush.flush(new Date(MORNING_INSTANT))
+
+		expect(observation_ledger_migrate.migrate).toHaveBeenCalledWith(process.cwd())
+		expect(vi.mocked(git_command.add_path).mock.calls).toEqual([
+			[LEGACY_OBSERVATION_LEDGER_PATH],
+			[OBSERVATION_LEDGER_PATH],
+		])
 	})
 })
 
