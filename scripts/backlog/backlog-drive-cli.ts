@@ -3,6 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
+import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
@@ -24,6 +25,7 @@ import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_restore } from './backlog-drive-restore'
+import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_offer_cli } from './backlog-offer-cli'
 
 // `josh backlog:drive` — the backlogrun parent's loop as one resident wait (joshuafolkken/kit#2499).
@@ -193,7 +195,7 @@ async function read_offer(
 
 	return offer === undefined
 		? undefined
-		: { ...offer, is_retrospective_done: carry.retrospective === true }
+		: { ...offer, is_retrospective_owed: backlog_drive_retrospective.is_owed(carry) }
 }
 
 // A non-zero `run:merge` prints its token first only for a hand-off (`busy`, `stop`, `retry`); any
@@ -357,6 +359,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
+	// Load `.env` on the real command path only, so `JOSH_RETROSPECTIVE` set there reaches the offer read.
+	hook_decision.load_environment_file()
 	process.exitCode = await run(argv)
 }
 
