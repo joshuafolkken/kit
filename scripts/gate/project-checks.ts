@@ -2,6 +2,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
+import { z } from 'zod'
 
 const PACKAGE_JSON = 'package.json'
 const IGNORED_DIRS = new Set([
@@ -36,6 +37,8 @@ const CSPELL_CONFIGS = [
 	'cspell.yaml',
 ]
 const TYPE_CONFIGS = ['tsconfig.json', 'jsconfig.json']
+const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies']
+const object_schema = z.record(z.string(), z.unknown())
 
 function project_root(directory: string): string {
 	let current = directory
@@ -78,50 +81,77 @@ function is_static_manifest(manifest: unknown): boolean {
 	return josh.profile === 'static'
 }
 
-function is_static(directory: string): boolean {
+function read_manifest(directory: string): unknown {
 	try {
 		const manifest_path = path.join(project_root(directory), PACKAGE_JSON)
-		const manifest: unknown = JSON.parse(readFileSync(manifest_path, 'utf8'))
 
-		return is_static_manifest(manifest)
+		return JSON.parse(readFileSync(manifest_path, 'utf8'))
 	} catch {
-		return false
+		return undefined
 	}
+}
+
+function is_static(directory: string): boolean {
+	return is_static_manifest(read_manifest(directory))
+}
+
+function is_declared(directory: string, package_name: string): boolean {
+	const manifest = object_schema.safeParse(read_manifest(directory))
+	if (!manifest.success) return false
+
+	return DEPENDENCY_FIELDS.some((field) => {
+		const dependencies = object_schema.safeParse(manifest.data[field])
+
+		return dependencies.success && Object.hasOwn(dependencies.data, package_name)
+	})
+}
+
+// A tool the manifest lists but `node_modules` lacks is a project that has not run `pnpm install`
+// yet — typically right after `josh init` added it (joshuafolkken/kit#2709). Skipping it would pass a
+// check the configuration asks for without running it, so only an undeclared tool is skipped; a
+// declared one is run and fails until it is installed.
+function missing_tool_reason(
+	directory: string,
+	package_name: string,
+	bin_name: string,
+): string | undefined {
+	if (has_bin(directory, bin_name) || is_declared(directory, package_name)) return undefined
+
+	return `${package_name} is not installed`
 }
 
 function skip_notice(check: string, reason: string): string {
 	return `josh ${check}: ${reason} ${SKIP_MARKER} ${check}.`
 }
 
+// Shared by `josh check` and the gate's type-check step, so neither reaches `tsc` on a static
+// project that has nothing to type-check (joshuafolkken/kit#2709).
 function type_check_skip_reason(directory: string): string | undefined {
 	if (!is_static(directory)) return undefined
 	if (!has_files(directory, TYPE_FILES)) return 'no TypeScript files were found'
 	if (!has_config(directory, TYPE_CONFIGS)) return 'no TypeScript configuration was found'
-	if (!has_bin(directory, 'tsc')) return 'typescript is not installed'
 
-	return undefined
+	return missing_tool_reason(directory, 'typescript', 'tsc')
 }
 
-// Shared by `josh lint` and `josh format`, so a static project without Web files — a Python or Rust
-// project, which `josh init` gives no Prettier — is skipped for the same reason by both
-// (joshuafolkken/kit#2606).
+// Shared by `josh lint`, `josh lint:related` and `josh format`, so a static project without Web
+// files — a Python or Rust project, which `josh init` gives no Prettier — is skipped for the same
+// reason by all three (joshuafolkken/kit#2606, joshuafolkken/kit#2709).
 function prettier_skip_reason(directory: string): string | undefined {
 	if (!is_static(directory)) return undefined
 	if (!has_files(directory, WEB_FILES)) return 'no HTML, CSS or JavaScript files were found'
-	if (!has_bin(directory, 'prettier')) return 'prettier is not installed'
 
-	return undefined
+	return missing_tool_reason(directory, 'prettier', 'prettier')
 }
 
-// Shared by `josh lint` and `josh format`, so a static project without ESLint is skipped for the
-// same reason by both (joshuafolkken/kit#2693).
+// Shared by `josh lint`, `josh lint:related` and `josh format`, so a static project without ESLint
+// is skipped for the same reason by all three (joshuafolkken/kit#2693, joshuafolkken/kit#2709).
 function eslint_skip_reason(directory: string): string | undefined {
 	if (!is_static(directory)) return undefined
 	if (!has_files(directory, SCRIPT_FILES)) return 'no JavaScript or TypeScript files were found'
 	if (!has_config(directory, ESLINT_CONFIGS)) return 'no ESLint configuration was found'
-	if (!has_bin(directory, 'eslint')) return 'eslint is not installed'
 
-	return undefined
+	return missing_tool_reason(directory, 'eslint', 'eslint')
 }
 
 const project_checks = {

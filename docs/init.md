@@ -186,7 +186,7 @@ The ESLint preset likewise resolves ESLint and its plugins from the consumer pro
 | `lefthook:push`      | `lefthook run pre-push`                                                                                                                                                  |
 | `main:sync`          | `git checkout <default> && git pull --ff-only`, then prunes merged branches with a `[gone]` remote-tracking upstream (refuses inside a linked work tree)                 |
 | `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                                                                                                           |
-| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                                                                                                              |
+| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` (a `static` project with nothing to type-check skips it with the reason)                                     |
 
 SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
 
