@@ -1,6 +1,6 @@
 import {
 	observation_ledger,
-	OBSERVATION_LEDGER_PATH,
+	OBSERVATION_LEDGER_PATHS,
 } from '#scripts/observations/observation-ledger'
 import { git_command } from './git-command'
 import { git_prompt } from './git-prompt'
@@ -73,10 +73,12 @@ async function stage_untracked_files(files: ReadonlyArray<string>): Promise<void
 // entirely — a diff a reviewer has no reason to question. Excluding it here covers every entry
 // point, because this is the one staging step all of them go through;
 // `pnpm josh observations:flush` is what commits it, on a branch of its own.
-const PATHS_EXCLUDED_FROM_STAGING: ReadonlyArray<string> = [OBSERVATION_LEDGER_PATH]
+// Both of its paths are excluded (joshuafolkken/kit#2724): a run on the old code still appends at
+// the old one until `observation-ledger-migrate.ts` moves it.
+const PATHS_EXCLUDED_FROM_STAGING: ReadonlyArray<string> = OBSERVATION_LEDGER_PATHS
 
 function is_stageable(file_path: string): boolean {
-	return !PATHS_EXCLUDED_FROM_STAGING.includes(file_path)
+	return !observation_ledger.is_ledger_path(file_path)
 }
 
 // **Said out loud, because the alternative is an unexplained failure.** With the ledger the only
@@ -84,7 +86,7 @@ function is_stageable(file_path: string): boolean {
 // step dies on git's empty index with `Failed to commit changes` — a message naming nothing that
 // caused it. This line is what turns that into a diagnosis.
 //
-// **The paths are parsed rather than matched as substrings**: `docs/observations.md.bak` contains the
+// **The paths are parsed rather than matched as substrings**: `docs/maintainers/observations.md.bak` contains the
 // ledger's path, and a hint naming a file the exclusion never touched is a hint that teaches the
 // reader to ignore it.
 function report_excluded_paths(status_output: string): void {

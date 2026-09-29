@@ -1,5 +1,6 @@
 import { json_format } from '#scripts/config-merge/json-format'
 import { vscode_settings_schema } from '#scripts/lib/schemas'
+import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { distributed_paths } from './distributed-paths'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
@@ -27,7 +28,7 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 const CSPELL_IMPORT = '@joshuafolkken/kit/cspell'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
-const SAFE_CHAIN_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
+const { SAFE_CHAIN_CMD } = safe_chain_preinstall
 const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts'
 // Marker identifying a consumer script that already runs the fix-gh-packages command.
 const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
@@ -90,6 +91,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/auto-tag.yml',
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-qube.yml',
+	'.github/workflows/pr-classification.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
 	'.github/dependabot.yml',
@@ -228,9 +230,12 @@ const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
 // format_json rather than JSON.stringify: it lays arrays out the way prettier does — inline while
 // they fit within printWidth, one element per line once they do not — so the file kit writes is
 // `prettier --check`-clean in the consumer whatever the entry count happens to be (#660).
+// TypeScript 6 defaults `types` to `[]`, so a node project sees no `process` global — not even in the
+// generated `playwright.config.ts` — until the Node types are named (joshuafolkken/kit#2710).
 function generate_tsconfig(): string {
 	return json_format.format_json({
 		extends: TSCONFIG_EXTENDS,
+		compilerOptions: { types: ['node'] },
 		[TSCONFIG_EXCLUDE_FIELD]: TSCONFIG_EXCLUDE,
 	})
 }

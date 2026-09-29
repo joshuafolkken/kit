@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { TSC_ARGS } from '#scripts/gate/type-check-command'
 import { plan_commands } from '#scripts/hooks/format-edited-file'
 import { PACKAGE_DIR, package_path } from '#scripts/init/init-paths'
 import { CSPELL_ARGS } from '#scripts/lint/cspell-cached'
@@ -34,13 +35,6 @@ interface CspellConfig {
 	ignorePaths?: Array<string>
 }
 
-// Joined rather than compared element-wise: `--tsBuildInfoFile` and `.tsbuildinfo` are a flag and
-// its value, and a membership check passes on an order that would make `tsc` read `--incremental`
-// as the file name.
-function command_line_of(command_name: string): string {
-	return (COMMAND_MAP[command_name]?.shell ?? []).join(' ')
-}
-
 function read_ignore_lines(relative_path: string): Array<string> {
 	return readFileSync(package_path(relative_path), 'utf8')
 		.split('\n')
@@ -55,7 +49,11 @@ function read_cspell_ignore_paths(): Array<string> {
 
 describe('verification gate cache flags', () => {
 	it('type-checks incrementally into a named build-info file', () => {
-		expect(command_line_of('check')).toContain(TS_CACHE_FLAGS.join(' '))
+		expect(COMMAND_MAP['check']?.script).toBe('scripts/gate/type-check-command.ts')
+		// Joined rather than compared element-wise: `--tsBuildInfoFile` and `.tsbuildinfo` are a flag
+		// and its value, and a membership check passes on an order that would make `tsc` read
+		// `--incremental` as the file name.
+		expect(TSC_ARGS.join(' ')).toContain(`--noEmit ${TS_CACHE_FLAGS.join(' ')}`)
 	})
 
 	it('spell-checks from a content-addressed cache at a named location', () => {

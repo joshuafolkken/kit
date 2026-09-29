@@ -26,6 +26,14 @@ describe('COMMAND_MAP — required fields', () => {
 		}
 	})
 
+	// kit serves `static` projects too, so no help line may describe a command as TypeScript-only
+	// (joshuafolkken/kit#2702).
+	it('no command description presents kit as TypeScript-only', () => {
+		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
+			expect(entry.description, `command ${name}`).not.toMatch(/TypeScript project/u)
+		}
+	})
+
 	it('every command has a category', () => {
 		for (const [name, entry] of Object.entries(COMMAND_MAP)) {
 			expect(entry.category, `command ${name} missing category`).toBeTruthy()

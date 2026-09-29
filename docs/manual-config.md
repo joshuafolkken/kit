@@ -1,6 +1,6 @@
 # Manual config
 
-Use individual configs directly if you prefer not to use `josh init`:
+For `node` projects that import kit's ESLint, Prettier and tsconfig presets by hand instead of running `josh init`. Use individual configs directly if you prefer not to use `josh init`:
 
 Install the optional ESLint dependencies listed in [package.md](./package.md#1-install) before importing the ESLint preset. A kit-only installation does not include them. The same preset import works before and after this change.
 

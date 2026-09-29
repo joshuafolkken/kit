@@ -1,6 +1,4 @@
 #!/usr/bin/env tsx
-import { appendFile, mkdir } from 'node:fs/promises'
-import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
@@ -154,11 +152,7 @@ async function run_record(parsed: Parsed, now: Date, ledger_path: string): Promi
 
 	const lines = build_lines(request, today(now))
 
-	// A consumer that does not keep the observation ledger has no `docs/` at its root, so the append
-	// below would fail with ENOENT and leave the merge gate unsatisfiable (joshuafolkken/kit#2402).
-	// Creating the parent first is the one write path that can bring the ledger into existence there.
-	await mkdir(path.dirname(ledger_path), { recursive: true })
-	await appendFile(ledger_path, `${lines.join('\n')}\n`, 'utf8')
+	await observation_ledger_home.append(ledger_path, lines)
 	console.info(confirmation(lines.length, ledger_path))
 
 	return 0

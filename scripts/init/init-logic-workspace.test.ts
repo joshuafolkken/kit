@@ -120,22 +120,55 @@ describe('init_logic_workspace.merge_workspace_yaml — pnpm build placeholders'
 	it('answers a placeholder the template decides', () => {
 		const existing = 'allowBuilds:\n  esbuild: set this to true or false\n'
 
-		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(
-			'allowBuilds:\n  esbuild: true\n',
-		)
+		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(BUILD_TEMPLATE)
 	})
 
 	it('matches a quoted scoped package name', () => {
 		const existing = "allowBuilds:\n  '@scope/tool': set this to true or false\n"
 
 		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(
-			"allowBuilds:\n  '@scope/tool': false\n",
+			"allowBuilds:\n  '@scope/tool': false\n  esbuild: true\n",
 		)
 	})
 
 	it('leaves a placeholder the template does not decide, and a user answer, untouched', () => {
-		const existing = 'allowBuilds:\n  esbuild: false\n  other: set this to true or false\n'
+		const existing =
+			"allowBuilds:\n  esbuild: false\n  other: set this to true or false\n  '@scope/tool': true\n"
 
 		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(existing)
+	})
+})
+
+// joshuafolkken/kit#2710: the key-level merge kept the esbuild-only `allowBuilds` that
+// `pnpm add -D @joshuafolkken/kit` leaves, so the first `pnpm install` failed on unrs-resolver.
+describe('init_logic_workspace.merge_workspace_yaml — missing build approvals', () => {
+	const KIT_TEMPLATE = 'allowBuilds:\n  esbuild: true\n  lefthook: true\n  unrs-resolver: true\n'
+
+	it('adds the template approvals an existing allowBuilds lacks', () => {
+		const existing = 'allowBuilds:\n  esbuild: true\n'
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, KIT_TEMPLATE)).toBe(KIT_TEMPLATE)
+	})
+
+	it('keeps a project answer and the keys that follow the block', () => {
+		const existing = 'allowBuilds:\n  unrs-resolver: false\n\nother: 1\n'
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, KIT_TEMPLATE)).toBe(
+			'allowBuilds:\n  unrs-resolver: false\n  esbuild: true\n  lefthook: true\n\nother: 1\n',
+		)
+	})
+
+	it('indents the added approvals to match the existing entries', () => {
+		const existing = 'allowBuilds:\n    esbuild: true\n'
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, KIT_TEMPLATE)).toBe(
+			'allowBuilds:\n    esbuild: true\n    lefthook: true\n    unrs-resolver: true\n',
+		)
+	})
+
+	it('leaves a flow-style allowBuilds whole rather than appending block lines to it', () => {
+		const existing = 'allowBuilds: { esbuild: true }\n'
+
+		expect(init_logic_workspace.merge_workspace_yaml(existing, KIT_TEMPLATE)).toBe(existing)
 	})
 })

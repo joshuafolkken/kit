@@ -14,6 +14,8 @@ const IGNORE = 'ignore-for-release'
 const DUPLICATE_ERROR = 'Choose exactly one'
 const LEGACY_ERROR = 'Remove legacy release labels'
 const CHOOSE_ERROR = 'Choose one release classification'
+const REPOSITORY = 'owner/repo'
+const PULL_NUMBER = 42
 
 describe('issue release classification', () => {
 	it('maps an issue bug label to the PR bugfix classification', () => {
@@ -137,16 +139,29 @@ it('rejects legacy release labels alongside a new classification', () => {
 	)
 })
 
-it('reads the current labels from a GitHub pull request event', () => {
+// The `opened` payload carries no labels because `josh pr` labels the pull request in a second call;
+// the check has to judge the labels as they stand, or that run fails for good (joshuafolkken/kit#2712).
+it('judges the labels the pull request has now, not the ones its event carried', () => {
 	const directory = mkdtempSync(path.join(tmpdir(), 'pr-classification-'))
 	const event_path = path.join(directory, 'event.json')
+	const requests: Array<string> = []
 
 	try {
 		writeFileSync(
 			event_path,
-			JSON.stringify({ pull_request: { user: { login: HUMAN }, labels: [{ name: BUGFIX }] } }),
+			JSON.stringify({
+				pull_request: { number: PULL_NUMBER, user: { login: HUMAN }, labels: [] },
+				repository: { full_name: REPOSITORY },
+			}),
 		)
-		expect(pr_classification.check_event(event_path)).toBeUndefined()
+		const error = pr_classification.check_event(event_path, (repository, pull_number) => {
+			requests.push(`${repository}#${String(pull_number)}`)
+
+			return [BUGFIX]
+		})
+
+		expect(error).toBeUndefined()
+		expect(requests).toEqual([`${REPOSITORY}#${String(PULL_NUMBER)}`])
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
 	}

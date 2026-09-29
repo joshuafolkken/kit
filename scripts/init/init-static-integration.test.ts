@@ -93,6 +93,13 @@ describe('Git-free static initialization', () => {
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 
+	it('tells the user to install what it added to package.json', async () => {
+		write_index_html()
+		await run_init()
+
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('run `pnpm install`'))
+	})
+
 	it('approves only the esbuild build so the first pnpm install succeeds', async () => {
 		write_index_html()
 		await run_init()

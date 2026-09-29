@@ -49,7 +49,7 @@ const NO_ISSUE_MARKER = '元 Issue なし'
 const CATEGORIES = new Set([BREAKING_LABEL, 'enhancement', 'bugfix', OTHER_LABEL, IGNORE_LABEL])
 
 function read_audit(issue: number): Array<Array<string>> {
-	return readFileSync(`docs/release-classification-audit-${String(issue)}.tsv`, 'utf8')
+	return readFileSync(`docs/maintainers/release-classification-audit-${String(issue)}.tsv`, 'utf8')
 		.replace(/\n$/u, '')
 		.split('\n')
 		.map((line) => line.split('\t'))
@@ -89,10 +89,10 @@ it('matches the recorded categories and release-notes preview', () => {
 })
 
 it('keeps the published summary in sync with the audit', () => {
-	const report = readFileSync('docs/release-classification-audit.md', 'utf8').replaceAll(
-		/\s+/gu,
-		' ',
-	)
+	const report = readFileSync(
+		'docs/maintainers/release-classification-audit.md',
+		'utf8',
+	).replaceAll(/\s+/gu, ' ')
 
 	for (const [category, count] of Object.entries(EXPECTED_CATEGORIES)) {
 		const release_count = category === IGNORE_LABEL ? 0 : count

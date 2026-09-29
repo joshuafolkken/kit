@@ -13,7 +13,11 @@ import type { StashEntry } from './git-stash'
 // opens with `N: ` is `git_stash.work_message`'s; and a lane branch (`On N-lane: …`) names it by where
 // the work was pushed from. A subject is `On <branch>: <message>` (or `WIP on <branch>: …` without
 // `-m`), and a branch name carries no `:`, so `(?:^|: )` anchors the message start either way.
-const MESSAGE_PATTERNS: ReadonlyArray<RegExp> = [/#(?<issue>\d+)\b/u, /(?:^|: )(?<issue>\d+): /u]
+const HASH_PATTERN = /#(?<issue>\d+)\b/u
+const LEADING_PATTERN = /(?:^|: )(?<issue>\d+): /u
+const MESSAGE_PATTERNS: ReadonlyArray<RegExp> = [HASH_PATTERN, LEADING_PATTERN]
+// Every `#N` in the message rather than the first, for `issues_named`.
+const ALL_ISSUE_PATTERN = new RegExp(HASH_PATTERN.source, 'gu')
 const BRANCH_PATTERN = /^(?:WIP on|On) (?<issue>\d+)-lane: /u
 // A stash pushed without `-m` lists as `WIP on <branch>: <sha> <HEAD's commit subject>` — text no run
 // wrote. This repository's commit subjects end in `#N` and merges read `Merge pull request #N`, so a
@@ -61,6 +65,24 @@ function issues_of(entries: ReadonlyArray<StashEntry>): Array<string> {
 	return [...new Set(issues.filter((issue): issue is string => issue !== undefined))]
 }
 
+function message_issues(subject: string): Array<string | undefined> {
+	const hashed = [...subject.matchAll(ALL_ISSUE_PATTERN)].map((match) => match.groups?.['issue'])
+
+	return [...hashed, LEADING_PATTERN.exec(subject)?.groups?.['issue']]
+}
+
+// Every issue a subject names, not just its owner (joshuafolkken/kit#2701): `backlogrun: paused #M for
+// prerequisite #N` is tied to both, and the `#N` of a `run:hold reclaimed before #N` entry — which
+// `issue_of` reads as no owner — still names the run the work was found by. A `WIP on` subject is
+// read by its branch alone, for the reason `WIP_PREFIX` records.
+function issues_named(subject: string): Array<string> {
+	const branch = BRANCH_PATTERN.exec(subject)?.groups?.['issue']
+	const named = subject.startsWith(WIP_PREFIX) ? [] : message_issues(subject)
+	const found = [...named, branch].filter((issue): issue is string => issue !== undefined)
+
+	return [...new Set(found)]
+}
+
 // An entry is reported when its issue is in `closed`, or when it names no issue at all — an entry with
 // no owner is exactly the one no run will ever pop. An open issue's entry is still some run's to resume.
 function orphans(
@@ -85,7 +107,7 @@ function format_report(found: ReadonlyArray<OrphanStash>): string | undefined {
 	return [HEADER, ...found.map((orphan) => format_line(orphan)), FOOTER].join(LINE_SEPARATOR)
 }
 
-const stash_orphans = { format_report, issue_of, issues_of, orphans }
+const stash_orphans = { format_report, issue_of, issues_named, issues_of, orphans }
 
 export type { OrphanStash }
 export { stash_orphans }

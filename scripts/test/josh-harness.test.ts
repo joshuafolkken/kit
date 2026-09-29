@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
+import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_carry } from '#scripts/run/run-carry'
 import { run_review_steps } from '#scripts/run/run-review-steps'
@@ -16,7 +17,7 @@ const SCENARIO_TIMEOUT_MS = 60_000
 const GATE_TIMEOUT_MS = 180_000
 const MARKER_WAIT_MS = 60_000
 
-const LEDGER = path.join('docs', 'observations.md')
+const LEDGER = OBSERVATION_LEDGER_PATH
 const GATE_GREEN = 'Gate green'
 const GATE_PASSED = 'verification gate passed'
 const RECORD = 'review:record'

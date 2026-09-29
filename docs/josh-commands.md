@@ -1,5 +1,7 @@
 # josh CLI — Command Reference
 
+The full reference for every `josh` command; look a command up here rather than reading top to bottom. Commands that need Node tooling (ESLint, `tsc`, Vitest, Playwright) skip in a `static` project and say why.
+
 See also: [Command Catalog](josh-command-catalog.md) — auto-generated from the command map (command name, aliases, synopsis, audience, side effects).
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal.
@@ -340,11 +342,10 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 ### `josh check`
 
-Type-check a SvelteKit project. Requires `@sveltejs/kit`.
+Type-check with `tsc --noEmit`. A `static` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
 
 ```bash
-pnpm josh check        # development mode
-pnpm josh check:ci     # strict mode (--threshold error), used in CI
+pnpm josh check
 ```
 
 ### `josh port`
@@ -540,7 +541,7 @@ Related: [`josh followup`](#josh-followup), [`josh pr`](#josh-pr).
 
 ### `josh pr:classification`
 
-Use one label (see PR template). Bots may omit it; label changes rerun CI.
+Use one label (see PR template). Bots may omit it; label changes rerun only the `Release classification` workflow (`.github/workflows/pr-classification.yml`), never CI.
 
 ### `josh pr`
 
@@ -601,7 +602,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 ### `josh observations:flush`
 
-Commit the observation ledger (`docs/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. It is the ledger's only commit path — `josh git` excludes the ledger from staging.
+Commit the observation ledger (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. It is the ledger's only commit path — `josh git` excludes the ledger from staging.
 
 ```bash
 pnpm josh observations:flush
@@ -619,13 +620,13 @@ Re-run a behavior-change Issue's declared baseline after it merges and print the
 pnpm josh measure:rerun /tmp/issue-body.md
 ```
 
-**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
+**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](#josh-issuelint).
 
 ### `josh review:record`
 
-Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the observation ledger (`docs/observations.md`) — the same append-only file the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the observation ledger (`docs/maintainers/observations.md`) — the same append-only file the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
 
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
@@ -881,7 +882,7 @@ Updates pnpm and pins `packageManager` to the newest release on the project's **
 
 #### `josh latest:update`
 
-Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`.
+Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`. Otherwise it also advances a pinned `@aikidosec/safe-chain@<version>` in `preinstall` to the newest release, and moves the `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env of `.github/workflows/ci.yml` and `templates/workflows/ci.yml` with it — the hash is computed from that release's `install-safe-chain.sh`, and a failed download leaves both workflows' pins untouched (the `preinstall` pin still advances, and the next `josh latest` retries).
 
 ---
 
@@ -1534,7 +1535,23 @@ pnpm josh run:release --force    # clear a record left by a run that has ended
 
 **Options:** `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
 
-**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an existing branch/PR, or a merged/closed PR), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`.
+**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an existing branch/PR, or a merged/closed PR), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
+
+### `josh run:tidy`
+
+Sweep what merged work left behind — run by `run:hold` after every successful claim, and by a `backlogrun` in its once-per-repository preparation.
+
+```bash
+pnpm josh run:tidy
+```
+
+- **Lanes:** closes a lane whose issue was closed by a merge, whose work tree has no uncommitted change, whose branch has no commit that no remote reaches, and that no live run holds — then releases its run record.
+- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches `docs/maintainers/observations.md` has its ledger lines appended to the primary checkout's ledger first, less those already there.
+- **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits.
+
+"Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.
+
+**Output / exit codes:** always exits 0. What was cleaned and what was kept (with the reason) goes to stderr; nothing is printed when nothing merged was found.
 
 ### `josh run:carry`
 
@@ -1957,7 +1974,7 @@ its recorded model (a model the floor table does not name is not version-checked
 dispatched lane takes the new default. `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
 only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`. See the [worker
-evaluation procedure](./backlogrun-worker-evaluation.md).
+evaluation procedure](./maintainers/backlogrun-worker-evaluation.md).
 
 **Output / exit codes:** prints the child's pid on stdout. Every refusal exits non-zero and sends a `warning` — including one because the `in-progress` label could not be applied (no log path, since nothing started). A child that started but whose log could not be opened warns and exits zero (`dispatched`).
 

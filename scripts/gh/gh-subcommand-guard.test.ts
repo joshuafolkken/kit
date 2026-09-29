@@ -34,6 +34,10 @@ const PACKAGE_JSON = path.join(
 	'..',
 	'package.json',
 )
+// A repository scan parses every file under scripts/ and scripts-ai/: about six seconds alone, past
+// the ten-second suite default once the gate runs its checks side by side. The allowance is
+// wall-clock only; the assertions are unchanged.
+const SCAN_TIMEOUT_MS = 60_000
 
 function scan(source: string): Array<GhSpawn> {
 	return gh_subcommand_guard.find_gh_spawns(source, FIXTURE_FILE)
@@ -53,15 +57,19 @@ function importing(module: string, name: string, local: string = name): string {
 }
 
 describe('gh subcommand guard — the repository as it stands', () => {
-	it('spawns gh only through `gh api`, apart from the allowlisted calls', () => {
-		const violations = gh_subcommand_guard
-			.scan_repository()
-			.filter((spawn) => !gh_subcommand_guard.is_allowed(spawn))
+	it(
+		'spawns gh only through `gh api`, apart from the allowlisted calls',
+		() => {
+			const violations = gh_subcommand_guard
+				.scan_repository()
+				.filter((spawn) => !gh_subcommand_guard.is_allowed(spawn))
 
-		expect(violations.map((spawn) => gh_subcommand_guard.describe_violation(spawn))).toStrictEqual(
-			[],
-		)
-	})
+			expect(
+				violations.map((spawn) => gh_subcommand_guard.describe_violation(spawn)),
+			).toStrictEqual([])
+		},
+		SCAN_TIMEOUT_MS,
+	)
 
 	// The blind spot itself. `scripts-ai/` was outside joshuafolkken/kit#1042's grep, so a scan that
 	// covered only `scripts/` would pass while `josh issue <N>` still spawned `gh issue view`.
@@ -75,12 +83,16 @@ describe('gh subcommand guard — the repository as it stands', () => {
 	})
 
 	// A scan that matched nothing would satisfy the assertion above without checking anything.
-	it('finds the gh spawns that do exist', () => {
-		const found = gh_subcommand_guard.scan_repository()
+	it(
+		'finds the gh spawns that do exist',
+		() => {
+			const found = gh_subcommand_guard.scan_repository()
 
-		expect(found.length).toBeGreaterThan(0)
-		expect(found.map((spawn) => spawn.file)).toContain(GH_EXEC_FILE)
-	})
+			expect(found.length).toBeGreaterThan(0)
+			expect(found.map((spawn) => spawn.file)).toContain(GH_EXEC_FILE)
+		},
+		SCAN_TIMEOUT_MS,
+	)
 })
 
 describe('gh subcommand guard — the allowlist', () => {

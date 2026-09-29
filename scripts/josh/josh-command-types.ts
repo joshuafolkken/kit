@@ -69,8 +69,6 @@ interface CommandEntry {
 // (joshuafolkken/kit#914).
 const GATE_COMMAND = 'gate'
 
-const PE = ['pnpm', 'exec'] as const
-
 // joshuafolkken/kit#1256: three of the gate's four checks keep a content-addressed cache, so a
 // second run reads only what changed. eslint had one from the start; the type check and the spell
 // check rescanned the whole tree every time, which cost 10.5s of CPU against 2.8s cached.
@@ -219,7 +217,6 @@ export {
 	GATE_COMMAND,
 	IGNORED_CACHE_FILES,
 	OPTIONAL_ENV_FILE_FLAGS,
-	PE,
 	SHARED_CACHE_SPECS,
 	TS_BUILD_INFO_FILE,
 	TS_CACHE_FLAGS,

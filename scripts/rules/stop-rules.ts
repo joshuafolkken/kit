@@ -2,6 +2,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { z } from 'zod'
 import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
+import { lane_background } from './lane-background'
 import { reply_language } from './reply-language'
 
 // The stop-time rules, delivered on the `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2422,
@@ -66,6 +67,9 @@ interface StopContext {
 	headless_refusals: number
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
+	// A background task this run launched has not finished — `lane_background.pending_background_ids`
+	// over the transcript tail (joshuafolkken/kit#2704).
+	background_pending: boolean
 	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
 	session_lang: string
 }
@@ -256,10 +260,19 @@ function count_headless_refusals(tail: string): number {
 	return tail.slice(Math.max(last_wait, 0)).split(HEADLESS_WAIT_MARKER).length - 1
 }
 
-// The two hold rules, notify ahead of release — behind the lane index route (joshuafolkken/kit#2445),
-// since the notify they would ask for announces a pause the run has no reason to take.
+// **A lane child with a task still running is sent back to wait, not to notify** (joshuafolkken/kit#2704).
+// Its turn-end kills the task, so the notify the hold rules would ask for announces a stop that loses
+// the work; the #2606 child obeyed exactly that and its gate died at `exit code 143`.
+function needs_background_wait(context: StopContext): boolean {
+	return context.lane_child && context.background_pending
+}
+
+// The two hold rules, notify ahead of release — behind the lane index route (joshuafolkken/kit#2445)
+// and the lane background wait (joshuafolkken/kit#2704), since the notify they would ask for announces
+// a pause the run has no reason to take.
 function hold_reason(context: StopContext): string | undefined {
 	if (needs_index_route(context)) return LANE_INDEX_REASON
+	if (needs_background_wait(context)) return lane_background.LANE_BACKGROUND_STOP_REASON
 	if (needs_notify(context)) return STOP_NOTIFY_REASON
 	if (needs_release(context)) return HOLD_RELEASE_REASON
 

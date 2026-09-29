@@ -8,6 +8,8 @@ const roots: Array<string> = []
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
 const INDEX_HTML = 'index.html'
+const APP_TS = 'app.ts'
+const TSCONFIG_JSON = 'tsconfig.json'
 const STATIC_MANIFEST = '{"josh":{"profile":"static"}}'
 
 function fixture(): string {
@@ -68,12 +70,24 @@ describe('project_checks type-check readiness', () => {
 
 		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
 		expect(project_checks.type_check_skip_reason(root)).toContain('no TypeScript files')
-		writeFileSync(path.join(root, 'app.ts'), '')
+		writeFileSync(path.join(root, APP_TS), '')
 		expect(project_checks.type_check_skip_reason(root)).toContain('no TypeScript configuration')
-		writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+		writeFileSync(path.join(root, TSCONFIG_JSON), '{}')
 		expect(project_checks.type_check_skip_reason(root)).toContain('typescript is not installed')
 		mkdirSync(path.join(root, NODE_MODULES, '.bin'), { recursive: true })
 		writeFileSync(path.join(root, NODE_MODULES, '.bin', 'tsc'), '')
+		expect(project_checks.type_check_skip_reason(root)).toBeUndefined()
+	})
+
+	it('does not skip a TypeScript that package.json lists but is not installed yet', () => {
+		const root = fixture()
+
+		writeFileSync(
+			path.join(root, PACKAGE_JSON),
+			'{"josh":{"profile":"static"},"devDependencies":{"typescript":"^6.0.0"}}',
+		)
+		writeFileSync(path.join(root, APP_TS), '')
+		writeFileSync(path.join(root, TSCONFIG_JSON), '{}')
 		expect(project_checks.type_check_skip_reason(root)).toBeUndefined()
 	})
 })
@@ -89,6 +103,17 @@ describe('project_checks prettier readiness', () => {
 		expect(project_checks.prettier_skip_reason(root)).toContain('prettier is not installed')
 		mkdirSync(path.join(root, NODE_MODULES, '.bin'), { recursive: true })
 		writeFileSync(path.join(root, NODE_MODULES, '.bin', 'prettier'), '')
+		expect(project_checks.prettier_skip_reason(root)).toBeUndefined()
+	})
+
+	it('does not skip a Prettier that package.json lists but is not installed yet', () => {
+		const root = fixture()
+
+		writeFileSync(
+			path.join(root, PACKAGE_JSON),
+			'{"josh":{"profile":"static"},"devDependencies":{"prettier":"^3.0.0"}}',
+		)
+		writeFileSync(path.join(root, INDEX_HTML), '')
 		expect(project_checks.prettier_skip_reason(root)).toBeUndefined()
 	})
 

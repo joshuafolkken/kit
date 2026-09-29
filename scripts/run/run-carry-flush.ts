@@ -1,3 +1,4 @@
+import { PORCELAIN_FLAG, UNTRACKED_FILES_FLAG } from '#scripts/git/constants'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { josh_command } from '#scripts/josh/josh-run'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
@@ -31,13 +32,7 @@ const FAILURE_NOTE =
 
 async function has_pending_append(): Promise<boolean> {
 	const root = observation_ledger_home.ledger_root()
-	const status = await git_spawn.read([
-		'-C',
-		root,
-		'status',
-		'--porcelain',
-		'--untracked-files=normal',
-	])
+	const status = await git_spawn.read(['-C', root, 'status', PORCELAIN_FLAG, UNTRACKED_FILES_FLAG])
 
 	return observation_ledger.has_pending_append(status)
 }

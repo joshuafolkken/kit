@@ -175,9 +175,6 @@ importers:
 
   .:
     dependencies:
-      '@playwright/test':
-        specifier: '>=1.0.0'
-        version: 1.63.0
       execa:
         specifier: ^10.0.1
         version: 10.0.1
@@ -215,6 +212,9 @@ importers:
       '@ianvs/prettier-plugin-sort-imports':
         specifier: ^4.7.1
         version: 4.7.1(prettier@3.9.9)(supports-color@10.2.2)
+      '@playwright/test':
+        specifier: ^1.63.0
+        version: 1.63.0
       '@secretlint/secretlint-rule-preset-recommend':
         specifier: ^13.0.6
         version: 13.0.6

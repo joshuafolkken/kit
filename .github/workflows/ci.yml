@@ -4,9 +4,13 @@ on:
   push:
     branches: [main]
 
+  # No `labeled` / `unlabeled`: a label added right after the pull request opens started a second
+  # run on the same commit, the concurrency block below cancelled one of the two, and a cancelled
+  # run left in the newer check suite blocked the merge (joshuafolkken/kit#2712). The one check that
+  # reads labels runs in `pr-classification.yml` instead.
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
 
 # A push run is grouped by the commit it carries, so a later push to main never cancels an earlier
 # one. Without the sha every push to main shares one group — `github.ref` is `refs/heads/main` for
@@ -23,6 +27,12 @@ concurrency:
 # set the JOSH_PLAYWRIGHT_BROWSERS repository variable to a space-separated list to widen it.
 env:
   JOSH_PLAYWRIGHT_BROWSERS: ${{ vars.JOSH_PLAYWRIGHT_BROWSERS || 'chromium' }}
+  # The safe-chain release every "Setup safe-chain" step installs, and the SHA-256 of that release's
+  # install-safe-chain.sh. The installer puts the safe-chain binary under ~/.safe-chain/bin and
+  # adds it to PATH beside the shims; `pnpm dlx … setup-ci` left only the shims, which then let
+  # every install through without a scan (joshuafolkken/kit#2711). `josh latest` moves both together.
+  SAFE_CHAIN_INSTALLER_VERSION: 1.5.20
+  SAFE_CHAIN_INSTALLER_SHA256: 0ad25efe15d1fa56105157a454d647223e78eb0c53d1f85e3d10afcd722e7bfd
 
 jobs:
   node-26-pnpm:
@@ -308,7 +318,11 @@ jobs:
             ${{ runner.os }}-cspell-cache-
 
       - name: Setup safe-chain
-        run: pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci
+        run: |
+          installer="$RUNNER_TEMP/install-safe-chain.sh"
+          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
+          echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
+          sh "$installer" --ci
 
       - name: Install dependencies
         env:
@@ -351,10 +365,6 @@ jobs:
       # `pnpm josh gate` to identify, and it is the price of the all-failures-in-one-pass summary.
       - name: Run verification gate
         run: pnpm josh gate --verbose --no-unit
-
-      - name: Check release classification
-        if: github.event_name == 'pull_request'
-        run: pnpm josh pr:classification
 
   # The other half of the gate, on a runner of its own. It carries the same setup steps as
   # `static-checks` rather than sharing them: a GitHub job is its own machine, so every job that
@@ -411,7 +421,11 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Setup safe-chain
-        run: pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci
+        run: |
+          installer="$RUNNER_TEMP/install-safe-chain.sh"
+          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
+          echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
+          sh "$installer" --ci
 
       - name: Install dependencies
         env:
@@ -623,7 +637,11 @@ jobs:
             ${{ runner.os }}-build-cache-e2e-
 
       - name: Setup safe-chain
-        run: pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci
+        run: |
+          installer="$RUNNER_TEMP/install-safe-chain.sh"
+          curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
+          echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
+          sh "$installer" --ci
 
       - name: Install dependencies
         env:

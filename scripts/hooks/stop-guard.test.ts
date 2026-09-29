@@ -3,6 +3,8 @@ import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
 import { run_headless } from '#scripts/run/run-headless'
@@ -120,5 +122,34 @@ describe('write_stop_decision — the session language is wired', () => {
 		)
 
 		expect(written).toEqual([])
+	})
+})
+
+// The stdout writes of one stop decision in a lane child whose transcript tail has `pending` tasks.
+async function decide_in_lane(pending: ReadonlyArray<string>): Promise<string> {
+	quiet_world()
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+	vi.spyOn(lane_background, 'pending_background_ids').mockReturnValue(pending)
+	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+	await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
+
+	return write.mock.calls.map((call) => String(call[0])).join('')
+}
+
+// joshuafolkken/kit#2704: the lane mark and the transcript's pending tasks both reach the stop rule.
+describe('write_stop_decision — the lane background wait is wired', () => {
+	beforeEach(() => {
+		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+	})
+
+	it('sends a lane child with a task still running back to wait', async () => {
+		expect(await decide_in_lane(['bxj18z032'])).toContain(
+			lane_background.LANE_BACKGROUND_STOP_REASON,
+		)
+	})
+
+	it('lets a lane child with no task running stop', async () => {
+		expect(await decide_in_lane([])).not.toContain(lane_background.LANE_BACKGROUND_STOP_REASON)
 	})
 })

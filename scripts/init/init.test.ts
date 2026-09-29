@@ -75,6 +75,21 @@ describe('install_lefthook', () => {
 		)
 	})
 
+	// `init` runs before the first `pnpm install`, whose `prepare` installs the hooks (#2710).
+	it('explains instead of warning when lefthook is not installed yet', () => {
+		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		mocked_execa_sync.mockClear()
+		init.install_lefthook(TEST_DIR)
+
+		expect(mocked_execa_sync).not.toHaveBeenCalled()
+		expect(warn_spy).not.toHaveBeenCalled()
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('pnpm install'))
+		warn_spy.mockRestore()
+		info_spy.mockRestore()
+	})
+
 	it('warns when the lefthook binary cannot be spawned (exitCode undefined)', () => {
 		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
@@ -120,13 +135,12 @@ describe('apply_package_json_merges', () => {
 		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
 	})
 
-	it('adds every public ESLint peer from the kit development versions', () => {
+	it('adds every public peer from the kit development versions', () => {
 		const deps = merge_development_dependencies('{}\n')
-		const peers = Object.keys(KIT_MANIFEST.peerDependencies).filter(
-			(name) => name !== '@playwright/test',
-		)
 
-		for (const name of peers) expect(deps[name]).toBe(KIT_MANIFEST.devDependencies[name])
+		for (const name of Object.keys(KIT_MANIFEST.peerDependencies)) {
+			expect(deps[name]).toBe(KIT_MANIFEST.devDependencies[name])
+		}
 	})
 
 	it('preserves an existing ESLint version during migration', () => {
@@ -142,6 +156,53 @@ describe('apply_package_json_merges', () => {
 
 		expect(deps['secretlint']).toBeDefined()
 		expect(deps['@secretlint/secretlint-rule-preset-recommend']).toBeDefined()
+	})
+})
+
+const PLAYWRIGHT_CONFIG = 'playwright.config.ts'
+
+// Each generated config needs its tool resolvable from the consumer, or the first `josh gate`
+// after `pnpm install` fails (#2710).
+describe('apply_package_json_merges — generated config dependencies', () => {
+	it.each([
+		['prettier.config.js', 'prettier'],
+		['cspell.config.yaml', 'cspell'],
+		[PLAYWRIGHT_CONFIG, '@playwright/test'],
+		[PLAYWRIGHT_CONFIG, '@types/node'],
+		['lefthook.yml', 'lefthook'],
+	])('adds the dependency %s needs: %s', (_config, name) => {
+		expect(merge_development_dependencies('{}\n')[name]).toBe(KIT_MANIFEST.devDependencies[name])
+	})
+
+	it('adds no lefthook to a project without Git, which gets no lefthook.yml', () => {
+		const merged = init.apply_package_json_merges('{}\n', false)
+		const parsed = JSON.parse(merged) as { devDependencies: Record<string, string> }
+
+		expect(parsed.devDependencies['lefthook']).toBeUndefined()
+		expect(parsed.devDependencies['prettier']).toBeDefined()
+	})
+})
+
+const PUBLISHED_PIN = '12.6.0+sha512.abc'
+const PACKAGE_MANAGER_FIELD = 'pnpm@12.7.0'
+
+// pnpm strips `packageManager` when it publishes, so the installed kit carries its pin only in
+// `devEngines`; the consumer used to get the bare `>=12.1.0` range instead (#2710).
+describe('resolve_kit_package_manager', () => {
+	it('prefers the packageManager field', () => {
+		const manifest = { packageManager: PACKAGE_MANAGER_FIELD }
+
+		expect(init.resolve_kit_package_manager(manifest)).toBe(PACKAGE_MANAGER_FIELD)
+	})
+
+	it('falls back to the exact devEngines pin of a published manifest', () => {
+		const manifest = { devEngines: { packageManager: { name: 'pnpm', version: PUBLISHED_PIN } } }
+
+		expect(init.resolve_kit_package_manager(manifest)).toBe(`pnpm@${PUBLISHED_PIN}`)
+	})
+
+	it('answers nothing when neither is declared', () => {
+		expect(init.resolve_kit_package_manager({})).toBeUndefined()
 	})
 })
 

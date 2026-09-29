@@ -75,6 +75,36 @@ describe('MERGE_GATE_EVALUATOR', () => {
 	})
 })
 
+describe('MERGE_GATE_EVALUATOR — check suites', () => {
+	// PR #2698: a label change started a second CI run on the same commit and concurrency cancelled
+	// it. That newer suite held the pull request `BLOCKED`, and the gate that read the older suite's
+	// later-created success waited on `BLOCKED` as pending for its whole budget (joshuafolkken/kit#2700).
+	it('fails at once on a cancelled check in the newer suite instead of waiting on BLOCKED', () => {
+		const check_runs_json = check_runs_pages([
+			{
+				id: 1,
+				name: 'SonarQube',
+				status: 'completed',
+				conclusion: 'cancelled',
+				check_suite: { id: 200 },
+			},
+			{
+				id: 2,
+				name: 'SonarQube',
+				status: 'completed',
+				conclusion: 'success',
+				check_suite: { id: 100 },
+			},
+		])
+		const rollup = to_status_check_rollup({ check_runs_json, status_json: status_pages([]) })
+		const snapshot = parse_pr_state_snapshot(
+			JSON.stringify({ statusCheckRollup: rollup, mergeStateStatus: 'BLOCKED' }),
+		)
+
+		expect(evaluate_pr_state(snapshot)).toBe('failure')
+	})
+})
+
 describe('wait_for_pr_success — the evaluator seam', () => {
 	// A pull request the merge gate would never pass, accepted by an evaluator that asks less.
 	it('honors a custom evaluator that accepts what the merge gate refuses', async () => {

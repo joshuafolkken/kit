@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { prettier_format_json } from '#scripts/config-merge/prettier-json-fixture'
+import { json_object_schema } from '#scripts/lib/schemas'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR } from './init-paths'
@@ -87,6 +89,16 @@ describe('generate_tsconfig', () => {
 		expect(written).toStrictEqual(expect.arrayContaining(root_relative_sveltekit_exclude()))
 	})
 
+	// TypeScript 6 defaults `types` to `[]`, so without this the generated playwright.config.ts
+	// fails `josh check` on `process` even with @types/node installed (#2710).
+	it('names the Node types', () => {
+		const parsed = JSON.parse(init_logic.generate_tsconfig()) as {
+			compilerOptions?: { types?: Array<string> }
+		}
+
+		expect(parsed.compilerOptions?.types).toStrictEqual(['node'])
+	})
+
 	// A multi-line `exclude` failed `prettier --check` in the consumer once (#660). Assert the intent
 	// directly — the written file is a prettier fixed point — rather than a shape the entry count
 	// happens to produce, so growing the array cannot quietly reintroduce the regression.
@@ -169,5 +181,30 @@ describe('tsconfig preset extension — Playwright extends resolution guard (#68
 		const expected = `./${TSCONFIG_PRESET_DIR}/${init_logic.get_tsconfig_preset_filename()}`
 
 		expect(read_tsconfig_base_export()).toBe(expected)
+	})
+})
+
+// `moduleResolution: "bundler"` is legal only beside a `module` of `preserve` or ES2015+. TypeScript
+// 6 defaults `module` to such a value, 5.x does not, so a preset that leaves it implicit fails the
+// first check of every consumer pinned below 6 with TS5095 (#2725).
+const BUNDLER_COMPATIBLE_MODULES = new Set(['preserve', 'es2015', 'es2020', 'es2022', 'esnext'])
+
+function read_preset_compiler_options(): Record<string, unknown> {
+	const preset_path = path.join(
+		PACKAGE_DIR,
+		TSCONFIG_PRESET_DIR,
+		init_logic.get_tsconfig_preset_filename(),
+	)
+	const options = parse_jsonc(readFileSync(preset_path, 'utf8'))['compilerOptions']
+
+	return json_object_schema.parse(options)
+}
+
+describe('tsconfig preset module — TypeScript 5.x bundler pairing guard (#2725)', () => {
+	it('states a module that moduleResolution bundler accepts instead of inheriting the default', () => {
+		const options = read_preset_compiler_options()
+
+		expect(options['moduleResolution']).toBe('bundler')
+		expect(BUNDLER_COMPATIBLE_MODULES.has(String(options['module']).toLowerCase())).toBe(true)
 	})
 })

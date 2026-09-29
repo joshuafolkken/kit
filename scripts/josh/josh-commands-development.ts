@@ -1,4 +1,4 @@
-import { GATE_COMMAND, PE, TS_CACHE_FLAGS, type CommandEntry } from './josh-command-types'
+import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
 
 const FILE_ARGUMENTS = '[files...]'
 const REQUIRED_FILE_ARGUMENTS = '<files...>'
@@ -22,7 +22,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	lint: {
 		script: 'scripts/lint/lint-parallel.ts',
-		description: 'Check code with prettier and eslint',
+		description: 'Check code with prettier and eslint (skips a tool a static project lacks)',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 	},
@@ -61,7 +61,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	format: {
 		script: 'scripts/lint/format.ts',
-		description: 'Format code with prettier and eslint',
+		description: 'Format code with prettier and eslint (skips a tool a static project lacks)',
 		category: 'Development',
 		reference: ['', 'developer', ['files', 'processes']],
 	},
@@ -182,8 +182,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		argument_targets: ['test:unit', 'test:e2e'],
 	},
 	check: {
-		shell: [...PE, 'tsc', '--noEmit', ...TS_CACHE_FLAGS],
-		description: 'Type-check TypeScript project',
+		script: 'scripts/gate/type-check-command.ts',
+		description: 'Type-check with tsc (skips a static project with no TypeScript to check)',
 		category: 'Development',
 		reference: ['[arguments...]', 'developer', ['processes']],
 	},

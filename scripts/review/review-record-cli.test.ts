@@ -5,9 +5,11 @@ import { observation_ledger_home } from '#scripts/observations/observation-ledge
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { review_record_cli } from './review-record-cli'
 
-vi.mock('#scripts/observations/observation-ledger-home', () => ({
-	observation_ledger_home: { ledger_path: vi.fn() },
-}))
+vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
+	const actual = await original<{ observation_ledger_home: typeof observation_ledger_home }>()
+
+	return { observation_ledger_home: { ...actual.observation_ledger_home, ledger_path: vi.fn() } }
+})
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')

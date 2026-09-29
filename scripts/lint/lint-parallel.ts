@@ -34,18 +34,25 @@ function skipped(check: string, reason: string): BufferedProcessResult {
 	return { output: `${project_checks.skip_notice(check, reason)}\n`, exit_code: 0, elapsed_ms: 0 }
 }
 
-async function run_static_prettier(directory: string): Promise<BufferedProcessResult> {
+async function run_prettier(
+	directory: string,
+	prettier_args: ReadonlyArray<string>,
+): Promise<BufferedProcessResult> {
 	const reason = project_checks.prettier_skip_reason(directory)
 	if (reason !== undefined) return skipped('prettier', reason)
 
-	return await buffered_process.run_buffered_process(PRETTIER_ARGS)
+	return await buffered_process.run_buffered_process(prettier_args)
 }
 
-async function run_static_eslint(directory: string): Promise<BufferedProcessResult> {
+async function run_checked_eslint(
+	directory: string,
+	eslint_args: ReadonlyArray<string>,
+	cache_file: string,
+): Promise<BufferedProcessResult> {
 	const reason = project_checks.eslint_skip_reason(directory)
 	if (reason !== undefined) return skipped('eslint', reason)
 
-	return await run_eslint(ESLINT_ARGS, ESLINT_CACHE_FILE)
+	return await run_eslint(eslint_args, cache_file)
 }
 
 function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcessResult): number {
@@ -56,15 +63,19 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 
 // The two checks are run from here whether they were pointed at the whole tree or at one change's
 // files, so `josh lint:related` reaches prettier and eslint through the same buffering, the same
-// "one failure does not abort the other" reading, and the same exit code (joshuafolkken/kit#1298).
+// "one failure does not abort the other" reading, and the same exit code (joshuafolkken/kit#1298) —
+// and through the same static-project skip, so a narrowed run never reaches a tool the whole-tree
+// run would have skipped (joshuafolkken/kit#2709). The skip reasons answer nothing for a node
+// project, so the one path serves both profiles.
 async function run_lint_checks(
 	prettier_args: ReadonlyArray<string>,
 	eslint_args: ReadonlyArray<string>,
 	eslint_cache_file: string = ESLINT_CACHE_FILE,
 ): Promise<number> {
+	const directory = process.cwd()
 	const [prettier, eslint] = await Promise.all([
-		buffered_process.run_buffered_process(prettier_args),
-		run_eslint(eslint_args, eslint_cache_file),
+		run_prettier(directory, prettier_args),
+		run_checked_eslint(directory, eslint_args, eslint_cache_file),
 	])
 
 	write_output(prettier)
@@ -74,17 +85,7 @@ async function run_lint_checks(
 }
 
 async function run_lint_parallel_checks(): Promise<number> {
-	const directory = process.cwd()
-	if (!project_checks.is_static(directory)) return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS)
-	const [prettier, eslint] = await Promise.all([
-		run_static_prettier(directory),
-		run_static_eslint(directory),
-	])
-
-	write_output(prettier)
-	write_output(eslint)
-
-	return lint_exit_code(prettier, eslint)
+	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS)
 }
 
 // `process.exitCode` rather than `process.exit()`: both reports are buffered and written here in
