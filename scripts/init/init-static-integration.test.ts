@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,6 +19,7 @@ vi.mock('./init-paths', () => ({
 	package_path: (relative_path: string): string => path.join(paths_mock.package_dir, relative_path),
 }))
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
+vi.mock('node:readline/promises', () => ({ createInterface: vi.fn() }))
 const mocked_execa = vi.mocked(execaSync)
 const PACKAGE_JSON = 'package.json'
 const GITIGNORE = '.gitignore'
@@ -156,6 +158,23 @@ describe('static initialization after Git adoption', () => {
 		expect(existsSync(path.join(paths_mock.root, '.gitattributes'))).toBe(true)
 		expect(existsSync(path.join(paths_mock.root, SECURITY_MD))).toBe(false)
 		expect(manifest).toContain(STATIC_PROFILE_ENTRY)
+	})
+
+	// The boundary josh start relies on (joshuafolkken/kit#2197): init, first run or rerun, never
+	// prompts and never creates a repository, a GitHub repository or a push — that is josh start's.
+	it('never asks, creates a repository or pushes on a first run and a rerun', async () => {
+		mkdirSync(path.join(paths_mock.root, '.git'))
+		mocked_execa.mockReturnValue(fake_git_result(1, ''))
+		await run_init()
+		await run_init()
+		const invoked = mocked_execa.mock.calls.map((call) =>
+			[call[0], ...(Array.isArray(call[1]) ? call[1] : [])].join(' '),
+		)
+
+		expect(createInterface).not.toHaveBeenCalled()
+		expect(invoked.filter((command) => /git init|repo create|push/u.test(command))).toStrictEqual(
+			[],
+		)
 	})
 
 	it('adds GitHub files only after a GitHub origin is added', async () => {

@@ -14,9 +14,13 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	},
 	start: {
 		script: 'scripts/init/start.ts',
-		description: 'Initialize a project for the GitHub Issue workflow',
+		description: 'Create a new project for the GitHub Issue workflow, from git init to labels',
 		category: 'Project',
-		reference: [PROFILE_ARGUMENTS, 'developer', ['files', 'git', 'network']],
+		reference: [
+			`${PROFILE_ARGUMENTS} [--yes] [--github] [--public]`,
+			'developer',
+			['files', 'git', 'network', 'processes'],
+		],
 	},
 	init: {
 		script: 'scripts/init/init.ts',
