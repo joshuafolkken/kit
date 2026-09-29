@@ -9,11 +9,11 @@ An agent runs your project in a cloud session or container instead of on your ma
 1. Allow the hosts kit needs in the environment's network policy ([the hosts to allow](../cloud-session.md#network-policy--the-hosts-to-allow)).
 2. Make sure `gh` is installed; kit's GitHub operations go through it ([why `gh` has to be installed](../cloud-session.md#gh--rest-only-and-it-has-to-be-installed)). It authenticates from `GH_TOKEN`, so no interactive login is needed.
 3. Pass notification settings and `JOSH_SESSION_LANG` as environment variables ([environment variables](../cloud-session.md#environment-variables)).
-4. Run [`josh doctor`](../josh-commands.md#josh-doctor) to see what the session is missing. It only reports; it never changes a setting.
+4. Make sure the vulnerability scanner is present with [`josh audit:provision`](../josh-commands.md#josh-auditprovision); the pre-push audit refuses a push without it.
 
 ## Check it worked
 
-- `josh doctor` reports no missing tools, and a `git push` succeeds.
+- `command -v gh` finds `gh`, `josh audit:provision` reports a scanner, and a `git push` succeeds.
 
 ## Common failures
 
