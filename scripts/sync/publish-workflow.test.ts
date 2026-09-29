@@ -206,7 +206,7 @@ describe('installation guidance', () => {
 	it('starts the README without GitHub Packages authentication', () => {
 		const content = readFileSync('README.md', 'utf8')
 
-		expect(content).toContain('pnpm add -g @joshuafolkken/kit')
+		expect(content).toContain('pnpm add -D --allow-build=esbuild @joshuafolkken/kit')
 		expect(content).not.toContain('gh auth login --scopes read:packages')
 		expect(content).toContain('gh CLI](https://cli.github.com/) for `josh version`')
 	})
