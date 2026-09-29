@@ -29,12 +29,16 @@ function parse_profile(value: unknown): ProjectProfile | undefined {
 	return undefined
 }
 
-function requested_profile(args: ReadonlyArray<string>): ProjectProfile | undefined {
-	if (args.length === 0) return undefined
+function is_profile_pair(args: ReadonlyArray<string>): boolean {
+	return args.length === PROFILE_ARG_LENGTH && args[0] === '--profile'
+}
 
-	if (args.length !== PROFILE_ARG_LENGTH || args[0] !== '--profile') {
-		throw new Error('Usage: josh init [--profile static|node]')
-	}
+function requested_profile(
+	args: ReadonlyArray<string>,
+	usage = 'josh init [--profile static|node]',
+): ProjectProfile | undefined {
+	if (args.length === 0) return undefined
+	if (!is_profile_pair(args)) throw new Error(`Usage: ${usage}`)
 
 	const profile = parse_profile(args[1])
 	if (profile !== undefined) return profile

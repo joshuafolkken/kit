@@ -1103,12 +1103,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "start": [
-      "[--profile static|node]",
+      "[--profile static|node] [--yes] [--github] [--public]",
       "developer",
       [
         "files",
         "git",
         "network",
+        "processes",
       ],
     ],
     "stash:pop": [

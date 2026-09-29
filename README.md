@@ -26,6 +26,8 @@ pnpm josh format
 pnpm josh gate
 ```
 
+`josh init` is the entry without GitHub. To start a new project on the GitHub Issue workflow (`kickoff`), run `pnpm exec josh start` instead of `josh init` — it also creates the Git repository, the GitHub repository and the labels ([init.md → `josh init` or `josh start`](./docs/init.md#josh-init-or-josh-start)).
+
 It needs [Node.js](https://nodejs.org/) 22.19.0 or later with [pnpm](https://pnpm.io/), even for a `static` project; [getting-started.md](./docs/getting-started.md) installs both. The global `josh` command ([cli.md](./docs/cli.md)) and the [gh CLI](https://cli.github.com/) for `josh version` and the GitHub Issue workflow are optional.
 
 ## Documentation

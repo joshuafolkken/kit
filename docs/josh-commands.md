@@ -406,7 +406,28 @@ pnpm josh profile
 
 ### `josh start`
 
-Start GitHub Issue setup; requires Git and a GitHub origin.
+Create a new project for the GitHub Issue workflow in one command, so `kickoff new` works right after it. Use `josh init` instead for a project without GitHub or for a re-run — [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start) compares the two.
+
+```bash
+pnpm exec josh start                                    # asks for the profile and the repository
+pnpm exec josh start --yes --github --profile static    # unattended, including the GitHub repository
+```
+
+**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything.
+
+**Steps**, printed as `[n/N]` while they run:
+
+1. `git init` on `main` — skipped when Git already exists
+2. The same setup `josh init` runs, with the confirmed profile
+3. The initial commit of every file — skipped when the repository already has commits
+4. `gh repo create <directory name> --private` (or `--public`) and push `main`
+5. The workflow labels (`epic`, `in-progress`, `route:*`, `depth:*`) the repository is missing; existing labels are left unchanged
+
+**Options:** `--profile static|node` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults without asking, but is **not** consent to create a repository or push: without `--github` an unattended run stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
+
+**Existing state:** a directory with a GitHub origin gets only the setup and the missing labels — no commit, repository or push. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
+
+**Output / exit codes:** exits 0 when the workflow is ready. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
 
 ### `josh init`
 
