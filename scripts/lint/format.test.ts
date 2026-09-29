@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,15 +19,29 @@ function fake_result(exit_code: number): ExecaResult {
 	return { exitCode: exit_code } as unknown as ExecaResult
 }
 
-function write_project(manifest: Record<string, unknown>): string {
+type ProjectFiles = ReadonlyArray<readonly [string, string]>
+
+const WEB_FILES: ProjectFiles = [
+	['index.html', '<h1>Hello</h1>'],
+	['site.js', 'console.log(1)\n'],
+]
+const PYTHON_FILES: ProjectFiles = [['main.py', 'print(1)\n']]
+
+function write_project(manifest: Record<string, unknown>, files: ProjectFiles = WEB_FILES): string {
 	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-format-'))
 
 	roots.push(root)
 	writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
-	writeFileSync(path.join(root, 'index.html'), '<h1>Hello</h1>')
-	writeFileSync(path.join(root, 'site.js'), 'console.log(1)\n')
+	for (const [name, content] of files) writeFileSync(path.join(root, name), content)
 
 	return root
+}
+
+function install_prettier(root: string): void {
+	const bin_directory = path.join(root, 'node_modules', '.bin')
+
+	mkdirSync(bin_directory, { recursive: true })
+	writeFileSync(path.join(bin_directory, 'prettier'), '')
 }
 
 function invoked_tools(): Array<unknown> {
@@ -49,6 +63,7 @@ describe('josh format', () => {
 	it('skips ESLint with a reason and exits 0 on a static project without it', async () => {
 		const root = write_project({ josh: { profile: 'static' } })
 
+		install_prettier(root)
 		expect(await format.run_format(root)).toBe(0)
 		expect(invoked_tools()).toEqual(['prettier'])
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('josh eslint:'))
@@ -84,5 +99,17 @@ describe('josh format', () => {
 
 		expect(await format.run([], root)).toBe(0)
 		expect(invoked_tools()).toEqual(['prettier', 'eslint'])
+	})
+})
+
+describe('josh format without Web files', () => {
+	it('skips Prettier with a reason and exits 0 on a static Python project', async () => {
+		const root = write_project({ josh: { profile: 'static' } }, PYTHON_FILES)
+
+		expect(await format.run_format(root)).toBe(0)
+		expect(mocked_execa).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining('josh prettier: no HTML, CSS or JavaScript files were found'),
+		)
 	})
 })

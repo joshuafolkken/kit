@@ -7,6 +7,7 @@ import { project_checks } from './project-checks'
 const roots: Array<string> = []
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
+const INDEX_HTML = 'index.html'
 const STATIC_MANIFEST = '{"josh":{"profile":"static"}}'
 
 function fixture(): string {
@@ -45,7 +46,7 @@ describe('project_checks profile and files', () => {
 	it('finds web files added later from a subdirectory', () => {
 		const root = fixture()
 
-		writeFileSync(path.join(root, 'index.html'), '')
+		writeFileSync(path.join(root, INDEX_HTML), '')
 		expect(project_checks.has_files(root, project_checks.WEB_FILES)).toBe(true)
 		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
 		mkdirSync(path.join(root, 'src'))
@@ -74,6 +75,25 @@ describe('project_checks type-check readiness', () => {
 		mkdirSync(path.join(root, NODE_MODULES, '.bin'), { recursive: true })
 		writeFileSync(path.join(root, NODE_MODULES, '.bin', 'tsc'), '')
 		expect(project_checks.type_check_skip_reason(root)).toBeUndefined()
+	})
+})
+
+describe('project_checks prettier readiness', () => {
+	it('skips Prettier on a static project until Web files and the tool arrive', () => {
+		const root = fixture()
+
+		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
+		writeFileSync(path.join(root, 'main.py'), '')
+		expect(project_checks.prettier_skip_reason(root)).toContain('no HTML, CSS or JavaScript')
+		writeFileSync(path.join(root, INDEX_HTML), '')
+		expect(project_checks.prettier_skip_reason(root)).toContain('prettier is not installed')
+		mkdirSync(path.join(root, NODE_MODULES, '.bin'), { recursive: true })
+		writeFileSync(path.join(root, NODE_MODULES, '.bin', 'prettier'), '')
+		expect(project_checks.prettier_skip_reason(root)).toBeUndefined()
+	})
+
+	it('never skips Prettier on a node project', () => {
+		expect(project_checks.prettier_skip_reason(fixture())).toBeUndefined()
 	})
 })
 

@@ -35,13 +35,8 @@ function skipped(check: string, reason: string): BufferedProcessResult {
 }
 
 async function run_static_prettier(directory: string): Promise<BufferedProcessResult> {
-	if (!project_checks.has_files(directory, project_checks.WEB_FILES)) {
-		return skipped('prettier', 'no HTML, CSS or JavaScript files were found')
-	}
-
-	if (!project_checks.has_bin(directory, 'prettier')) {
-		return skipped('prettier', 'prettier is not installed')
-	}
+	const reason = project_checks.prettier_skip_reason(directory)
+	if (reason !== undefined) return skipped('prettier', reason)
 
 	return await buffered_process.run_buffered_process(PRETTIER_ARGS)
 }

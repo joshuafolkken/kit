@@ -100,8 +100,7 @@ describe('run_lint_checks', () => {
 
 function static_project(): void {
 	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
-	vi.spyOn(project_checks, 'has_files').mockReturnValue(true)
-	vi.spyOn(project_checks, 'has_bin').mockReturnValue(true)
+	vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(undefined)
 	vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(
 		'no ESLint configuration was found',
 	)
@@ -120,7 +119,9 @@ describe('static project lint', () => {
 
 	it('skips Prettier when no web file exists', async () => {
 		static_project()
-		vi.spyOn(project_checks, 'has_files').mockReturnValue(false)
+		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(
+			'no HTML, CSS or JavaScript files were found',
+		)
 		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(
 			'no JavaScript or TypeScript files were found',
 		)

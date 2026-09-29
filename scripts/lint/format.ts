@@ -19,20 +19,32 @@ async function run_step(args: ReadonlyArray<string>, directory: string): Promise
 
 // prettier first, deliberately: `eslint --fix` exits 1 whenever a non-autofixable error remains, so
 // putting it first would mean one unused variable anywhere in the tree stops prettier from running.
-// A static project without ESLint is skipped with the same reason `josh lint` prints
-// (joshuafolkken/kit#2693).
+// A static project without Prettier or ESLint is skipped with the same reason `josh lint` prints
+// (joshuafolkken/kit#2693, joshuafolkken/kit#2606).
+async function run_unless_skipped(
+	check: string,
+	reason: string | undefined,
+	args: ReadonlyArray<string>,
+	directory: string,
+): Promise<number> {
+	if (reason === undefined) return await run_step(args, directory)
+	console.info(project_checks.skip_notice(check, reason))
+
+	return 0
+}
+
 async function run_format(directory: string): Promise<number> {
-	const prettier_exit_code = await run_step(PRETTIER_ARGS, directory)
+	const prettier_reason = project_checks.prettier_skip_reason(directory)
+	const prettier_exit_code = await run_unless_skipped(
+		'prettier',
+		prettier_reason,
+		PRETTIER_ARGS,
+		directory,
+	)
 	if (prettier_exit_code !== 0) return prettier_exit_code
-	const reason = project_checks.eslint_skip_reason(directory)
+	const eslint_reason = project_checks.eslint_skip_reason(directory)
 
-	if (reason !== undefined) {
-		console.info(project_checks.skip_notice('eslint', reason))
-
-		return 0
-	}
-
-	return await run_step(ESLINT_FIX_ARGS, directory)
+	return await run_unless_skipped('eslint', eslint_reason, ESLINT_FIX_ARGS, directory)
 }
 
 // The argument refusal survives leaving the `sh -c` composite shape: both tools run over the whole

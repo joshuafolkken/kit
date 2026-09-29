@@ -7,7 +7,7 @@ Shared toolchain config and CLI for TypeScript projects — ESLint, Prettier, Ty
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) with [pnpm](https://pnpm.io/)
+- [Node.js](https://nodejs.org/) 22.19.0 or later with [pnpm](https://pnpm.io/) — [getting-started.md](./docs/getting-started.md) covers installing both
 - [gh CLI](https://cli.github.com/) for `josh version` and existing GitHub Packages consumers. It is not required to install kit from public npm; see [authentication.md](./docs/authentication.md) for setup when needed.
 
 ## Quick start
@@ -24,6 +24,7 @@ Using the kit inside a project? See [docs/package.md](./docs/package.md).
 | Guide                                           | What it covers                                                                   |
 | ----------------------------------------------- | -------------------------------------------------------------------------------- |
 | [why.md](./docs/why.md)                         | Why kit exists — the AI-development problems it solves, for practitioners        |
+| [getting-started.md](./docs/getting-started.md) | First install for an `index.html` site or a non-Node project, without Git        |
 | [authentication.md](./docs/authentication.md)   | GitHub Packages auth for existing projects                                       |
 | [cli.md](./docs/cli.md)                         | Install and use the global `josh` CLI                                            |
 | [package.md](./docs/package.md)                 | Use the kit as a project devDependency — configs, prompts, scripts, `josh init`  |

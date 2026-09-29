@@ -4,6 +4,8 @@ Add `@joshuafolkken/kit` as a devDependency so a project can consume its ESLint 
 
 This is independent of the [global `josh` CLI](./cli.md) — most projects want both, but the package alone is enough to consume configs.
 
+For an `index.html` site or a project without Node tooling, start with [getting-started.md](./getting-started.md), which also covers installing Node.js and pnpm.
+
 ## 1. Install
 
 The public npm registry serves `@joshuafolkken/kit` without a GitHub token or project `.npmrc` mapping. Existing projects with a `@joshuafolkken` mapping to GitHub Packages keep using it; see [authentication.md](./authentication.md) until those projects migrate.
