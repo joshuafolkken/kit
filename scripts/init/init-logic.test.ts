@@ -128,6 +128,7 @@ describe('get_ai_copy_files - AI and community files', () => {
 		expect(result).toContain('.github/workflows/production.yml')
 		expect(result).not.toContain('.github/workflows/publish.yml')
 		expect(result).toContain('.github/workflows/sonar-qube.yml')
+		expect(result).toContain('.github/workflows/pr-classification.yml')
 		expect(result).toContain('.github/pull_request_template.md')
 		expect(result).toContain('.github/release.yml')
 		expect(result).toContain('.github/dependabot.yml')

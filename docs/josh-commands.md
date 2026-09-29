@@ -539,7 +539,7 @@ Related: [`josh followup`](#josh-followup), [`josh pr`](#josh-pr).
 
 ### `josh pr:classification`
 
-Use one label (see PR template). Bots may omit it; label changes rerun CI.
+Use one label (see PR template). Bots may omit it; label changes rerun only the `Release classification` workflow (`.github/workflows/pr-classification.yml`), never CI.
 
 ### `josh pr`
 
