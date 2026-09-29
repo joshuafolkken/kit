@@ -135,7 +135,10 @@ function did_migrate_prettierrc(destination_path: string): boolean {
 
 	const existing = readFileSync(legacy_path, 'utf8')
 
-	writeFileSync(destination_path, init_logic.merge_prettier_config(existing))
+	writeFileSync(
+		destination_path,
+		init_logic.merge_prettier_config(existing, path.dirname(destination_path)),
+	)
 	rmSync(legacy_path)
 
 	return true
@@ -143,7 +146,7 @@ function did_migrate_prettierrc(destination_path: string): boolean {
 
 function write_merged_prettier_config(destination_path: string): void {
 	const existing = readFileSync(destination_path, 'utf8')
-	const merged = init_logic.merge_prettier_config(existing)
+	const merged = init_logic.merge_prettier_config(existing, path.dirname(destination_path))
 
 	if (merged === existing) {
 		console.info('  ✔ unchanged prettier.config.js')

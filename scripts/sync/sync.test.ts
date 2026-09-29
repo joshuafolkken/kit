@@ -185,7 +185,15 @@ const NEW_PRETTIER_CONTENT = `import { config } from '@joshuafolkken/kit/prettie
 const KIT_PRETTIER_IMPORT = "from '@joshuafolkken/kit/prettier'"
 const APP_CSS_STYLESHEET = "tailwindStylesheet: './src/app.css'"
 
+// A named stylesheet survives the merge only while the file exists (#2710).
+function add_app_stylesheet(): void {
+	mkdirSync(path.join(TEST_DIR, 'dest', 'src'), { recursive: true })
+	writeFileSync(path.join(TEST_DIR, 'dest', 'src', 'app.css'), '')
+}
+
 describe('migrate_prettierrc', () => {
+	beforeEach(add_app_stylesheet)
+
 	it('returns false and does nothing when .prettierrc does not exist', () => {
 		const is_migrated = sync.migrate_prettierrc(PRETTIER_DEST)
 
@@ -212,7 +220,9 @@ describe('migrate_prettierrc', () => {
 		expect(migrated_content).toContain(APP_CSS_STYLESHEET)
 	})
 
-	it('uses default tailwindStylesheet when .prettierrc has no tailwindStylesheet', () => {
+	it('uses the default tailwindStylesheet when the project has that stylesheet', () => {
+		mkdirSync(path.join(TEST_DIR, 'dest', 'src', 'routes'), { recursive: true })
+		writeFileSync(path.join(TEST_DIR, 'dest', 'src', 'routes', 'layout.css'), '')
 		writeFileSync(PRETTIERRC_PATH, `{\n\t"useTabs": true\n}`)
 		sync.migrate_prettierrc(PRETTIER_DEST)
 
@@ -222,7 +232,19 @@ describe('migrate_prettierrc', () => {
 	})
 })
 
+// prettier-plugin-tailwindcss aborts every format on a missing stylesheet (#2710).
+describe('migrate_prettierrc — project without a stylesheet', () => {
+	it('drops a named stylesheet the project does not have', () => {
+		writeFileSync(PRETTIERRC_PATH, OLD_PRETTIER_CONTENT)
+		sync.migrate_prettierrc(PRETTIER_DEST)
+
+		expect(readFileSync(PRETTIER_DEST, 'utf8')).not.toContain('tailwindStylesheet')
+	})
+})
+
 describe('sync_prettier_config', () => {
+	beforeEach(add_app_stylesheet)
+
 	it('does nothing when file does not exist', () => {
 		sync.sync_prettier_config(PRETTIER_DEST)
 		expect(existsSync(PRETTIER_DEST)).toBe(false)

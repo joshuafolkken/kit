@@ -1,11 +1,39 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { init_logic_templates } from './init-logic-templates'
 import { PACKAGE_DIR } from './init-paths'
 
+// A holder rather than a bare `let`: `beforeEach` writes a property here rather than reassigning a
+// module binding, which `unicorn/no-top-level-assignment-in-function` forbids.
+const context = { project: '' }
+
+beforeEach(() => {
+	context.project = mkdtempSync(path.join(tmpdir(), 'init-templates-test-'))
+})
+
+afterEach(() => {
+	rmSync(context.project, { recursive: true, force: true })
+})
+
+const SPREAD_ONLY = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n}\n`
+
+function merge_in_project(existing: string): string {
+	return init_logic_templates.merge_prettier_config(existing, context.project)
+}
+
+function add_stylesheet(relative_path: string): void {
+	const file = path.join(context.project, relative_path)
+
+	mkdirSync(path.dirname(file), { recursive: true })
+	writeFileSync(file, '')
+}
+
 const DEFAULT_STYLESHEET = "tailwindStylesheet: './src/routes/layout.css'"
-const APP_CSS_STYLESHEET = "tailwindStylesheet: './src/app.css'"
+const APP_CSS = './src/app.css'
+const APP_CSS_STYLESHEET = `tailwindStylesheet: '${APP_CSS}'`
+const NAMED_APP_CSS = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n\t${APP_CSS_STYLESHEET},\n}\n`
 const KIT_PRETTIER_IMPORT = "from '@joshuafolkken/kit/prettier'"
 
 const CREATE_VANILLA_CONFIG = 'create_vanilla_config'
@@ -23,14 +51,13 @@ describe('init_logic_templates.generate_prettier_config', () => {
 		expect(init_logic_templates.generate_prettier_config()).toContain('@joshuafolkken/kit/prettier')
 	})
 
-	it('includes default tailwindStylesheet', () => {
-		expect(init_logic_templates.generate_prettier_config()).toContain(DEFAULT_STYLESHEET)
+	// prettier-plugin-tailwindcss aborts every format when the named stylesheet is missing (#2710).
+	it('names no tailwindStylesheet when none is given', () => {
+		expect(init_logic_templates.generate_prettier_config()).not.toContain('tailwindStylesheet')
 	})
 
 	it('uses provided stylesheet when given', () => {
-		expect(init_logic_templates.generate_prettier_config('./src/app.css')).toContain(
-			APP_CSS_STYLESHEET,
-		)
+		expect(init_logic_templates.generate_prettier_config(APP_CSS)).toContain(APP_CSS_STYLESHEET)
 	})
 })
 
@@ -86,27 +113,48 @@ describe('init_logic_templates.merge_eslint_config fallbacks', () => {
 
 describe('init_logic_templates.merge_prettier_config', () => {
 	it('preserves tailwindStylesheet from new template format', () => {
-		const existing = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n\ttailwindStylesheet: './src/app.css',\n}\n`
+		add_stylesheet(APP_CSS)
 
-		expect(init_logic_templates.merge_prettier_config(existing)).toContain(APP_CSS_STYLESHEET)
+		expect(merge_in_project(NAMED_APP_CSS)).toContain(APP_CSS_STYLESHEET)
 	})
 
 	it('preserves tailwindStylesheet from old JSON format', () => {
 		const existing = `{\n\t"useTabs": true,\n\t"tailwindStylesheet": "./src/app.css"\n}`
 
-		expect(init_logic_templates.merge_prettier_config(existing)).toContain(APP_CSS_STYLESHEET)
+		add_stylesheet(APP_CSS)
+
+		expect(merge_in_project(existing)).toContain(APP_CSS_STYLESHEET)
 	})
 
-	it('uses default when existing file has no tailwindStylesheet', () => {
-		const existing = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n}\n`
+	// kit ≤1.929 named the SvelteKit default in every node project; `josh sync` has to drop it (#2710).
+	it('drops a named stylesheet the project does not have', () => {
+		expect(merge_in_project(NAMED_APP_CSS)).toBe(SPREAD_ONLY)
+	})
 
-		expect(init_logic_templates.merge_prettier_config(existing)).toContain(DEFAULT_STYLESHEET)
+	it('keeps an absolute stylesheet path that exists', () => {
+		add_stylesheet(APP_CSS)
+		const named = `tailwindStylesheet: '${path.join(context.project, APP_CSS)}'`
+		const existing = `export default {\n\t${named},\n}\n`
+
+		expect(merge_in_project(existing)).toContain(named)
+	})
+
+	it('uses the default when the project has that stylesheet', () => {
+		add_stylesheet('src/routes/layout.css')
+
+		expect(merge_in_project(SPREAD_ONLY)).toContain(DEFAULT_STYLESHEET)
+	})
+
+	it('names no stylesheet when the project has none', () => {
+		const merged = merge_in_project(SPREAD_ONLY)
+
+		expect(merged).toBe(SPREAD_ONLY)
 	})
 
 	it('rewrites old format to use kit prettier import', () => {
 		const existing = `{\n\t"useTabs": true,\n\t"singleQuote": true\n}`
 
-		expect(init_logic_templates.merge_prettier_config(existing)).toContain(KIT_PRETTIER_IMPORT)
+		expect(merge_in_project(existing)).toContain(KIT_PRETTIER_IMPORT)
 	})
 })
 

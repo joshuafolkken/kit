@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { package_path } from './init-paths'
 
 const ESLINT_VANILLA = `import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
@@ -111,20 +112,38 @@ function merge_eslint_config(existing: string): string {
 	return apply_rules_template(rules_blocks.join(',\n'))
 }
 
-function generate_prettier_config(stylesheet: string = DEFAULT_TAILWIND_STYLESHEET): string {
+// The default is SvelteKit's stylesheet, and prettier-plugin-tailwindcss aborts every format when
+// the named file is missing — so it is written only for a project that has it (joshuafolkken/kit#2710).
+function detect_tailwind_stylesheet(project_root: string): string | undefined {
+	return existsSync(path.join(project_root, DEFAULT_TAILWIND_STYLESHEET))
+		? DEFAULT_TAILWIND_STYLESHEET
+		: undefined
+}
+
+function generate_prettier_config(stylesheet?: string): string {
+	const stylesheet_line = stylesheet === undefined ? '' : `\ttailwindStylesheet: '${stylesheet}',\n`
+
 	return `import { config } from '@joshuafolkken/kit/prettier'
 
 export default {
 \t...config,
-\ttailwindStylesheet: '${stylesheet}',
-}
+${stylesheet_line}}
 `
 }
 
-function merge_prettier_config(existing: string): string {
-	const match = TAILWIND_STYLESHEET_PATTERN.exec(existing)
+// A named stylesheet is kept only while it exists: kit ≤1.929 wrote the SvelteKit default into every
+// node project, and keeping that line would leave `josh sync` unable to repair the aborting format.
+function existing_stylesheet(existing: string, project_root: string): string | undefined {
+	const named = TAILWIND_STYLESHEET_PATTERN.exec(existing)?.[1]
 
-	return generate_prettier_config(match?.[1] ?? DEFAULT_TAILWIND_STYLESHEET)
+	return named !== undefined && existsSync(path.resolve(project_root, named)) ? named : undefined
+}
+
+function merge_prettier_config(existing: string, project_root: string): string {
+	const stylesheet =
+		existing_stylesheet(existing, project_root) ?? detect_tailwind_stylesheet(project_root)
+
+	return generate_prettier_config(stylesheet)
 }
 
 function generate_playwright_config(): string {
@@ -134,6 +153,7 @@ function generate_playwright_config(): string {
 const init_logic_templates = {
 	generate_eslint_config,
 	merge_eslint_config,
+	detect_tailwind_stylesheet,
 	generate_prettier_config,
 	merge_prettier_config,
 	generate_playwright_config,
