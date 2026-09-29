@@ -449,3 +449,17 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | low | scripts/josh/josh-composite-arguments.test.ts:112 | 2026-09-28 | #2693
 - rf:assumptions | low | docs/package.md:85 | 2026-09-28 | #2693
 - rf:tests | low | scripts/init/init-static-integration.test.ts | 2026-09-28 | #2696
+- rf:bug-risks | medium | scripts/run/run-ship-detach.ts:138 | 2026-09-27 | #2639
+- rf:bug-risks | medium | scripts/run/run-ship-detach.ts:139 | 2026-09-27 | #2639
+- rf:bug-risks | medium | scripts/run/run-ship-detach.ts:127 | 2026-09-27 | #2639
+- rf:bug-risks | medium | scripts/run/run-ship-detach.ts:144 | 2026-09-27 | #2639
+- rf:bug-risks | medium | scripts/git/git-pr.ts | 2026-09-28 | #2666
+- rf:bug-risks | medium | scripts/git/git-pr.ts | 2026-09-28 | #2666
+- rf:bug-risks | medium | scripts/git/git-gh-pr.ts | 2026-09-28 | #2666
+- rf:bug-risks | medium | scripts/git/git-pr.ts | 2026-09-28 | #2666
+- rf:tests | medium | scripts/package/optional-eslint.test.ts | 2026-09-28 | #2655
+- rf:none | none | - | 2026-09-28 | #2655
+- rf:bug-risks | medium | docs/getting-started.md:76 | 2026-09-29 | #2606
+- rf:bug-risks | medium | docs/getting-started.md:14 | 2026-09-29 | #2606
+- rf:comments | low | docs/getting-started.md:52 | 2026-09-29 | #2606
+- rf:comments | low | docs/getting-started.md:31 | 2026-09-29 | #2606
