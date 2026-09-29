@@ -1,6 +1,6 @@
 # scripts-ai/ — AI Workflow Automation
 
-The `scripts-ai/` directory contains automation scripts for AI-assisted development workflows. These scripts power the `josh followup` and `josh notify` commands.
+For projects using the AI Issue workflow (`josh followup`, `josh notify`): the Telegram settings and what the scripts do. The `scripts-ai/` directory contains automation scripts for AI-assisted development workflows. These scripts power the `josh followup` and `josh notify` commands.
 
 ## Required Environment Variables
 

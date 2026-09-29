@@ -1,10 +1,13 @@
 # Use the kit as a project package
 
-Add `@joshuafolkken/kit` as a devDependency so a project can consume its ESLint / Prettier / tsconfig configs, prompts, and scripts, and run `josh init` to wire them up.
+For adding kit to a project and wiring it up with `josh init`. The install steps differ by [project profile](./init.md#project-profiles):
 
-This is independent of the [global `josh` CLI](./cli.md) — most projects want both, but the package alone is enough to consume configs.
+| Profile  | Your project                                                      | Start here                                                               |
+| -------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `static` | An `index.html` site, or Python, Rust or another non-Node project | [getting-started.md](./getting-started.md) — also installs Node and pnpm |
+| `node`   | A JavaScript / TypeScript project with npm dependencies           | the steps below                                                          |
 
-For an `index.html` site or a project without Node tooling, start with [getting-started.md](./getting-started.md), which also covers installing Node.js and pnpm.
+The package is independent of the [global `josh` CLI](./cli.md) — most projects want both, but the package alone is enough to consume configs.
 
 ## 1. Install
 

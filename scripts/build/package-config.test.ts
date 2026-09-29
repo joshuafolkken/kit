@@ -4,6 +4,7 @@ import { yaml_config_fixture } from '#scripts/yaml/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
 
 interface PackageJson {
+	description?: string
 	files?: Array<string>
 	bin?: Record<string, string>
 	exports?: Record<string, unknown>
@@ -89,6 +90,16 @@ const AI_COPY_ROOT_FILES = [
 	WORKSPACE_CONFIG,
 	'tsconfig.sonar.json',
 ] as const
+
+describe('package.json description', () => {
+	const { description } = load_manifest()
+
+	it('describes the package for both project profiles, not TypeScript alone', () => {
+		expect(description).toMatch(/any repository/u)
+		expect(description).toMatch(/Node projects/u)
+		expect(description).not.toMatch(/TypeScript projects/u)
+	})
+})
 
 describe('package.json files field', () => {
 	const manifest = load_manifest()
