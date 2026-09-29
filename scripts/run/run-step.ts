@@ -2,6 +2,7 @@ import { git_stash } from '#scripts/git/git-stash'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import type { CarryRead } from './run-carry'
 import { run_event_stream } from './run-event-stream'
+import { run_retrospective } from './run-retrospective'
 
 // `josh run:step <N>` — the run's next single action, computed from three mechanical inputs and nothing
 // else (joshuafolkken/kit#2248). It is the child of epic #2166 that lifts the fold from an *event* to a
@@ -174,23 +175,10 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 // (joshuafolkken/kit#2297).
 const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
 
-// Whether a run at a winding-down position still owes its end-of-run retrospective
-// (joshuafolkken/kit#2328) — false when the switch is off (the opt-in default, joshuafolkken/kit#2370),
-// for a dispatched lane child, where the batch runs one at its own end and never a child's (the
-// `release:scope` precedent), for a run whose retrospective has already run this invocation, and in a
-// consumer checkout, where the kit-only command is refused. The switch is read first, so a run that has
-// not opted in never consults the other three. The two positions that consult it are the drain and the
-// stop; both read exactly this, so the exclusion set is single-sourced.
-function is_retrospective_owed(input: StepInput): boolean {
-	if (!input.is_retrospective_enabled) return false
-
-	return !input.is_lane_child && !input.is_retrospective_done && !input.is_consumer
-}
-
 // A stopped run's last owed step is the end-of-run retrospective. When it is not owed the position stops
 // with no command to run, which is what the position meant before the retrospective existed.
 function stop_action(input: StepInput): StepAction {
-	return is_retrospective_owed(input) ? command(RETROSPECTIVE_COMMAND) : verdict(STOP)
+	return run_retrospective.is_owed(input) ? command(RETROSPECTIVE_COMMAND) : verdict(STOP)
 }
 
 // The drain fires the retrospective *before* the idle watch, not after it (joshuafolkken/kit#2335): the
@@ -199,7 +187,7 @@ function stop_action(input: StepInput): StepAction {
 // run proceeds to that watch, which is a `WAIT` rather than a `STOP`: the backlog is empty but the run is
 // not ending, and the real `STOP` follows when the watch expires with the retrospective already done.
 function drain_action(input: StepInput): StepAction {
-	return is_retrospective_owed(input) ? command(RETROSPECTIVE_COMMAND) : verdict(WAIT)
+	return run_retrospective.is_owed(input) ? command(RETROSPECTIVE_COMMAND) : verdict(WAIT)
 }
 
 // The hand-off a `backlogrun` parent without a completion callback takes right after dispatching

@@ -218,12 +218,12 @@ describe('backlog_drive.run_pass — verdicts', () => {
 		const drained = await backlog_drive.run_pass(
 			state(),
 			true,
-			harness({ offers: [offer('watch')] }).ports,
+			harness({ offers: [{ ...offer('watch'), is_retrospective_owed: true }] }).ports,
 		)
 		const waiting = await backlog_drive.run_pass(
 			state([FIRST_CHILD]),
 			true,
-			harness({ offers: [offer('watch')] }).ports,
+			harness({ offers: [{ ...offer('watch'), is_retrospective_owed: true }] }).ports,
 		)
 
 		expect(drained.kind === 'end' && drained.end.reason).toBe('watch')
@@ -283,8 +283,9 @@ it('returns window once the bounded wait is spent', async () => {
 	expect(end.reason).toBe('window')
 })
 
-it('continues the idle watch after the retrospective has run', async () => {
-	const { ports } = harness({ offers: [{ ...offer('watch'), is_retrospective_done: true }] })
+// Not owed covers both a retrospective already run and the opt-in switch left off (joshuafolkken/kit#2750).
+it('continues the idle watch on a drain that owes no retrospective', async () => {
+	const { ports } = harness({ offers: [offer('watch')] })
 	const end = await backlog_drive.run_loop(state(), { ...CONFIG, window_ms: POLL_MS }, ports)
 
 	expect(end.reason).toBe('window')
@@ -299,11 +300,21 @@ it('keeps the budget reason on the first stop verdict', async () => {
 })
 
 it('returns the drained stop for a retrospective before ending the carry', async () => {
-	const { ports, calls } = harness({ offers: [{ ...offer('stop'), answer: 'exhausted' }] })
+	const { ports, calls } = harness({
+		offers: [{ ...offer('stop'), answer: 'exhausted', is_retrospective_owed: true }],
+	})
 	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
 
 	expect(end.reason).toBe('retrospective')
 	expect(calls).not.toContain('finish')
+})
+
+it('ends a drained stop that owes no retrospective without handing it back', async () => {
+	const { ports, calls } = harness({ offers: [{ ...offer('stop'), answer: 'exhausted' }] })
+	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
+
+	expect(end.reason).toBe('stop')
+	expect(calls).toContain('finish')
 })
 
 describe('backlog_drive.run_loop — hand-back state', () => {

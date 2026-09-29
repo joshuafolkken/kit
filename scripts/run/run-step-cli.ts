@@ -9,6 +9,7 @@ import { run_carry, type CarryRead } from './run-carry'
 import { run_event_scope } from './run-event-scope'
 import { run_event_stream } from './run-event-stream'
 import { run_prep_cli } from './run-prep-cli'
+import { run_retrospective } from './run-retrospective'
 import { run_step, type StepInput } from './run-step'
 
 // `josh run:step <N>` — print the run's next single action, computed from the event stream, the carry
@@ -22,10 +23,6 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh run:step <issue-number>'
-// The opt-in switch that gates the end-of-run retrospective (joshuafolkken/kit#2370). Read here rather
-// than in `run-step.ts` so the position logic stays a pure function of its input; it defaults off, so an
-// unset variable prints no retrospective step.
-const RETROSPECTIVE_ENV_KEY = 'JOSH_RETROSPECTIVE'
 
 interface RunReads {
 	carry_kind: CarryRead['kind']
@@ -83,7 +80,8 @@ async function gather(issue_number: string): Promise<StepInput> {
 		is_at_cut_cap: run_reads.is_at_cut_cap,
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
-		is_retrospective_enabled: hook_decision.is_switch_opt_in(RETROSPECTIVE_ENV_KEY),
+		// Read here rather than in `run-step.ts` so the position logic stays a pure function of its input.
+		is_retrospective_enabled: run_retrospective.is_enabled(),
 		has_changes: parts.has_changes,
 		has_completion_callback: agent_role_profile.has_completion_callback(),
 	}
