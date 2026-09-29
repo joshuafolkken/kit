@@ -1,6 +1,7 @@
 import { PORCELAIN_FLAG } from './constants'
 import { ls_remote_branch_arguments } from './git-ls-remote'
 import { git_spawn } from './git-spawn'
+import { repository_lock } from './repository-lock'
 
 // The four worktree reads and writes a lane's lifecycle needs, plus the branch deletion that ends it
 // (joshuafolkken/kit#1490; split out of `git-command.ts` under joshuafolkken/kit#1640). They live
@@ -18,6 +19,36 @@ import { git_spawn } from './git-spawn'
 // on — so this module stops at "what git printed" and the meaning of it is decided there
 // (joshuafolkken/kit#1641; before it, `lane-start-point.ts` was the only reader and did both).
 const WORKTREE = 'worktree'
+
+// **Every call that writes `.git/worktrees/` runs under one repository-wide lock**
+// (joshuafolkken/kit#2736). `git worktree add` is not safe against itself: while one add is still
+// building `.git/worktrees/<id>/` — its `commondir` not yet written — a second add enumerates the
+// existing registrations, reads the half-built one and fails with `fatal: failed to read
+// .git/worktrees/<id>/commondir`. Two lanes opened at once do exactly that, and the per-seat lock in
+// `lane-open.ts` does not serialize them. `remove` and `prune` edit the same directory, so they take
+// the same lock. The lock wraps the git call alone; the slow steps a caller runs afterwards — a lane's
+// dependency install — stay outside it.
+const WORKTREE_LOCK_PREFIX = 'josh-worktree-lock-'
+// A holder runs one local git command, so the wait only bounds a checkout that hung; it is generous
+// because a large repository's checkout is itself several seconds, and several lanes queue behind it.
+const WORKTREE_LOCK_MAX_WAIT_MS = 120_000
+
+async function locked(arguments_: Array<string>): Promise<string> {
+	const target = repository_lock.lock_path(WORKTREE_LOCK_PREFIX)
+	const output = await repository_lock.with_lock(
+		async () => await git_spawn.read(arguments_),
+		target,
+		WORKTREE_LOCK_MAX_WAIT_MS,
+	)
+
+	if (output === undefined) {
+		throw new Error(
+			`git ${arguments_.join(' ')}: timed out waiting for the work-tree lock ${target}`,
+		)
+	}
+
+	return output
+}
 
 // Every registered work tree of this repository, in git's own machine-readable form: one `worktree
 // <path>` / `HEAD <sha>` / `branch <ref>` block per tree, blocks separated by a blank line. Parsing
@@ -50,14 +81,14 @@ async function worktree_add(
 ): Promise<string> {
 	const flags = start_point === undefined ? ['add'] : ['add', '--no-track', '-b', branch_name]
 
-	return await git_spawn.read([WORKTREE, ...flags, directory, start_point ?? branch_name])
+	return await locked([WORKTREE, ...flags, directory, start_point ?? branch_name])
 }
 
 // A throwaway tree at one commit, on no branch — `josh test:red` checks the merge-base out here, so
 // the pre-fix tree is built without creating a branch or touching the caller's tree and index
 // (joshuafolkken/kit#2448).
 async function worktree_add_detached(directory: string, commit: string): Promise<string> {
-	return await git_spawn.read([WORKTREE, 'add', '--detach', directory, commit])
+	return await locked([WORKTREE, 'add', '--detach', directory, commit])
 }
 
 // **`--force` is the point, not a convenience.** A lane is closed after a park, a failure or an
@@ -65,13 +96,13 @@ async function worktree_add_detached(directory: string, commit: string): Promise
 // or untracked work. Refusing to remove it there would leave exactly the debris the close exists to
 // prevent.
 async function worktree_remove(directory: string): Promise<string> {
-	return await git_spawn.read([WORKTREE, 'remove', '--force', directory])
+	return await locked([WORKTREE, 'remove', '--force', directory])
 }
 
 // Drops the registrations whose directories are already gone — what makes a lane whose directory was
 // deleted by hand recoverable rather than a permanent `worktree add` refusal on that path.
 async function worktree_prune(): Promise<string> {
-	return await git_spawn.read([WORKTREE, 'prune'])
+	return await locked([WORKTREE, 'prune'])
 }
 
 // **Asked of the remote itself, because nothing prunes the remote-tracking refs**

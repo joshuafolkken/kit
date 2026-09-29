@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
+import node_path from 'node:path'
 import { package_file } from '#scripts/claude/skill-fixture'
 import { PLUGIN_SKILL_DIRECTORIES } from '#scripts/sync/plugin-skill-directories'
+import { document_scan } from './document-scan'
 
 // Where the rules live, for every marker suite that checks one is present.
 //
@@ -132,6 +134,15 @@ function read_document(relative_path: string): string {
 	return readFileSync(package_file(relative_path), 'utf8')
 }
 
+// Link targets resolved to repository-relative paths, against the linking document's directory.
+function linked_paths(from: string): Array<string> {
+	const directory = node_path.dirname(from)
+
+	return document_scan
+		.link_targets(read_document(from))
+		.map((target) => node_path.normalize(node_path.join(directory, target)))
+}
+
 // Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
 // a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
 // column they landed in. Every marker suite needs this, which is why it lives here rather than being
@@ -191,6 +202,7 @@ export {
 	CANONICAL_DOC,
 	CLAUDE_SETTINGS,
 	ENV_EXAMPLE,
+	linked_paths,
 	PROMPT_ROOT,
 	read_document,
 	read_index,

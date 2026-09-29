@@ -1,14 +1,28 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_common_directory } from './git-common-directory'
 import { git_worktree } from './git-worktree'
 
 // The subject here is the argument list each call hands the shared spawn helper, so the double is of
 // `git_spawn` rather than of `execa`: `git-command.test.ts` already exercises the spawn layer itself
 // through the real module, and repeating that mock here would clone it for nothing.
+//
+// The double also counts how many calls are inside git at once, and holds each one open for a few
+// milliseconds so two calls left to run side by side would overlap there (joshuafolkken/kit#2736).
 const spawn_mock = vi.hoisted(() => {
-	const state = { last_arguments: [] as Array<string> }
+	const HOLD_MS = 20
+	const state = { last_arguments: [] as Array<string>, active: 0, peak: 0 }
 
 	async function read(arguments_: Array<string>): Promise<string> {
 		state.last_arguments = [...arguments_]
+		state.active += 1
+		state.peak = Math.max(state.peak, state.active)
+		await new Promise<void>((resolve) => {
+			setTimeout(resolve, HOLD_MS)
+		})
+		state.active -= 1
 
 		return ''
 	}
@@ -34,8 +48,19 @@ const LANE_BRANCH_REF = 'refs/heads/1490-lane'
 const RELEASE_BRANCH = 'release/v1.2.0'
 const RELEASE_BRANCH_REF = 'refs/heads/release/v1.2.0'
 
+// The lock record is keyed on the git common directory; pointing that at a scratch directory keeps
+// this suite's lock apart from any real lane opening on the same machine.
+const scratch = mkdtempSync(path.join(tmpdir(), 'git-worktree-test-'))
+
 beforeEach(() => {
 	spawn_mock.state.last_arguments = []
+	spawn_mock.state.peak = 0
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(scratch)
+})
+
+afterAll(() => {
+	vi.restoreAllMocks()
+	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('git_worktree worktree calls', () => {
@@ -115,6 +140,37 @@ describe('git_worktree lane reads', () => {
 // joshuafolkken/kit#1627: attaching is the only way back to a child parked after it pushed. `-b`
 // refuses the branch that is already there, and deleting it to get `-b` back would take the pushed
 // commits with it. `--no-track` belongs to the branch creation, and git rejects it on this form.
+// joshuafolkken/kit#2736: two lanes opened at once ran `git worktree add` side by side, and one read
+// the other's half-built `.git/worktrees/<id>/` and failed. Every call that writes that directory now
+// runs under one repository-wide lock, so no two of them are inside git at the same time.
+describe('git_worktree serializes the calls that write .git/worktrees', () => {
+	it('never runs two concurrent adds inside git at once', async () => {
+		await Promise.all([
+			git_worktree.worktree_add(LANE_DIRECTORY, LANE_BRANCH, ORIGIN_MAIN_REF),
+			git_worktree.worktree_add(`${LANE_DIRECTORY}-2`, `${LANE_BRANCH}-2`, ORIGIN_MAIN_REF),
+		])
+
+		expect(spawn_mock.state.peak).toBe(1)
+	})
+
+	it('serializes an add against a detached add, a removal and a prune', async () => {
+		await Promise.all([
+			git_worktree.worktree_add(LANE_DIRECTORY, LANE_BRANCH, ORIGIN_MAIN_REF),
+			git_worktree.worktree_add_detached(`${LANE_DIRECTORY}-red`, 'HEAD'),
+			git_worktree.worktree_remove(`${LANE_DIRECTORY}-old`),
+			git_worktree.worktree_prune(),
+		])
+
+		expect(spawn_mock.state.peak).toBe(1)
+	})
+
+	it('lets the reads run side by side, since they write nothing', async () => {
+		await Promise.all([git_worktree.worktree_list(), git_worktree.worktree_list()])
+
+		expect(spawn_mock.state.peak).toBe(2)
+	})
+})
+
 describe('git_worktree worktree add on an existing branch', () => {
 	it('passes neither --no-track nor -b when given no start point', async () => {
 		await git_worktree.worktree_add(LANE_DIRECTORY, LANE_BRANCH, undefined)

@@ -1,9 +1,7 @@
 import { readdirSync } from 'node:fs'
-import node_path from 'node:path'
 import { package_file } from '#scripts/claude/skill-fixture'
 import { describe, expect, it } from 'vitest'
-import { all_documents, read_document } from './ai-document-fixture'
-import { document_scan } from './document-scan'
+import { all_documents, linked_paths } from './ai-document-fixture'
 
 // The task-oriented how-to layer (joshuafolkken/kit#2713): one index, one page per task. The pages
 // only earn their keep while the command-name and link-resolution scans walk them, and while the
@@ -16,15 +14,6 @@ function how_to_pages(): Array<string> {
 	return readdirSync(package_file(HOW_TO_DIRECTORY), { encoding: 'utf8' })
 		.filter((entry) => entry.endsWith('.md'))
 		.map((entry) => `${HOW_TO_DIRECTORY}/${entry}`)
-}
-
-// Link targets resolved to repository-relative paths, against the linking document's directory.
-function linked_paths(from: string): Array<string> {
-	const directory = node_path.dirname(from)
-
-	return document_scan
-		.link_targets(read_document(from))
-		.map((target) => node_path.normalize(node_path.join(directory, target)))
 }
 
 describe('the how-to layer', () => {
