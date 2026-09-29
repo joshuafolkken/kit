@@ -45,7 +45,9 @@ interface OfferRead {
 	retries: number
 	answer?: string | undefined
 	reason?: string | undefined
-	is_retrospective_done?: boolean
+	// Whether a drain here owes the retrospective: the opt-in switch is on and it has not run yet. Absent
+	// reads as not owed, so a drain with the switch off keeps the idle watch (joshuafolkken/kit#2750).
+	is_retrospective_owed?: boolean
 	is_finish?: boolean | undefined
 }
 
@@ -106,7 +108,9 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 
 function is_drain(read: OfferRead, state: DriveState): boolean {
 	return (
-		read.verdict === WATCH_VERDICT && state.in_flight.length === 0 && !read.is_retrospective_done
+		read.verdict === WATCH_VERDICT &&
+		state.in_flight.length === 0 &&
+		read.is_retrospective_owed === true
 	)
 }
 
@@ -115,7 +119,7 @@ function needs_retrospective(read: OfferRead, state: DriveState): boolean {
 		read.verdict === STOP_VERDICT &&
 		read.answer === 'exhausted' &&
 		state.in_flight.length === 0 &&
-		!read.is_retrospective_done
+		read.is_retrospective_owed === true
 	)
 }
 
