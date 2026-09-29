@@ -87,6 +87,16 @@ describe('generate_tsconfig', () => {
 		expect(written).toStrictEqual(expect.arrayContaining(root_relative_sveltekit_exclude()))
 	})
 
+	// TypeScript 6 defaults `types` to `[]`, so without this the generated playwright.config.ts
+	// fails `josh check` on `process` even with @types/node installed (#2710).
+	it('names the Node types', () => {
+		const parsed = JSON.parse(init_logic.generate_tsconfig()) as {
+			compilerOptions?: { types?: Array<string> }
+		}
+
+		expect(parsed.compilerOptions?.types).toStrictEqual(['node'])
+	})
+
 	// A multi-line `exclude` failed `prettier --check` in the consumer once (#660). Assert the intent
 	// directly — the written file is a prettier fixed point — rather than a shape the entry count
 	// happens to produce, so growing the array cannot quietly reintroduce the regression.

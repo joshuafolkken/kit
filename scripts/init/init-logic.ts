@@ -228,9 +228,12 @@ const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
 // format_json rather than JSON.stringify: it lays arrays out the way prettier does — inline while
 // they fit within printWidth, one element per line once they do not — so the file kit writes is
 // `prettier --check`-clean in the consumer whatever the entry count happens to be (#660).
+// TypeScript 6 defaults `types` to `[]`, so a node project sees no `process` global — not even in the
+// generated `playwright.config.ts` — until the Node types are named (joshuafolkken/kit#2710).
 function generate_tsconfig(): string {
 	return json_format.format_json({
 		extends: TSCONFIG_EXTENDS,
+		compilerOptions: { types: ['node'] },
 		[TSCONFIG_EXCLUDE_FIELD]: TSCONFIG_EXCLUDE,
 	})
 }

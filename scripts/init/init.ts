@@ -77,12 +77,25 @@ function execute_file_action(action: FileAction): void {
 	merge_existing_file(action.merge, destination_path, action.dest)
 }
 
-function get_kit_package_manager(): string | undefined {
-	const { packageManager: package_manager } = with_package_manager_schema.parse(
-		init_actions.read_package_json(PACKAGE_JSON),
-	)
+const engine_pin_schema = z.looseObject({ name: z.string(), version: z.string() })
 
-	return package_manager !== undefined && package_manager.length > 0 ? package_manager : undefined
+const published_development_engines_schema = z.looseObject({
+	devEngines: z.looseObject({ packageManager: engine_pin_schema.optional() }).optional(),
+})
+
+// pnpm strips `packageManager` from a published manifest, so the kit a consumer installs carries its
+// pin only in `devEngines`. Falling back to that exact version keeps the consumer off the bare
+// `>=12.1.0` range, which every later `pnpm` call rejects as an invalid packageManager specification.
+function resolve_kit_package_manager(manifest: unknown): string | undefined {
+	const { packageManager: package_manager } = with_package_manager_schema.parse(manifest)
+	if (package_manager !== undefined && package_manager.length > 0) return package_manager
+	const pin = published_development_engines_schema.parse(manifest).devEngines?.packageManager
+
+	return pin === undefined ? undefined : `${pin.name}@${pin.version}`
+}
+
+function get_kit_package_manager(): string | undefined {
+	return resolve_kit_package_manager(init_actions.read_package_json(PACKAGE_JSON))
 }
 
 function get_kit_development_engines(): Record<string, unknown> {
@@ -97,21 +110,34 @@ function get_kit_self_dependency(): Record<string, string> {
 	return { [KIT_PACKAGE_NAME]: version }
 }
 
-function get_eslint_development_dependencies(): Record<string, string> {
+// Each config `init` generates runs a CLI or imports types the consumer has to resolve itself:
+// `prettier.config.js` → prettier, `cspell.config.yaml` → cspell, `playwright.config.ts` →
+// @types/node (with @playwright/test among the peers), `lefthook.yml` → lefthook. Without them the
+// first `josh gate` after `pnpm install` fails (joshuafolkken/kit#2710).
+const TOOL_DEVELOPMENT_DEPENDENCIES = ['prettier', 'cspell', '@types/node']
+const LEFTHOOK_DEVELOPMENT_DEPENDENCY = 'lefthook'
+
+function tool_dependency_names(has_git: boolean): ReadonlyArray<string> {
+	return has_git
+		? [...TOOL_DEVELOPMENT_DEPENDENCIES, LEFTHOOK_DEVELOPMENT_DEPENDENCY]
+		: TOOL_DEVELOPMENT_DEPENDENCIES
+}
+
+// Versions mirror kit's own devDependencies, so the consumer runs the toolchain kit is verified with.
+function get_toolchain_development_dependencies(has_git: boolean): Record<string, string> {
 	const manifest = z
 		.object({
 			peerDependencies: z.record(z.string(), z.string()),
 			devDependencies: z.record(z.string(), z.string()),
 		})
 		.parse(init_actions.read_package_json(PACKAGE_JSON))
-	const entries = Object.keys(manifest.peerDependencies)
-		.filter((name) => name !== '@playwright/test')
-		.map((name): [string, string] => {
-			const version = manifest.devDependencies[name]
-			if (version === undefined) throw new Error(`Missing development version for ${name}`)
+	const names = [...Object.keys(manifest.peerDependencies), ...tool_dependency_names(has_git)]
+	const entries = names.map((name): [string, string] => {
+		const version = manifest.devDependencies[name]
+		if (version === undefined) throw new Error(`Missing development version for ${name}`)
 
-			return [name, version]
-		})
+		return [name, version]
+	})
 
 	return Object.fromEntries(entries)
 }
@@ -126,11 +152,11 @@ function apply_dependency_merges(content: string, has_git = true): string {
 			: Object.fromEntries(Object.entries(suggested).filter(([key]) => key !== 'prepare')),
 	)
 	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
-	const with_eslint = init_logic.merge_development_dependencies(
+	const with_toolchain = init_logic.merge_development_dependencies(
 		with_prettier,
-		get_eslint_development_dependencies(),
+		get_toolchain_development_dependencies(has_git),
 	)
-	const with_secretlint = init_logic.merge_secretlint_development_deps(with_eslint)
+	const with_secretlint = init_logic.merge_secretlint_development_deps(with_toolchain)
 
 	return init_logic.merge_development_dependencies(with_secretlint, get_kit_self_dependency())
 }
@@ -193,10 +219,19 @@ function merge_project_package_json(shape: ProjectShape): void {
 	console.info(`  ✔ ${is_existing ? 'updated' : 'created'}   package.json`)
 }
 
-function install_lefthook(): void {
+// A fresh project runs `init` before its first `pnpm install`, so lefthook — added to devDependencies
+// above — is not there yet; the `prepare` script installs the hooks once it is.
+function install_lefthook(project_root: string = PROJECT_ROOT): void {
 	console.info('\nLefthook:')
-	const bin = resolve_local_bin(PROJECT_ROOT, LEFTHOOK_BIN)
-	const result = execaSync(bin, ['install'], { cwd: PROJECT_ROOT, stdio: 'inherit', reject: false })
+	const bin = resolve_local_bin(project_root, LEFTHOOK_BIN)
+
+	if (!existsSync(bin)) {
+		console.info('  ℹ lefthook is not installed yet — `pnpm install` installs the git hooks')
+
+		return
+	}
+
+	const result = execaSync(bin, ['install'], { cwd: project_root, stdio: 'inherit', reject: false })
 
 	if (result.exitCode === undefined) {
 		console.warn('  ⚠ lefthook install failed — run it manually: lefthook install')
@@ -281,6 +316,7 @@ const init = {
 	copy_ai_file: init_ai_copy.copy_ai_file,
 	apply_package_json_merges,
 	install_lefthook,
+	resolve_kit_package_manager,
 }
 
 // `init` is the entry point; `main` is exported for its own unit test, the way `sync.ts` exports the

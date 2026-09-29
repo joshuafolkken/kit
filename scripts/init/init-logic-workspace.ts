@@ -75,10 +75,46 @@ function answer_build_placeholders(existing: string, template: string): string {
 	})
 }
 
+const BUILD_ENTRY_KEY_PATTERN = /^[ \t]+(?<key>[^\s:#][^:#]*):/u
+
+function build_entry_key(line: string): string | undefined {
+	const key = BUILD_ENTRY_KEY_PATTERN.exec(line)?.groups?.['key']
+
+	return key === undefined ? undefined : unquote(key)
+}
+
+function build_entry_keys(block: string): Set<string> {
+	return new Set(block.split('\n').flatMap((line) => build_entry_key(line) ?? []))
+}
+
+// The key-level merge keeps an existing `allowBuilds` whole, and `pnpm add -D @joshuafolkken/kit`
+// before `josh init` always leaves one (esbuild's), so without this the template's other approvals
+// never landed and the first `pnpm install` failed on the next build script, e.g. unrs-resolver's
+// (joshuafolkken/kit#2710). Entries the project already answered keep their value.
+// Only a block mapping can take appended entry lines; a flow map (`allowBuilds: { … }`) is left whole.
+const BLOCK_MAPPING_HEADER_PATTERN = /^allowBuilds:[ \t]*(?:#[^\n]*)?(?:\n|$)/u
+
+function add_missing_build_entries(existing: string, template: string): string {
+	const block = extract_yaml_block(existing, 'allowBuilds')
+	if (!BLOCK_MAPPING_HEADER_PATTERN.test(block)) return existing
+	const present = build_entry_keys(block)
+	const missing = extract_yaml_block(template, 'allowBuilds')
+		.split('\n')
+		.filter((line) => {
+			const key = build_entry_key(line)
+
+			return key !== undefined && !present.has(key)
+		})
+	if (missing.length === 0) return existing
+
+	return existing.replace(block, () => [block, ...missing].join('\n'))
+}
+
 function merge_workspace_yaml(existing: string, template: string): string {
 	if (!existing.trim()) return template
 	const normalized = existing.endsWith('\n') ? existing : `${existing}\n`
-	const cleaned = answer_build_placeholders(remove_deprecated_yaml_keys(normalized), template)
+	const answered = answer_build_placeholders(remove_deprecated_yaml_keys(normalized), template)
+	const cleaned = add_missing_build_entries(answered, template)
 	if (!cleaned.trim()) return template
 	const existing_keys = new Set(extract_yaml_top_level_keys(cleaned))
 	const new_keys = extract_yaml_top_level_keys(template).filter((k) => !existing_keys.has(k))

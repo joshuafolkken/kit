@@ -212,7 +212,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/init/init-logic-migrate.test.ts',
 	'scripts/init/init-logic-secretlint.test.ts',
 	'scripts/init/init-logic-sonar.test.ts',
-	'scripts/init/init-logic-templates.test.ts',
 	'scripts/init/init-logic-workspace.test.ts',
 	'scripts/init/init-logic.cspell.test.ts',
 	'scripts/init/init-logic.merge.test.ts',

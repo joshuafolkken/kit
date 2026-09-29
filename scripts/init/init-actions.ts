@@ -218,8 +218,9 @@ function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
 		build_eslint_action(),
 		build_action(
 			PRETTIER_CONFIG_JS,
-			() => init_logic.generate_prettier_config(),
-			(existing) => init_logic.merge_prettier_config(existing),
+			() =>
+				init_logic.generate_prettier_config(init_logic.detect_tailwind_stylesheet(PROJECT_ROOT)),
+			(existing) => init_logic.merge_prettier_config(existing, PROJECT_ROOT),
 		),
 		build_playwright_action(),
 		...build_config_file_actions().filter(
