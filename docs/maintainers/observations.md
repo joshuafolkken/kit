@@ -538,3 +538,10 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | low | docs/why.md | 2026-09-29 | #2703
 - rf:bug-risks | medium | docs/why.md | 2026-09-29 | #2703
 - rf:none | none | - | 2026-09-29 | #2703
+- rf:tests | low | scripts/git/repository-lock.ts | 2026-09-29 | #2736
+- rf:bug-risks | medium | scripts/sync/sync.ts:374 | 2026-09-29 | #2743
+- rf:bug-risks | medium | scripts/safe-chain/project-config.ts:83 | 2026-09-29 | #2743
+- rf:tests | low | scripts/sync/sync-project-config-order.test.ts:15 | 2026-09-29 | #2743
+- rf:bug-risks | low | scripts/safe-chain/project-config.ts | 2026-09-29 | #2743
+- rf:bug-risks | medium | docs/tutorial.md | 2026-09-29 | #2745
+- rf:none | none | - | 2026-09-29 | #2745
