@@ -28,7 +28,13 @@ const STATIC_AI_FILES = [
 	GIT_ATTRIBUTES,
 	CODE_OF_CONDUCT,
 	SECURITY_MD,
+	WORKSPACE_YAML,
 ]
+// A static project gets its own template for these, not kit's development copy (joshuafolkken/kit#2693).
+const STATIC_SOURCES: Readonly<Record<string, string>> = {
+	[PRETTIER_IGNORE]: 'templates/prettierignore.static',
+	[WORKSPACE_YAML]: 'templates/pnpm-workspace.static.yaml',
+}
 const GITHUB_FILES = new Set([CODE_OF_CONDUCT, SECURITY_MD])
 const STATIC_POINTER_MAPPING = { src: 'templates/cursorrules.static', dest: '.cursorrules' }
 const PULL_REQUEST_TEMPLATE = '.github/pull_request_template.md'
@@ -112,11 +118,8 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 }
 
 function did_skip_ai_file_copy(filename: string, shape?: ProjectShape): boolean {
-	const source_path = package_path(
-		filename === PRETTIER_IGNORE && shape?.profile === 'static'
-			? 'templates/prettierignore.static'
-			: filename,
-	)
+	const static_source = shape?.profile === 'static' ? STATIC_SOURCES[filename] : undefined
+	const source_path = package_path(static_source ?? filename)
 	const destination_path = path.join(PROJECT_ROOT, filename)
 
 	if (filename === WORKSPACE_YAML) {

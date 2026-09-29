@@ -203,7 +203,10 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			},
 		},
 		{
-			files: ['**/*.js'],
+			// `.mjs` / `.cjs` too (joshuafolkken/kit#2693): the typed parser options above reach only
+			// TypeScript files, so a hand-authored module in either extension crashed the whole run on
+			// the first type-aware rule instead of being linted as JavaScript.
+			files: ['**/*.{js,mjs,cjs}'],
 			...ts.configs.disableTypeChecked,
 			rules: {
 				...ts.configs.disableTypeChecked.rules,

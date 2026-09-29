@@ -4,13 +4,17 @@ Add `@joshuafolkken/kit` as a devDependency so a project can consume its ESLint 
 
 This is independent of the [global `josh` CLI](./cli.md) — most projects want both, but the package alone is enough to consume configs.
 
+For an `index.html` site or a project without Node tooling, start with [getting-started.md](./getting-started.md), which also covers installing Node.js and pnpm.
+
 ## 1. Install
 
 The public npm registry serves `@joshuafolkken/kit` without a GitHub token or project `.npmrc` mapping. Existing projects with a `@joshuafolkken` mapping to GitHub Packages keep using it; see [authentication.md](./authentication.md) until those projects migrate.
 
 ```bash
-pnpm add -D @joshuafolkken/kit
+pnpm add -D --allow-build=esbuild @joshuafolkken/kit
 ```
+
+kit's CLI runs on tsx, which depends on esbuild, and pnpm fails an install whose dependencies carry an unapproved build script. `--allow-build=esbuild` records that one approval in `pnpm-workspace.yaml`. Added without it, the command reports esbuild as an ignored build; `josh init` then answers pnpm's placeholder, and the next `pnpm install` succeeds.
 
 The package-only installation provides the shared CLI and common configuration without installing ESLint or Svelte. ESLint is an optional feature: its published preset stays at `@joshuafolkken/kit/eslint/vanilla`, but the project using that preset must also install ESLint and its plugins. `josh init` adds those development dependencies for the config it generates. For a package-only project, skip initialization and import only the common entry points you need.
 
@@ -54,6 +58,7 @@ The package exposes config presets for direct import:
 | Version library | `@joshuafolkken/kit/version`                                        |
 | Config-merge    | `@joshuafolkken/kit/config-merge`                                   |
 | Env flags       | `@joshuafolkken/kit/env`                                            |
+| webServer cmd   | `@joshuafolkken/kit/web-server`                                     |
 
 Prefer wiring up individual configs without `josh init`? See [manual-config.md](./manual-config.md).
 
@@ -179,6 +184,22 @@ const is_ci = environment_flags.is_ci_enabled(process.env['CI'])
 vocabulary with their own comparisons. The module is plain committed JavaScript with a
 hand-written `.d.ts` — like `./ports`, it must resolve on a fresh clone before any build, because
 `playwright.config.ts` imports it.
+
+### webServer command library (`@joshuafolkken/kit/web-server`)
+
+Builds the command the distributed `playwright.config.ts` hands its `webServer`: the named
+`package.json` scripts run through `node --run` instead of `pnpm run`. pnpm 11.27.1+ moves a script
+it runs without a terminal into its own process group, so Playwright's teardown signal reached pnpm
+and not the server; `node --run` keeps the server in Playwright's group, so the default teardown
+stops it with no relay in between. `node --run` does not run `pre<name>` hooks, so each script's
+`pre` hook is chained in explicitly when the project defines one.
+
+```ts
+import { web_server } from '@joshuafolkken/kit/web-server'
+
+web_server.script_command(['build', 'preview'])
+// 'node --run build && node --run prepreview && node --run preview' when `prepreview` exists
+```
 
 ## Next
 

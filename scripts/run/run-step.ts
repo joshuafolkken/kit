@@ -118,6 +118,13 @@ interface StepInput extends PreInput {
 	// are opt-in — so a run that leaves the variable unset never prints the retrospective step, while the
 	// retrospective's own logic is untouched and `pnpm josh retrospective` still runs by hand.
 	is_retrospective_enabled: boolean
+	// Whether this session is woken when a background command it started completes, read by the CLI from
+	// the session's own environment (joshuafolkken/kit#2653). A parent without the callback cannot wait
+	// on its lanes except by polling, so it hands the run to the supervisor instead of waiting.
+	has_completion_callback: boolean
+	// Whether the carried invocation has already taken its maximum cuts, read off the carry record by the
+	// CLI (joshuafolkken/kit#2346). At the cap `run:carry --cut` refuses, so the hand-off is not offered.
+	is_at_cut_cap: boolean
 }
 
 interface StepAction {
@@ -134,10 +141,9 @@ function command(line: string): StepAction {
 }
 
 // The action for each event a run can be positioned at, keyed on the newest one. Each dispatches to the
-// command that owns that phase; `child-launch` is the one position with no command to run — the parent
-// waits for its child. `stop` and `drain` are handled apart in `stop_action` / `drain_action`, because
-// whether either still owes a retrospective needs more than the issue number. A merge and an outage share a next step: `run:merge`
-// classifies both, including the outage's stop condition.
+// command that owns that phase. `stop`, `drain` and `child-launch` are handled apart in
+// `FULL_INPUT_ACTIONS`, because each needs more than the issue number. A merge and an outage share a
+// next step: `run:merge` classifies both, including the outage's stop condition.
 const KIND = run_event_stream.EVENT_KIND
 // A park and a stall share this next step: both mean runnable work is waiting to be offered
 // (joshuafolkken/kit#2359), so both are pointed at the backlog.
@@ -149,7 +155,6 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.OUTAGE]: (issue_number) => command(`pnpm josh run:merge ${issue_number}`),
 	[KIND.PARK]: () => command(OFFER_BACKLOG),
 	[KIND.CUT]: (issue_number) => command(`pnpm josh run:cut --resume ${issue_number}`),
-	[KIND.CHILD_LAUNCH]: () => verdict(WAIT),
 	// A stall is undispatched ready work with a free lane, so its next step is exactly a park's: offer
 	// the backlog. The detector only reports the stall; reading it here as a dispatch is what turns the
 	// report into the action that resolves it.
@@ -197,12 +202,34 @@ function drain_action(input: StepInput): StepAction {
 	return is_retrospective_owed(input) ? command(RETROSPECTIVE_COMMAND) : verdict(WAIT)
 }
 
-// The two positions whose action needs the whole input rather than the issue number — a stop and a
-// drain both turn on whether the retrospective is still owed. Kept in a map so `next_action` dispatches
-// them in one branch rather than one `if` apiece (`is_retrospective_owed` is the shared gate).
+// The hand-off a `backlogrun` parent without a completion callback takes right after dispatching
+// (joshuafolkken/kit#2653). It is the existing merge-time cut, so the ownership check and the cut cap
+// apply unchanged, and the supervisor's driver adopts the in-flight lanes from their `child-launch`
+// events.
+const HAND_OFF_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
+
+// After a dispatch the parent waits for its child — where waiting is free. A session the completion
+// does not re-invoke could only wait by polling, each poll a model call over its whole context, so a
+// `backlogrun` parent there hands the carry record to the supervisor instead. A lane child and a run
+// with no carry record have nothing to hand off, so both still wait; so does a run at the cut cap, whose
+// cut would be refused on every ask and leave the carry record with nobody.
+function can_hand_off(input: StepInput): boolean {
+	if (input.is_lane_child || input.is_at_cut_cap) return false
+
+	return input.carry_kind === 'carried' && !input.has_completion_callback
+}
+
+function child_launch_action(input: StepInput): StepAction {
+	return can_hand_off(input) ? command(HAND_OFF_COMMAND) : verdict(WAIT)
+}
+
+// The positions whose action needs the whole input rather than the issue number — a stop and a drain
+// both turn on whether the retrospective is still owed, a child launch on whether waiting is free. Kept
+// in a map so `next_action` dispatches them in one branch rather than one `if` apiece.
 const FULL_INPUT_ACTIONS: Record<string, (input: StepInput) => StepAction> = {
 	[KIND.STOP]: stop_action,
 	[KIND.DRAIN]: drain_action,
+	[KIND.CHILD_LAUNCH]: child_launch_action,
 }
 
 // An event the table does not name leaves the position unknown rather than guessing a next step. A
@@ -275,6 +302,7 @@ function next_action(input: StepInput): StepAction {
 const run_step = {
 	ALREADY_DONE,
 	EXPIRED_DECISION,
+	HAND_OFF_COMMAND,
 	HUMAN_REVIEW,
 	IMPLEMENT,
 	KEEP_WORK,

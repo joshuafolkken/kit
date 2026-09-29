@@ -36,7 +36,10 @@ function merge_static_manifest(
 	versions: StaticVersions,
 ): string {
 	const with_profile = with_recorded_profile(content, shape.profile)
-	const with_script = init_logic.merge_package_scripts(with_profile, { josh: 'josh' })
+	const with_script = init_logic.merge_package_scripts(with_profile, {
+		preinstall: init_logic.SAFE_CHAIN_CMD,
+		josh: 'josh',
+	})
 	const with_kit = init_logic.merge_development_dependencies(with_script, {
 		[KIT_PACKAGE_NAME]: versions.kit,
 	})

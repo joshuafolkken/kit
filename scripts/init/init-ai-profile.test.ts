@@ -15,7 +15,11 @@ const SECURITY_MD = 'SECURITY.md'
 
 describe('profile-specific AI files', () => {
 	it('keeps Git-free, Web-free static files to pointers', () => {
-		expect(init_ai_copy.ai_files(STATIC_SHAPE)).toEqual(['AGENTS.md', 'GEMINI.md'])
+		expect(init_ai_copy.ai_files(STATIC_SHAPE)).toEqual([
+			'AGENTS.md',
+			'GEMINI.md',
+			'pnpm-workspace.yaml',
+		])
 	})
 
 	it('adds Web and Git files only when those axes are present', () => {

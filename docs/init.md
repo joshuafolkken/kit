@@ -13,15 +13,15 @@ pnpm josh init --profile static
 
 `josh profile` prints the selected profile and its reason, for example `profile: static (no package.json)`. The profiles are `static` (minimal settings for a project without a Node development toolchain) and `node` (the existing Node toolchain). An `index.html` file does not decide the profile: Vite projects normally have one.
 
-| Priority | Condition                                                    | Profile             |
-| -------- | ------------------------------------------------------------ | ------------------- |
-| 1        | `--profile static` or `--profile node`                       | The requested value |
-| 2        | `package.json` contains `josh.profile`                       | The recorded value  |
-| 3        | No `package.json`                                            | `static`            |
-| 4        | Dependencies, dev dependencies, or a `build` or `dev` script | `node`              |
-| 5        | Metadata-only `package.json`                                 | `static`            |
+| Priority | Condition                                                 | Profile             |
+| -------- | --------------------------------------------------------- | ------------------- |
+| 1        | `--profile static` or `--profile node`                    | The requested value |
+| 2        | `package.json` contains `josh.profile`                    | The recorded value  |
+| 3        | No `package.json`                                         | `static`            |
+| 4        | Dependencies other than kit, or a `build` or `dev` script | `node`              |
+| 5        | Metadata-only `package.json`                              | `static`            |
 
-`josh init` records the first decision in `package.json` as `josh.profile`. Re-running it keeps that profile even after dependencies are added. Pass `--profile` to change the recorded value deliberately. Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
+kit itself does not count as a dependency, so `pnpm add -D @joshuafolkken/kit` before `josh init` still selects `static` for an `index.html` site. `josh init` records the first decision in `package.json` as `josh.profile`. Re-running it keeps that profile even after dependencies are added. Pass `--profile` to change the recorded value deliberately. Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
 
 | Setting or tool                                                                     | `static`                                                                                                   | `node`                                    |
 | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -136,7 +136,7 @@ These files have no merge strategy. If they already exist, `josh init` prints th
 
 ## Package scripts
 
-The `node` profile adds these scripts to your `package.json`; the `static` profile adds only `josh`:
+The `node` profile adds these scripts to your `package.json`; the `static` profile adds `preinstall` and `josh` — the same safe-chain guard as `node`, so installing kit and Prettier from npm is scanned for malicious packages and too-new releases:
 
 | Script       | Command                                                                                                                                             |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -172,19 +172,19 @@ The ESLint preset likewise resolves ESLint and its plugins from the consumer pro
 
 ### Available `pnpm josh` subcommands
 
-| Command              | Runs                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lint`               | `prettier --check .` then `eslint . --cache --cache-strategy content`                                                                                    |
-| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`                                                                              |
-| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`                                                                          |
-| `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file)                                                                   |
-| `lefthook:install`   | `lefthook install`                                                                                                                                       |
-| `lefthook:uninstall` | `lefthook uninstall`                                                                                                                                     |
-| `lefthook:commit`    | `lefthook run pre-commit`                                                                                                                                |
-| `lefthook:push`      | `lefthook run pre-push`                                                                                                                                  |
-| `main:sync`          | `git checkout <default> && git pull --ff-only`, then prunes merged branches with a `[gone]` remote-tracking upstream (refuses inside a linked work tree) |
-| `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                                                                                           |
-| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                                                                                              |
+| Command              | Runs                                                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lint`               | `prettier --check .` then `eslint . --cache --cache-strategy content`                                                                                                    |
+| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`; a `static` project without Prettier or ESLint skips that tool with a reason, as `lint` does |
+| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`                                                                                          |
+| `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file)                                                                                   |
+| `lefthook:install`   | `lefthook install`                                                                                                                                                       |
+| `lefthook:uninstall` | `lefthook uninstall`                                                                                                                                                     |
+| `lefthook:commit`    | `lefthook run pre-commit`                                                                                                                                                |
+| `lefthook:push`      | `lefthook run pre-push`                                                                                                                                                  |
+| `main:sync`          | `git checkout <default> && git pull --ff-only`, then prunes merged branches with a `[gone]` remote-tracking upstream (refuses inside a linked work tree)                 |
+| `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                                                                                                           |
+| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                                                                                                              |
 
 SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
 
@@ -192,7 +192,7 @@ Retired scripts (previously managed, now removed): `git`, `git:followup`, `teleg
 
 ## AI files
 
-The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
+The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves only esbuild's build script (kit's CLI runs on tsx, which depends on esbuild, and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md

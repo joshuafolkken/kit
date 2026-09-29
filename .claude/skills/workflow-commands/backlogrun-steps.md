@@ -535,7 +535,8 @@ ordinary way.
 **So every cut is taken at a merge, which is what lets a resumed session state its own `--active`**: a
 woken session picks the run up seconds after the merge the cut was taken at. The one shape that puts a
 cut inside a watch — the backlog answering `exhausted` while this run's own children are still
-merging — is the same, because the woken session has just merged a child.
+merging — is the same, because the woken session has just merged a child. A Codex parent's cut is the one
+taken at a dispatch instead (`backlogrun-progress.md` → "A parent without a completion callback").
 
 **The 8-hour whole-run bound is untouched and still outranks all of this** — it is measured from the
 record's `started_at` across every cut, so a run cannot watch its way past it in 30-minute pieces.

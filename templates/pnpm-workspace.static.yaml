@@ -1,0 +1,4 @@
+# Written by `josh init` for a static project (joshuafolkken/kit#2693). kit's CLI runs on tsx, which
+# depends on esbuild, and pnpm fails an install whose dependencies carry an unapproved build script.
+allowBuilds:
+  esbuild: true

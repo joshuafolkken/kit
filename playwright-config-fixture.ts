@@ -38,7 +38,7 @@ function write_environment_file(contents: string): void {
 }
 
 // #826: `pnpm exec playwright test` run from a subdirectory left the config on seed 0 while the
-// `webServer` command — which `pnpm run` executes from the package root — started on the seeded
+// `webServer` command — whose script runs from the package root — started on the seeded
 // port. The throwaway project already carries the `package.json` that makes it a root, so pointing
 // the working directory at a directory under it reproduces exactly that layout.
 // The name is remembered so `restore_project` can take the directory back out: the project is

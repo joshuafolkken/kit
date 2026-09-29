@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { init_logic } from './init-logic'
 
 const paths_mock = vi.hoisted(() => ({ root: '', package_dir: '' }))
 
@@ -24,6 +25,10 @@ const GITHUB_DIR = '.github'
 const STATIC_PROFILE_ENTRY = '"profile": "static"'
 const SECURITY_MD = 'SECURITY.md'
 const STATIC_PRETTIER = 'prettier.config.mjs'
+
+function write_index_html(): void {
+	writeFileSync(path.join(paths_mock.root, 'index.html'), '<h1>Hello</h1>')
+}
 
 async function run_init(): Promise<void> {
 	const { main } = await import('./init')
@@ -77,7 +82,7 @@ describe('Git-free static initialization', () => {
 	})
 
 	it('initializes an index.html site without Git', async () => {
-		writeFileSync(path.join(paths_mock.root, 'index.html'), '<h1>Hello</h1>')
+		write_index_html()
 		await run_init()
 
 		expect(existsSync(path.join(paths_mock.root, STATIC_PRETTIER))).toBe(true)
@@ -86,6 +91,15 @@ describe('Git-free static initialization', () => {
 		)
 		expect(existsSync(path.join(paths_mock.root, GITHUB_DIR))).toBe(false)
 		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+
+	it('approves only the esbuild build so the first pnpm install succeeds', async () => {
+		write_index_html()
+		await run_init()
+		const workspace = readFileSync(path.join(paths_mock.root, 'pnpm-workspace.yaml'), 'utf8')
+
+		expect(workspace).toContain('allowBuilds:\n  esbuild: true\n')
+		expect(workspace).not.toContain('overrides')
 	})
 })
 
@@ -117,6 +131,7 @@ describe('Git-free Web and node initialization', () => {
 		expect(settings).toContain('python')
 		expect(manifest).toContain('"prettier"')
 		expect(manifest).toContain(STATIC_PROFILE_ENTRY)
+		expect(manifest).toContain(`"preinstall": ${JSON.stringify(init_logic.SAFE_CHAIN_CMD)}`)
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 })

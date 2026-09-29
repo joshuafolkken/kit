@@ -133,10 +133,14 @@ const EXPLICIT_RETURN_TYPE_RULE = '@typescript-eslint/explicit-function-return-t
 const EXPLICIT_BOUNDARY_RULE = '@typescript-eslint/explicit-module-boundary-types'
 
 describe('create_base_config — js block (issue #624)', () => {
-	it('disables the annotation-presence rules for **/*.js (unsatisfiable in plain JS)', () => {
+	// `.mjs` / `.cjs` included (joshuafolkken/kit#2693): left on the typed surface, a hand-authored
+	// module in either extension crashed the run on the first type-aware rule.
+	it('disables type-aware and annotation-presence rules for .js, .mjs and .cjs', () => {
 		const js_block = build_config().find(
 			(block) =>
-				Array.isArray(block.files) && block.files.length === 1 && block.files[0] === '**/*.js',
+				Array.isArray(block.files) &&
+				block.files.length === 1 &&
+				block.files[0] === '**/*.{js,mjs,cjs}',
 		)
 
 		expect(js_block).toBeDefined()
@@ -145,6 +149,7 @@ describe('create_base_config — js block (issue #624)', () => {
 
 		expect(rules[EXPLICIT_RETURN_TYPE_RULE]).toBe('off')
 		expect(rules[EXPLICIT_BOUNDARY_RULE]).toBe('off')
+		expect(rules['@typescript-eslint/await-thenable']).toBe('off')
 	})
 
 	it('keeps the annotation-presence rules enabled on the typed surface (no .ts regression)', () => {
