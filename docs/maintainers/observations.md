@@ -531,3 +531,10 @@ dropping either side destroys exactly what it exists to record.
 - rf:none | none | - | 2026-09-29 | #2725
 - rf:bug-risks | medium | README.md | 2026-09-29 | #2730
 - rf:none | none | - | 2026-09-29 | #2730
+- rf:bug-risks | medium | docs/tutorial.md:49 | 2026-09-29 | #2714
+- rf:comments | low | docs/tutorial.md:83 | 2026-09-29 | #2714
+- rf:none | none | - | 2026-09-29 | #2714
+- rf:bug-risks | medium | docs/why.md | 2026-09-29 | #2703
+- rf:bug-risks | low | docs/why.md | 2026-09-29 | #2703
+- rf:bug-risks | medium | docs/why.md | 2026-09-29 | #2703
+- rf:none | none | - | 2026-09-29 | #2703
