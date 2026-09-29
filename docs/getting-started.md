@@ -73,7 +73,9 @@ pnpm install
 
 It adds no ESLint, cspell, Playwright, Git hooks, GitHub workflows or external-service settings, and it creates no Git repository. Existing VS Code settings, such as a `[python]` section, are kept. See [init.md](./init.md#project-profiles) for how the profile is chosen.
 
-The `preinstall` script runs [safe-chain](https://github.com/AikidoSec/safe-chain) during `pnpm install` to scan packages for malware. It creates command shims under `~/.safe-chain`.
+The `preinstall` script runs [safe-chain](https://github.com/AikidoSec/safe-chain)'s `setup-ci`, which creates command shims under `~/.safe-chain` and adds them to `PATH` on a CI runner only. **It does not scan the `pnpm install` on your machine** — neither the one that runs it nor any later one. To have local installs scanned for malware, enable safe-chain's shell integration yourself: install safe-chain as its [README](https://github.com/AikidoSec/safe-chain#installation) describes (or run `safe-chain setup` if it is already installed), then restart your terminal. kit never changes your shell configuration for you. Until the integration is active, `preinstall` prints a warning with these steps; the install itself is never blocked, and the warning stays silent on CI.
+
+CI installs are not scanned by the shims `pnpm dlx … setup-ci` leaves behind either, because the `safe-chain` binary does not stay on `PATH` — [#2711](https://github.com/joshuafolkken/kit/issues/2711) tracks installing it on the runner.
 
 ## 5. Format and verify
 

@@ -136,13 +136,15 @@ These files have no merge strategy. If they already exist, `josh init` prints th
 
 ## Package scripts
 
-The `node` profile adds these scripts to your `package.json`; the `static` profile adds `preinstall` and `josh` — the same safe-chain guard as `node`, so installing kit and Prettier from npm is scanned for malicious packages and too-new releases:
+The `node` profile adds these scripts to your `package.json`; the `static` profile adds `preinstall` and `josh` — the same safe-chain `preinstall` as `node`:
 
 | Script       | Command                                                                                                                                             |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preinstall` | `pnpm dlx @aikidosec/safe-chain setup-ci`                                                                                                           |
+| `preinstall` | `pnpm dlx @aikidosec/safe-chain setup-ci && node -e "…"` (the local shell-integration check below)                                                  |
 | `prepare`    | `(command -v lefthook >/dev/null 2>&1 && { lefthook install \|\| echo '…' >&2; } \|\| true) && (command -v tsx >/dev/null 2>&1 && tsx … \|\| true)` |
 | `josh`       | `josh`                                                                                                                                              |
+
+**What `preinstall` protects, and what it does not** ([#2707](https://github.com/joshuafolkken/kit/issues/2707)). safe-chain's `setup-ci` only creates shims under `~/.safe-chain` and adds them to `PATH` on a CI runner (`GITHUB_PATH` / `TF_BUILD`); it changes neither your shell nor the running install, so **a `pnpm install` on your machine is not scanned** by it. Local installs are scanned only once you enable safe-chain's own shell integration — install safe-chain per its [README](https://github.com/AikidoSec/safe-chain#installation) (or run `safe-chain setup` if it is already installed) and restart your terminal. kit does not run that for you, because it rewrites your shell configuration. Instead, the `node -e` step after `setup-ci` prints a warning with those steps whenever the install is not running behind safe-chain's proxy (safe-chain hands `GLOBAL_AGENT_HTTP_PROXY` to the package manager it wraps); it always exits zero and stays silent when `CI` is set. Re-running `josh init` upgrades a `preinstall` kit wrote earlier — `pnpm dlx @aikidosec/safe-chain[@<version>] setup-ci` — to this form and leaves any other value alone. On CI, the shims `pnpm dlx` leaves behind cannot find the `safe-chain` binary and let the install through without a scan; [#2711](https://github.com/joshuafolkken/kit/issues/2711) tracks installing it on the runner.
 
 The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`**, not `postinstall`. `prepare` runs on a local `pnpm install` and during `pack`/`publish`, but **not** when your package is installed as a dependency by a consumer — which is the correct scope for these developer-only hooks. The command is **guarded**: each step runs only when its binary is on `PATH`, and each optional hook is individually tolerated with `|| true`, chained with `&&`. This prevents a missing `lefthook`/`tsx` (or a failing optional hook) from aborting `pnpm install` in production or CI installs that omit dev dependencies — **without** masking the core steps it is appended to.
 

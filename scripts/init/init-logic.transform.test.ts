@@ -4,7 +4,9 @@ import { init_logic } from './init-logic'
 
 const JOSH_SCRIPT_VALUE = 'josh'
 
-const SAFE_CHAIN_SCRIPT_VALUE = 'pnpm dlx @aikidosec/safe-chain setup-ci'
+const SAFE_CHAIN_SCRIPT_VALUE = init_logic.SAFE_CHAIN_CMD
+const LEGACY_SAFE_CHAIN_VALUE = 'pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci'
+const CONSUMER_PREINSTALL_VALUE = 'npx only-allow pnpm'
 
 describe('get_suggested_scripts common scripts', () => {
 	it('includes preinstall', () => {
@@ -247,6 +249,27 @@ describe('merge_package_scripts preinstall ordering', () => {
 
 		expect(Object.keys(result.scripts)[0]).toBe('preinstall')
 		expect(result.scripts['preinstall']).toBe(SAFE_CHAIN_SCRIPT_VALUE)
+	})
+})
+
+function merged_preinstall(existing: string): string | undefined {
+	const content = JSON.stringify({ scripts: { preinstall: existing } })
+	const result = JSON.parse(
+		init_logic.merge_package_scripts(content, { preinstall: SAFE_CHAIN_SCRIPT_VALUE }),
+	) as { scripts: Record<string, string> }
+
+	return result.scripts['preinstall']
+}
+
+describe('merge_package_scripts preinstall migration', () => {
+	it('adds the local integration check to a preinstall kit wrote earlier', () => {
+		expect(merged_preinstall(LEGACY_SAFE_CHAIN_VALUE)).toContain(
+			`${LEGACY_SAFE_CHAIN_VALUE} && node -e`,
+		)
+	})
+
+	it('keeps a consumer-authored preinstall untouched', () => {
+		expect(merged_preinstall(CONSUMER_PREINSTALL_VALUE)).toBe(CONSUMER_PREINSTALL_VALUE)
 	})
 })
 
