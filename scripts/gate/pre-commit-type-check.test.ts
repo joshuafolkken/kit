@@ -3,6 +3,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
+import { TSC_ARGS } from './type-check-command'
 
 // joshuafolkken/kit#1381: the pre-commit hook type-checked the whole project seconds after `josh gate`
 // had printed the same project-wide type check green on the same tree, with nothing edited in between.
@@ -93,6 +94,7 @@ const DEFAULT_STEP: ReadonlyArray<string> = ['josh', 'check']
 const GATE_TYPE_CHECK_COMMAND = 'check'
 // The one token of the hook's argv that names `pnpm exec` rather than the check itself.
 const EXEC_TOKEN = 'exec'
+const TYPE_CHECK_SCRIPT = 'scripts/gate/type-check-command.ts'
 
 const TYPE_CHECK_EXIT_CODE = 2
 
@@ -340,7 +342,8 @@ describe('the recorded default step is this hook’s own check', () => {
 	it.each(pre_commit_type_check.TYPE_CHECK_ARGUMENTS.filter((token) => token !== EXEC_TOKEN))(
 		'josh check runs %s, so a record it wrote covers what this hook would run',
 		(token) => {
-			expect(COMMAND_MAP[GATE_TYPE_CHECK_COMMAND]?.shell).toContain(token)
+			expect(COMMAND_MAP[GATE_TYPE_CHECK_COMMAND]?.script).toBe(TYPE_CHECK_SCRIPT)
+			expect(TSC_ARGS).toContain(token)
 		},
 	)
 })

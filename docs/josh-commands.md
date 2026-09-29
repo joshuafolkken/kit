@@ -340,11 +340,10 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 ### `josh check`
 
-Type-check a SvelteKit project. Requires `@sveltejs/kit`.
+Type-check with `tsc --noEmit`. A `static` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
 
 ```bash
-pnpm josh check        # development mode
-pnpm josh check:ci     # strict mode (--threshold error), used in CI
+pnpm josh check
 ```
 
 ### `josh port`

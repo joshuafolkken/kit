@@ -41,7 +41,7 @@ Print an agent-read document's byte size against its ceiling and the headroom le
 
 `[arguments...]`
 
-Type-check TypeScript project
+Type-check TypeScript project (skips a static project with nothing to check)
 
 ---
 

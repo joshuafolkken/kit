@@ -1,4 +1,4 @@
-import { GATE_COMMAND, PE, TS_CACHE_FLAGS, type CommandEntry } from './josh-command-types'
+import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
 
 const FILE_ARGUMENTS = '[files...]'
 const REQUIRED_FILE_ARGUMENTS = '<files...>'
@@ -182,8 +182,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		argument_targets: ['test:unit', 'test:e2e'],
 	},
 	check: {
-		shell: [...PE, 'tsc', '--noEmit', ...TS_CACHE_FLAGS],
-		description: 'Type-check TypeScript project',
+		script: 'scripts/gate/type-check-command.ts',
+		description: 'Type-check TypeScript project (skips a static project with nothing to check)',
 		category: 'Development',
 		reference: ['[arguments...]', 'developer', ['processes']],
 	},

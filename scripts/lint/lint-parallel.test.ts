@@ -98,12 +98,13 @@ describe('run_lint_checks', () => {
 	})
 })
 
+const NO_ESLINT_CONFIG = 'no ESLint configuration was found'
+const NO_WEB_FILES = 'no HTML, CSS or JavaScript files were found'
+
 function static_project(): void {
 	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
 	vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(undefined)
-	vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(
-		'no ESLint configuration was found',
-	)
+	vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(NO_ESLINT_CONFIG)
 }
 
 describe('static project lint', () => {
@@ -114,14 +115,12 @@ describe('static project lint', () => {
 
 		expect(await run_lint_parallel_checks()).toBe(0)
 		expect(mocked_execa).toHaveBeenCalledOnce()
-		expect(stdout).toHaveBeenCalledWith(expect.stringContaining('no ESLint configuration'))
+		expect(stdout).toHaveBeenCalledWith(expect.stringContaining(NO_ESLINT_CONFIG))
 	})
 
 	it('skips Prettier when no web file exists', async () => {
 		static_project()
-		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(
-			'no HTML, CSS or JavaScript files were found',
-		)
+		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(NO_WEB_FILES)
 		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(
 			'no JavaScript or TypeScript files were found',
 		)
@@ -129,7 +128,7 @@ describe('static project lint', () => {
 
 		expect(await run_lint_parallel_checks()).toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()
-		expect(stdout).toHaveBeenCalledWith(expect.stringContaining('no HTML, CSS or JavaScript'))
+		expect(stdout).toHaveBeenCalledWith(expect.stringContaining(NO_WEB_FILES))
 	})
 
 	it('runs ESLint after its configuration is added', async () => {
@@ -138,5 +137,17 @@ describe('static project lint', () => {
 		mock_exit_codes(0, 0)
 		expect(await run_lint_parallel_checks()).toBe(0)
 		expect(mocked_execa).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('static project lint over the changed files', () => {
+	it('skips the same tools the whole-tree run skips', async () => {
+		static_project()
+		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(NO_WEB_FILES)
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_checks(['exec', 'prettier', 'a.py'], ['exec', 'eslint', 'a.py'])).toBe(0)
+		expect(mocked_execa).not.toHaveBeenCalled()
+		expect(stdout).toHaveBeenCalledWith(expect.stringContaining(NO_ESLINT_CONFIG))
 	})
 })

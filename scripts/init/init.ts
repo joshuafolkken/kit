@@ -27,6 +27,7 @@ const LEFTHOOK_BIN = 'lefthook'
 const SAMPLE_INDENT_WIDTH = 4
 const ARGUMENT_START_INDEX = 2
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
+const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
 
 function write_new_file(action: FileAction, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -191,6 +192,10 @@ function merge_project_package_json(shape: ProjectShape): void {
 
 	writeFileSync(package_json_path, merged)
 	console.info(`  ✔ ${is_existing ? 'updated' : 'created'}   package.json`)
+	// `init` writes the manifest but installs nothing, so a tool it just listed is absent until the
+	// user installs it — and `josh lint` then fails on it rather than skipping it
+	// (joshuafolkken/kit#2709). Saying so here is what tells the user the next step.
+	console.info(`    ${INSTALL_HINT}`)
 }
 
 function install_lefthook(): void {
