@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
 import { run_preflight, type PreflightDecision } from './run-preflight'
+import { run_tidy_cli } from './run-tidy-cli'
 
 // `josh run:hold [<N>]` and `josh run:release [<N> | --force]` — the working-tree guard the typed
 // entry points ask before they start (joshuafolkken/kit#1091).
@@ -28,6 +29,10 @@ import { run_preflight, type PreflightDecision } from './run-preflight'
 // The contract is `epic:next`'s: **standard output carries exactly one token** — `hold`, `busy` or
 // `unknown` — and every explanation goes to standard error, so `answer=$(pnpm josh run:hold 1091)`
 // captures something a loop can branch on.
+//
+// **A successful claim then sweeps merged residue** — `run:tidy` (joshuafolkken/kit#2701). After the
+// claim rather than before it: the sweep may append to the primary checkout's observation ledger, and
+// doing that ahead of the preflight would turn a clean primary checkout into a `reclaim`.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -181,9 +186,12 @@ async function claim(target: string, issue: string, is_linked: boolean): Promise
 
 	if (blocked !== undefined) return report_busy(blocked)
 
-	if (read.kind === 'stale') return replace_stale(target, issue, read.hold)
+	const code =
+		read.kind === 'stale' ? replace_stale(target, issue, read.hold) : take_free_tree(target, issue)
 
-	return take_free_tree(target, issue)
+	if (code === SUCCESS_EXIT_CODE) await run_tidy_cli.sweep()
+
+	return code
 }
 
 function remove_record(target: string, was_present: boolean): number {

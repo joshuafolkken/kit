@@ -14,6 +14,12 @@ const FIELD_SEPARATOR = '\u{0}'
 // stash pushed with `-m`); `%x00` emits the NUL the fields are split on.
 const LIST_FORMAT = '--format=%gd%x00%gs'
 const SUBJECT_MESSAGE_SEPARATOR = ': '
+// `%H` is the entry's commit hash; the second format pairs it with the position a drop needs.
+const HASH_FORMAT = '--format=%H%x00%gs'
+const HASH_POSITION_FORMAT = '--format=%H%x00%gd'
+const NAME_ONLY_FLAG = '--name-only'
+const ADDED_PREFIX = '+'
+const FILE_HEADER_PREFIX = '+++'
 
 interface StashEntry {
 	selector: string
@@ -84,7 +90,7 @@ async function pop(selector: string, directory?: string): Promise<void> {
 // by the unmerged paths it leaves: `--diff-filter=U` lists exactly those, empty on any other failure.
 async function has_conflict(directory?: string): Promise<boolean> {
 	const unmerged = await git_spawn.read(
-		git_args(directory, ['diff', '--name-only', '--diff-filter=U']),
+		git_args(directory, ['diff', NAME_ONLY_FLAG, '--diff-filter=U']),
 	)
 
 	return unmerged !== ''
@@ -102,6 +108,68 @@ async function push(message: string, directory?: string): Promise<void> {
 	await git_spawn.read(git_args(directory, ['stash', 'push', '-u', '-m', message]))
 }
 
+// The stack keyed by commit rather than position (joshuafolkken/kit#2701): a sweep that reads the
+// stack, asks GitHub about each entry and only then drops one would drop whatever another lane pushed
+// on top in the meantime if it kept the `stash@{n}` it read first. The `selector` of each entry here is
+// its commit hash, which never moves.
+async function list_by_hash(directory?: string): Promise<Array<StashEntry>> {
+	return parse_entries(await git_spawn.read(git_args(directory, ['stash', 'list', HASH_FORMAT])))
+}
+
+// The paths an entry carries, untracked files included — `push` stashes with `-u`.
+async function changed_paths(hash: string, directory?: string): Promise<Array<string>> {
+	const raw = await git_spawn.read(
+		git_args(directory, ['stash', 'show', '--include-untracked', NAME_ONLY_FLAG, hash]),
+	)
+
+	return raw === '' ? [] : raw.split(ENTRY_SEPARATOR)
+}
+
+// A path untracked when the entry was pushed with `-u` lives in its third parent, not in its diff, so
+// every line of it is an added one; a path absent from that parent reads as none.
+async function untracked_lines(
+	hash: string,
+	file: string,
+	directory?: string,
+): Promise<Array<string>> {
+	try {
+		const raw = await git_spawn.read(git_args(directory, ['show', `${hash}^3:${file}`]))
+
+		return raw === '' ? [] : raw.split(ENTRY_SEPARATOR)
+	} catch {
+		return []
+	}
+}
+
+// The lines an entry adds to one path, as a unified diff against the commit it was pushed on — or, for
+// a path that was untracked then, the whole file.
+async function added_lines(hash: string, file: string, directory?: string): Promise<Array<string>> {
+	const diff = await git_spawn.read(git_args(directory, ['diff', `${hash}^1`, hash, '--', file]))
+
+	if (diff === '') return await untracked_lines(hash, file, directory)
+
+	return diff
+		.split(ENTRY_SEPARATOR)
+		.filter((line) => line.startsWith(ADDED_PREFIX) && !line.startsWith(FILE_HEADER_PREFIX))
+		.map((line) => line.slice(ADDED_PREFIX.length))
+}
+
+// The position is resolved from the hash immediately before the drop, so an entry pushed since the
+// sweep's read cannot be dropped in its place; an entry already gone answers `false` rather than
+// throwing. Sweeps are serialized by `stash-sweep-lock`, but a plain `git stash push` or `pop` from
+// another command landing between the resolve and the drop still shifts the position — that window is
+// the length of two local git calls.
+async function drop_by_hash(hash: string, directory?: string): Promise<boolean> {
+	const raw = await git_spawn.read(git_args(directory, ['stash', 'list', HASH_POSITION_FORMAT]))
+	const entry = parse_entries(raw).find((candidate) => candidate.selector === hash)
+
+	if (entry === undefined) return false
+
+	await git_spawn.read(git_args(directory, ['stash', 'drop', entry.subject]))
+
+	return true
+}
+
 // The message uncommitted work is pushed with, keyed on the issue so `josh stash:pop` can target it and
 // on the occasion so two pushes for one issue — a lane close and an `already-done` read — stay apart.
 function work_message(issue: string, occasion: string): string {
@@ -109,9 +177,13 @@ function work_message(issue: string, occasion: string): string {
 }
 
 const git_stash = {
+	added_lines,
+	changed_paths,
+	drop_by_hash,
 	has_changes,
 	has_conflict,
 	list,
+	list_by_hash,
 	matches,
 	parse_entries,
 	pop,

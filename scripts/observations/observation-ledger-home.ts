@@ -1,3 +1,4 @@
+import { appendFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { OBSERVATION_LEDGER_PATH } from './observation-ledger'
@@ -27,6 +28,16 @@ function ledger_path(cwd: string = process.cwd()): string {
 	return path.join(ledger_root(cwd), OBSERVATION_LEDGER_PATH)
 }
 
-const observation_ledger_home = { is_lane, ledger_path, ledger_root }
+// The one append every ledger writer goes through. A consumer that does not keep the ledger has no
+// `docs/` at its root, so the parent is created first — the one write path that can bring the ledger
+// into existence there (joshuafolkken/kit#2402).
+async function append(target: string, lines: ReadonlyArray<string>): Promise<void> {
+	if (lines.length === 0) return
+
+	await mkdir(path.dirname(target), { recursive: true })
+	await appendFile(target, `${lines.join('\n')}\n`, 'utf8')
+}
+
+const observation_ledger_home = { append, is_lane, ledger_path, ledger_root }
 
 export { observation_ledger_home }

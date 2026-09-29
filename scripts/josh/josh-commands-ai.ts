@@ -147,6 +147,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['[issue|--force]', 'automation', ['files']],
 		default_script_arguments: ['--release'],
 	},
+	'run:tidy': {
+		script: 'scripts/run/run-tidy-cli.ts',
+		description: 'Close merged lanes and drop stashes whose issues are all merged',
+		category: 'AI tools',
+		reference: ['', 'automation', ['git', 'network', 'files']],
+	},
 	'run:carry': {
 		script: 'scripts/run/run-carry-cli.ts',
 		description: 'Carry one invocation’s budget across its own session cuts',

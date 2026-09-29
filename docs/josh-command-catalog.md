@@ -1375,6 +1375,16 @@ Close a run in one call: commit the observation ledger, read the citations, deci
 
 ---
 
+### `josh run:tidy` · `josh rtd`
+
+> **Audience:** automation · **Side effects:** git, network, files
+
+_No arguments._
+
+Close merged lanes and drop stashes whose issues are all merged
+
+---
+
 ### `josh run:wake` · `josh rw`
 
 > **Audience:** automation · **Side effects:** processes, notifications
