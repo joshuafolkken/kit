@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { execaSync } from 'execa'
 import { z } from 'zod'
 
 const BUGFIX = 'bugfix'
@@ -19,9 +20,10 @@ const LEGACY_LABELS: ReadonlySet<string> = new Set(['semver-major', 'semver-mino
 
 const LABEL = z.object({ name: z.string() })
 const USER = z.object({ login: z.string() })
-const PULL_REQUEST = z.object({ user: USER, labels: z.array(LABEL) })
+const PULL_REQUEST = z.object({ number: z.number(), user: USER })
 const EVENT = z.object({
 	pull_request: PULL_REQUEST,
+	repository: z.object({ full_name: z.string() }),
 })
 
 function classification_error(labels: ReadonlyArray<string>, author: string): string | undefined {
@@ -83,13 +85,32 @@ function select_issue_classification(issue_json: string): ReleaseClassification 
 	return label
 }
 
-function check_event(event_path: string): string | undefined {
-	const event = EVENT.parse(JSON.parse(readFileSync(event_path, 'utf8')))
-
-	return classification_error(
-		event.pull_request.labels.map((label) => label.name),
-		event.pull_request.user.login,
+// The labels as they stand when the check runs, not as the event carried them. `josh pr` opens the
+// pull request and labels it in a second call, so the `opened` event carries none; judged from the
+// payload, that run fails, and when it lands in the newer check suite GitHub keeps its red result —
+// a rerun replays the same payload and fails again (joshuafolkken/kit#2712).
+function fetch_current_labels(repository: string, pull_number: number): ReadonlyArray<string> {
+	const result = execaSync(
+		'gh',
+		['api', `repos/${repository}/issues/${String(pull_number)}/labels`, '--jq', '.[].name'],
+		{ reject: false },
 	)
+
+	if (result.exitCode !== 0) {
+		throw new Error(`Could not read the pull request labels: ${result.stderr}`)
+	}
+
+	return result.stdout.split('\n').filter((name) => name !== '')
+}
+
+function check_event(
+	event_path: string,
+	read_labels: typeof fetch_current_labels = fetch_current_labels,
+): string | undefined {
+	const event = EVENT.parse(JSON.parse(readFileSync(event_path, 'utf8')))
+	const labels = read_labels(event.repository.full_name, event.pull_request.number)
+
+	return classification_error(labels, event.pull_request.user.login)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

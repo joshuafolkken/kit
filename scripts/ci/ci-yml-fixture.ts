@@ -19,6 +19,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+	concurrency?: WorkflowConcurrency
 	container?: unknown
 	env?: Record<string, string>
 	// The display name, and the string a branch ruleset's required status check is matched against —

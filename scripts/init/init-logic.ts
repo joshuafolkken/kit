@@ -91,6 +91,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/auto-tag.yml',
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-qube.yml',
+	'.github/workflows/pr-classification.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
 	'.github/dependabot.yml',

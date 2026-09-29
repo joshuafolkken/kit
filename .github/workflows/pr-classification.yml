@@ -1,0 +1,76 @@
+name: Release classification
+
+# The release-classification check, on its own because it is the one check that reads labels
+# (joshuafolkken/kit#2712). While it lived in CI, CI had to rerun on `labeled` / `unlabeled`; `josh pr`
+# labels a pull request the moment it opens, so every pull request started two CI runs on one commit,
+# and CI's per-ref concurrency cancelled one of them. GitHub judges a check name by its newest check
+# suite, and which of the two runs sat in the newer suite was a race — when it was the cancelled one,
+# the pull request stayed BLOCKED until someone reran it.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# Deliberately no `concurrency` block. Cancelling is exactly what left the blocking suite behind, and
+# nothing here needs it: every run reads the pull request's labels as they stand when it runs, not as
+# its event carried them, so whichever suite GitHub counts as newest holds a current verdict.
+
+jobs:
+  classification:
+    name: Release classification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Configure GitHub Packages authentication for existing projects
+        run: printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
+
+      - name: Resolve pnpm version
+        id: pnpm-version
+        run: |
+          version=$(node -p "const m = require('./package.json'); m.packageManager?.match(/^pnpm@([^+]+)/)?.[1] ?? (m.devEngines?.packageManager?.name === 'pnpm' ? m.devEngines.packageManager.version?.split('+')[0] : 'latest') ?? 'latest'")
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          version: ${{ steps.pnpm-version.outputs.version }}
+          install: false
+
+      - name: Resolve pnpm store path
+        run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm store cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Setup safe-chain
+        run: pnpm dlx @aikidosec/safe-chain@1.5.20 setup-ci
+
+      - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Check release classification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm josh pr:classification
