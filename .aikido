@@ -4,3 +4,4 @@ safe-chain:
       - vite
       - '@types/node'
       - tsx
+  minimumPackageAgeHours: 24

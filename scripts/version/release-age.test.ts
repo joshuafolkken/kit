@@ -3,6 +3,7 @@ import { release_age } from './release-age'
 
 const MAJOR = '11'
 const AGE_1440 = 1440
+const NPMRC_WITHOUT_WINDOW = 'engine-strict=true\n'
 const NOW_MS = Date.parse('2026-08-04T12:00:00.000Z')
 const OLD_ENOUGH = '2026-08-01T00:00:00.000Z'
 const TOO_YOUNG = '2026-08-04T11:00:00.000Z'
@@ -27,11 +28,18 @@ describe('release_age.parse_minimum_release_age', () => {
 	})
 
 	it('defaults to no quarantine when the setting is absent', () => {
-		expect(release_age.parse_minimum_release_age('engine-strict=true\n')).toBe(0)
+		expect(release_age.parse_minimum_release_age(NPMRC_WITHOUT_WINDOW)).toBe(0)
 	})
 
 	it('defaults to no quarantine for a malformed value', () => {
 		expect(release_age.parse_minimum_release_age('minimum-release-age=soon\n')).toBe(0)
+	})
+})
+
+describe('release_age.parse_declared_minimum_release_age', () => {
+	it('keeps an explicit zero distinct from an undeclared window', () => {
+		expect(release_age.parse_declared_minimum_release_age('minimum-release-age=0\n')).toBe(0)
+		expect(release_age.parse_declared_minimum_release_age(NPMRC_WITHOUT_WINDOW)).toBeUndefined()
 	})
 })
 

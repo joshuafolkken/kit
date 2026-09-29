@@ -19,12 +19,18 @@ const NPMRC_PATH = '.npmrc'
 const release_times_schema = z.record(z.string(), z.string())
 const MS_PER_MINUTE = 60_000
 
+// The window `.npmrc` content declares, or nothing when it does not declare one — an explicit
+// `minimum-release-age=0` stays 0 rather than collapsing into "not declared".
+function parse_declared_minimum_release_age(npmrc_content: string): number | undefined {
+	const raw = MINIMUM_RELEASE_AGE_RE.exec(npmrc_content)?.[1]
+
+	return raw === undefined ? undefined : Number(raw)
+}
+
 // The quarantine window in minutes from `.npmrc`; a missing or malformed entry means no
 // quarantine, matching pnpm's own default for the setting.
 function parse_minimum_release_age(npmrc_content: string): number {
-	const raw = MINIMUM_RELEASE_AGE_RE.exec(npmrc_content)?.[1]
-
-	return raw === undefined ? NO_QUARANTINE_MINUTES : Number(raw)
+	return parse_declared_minimum_release_age(npmrc_content) ?? NO_QUARANTINE_MINUTES
 }
 
 // Stable releases only, on the requested major, published at or before the cutoff. The
@@ -82,9 +88,7 @@ function select_aged_version(
 // `minimum-release-age=0` opt-out stop the walk instead of falling through to an ancestor's policy.
 function read_declared_minimum_release_age(npmrc_path: string): number | undefined {
 	try {
-		const raw = MINIMUM_RELEASE_AGE_RE.exec(readFileSync(npmrc_path, 'utf8'))?.[1]
-
-		return raw === undefined ? undefined : Number(raw)
+		return parse_declared_minimum_release_age(readFileSync(npmrc_path, 'utf8'))
 	} catch {
 		return undefined
 	}
@@ -138,6 +142,7 @@ function read_nearest_minimum_release_age(start: string, boundary?: string): num
 const release_age = {
 	release_times_schema,
 	parse_minimum_release_age,
+	parse_declared_minimum_release_age,
 	read_minimum_release_age,
 	read_nearest_minimum_release_age,
 	select_aged_version,
