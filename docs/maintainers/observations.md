@@ -538,3 +538,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | low | docs/why.md | 2026-09-29 | #2703
 - rf:bug-risks | medium | docs/why.md | 2026-09-29 | #2703
 - rf:none | none | - | 2026-09-29 | #2703
+- rf:tests | low | scripts/git/repository-lock.ts | 2026-09-29 | #2736
