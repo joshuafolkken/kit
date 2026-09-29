@@ -29,7 +29,6 @@ const check_runs_page_schema = z.looseObject({
 	// answer an empty rollup — which `git-pr-followup.ts` reports as "this branch has no checks".
 	check_runs: z.array(rollup_element_schema),
 })
-const check_run_app_schema = z.object({ id: z.number() })
 
 const status_page_schema = z.looseObject({
 	statuses: z.array(rollup_element_schema),
@@ -51,37 +50,18 @@ function read_pages<T>(raw_json: string, schema: z.ZodType<T>, message: string):
 	return pages
 }
 
-function check_run_group_key(run: RollupElement): string | undefined {
-	const { name, app: raw_app } = run
-	if (typeof name !== 'string') return undefined
-	const app = check_run_app_schema.safeParse(raw_app)
-
-	return JSON.stringify([name, app.success ? app.data.id : undefined])
-}
-
-function remember_newest_run(run: RollupElement, latest_ids: Map<string, number>): void {
-	const key = check_run_group_key(run)
-	const { id } = run
-	if (key === undefined || typeof id !== 'number') return
-	const previous_id = latest_ids.get(key)
-	if (previous_id === undefined || id > previous_id) latest_ids.set(key, id)
-}
-
-function is_newest_run(run: RollupElement, latest_ids: Map<string, number>): boolean {
-	const key = check_run_group_key(run)
-	const { id } = run
-	if (key === undefined || typeof id !== 'number') return true
-
-	return id === latest_ids.get(key)
-}
-
+// **Every run the endpoint lists is kept — the endpoint has already superseded what GitHub supersedes.**
+// Its default `filter=latest` answers the newest run of each name *within each check suite*, which
+// is the grouping GitHub's merge box applies: a re-run job lands in the suite it re-runs and replaces
+// its predecessor there, while a second workflow run on the same commit (a label change re-triggering
+// CI) is a suite of its own whose latest runs GitHub still requires to pass. Collapsing runs across
+// suites here (joshuafolkken/kit#2644) hid a superseded suite's cancelled runs, so `followup` read the
+// pull request green while GitHub held it `BLOCKED` and waited out its whole budget
+// (joshuafolkken/kit#2700).
 function to_check_run_items(check_runs_json: string): Array<RollupElement> {
 	const pages = read_pages(check_runs_json, check_runs_page_schema, NOT_A_CHECK_RUNS_LISTING)
-	const runs = pages.flatMap((page) => page.check_runs)
-	const latest_ids = new Map<string, number>()
-	for (const run of runs) remember_newest_run(run, latest_ids)
 
-	return runs.filter((run) => is_newest_run(run, latest_ids))
+	return pages.flatMap((page) => page.check_runs)
 }
 
 function to_status_context_items(status_json: string): Array<RollupElement> {

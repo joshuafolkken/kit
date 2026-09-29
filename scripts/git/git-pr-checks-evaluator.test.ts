@@ -41,37 +41,32 @@ describe('MERGE_GATE_EVALUATOR', () => {
 		expect(MERGE_GATE_EVALUATOR.describe).toBe(describe_pr_failure)
 	})
 
-	it.each([
-		['completed', 'success', 'success'],
-		['completed', 'failure', 'failure'],
-	] as const)(
-		'uses the latest classification rerun when it is %s and %s',
-		(status, conclusion, expected) => {
-			const check_runs_json = check_runs_pages([
-				{ id: 1, name: 'Checks', status: 'completed', conclusion: 'failure' },
-				{ id: 2, name: 'Checks', status, conclusion },
-				{ id: 3, name: 'SonarQube', status: 'completed', conclusion: 'success' },
-			])
-			const rollup = to_status_check_rollup({ check_runs_json, status_json: status_pages([]) })
-			const snapshot = parse_pr_state_snapshot(
-				JSON.stringify({ statusCheckRollup: rollup, mergeStateStatus: 'CLEAN' }),
-			)
-
-			expect(evaluate_pr_state(snapshot)).toBe(expected)
-		},
-	)
-
-	it('waits while the latest required check rerun is in progress', () => {
+	// PR #2698: a label change started a second CI run on the same commit and concurrency cancelled
+	// it. GitHub held the pull request `BLOCKED` on that suite, and the gate that read every check green
+	// waited on `BLOCKED` as pending for its whole budget (joshuafolkken/kit#2700).
+	it('fails at once on a cancelled check in a second suite instead of waiting on BLOCKED', () => {
 		const check_runs_json = check_runs_pages([
-			{ id: 1, name: 'SonarQube', status: 'completed', conclusion: 'failure' },
-			{ id: 2, name: 'SonarQube', status: 'in_progress' },
+			{
+				id: 1,
+				name: 'SonarQube',
+				status: 'completed',
+				conclusion: 'cancelled',
+				check_suite: { id: 100 },
+			},
+			{
+				id: 2,
+				name: 'SonarQube',
+				status: 'completed',
+				conclusion: 'success',
+				check_suite: { id: 200 },
+			},
 		])
 		const rollup = to_status_check_rollup({ check_runs_json, status_json: status_pages([]) })
 		const snapshot = parse_pr_state_snapshot(
-			JSON.stringify({ statusCheckRollup: rollup, mergeStateStatus: 'CLEAN' }),
+			JSON.stringify({ statusCheckRollup: rollup, mergeStateStatus: 'BLOCKED' }),
 		)
 
-		expect(evaluate_pr_state(snapshot)).toBe('pending')
+		expect(evaluate_pr_state(snapshot)).toBe('failure')
 	})
 })
 
