@@ -577,3 +577,8 @@ dropping either side destroys exactly what it exists to record.
 - k:stop-guard-fires-while-awaiting-subagent | d1 | 2026-09-30 | pnpm josh stop:guard | During fullrun #2772 the stop guard again demanded a confirmation Telegram at a turn end spent waiting on the background review subagent and gate, though no person was being waited on
 - rf:comments | low | scripts/run/run-carry-cli-fixture.ts | 2026-09-30 | #2772
 - rf:comments | low | docs/maintainers/observations.md | 2026-09-30 | #2772
+- rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-lanes.md:83 | 2026-09-30 | #2776
+- rf:project-conventions | low | scripts/backlog/backlog-plan.ts:81 | 2026-09-30 | #2776
+- rf:bug-risks | low | scripts/backlog/backlog-next.ts:283 | 2026-09-30 | #2776
+- rf:performance | low | scripts/epic/epic-lane-offer.ts:209 | 2026-09-30 | #2776
+- rf:comments | low | scripts/epic/epic-lane-offer.ts:183 | 2026-09-30 | #2776

@@ -302,12 +302,16 @@ stop at a time.**
   applied — the same label a parked child gets, applied the way `backlogrun-park.md` → "park and continue"
   applies it. **The next plan then classifies it by reading the label alone**, never by reading the
   body again.
+- **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
+  `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
+  path) becomes a native `blocked-by`; an issue the `wip-cap.md` → 「実行のしかた」 enumeration hits
+  gets `run:solo`. Comment the reason; the offer commands enforce both.
 - **Then start the loop.** Whatever is still labelled is reported as parked and left standing; the
   run does not wait on it.
 
-**`needs-decision` is the one workflow label a run may apply, and it is neither `auto-ok` nor
+**`needs-decision` and `run:solo` are the workflow labels a run may apply, and neither is `auto-ok` or
 `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a run parks with
-`needs-decision` and a person clears it.
+`needs-decision` and a person clears it, and a run isolates with `run:solo`.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
 

@@ -14,6 +14,7 @@ import {
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
+	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
 	WORKFLOW_LABELS,
@@ -89,10 +90,11 @@ describe('FILING_ROUTE_LABELS', () => {
 
 describe('WORKFLOW_LABELS', () => {
 	// What josh start provisions: every label a run applies on its own, never one only a person may.
-	it('carries epic, in-progress, every route and every depth label', () => {
+	it('carries epic, in-progress, run:solo, every route and every depth label', () => {
 		expect(WORKFLOW_LABELS.map((label) => label.name)).toStrictEqual([
 			EPIC_LABEL,
 			IN_PROGRESS_LABEL,
+			RUN_SOLO_LABEL,
 			...FILING_ROUTE_LABELS.map((label) => label.name),
 			...DEPTH_LABELS.map((label) => label.name),
 		])

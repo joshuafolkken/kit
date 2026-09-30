@@ -4,7 +4,7 @@ import {
 	listing_of,
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
+import { IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
@@ -268,5 +268,53 @@ describe('epic_lane_offer.offer_for_repo — a child two epics both track', () =
 		)
 
 		expect(numbers_of(offer.children)).toEqual([FIRST, SECOND])
+	})
+})
+
+// joshuafolkken/kit#2776: a named epic's lanes go through `epic:next --lanes`, not `backlog:next`, so
+// the `run:solo` gate has to hold here as well.
+function solo(number: number): EpicChild {
+	return { ...child(number), labels: [RUN_SOLO_LABEL] }
+}
+
+describe('epic_lane_offer.offer_for_repo — run:solo', () => {
+	it('offers a run:solo head alone into an idle repository', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const children = [solo(FIRST), child(SECOND)]
+		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(TWO_LANES))
+
+		expect(numbers_of(offer.children)).toEqual([FIRST])
+	})
+
+	it('waits rather than opening a run:solo head beside a running lane', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(holders([HOLDER])))
+
+		const children = [solo(FIRST), child(SECOND)]
+		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(THREE_LANES))
+
+		expect(offer.children).toEqual([])
+		expect(offer.verdict).toBe('wait')
+		expect(offer.notice).toContain(RUN_SOLO_LABEL)
+	})
+
+	it('offers nothing beside a running run:solo issue', async () => {
+		const running = [issue(HOLDER, CREATED_EARLIER, [IN_PROGRESS_LABEL, RUN_SOLO_LABEL])]
+
+		issue_list.mockResolvedValueOnce(listing_of(running))
+
+		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST)])], request(TWO_LANES))
+
+		expect(offer.children).toEqual([])
+		expect(offer.verdict).toBe('wait')
+	})
+
+	it('offers only the children ranked ahead of a later run:solo child', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const children = [child(FIRST), solo(SECOND), child(THIRD)]
+		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(THREE_LANES))
+
+		expect(numbers_of(offer.children)).toEqual([FIRST])
 	})
 })
