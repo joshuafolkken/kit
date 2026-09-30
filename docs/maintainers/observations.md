@@ -559,3 +559,21 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | low | scripts/init/init-static-integration.test.ts:217 | 2026-09-29 | #2197
 - rf:bug-risks | medium | scripts/init/start-plan.ts:71 | 2026-09-29 | #2197
 - rf:project-conventions | low | scripts/init/start-steps.ts:67 | 2026-09-29 | #2197
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-child.md:8 | 2026-09-30 | #2762
+- rf:comments | low | CLAUDE.md:147 | 2026-09-30 | #2762
+- rf:comments | low | CLAUDE.md:169 | 2026-09-30 | #2762
+- rf:comments | low | .claude/skills/workflow-commands/pre-gate-cut.md:9 | 2026-09-30 | #2762
+- rf:project-conventions | low | .claude/skills/workflow-commands/backlogrun-progress.md:36 | 2026-09-30 | #2762
+- rf:tests | low | scripts/document/rationale-documents.test.ts:29 | 2026-09-30 | #2762
+- rf:bug-risks | medium | scripts/git/git-staging.ts:116 | 2026-09-30 | #2763
+- rf:comments | low | scripts/observations/observations-flush.ts:97 | 2026-09-30 | #2763
+- rf:comments | low | scripts/observations/observation-ledger-home.ts:11 | 2026-09-30 | #2763
+- rf:comments | low | scripts/observations/observation-ledger.ts:13 | 2026-09-30 | #2763
+- rf:comments | low | scripts/observations/observations-flush.test.ts:13 | 2026-09-30 | #2763
+- rf:assumptions | low | scripts/gate/hook-gate-reuse.ts:56 | 2026-09-30 | #2763
+- rf:confidence | low | scripts/git/git-staging.ts:82 | 2026-09-30 | #2763
+- rf:none | none | - | 2026-09-30 | #2763
+- k:session-verdict-reads-whole-corpus | d2 | 2026-09-30 | scripts/cost-runtime/cost-cli.ts session_verdict | Pricing one session parses every transcript in the corpus before selecting it, 11 to 20 seconds against a 1.3 GB home, and run:carry, run:cut and the pre-gate-cut hook each pay it
+- k:stop-guard-fires-while-awaiting-subagent | d1 | 2026-09-30 | pnpm josh stop:guard | During fullrun #2772 the stop guard again demanded a confirmation Telegram at a turn end spent waiting on the background review subagent and gate, though no person was being waited on
+- rf:comments | low | scripts/run/run-carry-cli-fixture.ts | 2026-09-30 | #2772
+- rf:comments | low | docs/maintainers/observations.md | 2026-09-30 | #2772

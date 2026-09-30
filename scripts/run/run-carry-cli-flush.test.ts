@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
+import { run_carry_cli_fixture } from './run-carry-cli-fixture'
 
 // joshuafolkken/kit#2492: `--end` makes the batch's one ledger flush while its record is still there, so
 // the lanes' per-issue ledger pull requests collapse into one. The flush is mocked; what it does is
@@ -36,6 +37,7 @@ const INVOCATION = 'backlogrun --max 5'
 const OK = 0
 
 beforeEach(() => {
+	run_carry_cli_fixture.hold_verdict()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])
