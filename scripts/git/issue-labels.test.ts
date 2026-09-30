@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
+	DEPTH_LABELS,
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,
 	has_any_label,
@@ -15,6 +16,7 @@ import {
 	REVIEW_CAP_ROUTE_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
+	WORKFLOW_LABELS,
 } from './issue-labels'
 
 // The label names are the contract between these scripts and GitHub, and every one of them fails
@@ -82,6 +84,25 @@ describe('FILING_ROUTE_LABELS', () => {
 			expect(label.color).toMatch(/^[0-9a-f]{6}$/u)
 			expect(label.description.length).toBeGreaterThan(0)
 		}
+	})
+})
+
+describe('WORKFLOW_LABELS', () => {
+	// What josh start provisions: every label a run applies on its own, never one only a person may.
+	it('carries epic, in-progress, every route and every depth label', () => {
+		expect(WORKFLOW_LABELS.map((label) => label.name)).toStrictEqual([
+			EPIC_LABEL,
+			IN_PROGRESS_LABEL,
+			...FILING_ROUTE_LABELS.map((label) => label.name),
+			...DEPTH_LABELS.map((label) => label.name),
+		])
+	})
+
+	it('leaves out the labels only a person applies', () => {
+		const names = WORKFLOW_LABELS.map((label) => label.name)
+
+		expect(names).not.toContain(AUTO_OK_LABEL)
+		expect(names).not.toContain(NEEDS_HUMAN_REVIEW_LABEL)
 	})
 })
 

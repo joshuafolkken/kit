@@ -39,7 +39,21 @@ VS Code extensions are recommendations, not automatic installs. Code Spell Check
 
 The static Web profile writes `prettier.config.mjs`, which loads under either CommonJS or ESM package settings. Its `.prettierignore` keeps generated files out of formatting without excluding a site's `static/` source directory. A Git-free node project does not receive kit's Git and GitHub `prepare` commands.
 
-To add Git later, run `git init`, then run `josh init` again to add Git files without changing the recorded profile. After adding a GitHub origin, run `josh init` again for GitHub files. `josh start` is an optional entry for the GitHub Issue workflow; `josh init` is the entry for a local project without Git.
+To add Git later, run `git init`, then run `josh init` again to add Git files without changing the recorded profile. After adding a GitHub origin, run `josh init` again for GitHub files.
+
+## `josh init` or `josh start`
+
+One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `backlogrun`)? If not, run `josh init`. If it will and the project has no GitHub repository yet, run `josh start`.
+
+| Situation                                                    | Run                                                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `index.html` only, without Git                               | `josh init`                                                                          |
+| New project that will use the GitHub Issue workflow          | `josh start`                                                                         |
+| Project that already has Git and GitHub, or any re-run       | `josh init`                                                                          |
+| Started without Git, now moving to the GitHub Issue workflow | `josh start` — it runs `git init`, commits what is there, and creates the repository |
+
+- **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository or pushes, so it is safe to re-run and to automate.
+- **`josh start`** asks, and then prepares GitHub: `git init` on `main` → the same setup `josh init` runs → the initial commit → `gh repo create` (private unless `--public`) and push → the workflow labels the repository is missing. Afterwards `kickoff new` works. Its steps and safety rules are in [josh-commands.md → `josh start`](./josh-commands.md#josh-start).
 
 ## Refused inside the package's own repository
 

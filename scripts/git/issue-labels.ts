@@ -177,6 +177,24 @@ const DEPTH_LABELS: ReadonlyArray<{
 	},
 ]
 
+// What `josh start` provisions on a new repository so the first `kickoff` finds every label a run
+// applies with its intended color (joshuafolkken/kit#2197). The `epic` and `in-progress` metadata is
+// the one the workflow documents create them with; the labels only a person applies are left out.
+const WORKFLOW_LABELS: ReadonlyArray<{
+	name: string
+	color: string
+	description: string
+}> = [
+	{
+		name: EPIC_LABEL,
+		color: '5319e7',
+		description: 'Tracks a batch of child issues from one split',
+	},
+	{ name: IN_PROGRESS_LABEL, color: '0075ca', description: 'Work is actively in progress' },
+	...FILING_ROUTE_LABELS,
+	...DEPTH_LABELS,
+]
+
 // The shape `gh issue list --json labels` returns; narrowed here so the predicate below takes any
 // listing row without importing a schema.
 interface LabelReference {
@@ -285,4 +303,5 @@ export {
 	REVIEW_ROUND2_SKIPPED_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
+	WORKFLOW_LABELS,
 }

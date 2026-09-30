@@ -307,11 +307,11 @@ Fetch SonarCloud hotspots on a pull request and print each one's Step B disposit
 
 ### `josh start` · `josh st`
 
-> **Audience:** developer · **Side effects:** files, git, network
+> **Audience:** developer · **Side effects:** files, git, network, processes
 
-`[--profile static|node]`
+`[--profile static|node] [--yes] [--github] [--public]`
 
-Initialize a project for the GitHub Issue workflow
+Create a new project for the GitHub Issue workflow, from git init to labels
 
 ---
 

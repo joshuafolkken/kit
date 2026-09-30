@@ -55,6 +55,7 @@ If the shim keeps coming back, a project pinned `< 0.200.0` is regenerating it o
 
 ## Next
 
+- Set up a project: `josh init` is the main entry and needs no Git; `josh start` is the optional entry that also creates the GitHub repository for the Issue workflow — see [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start).
 - Full command reference: [josh-commands.md](./josh-commands.md).
 - Using the kit inside a project too? See [package.md](./package.md).
 - Hitting an error? See [troubleshooting.md](./troubleshooting.md).
