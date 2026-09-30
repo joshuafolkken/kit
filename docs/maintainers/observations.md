@@ -580,3 +580,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | .claude/skills/workflow-commands/backlogrun-lanes.md:83 | 2026-09-30 | #2776
 - rf:project-conventions | low | scripts/backlog/backlog-plan.ts:81 | 2026-09-30 | #2776
 - rf:bug-risks | low | scripts/backlog/backlog-next.ts:283 | 2026-09-30 | #2776
+- rf:performance | low | scripts/epic/epic-lane-offer.ts:209 | 2026-09-30 | #2776
+- rf:comments | low | scripts/epic/epic-lane-offer.ts:183 | 2026-09-30 | #2776
