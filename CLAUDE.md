@@ -89,7 +89,7 @@ Read from a `.env` file at the project root by the AI scripts, `josh port` and `
 
 ### Dependency overrides (`pnpm-workspace.yaml` / `package.json`)
 
-- **Effective overrides live in `pnpm-workspace.yaml`.** pnpm 11 and 12 ignore `pnpm.overrides` in `package.json` (verified with pnpm 12.6.0). Check both files for existing declarations, but never count the ignored package field as an effective override. **An absent or empty `pnpm.overrides` is not evidence that the project has no overrides.**
+- **Effective overrides live in `pnpm-workspace.yaml`.** pnpm 11 and 12 ignore `pnpm.overrides` in `package.json`. Check both files for existing declarations, but never count the ignored package field as an effective override. **An absent or empty `pnpm.overrides` is not evidence that the project has no overrides.**
 - **NEVER** remove or modify entries in **either** location without explicit user approval.
 - **NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation. It pins the development toolchain (e.g. pnpm version); silently changing it can break CI or other contributors' environments.
 - **The check is a command you run, not a conclusion you reach.** After `pnpm update`, `josh latest`, or any dependency-update command, **load the `dependency-update` skill** and follow its procedure before reporting anything about the pins.
@@ -144,7 +144,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 ## Doc Sync Rules
 
-**`CLAUDE.md` is the single source for every agent rule.** `AGENTS.md` and `GEMINI.md` carry no rules — a rule addition, spec change or wording fix is written **once**, here (joshuafolkken/kit#963). The structural test [scripts/document/ai-document-pointers.test.ts](https://github.com/joshuafolkken/kit/blob/main/scripts/document/ai-document-pointers.test.ts) fails if a rule body reappears in either, or if a pointer loses the sentence that sends an agent here.
+**`CLAUDE.md` is the single source for every agent rule.** `AGENTS.md` and `GEMINI.md` carry no rules — a rule addition, spec change or wording fix is written **once**, here (joshuafolkken/kit#963).
 
 **docs/ must stay in sync with the package.** When `josh bump` changes the version, review `docs/` and update any section describing changed behavior (new/renamed commands, `josh init` / `josh sync` behavior, new config files) before committing.
 
@@ -166,7 +166,7 @@ Before every `git commit` (follow-up commits included), self-review against `pro
 
 `kickoff`, `fullrun`, `halfrun` and `backlogrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill. **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do; everything a run reaches only after reading the skill is routed to, never restated (`SKILL.md` → "What stays resident, and what is read from here").
 
-**Read the skill before running any part of a command — including the first `gh` call.** Acting from the table below alone is not enough: the table says which command was typed, not how to run it.
+**Read the skill before running any part of a command — including the first `gh` call.**
 
 | Typed keyword            | What it does                                                                                                                                                          | Read first                                                       |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
