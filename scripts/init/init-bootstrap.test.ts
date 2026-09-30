@@ -47,6 +47,7 @@ beforeEach(() => {
 afterEach(() => {
 	rmSync(fixture.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 describe('is_project_kit', () => {
@@ -132,6 +133,5 @@ describe('hand_off — a repeated hand-off', () => {
 
 		expect(init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)).toContain('not at')
 		expect(mocked_execa).not.toHaveBeenCalled()
-		vi.unstubAllEnvs()
 	})
 })
