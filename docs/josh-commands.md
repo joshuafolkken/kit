@@ -421,7 +421,7 @@ pnpm exec josh start --yes --github --profile static    # unattended, including 
 2. The same setup `josh init` runs, with the confirmed profile
 3. The initial commit of every file — skipped when the repository already has commits
 4. `gh repo create <directory name> --private` (or `--public`) and push `main`
-5. The workflow labels (`epic`, `in-progress`, `route:*`, `depth:*`) the repository is missing; existing labels are left unchanged
+5. The missing workflow and release-classification labels; existing ones are left unchanged
 
 **Options:** `--profile static|node` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults without asking, but is **not** consent to create a repository or push: without `--github` an unattended run stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
 
@@ -453,7 +453,7 @@ pnpm josh registry:migrate
 
 ### `josh sync`
 
-Overwrite managed files with the latest versions from the package. Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, workflow templates, and other managed files. Also realigns `devEngines.packageManager.version` with the `packageManager` pin so the two never drift.
+Overwrite managed files with the latest versions from the package. Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, workflow templates, and other managed files. Also realigns `devEngines.packageManager.version` with the `packageManager` pin, and creates missing labels as [`josh start`](#josh-start) does.
 
 ```bash
 pnpm josh sync   # overwrite managed files

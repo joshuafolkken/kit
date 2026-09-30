@@ -186,14 +186,16 @@ const DEPTH_LABELS: ReadonlyArray<{
 	},
 ]
 
-// What `josh start` provisions on a new repository so the first `kickoff` finds every label a run
-// applies with its intended color (joshuafolkken/kit#2197). The `epic` and `in-progress` metadata is
-// the one the workflow documents create them with; the labels only a person applies are left out.
-const WORKFLOW_LABELS: ReadonlyArray<{
+interface LabelDefinition {
 	name: string
 	color: string
 	description: string
-}> = [
+}
+
+// What `josh start` provisions on a new repository so the first `kickoff` finds every label a run
+// applies with its intended color (joshuafolkken/kit#2197). The `epic` and `in-progress` metadata is
+// the one the workflow documents create them with; the labels only a person applies are left out.
+const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 	{
 		name: EPIC_LABEL,
 		color: '5319e7',
@@ -212,6 +214,41 @@ const WORKFLOW_LABELS: ReadonlyArray<{
 	},
 	...FILING_ROUTE_LABELS,
 	...DEPTH_LABELS,
+]
+
+// The pull request release classifications `pr-classification.yml` requires exactly one of
+// (joshuafolkken/kit#2797). The check is distributed by `josh sync`, so the labels it asks for are
+// provisioned from this same list — a repository that never had them would otherwise fail the check
+// on every pull request that is not an `enhancement`.
+const BUGFIX_LABEL = 'bugfix'
+const OTHER_CHANGE_LABEL = 'other-change'
+const IGNORE_FOR_RELEASE_LABEL = 'ignore-for-release'
+const RELEASE_CLASSIFICATION_NAMES = [
+	BREAKING_CHANGE_LABEL,
+	ENHANCEMENT_LABEL,
+	BUGFIX_LABEL,
+	OTHER_CHANGE_LABEL,
+	IGNORE_FOR_RELEASE_LABEL,
+] as const
+type ReleaseClassification = (typeof RELEASE_CLASSIFICATION_NAMES)[number]
+
+const RELEASE_CLASSIFICATION_METADATA: Readonly<
+	Record<ReleaseClassification, Omit<LabelDefinition, 'name'>>
+> = {
+	[BREAKING_CHANGE_LABEL]: { color: 'd93f0b', description: 'Release: a breaking change (major)' },
+	[ENHANCEMENT_LABEL]: { color: '84b6eb', description: 'Release: a new feature (minor)' },
+	[BUGFIX_LABEL]: { color: 'd73a4a', description: 'Release: a bug fix (patch)' },
+	[OTHER_CHANGE_LABEL]: { color: 'c2e0c6', description: 'Release: any other change (patch)' },
+	[IGNORE_FOR_RELEASE_LABEL]: { color: 'cfd3d7', description: 'Release: left out of the notes' },
+}
+
+const RELEASE_CLASSIFICATION_LABELS: ReadonlyArray<LabelDefinition> =
+	RELEASE_CLASSIFICATION_NAMES.map((name) => ({ name, ...RELEASE_CLASSIFICATION_METADATA[name] }))
+
+// Every label kit provisions on a repository — `josh start` on a new one, `josh sync` on every run.
+const REPOSITORY_LABELS: ReadonlyArray<LabelDefinition> = [
+	...WORKFLOW_LABELS,
+	...RELEASE_CLASSIFICATION_LABELS,
 ]
 
 // The shape `gh issue list --json labels` returns; narrowed here so the predicate below takes any
@@ -295,13 +332,18 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	DEPTH_0_LABEL,
 	DEPTH_1_LABEL,
 	DEPTH_2_LABEL,
+	BUGFIX_LABEL,
+	OTHER_CHANGE_LABEL,
+	IGNORE_FOR_RELEASE_LABEL,
 ])
 
+export type { LabelDefinition, ReleaseClassification }
 export {
 	ALL_LABELS,
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	BUG_LABEL,
+	BUGFIX_LABEL,
 	BREAKING_CHANGE_LABEL,
 	depth_label_of,
 	DEPTH_0_LABEL,
@@ -314,12 +356,17 @@ export {
 	FILING_ROUTE_LABELS,
 	has_any_label,
 	has_label_name,
+	IGNORE_FOR_RELEASE_LABEL,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	label_name_of,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
+	OTHER_CHANGE_LABEL,
+	RELEASE_CLASSIFICATION_LABELS,
+	RELEASE_CLASSIFICATION_NAMES,
+	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,

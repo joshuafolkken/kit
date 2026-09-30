@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { WORKFLOW_LABELS } from '#scripts/git/issue-labels'
+import { repository_labels } from '#scripts/repo/repository-labels'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { main as init_main } from './init'
@@ -9,6 +9,9 @@ import { start_steps, type StepContext } from './start-steps'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('./init', () => ({ main: vi.fn() }))
+vi.mock('#scripts/repo/repository-labels', () => ({
+	repository_labels: { ensure_labels: vi.fn() },
+}))
 
 const mocked_execa = vi.mocked(execaSync)
 const GIT_ADD_ALL = 'git add --all'
@@ -125,15 +128,12 @@ describe('the steps josh start runs', () => {
 })
 
 describe('the labels and failures of josh start', () => {
-	it('creates only the workflow labels the repository is missing', () => {
-		const present = WORKFLOW_LABELS.slice(1).map((label) => label.name.toUpperCase())
-
-		mocked_execa.mockReturnValueOnce(result(0, `${present.join('\n')}\n`))
+	// Which labels are missing and how a failure is reported is `repository-labels.test.ts`'s.
+	it('provisions the labels through the shared step, on the repository gh resolves here', () => {
 		start_steps.run_steps(['labels'], CONTEXT)
-		const created = commands().filter((command) => command.includes('-f name='))
 
-		expect(created).toHaveLength(1)
-		expect(created[0]).toContain(`name=${WORKFLOW_LABELS[0]?.name ?? ''}`)
+		expect(repository_labels.ensure_labels).toHaveBeenCalledWith('{owner}/{repo}')
+		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 
 	it('reports how far it got when a step fails', () => {
