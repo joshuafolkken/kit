@@ -620,3 +620,11 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/init/init.ts | 2026-09-30 | #2794
 - rf:bug-risks | low | scripts/init/init-bootstrap.ts | 2026-09-30 | #2794
 - rf:tests | low | scripts/init/init-bootstrap.test.ts | 2026-09-30 | #2794
+- rf:bug-risks | high | scripts/run/run-halfrun-resume.ts | 2026-09-30 | #2796
+- rf:bug-risks | medium | scripts/run/run-entry-cli.ts | 2026-09-30 | #2796
+- rf:bug-risks | medium | .claude/skills/workflow-commands/halfrun.md | 2026-09-30 | #2796
+- rf:bug-risks | medium | .claude/skills/workflow-commands/halfrun.md | 2026-09-30 | #2796
+- rf:bug-risks | medium | scripts/run/run-halfrun-resume.ts | 2026-09-30 | #2796
+- rf:bug-risks | low | scripts/run/run-entry-cli.ts | 2026-09-30 | #2796
+- rf:bug-risks | low | scripts/run/run-halfrun-resume.ts | 2026-09-30 | #2796
+- rf:bug-risks | low | scripts/run/run-hold-cli.ts | 2026-09-30 | #2796

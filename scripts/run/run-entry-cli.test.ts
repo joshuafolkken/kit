@@ -5,6 +5,8 @@ const is_child_mock = vi.hoisted(() => vi.fn())
 const gather_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
 const format_report_mock = vi.hoisted(() => vi.fn())
+const adopt_mock = vi.hoisted(() => vi.fn())
+const is_pending_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
@@ -14,6 +16,9 @@ vi.mock('./run-prep-cli', () => ({
 	run_prep_cli: { gather: gather_mock, to_parts: to_parts_mock },
 }))
 vi.mock('./run-prep', () => ({ run_prep: { format_report: format_report_mock } }))
+vi.mock('./run-halfrun-resume', () => ({
+	run_halfrun_resume: { adopt: adopt_mock, is_pending: is_pending_mock },
+}))
 
 const { run_entry_cli } = await import('./run-entry-cli')
 
@@ -36,6 +41,8 @@ beforeEach(() => {
 	gather_mock.mockReset().mockResolvedValue({})
 	to_parts_mock.mockReset().mockReturnValue(state_parts('OPEN'))
 	format_report_mock.mockReset().mockReturnValue(PREP_BODY)
+	adopt_mock.mockReset().mockResolvedValue(false)
+	is_pending_mock.mockReset().mockResolvedValue(false)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -62,6 +69,38 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 		expect(info_lines).toStrictEqual([
 			`entry #${ISSUE} — hold: hold · cost: under · verdict: implement\n\n${PREP_BODY}`,
 		])
+	})
+})
+
+describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (joshuafolkken/kit#2796)', () => {
+	it('reads the budget, adopts the halfrun hold and reports the resume without claiming', async () => {
+		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(UNDER)
+		is_pending_mock.mockResolvedValue(true)
+		adopt_mock.mockResolvedValue(true)
+
+		const code = await run_entry_cli.run([ISSUE])
+
+		expect(code).toBe(OK)
+		expect(adopt_mock).toHaveBeenCalledWith(ISSUE)
+		expect(josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)).toStrictEqual([
+			['run:cut', '--resume', ISSUE],
+			['cost', '--cut'],
+		])
+		expect(gather_mock).not.toHaveBeenCalled()
+		expect(info_lines).toStrictEqual([
+			`entry #${ISSUE} — resume: ${run_entry_cli.HALFRUN_RESUME_TOKEN}`,
+		])
+	})
+
+	it('stops on a spent budget without adopting the halfrun hold', async () => {
+		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce({ code: OK, out: 'over' })
+		is_pending_mock.mockResolvedValue(true)
+
+		const code = await run_entry_cli.run([ISSUE])
+
+		expect(code).not.toBe(OK)
+		expect(adopt_mock).not.toHaveBeenCalled()
+		expect(info_lines[0]).toContain('cost: over')
 	})
 })
 

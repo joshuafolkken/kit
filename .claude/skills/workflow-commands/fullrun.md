@@ -63,6 +63,7 @@ call reports `hold`.
   boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
   `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`), and it records any park on the Issue before the stop notify.
   `pre-gate-cut.md` is the single source of both.
+- **`resume: halfrun`** adopted a stopped `halfrun` (#2796): gate in full; `working-tree-hold.md`.
 
 ## The stop branches
 

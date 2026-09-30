@@ -81,6 +81,7 @@ describe('parse_request', () => {
 		[[], 'claim'],
 		[[ISSUE], 'claim'],
 		[[ISSUE, '--fullrun'], 'claim'],
+		[[ISSUE, '--halfrun-stop'], 'halfrun-stop'],
 		[['--release'], 'release'],
 		[['--release', ISSUE], 'release'],
 		[['--release', '--force'], 'force-release'],
