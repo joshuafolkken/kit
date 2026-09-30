@@ -9,6 +9,7 @@ const decide_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
+const locate_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-read-cli', () => ({
 	issue_read_cli: { read_block: read_block_mock },
@@ -20,6 +21,10 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 
 vi.mock('#scripts/version/latest-scope-cli', () => ({
 	latest_scope_cli: { decide: decide_mock },
+}))
+
+vi.mock('./run-prep-locate', () => ({
+	run_prep_locate: { locate: locate_mock },
 }))
 
 vi.mock('#scripts/lane/lane-child-marker', () => ({
@@ -41,6 +46,7 @@ const OTHER_ISSUE = '1979'
 const BLOCK = 'issue: 1978\nThe body\n\ncomment by alice: agreed'
 const OPEN_STATE: IssueState = { state: 'OPEN', labels: ['auto-ok'], is_human_review: false }
 const SKIP_DECISION = { scope: 'skip', reason: 'ran 2 hours ago; window is 12h' }
+const LOCATIONS = 'run:prep\n  scripts/josh/josh-commands-ai.ts:42  run:prep'
 const REVIEW_STATE: IssueState = {
 	state: 'OPEN',
 	labels: ['needs-human-review'],
@@ -71,6 +77,11 @@ beforeEach(() => {
 	error_mock.mockReset()
 	decide_mock.mockReturnValue(SKIP_DECISION)
 	is_child_mock.mockReturnValue(false)
+})
+
+beforeEach(() => {
+	locate_mock.mockReset()
+	locate_mock.mockResolvedValue(LOCATIONS)
 })
 
 afterEach(() => {
@@ -133,6 +144,27 @@ describe('run_prep_cli.run', () => {
 	it('refuses no argument', async () => {
 		expect(await run_prep_cli.run([])).toBe(FAILURE)
 		expect(reported()).toContain('Usage')
+	})
+})
+
+// joshuafolkken/kit#2761: the code locations the body names are bundled as their own section.
+describe('run_prep_cli.run code locations', () => {
+	it('locates the names from the body it read and prints them as their own section', async () => {
+		stub_ok()
+
+		await run_prep_cli.run([ISSUE])
+
+		expect(locate_mock).toHaveBeenCalledWith(BLOCK)
+		expect(printed()).toContain(`${run_prep.LOCATIONS_HEADER}\n${LOCATIONS}`)
+	})
+
+	it('locates nothing from a body that could not be read', async () => {
+		read_block_mock.mockResolvedValue({ kind: 'missing' })
+		read_state_mock.mockResolvedValue({ kind: 'state', state: OPEN_STATE })
+
+		await run_prep_cli.run([ISSUE])
+
+		expect(locate_mock).toHaveBeenCalledWith('')
 	})
 })
 
@@ -206,6 +238,7 @@ describe('run_prep.format_report', () => {
 			latest_scope: 'required',
 			latest_reason: 'last update 20h ago',
 			has_changes: false,
+			locations: '',
 		})
 
 		expect(report.split('\n', 1)[0]).toContain('human_review: yes')

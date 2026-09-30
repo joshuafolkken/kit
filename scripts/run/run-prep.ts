@@ -23,6 +23,7 @@ const NO = 'no'
 const CONTENT_HEADER = '=== issue ==='
 const STATE_HEADER = '=== state ==='
 const LATEST_HEADER = '=== dependency update ==='
+const LOCATIONS_HEADER = '=== code locations ==='
 const SECTION_SEPARATOR = '\n\n'
 const LATEST_JOINER = ' — '
 
@@ -35,6 +36,8 @@ interface PrepParts {
 	state_failure: string
 	latest_scope: string
 	latest_reason: string
+	// Where the paths and identifiers the issue names occur in code (joshuafolkken/kit#2761).
+	locations: string
 	// Whether a lane child's tree holds uncommitted work — read for the verdict, not printed in the
 	// report (joshuafolkken/kit#2476).
 	has_changes: boolean
@@ -75,10 +78,18 @@ function format_report(parts: PrepParts): string {
 		section(CONTENT_HEADER, parts.content_body),
 		section(STATE_HEADER, state_body(parts)),
 		section(LATEST_HEADER, `${parts.latest_scope}${LATEST_JOINER}${parts.latest_reason}`),
+		section(LOCATIONS_HEADER, parts.locations),
 	].join(SECTION_SEPARATOR)
 }
 
-const run_prep = { CONTENT_HEADER, LATEST_HEADER, STATE_HEADER, SUMMARY_PREFIX, format_report }
+const run_prep = {
+	CONTENT_HEADER,
+	LATEST_HEADER,
+	LOCATIONS_HEADER,
+	STATE_HEADER,
+	SUMMARY_PREFIX,
+	format_report,
+}
 
 export type { PrepParts }
 export { run_prep }
