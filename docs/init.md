@@ -7,6 +7,9 @@ pnpm josh init
 
 # Override the automatic decision for this run
 pnpm josh init --profile static
+
+# Write the files only — skip the install and format it ends with
+pnpm josh init --no-install
 ```
 
 ## Project profiles
@@ -185,7 +188,7 @@ The `node` profile adds the packages below to `devDependencies`. The `static` pr
 | `lefthook`                                                   | version from kit's own development dependencies; only when Git exists (the only case `lefthook.yml` is written) |
 | `secretlint`, `@secretlint/secretlint-rule-preset-recommend` | `^13.0.2`; see [Secret scanning](#secret-scanning-pre-commit)                                                   |
 
-Every generated config has its tool in this list, so `josh init` → `pnpm install` → `josh gate` passes in a new project with no manual install ([#2710](https://github.com/joshuafolkken/kit/issues/2710)): `prettier.config.js` needs `prettier`, `cspell.config.yaml` needs `cspell`, `playwright.config.ts` needs `@playwright/test` and `@types/node`, and `lefthook.yml` needs `lefthook`. The generated `tsconfig.json` names `"types": ["node"]`, because TypeScript 6 no longer loads installed `@types/*` packages by default. `josh init` runs before the first `pnpm install`, so it reports that lefthook is not installed yet and leaves the hook installation to the `prepare` script.
+Every generated config has its tool in this list, so `josh init` (which installs them) → `josh gate` passes in a new project with no manual install ([#2710](https://github.com/joshuafolkken/kit/issues/2710)): `prettier.config.js` needs `prettier`, `cspell.config.yaml` needs `cspell`, `playwright.config.ts` needs `@playwright/test` and `@types/node`, and `lefthook.yml` needs `lefthook`. The generated `tsconfig.json` names `"types": ["node"]`, because TypeScript 6 no longer loads installed `@types/*` packages by default. The `pnpm install` that `josh init` ends with runs the `prepare` script, which installs the hooks; under `--no-install` a new project has no lefthook yet, so `josh init` reports that and leaves the hooks to the `prepare` script of your own install.
 
 `packageManager` and `devEngines.packageManager.version` are written with kit's exact pnpm pin. pnpm removes `packageManager` from a published manifest, so the pin is read from the installed kit's `devEngines` when the field is absent. An older pnpm then reads that exact version instead of rejecting a `>=` range as an invalid `packageManager` specification. The `allowBuilds` entries kit's `pnpm-workspace.yaml` approves are added to an existing `allowBuilds` map. `pnpm add -D @joshuafolkken/kit` always leaves such a map before `josh init` runs. Entries you already answered keep their values.
 
@@ -247,9 +250,14 @@ The Codex files are managed copies of kit's project configuration. An existing f
 
 ## Tool installs
 
-After all files are processed, `josh init` runs:
+After all files are processed, `josh init` runs ([#2766](https://github.com/joshuafolkken/kit/issues/2766)):
 
-1. **`lefthook install`** — installs git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
+1. **`pnpm install`** — installs the development dependencies it added. The `prepare` script it runs installs the git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
+2. **`josh format`** — formats every file, including the ones `josh init` just wrote.
+
+A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its initial commit. A failed format is only a warning: in a `node` project `josh format` also runs `eslint --fix`, which fails on the project's own unfixable errors. `josh gate` is deliberately not run: in an existing project it can fail on the project's own code, which is not a failed setup.
+
+`--no-install` skips both, for CI or an offline machine. `josh init` then prints the `pnpm install` hint and, in a `node` project with Git, runs `lefthook install` only when lefthook is already installed.
 
 ### `core.hooksPath` stops lefthook installing anything
 

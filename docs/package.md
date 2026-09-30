@@ -37,9 +37,10 @@ Run once after installing — creates or merges all config files:
 
 ```bash
 pnpm exec josh init
+pnpm josh gate
 ```
 
-See [init.md](./init.md) for the full list of managed files. After upgrading the package, pull in updated AI files, workflow templates, and other managed files with:
+`josh init` ends by running `pnpm install` and `josh format`, so the development dependencies it adds are installed, the Git hooks are in place and the new files are formatted before `josh gate` runs. `--no-install` skips both steps. See [init.md](./init.md) for the full list of managed files. After upgrading the package, pull in updated AI files, workflow templates, and other managed files with:
 
 ```bash
 pnpm exec josh sync

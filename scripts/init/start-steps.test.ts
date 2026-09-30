@@ -11,6 +11,7 @@ vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('./init', () => ({ main: vi.fn() }))
 
 const mocked_execa = vi.mocked(execaSync)
+const GIT_ADD_ALL = 'git add --all'
 const ROOT = path.join(path.sep, 'work', 'my-site')
 const CONTEXT: StepContext = { root: ROOT, profile: 'static', visibility: 'private' }
 const SHAPE: ProjectShape = {
@@ -100,7 +101,7 @@ describe('the steps josh start runs', () => {
 
 		expect(commands()).toStrictEqual([
 			'git init --initial-branch=main',
-			'git add --all',
+			GIT_ADD_ALL,
 			'git commit --no-verify --message Initial commit',
 			'git branch --move --force main',
 			'gh repo create my-site --private --source . --remote origin --push',
@@ -112,6 +113,14 @@ describe('the steps josh start runs', () => {
 
 		expect(init_main).toHaveBeenCalledWith(['--profile', 'node'])
 		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+
+	// The initialize step installs, so the commit after it carries the lockfile (#2766).
+	it('does not opt out of the install, so the initial commit carries the lockfile', () => {
+		start_steps.run_steps(['initialize', 'commit'], CONTEXT)
+
+		expect(vi.mocked(init_main).mock.calls[0]?.[0]).not.toContain('--no-install')
+		expect(commands()).toContain(GIT_ADD_ALL)
 	})
 })
 

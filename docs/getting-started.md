@@ -57,7 +57,6 @@ This installs from the public npm registry without authentication and creates `p
 
 ```bash
 pnpm exec josh init
-pnpm install
 ```
 
 `josh init` selects the `static` profile and records it in `package.json`. It creates only:
@@ -71,20 +70,21 @@ pnpm install
 | `prettier.config.mjs`, `.prettierignore`, `.vscode/settings.json`, Prettier | Only when HTML, CSS or JavaScript files exist |
 | `tsconfig.json`                                                             | Only when TypeScript files exist              |
 
+It then runs `pnpm install` and `josh format` for you, so the tools it listed are installed and every file is formatted. If the install fails, `josh init` stops before formatting, exits non-zero and prints the commands to re-run by hand. `--no-install` skips both steps, for CI or an offline machine; run `pnpm install` and `pnpm josh format` yourself afterwards.
+
 It adds no ESLint, cspell, Playwright, Git hooks, GitHub workflows or external-service settings, and it creates no Git repository. Existing VS Code settings, such as a `[python]` section, are kept. See [init.md](./init.md#project-profiles) for how the profile is chosen.
 
 The `preinstall` script runs [safe-chain](https://github.com/AikidoSec/safe-chain)'s `setup-ci`, which creates command shims under `~/.safe-chain` and adds them to `PATH` on a CI runner only. **It does not scan the `pnpm install` on your machine** — neither the one that runs it nor any later one. To have local installs scanned for malware, enable safe-chain's shell integration yourself: install safe-chain as its [README](https://github.com/AikidoSec/safe-chain#installation) describes (or run `safe-chain setup` if it is already installed), then restart your terminal. kit never changes your shell configuration for you. Until the integration is active, `preinstall` prints a warning with these steps; the install itself is never blocked, and the warning stays silent on CI.
 
 CI installs are scanned by the workflow itself, not by `preinstall`: each job's "Setup safe-chain" step downloads safe-chain's release installer, checks its SHA-256 and runs it with `--ci`, which puts the `safe-chain` binary on `PATH` beside its shims ([#2711](https://github.com/joshuafolkken/kit/issues/2711)). The release and the hash are the `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env at the top of `ci.yml` and of `pr-classification.yml`, which carry the same pin ([#2765](https://github.com/joshuafolkken/kit/issues/2765)).
 
-## 5. Format and verify
+## 5. Verify
 
 ```bash
-pnpm josh format
 pnpm josh gate
 ```
 
-`josh format` runs Prettier over every file type it supports — HTML, CSS and JavaScript, and also Markdown, JSON and YAML such as `CLAUDE.md` and `package.json`; running it again changes nothing. `josh gate` runs Prettier's check and skips each check the project does not have, printing why — for example `josh eslint: no ESLint configuration was found — skipping eslint.` A project with no Web files has no Prettier, so both commands skip it with `josh prettier: no HTML, CSS or JavaScript files were found`.
+`josh gate` is not part of `josh init`, so a lint error in your own code is never mistaken for a failed setup. The `josh format` that `josh init` ran uses Prettier over every file type it supports — HTML, CSS and JavaScript, and also Markdown, JSON and YAML such as `CLAUDE.md` and `package.json`; running it again changes nothing. `josh gate` runs Prettier's check and skips each check the project does not have, printing why — for example `josh eslint: no ESLint configuration was found — skipping eslint.` A project with no Web files has no Prettier, so both commands skip it with `josh prettier: no HTML, CSS or JavaScript files were found`.
 
 Re-running `pnpm exec josh init` later leaves the files unchanged.
 
@@ -108,8 +108,8 @@ curl -fsSL https://get.pnpm.io/install.sh | sh - && source ~/.bashrc
 pnpm runtime set node 22 -g
 mkdir /site && cd /site && printf '<!doctype html><html><body><h1>Hello</h1></body></html>\n' > index.html
 pnpm add -D --allow-build=esbuild @joshuafolkken/kit
-pnpm exec josh init && pnpm install
-pnpm josh format && pnpm josh format && pnpm josh gate
+pnpm exec josh init
+pnpm josh format && pnpm josh gate
 ls -A   # no .git, .github or lefthook.yml
 ```
 
