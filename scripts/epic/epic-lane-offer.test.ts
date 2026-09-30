@@ -309,12 +309,42 @@ describe('epic_lane_offer.offer_for_repo — run:solo', () => {
 		expect(offer.verdict).toBe('wait')
 	})
 
-	it('offers only the children ranked ahead of a later run:solo child', async () => {
-		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+	it('offers only the children ranked ahead of a later run:solo child while a lane runs', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(holders([HOLDER])))
 
 		const children = [child(FIRST), solo(SECOND), child(THIRD)]
 		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(THREE_LANES))
 
 		expect(numbers_of(offer.children)).toEqual([FIRST])
+	})
+})
+
+// joshuafolkken/kit#2778: an idle repository takes its first run:solo child ahead of the ranking.
+describe('epic_lane_offer.offer_for_repo — a later run:solo child', () => {
+	it('offers a later run:solo child alone into an idle repository', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const children = [child(FIRST), solo(SECOND), child(THIRD)]
+		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(THREE_LANES))
+
+		expect(numbers_of(offer.children)).toEqual([SECOND])
+	})
+
+	it('reaches a run:solo child in a pool past the free lanes of an idle repository', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const pools = [pool([child(FIRST), child(SECOND)]), pool([solo(THIRD)])]
+		const offer = await epic_lane_offer.offer_for_repo(pools, request(TWO_LANES))
+
+		expect(numbers_of(offer.children)).toEqual([THIRD])
+	})
+
+	it('reaches a run:solo child ranked past the free lanes of an idle repository', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const children = [child(FIRST), child(SECOND), solo(THIRD)]
+		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(ONE_LANE))
+
+		expect(numbers_of(offer.children)).toEqual([THIRD])
 	})
 })

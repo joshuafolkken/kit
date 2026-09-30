@@ -306,6 +306,8 @@ stop at a time.**
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
   path) becomes a native `blocked-by`; an issue the `wip-cap.md` → 「実行のしかた」 enumeration hits
   gets `run:solo`. Comment the reason; the offer commands enforce both.
+- **Report the order those labels produce — `pnpm josh backlog:plan --waves`** (joshuafolkken/kit#2778),
+  `backlog:next` played forward wave by wave. Report it with the plan, never an order derived by hand.
 - **Then start the loop.** Whatever is still labelled is reported as parked and left standing; the
   run does not wait on it.
 

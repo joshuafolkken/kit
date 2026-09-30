@@ -174,15 +174,31 @@ function solo_offer(
 	read: BusyRead,
 	request: LaneRequest,
 ): LaneOffer {
-	const { keep, notice } = epic_solo.select(answer.children, read, request.repo)
+	const { offered, notice } = epic_solo.select(answer.children, read, request.repo)
 
-	if (keep === NO_LANES && answer.children.length > NO_LANES) {
+	if (offered.length === NO_LANES && answer.children.length > NO_LANES) {
 		return { children: [], verdict: WAIT_VERDICT, notice: notice ?? '' }
 	}
 
-	const children = answer.children.slice(0, keep)
+	return { ...answer, children: offered, notice: offered_notice(offered, read, request) }
+}
 
-	return { ...answer, children, notice: offered_notice(children, read, request) }
+// The confirmation walk stops at the free-lane count, so a `run:solo` candidate ranked past it — or
+// in a pool past it — would never reach `solo_offer` to be preferred. Into an idle repository the
+// first pool holding one is asked first, with it at its head through the same `epic_solo.prefer` the
+// offer applies (joshuafolkken/kit#2778). The candidate stays in its own pool, because a pool carries
+// the graph it is confirmed against.
+function solo_first(pools: ReadonlyArray<RepoPool>, read: BusyRead): ReadonlyArray<RepoPool> {
+	if (read.kind !== 'idle') return pools
+
+	const index = pools.findIndex((pool) => pool.candidates.some((child) => epic_solo.is_solo(child)))
+	const pool = pools[index]
+
+	if (pool === undefined) return pools
+
+	const lifted = { ...pool, candidates: epic_solo.prefer(pool.candidates, read) }
+
+	return [lifted, ...pools.filter((other) => other !== pool)]
 }
 
 // The repository is asked how full it is **before** any candidate is confirmed, for the reason
@@ -204,7 +220,10 @@ async function offer_for_repo(
 		}
 	}
 
-	const for_repo = dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo)))
+	const for_repo = solo_first(
+		dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo))),
+		read,
+	)
 
 	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request)
 }
