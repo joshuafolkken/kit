@@ -49,6 +49,7 @@ const GATEWAY_ERROR = '502 Bad Gateway'
 const BASE_INPUT: WrapupInput = {
 	branch_name: 'feature-branch',
 	issue_number: '42',
+	closes_number: '42',
 	notify_config: NOTIFY_CONFIG,
 	pr_url: 'https://github.com/owner/repo/pull/7',
 	should_merge: true,
@@ -105,6 +106,15 @@ describe('run_wrapup — the merged issue close', () => {
 		await run_wrapup({ should_merge: false })
 
 		expect(mocked_ensure_closed).not.toHaveBeenCalled()
+	})
+
+	it('acts on the body closes number, never the invocation number', async () => {
+		await run_wrapup({ should_merge: true, issue_number: '42', closes_number: undefined })
+
+		expect(mocked_ensure_closed).toHaveBeenCalledWith({
+			issue_number: undefined,
+			pr_url: BASE_INPUT.pr_url,
+		})
 	})
 
 	it('reports a failed close with its recovery instead of failing the merged run', async () => {

@@ -234,6 +234,7 @@ async function read_issue_title(
 
 interface RunContext {
 	issue_number: string | undefined
+	closes_number: string | undefined
 	context: TelegramContext
 }
 
@@ -256,19 +257,17 @@ async function read_run_context(input: {
 	issue_number: string | undefined
 }): Promise<RunContext> {
 	const closes = warn_if_missing_closes(input.branch_name)
-	const owner = git_gh_command.repo_get_name_with_owner()
-	const url = git_gh_command.pr_get_url(input.branch_name)
-	const title = read_issue_title(input.issue_number, closes)
 	const [closes_number, name_with_owner, pr_url, issue_title] = await Promise.all([
 		closes,
-		owner,
-		url,
-		title,
+		git_gh_command.repo_get_name_with_owner(),
+		git_gh_command.pr_get_url(input.branch_name),
+		read_issue_title(input.issue_number, closes),
 	])
 	const issue_number = input.issue_number ?? closes_number
 
 	return {
 		issue_number,
+		closes_number,
 		context: {
 			repo_name: parse_repo_name(name_with_owner),
 			issue_title,
@@ -373,7 +372,7 @@ async function run_review_checks(
 // the epic close all name the same issue — and so the caller's own tail can record a run whose number
 // only the pull request knew.
 async function run_stages(input: FollowupInput, log: StageLog): Promise<string | undefined> {
-	const { issue_number, context } = await read_run_context(input)
+	const { issue_number, closes_number, context } = await read_run_context(input)
 
 	lap(log, STAGE.closes_and_context)
 	const checks = await run_review_checks(input, context, log)
@@ -385,6 +384,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 		{
 			branch_name: input.branch_name,
 			issue_number,
+			closes_number,
 			notify_config: input.notify_config,
 			pr_url: context.pr_url,
 			should_merge: input.should_merge,
