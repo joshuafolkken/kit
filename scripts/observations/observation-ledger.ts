@@ -1,9 +1,8 @@
 // The observation ledger's one path, named here rather than inside any of the places that act on it
-// (joshuafolkken/kit#1756). `git-staging.ts` excludes it from every ordinary commit,
-// `hook-gate-reuse.ts` excludes it from what a hook calls a carried tree, and
-// `observations-flush.ts` is the only thing that stages it — so a literal in each would be three
-// answers to one question, and a rename reaching only some of them would silently restore the
-// contamination the exclusion exists to prevent.
+// (joshuafolkken/kit#1756). `git-staging.ts` stages it with the run's own commit when its grammar
+// holds (joshuafolkken/kit#2763), `hook-gate-reuse.ts` excludes it from what a hook calls a carried
+// tree, and `observations-flush.ts` commits what no run carried — so a literal in each would be three
+// answers to one question, and a rename reaching only some of them would silently split them.
 //
 // **It sits under `docs/maintainers/`, apart from the reader-facing documents** (joshuafolkken/kit#2724).
 const OBSERVATION_LEDGER_PATH = 'docs/maintainers/observations.md'
@@ -70,6 +69,7 @@ const observation_ledger = {
 	has_pending_append,
 	is_ledger_line,
 	is_ledger_path,
+	is_migration_claim,
 	ledger_paths,
 	status_path,
 }

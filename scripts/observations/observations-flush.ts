@@ -1,17 +1,15 @@
-import { readFile } from 'node:fs/promises'
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { observation_ledger, OBSERVATION_LEDGER_PATH } from './observation-ledger'
-import { observation_ledger_line, type BrokenLine } from './observation-ledger-line'
-import { observation_ledger_migrate } from './observation-ledger-migrate'
+import type { BrokenLine } from './observation-ledger-line'
+import { observation_ledger_prepare } from './observation-ledger-prepare'
 import { observations_flush_landing } from './observations-flush-landing'
 
-// The commit path the observation ledger did not have (joshuafolkken/kit#1756). The parent session
-// that appends a line never runs `pnpm josh git`; a child runs it inside a lane work tree, which
-// cannot see the parent's checkout at all; and in the primary checkout `git add -u` swept the line
-// into whatever unrelated pull request that run was opening. So the ledger is excluded from ordinary
-// staging (`scripts/git/git-staging.ts`) and this is the one thing that stages it.
+// The commit path for the ledger lines no run's own commit carried (joshuafolkken/kit#1756). A run in
+// the primary checkout commits its appended lines with its own pull request (`scripts/git/
+// git-staging.ts`, joshuafolkken/kit#2763), so what is left here is a lane's lines — they sit in the
+// primary checkout, which a lane's commit cannot see — and whatever was appended after a commit.
 //
 // **The shape is `scripts/release/release-publish.ts`'s, deliberately.** Both open a pull request of
 // their own over one path, wait on the same required checks every other pull request waits on, and
@@ -57,7 +55,7 @@ function branch_name_for(stamp: string): string {
 // single issue, and the ledger's own lines say where each one was seen.
 function pull_request_body(): string {
 	return [
-		`Appended observations from \`${OBSERVATION_LEDGER_PATH}\`, which \`pnpm josh git\` never stages.`,
+		`Appended observations from \`${OBSERVATION_LEDGER_PATH}\` that no run's own commit carried.`,
 		'',
 		'The ledger is append-only, and a second line under one key is what promotes an observation to an issue — so this pull request adds lines and changes none.',
 		'',
@@ -373,29 +371,12 @@ function broken_lines_message(broken: ReadonlyArray<BrokenLine>): string {
 
 // **A malformed line is refused before a branch is cut, not after.** The ledger path was collected
 // without a line ever being parsed (joshuafolkken/kit#2123), so a broken append could ride a flush
-// through; validating here keeps the committed ledger to its grammar.
-//
-// **A ledger that is not there has no line to break** — the change the status saw is then its
-// deletion, and a flush commits that like any other change to it.
-async function read_ledger(): Promise<string> {
-	try {
-		return await readFile(OBSERVATION_LEDGER_PATH, 'utf8')
-	} catch {
-		return ''
-	}
-}
-
-async function refuse_broken_ledger(): Promise<void> {
-	const broken = observation_ledger_line.broken_ledger_lines(await read_ledger())
+// through; validating here keeps the committed ledger to its grammar. The migration and the parse are
+// `observation-ledger-prepare.ts`'s, shared with the run's own commit (joshuafolkken/kit#2763).
+async function prepare_ledger(): Promise<void> {
+	const broken = await observation_ledger_prepare.prepare(process.cwd())
 
 	if (broken.length > 0) throw new Error(broken_lines_message(broken))
-}
-
-// Lines still on the ledger's old path are moved before anything is validated or staged
-// (joshuafolkken/kit#2724), so the flush commits the move and the lines together.
-async function prepare_ledger(): Promise<void> {
-	observation_ledger_migrate.migrate(process.cwd())
-	await refuse_broken_ledger()
 }
 
 // **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by

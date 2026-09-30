@@ -5,12 +5,11 @@ import { git_command } from './git-command'
 import { git_followup_cleanup } from './git-followup-cleanup'
 import { main_sync } from './main-sync'
 
-// The observation ledger's only commit path is `pnpm josh observations:flush`, and until now no
-// command's procedure called it (joshuafolkken/kit#1810). The ledger is excluded from ordinary
-// staging (joshuafolkken/kit#1756), so an appended line stayed in the working tree until a person
-// remembered to flush it — the same "a run that had to remember is the run that forgets" defect the
-// staging side was built to avoid, left standing on the commit side. This wires the flush into
-// `pnpm josh followup`, the one step that knows the merge has landed.
+// The residual commit path for the observation ledger (joshuafolkken/kit#1810). A run's appended lines
+// ride its own commit (joshuafolkken/kit#2763), so after the merge the ledger is usually clean and this
+// short-circuits; what it still catches is a line appended after the commit — a second review round's
+// record — which would otherwise stay in the working tree until a person remembered to flush it. This
+// wires the flush into `pnpm josh followup`, the one step that knows the merge has landed.
 //
 // **It runs before the working-tree hold is released** (`scripts-ai/git-followup-finish.ts`, whose
 // `finish()` runs after `git_pr_followup.run()` returns), because a flush switches branches, and a

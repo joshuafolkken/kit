@@ -623,7 +623,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 ### `josh observations:flush`
 
-Commit the observation ledger (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. It is the ledger's only commit path — `josh git` excludes the ledger from staging.
+Commit the observation ledger lines no run's own commit carried (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run in the primary checkout needs none: `josh git` stages the ledger with the run's own commit when its grammar holds (joshuafolkken/kit#2763), so what is left here is a lane's lines and whatever was appended after a commit.
 
 ```bash
 pnpm josh observations:flush
@@ -1811,8 +1811,10 @@ Closes a run in one call, folding the three-round-trip post-merge sequence (josh
 `observations:flush`, `issue:cite` (the closed issue and any follow-ups filed this run) and
 `release:scope`, run in order — the ledger commits before the release scope reads main — and joined
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
-merge and the push above it stay their own calls. **A lane child skips `observations:flush`**; its
-line waits for `pnpm josh run:carry --end` (joshuafolkken/kit#2492).
+merge and the push above it stay their own calls. The flush is residual: a run's appended lines ride
+its own commit (joshuafolkken/kit#2763), so it commits only a line appended after that commit and
+otherwise prints `clean`. **A lane child skips `observations:flush`**; its line waits for
+`pnpm josh run:carry --end` (joshuafolkken/kit#2492).
 
 ### `josh ship`
 

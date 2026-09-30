@@ -52,9 +52,9 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['--task-type <type> --body <text>', 'automation', ['notifications']],
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
-	// The observation ledger's only commit path (joshuafolkken/kit#1756). `pnpm josh git` excludes the
-	// ledger from what it stages, so without this command a parent's appended line has no route to the
-	// default branch at all — and the recurrence count the promotion rule reads is a count of main.
+	// The observation ledger's commit path for the lines no run's own commit carried
+	// (joshuafolkken/kit#1756, joshuafolkken/kit#2763): a lane's lines sit in the primary checkout, which
+	// its commit cannot see, and the recurrence count the promotion rule reads is a count of main.
 	'observations:flush': {
 		script: 'scripts/observations/observations-flush-cli.ts',
 		description: 'Commit the observation ledger as a pull request of its own, and merge it',
