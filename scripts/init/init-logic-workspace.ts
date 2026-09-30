@@ -138,6 +138,6 @@ function merge_workspace_yaml(existing: string, template: string): string {
 	return append_user_blocks(cleaned, new_keys, template)
 }
 
-const init_logic_workspace = { merge_workspace_yaml }
+const init_logic_workspace = { merge_workspace_yaml, template_build_values }
 
 export { init_logic_workspace }

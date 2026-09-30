@@ -617,3 +617,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | medium | docs/init.md | 2026-09-30 | #2785
 - rf:tests | low | scripts/init/init-static-integration.test.ts | 2026-09-30 | #2785
 - rf:none | none | - | 2026-09-30 | #2785
+- rf:bug-risks | medium | scripts/init/init.ts | 2026-09-30 | #2794
+- rf:bug-risks | low | scripts/init/init-bootstrap.ts | 2026-09-30 | #2794
+- rf:tests | low | scripts/init/init-bootstrap.test.ts | 2026-09-30 | #2794

@@ -4,6 +4,7 @@ interface InstallStep {
 	label: string
 	command: string
 	args: ReadonlyArray<string>
+	env?: Readonly<Record<string, string>>
 }
 
 interface InstallRequest {
@@ -40,6 +41,7 @@ function did_step_succeed(step: InstallStep, project_root: string): boolean {
 	console.info(`\n$ ${step.label}`)
 	const result = execaSync(step.command, step.args, {
 		cwd: project_root,
+		env: step.env ?? {},
 		stdio: 'inherit',
 		reject: false,
 	})
@@ -60,5 +62,6 @@ function run_post_init_steps(project_root: string): string | undefined {
 	return undefined
 }
 
-const init_install = { NO_INSTALL_FLAG, split_install_flag, run_post_init_steps }
+const init_install = { NO_INSTALL_FLAG, split_install_flag, did_step_succeed, run_post_init_steps }
 export { init_install }
+export type { InstallStep }

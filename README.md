@@ -19,14 +19,18 @@ kit adds no linter or test runner for languages other than JavaScript and TypeSc
 In your project directory:
 
 ```bash
-pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
-pnpm exec josh init
+pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 pnpm josh gate
 ```
 
-`josh init` finishes by running `pnpm install` and `josh format` itself; pass `--no-install` to skip both, for example on CI or offline.
+`josh init` adds kit to the project, then finishes by running `pnpm install` and `josh format` itself. The version added is the one pnpm picks for the project, never whatever kit `dlx` happened to have cached ([init.md → Run from outside the project](./docs/init.md#run-from-outside-the-project)).
 
-`josh init` is the entry without GitHub. To start a new project on the GitHub Issue workflow (`kickoff`), run `pnpm exec josh start` instead of `josh init` — it also creates the Git repository, the GitHub repository and the labels ([init.md → `josh init` or `josh start`](./docs/init.md#josh-init-or-josh-start)).
+`josh init` is the entry without GitHub. To start a new project on the GitHub Issue workflow (`kickoff`), add kit first and run `josh start` instead of `josh init` — it also creates the Git repository, the GitHub repository and the labels ([init.md → `josh init` or `josh start`](./docs/init.md#josh-init-or-josh-start)):
+
+```bash
+pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
+pnpm exec josh start
+```
 
 It needs [Node.js](https://nodejs.org/) 22.19.0 or later with [pnpm](https://pnpm.io/), even for a `static` project; [getting-started.md](./docs/getting-started.md) installs both. The global `josh` command ([cli.md](./docs/cli.md)) and the [gh CLI](https://cli.github.com/) for `josh version` and the GitHub Issue workflow are optional.
 
