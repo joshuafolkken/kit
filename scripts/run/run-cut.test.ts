@@ -407,3 +407,17 @@ describe('record_within_bound checks the assembled record, not the handoff alone
 		expect(run_cut.record_within_bound(spec, START)).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#2760: the outside-lane cut resumes as `fullrun #N`, so only a hold `run:entry`
+// marked as a `fullrun`'s names an issue — a `halfrun` or in-session `backlogrun` child's does not.
+describe('fullrun_issue', () => {
+	const HOLD = { issue: ISSUE, taken_at: START.toISOString(), pid: 1 }
+
+	it.each([
+		[{ ...HOLD, is_fullrun: true }, ISSUE],
+		[HOLD, undefined],
+		[undefined, undefined],
+	])('reads %j as %j', (hold, expected) => {
+		expect(run_cut.fullrun_issue(hold)).toBe(expected)
+	})
+})

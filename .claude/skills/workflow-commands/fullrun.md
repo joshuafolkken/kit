@@ -58,11 +58,10 @@ call reports `hold`.
   ambient surface is the run's event stream, followed identically before and after a cut, so nothing
   about the reporter moves when execution hands off (`backlogrun-progress.md` → "The invariant is a
   tier, not a mechanism").
-- **A dispatched lane child asks whether it is a resume first — `pnpm josh run:cut --resume <N>`**; on
-  `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
+- **A lane child asks whether it is a resume first — `pnpm josh run:cut --resume <N>`** (`run:entry` asks it
+  before the hold, joshuafolkken/kit#2760); on `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
   boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
-  `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`, so the cut is taken before the gate
-  rather than after a refusal), and it records any park on the Issue before the stop notify.
+  `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`), and it records any park on the Issue before the stop notify.
   `pre-gate-cut.md` is the single source of both.
 
 ## The stop branches

@@ -5,9 +5,11 @@ import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { find_package_directory } from '#scripts/josh/josh-logic'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_reap } from '#scripts/lane/lane-reap'
 import { run_carry, type CarryRead } from './run-carry'
 import { run_event_scope } from './run-event-scope'
 import { run_event_stream } from './run-event-stream'
+import { run_headless } from './run-headless'
 import { run_prep_cli } from './run-prep-cli'
 import { run_retrospective } from './run-retrospective'
 import { run_step, type StepInput } from './run-step'
@@ -28,7 +30,18 @@ interface RunReads {
 	carry_kind: CarryRead['kind']
 	is_retrospective_done: boolean
 	is_at_cut_cap: boolean
+	is_handed_off: boolean
 	last_event: string | undefined
+}
+
+// **A hand-off stops only the session that declared the record** (joshuafolkken/kit#2760). The record is
+// one per repository, so a `fullrun #M` a person starts in a fresh conversation beside a `backlogrun`
+// waiting for its successor reads the same handed-off mark — and would be told to stop on every step.
+// The owner is `--owner "$PPID"`, an ancestor of this process only in the session that took the cut.
+function is_handed_off_here(carry: CarryRead): boolean {
+	if (carry.kind !== 'carried' || carry.carry.is_handed_off !== true) return false
+
+	return run_headless.is_owned_here(carry.carry, lane_reap.own_ancestry)
 }
 
 // The run-level reads, keyed on the common git directory both the carry and the event stream share. A
@@ -39,6 +52,7 @@ function read_run(directory: string | undefined, issue_number: string): RunReads
 			carry_kind: 'unreadable',
 			is_retrospective_done: false,
 			is_at_cut_cap: false,
+			is_handed_off: false,
 			last_event: undefined,
 		}
 	}
@@ -60,6 +74,7 @@ function read_run(directory: string | undefined, issue_number: string): RunReads
 		carry_kind: carry.kind,
 		is_retrospective_done: run_carry.retrospective_done_of(carry),
 		is_at_cut_cap: carry.kind === 'carried' && run_carry.is_at_cut_cap(carry.carry),
+		is_handed_off: is_handed_off_here(carry),
 		last_event: last?.kind,
 	}
 }
@@ -78,6 +93,7 @@ async function gather(issue_number: string): Promise<StepInput> {
 		carry_kind: run_reads.carry_kind,
 		is_retrospective_done: run_reads.is_retrospective_done,
 		is_at_cut_cap: run_reads.is_at_cut_cap,
+		is_handed_off: run_reads.is_handed_off,
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
 		// Read here rather than in `run-step.ts` so the position logic stays a pure function of its input.

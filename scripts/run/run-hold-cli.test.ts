@@ -80,6 +80,7 @@ describe('parse_request', () => {
 	it.each([
 		[[], 'claim'],
 		[[ISSUE], 'claim'],
+		[[ISSUE, '--fullrun'], 'claim'],
 		[['--release'], 'release'],
 		[['--release', ISSUE], 'release'],
 		[['--release', '--force'], 'force-release'],
@@ -87,12 +88,15 @@ describe('parse_request', () => {
 		expect(run_hold_cli.parse_request(argv)?.kind).toBe(kind)
 	})
 
-	it.each([[[NOT_A_NUMBER]], [['--release', NOT_A_NUMBER]], [[ISSUE, '12']], [['0']]])(
-		'refuses %j',
-		(argv) => {
-			expect(run_hold_cli.parse_request(argv)).toBeUndefined()
-		},
-	)
+	it.each([
+		[[NOT_A_NUMBER]],
+		[['--release', NOT_A_NUMBER]],
+		[[ISSUE, '12']],
+		[['0']],
+		[['--fullrun']],
+	])('refuses %j', (argv) => {
+		expect(run_hold_cli.parse_request(argv)).toBeUndefined()
+	})
 })
 
 describe('claiming a free work tree', () => {
@@ -101,12 +105,19 @@ describe('claiming a free work tree', () => {
 		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
 	})
 
-	it('records the issue number it was given', async () => {
-		await run_hold_cli.run([ISSUE])
+	// The issue number it was given, and — joshuafolkken/kit#2760 — the `fullrun` mark only `fullrun #N`'s
+	// entry sets, which scopes the outside-lane cut.
+	it.each([
+		[[ISSUE, '--fullrun'], true],
+		[[ISSUE], undefined],
+	])('records the issue for %j with is_fullrun %s', async (argv, is_fullrun) => {
+		await run_hold_cli.run(argv)
 
 		const read = run_hold.read_hold(run_hold.hold_path(WORKTREE))
 
-		expect(read.kind === 'held' ? read.hold.issue : undefined).toBe(ISSUE)
+		const hold = read.kind === 'held' ? read.hold : undefined
+
+		expect([hold?.issue, hold?.is_fullrun]).toStrictEqual([ISSUE, is_fullrun])
 	})
 
 	it('records an unnumbered run when the issue does not exist yet', async () => {

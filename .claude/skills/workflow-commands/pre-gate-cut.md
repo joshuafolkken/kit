@@ -198,14 +198,13 @@ whose recent-context cost is over threshold, handing back `pnpm josh run:cut --i
 `PreToolUse` refusal lands *before* the edit, so the tree is at the state the previous edit left it. `cut`
 ends the turn, the rest leave this process implementing; a fresh process's `pnpm josh run:cut --resume
 <N>` then answers **`resume-impl`**, so it **skips the title, plan, hold claim and split assessment** and
-**continues implementation** rather than gating. Unlike the pre-gate cut, **the implementation resume
-clears the record** (joshuafolkken/kit#2310): the pre-gate cut fires once per lane so its record must
-survive to answer a second resume `handed-off` (joshuafolkken/kit#1935), but this one may fire again, so
-its record is removed on resume. A double cut stays impossible — `begin_cut`'s exclusive create prevents
-it — so a lane crosses this boundary several times, each with exactly one successor.
+**continues implementation** rather than gating. Unlike the pre-gate cut, **the implementation resume clears the record**
+(joshuafolkken/kit#2310) — it may fire again, unlike the once-per-lane pre-gate cut
+(joshuafolkken/kit#1935); `begin_cut`'s exclusive create still gives each crossing one successor.
 
-- **It fires for a marked child and nowhere else** — the dispatch mark names this lane's own issue, so a
-  person's own `fullrun` carries no mark and sees no refusal.
+- **It fires for a marked child, or a run held outside a lane on a measured `over`**
+  (joshuafolkken/kit#2760); a person's tree holds no run. Outside a lane `cut` relaunches nothing: keep
+  the hold, send a `confirmation` Telegram naming `fullrun #<N>`, end the turn.
 - **It fires on every threshold crossing, not once per run** (joshuafolkken/kit#2385) — once per run
   silenced the row after its first refusal, so a `busy` / `failed` / `unready` verdict, or an edit
   reissued unchanged, left the context to grow unwatched (joshuafolkken/kit#2382 ran to 282,747 tokens,
@@ -213,8 +212,7 @@ it — so a lane crosses this boundary several times, each with exactly one succ
 - **An edit reissued right after a refusal passes** (joshuafolkken/kit#2385) — so a `busy` / `failed` cut
   cannot wedge the run: the reissue lands inside a short window and goes through, a genuinely new crossing
   past it refuses again.
-- **An unmeasurable session warrants the cut** (joshuafolkken/kit#2385) — the `verdict !== UNDER_VERDICT`
-  reading matches the pre-gate cut's `warrants_the_cut`, so they never disagree.
+- **An unmeasurable session warrants the cut** in a lane (joshuafolkken/kit#2385), as the pre-gate cut's does.
 - **It is silent between a cut and its resume** — a carried record naming this issue keeps it quiet; the
   resume clears it, and the fresh process reads its own transcript under threshold.
 - **The verdict read is reused over a short window** (joshuafolkken/kit#2385) — the whole-transcript

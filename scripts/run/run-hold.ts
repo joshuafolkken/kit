@@ -43,6 +43,11 @@ interface RunHold {
 	issue: string
 	taken_at: string
 	pid: number
+	// Set only by `fullrun #N`'s entry (`run:entry` claims with `--fullrun`, joshuafolkken/kit#2760).
+	// The implementation cut outside a lane resumes as `fullrun #N`, so a `halfrun` or an in-session
+	// `backlogrun` child — which hold the tree just the same — must not be read as one. Optional and
+	// `| undefined` because a record written before this field existed is simply not a `fullrun`'s.
+	is_fullrun?: boolean | undefined
 }
 
 type HoldRead =
@@ -81,6 +86,7 @@ const run_hold_schema = z.object({
 	issue: z.string(),
 	taken_at: z.string(),
 	pid: z.number(),
+	is_fullrun: z.boolean().optional(),
 })
 
 // `undefined` for anything that is not a well-formed record, so the caller decides what a broken one
@@ -125,8 +131,8 @@ function read_hold(target: string, now: Date = new Date()): HoldRead {
 	return classify(stamp_file.read_stamp_text(target), now)
 }
 
-function build_hold(issue: string, now: Date): RunHold {
-	return { issue, taken_at: now.toISOString(), pid: process.pid }
+function build_hold(issue: string, now: Date, is_fullrun?: boolean): RunHold {
+	return { issue, taken_at: now.toISOString(), pid: process.pid, is_fullrun }
 }
 
 function write_hold(target: string, issue: string, now: Date = new Date()): RunHold {
@@ -141,8 +147,13 @@ function write_hold(target: string, issue: string, now: Date = new Date()): RunH
 // an entry point in the same second both read `free`, and a write would tell both of them they won —
 // which is the incident this guard was written after, reproduced by the guard itself. `false` means
 // the other one got there first.
-function create_hold(target: string, issue: string, now: Date = new Date()): boolean {
-	return stamp_file.create_stamp(target, build_hold(issue, now))
+function create_hold(
+	target: string,
+	issue: string,
+	now: Date = new Date(),
+	is_fullrun?: boolean,
+): boolean {
+	return stamp_file.create_stamp(target, build_hold(issue, now, is_fullrun))
 }
 
 // **A tree with uncommitted work in it is never handed over, however old its record is.** No age can
