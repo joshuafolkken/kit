@@ -19,7 +19,7 @@ kit adds no linter or test runner for languages other than JavaScript and TypeSc
 In your project directory:
 
 ```bash
-pnpm add -D --allow-build=esbuild @joshuafolkken/kit
+pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 pnpm exec josh init
 pnpm josh gate
 ```
