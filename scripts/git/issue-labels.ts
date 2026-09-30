@@ -10,6 +10,11 @@ const IN_PROGRESS_LABEL = 'in-progress'
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
 // forever (joshuafolkken/kit#860).
 const NEEDS_DECISION_LABEL = 'needs-decision'
+// Marks an issue whose defect reaches the verification path, so it runs with nothing beside it
+// (joshuafolkken/kit#2776). A run applies it from the verification-path enumeration in `wip-cap.md`;
+// `backlog:next` enforces it (`backlog-solo.ts`), so the rule no longer rests on a judgement at
+// dispatch time.
+const RUN_SOLO_LABEL = 'run:solo'
 // Opts one issue outside any epic into unattended execution (joshuafolkken/kit#906). **Only a
 // person applies it.** `epicrun #<E>` approves the merges inside `#<E>`; this label is the only way
 // a person extends that approval past the epic's edge, so a label an AI could apply to itself would
@@ -191,6 +196,11 @@ const WORKFLOW_LABELS: ReadonlyArray<{
 		description: 'Tracks a batch of child issues from one split',
 	},
 	{ name: IN_PROGRESS_LABEL, color: '0075ca', description: 'Work is actively in progress' },
+	{
+		name: RUN_SOLO_LABEL,
+		color: 'b60205',
+		description: 'Runs alone in a backlogrun: nothing starts beside it',
+	},
 	...FILING_ROUTE_LABELS,
 	...DEPTH_LABELS,
 ]
@@ -269,6 +279,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	INTERRUPT_ROUTE_LABEL,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
+	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
 	DEPTH_0_LABEL,
@@ -301,6 +312,7 @@ export {
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
+	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
 	WORKFLOW_LABELS,

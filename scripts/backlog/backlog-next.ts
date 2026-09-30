@@ -2,11 +2,13 @@ import { fileURLToPath } from 'node:url'
 import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
+import { epic_busy } from '#scripts/epic/epic-busy'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_next } from '#scripts/epic/epic-next'
 import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
+import { epic_solo } from '#scripts/epic/epic-solo'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
@@ -266,13 +268,26 @@ function report_retry(context: PoolContext): number {
 	return SUCCESS_EXIT_CODE
 }
 
+// The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
+// `resolve` and a plan made before the run lists everything (joshuafolkken/kit#2776). The holders are
+// read only on a `run` answer — the one answer the gate can change.
+async function gate_solo(result: EpicNextResult, repo: string): Promise<EpicNextResult> {
+	if (result.verdict !== 'run') return result
+
+	const gated = epic_solo.gate(result, await epic_busy.read_repository(repo), repo)
+
+	if (gated.notice !== undefined) console.error(gated.notice)
+
+	return gated.result
+}
+
 async function answer_pool(context: PoolContext): Promise<number> {
 	const result = await resolve(context)
 
 	if (result === undefined) return FAILURE_EXIT_CODE
 	if (is_transport_failure(result)) return report_retry(context)
 
-	return report(result, context)
+	return report(await gate_solo(result, context.repo), context)
 }
 
 // A backlog nobody has opted into answers `none` before either listing below is asked for.

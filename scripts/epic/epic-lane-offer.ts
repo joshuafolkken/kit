@@ -7,6 +7,7 @@ import {
 } from './epic-candidate-confirm'
 import { epic_graph, type EpicChild } from './epic-graph'
 import type { EpicVerdict } from './epic-report'
+import { epic_solo } from './epic-solo'
 
 // Which children a repository has room to start right now (joshuafolkken/kit#1491).
 //
@@ -165,6 +166,25 @@ async function collect(
 	return { children, verdict: children.length > NO_LANES ? RUN_VERDICT : verdict }
 }
 
+// The `run:solo` gate `backlog:next` applies, applied to a named epic's lanes too
+// (joshuafolkken/kit#2776): the confirmed children are cut where `epic_solo.select` says, so a
+// `run:solo` child never opens a lane beside another one on either path.
+function solo_offer(
+	answer: { children: ReadonlyArray<EpicChild>; verdict: EpicVerdict },
+	read: BusyRead,
+	request: LaneRequest,
+): LaneOffer {
+	const { keep, notice } = epic_solo.select(answer.children, read, request.repo)
+
+	if (keep === NO_LANES && answer.children.length > NO_LANES) {
+		return { children: [], verdict: WAIT_VERDICT, notice: notice ?? '' }
+	}
+
+	const children = answer.children.slice(0, keep)
+
+	return { ...answer, children, notice: offered_notice(children, read, request) }
+}
+
 // The repository is asked how full it is **before** any candidate is confirmed, for the reason
 // joshuafolkken/kit#1121 records: a repository with no free lane is handed nothing, so the relations
 // request that would confirm a candidate there buys an answer nobody reads — and a polling `epicrun`
@@ -185,9 +205,8 @@ async function offer_for_repo(
 	}
 
 	const for_repo = dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo)))
-	const answer = await collect(for_repo, wanted_of(request, free))
 
-	return { ...answer, notice: offered_notice(answer.children, read, request) }
+	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request)
 }
 
 const epic_lane_offer = {

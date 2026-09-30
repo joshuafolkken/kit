@@ -1,7 +1,8 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
+import { epic_solo } from '#scripts/epic/epic-solo'
 import type { IssueReference } from '#scripts/git/git-epic-reference'
-import { has_label_name, IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
+import { has_label_name, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
 import type { OutOfScopeRow } from './backlog-scope'
 
 // The plan a person reads before a `backlogrun` starts (joshuafolkken/kit#1652).
@@ -74,8 +75,18 @@ function join_row(reference: string, title: string, note: string): string {
 	return `${ROW_INDENT}${parts.join('  ')}`
 }
 
+// A `run:solo` child is marked beside its number, so a person reading the plan sees which issues
+// `backlog:next` will start alone before the run starts (joshuafolkken/kit#2776).
+const SOLO_MARK = `[${RUN_SOLO_LABEL}]`
+
+function marked_reference(child: EpicChild, repo: string): string {
+	const reference = reference_of(child, repo)
+
+	return epic_solo.is_solo(child) ? `${reference} ${SOLO_MARK}` : reference
+}
+
 function row_of(child: EpicChild, context: PlanContext, note: string): string {
-	return join_row(reference_of(child, context.repo), title_of(child, context), note)
+	return join_row(marked_reference(child, context.repo), title_of(child, context), note)
 }
 
 // Why this one is not offered yet. The blocker numbers are the answer whenever there are any — that
@@ -221,9 +232,11 @@ const backlog_plan = {
 	PAST_OFFER_NOTE,
 	READY_HEADING,
 	SCOPE_HEADING,
+	SOLO_MARK,
 	UNUSABLE_HEADING,
 	WAITING_HEADING,
 	format_plan,
+	row_of,
 	waiting_note,
 }
 

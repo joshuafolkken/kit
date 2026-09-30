@@ -80,8 +80,8 @@ number (`pre-gate-cut.md` → "The dispatch mark" and "The stage is passed to th
 verification path itself.** It runs alone, and the batch resumes only once it has merged. **Decide it
 from the enumeration, never from how serious it looks** — does the defect reach the verification gate
 (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
-checks? One of those, and the offered children wait; none, and it fills a lane like any other child.
-**Ask it of what `epic:next --lanes` just offered, before opening a second lane**; the rule is
+checks? One of those, and the issue carries `run:solo`; none, and it fills a lane like any other child.
+`backlog:next` and `epic:next --lanes` enforce the label (joshuafolkken/kit#2776). The rule is
 `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」, its single source.
 
 **A lane's review does not inherit the lane, and `pnpm josh review:brief` is what closes that.**

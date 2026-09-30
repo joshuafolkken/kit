@@ -57,6 +57,9 @@ interface BacklogInput {
 	defect_rate?: DefectRate
 	// A measurement that could not be read at all.
 	is_rate_unreadable?: boolean
+	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer
+	// (joshuafolkken/kit#2776). Left out, nothing is running.
+	in_progress?: ReadonlyArray<OpenIssueData>
 }
 
 const AT_BASELINE: DefectRate = {
@@ -136,18 +139,27 @@ function stub_defect_priority(input: BacklogInput): void {
 	)
 }
 
-function stub_backlog(input: BacklogInput): void {
-	const epics = input.epics ?? []
-	const bodies = epic_bodies(epics)
-	const children = child_texts(input.children ?? [])
-
-	stub_environment()
+// The three label listings: the opted-in rows, the epics, and the `in-progress` holders the
+// `run:solo` gate reads (joshuafolkken/kit#2776).
+function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): void {
 	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockResolvedValue(
 		listing_outcome(JSON.stringify(input.opted_in ?? [])),
 	)
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(
 		listing_outcome(auto_ok_fixture.epic_listing(epics)),
 	)
+	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockResolvedValue(
+		listing_outcome(JSON.stringify(input.in_progress ?? [])),
+	)
+}
+
+function stub_backlog(input: BacklogInput): void {
+	const epics = input.epics ?? []
+	const bodies = epic_bodies(epics)
+	const children = child_texts(input.children ?? [])
+
+	stub_environment()
+	stub_listings(input, epics)
 	// The classified reads (joshuafolkken/kit#1690). An epic the fixture has no body for is a body that
 	// is simply absent, which is what it always meant here; a child it has no text for is a read that
 	// failed for a reason asking again will not change, which is what an absent payload meant.
