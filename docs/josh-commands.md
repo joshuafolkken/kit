@@ -1690,7 +1690,7 @@ Opens a run in one call, folding the four-round-trip entry sequence a lane re-bi
 (joshuafolkken/kit#2372): `run:hold`, `cost --cut` (skipped in a dispatched lane child), `run:prep` and
 `run:step`. The `entry #<N> — hold: … · cost: … · verdict: …` line carries the three facts the run
 branches on; a `busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit — the
-shape `backlog:offer` folded the parent loop head on.
+shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume <N>` before the hold: any answer but `fresh` prints `entry #<N> — resume: <token>` with that command's exit code and claims nothing, since an implementation cut outside a lane keeps its hold (joshuafolkken/kit#2760).
 
 ### `josh run:status`
 

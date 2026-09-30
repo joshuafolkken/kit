@@ -18,6 +18,7 @@ vi.mock('./run-prep', () => ({ run_prep: { format_report: format_report_mock } }
 const { run_entry_cli } = await import('./run-entry-cli')
 
 const OK = 0
+const FRESH = { code: OK, out: 'fresh' }
 const HELD = { code: OK, out: 'hold' }
 const UNDER = { code: OK, out: 'under\n43630 billed input tokens' }
 const PREP_BODY = '=== issue ===\nbody'
@@ -44,12 +45,16 @@ beforeEach(() => {
 
 describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and step into one report', () => {
 	it('claims the tree, reads the budget, gathers the reads and prints one composite', async () => {
-		josh_run_mock.mockResolvedValueOnce(HELD).mockResolvedValueOnce(UNDER)
+		josh_run_mock
+			.mockResolvedValueOnce(FRESH)
+			.mockResolvedValueOnce(HELD)
+			.mockResolvedValueOnce(UNDER)
 
 		const code = await run_entry_cli.run([ISSUE])
 
 		expect(code).toBe(OK)
 		expect(josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)).toStrictEqual([
+			['run:cut', '--resume', ISSUE],
 			['run:hold', ISSUE, '--fullrun'],
 			['cost', '--cut'],
 		])
@@ -62,18 +67,21 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 
 describe('run_entry_cli.run — a stop short-circuits before the reads it would waste', () => {
 	it('stops on a busy hold without reading the budget or the issue', async () => {
-		josh_run_mock.mockResolvedValueOnce({ code: OK, out: 'busy' })
+		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce({ code: OK, out: 'busy' })
 
 		const code = await run_entry_cli.run([ISSUE])
 
 		expect(code).not.toBe(OK)
-		expect(josh_run_mock).toHaveBeenCalledTimes(1)
+		expect(josh_run_mock).toHaveBeenCalledTimes(2)
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines[0]).toContain(`entry #${ISSUE} — hold: busy · cost: skipped · verdict: -`)
 	})
 
 	it('stops on a spent budget without reading the issue', async () => {
-		josh_run_mock.mockResolvedValueOnce(HELD).mockResolvedValueOnce({ code: OK, out: 'over' })
+		josh_run_mock
+			.mockResolvedValueOnce(FRESH)
+			.mockResolvedValueOnce(HELD)
+			.mockResolvedValueOnce({ code: OK, out: 'over' })
 
 		const code = await run_entry_cli.run([ISSUE])
 
@@ -83,14 +91,35 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 	})
 })
 
+// joshuafolkken/kit#2760: an implementation cut outside a lane keeps its hold, so claiming first
+// refused the fresh session `busy` by its own run's hold and the resume was never asked.
+describe('run_entry_cli.run — a carried cut is resumed before the hold is claimed', () => {
+	it.each([
+		['resume-impl', OK],
+		['over', 1],
+	])('answers %j with its exit code and claims nothing', async (token, exit) => {
+		josh_run_mock.mockResolvedValueOnce({ code: exit, out: token })
+
+		const code = await run_entry_cli.run([ISSUE])
+
+		expect(code).toBe(exit)
+		expect(josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)).toStrictEqual([
+			['run:cut', '--resume', ISSUE],
+		])
+		expect(gather_mock).not.toHaveBeenCalled()
+		expect(info_lines).toStrictEqual([`entry #${ISSUE} — resume: ${token}`])
+	})
+})
+
 describe('run_entry_cli — the lane-aware budget skip', () => {
 	it('skips cost --cut in a dispatched lane child, where the parent owns the budget', async () => {
 		is_child_mock.mockReturnValue(true)
-		josh_run_mock.mockResolvedValueOnce(HELD)
+		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(HELD)
 
 		await run_entry_cli.run([ISSUE])
 
 		expect(josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)).toStrictEqual([
+			['run:cut', '--resume', ISSUE],
 			['run:hold', ISSUE, '--fullrun'],
 		])
 		expect(info_lines[0]).toContain('cost: skipped')

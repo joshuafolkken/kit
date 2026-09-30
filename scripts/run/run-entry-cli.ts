@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { run_cut_report } from './run-cut-report'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_hold_cli } from './run-hold-cli'
 import { run_next } from './run-next'
@@ -100,7 +101,36 @@ function stop_report(issue_number: string, hold: string, cost: string, report: s
 	return emit({ issue_number, hold, cost, verdict: run_entry.NO_VERDICT, report })
 }
 
+interface Resume {
+	token: string
+	code: number
+}
+
+// **A resume is asked before the hold is claimed** (joshuafolkken/kit#2760). An implementation cut
+// outside a lane keeps its hold, so the fresh session's `fullrun #N` would be refused `busy` by its own
+// run's hold before it ever reached `run:cut --resume` — the hand-off the cut promised could not land.
+async function ask_resume(issue_number: string): Promise<Resume> {
+	const asked = await josh_command.josh_run(
+		['run:cut', '--resume', issue_number],
+		should_forward_stderr,
+	)
+
+	return { token: first_line(asked.out), code: asked.code }
+}
+
+// Anything but `fresh` is `run:cut --resume`'s answer to act on (`pre-gate-cut.md`), not a new run: the
+// token and its exit code are passed through, and nothing is claimed or read.
+function resume_report(issue_number: string, resume: Resume): number {
+	console.info(`entry #${issue_number} — resume: ${resume.token}`)
+
+	return resume.code
+}
+
 async function open_run(issue_number: string): Promise<number> {
+	const resume = await ask_resume(issue_number)
+
+	if (resume.token !== run_cut_report.FRESH_VERDICT) return resume_report(issue_number, resume)
+
 	const hold = await claim_hold(issue_number)
 
 	if (hold !== run_hold_cli.HOLD_VERDICT) {
