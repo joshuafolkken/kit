@@ -1,20 +1,32 @@
 import {
 	LEGACY_OBSERVATION_LEDGER_PATH,
+	MIGRATION_CLAIM_SUFFIX,
 	OBSERVATION_LEDGER_PATH,
 } from '#scripts/observations/observation-ledger'
+import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_command } from './git-command'
 import { git_prompt } from './git-prompt'
 import { git_staging } from './git-staging'
 import { git_status } from './git-status'
 
+const REPOSITORY_ROOT = '/repository'
+
 vi.mock('./git-command', () => ({
 	git_command: {
 		add_tracked: vi.fn(),
 		add_path: vi.fn(),
+		repository_root: vi.fn(),
 		status: vi.fn().mockResolvedValue(''),
 	},
 }))
+
+vi.mock('#scripts/observations/observation-ledger-prepare', () => ({
+	observation_ledger_prepare: { prepare: vi.fn().mockResolvedValue([]) },
+}))
+
+const MIGRATION_CLAIM_FILE = `${LEGACY_OBSERVATION_LEDGER_PATH}.123${MIGRATION_CLAIM_SUFFIX}`
+const BROKEN_LINE = { line: '- k:broken', reason: 'expected 5 fields' }
 
 vi.mock('./git-status', () => ({
 	git_status: {
@@ -97,17 +109,64 @@ describe('git_staging.check_and_confirm_staging — untracked files', () => {
 	})
 })
 
-// joshuafolkken/kit#1756: a parent session appends to the observation ledger in the primary
-// checkout, and the next `pnpm josh git` run there used to sweep that line into a pull request about
-// something else. Both halves are pinned, because the ledger can be either tracked or — in a
-// repository taking its first observation — untracked, and an exclusion covering one of the two
-// leaves the contamination on the other path.
-describe('git_staging.check_and_confirm_staging — the observation ledger', () => {
+// joshuafolkken/kit#2763: the ledger lines a run appended ride that run's own commit, so no pull
+// request of the ledger's own follows the merge. Both halves are pinned, because the ledger can be
+// either tracked or — in a repository taking its first observation — untracked.
+describe('git_staging.check_and_confirm_staging — the observation ledger rides the commit', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 	})
 
-	it('excludes the ledger from the tracked-file staging', async () => {
+	it('stages the ledger with the tracked files when its grammar holds', async () => {
+		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
+
+		await git_staging.check_and_confirm_staging(true)
+
+		expect(git_command.add_tracked).toHaveBeenCalledWith([])
+	})
+
+	it('stages an untracked ledger, but never a migration claim', async () => {
+		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
+		vi.mocked(git_status.list_untracked_files).mockReturnValueOnce([
+			OBSERVATION_LEDGER_PATH,
+			MIGRATION_CLAIM_FILE,
+		])
+
+		await git_staging.check_and_confirm_staging(true)
+
+		expect(git_command.add_path).toHaveBeenCalledExactlyOnceWith(OBSERVATION_LEDGER_PATH)
+	})
+
+	it('prepares the ledger at the repository root before staging', async () => {
+		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
+		vi.mocked(git_command.repository_root).mockResolvedValueOnce(REPOSITORY_ROOT)
+
+		await git_staging.check_and_confirm_staging(true)
+
+		expect(observation_ledger_prepare.prepare).toHaveBeenCalledWith(REPOSITORY_ROOT)
+	})
+
+	it('reads the status only after the migration has moved an old-path ledger', async () => {
+		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
+
+		await git_staging.check_and_confirm_staging(true)
+
+		const [prepared_at] = vi.mocked(observation_ledger_prepare.prepare).mock.invocationCallOrder
+		const [status_read_at] = vi.mocked(git_command.status).mock.invocationCallOrder
+
+		expect(prepared_at).toBeLessThan(status_read_at ?? 0)
+	})
+})
+
+// joshuafolkken/kit#2123: a line that breaks the ledger grammar never reaches a commit. The run's
+// commit still goes ahead, without the ledger, and says where the line is named.
+describe('git_staging.check_and_confirm_staging — a ledger that breaks the grammar', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vi.mocked(observation_ledger_prepare.prepare).mockResolvedValueOnce([BROKEN_LINE])
+	})
+
+	it('excludes both ledger paths from the tracked-file staging', async () => {
 		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
 
 		await git_staging.check_and_confirm_staging(true)

@@ -8,6 +8,9 @@
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
 - Keep `pnpm josh followup` in the foreground — nearly every following step reads its result.
+- **Record before the CI wait ends, never after the merge** (joshuafolkken/kit#2763): the commit
+  carries the observation ledger lines recorded so far, and while CI runs the run makes the records
+  that need no CI result — observation Issues, the completion report draft.
 - Overlap only tree-readers, and compose merge-independent tail data before `followup` (the table
   below is the full mapping); keep `josh ms`, state checks, next-child selection, lane closing and the
   session-cost check after the merge.
