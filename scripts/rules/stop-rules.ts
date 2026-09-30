@@ -67,9 +67,12 @@ interface StopContext {
 	headless_refusals: number
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
-	// A background task this run launched has not finished — `lane_background.pending_background_ids`
-	// over the transcript tail (joshuafolkken/kit#2704).
+	// A background task this run launched — a command or a subagent — has not finished —
+	// `lane_background.pending_background_ids` over the transcript tail (joshuafolkken/kit#2704).
 	background_pending: boolean
+	// A backgrounded subagent this run launched has not finished — `lane_background.pending_agent_ids`
+	// (joshuafolkken/kit#2774). Apart from `background_pending`, since only a subagent is sure to end.
+	agent_pending: boolean
 	// The resolved `JOSH_SESSION_LANG` — `session_language.resolve_session_lang` (joshuafolkken/kit#2470).
 	session_lang: string
 }
@@ -221,12 +224,21 @@ function needs_filing(context: StopContext): boolean {
 	return filing_offer.is_first_party_target(context.message, context.session_owner)
 }
 
+// **A running background subagent stands both hold rules down** (joshuafolkken/kit#2774). Its completion
+// notice re-invokes the session, so the turn-end is a wait on the run's own work, not on a person — a
+// notify there says "nothing needed" and dilutes the ones that do. A backgrounded command does not
+// count: a dev server never ends, and a stop behind it would leave a person silently waiting. A lane
+// child never reaches this with a task running: `needs_background_wait` answers it first.
+function is_held_idle(context: StopContext): boolean {
+	return context.hold_present && !context.agent_pending
+}
+
 function needs_notify(context: StopContext): boolean {
-	return context.hold_present && !context.notified
+	return is_held_idle(context) && !context.notified
 }
 
 function needs_release(context: StopContext): boolean {
-	return context.hold_present && context.tree_clean
+	return is_held_idle(context) && context.tree_clean
 }
 
 function citation_reason(message: string): string | undefined {

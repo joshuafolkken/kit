@@ -27,6 +27,8 @@ function never(): boolean {
 
 const TIMESTAMP = '2026-09-29T03:00:00.000Z'
 const TASK_ID = 'bxj18z032'
+const AGENT_ID = 'a6b97a47275a1a193'
+const DROPS_FINISHED_AGENT = 'drops a subagent whose finish notice is on the tail'
 const { context } = stop_rules_fixture
 
 function background_call(command: string): { name: string; input: Record<string, unknown> } {
@@ -38,6 +40,22 @@ function launch_line(id: string): string {
 		type: 'tool_result',
 		tool_use_id: 'toolu_1',
 		content: `Command running in background with ID: ${id}`,
+	}
+
+	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { content: [result] } })
+}
+
+// The launch result the harness writes for a subagent taken into the background (joshuafolkken/kit#2774),
+// in the list-of-text-blocks shape it really uses.
+function agent_launch_line(id: string): string {
+	const text = `Async agent launched successfully.\nagentId: ${id} (internal ID)`
+	const result = {
+		type: 'tool_result',
+		tool_use_id: 'toolu_2',
+		content: [
+			{ type: 'text', text },
+			{ type: 'text', text: 'output_file: /tmp/x.output' },
+		],
 	}
 
 	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { content: [result] } })
@@ -121,8 +139,34 @@ describe('lane_background.pending_background_ids', () => {
 		expect(lane_background.pending_background_ids(tail)).toStrictEqual([])
 	})
 
+	it('reports a subagent launched into the background and never finished', () => {
+		expect(lane_background.pending_background_ids(agent_launch_line(AGENT_ID))).toStrictEqual([
+			AGENT_ID,
+		])
+	})
+
+	it(DROPS_FINISHED_AGENT, () => {
+		const tail = [agent_launch_line(AGENT_ID), finish_line(AGENT_ID)].join('\n')
+
+		expect(lane_background.pending_background_ids(tail)).toStrictEqual([])
+	})
+
 	it('ignores a partial first line and a tail with no launch', () => {
 		expect(lane_background.pending_background_ids('{"type":"us\nnot json')).toStrictEqual([])
+	})
+})
+
+describe('lane_background.pending_agent_ids', () => {
+	it('reports the subagent and leaves a command out', () => {
+		const tail = [launch_line(TASK_ID), agent_launch_line(AGENT_ID)].join('\n')
+
+		expect(lane_background.pending_agent_ids(tail)).toStrictEqual([AGENT_ID])
+	})
+
+	it(DROPS_FINISHED_AGENT, () => {
+		const tail = [agent_launch_line(AGENT_ID), finish_line(AGENT_ID)].join('\n')
+
+		expect(lane_background.pending_agent_ids(tail)).toStrictEqual([])
 	})
 })
 
@@ -137,6 +181,33 @@ describe('stop_rules.stop_outcome — lane background wait', () => {
 		const stop = context({ background_pending: true })
 
 		expect(stop_rules.stop_outcome(stop).reason).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#2774: the subagent's completion notice re-invokes the session, so nobody is waited on.
+	it.each([true, false])(
+		'asks no notify or release of a held run waiting on a subagent (tree clean: %s)',
+		(tree_clean) => {
+			const pending = { background_pending: true, agent_pending: true }
+			const held = context({ ...pending, hold_present: true, tree_clean })
+
+			expect(stop_rules.stop_outcome(held).reason).toBeUndefined()
+		},
+	)
+
+	it.each([
+		['nothing running', {}],
+		['only a command running, which may never end', { background_pending: true }],
+	])('still asks the notify of a held run with %s', (_label, pending) => {
+		const held = context({ ...pending, hold_present: true })
+
+		expect(stop_rules.stop_outcome(held).reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	})
+
+	it('still refuses a bare issue number while a subagent runs', () => {
+		const pending = { background_pending: true, agent_pending: true }
+		const stop = context({ ...pending, hold_present: true, message: 'See #2774.' })
+
+		expect(stop_rules.stop_outcome(stop).reason).toContain('issue citation')
 	})
 
 	it('honours the loop-breaker', () => {

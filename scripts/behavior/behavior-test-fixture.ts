@@ -52,6 +52,7 @@ function bash_block(command: string): Block {
 		error_text: '',
 		refusal_guard: '',
 		background_id: '',
+		agent_id: '',
 	}
 }
 

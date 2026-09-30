@@ -78,6 +78,24 @@ describe('time_background.launch_id', () => {
 	})
 })
 
+describe('time_background.agent_launch_id', () => {
+	const AGENT_ID = 'a6b97a47275a1a193'
+
+	it('reads the agent id out of a background subagent launch result', () => {
+		const body = `Async agent launched successfully. (internal metadata)\nagentId: ${AGENT_ID} (internal ID)`
+
+		expect(time_background.agent_launch_id(body)).toBe(AGENT_ID)
+	})
+
+	// A command launch is `launch_id`'s, so the timeline windows never see a subagent.
+	it.each([LAUNCH_BODY, 'done', `quoted: Async agent launched\nagentId: ${AGENT_ID}`])(
+		'answers with nothing for %s',
+		(body) => {
+			expect(time_background.agent_launch_id(body)).toBe(time_background.NO_BACKGROUND)
+		},
+	)
+})
+
 describe('time_background.finished_id', () => {
 	it('reads the id out of the notice the harness writes when the task ends', () => {
 		expect(time_background.finished_id(FINISH_NOTICE)).toBe(GATE_ID)

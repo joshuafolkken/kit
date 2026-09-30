@@ -15,6 +15,7 @@ const BASE: StopContext = {
 	headless_refusals: 0,
 	lane_child: false,
 	background_pending: false,
+	agent_pending: false,
 	session_lang: 'en',
 }
 
