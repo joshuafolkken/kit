@@ -582,3 +582,9 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | low | scripts/backlog/backlog-next.ts:283 | 2026-09-30 | #2776
 - rf:performance | low | scripts/epic/epic-lane-offer.ts:209 | 2026-09-30 | #2776
 - rf:comments | low | scripts/epic/epic-lane-offer.ts:183 | 2026-09-30 | #2776
+- rf:bug-risks | medium | scripts/backlog/backlog-waves.ts | 2026-09-30 | #2778
+- rf:bug-risks | medium | scripts/backlog/backlog-plan-cli.ts | 2026-09-30 | #2778
+- rf:bug-risks | medium | scripts/epic/epic-lane-offer.ts | 2026-09-30 | #2778
+- rf:comments | low | scripts/backlog/backlog-waves.ts | 2026-09-30 | #2778
+- rf:bug-risks | low | scripts/epic/epic-lane-offer.ts | 2026-09-30 | #2778
+- rf:tests | low | scripts/backlog/backlog-waves.test.ts | 2026-09-30 | #2778

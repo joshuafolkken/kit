@@ -21,11 +21,18 @@ const HOLDER = 950
 const streams = console_streams()
 const { stdout, stderr } = streams
 
-function epic_with(first: ReadonlyArray<string>, in_progress: ReadonlyArray<string> = []): void {
+function epic_with(
+	first: ReadonlyArray<string>,
+	in_progress: ReadonlyArray<string> = [],
+	second: ReadonlyArray<string> = [],
+): void {
 	backlog_fixture.stub_backlog({
 		opted_in: [opted_in_epic()],
 		epics: [{ number: EPIC_NUMBER, children: [CHILD, SECOND_CHILD] }],
-		children: [{ number: CHILD, labels: first }, { number: SECOND_CHILD }],
+		children: [
+			{ number: CHILD, labels: first },
+			{ number: SECOND_CHILD, labels: second },
+		],
 		in_progress:
 			in_progress.length === 0
 				? []
@@ -50,6 +57,20 @@ describe('backlog:next with run:solo', () => {
 
 	it('prints only the run:solo child when the repository is idle', async () => {
 		epic_with([RUN_SOLO_LABEL])
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(CHILD))
+	})
+
+	it('prints a later run:solo child alone, ahead of the ranking, when the repository is idle', async () => {
+		epic_with([], [], [RUN_SOLO_LABEL])
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(SECOND_CHILD))
+	})
+
+	it('prints only the children ahead of a later run:solo child while another issue holds a lane', async () => {
+		epic_with([], [AUTO_OK_LABEL], [RUN_SOLO_LABEL])
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(CHILD))

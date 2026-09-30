@@ -1296,7 +1296,7 @@ stdout is one token per line (all exit 0 unless noted): `<number>…` (each an i
 
 **Defect priority** (joshuafolkken/kit#2455): on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline recorded on joshuafolkken/kit#2449 (0.42), the runnable numbers are re-ordered — defects (`- 種別: 不具合` or `route:interrupt`) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
 
-**`run:solo` gate** (joshuafolkken/kit#2776): on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. A `run:solo` candidate at the head is printed alone, and only when nothing is running; otherwise it prints `wait`. A `run:solo` candidate further down cuts the list, so only the candidates ahead of it are printed. When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]`.
+**`run:solo` gate** (joshuafolkken/kit#2776): on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. When nothing is running, the first `run:solo` candidate is printed alone, wherever it ranks (joshuafolkken/kit#2778). While other lanes run, a `run:solo` candidate at the head prints `wait`, and one further down cuts the list, so only the candidates ahead of it are printed. When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]`.
 
 ### `josh backlog:plan`
 
@@ -1305,9 +1305,17 @@ The whole backlog rendered as a plan a person reads before a run starts — four
 ```bash
 pnpm josh backlog:plan
 pnpm josh backlog:plan --exclude 1630  # after #1630 merged
+pnpm josh backlog:plan --waves         # the run order, wave by wave
 ```
 
 - `--exclude <N>` — same exclusion as `backlog:next`.
+- `--waves` — print the order the run takes instead of the sections (joshuafolkken/kit#2778). It assumes each wave merges before the next one starts, leaves out issues a run already has, and plans only this repository. Wave 1 is what `backlog:next` prints for an idle repository; each later wave marks the earlier ones closed and applies the same classification and `run:solo` gate again. A wave of several issues is marked `(parallel)`. Issues no wave reaches are listed last with their reason. Read-only, and refused with named issues or `--only`.
+
+```text
+Wave 1  #2770 [run:solo]
+Wave 2  #2765 [run:solo]
+Wave 3  #2774 #2766 #2769   (parallel)
+```
 
 Sections: **Ready now** (runnable children, grouped by repository = the parallelism; a `run:solo` row is marked `[run:solo]`), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
 

@@ -236,7 +236,10 @@ const backlog_plan = {
 	UNUSABLE_HEADING,
 	WAITING_HEADING,
 	format_plan,
+	format_unusable,
+	marked_reference,
 	row_of,
+	section,
 	waiting_note,
 }
 
