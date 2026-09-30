@@ -16,7 +16,7 @@ import { epic_lane_offer, type LaneOffer, type LaneRequest } from './epic-lane-o
 import { epic_next_read, type EpicRead, type SnapshotReads } from './epic-next-read'
 import { epic_next_views, type EpicView } from './epic-next-views'
 import { epic_outside_blocker } from './epic-outside-blocker'
-import { epic_report, type EpicNextResult, type EpicVerdict } from './epic-report'
+import { epic_report, type EpicNextResult } from './epic-report'
 
 // `josh epic:next <E…>` — which of the named epics' children can be started right now, bundled per
 // repository, and what the rest are waiting on (joshuafolkken/kit#860).
@@ -210,7 +210,7 @@ function refuse(reason: string): number {
 // The verdict as it applies to *this* repository. `run` never reaches a caller here: it means some
 // other repository has work, which for this session is something to wait on rather than a state its
 // loop has a branch for. The whole-run timeout is what bounds that wait.
-function repo_verdict(verdict: EpicVerdict): EpicVerdict {
+function repo_verdict(verdict: LaneOffer['verdict']): LaneOffer['verdict'] {
 	return verdict === 'run' ? 'wait' : verdict
 }
 

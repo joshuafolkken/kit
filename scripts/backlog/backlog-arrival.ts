@@ -1,3 +1,4 @@
+import { epic_triage } from '#scripts/epic/epic-triage'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { run_headless } from '#scripts/run/run-headless'
 import { backlog_next } from './backlog-next'
@@ -51,6 +52,10 @@ function answered_issues(result: JoshResult | undefined): ReadonlyArray<string> 
 		throw new Error('`backlog:next` did not answer')
 	}
 
+	// `triage` names no number, yet the parent has work — so it is read as one token, which a reading
+	// sees as an arrival (joshuafolkken/kit#2779).
+	if (backlog_stalled.needs_triage(result.out)) return [epic_triage.TRIAGE_VERDICT]
+
 	return backlog_stalled.ready_tokens(result.out)
 }
 
@@ -76,9 +81,14 @@ function arrivals(baseline: ReadonlySet<string>, reading: ReadyReading): Readonl
 
 // The baseline is the whole runnable pool, free lane or not: an issue that was waiting for a lane is not
 // new when one frees, and the child's merge that freed it already wakes the parent.
+//
+// A baseline read during a `triage` answer names none of the issues it withheld, so every one of them
+// would arrive once they were judged — the whole-pool wake. It is read as a baseline that did not answer.
 async function read_baseline(ports: ReadyPorts): Promise<ReadonlySet<string> | undefined> {
 	try {
-		return new Set(await ports.ready_issues())
+		const issues = await ports.ready_issues()
+
+		return issues.includes(epic_triage.TRIAGE_VERDICT) ? undefined : new Set(issues)
 	} catch {
 		return undefined
 	}

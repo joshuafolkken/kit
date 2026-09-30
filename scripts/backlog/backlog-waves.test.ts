@@ -2,7 +2,12 @@ import { epic_cross_repo } from '#scripts/epic/epic-cross-repo'
 import type { EpicChild, IssueReference } from '#scripts/epic/epic-graph'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo } from '#scripts/epic/epic-solo'
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/git/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'
@@ -36,7 +41,7 @@ function child(number: number, spec: ChildSpec = {}): EpicChild {
 		number,
 		repo,
 		state: 'OPEN',
-		labels: spec.labels ?? [],
+		labels: spec.labels ?? [RUN_LANE_LABEL],
 		blocked_by: (spec.blocked_by ?? []).map((blocker) => ({
 			repo,
 			number: blocker,
@@ -183,7 +188,7 @@ describe('backlog_waves.format_waves', () => {
 	})
 
 	it('names what each unreached issue waits on', () => {
-		const parked = child(PARKED, { labels: [NEEDS_DECISION_LABEL] })
+		const parked = child(PARKED, { labels: [NEEDS_DECISION_LABEL, RUN_LANE_LABEL] })
 		const input = result([child(FIRST)], [], [parked, child(SECOND, { blocked_by: [PARKED] })])
 		const text = backlog_waves.format_waves(input, CONTEXT)
 

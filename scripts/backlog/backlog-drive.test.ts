@@ -241,6 +241,22 @@ describe('backlog_drive.run_pass — verdicts', () => {
 	})
 })
 
+// joshuafolkken/kit#2779: an untriaged candidate is the parent's to judge.
+describe('backlog_drive.run_pass — triage', () => {
+	it('hands triage back without launching, leaving running children in flight', async () => {
+		const { ports, calls } = harness({ offers: [offer('triage')] })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+
+		expect(calls).toStrictEqual(['offer'])
+		expect(result.kind === 'end' && result.end).toStrictEqual({
+			reason: 'triage',
+			token: 'triage',
+			issue: undefined,
+		})
+		expect(result.state.in_flight).toStrictEqual([FIRST_CHILD])
+	})
+})
+
 describe('backlog_drive.run_loop', () => {
 	it('dispatches, collects and ends without the parent until the run stops', async () => {
 		const { ports, calls, states } = harness({

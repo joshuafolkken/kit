@@ -1211,7 +1211,7 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 **Options:**
 
 - `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
-- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6.
+- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in [`josh backlog:next`](#josh-backlognext), joshuafolkken/kit#2779).
 
 Several leading epic arguments merge into one candidate pool per repository. A cross-repository dependency resolves only when the blocker is closed **and** its declared version has published. `run`/`wait`/`stop`/`complete` exit `0`; an unusable graph (cycle, or body/relations disagreement) exits `1`.
 
@@ -1292,11 +1292,13 @@ pnpm josh backlog:next --exclude 1630  # skip the issue just merged
 
 - `--exclude <N>` — drop issues from every bucket; comma-separated, repeatable.
 
-stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
+stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `triage` (a candidate is untriaged — see below), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
+
+**Triage gate** (joshuafolkken/kit#2779): a candidate is triaged when it carries `run:solo` (runs alone) or `run:lane` (may run beside others), matched case-insensitively. When any candidate of this repository carries neither, the command prints `triage` and no numbers — an untriaged issue may be one that must run alone, so none of the others may start either — and names the untriaged issues on stderr. `backlog:offer` maps it to the budget answer `untriaged`, `backlog:budget` answers `triage`, and `backlog:drive` hands it back to the parent. The gate runs before the `run:solo` gate below. `epic:next --lanes` applies it to a named epic's lanes too.
 
 **Defect priority** (joshuafolkken/kit#2455): on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline recorded on joshuafolkken/kit#2449 (0.42), the runnable numbers are re-ordered — defects (`- 種別: 不具合` or `route:interrupt`) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
 
-**`run:solo` gate** (joshuafolkken/kit#2776): on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. When nothing is running, the first `run:solo` candidate is printed alone, wherever it ranks (joshuafolkken/kit#2778). While other lanes run, a `run:solo` candidate at the head prints `wait`, and one further down cuts the list, so only the candidates ahead of it are printed. When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]`.
+**`run:solo` gate** (joshuafolkken/kit#2776): on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. When nothing is running, the first `run:solo` candidate is printed alone, wherever it ranks (joshuafolkken/kit#2778). While other lanes run, a `run:solo` candidate at the head prints `wait`, and one further down cuts the list, so only the candidates ahead of it are printed. When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]` and rows with neither label `[untriaged]`.
 
 ### `josh backlog:plan`
 
@@ -1317,7 +1319,7 @@ Wave 2  #2765 [run:solo]
 Wave 3  #2774 #2766 #2769   (parallel)
 ```
 
-Sections: **Ready now** (runnable children, grouped by repository = the parallelism; a `run:solo` row is marked `[run:solo]`), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
+Sections: **Ready now** (runnable children, grouped by repository = the parallelism; a `run:solo` row is marked `[run:solo]`, a row with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
 
 ### `josh backlog:stalled`
 
@@ -1339,13 +1341,13 @@ pnpm josh backlog:budget --answer exhausted  --started "$started" --active "$act
 pnpm josh backlog:budget --answer candidates --started "$started" --active "$active" --merged 3 --running 2 --max 5
 ```
 
-- `--answer <candidates|exhausted|blocked|parked|unreadable>` — `backlog:next`'s answer, mapped.
+- `--answer <candidates|exhausted|blocked|parked|unreadable|untriaged>` — `backlog:next`'s answer, mapped.
 - `--started` / `--active` — when the invocation began / when it last had work (required unless the watch is off).
 - `--idle <minutes>` — after candidates run out, keep polling this long (default 30; `--idle 0` turns the watch off).
 - `--max <count>` — issues one invocation may take (default unlimited); `--merged` and `--running` count against it.
 - `--json` — collapse verdict and reason into `{"budget": "<verdict>", "reason": "…"}`.
 
-stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), or empty with exit 1 if the invocation is unreadable. The whole-run bound (8 hours) is decided here and outranks both budgets, but a `parked` or `unreadable` answer outranks the bound. A watch polls every 5 min.
+stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), `triage` (judge the untriaged issues, then ask again — only after the bound and the maximum), or empty with exit 1 if the invocation is unreadable. The whole-run bound (8 hours) is decided here and outranks both budgets, but a `parked` or `unreadable` answer outranks the bound. A watch polls every 5 min.
 
 ### `josh backlog:offer`
 
@@ -1367,7 +1369,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
+An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
 
 ### `needs-human-review` — the opposite label
 

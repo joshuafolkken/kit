@@ -249,6 +249,7 @@ words:
   - inlines
   - extensionless
   - triaging
+  - untriaged
   - mnemecha
   - waneccha
   - ENOENT

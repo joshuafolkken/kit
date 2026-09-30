@@ -588,3 +588,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:comments | low | scripts/backlog/backlog-waves.ts | 2026-09-30 | #2778
 - rf:bug-risks | low | scripts/epic/epic-lane-offer.ts | 2026-09-30 | #2778
 - rf:tests | low | scripts/backlog/backlog-waves.test.ts | 2026-09-30 | #2778
+- rf:bug-risks | medium | scripts/run/run-wake-work.ts | 2026-09-30 | #2779
+- rf:bug-risks | medium | scripts/backlog/backlog-arrival.ts | 2026-09-30 | #2779
+- rf:bug-risks | low | scripts/epic/epic-lane-offer.ts | 2026-09-30 | #2779
