@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createInterface } from 'node:readline/promises'
@@ -33,6 +41,15 @@ const PNPM_INSTALL = 'pnpm install'
 
 function write_index_html(): void {
 	writeFileSync(path.join(paths_mock.root, 'index.html'), '<h1>Hello</h1>')
+}
+
+// `init` does the setup only as the kit the project itself installed; any other kit hands off to that
+// one first (joshuafolkken/kit#2794).
+function install_project_kit(): void {
+	const scope = path.join(paths_mock.root, 'node_modules', '@joshuafolkken')
+
+	mkdirSync(scope, { recursive: true })
+	symlinkSync(paths_mock.package_dir, path.join(scope, 'kit'))
 }
 
 // The cases below pin what `init` writes, so they skip the install it ends with; the install itself
@@ -199,6 +216,10 @@ describe('static initialization after Git adoption', () => {
 // `init` ends by installing what it listed and formatting, so the quick start needs no separate
 // `pnpm install` / `josh format` (joshuafolkken/kit#2766).
 describe('the install and format init finishes with', () => {
+	beforeEach(() => {
+		install_project_kit()
+	})
+
 	it('installs, then formats, and drops the manual install hint', async () => {
 		write_index_html()
 		mocked_execa.mockReturnValue(fake_git_result(0, ''))
@@ -224,5 +245,44 @@ describe('the install and format init finishes with', () => {
 		await run_init([NO_INSTALL, '--profile', 'static'])
 
 		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+})
+
+// A `pnpm dlx` kit may be a stale cache entry; the version the project gets is pnpm's choice, and the
+// setup is that version's (joshuafolkken/kit#2794).
+describe('a kit run from outside the project', () => {
+	it('installs the project kit and hands the run to it without writing anything itself', async () => {
+		write_index_html()
+		mocked_execa.mockReturnValue(fake_git_result(0, ''))
+		await run_init(['--profile', 'static'])
+
+		expect(invoked_commands()).toStrictEqual([
+			'pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit',
+			'pnpm exec josh init --profile static',
+		])
+		expect(existsSync(path.join(paths_mock.root, PACKAGE_JSON))).toBe(false)
+	})
+
+	it('fails without handing off when the kit install fails', async () => {
+		write_index_html()
+		mocked_execa.mockReturnValue(fake_git_result(1, ''))
+
+		await expect(run_init([])).rejects.toThrow('@joshuafolkken/kit failed')
+		expect(mocked_execa).toHaveBeenCalledTimes(1)
+	})
+
+	it('refuses a malformed profile before installing anything', async () => {
+		write_index_html()
+
+		await expect(run_init(['--profile', 'bogus'])).rejects.toThrow('Profile must be static or node')
+		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+
+	it('sets the project up itself under --no-install', async () => {
+		write_index_html()
+		await run_init([NO_INSTALL])
+
+		expect(mocked_execa).not.toHaveBeenCalled()
+		expect(existsSync(path.join(paths_mock.root, PACKAGE_JSON))).toBe(true)
 	})
 })

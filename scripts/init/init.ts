@@ -15,12 +15,13 @@ import { execaSync } from 'execa'
 import { z } from 'zod'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
+import { init_bootstrap } from './init-bootstrap'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { init_static } from './init-static'
 import { plugin_install_hint_module } from './plugin-install-hint'
-import { project_profile, type ProjectShape } from './project-profile'
+import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -320,15 +321,32 @@ function finish_dependencies(shape: ProjectShape, is_install: boolean): void {
 	if (failure !== undefined) throw new Error(failure)
 }
 
-function main(args: ReadonlyArray<string> = []): void {
-	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
-	const { is_install, rest } = init_install.split_install_flag(args)
-	const requested = project_profile.requested_profile(rest, INIT_USAGE)
+// A kit run from outside the project — `pnpm dlx`, a global install — sets nothing up itself: it
+// installs the project's kit and hands the whole run to that one (joshuafolkken/kit#2794). Under
+// `--no-install` nothing is installed, so the running kit does the setup as before.
+function did_hand_off(args: ReadonlyArray<string>): boolean {
+	if (init_bootstrap.is_project_kit(PACKAGE_DIR, PROJECT_ROOT)) return false
+	const failure = init_bootstrap.hand_off(PACKAGE_DIR, PROJECT_ROOT, args)
+	if (failure !== undefined) throw new Error(failure)
+
+	return true
+}
+
+function set_up_project(requested: ProjectProfile | undefined, is_install: boolean): void {
 	const shape = project_profile.inspect_project(PROJECT_ROOT, requested)
 
 	initialize_project(shape)
 	finish_dependencies(shape, is_install)
 	console.info('\n✅ Done.\n')
+}
+
+function main(args: ReadonlyArray<string> = []): void {
+	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
+	const { is_install, rest } = init_install.split_install_flag(args)
+	// Validated before the hand-off, so a malformed invocation is refused before kit is installed.
+	const requested = project_profile.requested_profile(rest, INIT_USAGE)
+
+	if (!is_install || !did_hand_off(args)) set_up_project(requested, is_install)
 }
 
 function run_cli(args: ReadonlyArray<string>): void {
