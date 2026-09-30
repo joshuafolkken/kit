@@ -1550,11 +1550,12 @@ Guard a working tree so only one run holds it at a time — `run:hold` claims it
 
 ```bash
 pnpm josh run:hold 1091          # claim for issue 1091
+pnpm josh run:hold 1091 --fullrun  # claim as `fullrun #1091` (what `run:entry` runs)
 pnpm josh run:release 1091       # release this run's own record
 pnpm josh run:release --force    # clear a record left by a run that has ended
 ```
 
-**Options:** `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
+**Options:** `--fullrun` (`run:hold <N>`) marks the record as `fullrun #N`'s, the one hold the implementation cut outside a lane acts on (joshuafolkken/kit#2760); `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
 
 **Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an existing branch/PR, or a merged/closed PR), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
 
@@ -1595,7 +1596,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not (joshuafolkken/kit#2136). A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
 - `--end` over a live record flushes pending ledger lines once (joshuafolkken/kit#2492); a failed flush goes to stderr and the record is still cleared.
 
-**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
+**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` (#2760) exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
 ### `josh run:wake`
 
@@ -1623,6 +1624,9 @@ another live owner's run.
 
 Cut a dispatched lane child before the verification gate. OpenAI uses its lane supervisor; Anthropic
 relaunches directly. With no matching supervisor, OpenAI returns `failed` before writing the cut.
+Outside a lane only an `--impl` cut on a tree `run:hold <N> --fullrun` holds for that issue is taken
+(joshuafolkken/kit#2760): the record is written and nothing is relaunched, so the session ends its turn
+and a fresh `fullrun #<N>` resumes it; every other cut outside a lane answers `not-a-lane`.
 
 ```bash
 pnpm josh run:cut 1839                          # take the cut and hand it to a fresh process
@@ -1641,7 +1645,7 @@ rather than continuing blind.
 
 The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while an `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
 
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or an `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). The setup-phase `--setup` cut (joshuafolkken/kit#2346) is retired (joshuafolkken/kit#2489): a lane child's context is bounded by the threshold-gated implementation cut alone, and `--setup` is a usage error. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
+**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or an `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). The setup-phase `--setup` cut (joshuafolkken/kit#2346) is retired (joshuafolkken/kit#2489): a lane child's context is bounded by the threshold-gated implementation cut alone, and `--setup` is a usage error. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` (matched the tree but carried no instruction), or `over` (an implementation cut asked for by a session still over the context-cut threshold; the record is kept for a fresh session, joshuafolkken/kit#2760).
 
 ### `josh run:liveness`
 

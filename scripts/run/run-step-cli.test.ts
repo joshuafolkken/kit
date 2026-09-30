@@ -11,6 +11,8 @@ const repo_directory_mock = vi.hoisted(() => vi.fn())
 const read_carry_mock = vi.hoisted(() => vi.fn())
 const read_events_mock = vi.hoisted(() => vi.fn())
 const cut_cap_mock = vi.hoisted(() => vi.fn(() => false))
+// The session's own process ancestry, which a handed-off record's owner is checked against.
+const ancestry_mock = vi.hoisted(() => vi.fn((): ReadonlySet<number> => new Set()))
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
 // Hoisted so the mock's EVENT_KIND and the stale-event regression test name the one kind once
@@ -32,6 +34,8 @@ vi.mock('./run-carry', () => ({
 		is_at_cut_cap: cut_cap_mock,
 	},
 }))
+
+vi.mock('#scripts/lane/lane-reap', () => ({ lane_reap: { own_ancestry: ancestry_mock } }))
 
 vi.mock('./run-event-stream', () => ({
 	run_event_stream: {
@@ -281,5 +285,40 @@ describe('run_step_cli.run — the JOSH_RETROSPECTIVE switch', () => {
 		await run_step_cli.run([ISSUE])
 
 		expect(printed()).toBe(run_step.RETROSPECTIVE_COMMAND)
+	})
+})
+
+describe('run_step_cli.run — a handed-off carry record', () => {
+	const OWNER_PID = 4242
+	const OTHER_PID = 5151
+
+	function hand_off(): void {
+		read_carry_mock.mockReturnValue({
+			kind: CARRIED,
+			carry: { started_at: RUN_START, is_handed_off: true, owner_pid: OWNER_PID },
+		})
+		read_events_mock.mockReturnValue([stream_event('merge', RUN_START)])
+	}
+
+	// joshuafolkken/kit#2760: the hand-off mark is read off the record, so the session that took the cut
+	// is told to stop rather than pointed at the next child.
+	it('stops the session that declared the handed-off record', async () => {
+		hand_off()
+		ancestry_mock.mockReturnValue(new Set([OTHER_PID, OWNER_PID]))
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).toBe(run_step.STOP)
+	})
+
+	// A `fullrun #M` started in another conversation shares the repository's record, but is not its owner,
+	// so the parent's hand-off must not stop it.
+	it('does not stop a session that is not the record’s owner', async () => {
+		hand_off()
+		ancestry_mock.mockReturnValue(new Set([OTHER_PID]))
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed()).not.toBe(run_step.STOP)
 	})
 })

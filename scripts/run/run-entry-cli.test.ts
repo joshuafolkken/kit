@@ -50,7 +50,7 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 
 		expect(code).toBe(OK)
 		expect(josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)).toStrictEqual([
-			['run:hold', ISSUE],
+			['run:hold', ISSUE, '--fullrun'],
 			['cost', '--cut'],
 		])
 		expect(gather_mock).toHaveBeenCalledTimes(1)
@@ -91,7 +91,7 @@ describe('run_entry_cli — the lane-aware budget skip', () => {
 		await run_entry_cli.run([ISSUE])
 
 		expect(josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)).toStrictEqual([
-			['run:hold', ISSUE],
+			['run:hold', ISSUE, '--fullrun'],
 		])
 		expect(info_lines[0]).toContain('cost: skipped')
 	})

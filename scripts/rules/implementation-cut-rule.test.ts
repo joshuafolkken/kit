@@ -48,7 +48,7 @@ describe('the delivered text — what the refusal states', () => {
 	// **The dispatch mark is what fires the refusal, so a person sees none** (joshuafolkken/kit#1904).
 	it('states that the dispatch mark fired it, and a person carries none', () => {
 		expect(delivered).toContain('the dispatch mark names this lane')
-		expect(delivered).toContain('carries no mark and sees no refusal')
+		expect(delivered).toContain('carries no mark and holds no run, so sees no refusal')
 	})
 })
 

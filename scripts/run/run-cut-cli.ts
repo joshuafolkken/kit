@@ -9,6 +9,7 @@ import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_handoff } from './run-cut-handoff'
+import { run_cut_report } from './run-cut-report'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 
@@ -24,115 +25,41 @@ import { run_event_stream_emit } from './run-event-stream-emit'
 // session.
 
 const ARGV_OFFSET = 2
-const SUCCESS_EXIT_CODE = 0
-const FAILURE_EXIT_CODE = 1
 
-const CUT_VERDICT = 'cut'
-const RESUME_VERDICT = 'resume'
-// An implementation-phase resume: the fresh process continues implementing rather than going to the
-// gate (joshuafolkken/kit#1933). It is a distinct token so the resuming child branches on it without
-// re-reading the record.
-const RESUME_IMPL_VERDICT = 'resume-impl'
-const FRESH_VERDICT = 'fresh'
-// The recent-window context is under the shared cut threshold, so the pre-gate cut was not worth its
-// resume and nothing was cut (joshuafolkken/kit#2312). A benign, non-failing answer: the run carries
-// on to the gate itself, exactly as `not-a-lane` does.
-const UNDER_THRESHOLD_VERDICT = 'under-threshold'
-const STALE_VERDICT = 'stale'
-// The record matched the tree but carried no instruction to resume on, so the run was refused rather
-// than continued blind to what it was told to do (joshuafolkken/kit#2354).
-const INCOMPLETE_VERDICT = 'incomplete'
-// The `--handoff` path was given but could not be read as a handoff, or was too large for the record;
-// the cut is refused rather than taken without the instruction it was meant to carry.
-const BAD_HANDOFF_VERDICT = 'bad-handoff'
-const HANDED_OFF_VERDICT = 'handed-off'
-const BUSY_VERDICT = 'busy'
-const NOT_A_LANE_VERDICT = 'not-a-lane'
-const UNREADY_VERDICT = 'unready'
-const FAILED_VERDICT = 'failed'
-const ENDED_VERDICT = 'ended'
-const UNREADABLE_VERDICT = 'unreadable'
-const UNKNOWN_VERDICT = 'unknown'
-
-function report(verdict: string, code: number): number {
-	console.info(verdict)
-
-	return code
-}
-
-function report_stale(cut_record: RunCut): number {
-	console.error(run_cut.stale_message(cut_record))
-
-	return report(STALE_VERDICT, FAILURE_EXIT_CODE)
-}
-
-function report_busy(cut_record: RunCut): number {
-	console.error(run_cut.busy_message(cut_record))
-
-	return report(BUSY_VERDICT, FAILURE_EXIT_CODE)
-}
-
-// The record matched the tree but carried no instruction; the run is refused rather than continued
-// without what it was told to do (joshuafolkken/kit#2354).
-function report_incomplete(cut_record: RunCut): number {
-	console.error(run_cut.incomplete_message(cut_record))
-
-	return report(INCOMPLETE_VERDICT, FAILURE_EXIT_CODE)
-}
-
-// The `--handoff` file parsed but the assembled record would not fit the byte bound — the scalar fields
-// carry a handoff that fit alone past the cap (joshuafolkken/kit#2354).
-const HANDOFF_OVERFLOW_NOTE = '--handoff <path> would grow the cut record past its byte bound'
-// An implementation cut resumes into implementation, and that resume refuses a record with no
-// instruction (`incomplete`) — so the cut is refused here instead of relaunching a successor that can
-// only stop (joshuafolkken/kit#2484).
-const HANDOFF_MISSING_NOTE = 'this cut resumes into implementation and needs --handoff <path>'
-
-function report_bad_handoff(note: string): number {
-	console.error(`${note}. Nothing was cut; write the handoff file and reissue.`)
-
-	return report(BAD_HANDOFF_VERDICT, FAILURE_EXIT_CODE)
-}
-
-// A successor already resumed this cut; a process woken after its own hand-off is told to stop rather
-// than to investigate (joshuafolkken/kit#1935). It is a benign, non-failing stop.
-function report_handed_off(cut_record: RunCut): number {
-	console.error(run_cut.handed_off_message(cut_record))
-
-	return report(HANDED_OFF_VERDICT, SUCCESS_EXIT_CODE)
-}
-
-function report_unreadable(): number {
-	console.error(run_cut.unreadable_message())
-
-	return report(UNREADABLE_VERDICT, FAILURE_EXIT_CODE)
-}
-
-function report_unknown(): number {
-	console.error(run_cut.unknown_message())
-
-	return report(UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
-}
-
-// A cut is only meaningful on a lane branch whose implementation is uncommitted. On the default
-// branch, or with a clean tree, there is nothing to carry across the boundary.
-function refuse_unready(state: CutState): number {
-	console.error(
-		`Not ready to cut on ${state.branch} (dirty: ${String(state.is_dirty)}); a cut needs an uncommitted lane branch. Nothing was cut.`,
-	)
-
-	return report(UNREADY_VERDICT, FAILURE_EXIT_CODE)
-}
-
-// Below the shared context threshold there is no accumulation a cut would drop, so the resume it would
-// relaunch costs more than it saves; the current process carries the run on to the gate uncut.
-function report_under_threshold(): number {
-	console.error(
-		'The recent-window context is under the shared cut threshold, so nothing was cut; a resume would cost more than the accumulation it would drop. Continue to the gate.',
-	)
-
-	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)
-}
+const {
+	BAD_HANDOFF_VERDICT,
+	BUSY_VERDICT,
+	CUT_VERDICT,
+	ENDED_VERDICT,
+	FAILED_VERDICT,
+	FAILURE_EXIT_CODE,
+	FRESH_VERDICT,
+	HANDED_OFF_VERDICT,
+	HANDOFF_MISSING_NOTE,
+	HANDOFF_OVERFLOW_NOTE,
+	INCOMPLETE_VERDICT,
+	NOT_A_LANE_VERDICT,
+	OVER_VERDICT,
+	RESUME_IMPL_VERDICT,
+	RESUME_VERDICT,
+	STALE_VERDICT,
+	SUCCESS_EXIT_CODE,
+	UNDER_THRESHOLD_VERDICT,
+	UNKNOWN_VERDICT,
+	UNREADABLE_VERDICT,
+	UNREADY_VERDICT,
+	refuse_unready,
+	report,
+	report_bad_handoff,
+	report_busy,
+	report_handed_off,
+	report_incomplete,
+	report_over,
+	report_stale,
+	report_under_threshold,
+	report_unknown,
+	report_unreadable,
+} = run_cut_report
 
 // **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**
 // (joshuafolkken/kit#2312). `cost_cli.session_verdict` prices the recent `RECENT_REQUEST_WINDOW`
@@ -240,7 +167,9 @@ function spec_refusal(spec: Parameters<typeof run_cut.begin_cut>[1]): string | u
 	return undefined
 }
 
-async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): Promise<number> {
+// Writes the record and appends the `cut` event, or answers the refusal that stopped it — the half of a
+// cut every checkout shares; what follows the write (a relaunch or a stop) is the caller's.
+async function write_cut(target: string, request: CutRequest): Promise<number | undefined> {
 	const loaded = run_cut_handoff.load_handoff(request.handoff_path, run_cut.MAX_HANDOFF_BYTES)
 	if (loaded.kind === 'bad') return report_bad_handoff(loaded.note)
 
@@ -258,9 +187,51 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 
 	await emit_cut_event(request)
 
+	return undefined
+}
+
+async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): Promise<number> {
+	const refused = await write_cut(target, request)
+
+	if (refused !== undefined) return refused
+
 	return lane_relaunch.is_openai_lane(lane)
 		? report(CUT_VERDICT, SUCCESS_EXIT_CODE)
 		: relaunch(target, lane, request.phase)
+}
+
+// The cut outside a lane is taken, and nothing is relaunched: the session that took it is the one a
+// person is watching, so the run is handed on the way `fullrun`'s entry `over` stop hands it on.
+function report_held_cut(issue: string): number {
+	console.error(
+		`The cut is recorded for #${issue} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun #${issue}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
+	)
+
+	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+// **A `fullrun` held in its own checkout takes the implementation cut too** (joshuafolkken/kit#2760).
+// The cut was lane-only, so a run a person started had no bound on its context mid-implementation. The
+// hold naming this issue is what marks the run — a tree nobody holds for it, and the pre-gate phase
+// (which a held run's gate reaches in the same session), stay `not-a-lane` exactly as before.
+async function cut_outside_lane(
+	target: string,
+	request: Omit<CutRequest, 'branch'>,
+): Promise<number> {
+	if (request.phase !== run_cut.IMPLEMENTATION_PHASE) {
+		return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
+	}
+
+	const state = await run_cut.current_state()
+
+	if (state.held_issue !== request.issue) return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
+	if (!(await is_lane_branch(state))) return refuse_unready(state)
+
+	clear_expired(target)
+
+	const refused = await write_cut(target, { ...request, branch: state.branch })
+
+	return refused ?? report_held_cut(request.issue)
 }
 
 async function cut(
@@ -271,7 +242,7 @@ async function cut(
 ): Promise<number> {
 	const lane = await lane_registry.find_open_lane(issue)
 
-	if (lane === undefined) return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
+	if (lane === undefined) return await cut_outside_lane(target, { issue, phase, handoff_path })
 
 	const state = await run_cut.current_state()
 
@@ -331,6 +302,14 @@ function adopt(target: string, cut_record: RunCut): number {
 	return report(resume_verdict_for(cut_record), SUCCESS_EXIT_CODE)
 }
 
+// A relaunched lane child and a fresh session both measure `under`, so only the session that took an
+// implementation cut resumes over the threshold (joshuafolkken/kit#2760); unmeasurable is not refused.
+function is_over_threshold_resume(cut_record: RunCut): boolean {
+	if (!run_cut.resumes_into_implementation(cut_record.phase)) return false
+
+	return cost_cli.session_verdict() === cost_verdict.OVER_VERDICT
+}
+
 async function verify_and_adopt(
 	target: string,
 	cut_record: RunCut,
@@ -349,6 +328,8 @@ async function verify_and_adopt(
 	if (verdict === 'stale') return report_stale(cut_record)
 
 	if (verdict === INCOMPLETE_VERDICT) return report_incomplete(cut_record)
+
+	if (is_over_threshold_resume(cut_record)) return report_over()
 
 	return adopt(target, cut_record)
 }
@@ -444,6 +425,7 @@ const run_cut_cli = {
 	HANDED_OFF_VERDICT,
 	INCOMPLETE_VERDICT,
 	NOT_A_LANE_VERDICT,
+	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
 	STALE_VERDICT,

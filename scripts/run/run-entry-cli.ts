@@ -50,9 +50,13 @@ function first_line(out: string): string {
 }
 
 // `run:hold <N>` prints one token — `hold`, `busy` or `unknown` — and forwards its explanation to
-// stderr, so the composite branches on the token and the reader still sees why.
+// stderr, so the composite branches on the token and the reader still sees why. `--fullrun` marks the
+// hold as this entry's, since `run:entry` is `fullrun #N`'s alone (joshuafolkken/kit#2760).
 async function claim_hold(issue_number: string): Promise<string> {
-	const held = await josh_command.josh_run(['run:hold', issue_number], should_forward_stderr)
+	const held = await josh_command.josh_run(
+		['run:hold', issue_number, '--fullrun'],
+		should_forward_stderr,
+	)
 
 	return first_line(held.out)
 }

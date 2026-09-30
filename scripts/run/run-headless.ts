@@ -99,6 +99,7 @@ const run_headless = {
 	environment,
 	is_backlog_parent,
 	is_headless,
+	is_owned_here,
 	must_keep_waiting,
 }
 

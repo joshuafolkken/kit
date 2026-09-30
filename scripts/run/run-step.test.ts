@@ -22,6 +22,7 @@ function input(overrides: Partial<StepInput>): StepInput {
 		has_changes: false,
 		has_completion_callback: true,
 		is_at_cut_cap: false,
+		is_handed_off: false,
 		...overrides,
 	}
 }
@@ -341,5 +342,42 @@ describe('run_step.next_action — the printed contract', () => {
 
 			expect(second).toBe(first)
 		}
+	})
+})
+
+// joshuafolkken/kit#2760: a `backlogrun` parent that took its cut at `over` kept launching children in
+// the same conversation, because the driver had no handed-off state and went on answering `wait` or the
+// next offer. A handed-off record stops the session that holds it, wherever the stream stands.
+describe('run_step.next_action — a handed-off parent', () => {
+	it.each([[KIND.CHILD_LAUNCH], [KIND.MERGE], [KIND.PARK], [KIND.STALL], [undefined]])(
+		'stops rather than advancing to the next child at %j',
+		(last_event) => {
+			const action = run_step.next_action(
+				input({ carry_kind: 'carried', is_handed_off: true, last_event }),
+			)
+
+			expect(action).toEqual({ kind: 'verdict', line: run_step.STOP })
+		},
+	)
+
+	it('does not decide a lane child position from the parent hand-off', () => {
+		const action = run_step.next_action(
+			input({
+				carry_kind: 'carried',
+				is_handed_off: true,
+				is_lane_child: true,
+				last_event: KIND.PR_OPENED,
+			}),
+		)
+
+		expect(action).toEqual({ kind: 'command', line: FOLLOWUP_COMMAND })
+	})
+
+	it('advances as before once a successor has adopted the record', () => {
+		const action = run_step.next_action(
+			input({ carry_kind: 'carried', is_handed_off: false, last_event: KIND.MERGE }),
+		)
+
+		expect(action).toEqual({ kind: 'command', line: `pnpm josh run:merge ${ISSUE}` })
 	})
 })

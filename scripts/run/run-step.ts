@@ -126,6 +126,11 @@ interface StepInput extends PreInput {
 	// Whether the carried invocation has already taken its maximum cuts, read off the carry record by the
 	// CLI (joshuafolkken/kit#2346). At the cap `run:carry --cut` refuses, so the hand-off is not offered.
 	is_at_cut_cap: boolean
+	// Whether the carry record has been handed off by a cut and no successor has adopted it yet, read off
+	// the record by the CLI (joshuafolkken/kit#2760) and set only in the session that declared the record.
+	// The session that took the cut is the only one that can read this — a successor spends the mark when
+	// it begins — so it is what tells that session to stop.
+	is_handed_off: boolean
 }
 
 interface StepAction {
@@ -258,12 +263,31 @@ function closed_action(input: StepInput): StepAction {
 	}
 }
 
-// The terminal answers read before the run's position matters: an unreadable carry record leaves the
-// position unknowable, a spent budget is the person's call, and the issue's own state can end the run
-// whatever the events say. `undefined` when none applies and the position decides.
-function terminal_action(input: StepInput): StepAction | undefined {
+// **A cut hands the run on, so the session that took it stops** (joshuafolkken/kit#2760). The driver had
+// no handed-off state, so after `run:carry --cut` it went on answering `wait` or the next offer — a
+// `backlogrun` parent measured at 233k kept launching children in the same conversation up to 294k. A
+// lane child never holds the carry record, so its own position is not decided here.
+function is_handed_off_parent(input: StepInput): boolean {
+	return input.is_handed_off && input.carry_kind === 'carried' && !input.is_lane_child
+}
+
+// The carry record's terminal answers: an unreadable record leaves the position unknowable, a handed-off
+// run is its successor's, and a spent budget is the person's call.
+function carry_terminal_action(input: StepInput): StepAction | undefined {
 	if (input.carry_kind === 'unreadable') return verdict(UNKNOWN)
+	if (is_handed_off_parent(input)) return verdict(STOP)
 	if (input.carry_kind === 'expired') return { kind: 'decide', line: EXPIRED_DECISION }
+
+	return undefined
+}
+
+// The terminal answers read before the run's position matters: the carry record's first, then the
+// issue's own state, which can end the run whatever the events say. `undefined` when none applies and
+// the position decides.
+function terminal_action(input: StepInput): StepAction | undefined {
+	const carry_action = carry_terminal_action(input)
+
+	if (carry_action !== undefined) return carry_action
 	if (input.state === undefined) return verdict(UNKNOWN)
 	if (input.state === CLOSED) return closed_action(input)
 
