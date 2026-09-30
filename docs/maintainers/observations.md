@@ -636,3 +636,4 @@ dropping either side destroys exactly what it exists to record.
 - rf:none | none | - | 2026-09-30 | #2799
 - rf:bug-risks | medium | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
 - rf:bug-risks | low | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
+- rf:bug-risks | medium | scripts/git/git-push-transport.ts | 2026-09-30 | #2801

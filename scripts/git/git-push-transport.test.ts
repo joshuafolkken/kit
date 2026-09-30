@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-	FORWARDED_OUTPUT,
 	git_push_transport,
 	KEEPALIVE_SSH_COMMAND,
 	PUSH_TIMEOUT_MESSAGE,
@@ -100,11 +99,7 @@ describe('the push spawn is bounded and kept alive', () => {
 	it('spawns git push with the arguments it was given', async () => {
 		await git_push_transport.push(UPSTREAM_ARGS)
 
-		expect(execa_mock.state.push_calls[0]?.argument_list).toStrictEqual([
-			'push',
-			'--progress',
-			...UPSTREAM_ARGS,
-		])
+		expect(execa_mock.state.push_calls[0]?.argument_list).toStrictEqual(['push', ...UPSTREAM_ARGS])
 	})
 
 	it('passes an SSH keepalive so a dead connection is not waited out to the TCP default', async () => {
@@ -112,20 +107,6 @@ describe('the push spawn is bounded and kept alive', () => {
 
 		expect(first_push_options()).toMatchObject({
 			env: { [SSH_COMMAND_VARIABLE]: KEEPALIVE_SSH_COMMAND },
-		})
-	})
-})
-
-// A hook command that finds a terminal on its stdout may query it (osv-scanner sends OSC 11 plus a
-// cursor-position request) and leave the answers for the shell to print after `pnpm josh release`.
-describe('the push output is forwarded rather than handed the terminal', () => {
-	it('pipes stdout and stderr through to the console while keeping stdin on the terminal', async () => {
-		await git_push_transport.push([])
-
-		expect(first_push_options()).toMatchObject({
-			stdin: 'inherit',
-			stdout: ['inherit', 'pipe'],
-			stderr: ['inherit', 'pipe'],
 		})
 	})
 })
@@ -140,9 +121,7 @@ describe('an ssh command someone else configured is left alone', () => {
 		await git_push_transport.push([])
 
 		expect(first_push_options()).toStrictEqual({
-			stdin: 'inherit',
-			stdout: FORWARDED_OUTPUT,
-			stderr: FORWARDED_OUTPUT,
+			stdio: 'inherit',
 			timeout: PUSH_TIMEOUT_MS,
 			env: {},
 		})

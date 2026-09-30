@@ -21,8 +21,8 @@ const MS_PER_SECOND = 1000
 // `git_command.push` may then fall back to a `--set-upstream` push that is itself bounded and
 // retried — so a `josh git` that hits every one of those waits takes longer than two budgets.
 //
-// **Time spent at a credential prompt counts against it.** An encrypted key with no agent behind it
-// prompts on the terminal, and the budget does not know the
+// **Time spent at a credential prompt counts against it.** With `stdio: 'inherit'` an encrypted key
+// with no agent behind it prompts on the inherited terminal, and the budget does not know the
 // difference between waiting on a remote and waiting on a person. Two minutes is a generous window
 // for typing a passphrase you were just asked for, and the failure names the command to re-run.
 const PUSH_TIMEOUT_SECONDS = 120
@@ -92,22 +92,8 @@ async function has_configured_ssh_command(): Promise<boolean> {
 	}
 }
 
-// **Output is forwarded, never handed the terminal itself.** The pre-push hook runs osv-scanner, a Go
-// binary that probes a terminal on its stdout for its background color (an OSC 11 query followed by a
-// cursor-position request). Run under lefthook it never reads the answers, so they sat in the terminal's
-// input queue and surfaced at the next shell prompt as `11;rgb:0101/0404/0909;1R` after
-// `pnpm josh release`. A pipe on stdout/stderr means no hook command sees a terminal and none asks; the
-// `inherit` half still streams every line live. stdin stays inherited, and ssh prompts on `/dev/tty`
-// regardless, so a passphrase prompt is unaffected. git only draws its `Writing objects: N%` meter
-// when stderr is a terminal, so `--progress` asks for it explicitly — without it a slow push and a
-// stalled one would look the same.
-const FORWARDED_OUTPUT = ['inherit', 'pipe'] as const
-const PROGRESS_FLAG = '--progress'
-
 interface PushOptions {
-	stdin: 'inherit'
-	stdout: typeof FORWARDED_OUTPUT
-	stderr: typeof FORWARDED_OUTPUT
+	stdio: 'inherit'
 	timeout: number
 	env: Record<string, string>
 }
@@ -116,9 +102,7 @@ async function to_push_options(): Promise<PushOptions> {
 	const should_keep_alive = !(await has_configured_ssh_command())
 
 	return {
-		stdin: 'inherit',
-		stdout: FORWARDED_OUTPUT,
-		stderr: FORWARDED_OUTPUT,
+		stdio: 'inherit',
 		timeout: PUSH_TIMEOUT_MS,
 		env: should_keep_alive ? { [SSH_COMMAND_VARIABLE]: KEEPALIVE_SSH_COMMAND } : {},
 	}
@@ -134,7 +118,7 @@ async function did_push_time_out(arguments_list: Array<string>): Promise<boolean
 		// execa runs the binary directly with an argument array and no `shell` option, so CLI
 		// args cannot break out of a shell sandbox; the git command and args are internally
 		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		await execa(git_command_bin, [PUSH_SUBCOMMAND, PROGRESS_FLAG, ...arguments_list], options) // NOSONAR
+		await execa(git_command_bin, [PUSH_SUBCOMMAND, ...arguments_list], options) // NOSONAR
 
 		return false
 	} catch (error) {
@@ -181,7 +165,6 @@ const git_push_transport = {
 
 export { git_push_transport }
 export {
-	FORWARDED_OUTPUT,
 	KEEPALIVE_SSH_COMMAND,
 	PUSH_TIMEOUT_MESSAGE,
 	PUSH_TIMEOUT_MS,
