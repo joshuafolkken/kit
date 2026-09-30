@@ -220,7 +220,7 @@ Retired scripts (previously managed, now removed): `git`, `git:followup`, `teleg
 
 ## AI files
 
-The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves only esbuild's build script (kit's CLI runs on tsx, which depends on esbuild, and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
+The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves the esbuild and unrs-resolver build scripts (kit's CLI runs on tsx, which depends on esbuild; kit's optional ESLint import plugins bring in unrs-resolver; and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md

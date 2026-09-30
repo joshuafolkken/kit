@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { init_logic_workspace } from './init-logic-workspace'
 
@@ -136,6 +137,21 @@ describe('init_logic_workspace.merge_workspace_yaml — pnpm build placeholders'
 			"allowBuilds:\n  esbuild: false\n  other: set this to true or false\n  '@scope/tool': true\n"
 
 		expect(init_logic_workspace.merge_workspace_yaml(existing, BUILD_TEMPLATE)).toBe(existing)
+	})
+})
+
+// joshuafolkken/kit#2785: in a static project `pnpm add` also leaves unrs-resolver's placeholder,
+// pulled in by kit's optional ESLint import peers, and the static template did not answer it.
+describe('init_logic_workspace.merge_workspace_yaml — static template build approvals', () => {
+	const STATIC_TEMPLATE = readFileSync('templates/pnpm-workspace.static.yaml', 'utf8')
+	const AFTER_PNPM_ADD =
+		'allowBuilds:\n  esbuild: true\n  unrs-resolver: set this to true or false\n'
+
+	it('answers every placeholder pnpm add leaves in a static project', () => {
+		const result = init_logic_workspace.merge_workspace_yaml(AFTER_PNPM_ADD, STATIC_TEMPLATE)
+
+		expect(result).toContain('unrs-resolver: true')
+		expect(result).not.toContain('set this to true or false')
 	})
 })
 

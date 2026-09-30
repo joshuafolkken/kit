@@ -113,12 +113,12 @@ describe('Git-free static initialization', () => {
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(INSTALL_HINT))
 	})
 
-	it('approves only the esbuild build so the first pnpm install succeeds', async () => {
+	it('approves the esbuild and unrs-resolver builds so the first pnpm install succeeds', async () => {
 		write_index_html()
 		await run_init()
 		const workspace = readFileSync(path.join(paths_mock.root, 'pnpm-workspace.yaml'), 'utf8')
 
-		expect(workspace).toContain('allowBuilds:\n  esbuild: true\n')
+		expect(workspace).toContain('allowBuilds:\n  esbuild: true\n  unrs-resolver: true\n')
 		expect(workspace).not.toContain('overrides')
 	})
 })

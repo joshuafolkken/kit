@@ -48,10 +48,10 @@ pnpm --version
 In the project directory:
 
 ```bash
-pnpm add -D --allow-build=esbuild @joshuafolkken/kit
+pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 ```
 
-This installs from the public npm registry without authentication and creates `package.json` if the directory has none. `--allow-build=esbuild` approves the one build script kit's CLI needs. pnpm 12 skips releases published less than a day ago by default (`minimumReleaseAge`), so right after a kit release this may install the previous version.
+This installs from the public npm registry without authentication and creates `package.json` if the directory has none. The two `--allow-build` flags approve the build scripts kit's dependencies carry: esbuild, which kit's CLI runs on, and unrs-resolver, which kit's optional ESLint import plugins bring in. pnpm 12 skips releases published less than a day ago by default (`minimumReleaseAge`), so right after a kit release this may install the previous version.
 
 ## 4. Initialize
 
@@ -61,14 +61,14 @@ pnpm exec josh init
 
 `josh init` selects the `static` profile and records it in `package.json`. It creates only:
 
-| File                                                                        | When                                          |
-| --------------------------------------------------------------------------- | --------------------------------------------- |
-| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`                       | Always — short AI assistant instructions      |
-| `.vscode/extensions.json`                                                   | Always — recommendations, not installs        |
-| `pnpm-workspace.yaml`                                                       | Always — approves esbuild's build script      |
-| `package.json` scripts `preinstall` and `josh`                              | Always                                        |
-| `prettier.config.mjs`, `.prettierignore`, `.vscode/settings.json`, Prettier | Only when HTML, CSS or JavaScript files exist |
-| `tsconfig.json`                                                             | Only when TypeScript files exist              |
+| File                                                                        | When                                                          |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`                       | Always — short AI assistant instructions                      |
+| `.vscode/extensions.json`                                                   | Always — recommendations, not installs                        |
+| `pnpm-workspace.yaml`                                                       | Always — approves the esbuild and unrs-resolver build scripts |
+| `package.json` scripts `preinstall` and `josh`                              | Always                                                        |
+| `prettier.config.mjs`, `.prettierignore`, `.vscode/settings.json`, Prettier | Only when HTML, CSS or JavaScript files exist                 |
+| `tsconfig.json`                                                             | Only when TypeScript files exist                              |
 
 It then runs `pnpm install` and `josh format` for you, so the tools it listed are installed and every file is formatted. If the install fails, `josh init` stops before formatting, exits non-zero and prints the commands to re-run by hand. `--no-install` skips both steps, for CI or an offline machine; run `pnpm install` and `pnpm josh format` yourself afterwards.
 
@@ -107,7 +107,7 @@ docker run --rm -it -e SHELL=/bin/bash buildpack-deps:bookworm-curl bash
 curl -fsSL https://get.pnpm.io/install.sh | sh - && source ~/.bashrc
 pnpm runtime set node 22 -g
 mkdir /site && cd /site && printf '<!doctype html><html><body><h1>Hello</h1></body></html>\n' > index.html
-pnpm add -D --allow-build=esbuild @joshuafolkken/kit
+pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 pnpm exec josh init
 pnpm josh format && pnpm josh gate
 ls -A   # no .git, .github or lefthook.yml
