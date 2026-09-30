@@ -201,7 +201,7 @@
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"@types/node": "^26.6.3",
 		"@types/semver": "^7.8.0",
-		"cspell": "^10.3.5",
+		"cspell": "^10.3.6",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.11.0",
 		"eslint-config-prettier": "^10.1.8",

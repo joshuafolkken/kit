@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
-import { WORKFLOW_LABELS } from '#scripts/git/issue-labels'
+import { repository_labels } from '#scripts/repo/repository-labels'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { execaSync } from 'execa'
 import { main as init_main } from './init'
@@ -14,10 +14,7 @@ interface StepContext {
 	visibility: Visibility
 }
 
-type WorkflowLabel = (typeof WORKFLOW_LABELS)[number]
-
 const DEFAULT_BRANCH = 'main'
-const LABELS_ENDPOINT = 'repos/{owner}/{repo}/labels'
 const GH_INSTALL_HINT =
 	'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/, run gh auth login, then run josh start again. Nothing was changed.'
 const GH_AUTH_HINT =
@@ -100,29 +97,10 @@ function create_github_repository(context: StepContext): void {
 	run('gh', ['repo', 'create', name, visibility, ...source], context.root)
 }
 
-// Labels already present are left as they are — only the missing ones are created, so a repository
-// that recolored a label keeps its choice. GitHub compares label names case-insensitively.
-function missing_workflow_labels(existing: ReadonlyArray<string>): ReadonlyArray<WorkflowLabel> {
-	const names = new Set(existing.map((name) => name.toLowerCase()))
-
-	return WORKFLOW_LABELS.filter((label) => !names.has(label.name))
-}
-
-function create_label(label: WorkflowLabel, root: string): void {
-	const fields = [`name=${label.name}`, `color=${label.color}`, `description=${label.description}`]
-
-	run('gh', ['api', LABELS_ENDPOINT, ...fields.flatMap((field) => ['-f', field]), '--silent'], root)
-	console.info(`  ✔ label ${label.name}`)
-}
-
-function add_missing_labels(context: StepContext): void {
-	const listing = execaSync('gh', ['api', '--paginate', LABELS_ENDPOINT, '--jq', '.[].name'], {
-		...git_gh_exec.direct_environment(),
-		cwd: context.root,
-	})
-	const existing = listing.stdout.split('\n').filter((name) => name.length > 0)
-
-	for (const label of missing_workflow_labels(existing)) create_label(label, context.root)
+// The repository was created by the step before, so `gh` resolves the placeholder from the
+// directory `josh start` runs in, which is the root.
+function add_missing_labels(): void {
+	repository_labels.ensure_labels('{owner}/{repo}')
 }
 
 const STEP_ACTIONS: Readonly<Record<StartStep, (context: StepContext) => void>> = {
@@ -160,7 +138,6 @@ const start_steps = {
 	read_git_state,
 	github_cli_refusal,
 	self_run_refusal,
-	missing_workflow_labels,
 	run_steps,
 }
 export { start_steps }

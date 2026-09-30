@@ -46,7 +46,7 @@ const STEP_LABELS: Readonly<Record<StartStep, string>> = {
 	initialize: 'Initialize kit (the same setup as josh init)',
 	commit: 'Commit every file as the initial commit',
 	repository: 'Create the GitHub repository and push main',
-	labels: 'Add the workflow labels the repository is missing',
+	labels: 'Add the workflow and release-classification labels the repository is missing',
 }
 
 function refused(refusal: string): StepPlan {
