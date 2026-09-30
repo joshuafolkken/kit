@@ -614,3 +614,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:security | low | scripts/run/run-merge.ts:181 | 2026-09-30 | #2769
 - rf:none | none | - | 2026-09-30 | #2766
 - rf:bug-risks | low | scripts/run/run-merge-cli.ts:214 | 2026-09-30 | #2769
+- rf:comments | medium | docs/init.md | 2026-09-30 | #2785
+- rf:tests | low | scripts/init/init-static-integration.test.ts | 2026-09-30 | #2785
+- rf:none | none | - | 2026-09-30 | #2785
