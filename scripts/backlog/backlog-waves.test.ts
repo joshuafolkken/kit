@@ -3,7 +3,7 @@ import type { EpicChild, IssueReference } from '#scripts/epic/epic-graph'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo } from '#scripts/epic/epic-solo'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_waves } from './backlog-waves'
@@ -70,6 +70,10 @@ function waves_of(input: EpicNextResult): Array<Array<number>> {
 function unreached_of(input: EpicNextResult): Array<number> {
 	return backlog_waves.build(input, REPO).unreached.map((entry) => entry.number)
 }
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
 describe('backlog_waves.build', () => {
 	it('walks a blocked-by chain one wave per link', () => {
@@ -154,7 +158,6 @@ describe('backlog_waves.build — issues no wave reaches', () => {
 
 		expect(waves_of(input)).toStrictEqual([[FIRST], [SECOND]])
 		expect(unreached_of(input)).toStrictEqual([THIRD])
-		vi.restoreAllMocks()
 	})
 
 	it('plans only this repository, leaving another repository out of both lists', () => {
