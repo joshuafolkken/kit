@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred_answer, type DeferredAnswer } from './deferred-answer-fixture'
 import { git_epic_close } from './git-epic-close'
 import { git_followup_flush } from './git-followup-flush'
+import { git_followup_issue_close } from './git-followup-issue-close'
 import { git_followup_label } from './git-followup-label'
 import { git_followup_stages } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
@@ -24,6 +25,10 @@ vi.mock('./git-gh-command', () => ({
 
 vi.mock('./git-followup-label', () => ({
 	git_followup_label: { strip_in_progress: vi.fn() },
+}))
+
+vi.mock('./git-followup-issue-close', () => ({
+	git_followup_issue_close: { ensure_issue_closed: vi.fn(), CLOSE_RECOVERY: 'close by hand' },
 }))
 
 vi.mock('./git-epic-close', () => ({
@@ -55,6 +60,7 @@ const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
 const mocked_comment = vi.mocked(git_gh_command.issue_comment)
 const mocked_close_epics = vi.mocked(git_epic_close.close_completed_epics)
 const mocked_strip_label = vi.mocked(git_followup_label.strip_in_progress)
+const mocked_ensure_closed = vi.mocked(git_followup_issue_close.ensure_issue_closed)
 
 async function run_wrapup(input: Partial<WrapupInput>): Promise<void> {
 	await git_pr_followup_wrapup.run_wrapup(
@@ -79,7 +85,36 @@ beforeEach(() => {
 	mocked_comment.mockResolvedValue('')
 	mocked_close_epics.mockResolvedValue()
 	mocked_strip_label.mockResolvedValue()
+	mocked_ensure_closed.mockResolvedValue()
 	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+})
+
+// joshuafolkken/kit#2770: GitHub stopped applying `closes #N` on some merges, so a merged run confirms
+// the issue closed; a run that merged nothing leaves the open issue alone.
+describe('run_wrapup — the merged issue close', () => {
+	it('confirms the issue closed on a merged run', async () => {
+		await run_wrapup({ should_merge: true })
+
+		expect(mocked_ensure_closed).toHaveBeenCalledWith({
+			issue_number: BASE_INPUT.issue_number,
+			pr_url: BASE_INPUT.pr_url,
+		})
+	})
+
+	it('leaves the issue alone on a run that merged nothing', async () => {
+		await run_wrapup({ should_merge: false })
+
+		expect(mocked_ensure_closed).not.toHaveBeenCalled()
+	})
+
+	it('reports a failed close with its recovery instead of failing the merged run', async () => {
+		mocked_ensure_closed.mockRejectedValue(new Error(GATEWAY_ERROR))
+
+		await run_wrapup({ should_merge: true })
+
+		expect(warned_text()).toContain('The merged issue close failed')
+		expect(warned_text()).toContain(git_followup_issue_close.CLOSE_RECOVERY)
+	})
 })
 
 describe('post_notify_issue — blank body uses edit, non-blank uses comment', () => {
