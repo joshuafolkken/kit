@@ -3,7 +3,10 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
-import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
+import {
+	time_transcript_line,
+	type Block as TranscriptBlock,
+} from '#scripts/time-runtime/time-transcript-line'
 import { run_tail } from './run-tail'
 
 // A dispatched lane child is stopped from backgrounding a long-running josh command (joshuafolkken/kit#2704).
@@ -60,14 +63,30 @@ function is_background_long_run(
 	return is_candidate(call) && is_lane_child()
 }
 
-// The background tasks the transcript tail launched and never saw finish. A launch is read off its own
-// tool result and a finish off the harness notice, both by `time_transcript_line`.
-function pending_background_ids(tail: string): ReadonlyArray<string> {
+// The launches `launched_ids` reads off the transcript tail that never saw their finish. A launch is
+// read off its own tool result and a finish off the harness notice, both by `time_transcript_line`.
+function unfinished_ids(
+	tail: string,
+	launched_ids: (block: TranscriptBlock) => ReadonlyArray<string>,
+): ReadonlyArray<string> {
 	const lines = tail.split('\n').map((line) => time_transcript_line.parse_line(line))
 	const finished = new Set(lines.map((line) => line?.finished_background ?? ''))
-	const launched = lines.flatMap((line) => line?.blocks.map((block) => block.background_id) ?? [])
+	const blocks = lines.flatMap((line) => line?.blocks ?? [])
+	const launched = blocks.flatMap((block) => launched_ids(block))
 
 	return launched.filter((id) => id !== '' && !finished.has(id))
+}
+
+// The background tasks the tail launched and never saw finish — commands and subagents alike
+// (joshuafolkken/kit#2774), since a lane child's turn-end kills either.
+function pending_background_ids(tail: string): ReadonlyArray<string> {
+	return unfinished_ids(tail, (block) => [block.background_id, block.agent_id])
+}
+
+// The backgrounded subagents alone. A subagent always ends and its notice re-invokes the session; a
+// command may be a server that never exits, so only this set says the run is certain to resume.
+function pending_agent_ids(tail: string): ReadonlyArray<string> {
+	return unfinished_ids(tail, (block) => [block.agent_id])
 }
 
 const LANE_BACKGROUND_REASON =
@@ -105,6 +124,7 @@ const lane_background = {
 	LANE_BACKGROUND_STOP_REASON,
 	ROW,
 	is_background_long_run,
+	pending_agent_ids,
 	pending_background_ids,
 }
 

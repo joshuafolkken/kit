@@ -78,6 +78,7 @@ async function build_context(
 		headless_refusals: stop_rules.count_headless_refusals(tail),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
 		background_pending: lane_background.pending_background_ids(tail).length > 0,
+		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
 		session_lang: session_lang(),
 	}
 }
