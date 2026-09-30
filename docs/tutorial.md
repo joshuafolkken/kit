@@ -63,7 +63,7 @@ Type:
 backlogrun
 ```
 
-The agent runs every opted-in Issue in dependency order, each one from implementation through the gate, the review and the merge, and notifies you as each finishes. [Run the backlog unattended](./how-to/run-backlog.md) covers naming Issues to run first, running one epic only, and where the run stops.
+The agent runs every opted-in Issue in dependency order, each one from implementation through the gate, the review and the merge, and notifies you as each finishes. You do not order the Issues or decide which may run side by side: before the first one starts, the agent reads them, records which must land before another as a `blocked-by` relation, and labels `run:solo` any Issue that changes the verification path itself (the gate, the review, the push hook or the merge checks). The run then starts such an Issue alone, and runs the rest in parallel lanes. [Run the backlog unattended](./how-to/run-backlog.md) covers naming Issues to run first, running one epic only, and where the run stops.
 
 ## Separately: pull in kit's updates with `josh sync`
 
