@@ -8,6 +8,7 @@ import {
 import { epic_graph, type EpicChild } from './epic-graph'
 import type { EpicVerdict } from './epic-report'
 import { epic_solo } from './epic-solo'
+import { epic_triage, type TriageVerdict } from './epic-triage'
 
 // Which children a repository has room to start right now (joshuafolkken/kit#1491).
 //
@@ -51,7 +52,7 @@ interface LaneRequest {
 // output carries issue numbers or a verdict and nothing else.
 interface LaneOffer {
 	children: ReadonlyArray<EpicChild>
-	verdict: EpicVerdict
+	verdict: EpicVerdict | TriageVerdict
 	notice: string
 }
 
@@ -205,10 +206,36 @@ function solo_first(pools: ReadonlyArray<RepoPool>, read: BusyRead): ReadonlyArr
 // joshuafolkken/kit#1121 records: a repository with no free lane is handed nothing, so the relations
 // request that would confirm a candidate there buys an answer nobody reads — and a polling `epicrun`
 // would pay it every round.
+//
+// **Triage is asked before even that** (joshuafolkken/kit#2779): an untriaged candidate withholds every
+// candidate whatever the occupancy, and it needs only the labels already read. Only a `--lanes` ask
+// is gated — it is the one that opens children beside each other; the single-child form starts one.
+function triage_offer(pools: ReadonlyArray<RepoPool>, request: LaneRequest): LaneOffer | undefined {
+	if (!request.is_all_lanes) return undefined
+
+	const untriaged = epic_triage.untriaged(
+		dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo))).flatMap(
+			(pool) => pool.candidates,
+		),
+	)
+
+	if (untriaged.length === NO_LANES) return undefined
+
+	return {
+		children: [],
+		verdict: epic_triage.TRIAGE_VERDICT,
+		notice: epic_triage.message(untriaged, request.repo),
+	}
+}
+
 async function offer_for_repo(
 	pools: ReadonlyArray<RepoPool>,
 	request: LaneRequest,
 ): Promise<LaneOffer> {
+	const triage = triage_offer(pools, request)
+
+	if (triage !== undefined) return triage
+
 	const read = await epic_busy.read_repository(request.repo)
 	const free = free_lanes(read, request.limit)
 

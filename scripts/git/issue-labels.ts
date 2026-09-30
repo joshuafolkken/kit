@@ -15,6 +15,10 @@ const NEEDS_DECISION_LABEL = 'needs-decision'
 // `backlog:next` enforces it (`backlog-solo.ts`), so the rule no longer rests on a judgement at
 // dispatch time.
 const RUN_SOLO_LABEL = 'run:solo'
+// The other half of the same judgement: an issue a run read and found safe to run beside others
+// (joshuafolkken/kit#2779). Without it an issue lacking `run:solo` could mean "judged parallel" or
+// "never judged", and `backlog:next` withholds the second (`epic-triage.ts`).
+const RUN_LANE_LABEL = 'run:lane'
 // Opts one issue outside any epic into unattended execution (joshuafolkken/kit#906). **Only a
 // person applies it.** `epicrun #<E>` approves the merges inside `#<E>`; this label is the only way
 // a person extends that approval past the epic's edge, so a label an AI could apply to itself would
@@ -201,6 +205,11 @@ const WORKFLOW_LABELS: ReadonlyArray<{
 		color: 'b60205',
 		description: 'Runs alone in a backlogrun: nothing starts beside it',
 	},
+	{
+		name: RUN_LANE_LABEL,
+		color: '0e8a16',
+		description: 'Judged safe to run beside others in a backlogrun',
+	},
 	...FILING_ROUTE_LABELS,
 	...DEPTH_LABELS,
 ]
@@ -279,6 +288,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	INTERRUPT_ROUTE_LABEL,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
+	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
@@ -312,6 +322,7 @@ export {
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
+	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,

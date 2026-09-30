@@ -305,15 +305,16 @@ stop at a time.**
 - **Order and isolate the pool in the same pass** (joshuafolkken/kit#2776), from the same
   `issue:read`: an issue that must land first (it builds what another reuses, or both edit one code
   path) becomes a native `blocked-by`; an issue the `wip-cap.md` → 「実行のしかた」 enumeration hits
-  gets `run:solo`. Comment the reason; the offer commands enforce both.
+  gets `run:solo`, **every other one `run:lane`**. Comment the reason; the offer commands enforce all
+  three, answering `triage` while an issue has neither.
 - **Report the order those labels produce — `pnpm josh backlog:plan --waves`** (joshuafolkken/kit#2778),
   `backlog:next` played forward wave by wave. Report it with the plan, never an order derived by hand.
 - **Then start the loop.** Whatever is still labelled is reported as parked and left standing; the
   run does not wait on it.
 
-**`needs-decision` and `run:solo` are the workflow labels a run may apply, and neither is `auto-ok` or
-`needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a run parks with
-`needs-decision` and a person clears it, and a run isolates with `run:solo`.
+**`needs-decision`, `run:solo` and `run:lane` are the workflow labels a run may apply, and none is
+`auto-ok` or `needs-human-review`.** Those two stay a person's alone (this file, `SKILL.md` → §2z); a
+run parks with `needs-decision` and a person clears it.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
 
@@ -350,10 +351,10 @@ of it decide how the mapping is written:**
    is never a token; this repository having no candidate of its own is answered `wait`. **So
    `backlogrun` takes no `owner/repo#N` token.** Report the other repository's candidates in the run
    summary and leave them to a session running there (`backlogrun-lanes.md` → "Concurrency").
-3. **The verdict words are `wait`, `stop`, `retry`, `error` and `none`** — `none` is `epic:next`'s
-   `complete` under this command's spelling, and there is no `complete` here. **`retry` is the one
-   with no `epic:next` counterpart**: it says GitHub did not answer.
-4. **Exit code 0 covers all five verdicts, and 1 means the listing could not be read** — no answer at
+3. **The verdict words are `wait`, `stop`, `triage`, `retry`, `error` and `none`** — `none` is
+   `epic:next`'s `complete` under this command's spelling, and there is no `complete` here. **`retry`
+   is the one with no `epic:next` counterpart**: it says GitHub did not answer.
+4. **Exit code 0 covers all six verdicts, and 1 means the listing could not be read** — no answer at
    all. **`error` cannot be told apart by exit code, so read the token rather than the status.**
 
 **What the answer means is this table's; whether the run may act on it is `pnpm josh backlog:budget`'s**
@@ -367,6 +368,7 @@ subsection.
 | `wait`, with something of this run's own still in flight | Everything opted in is blocked or already running, so waiting can still change the answer. **Ask the command again on the wake the progress watcher's exit delivers** — the parent starts no sleep of its own, and the interval is a floor on the re-ask rather than a clock (`backlogrun-progress.md` → "Waiting, and never waiting forever" and "The parent keeps no clock of its own") | `blocked` |
 | `wait` this checkout can never resolve — the only candidates the command reported on standard error are in other repositories, and this run has nothing of its own in flight | Report those candidates with their checkouts. **Waiting cannot resolve them, but a person opting a new issue in here still can**, so the ending is the idle watch's rather than this row's | `exhausted` |
 | `stop` | Nothing can proceed without a person. Report the parked issues and finish | `parked` |
+| `triage` | A candidate lacks `run:solo` / `run:lane` (joshuafolkken/kit#2779). Judge each one stderr names as the pre-start pass does, then **ask again**; running children continue | `untriaged` |
 | `retry`, on fewer than three consecutive asks | GitHub did not answer, so the graph was never read. Sleep the polling interval and **ask the command again** — **this is one of the states with no watcher-delivered wake** (`backlogrun-progress.md` → "The wake exists only while something is in flight"). This is the one answer re-asking is allowed on, and the count is consecutive: any other answer resets it to zero | `blocked` |
 | `retry` for a third consecutive time | The outage is not a hiccup. Report what the command printed on standard error and finish | `unreadable` |
 | `error` | The graph could not be resolved — report what the command printed on standard error and finish. **Never re-ask hoping for a different answer**, and never fall back to picking an issue by hand | `unreadable` |
@@ -380,13 +382,12 @@ subsection.
 as open on the next ask. The flag takes a comma-separated list and may be repeated; it drops the issue
 from every bucket rather than only from the offer.
 
-**A short offer is not proof the backlog is empty.** The standalone half of the pool is capped at the
-same five rows the `🗒 Next issues` display shows, so a sixth opted-in issue simply appears on the
-next ask. An epic's children are not capped that way — they come through the epic's own graph.
+**A short offer is not proof the backlog is empty**: the standalone half is capped at the five rows
+`🗒 Next issues` shows, so a sixth opted-in issue appears on the next ask; an epic's children come
+through its own graph, uncapped.
 
-**The epic side is found server-side by the `epic` label.** An epic that never received the label is
-invisible to the listing, so nothing knows it tracks anything at all (joshuafolkken/kit#1633). This is
-a known limit of the listing; do not assert the opposite anywhere.
+**The epic side is found server-side by the `epic` label**, so an epic without it is invisible and
+tracks nothing — a known limit of the listing (joshuafolkken/kit#1633).
 
 **A child is offered on its own `auto-ok` unless the epic tracking it is opted in**
 (joshuafolkken/kit#1668). An epic that **is** opted in owns its children entirely and sequences them;
@@ -401,7 +402,7 @@ epics answers `error`. The table is `docs/josh-commands.md` → "`josh epic:next
 
 **New work is picked up without restarting anything.** The command re-derives its pool from GitHub
 labels on every ask, so an issue filed and opted in while the run is going is offered on the next
-iteration.
+iteration, once triaged.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the loop's contract is shaped this way"
 

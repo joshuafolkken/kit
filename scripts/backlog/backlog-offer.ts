@@ -40,6 +40,7 @@ const VERDICT_ANSWERS: Readonly<Record<string, BacklogAnswer>> = {
 	[TOKENS.complete]: 'exhausted',
 	[TOKENS.error]: 'unreadable',
 	[TOKENS.stop]: 'parked',
+	[TOKENS.triage]: 'untriaged',
 }
 
 // `wait` is `blocked` while this run has children in flight and `exhausted` when it does not — the

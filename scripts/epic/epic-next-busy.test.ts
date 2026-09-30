@@ -4,7 +4,7 @@ import {
 	listing_of,
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL, RUN_LANE_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild } from './epic-graph'
@@ -52,7 +52,7 @@ const WAIT_TOKEN = 'wait'
 // The half of every not-idle explanation that says the guard did not fall open.
 const NOT_IDLE = 'not "nothing is running"'
 
-function child(number: number, labels: ReadonlyArray<string> = []): EpicChild {
+function child(number: number, labels: ReadonlyArray<string> = [RUN_LANE_LABEL]): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels, blocked_by: [] }
 }
 
@@ -337,6 +337,14 @@ describe('josh epic:next --repo --lanes', () => {
 
 		expect(await answer_for(children, TWO_LANES, true)).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(`${String(FIRST_CHILD)}\n${String(SECOND_CHILD)}`)
+	})
+
+	// joshuafolkken/kit#2779: an untriaged child withholds every lane.
+	it('prints triage while a child carries neither run:solo nor run:lane', async () => {
+		const children = [child(FIRST_CHILD), child(SECOND_CHILD, [])]
+
+		expect(await answer_for(children, TWO_LANES, true)).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe('triage')
 	})
 
 	it('offers a single child without the flag, however many lanes are free', async () => {

@@ -1,5 +1,5 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'
@@ -27,7 +27,23 @@ describe('backlog_plan.row_of', () => {
 		)
 	})
 
-	it('leaves a child without the label unmarked', () => {
-		expect(backlog_plan.row_of(child([]), CONTEXT, '')).not.toContain(backlog_plan.SOLO_MARK)
+	it('leaves a run:lane child unmarked', () => {
+		const row = backlog_plan.row_of(child([RUN_LANE_LABEL]), CONTEXT, '')
+
+		expect(row).not.toContain(backlog_plan.SOLO_MARK)
+		expect(row).not.toContain(backlog_plan.UNTRIAGED_MARK)
+	})
+
+	// joshuafolkken/kit#2779: a child with neither label is the one `backlog:next` answers `triage` for.
+	it('marks a child with neither label as untriaged', () => {
+		expect(backlog_plan.row_of(child([]), CONTEXT, '')).toContain(
+			`#${String(CHILD)} ${backlog_plan.UNTRIAGED_MARK}  ${TITLE}`,
+		)
+	})
+
+	it('reads the labels case-insensitively', () => {
+		expect(backlog_plan.row_of(child(['Run:Lane']), CONTEXT, '')).not.toContain(
+			backlog_plan.UNTRIAGED_MARK,
+		)
 	})
 })

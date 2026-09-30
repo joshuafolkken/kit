@@ -4,7 +4,7 @@ import {
 	listing_of,
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
+import { IN_PROGRESS_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
@@ -36,7 +36,7 @@ const TWO_LANES = 2
 const THREE_LANES = 3
 
 function child(number: number, repo: string = REPO): EpicChild {
-	return { number, repo, state: 'OPEN', labels: [], blocked_by: [] }
+	return { number, repo, state: 'OPEN', labels: [RUN_LANE_LABEL], blocked_by: [] }
 }
 
 async function no_blockers(): Promise<Array<IssueReference>> {
