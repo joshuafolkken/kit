@@ -3,7 +3,18 @@ import { run_cut } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
 import { run_cut_cli_fixture } from './run-cut-cli-fixture'
 
-const { ISSUE, target, launch, verdict } = run_cut_cli_fixture
+const {
+	BRANCH,
+	CONTEXT_UNDER,
+	ISSUE,
+	WITH_HANDOFF,
+	find_open_lane,
+	launch,
+	session_verdict,
+	state,
+	target,
+	verdict,
+} = run_cut_cli_fixture
 
 run_cut_cli_fixture.install()
 
@@ -30,5 +41,77 @@ describe('the retired setup-phase cut', () => {
 		expect(code).toBe(FAILURE_EXIT_CODE)
 		expect(run_cut.read_cut(target()).kind).toBe('none')
 		expect(launch).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#2760: a `fullrun` held in its own checkout — no lane — took no implementation cut,
+// so its context grew without a bound. The hold naming the issue is what lets it cut, relaunching
+// nothing: the session a person is watching hands the run on with the resume command instead.
+function held_by(issue: string | undefined): void {
+	find_open_lane.mockResolvedValue(undefined)
+	state.mockResolvedValue({
+		branch: BRANCH,
+		is_dirty: true,
+		is_held: issue !== undefined,
+		held_issue: issue,
+	})
+}
+
+describe('the implementation cut outside a lane', () => {
+	it('records the cut for a run held for this issue and relaunches nothing', async () => {
+		held_by(ISSUE)
+
+		const code = await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect([code, verdict()]).toStrictEqual([0, run_cut_cli.CUT_VERDICT])
+		expect(run_cut.read_cut(target()).kind).toBe('carried')
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	it('resumes that cut back into implementation in the fresh session', async () => {
+		held_by(ISSUE)
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
+
+		await run_cut_cli.run(['--resume', ISSUE])
+
+		expect(verdict()).toBe(run_cut_cli.RESUME_IMPL_VERDICT)
+	})
+
+	// The session that took the cut stays open outside a lane, so retyping `fullrun #N` there resumed it
+	// over the threshold and the next edit cut it again — a loop that shed no context.
+	it('refuses the resume in the session still over the threshold and keeps the record', async () => {
+		held_by(ISSUE)
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+		const taken = run_cut.read_cut(target())
+
+		const code = await run_cut_cli.run(['--resume', ISSUE])
+
+		expect([code, verdict()]).toStrictEqual([FAILURE_EXIT_CODE, run_cut_cli.OVER_VERDICT])
+		expect(run_cut.read_cut(target())).toStrictEqual(taken)
+	})
+})
+
+describe('a cut outside a lane that is not taken', () => {
+	it.each([[undefined], ['2294']])(
+		'answers not-a-lane when the hold names %j rather than this issue',
+		async (holder) => {
+			held_by(holder)
+
+			const code = await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+			expect([code, verdict()]).toStrictEqual([0, run_cut_cli.NOT_A_LANE_VERDICT])
+			expect(run_cut.read_cut(target()).kind).toBe('none')
+		},
+	)
+
+	// The pre-gate cut stays lane-only: a held run reaches its gate in the same session.
+	it('leaves the pre-gate cut not-a-lane even for a held run', async () => {
+		held_by(ISSUE)
+
+		await run_cut_cli.run([ISSUE])
+
+		expect(verdict()).toBe(run_cut_cli.NOT_A_LANE_VERDICT)
+		expect(run_cut.read_cut(target()).kind).toBe('none')
 	})
 })

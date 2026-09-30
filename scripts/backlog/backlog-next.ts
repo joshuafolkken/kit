@@ -2,11 +2,15 @@ import { fileURLToPath } from 'node:url'
 import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
+import { epic_busy } from '#scripts/epic/epic-busy'
+import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_next } from '#scripts/epic/epic-next'
 import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
+import { epic_solo } from '#scripts/epic/epic-solo'
+import { epic_triage, type TriageVerdict } from '#scripts/epic/epic-triage'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_citation } from '#scripts/rules/issue-citation'
@@ -61,7 +65,10 @@ const RETRY_MESSAGE =
 // no failure path that could emit it, so widening the shared union would give every consumer of it a
 // member none of them can produce — and `VERDICT_LINES` a line nothing ever prints. The token is a
 // backlog-level answer about the transport, not a reading of one epic's graph.
-type BacklogVerdict = EpicVerdict | 'retry'
+//
+// `triage` is `epic:next`'s word as well as this command's (joshuafolkken/kit#2779), but it is decided
+// after the graph is read rather than from it, so it stays `epic_triage`'s type too.
+type BacklogVerdict = EpicVerdict | 'retry' | TriageVerdict
 
 const VERDICT_TOKENS: Readonly<Record<BacklogVerdict, string>> = {
 	complete: auto_ok_cli.NONE_TOKEN,
@@ -69,6 +76,7 @@ const VERDICT_TOKENS: Readonly<Record<BacklogVerdict, string>> = {
 	retry: 'retry',
 	run: 'run',
 	stop: 'stop',
+	triage: epic_triage.TRIAGE_VERDICT,
 	wait: 'wait',
 }
 
@@ -266,13 +274,47 @@ function report_retry(context: PoolContext): number {
 	return SUCCESS_EXIT_CODE
 }
 
+// The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
+// `resolve` and a plan made before the run lists everything (joshuafolkken/kit#2776). The holders are
+// read only on a `run` answer — the one answer the gate can change.
+async function gate_solo(result: EpicNextResult, repo: string): Promise<EpicNextResult> {
+	if (result.verdict !== 'run') return result
+
+	const gated = epic_solo.gate(result, await epic_busy.read_repository(repo), repo)
+
+	if (gated.notice !== undefined) console.error(gated.notice)
+
+	return gated.result
+}
+
+// An untriaged candidate withholds every candidate (joshuafolkken/kit#2779). Checked before the
+// `run:solo` gate, which cannot be applied to an issue whose label is not recorded yet; the numbers go
+// to standard error, the one token to standard output.
+function report_triage(context: PoolContext, untriaged: ReadonlyArray<EpicChild>): number {
+	warn_epic_gap(context)
+	console.error(epic_triage.message(untriaged, context.repo))
+	console.info(VERDICT_TOKENS.triage)
+
+	return SUCCESS_EXIT_CODE
+}
+
+function untriaged_of(result: EpicNextResult, repo: string): ReadonlyArray<EpicChild> {
+	if (result.verdict !== 'run') return []
+
+	return epic_triage.untriaged(epic_report.candidates_for_repo(result, repo))
+}
+
 async function answer_pool(context: PoolContext): Promise<number> {
 	const result = await resolve(context)
 
 	if (result === undefined) return FAILURE_EXIT_CODE
 	if (is_transport_failure(result)) return report_retry(context)
 
-	return report(result, context)
+	const untriaged = untriaged_of(result, context.repo)
+
+	if (untriaged.length > 0) return report_triage(context, untriaged)
+
+	return report(await gate_solo(result, context.repo), context)
 }
 
 // A backlog nobody has opted into answers `none` before either listing below is asked for.
@@ -362,6 +404,7 @@ const backlog_next = {
 	resolve,
 	is_transport_failure,
 	report_retry,
+	report_triage,
 	context_of,
 	answer_pool,
 	report_none,

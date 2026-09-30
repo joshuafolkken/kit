@@ -47,20 +47,22 @@ const IDLE_POLL_MINUTES = 5
 const RUN_VERDICT = 'run'
 const WATCH_VERDICT = 'watch'
 const STOP_VERDICT = 'stop'
+const TRIAGE_VERDICT = 'triage'
 
 // `run` — start what `backlog:next` offered. `watch` — sleep the polling interval and ask again,
 // except while something of the run's own is in flight, where the wake is the progress watcher's exit
 // and the interval is only a floor (`backlogrun.md` → "The wake exists only while something is in
 // flight").
-// `stop` — report and finish. There is no fourth: an answer the loop cannot act on is a verdict
-// nobody can write a loop against.
-type BudgetVerdict = typeof RUN_VERDICT | typeof WATCH_VERDICT | typeof STOP_VERDICT
+// `stop` — report and finish. `triage` — judge the untriaged issues `backlog:next` named, then ask
+// again (joshuafolkken/kit#2779); it is the parent's to act on, so `backlog:drive` hands it back.
+type BudgetVerdict =
+	typeof RUN_VERDICT | typeof WATCH_VERDICT | typeof STOP_VERDICT | typeof TRIAGE_VERDICT
 
 // What `backlog:next` answered, in the words this decision needs. The mapping is mechanical and is
 // written once, in `backlogrun-steps.md` → "The loop": numbers are `candidates`, `wait` is `blocked` while
 // this run has children in flight and `exhausted` when it does not, `none` is `exhausted`, `stop` is
-// `parked`, and `error` or a failed listing is `unreadable`.
-const ANSWERS = ['blocked', 'candidates', 'exhausted', 'parked', 'unreadable'] as const
+// `parked`, `triage` is `untriaged`, and `error` or a failed listing is `unreadable`.
+const ANSWERS = ['blocked', 'candidates', 'exhausted', 'parked', 'unreadable', 'untriaged'] as const
 
 type BacklogAnswer = (typeof ANSWERS)[number]
 
@@ -101,6 +103,9 @@ const UNREADABLE_REASON =
 
 const BLOCKED_REASON =
 	'Everything opted in is blocked or already running, so waiting can still change the answer. Poll again at the polling interval.'
+
+const TRIAGE_REASON =
+	'An opted-in candidate carries neither `run:solo` nor `run:lane`, so nothing starts until it is judged. Read each issue named above, record its order and one of the two labels with a comment, then ask again.'
 
 const NO_IDLE_WATCH_REASON =
 	'The backlog is empty and the idle watch was turned off with `--idle 0`, so the run finishes here.'
@@ -237,6 +242,18 @@ function is_finish(input: BudgetInput): boolean {
 	return stop_reason(input) === undefined && max_decision(input) === undefined
 }
 
+// The answers whose decision no count changes, once the bounds above have been applied.
+const FIXED_DECISIONS: Readonly<Partial<Record<BacklogAnswer, BudgetDecision>>> = {
+	blocked: { verdict: WATCH_VERDICT, reason: BLOCKED_REASON },
+	untriaged: { verdict: TRIAGE_VERDICT, reason: TRIAGE_REASON },
+}
+
+function answer_decision(input: BudgetInput): BudgetDecision {
+	if (input.answer === 'candidates') return { verdict: RUN_VERDICT, reason: run_reason(input) }
+
+	return FIXED_DECISIONS[input.answer] ?? idle_decision(input)
+}
+
 function decide(input: BudgetInput): BudgetDecision {
 	const reason = stop_reason(input)
 
@@ -245,10 +262,8 @@ function decide(input: BudgetInput): BudgetDecision {
 	const capped = max_decision(input)
 
 	if (capped !== undefined) return capped
-	if (input.answer === 'candidates') return { verdict: RUN_VERDICT, reason: run_reason(input) }
-	if (input.answer === 'blocked') return { verdict: WATCH_VERDICT, reason: BLOCKED_REASON }
 
-	return idle_decision(input)
+	return answer_decision(input)
 }
 
 const backlog_budget = {
@@ -263,6 +278,8 @@ const backlog_budget = {
 	PARKED_REASON,
 	RUN_VERDICT,
 	STOP_VERDICT,
+	TRIAGE_REASON,
+	TRIAGE_VERDICT,
 	UNREADABLE_REASON,
 	WATCH_VERDICT,
 	WHOLE_RUN_BUDGET_HOURS,

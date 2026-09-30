@@ -58,6 +58,9 @@ What one invocation does, in order:
   A run that stopped at the merge therefore has no Issue comment, and the missing comment is what a
   failed merge looks like from GitHub.
 - **Closes the epics the Issue completes**, on a merged run only.
+- **Confirms the Issue itself closed**, on a merged run only. GitHub has left merged runs' Issues
+  open despite `closes #N` (joshuafolkken/kit#2770), so an Issue still open a few seconds after the
+  merge is closed with a comment saying why, and the repair is printed as a warning.
 - **Takes the `in-progress` label back off the Issue**, on a merged run only. A run that merged nothing
   keeps it. The removal reads the Issue's labels and sends back the spelling GitHub stored, so an
   `In-Progress` repository is not missed, and an Issue that never carried the label is never written to.

@@ -7,6 +7,9 @@ pnpm josh init
 
 # Override the automatic decision for this run
 pnpm josh init --profile static
+
+# Write the files only — skip the install and format it ends with
+pnpm josh init --no-install
 ```
 
 ## Project profiles
@@ -158,7 +161,7 @@ The `node` profile adds these scripts to your `package.json`; the `static` profi
 | `prepare`    | `(command -v lefthook >/dev/null 2>&1 && { lefthook install \|\| echo '…' >&2; } \|\| true) && (command -v tsx >/dev/null 2>&1 && tsx … \|\| true)` |
 | `josh`       | `josh`                                                                                                                                              |
 
-**What `preinstall` protects, and what it does not** ([#2707](https://github.com/joshuafolkken/kit/issues/2707)). safe-chain's `setup-ci` only creates shims under `~/.safe-chain` and adds them to `PATH` on a CI runner (`GITHUB_PATH` / `TF_BUILD`); it changes neither your shell nor the running install, so **a `pnpm install` on your machine is not scanned** by it. Local installs are scanned only once you enable safe-chain's own shell integration — install safe-chain per its [README](https://github.com/AikidoSec/safe-chain#installation) (or run `safe-chain setup` if it is already installed) and restart your terminal. kit does not run that for you, because it rewrites your shell configuration. Instead, the `node -e` step after `setup-ci` prints a warning with those steps whenever the install is not running behind safe-chain's proxy (safe-chain hands `GLOBAL_AGENT_HTTP_PROXY` to the package manager it wraps); it always exits zero and stays silent when `CI` is set. Re-running `josh init` upgrades a `preinstall` kit wrote earlier — `pnpm dlx @aikidosec/safe-chain[@<version>] setup-ci` — to this form and leaves any other value alone. On CI, the shims `pnpm dlx` leaves behind cannot find the `safe-chain` binary, so the distributed `ci.yml` does not rely on them: its "Setup safe-chain" steps install the binary with safe-chain's hash-verified release installer in `--ci` mode, pinned by the workflow's `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env ([#2711](https://github.com/joshuafolkken/kit/issues/2711)).
+**What `preinstall` protects, and what it does not** ([#2707](https://github.com/joshuafolkken/kit/issues/2707)). safe-chain's `setup-ci` only creates shims under `~/.safe-chain` and adds them to `PATH` on a CI runner (`GITHUB_PATH` / `TF_BUILD`); it changes neither your shell nor the running install, so **a `pnpm install` on your machine is not scanned** by it. Local installs are scanned only once you enable safe-chain's own shell integration — install safe-chain per its [README](https://github.com/AikidoSec/safe-chain#installation) (or run `safe-chain setup` if it is already installed) and restart your terminal. kit does not run that for you, because it rewrites your shell configuration. Instead, the `node -e` step after `setup-ci` prints a warning with those steps whenever the install is not running behind safe-chain's proxy (safe-chain hands `GLOBAL_AGENT_HTTP_PROXY` to the package manager it wraps); it always exits zero and stays silent when `CI` is set. Re-running `josh init` upgrades a `preinstall` kit wrote earlier — `pnpm dlx @aikidosec/safe-chain[@<version>] setup-ci` — to this form and leaves any other value alone. On CI, the shims `pnpm dlx` leaves behind cannot find the `safe-chain` binary, so the distributed `ci.yml` and `pr-classification.yml` do not rely on them: their "Setup safe-chain" steps install the binary with safe-chain's hash-verified release installer in `--ci` mode, pinned by each workflow's `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env ([#2711](https://github.com/joshuafolkken/kit/issues/2711)).
 
 The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`**, not `postinstall`. `prepare` runs on a local `pnpm install` and during `pack`/`publish`, but **not** when your package is installed as a dependency by a consumer — which is the correct scope for these developer-only hooks. The command is **guarded**: each step runs only when its binary is on `PATH`, and each optional hook is individually tolerated with `|| true`, chained with `&&`. This prevents a missing `lefthook`/`tsx` (or a failing optional hook) from aborting `pnpm install` in production or CI installs that omit dev dependencies — **without** masking the core steps it is appended to.
 
@@ -185,7 +188,7 @@ The `node` profile adds the packages below to `devDependencies`. The `static` pr
 | `lefthook`                                                   | version from kit's own development dependencies; only when Git exists (the only case `lefthook.yml` is written) |
 | `secretlint`, `@secretlint/secretlint-rule-preset-recommend` | `^13.0.2`; see [Secret scanning](#secret-scanning-pre-commit)                                                   |
 
-Every generated config has its tool in this list, so `josh init` → `pnpm install` → `josh gate` passes in a new project with no manual install ([#2710](https://github.com/joshuafolkken/kit/issues/2710)): `prettier.config.js` needs `prettier`, `cspell.config.yaml` needs `cspell`, `playwright.config.ts` needs `@playwright/test` and `@types/node`, and `lefthook.yml` needs `lefthook`. The generated `tsconfig.json` names `"types": ["node"]`, because TypeScript 6 no longer loads installed `@types/*` packages by default. `josh init` runs before the first `pnpm install`, so it reports that lefthook is not installed yet and leaves the hook installation to the `prepare` script.
+Every generated config has its tool in this list, so `josh init` (which installs them) → `josh gate` passes in a new project with no manual install ([#2710](https://github.com/joshuafolkken/kit/issues/2710)): `prettier.config.js` needs `prettier`, `cspell.config.yaml` needs `cspell`, `playwright.config.ts` needs `@playwright/test` and `@types/node`, and `lefthook.yml` needs `lefthook`. The generated `tsconfig.json` names `"types": ["node"]`, because TypeScript 6 no longer loads installed `@types/*` packages by default. The `pnpm install` that `josh init` ends with runs the `prepare` script, which installs the hooks; under `--no-install` a new project has no lefthook yet, so `josh init` reports that and leaves the hooks to the `prepare` script of your own install.
 
 `packageManager` and `devEngines.packageManager.version` are written with kit's exact pnpm pin. pnpm removes `packageManager` from a published manifest, so the pin is read from the installed kit's `devEngines` when the field is absent. An older pnpm then reads that exact version instead of rejecting a `>=` range as an invalid `packageManager` specification. The `allowBuilds` entries kit's `pnpm-workspace.yaml` approves are added to an existing `allowBuilds` map. `pnpm add -D @joshuafolkken/kit` always leaves such a map before `josh init` runs. Entries you already answered keep their values.
 
@@ -217,7 +220,7 @@ Retired scripts (previously managed, now removed): `git`, `git:followup`, `teleg
 
 ## AI files
 
-The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves only esbuild's build script (kit's CLI runs on tsx, which depends on esbuild, and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
+The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves the esbuild and unrs-resolver build scripts (kit's CLI runs on tsx, which depends on esbuild; kit's optional ESLint import plugins bring in unrs-resolver; and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md
@@ -247,9 +250,14 @@ The Codex files are managed copies of kit's project configuration. An existing f
 
 ## Tool installs
 
-After all files are processed, `josh init` runs:
+After all files are processed, `josh init` runs ([#2766](https://github.com/joshuafolkken/kit/issues/2766)):
 
-1. **`lefthook install`** — installs git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
+1. **`pnpm install`** — installs the development dependencies it added. The `prepare` script it runs installs the git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
+2. **`josh format`** — formats every file, including the ones `josh init` just wrote.
+
+A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its initial commit. A failed format is only a warning: in a `node` project `josh format` also runs `eslint --fix`, which fails on the project's own unfixable errors. `josh gate` is deliberately not run: in an existing project it can fail on the project's own code, which is not a failed setup.
+
+`--no-install` skips both, for CI or an offline machine. `josh init` then prints the `pnpm install` hint and, in a `node` project with Git, runs `lefthook install` only when lefthook is already installed.
 
 ### `core.hooksPath` stops lefthook installing anything
 

@@ -9,8 +9,9 @@ import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_named } from './backlog-named'
 import { backlog_next, type OptedIn } from './backlog-next'
-import { backlog_plan, type NamedPlan } from './backlog-plan'
+import { backlog_plan, type NamedPlan, type PlanContext } from './backlog-plan'
 import { backlog_scope } from './backlog-scope'
+import { backlog_waves } from './backlog-waves'
 
 // `josh backlog:plan` — the whole backlog as a plan a person reads before a run starts
 // (joshuafolkken/kit#1652).
@@ -36,9 +37,18 @@ const NAMED_COMMAND = 'backlogrun'
 // The flag that runs the named list and stops, mirrored here so the plan the person reads before the
 // run shows the same scope the run will take (joshuafolkken/kit#1984).
 const ONLY_FLAG = '--only'
+// The flag that renders the run's order wave by wave instead of the pool's sections
+// (joshuafolkken/kit#2778).
+const WAVES_FLAG = '--waves'
 
 const USAGE =
-	'Usage: josh backlog:plan [#<issue-number>...] [--only] [--exclude <issue-number>[,<issue-number>...]]...'
+	'Usage: josh backlog:plan [#<issue-number>...] [--only] [--waves] [--exclude <issue-number>[,<issue-number>...]]...'
+
+// The waves play the opted-in pool forward, and a named prefix runs ahead of it one issue at a time —
+// an epic among them running its children first — so waves drawn from the pool alone would promise an
+// order that invocation does not take.
+const WAVES_WITH_NAMED_MESSAGE =
+	'`--waves` plans the opted-in backlog alone; drop the named issues (and `--only`) to see its waves.'
 
 // The leading `#N` tokens are the named prefix a `backlogrun #N1 #N2 …` runs before the pool. They are
 // read through the invocation grammar so the plan and the run agree on what counts as a named issue.
@@ -56,10 +66,10 @@ function has_only_flag(argv: ReadonlyArray<string>): boolean {
 	return argv.includes(ONLY_FLAG)
 }
 
-// `--only` is stripped before the named block and the options are read, so it is never taken for a
-// positional or an unknown option; whether it was present is carried as a boolean instead.
-function without_only(argv: ReadonlyArray<string>): ReadonlyArray<string> {
-	return argv.filter((token) => token !== ONLY_FLAG)
+// `--only` and `--waves` are stripped before the named block and the options are read, so neither is
+// taken for a positional or an unknown option; whether each was present is carried as a boolean.
+function without_flags(argv: ReadonlyArray<string>): ReadonlyArray<string> {
+	return argv.filter((token) => token !== ONLY_FLAG && token !== WAVES_FLAG)
 }
 
 // The one start-time refusal: `--only` with no named issues has nothing to run. `backlog_named` is the
@@ -103,6 +113,12 @@ interface OpenListing {
 	is_capped: boolean
 }
 
+// Which rendering was asked for: the named prefix the sections lead with, or the waves.
+interface PlanView {
+	named: NamedPlan
+	is_waves: boolean
+}
+
 // The same reads and the same classification `backlog:next` makes, through the same two functions.
 // `undefined` is a failure it has already reported.
 async function classify(
@@ -138,26 +154,32 @@ async function fetch_open(): Promise<OpenListing | undefined> {
 	return read.kind === 'read' ? { rows: read.rows, is_capped } : undefined
 }
 
-function print_plan(
-	plan: Plan,
-	open_issues: ReadonlyArray<OpenIssueData>,
-	is_capped: boolean,
-	named: NamedPlan,
-): void {
-	const scope = { repo: plan.repo, exclude: plan.exclude, tracked: plan.tracked }
-	const rows = backlog_scope.out_of_scope(open_issues, plan.result, scope)
-	// A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is
-	// switched off rather than fed a set that would silently report standing blockers as gone.
-	const context = {
+// A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is
+// switched off rather than fed a set that would silently report standing blockers as gone.
+function context_of(plan: Plan, listing: OpenListing): PlanContext {
+	return {
 		repo: plan.repo,
-		titles: backlog_scope.titles_of(open_issues),
-		open_numbers: is_capped ? undefined : backlog_scope.open_numbers_of(open_issues),
+		titles: backlog_scope.titles_of(listing.rows),
+		open_numbers: listing.is_capped ? undefined : backlog_scope.open_numbers_of(listing.rows),
 	}
-
-	console.info(backlog_plan.format_plan(plan.result, rows, context, named))
 }
 
-async function report(plan: Plan, named: NamedPlan): Promise<number> {
+function print_plan(plan: Plan, listing: OpenListing, view: PlanView): void {
+	const context = context_of(plan, listing)
+
+	if (view.is_waves) {
+		console.info(backlog_waves.format_waves(plan.result, context))
+
+		return
+	}
+
+	const scope = { repo: plan.repo, exclude: plan.exclude, tracked: plan.tracked }
+	const rows = backlog_scope.out_of_scope(listing.rows, plan.result, scope)
+
+	console.info(backlog_plan.format_plan(plan.result, rows, context, view.named))
+}
+
+async function report(plan: Plan, view: PlanView): Promise<number> {
 	const listing = await fetch_open()
 
 	if (listing === undefined) {
@@ -167,12 +189,12 @@ async function report(plan: Plan, named: NamedPlan): Promise<number> {
 	}
 
 	if (listing.is_capped) console.error(OPEN_TRUNCATED_MESSAGE)
-	print_plan(plan, listing.rows, listing.is_capped, named)
+	print_plan(plan, listing, view)
 
 	return SUCCESS_EXIT_CODE
 }
 
-async function run_plan(rest: ReadonlyArray<string>, named: NamedPlan): Promise<number> {
+async function run_plan(rest: ReadonlyArray<string>, view: PlanView): Promise<number> {
 	const options = auto_ok_cli.parse_options(without_named(rest), USAGE)
 
 	if (options.usage !== undefined) {
@@ -191,17 +213,33 @@ async function run_plan(rest: ReadonlyArray<string>, named: NamedPlan): Promise<
 
 	const plan = await classify(opted_in, options.exclude ?? [])
 
-	return plan === undefined ? FAILURE_EXIT_CODE : await report(plan, named)
+	return plan === undefined ? FAILURE_EXIT_CODE : await report(plan, view)
+}
+
+// The start-time refusals, `--only`'s and `--waves`'s, in one place so `run` stays a straight line.
+//
+// The waves refusal reads the named block from the flag-stripped tokens, so `--waves #5` is refused
+// like `#5 --waves` rather than having its `#5` dropped by the option parser.
+function refusal_of(
+	named: ReadonlyArray<number>,
+	rest: ReadonlyArray<string>,
+	is_only: boolean,
+	is_waves: boolean,
+): string | undefined {
+	if (!is_waves) return only_refusal(named, is_only)
+
+	return is_only || named_of(rest).length > 0 ? WAVES_WITH_NAMED_MESSAGE : undefined
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const is_only = has_only_flag(argv)
-	const rest = without_only(argv)
+	const is_waves = argv.includes(WAVES_FLAG)
+	const rest = without_flags(argv)
 	// Read the named block from the *original* argv, so `--only` placed before the `#N` block breaks the
 	// leading block exactly as the run grammar does — the plan then refuses an ordering the run refuses,
 	// rather than promising a scope the resumed invocation would stop on (joshuafolkken/kit#1984).
 	const named = named_of(argv)
-	const refusal = only_refusal(named, is_only)
+	const refusal = refusal_of(named, rest, is_only, is_waves)
 
 	if (refusal !== undefined) {
 		console.error(refusal)
@@ -209,7 +247,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await run_plan(rest, { issues: named, only: is_only })
+	return await run_plan(rest, { named: { issues: named, only: is_only }, is_waves })
 }
 
 // `process.exitCode` rather than `process.exit()`, the reason `backlog:next` records: the plan is
@@ -222,6 +260,7 @@ const backlog_plan_cli = {
 	OPEN_TRUNCATED_MESSAGE,
 	OPEN_UNREADABLE_MESSAGE,
 	USAGE,
+	WAVES_WITH_NAMED_MESSAGE,
 	classify,
 	fetch_open,
 	main,

@@ -256,6 +256,7 @@ describe('cutting a lane child during implementation', () => {
 
 	it('resumes into implementation, not the gate, on a matching tree', async () => {
 		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
 
 		const code = await run_cut_cli.run(['--resume', ISSUE])
 
@@ -278,6 +279,7 @@ describe('cutting a lane child during implementation', () => {
 describe('re-arming after an implementation resume', () => {
 	it('clears the record on an implementation resume so both guards re-arm', async () => {
 		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
 
 		const code = await run_cut_cli.run(['--resume', ISSUE])
 
@@ -290,6 +292,7 @@ describe('re-arming after an implementation resume', () => {
 	// does not need to.
 	it('answers a second implementation resume fresh, not handed-off', async () => {
 		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
 		await run_cut_cli.run(['--resume', ISSUE])
 
 		const second = await run_cut_cli.run(['--resume', ISSUE])
@@ -302,6 +305,7 @@ describe('re-arming after an implementation resume', () => {
 	// the tree busy.
 	it('takes another implementation cut after a resume cleared the first', async () => {
 		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
 		await run_cut_cli.run(['--resume', ISSUE])
 
 		const again = await run_cut_cli.run(['--impl', ...WITH_HANDOFF, ISSUE])

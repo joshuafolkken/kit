@@ -40,6 +40,14 @@ describe('backlog_offer.answer_of — the verdict words map per the loop table',
 		expect(offer_of([NONE_TOKEN], NO_RUNNING, NO_RETRIES).answer).toBe('exhausted')
 	})
 
+	it('maps `triage` to untriaged', () => {
+		expect(offer_of([TOKENS.triage], SOME_RUNNING, NO_RETRIES)).toStrictEqual({
+			answer: 'untriaged',
+			issues: [],
+			retries: NO_RETRIES,
+		})
+	})
+
 	it('maps `error` to unreadable', () => {
 		expect(offer_of([TOKENS.error], NO_RUNNING, NO_RETRIES).answer).toBe('unreadable')
 	})

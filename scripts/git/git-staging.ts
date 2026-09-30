@@ -2,6 +2,7 @@ import {
 	observation_ledger,
 	OBSERVATION_LEDGER_PATHS,
 } from '#scripts/observations/observation-ledger'
+import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { git_command } from './git-command'
 import { git_prompt } from './git-prompt'
 import { git_status } from './git-status'
@@ -67,18 +68,26 @@ async function stage_untracked_files(files: ReadonlyArray<string>): Promise<void
 	for (const file of files) console.info(`   + ${file}`)
 }
 
-// **The observation ledger is never staged by an ordinary commit** (joshuafolkken/kit#1756). A
-// parent session appends to it in the primary checkout and nothing there commits it, so the next
-// `pnpm josh git` run in that checkout swept the line into a pull request about something else
-// entirely — a diff a reviewer has no reason to question. Excluding it here covers every entry
-// point, because this is the one staging step all of them go through;
-// `pnpm josh observations:flush` is what commits it, on a branch of its own.
-// Both of its paths are excluded (joshuafolkken/kit#2724): a run on the old code still appends at
-// the old one until `observation-ledger-migrate.ts` moves it.
-const PATHS_EXCLUDED_FROM_STAGING: ReadonlyArray<string> = OBSERVATION_LEDGER_PATHS
+// **The observation ledger rides the run's own commit** (joshuafolkken/kit#2763). It used to be
+// excluded here (joshuafolkken/kit#1756) and committed afterwards by `pnpm josh observations:flush` as
+// a pull request of its own — a second branch, CI wait and merge behind every run that appended a
+// line, 144 of them in one month. Staged with the run instead, the lines are reviewed and merged with
+// the pull request whose run recorded them, while CI for that pull request is the only wait.
+//
+// **A line that breaks the grammar keeps the old exclusion** (joshuafolkken/kit#2123): the commit
+// goes ahead without the ledger, and `pnpm josh observations:flush` — which refuses the same line and
+// names it — is where it is repaired. The migration is run first, as the flush runs it, so a line
+// still on the old path (joshuafolkken/kit#2724) is committed at the new one. A lane has no ledger
+// line of its own to carry: its writers append to the primary checkout's.
+async function ledger_exclusions(): Promise<ReadonlyArray<string>> {
+	const broken = await observation_ledger_prepare.prepare(await git_command.repository_root())
 
-function is_stageable(file_path: string): boolean {
-	return !observation_ledger.is_ledger_path(file_path)
+	return broken.length > 0 ? OBSERVATION_LEDGER_PATHS : []
+}
+
+// A migration claim is a copy mid-move, never the ledger itself, so it is never staged.
+function is_stageable(file_path: string, excluded: ReadonlyArray<string>): boolean {
+	return !observation_ledger.is_migration_claim(file_path) && !excluded.includes(file_path)
 }
 
 // **Said out loud, because the alternative is an unexplained failure.** With the ledger the only
@@ -89,27 +98,31 @@ function is_stageable(file_path: string): boolean {
 // **The paths are parsed rather than matched as substrings**: `docs/maintainers/observations.md.bak` contains the
 // ledger's path, and a hint naming a file the exclusion never touched is a hint that teaches the
 // reader to ignore it.
-function report_excluded_paths(status_output: string): void {
-	const excluded = status_output
+function report_excluded_paths(status_output: string, excluded: ReadonlyArray<string>): void {
+	const left_out = status_output
 		.split('\n')
 		.filter((line) => line.trim().length > 0)
 		.map((line) => observation_ledger.status_path(line))
-		.filter((file_path) => !is_stageable(file_path))
+		.filter((file_path) => excluded.includes(file_path))
 
-	for (const file_path of excluded) {
-		console.info(`💡 ${file_path} is not staged; commit it with \`pnpm josh observations:flush\`.`)
+	for (const file_path of left_out) {
+		console.info(
+			`💡 ${file_path} is not staged: a ledger line breaks the grammar; \`pnpm josh observations:flush\` names it.`,
+		)
 	}
 }
 
+// The status is read after the migration, so an old-path ledger it moved is not staged by its old name.
 async function stage_tracked_files(): Promise<void> {
+	const excluded = await ledger_exclusions()
 	const status_output = await git_command.status()
 	const untracked = git_status
 		.list_untracked_files(status_output)
-		.filter((file_path) => is_stageable(file_path))
+		.filter((file_path) => is_stageable(file_path, excluded))
 
-	await git_command.add_tracked(PATHS_EXCLUDED_FROM_STAGING)
+	await git_command.add_tracked(excluded)
 	console.info('💡 Auto-staged tracked modified files (git add -u).')
-	report_excluded_paths(status_output)
+	report_excluded_paths(status_output, excluded)
 	await stage_untracked_files(untracked)
 }
 

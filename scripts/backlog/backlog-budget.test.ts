@@ -273,6 +273,27 @@ describe('backlog_budget.decide — the bounds that outrank both budgets', () =>
 	})
 })
 
+describe('backlog_budget.decide — an untriaged candidate', () => {
+	it('answers triage so the parent judges it, even with children running', () => {
+		const decision = backlog_budget.decide(
+			input_of({ answer: 'untriaged', running: MERGED_UNDER_MAX, idle_budget_ms: IDLE_BUDGET_MS }),
+		)
+
+		expect(decision).toStrictEqual({
+			verdict: backlog_budget.TRIAGE_VERDICT,
+			reason: backlog_budget.TRIAGE_REASON,
+		})
+	})
+
+	it('lets the maximum end the run ahead of a triage', () => {
+		const decision = backlog_budget.decide(
+			input_of({ answer: 'untriaged', max_issues: MAX_ISSUES, merged: MAX_ISSUES }),
+		)
+
+		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
+	})
+})
+
 describe('backlog_budget.decide — the answers no budget can rescue', () => {
 	it('reports a parked backlog rather than watching it', () => {
 		const decision = backlog_budget.decide(

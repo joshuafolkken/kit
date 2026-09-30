@@ -7,6 +7,8 @@ import {
 } from './epic-candidate-confirm'
 import { epic_graph, type EpicChild } from './epic-graph'
 import type { EpicVerdict } from './epic-report'
+import { epic_solo } from './epic-solo'
+import { epic_triage, type TriageVerdict } from './epic-triage'
 
 // Which children a repository has room to start right now (joshuafolkken/kit#1491).
 //
@@ -50,7 +52,7 @@ interface LaneRequest {
 // output carries issue numbers or a verdict and nothing else.
 interface LaneOffer {
 	children: ReadonlyArray<EpicChild>
-	verdict: EpicVerdict
+	verdict: EpicVerdict | TriageVerdict
 	notice: string
 }
 
@@ -165,14 +167,75 @@ async function collect(
 	return { children, verdict: children.length > NO_LANES ? RUN_VERDICT : verdict }
 }
 
+// The `run:solo` gate `backlog:next` applies, applied to a named epic's lanes too
+// (joshuafolkken/kit#2776): the confirmed children are cut where `epic_solo.select` says, so a
+// `run:solo` child never opens a lane beside another one on either path.
+function solo_offer(
+	answer: { children: ReadonlyArray<EpicChild>; verdict: EpicVerdict },
+	read: BusyRead,
+	request: LaneRequest,
+): LaneOffer {
+	const { offered, notice } = epic_solo.select(answer.children, read, request.repo)
+
+	if (offered.length === NO_LANES && answer.children.length > NO_LANES) {
+		return { children: [], verdict: WAIT_VERDICT, notice: notice ?? '' }
+	}
+
+	return { ...answer, children: offered, notice: offered_notice(offered, read, request) }
+}
+
+// The confirmation walk stops at the free-lane count, so a `run:solo` candidate ranked past it — or
+// in a pool past it — would never reach `solo_offer` to be preferred. Into an idle repository the
+// first pool holding one is asked first, with it at its head through the same `epic_solo.prefer` the
+// offer applies (joshuafolkken/kit#2778). The candidate stays in its own pool, because a pool carries
+// the graph it is confirmed against.
+function solo_first(pools: ReadonlyArray<RepoPool>, read: BusyRead): ReadonlyArray<RepoPool> {
+	if (read.kind !== 'idle') return pools
+
+	const index = pools.findIndex((pool) => pool.candidates.some((child) => epic_solo.is_solo(child)))
+	const pool = pools[index]
+
+	if (pool === undefined) return pools
+
+	const lifted = { ...pool, candidates: epic_solo.prefer(pool.candidates, read) }
+
+	return [lifted, ...pools.filter((other) => other !== pool)]
+}
+
 // The repository is asked how full it is **before** any candidate is confirmed, for the reason
 // joshuafolkken/kit#1121 records: a repository with no free lane is handed nothing, so the relations
 // request that would confirm a candidate there buys an answer nobody reads — and a polling `epicrun`
 // would pay it every round.
+//
+// **Triage is asked before even that** (joshuafolkken/kit#2779): an untriaged candidate withholds every
+// candidate whatever the occupancy, and it needs only the labels already read. Only a `--lanes` ask
+// is gated — it is the one that opens children beside each other; the single-child form starts one.
+function triage_offer(pools: ReadonlyArray<RepoPool>, request: LaneRequest): LaneOffer | undefined {
+	if (!request.is_all_lanes) return undefined
+
+	const untriaged = epic_triage.untriaged(
+		dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo))).flatMap(
+			(pool) => pool.candidates,
+		),
+	)
+
+	if (untriaged.length === NO_LANES) return undefined
+
+	return {
+		children: [],
+		verdict: epic_triage.TRIAGE_VERDICT,
+		notice: epic_triage.message(untriaged, request.repo),
+	}
+}
+
 async function offer_for_repo(
 	pools: ReadonlyArray<RepoPool>,
 	request: LaneRequest,
 ): Promise<LaneOffer> {
+	const triage = triage_offer(pools, request)
+
+	if (triage !== undefined) return triage
+
 	const read = await epic_busy.read_repository(request.repo)
 	const free = free_lanes(read, request.limit)
 
@@ -184,10 +247,12 @@ async function offer_for_repo(
 		}
 	}
 
-	const for_repo = dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo)))
-	const answer = await collect(for_repo, wanted_of(request, free))
+	const for_repo = solo_first(
+		dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo))),
+		read,
+	)
 
-	return { ...answer, notice: offered_notice(answer.children, read, request) }
+	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request)
 }
 
 const epic_lane_offer = {

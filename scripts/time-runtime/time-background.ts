@@ -50,6 +50,8 @@ const NO_FINISH = 0
 // The launch's own result body, which is the only place the harness writes the id it assigns. Read
 // as a derived fact and the body discarded, exactly as `has_failure_line` and `followup_stages` are.
 const LAUNCH_PATTERN = /running in background with ID:\s*([\w-]+)/iu
+// A backgrounded subagent's launch result, which names its id on an `agentId:` line of its own.
+const AGENT_LAUNCH_PATTERN = /^Async agent launched[\s\S]*?\bagentId:\s*([\w-]+)/u
 // The notice the harness writes when a task it took into the background ends
 // (joshuafolkken/kit#1696). It is anchored at the start because the whole content of that line *is*
 // the notice — a body merely quoting one is text, the same hazard `read_id` unquotes for — and it
@@ -94,6 +96,14 @@ function read_id_of(input: unknown): string {
 
 function launch_id(text: string): string {
 	return LAUNCH_PATTERN.exec(text)?.[1] ?? NO_BACKGROUND
+}
+
+// The id of a subagent the harness took into the background (joshuafolkken/kit#2774). Its end is the
+// same `<task-id>` notice a command's is, so `finished_id` pairs it unchanged. It is kept apart from
+// `launch_id` on purpose: a subagent is not a command, and folding it in would open a timeline window
+// that re-stamps the spans a backgrounded gate running beside the review is owed.
+function agent_launch_id(text: string): string {
+	return AGENT_LAUNCH_PATTERN.exec(text)?.[1] ?? NO_BACKGROUND
 }
 
 // The background run a task-notification line reports the end of, or nothing for every other line —
@@ -288,6 +298,7 @@ const time_background = {
 	NO_BACKGROUND,
 	NO_FINISH,
 	launch_id,
+	agent_launch_id,
 	finished_id,
 	finished_at,
 	read_id,

@@ -1,6 +1,7 @@
 import { git_epic_close } from './git-epic-close'
 import { git_followup_cleanup } from './git-followup-cleanup'
 import { git_followup_flush } from './git-followup-flush'
+import { git_followup_issue_close } from './git-followup-issue-close'
 import { git_followup_label } from './git-followup-label'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
@@ -25,6 +26,9 @@ const IN_PROGRESS_RECOVERY = 'gh api -X DELETE repos/{owner}/{repo}/issues/<N>/l
 interface WrapupInput {
 	branch_name: string
 	issue_number: string | undefined
+	// The number the pull request body's `closes #N` names — the only issue the merge claimed to
+	// close, so the only one the merged-issue close may write to (joshuafolkken/kit#2770).
+	closes_number: string | undefined
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
 	should_merge: boolean
@@ -164,9 +168,30 @@ async function in_progress_step(input: WrapupInput): Promise<void> {
 	})
 }
 
+// **The merged issue's close, confirmed rather than assumed** (joshuafolkken/kit#2770): GitHub stopped
+// applying `closes #N` on some merges, and nothing noticed. The epic auto-close does not wait on it —
+// it already excludes the merged issue from its reads — so it runs beside the other steps. It acts on
+// the body's `closes #N` rather than the run's issue number: a pull request that closes nothing, or
+// another issue, never closes the one the invocation named.
+async function issue_close_step(input: WrapupInput): Promise<void> {
+	if (!input.should_merge) return
+
+	await git_followup_cleanup.run_guarded_step(input.should_merge, {
+		label: 'The merged issue close',
+		recovery: git_followup_issue_close.CLOSE_RECOVERY,
+		run: async () => {
+			await git_followup_issue_close.ensure_issue_closed({
+				issue_number: input.closes_number,
+				pr_url: input.pr_url,
+			})
+		},
+	})
+}
+
 // **The steps after the merge are issued together** (joshuafolkken/kit#1446). The completion
-// comment writes to the issue or the pull request, the auto-close reads the open epics, and the
-// label removal reads and writes the issue's labels; none needs another's answer, and measured
+// comment writes to the issue or the pull request, the auto-close reads the open epics, the label
+// removal reads and writes the issue's labels, and the merged-issue close reads and may close the
+// issue; none needs another's answer, and measured
 // serially the first two were 1.9 s and 3.1 s of `followup`'s own clock. Past the merge none can
 // reject another — `run_guarded_step` reports the failure and answers instead — so they settle
 // independently and the stage costs the longest of them rather than their sum.
@@ -178,9 +203,9 @@ async function in_progress_step(input: WrapupInput): Promise<void> {
 // (`git-followup-cleanup.ts`), which is easier to read as one sequence than as a settled set.
 //
 // **What the overlap costs, stated rather than glossed**: mutating requests now go out at once
-// against one repository — a comment write, an auto-close that comments on and closes epics, and a
-// label delete — which is what GitHub's secondary rate limit guidance is about. Past the merge all
-// of them are guarded, so the worst case is a cleanup reported as unfinished rather than a failed
+// against one repository — a comment write, an auto-close that comments on and closes epics, a label
+// delete, and the merged issue's close when GitHub did not apply it — which is what GitHub's
+// secondary rate limit guidance is about. Past the merge all of them are guarded, so the worst case is a cleanup reported as unfinished rather than a failed
 // run, and this is a handful of requests rather than a fan-out. **Their console output can
 // interleave too**: the guard's warning and its recovery line are printed as they happen, so an
 // auto-close progress line can land between them. The recovery line names its own command and stands
@@ -194,7 +219,12 @@ async function run_tail_steps(input: WrapupInput): Promise<void> {
 		return
 	}
 
-	await Promise.all([notify_step(input), epic_close_step(input), in_progress_step(input)])
+	await Promise.all([
+		notify_step(input),
+		epic_close_step(input),
+		in_progress_step(input),
+		issue_close_step(input),
+	])
 }
 
 async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {

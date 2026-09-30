@@ -5,6 +5,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import type { IssueRead } from '#scripts/git/git-gh-issue-read'
+import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/git/issue-labels'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
@@ -57,6 +58,13 @@ interface BacklogInput {
 	defect_rate?: DefectRate
 	// A measurement that could not be read at all.
 	is_rate_unreadable?: boolean
+	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer
+	// (joshuafolkken/kit#2776). Left out, nothing is running.
+	in_progress?: ReadonlyArray<OpenIssueData>
+	// The issues left without `run:solo` or `run:lane` (joshuafolkken/kit#2779). Every other child and
+	// opted-in row is given `run:lane` unless it carries `run:solo`, so a case about something else is
+	// not answered `triage`.
+	untriaged?: ReadonlyArray<number>
 }
 
 const AT_BASELINE: DefectRate = {
@@ -67,13 +75,41 @@ const AT_BASELINE: DefectRate = {
 	is_capped: false,
 }
 
+// The labels an issue is read with: `run:lane` added where the case left it judged.
+function triaged_labels(
+	number: number,
+	labels: ReadonlyArray<string>,
+	untriaged: ReadonlyArray<number>,
+): ReadonlyArray<string> {
+	if (untriaged.includes(number) || labels.includes(RUN_SOLO_LABEL)) return labels
+
+	return [...labels, RUN_LANE_LABEL]
+}
+
+function triaged_row(row: OpenIssueData, untriaged: ReadonlyArray<number>): OpenIssueData {
+	const names = triaged_labels(
+		row.number,
+		(row.labels ?? []).map((label) => label.name),
+		untriaged,
+	)
+
+	return { ...row, labels: names.map((name) => ({ name })) }
+}
+
 // The shape a `number,state,labels,blockedBy` read answers with — `blockedBy` is a connection rather
 // than a bare array, exactly as `epic-fetch.test.ts` records.
-function gh_child(input: ChildInput): string {
+function child_labels(
+	input: ChildInput,
+	untriaged: ReadonlyArray<number>,
+): ReadonlyArray<{ name: string }> {
+	return triaged_labels(input.number, input.labels ?? [], untriaged).map((name) => ({ name }))
+}
+
+function gh_child(input: ChildInput, untriaged: ReadonlyArray<number> = []): string {
 	return JSON.stringify({
 		number: input.number,
 		state: input.state ?? 'OPEN',
-		labels: (input.labels ?? []).map((name) => ({ name })),
+		labels: child_labels(input, untriaged),
 		blockedBy: {
 			nodes: (input.blocked_by ?? []).map((number) => ({ number })),
 			totalCount: (input.blocked_by ?? []).length,
@@ -107,8 +143,11 @@ function to_child_read(json: string | undefined): IssueRead {
 	return { kind: 'read', json }
 }
 
-function child_texts(children: ReadonlyArray<ChildInput>): Map<string, string> {
-	return new Map(children.map((child) => [String(child.number), gh_child(child)]))
+function child_texts(
+	children: ReadonlyArray<ChildInput>,
+	untriaged: ReadonlyArray<number>,
+): Map<string, string> {
+	return new Map(children.map((child) => [String(child.number), gh_child(child, untriaged)]))
 }
 
 // Where this checkout is, who it is, and that GitHub is answering — the three the backlog itself
@@ -136,18 +175,30 @@ function stub_defect_priority(input: BacklogInput): void {
 	)
 }
 
-function stub_backlog(input: BacklogInput): void {
-	const epics = input.epics ?? []
-	const bodies = epic_bodies(epics)
-	const children = child_texts(input.children ?? [])
+// The three label listings: the opted-in rows, the epics, and the `in-progress` holders the
+// `run:solo` gate reads (joshuafolkken/kit#2776).
+function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): void {
+	const untriaged = input.untriaged ?? []
+	const rows = (input.opted_in ?? []).map((row) => triaged_row(row, untriaged))
 
-	stub_environment()
 	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockResolvedValue(
-		listing_outcome(JSON.stringify(input.opted_in ?? [])),
+		listing_outcome(JSON.stringify(rows)),
 	)
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(
 		listing_outcome(auto_ok_fixture.epic_listing(epics)),
 	)
+	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockResolvedValue(
+		listing_outcome(JSON.stringify(input.in_progress ?? [])),
+	)
+}
+
+function stub_backlog(input: BacklogInput): void {
+	const epics = input.epics ?? []
+	const bodies = epic_bodies(epics)
+	const children = child_texts(input.children ?? [], input.untriaged ?? [])
+
+	stub_environment()
+	stub_listings(input, epics)
 	// The classified reads (joshuafolkken/kit#1690). An epic the fixture has no body for is a body that
 	// is simply absent, which is what it always meant here; a child it has no text for is a read that
 	// failed for a reason asking again will not change, which is what an absent payload meant.

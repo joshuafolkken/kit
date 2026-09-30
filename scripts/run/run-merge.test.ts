@@ -125,6 +125,72 @@ describe('classify_child — a declared cut', () => {
 	})
 })
 
+// joshuafolkken/kit#2769: a child whose pull request merged while GitHub left the issue OPEN is not a
+// failure — its work landed — so it is `merged`, and the failure streak is reset rather than grown.
+describe('classify_child — merged while the issue stayed OPEN', () => {
+	const MERGED_OPEN = { ...CUT, is_outage: true, merged_pr: 'https://github.com/o/r/pull/2768' }
+
+	it('reads an OPEN unparked child with a merged closing pull request as merged, not failed', () => {
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), MERGED_OPEN)).toBe(
+			MERGED,
+		)
+	})
+
+	it('leaves a parked child parked even with a merged closing pull request', () => {
+		expect(
+			run_merge.classify_child(issue_state_of({ labels: [NEEDS_DECISION] }), MERGED_OPEN),
+		).toBe(PARKED)
+	})
+
+	it('does not grow the consecutive-failure count for it', () => {
+		const outcome = run_merge.classify_child(issue_state_of({}), MERGED_OPEN)
+
+		expect(run_merge.change_of(outcome)).toStrictEqual({ merged: 1 })
+		expect(run_merge.change_of(outcome)).not.toHaveProperty('failures')
+	})
+})
+
+// joshuafolkken/kit#2769: a park the driver makes is explained on the issue — why, what was read, and
+// what a person does next.
+describe('park_comment', () => {
+	const CARRY: RunCarry = {
+		invocation: 'backlogrun',
+		started_at: '2026-09-30T00:00:00.000Z',
+		merged: 0,
+		filed: 0,
+		cuts: 0,
+		failures: 2,
+		outages: 0,
+	}
+
+	it('states the cause, the state read, the streak and the next step', () => {
+		const comment = run_merge.park_comment({
+			child: '2761',
+			cause: 'the session ended unfinished.',
+			carry: CARRY,
+			output: 'lane.jsonl',
+		})
+
+		expect(comment).toContain(NEEDS_DECISION)
+		expect(comment).toContain('- Why: the session ended unfinished.')
+		expect(comment).toContain('no merged pull request')
+		expect(comment).toContain('Consecutive failures: 2 of 3')
+		expect(comment).toContain('`lane.jsonl`')
+		expect(comment).toContain('`fullrun #2761`')
+	})
+
+	it('says the streak was not recorded when there is no carry record', () => {
+		const comment = run_merge.park_comment({
+			child: '1',
+			cause: 'x',
+			carry: undefined,
+			output: undefined,
+		})
+
+		expect(comment).toContain('not recorded')
+	})
+})
+
 describe('change_of', () => {
 	it('counts a merge, which resets the failure streak', () => {
 		expect(run_merge.change_of('merged')).toStrictEqual({ merged: 1 })

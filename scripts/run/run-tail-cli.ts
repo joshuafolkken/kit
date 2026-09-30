@@ -33,8 +33,10 @@ interface Step {
 	argv: (issues: ReadonlyArray<string>) => ReadonlyArray<string>
 }
 
-// The steps in the order a run closes on: the ledger is committed first so the recurrence count is on
-// main, the citations are read for the completion report, and the release scope is decided last.
+// The steps in the order a run closes on: any ledger line the run's own commit did not carry
+// (joshuafolkken/kit#2763) is committed first so the recurrence count is on main — on most runs the
+// flush answers `clean` — the citations are read for the completion report, and the release scope is
+// decided last.
 const FLUSH_STEP: Step = {
 	header: run_tail.OBSERVATIONS_HEADER,
 	argv: () => ['observations:flush'],

@@ -43,8 +43,14 @@ const RELEASE_FLAG = '--release'
 // cannot — clearing a record somebody else left behind — is spelled out rather than reached by
 // typing the ordinary command.
 const FORCE_FLAG = '--force'
+// What `fullrun #N`'s entry claims with, so the record says the run is a `fullrun` — the one run whose
+// implementation cut outside a lane resumes as `fullrun #N` (joshuafolkken/kit#2760).
+const FULLRUN_FLAG = '--fullrun'
+// The most a claim reads: the issue number and the `--fullrun` flag after it.
+const MAX_CLAIM_ARGUMENTS = 2
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
-const USAGE = 'Usage: josh run:hold [<issue-number>] | josh run:release [<issue-number> | --force]'
+const USAGE =
+	'Usage: josh run:hold [<issue-number> [--fullrun]] | josh run:release [<issue-number> | --force]'
 
 const HOLD_VERDICT = 'hold'
 const BUSY_VERDICT = 'busy'
@@ -57,10 +63,14 @@ const HELD_VERDICT = 'held'
 
 const FORCE_RELEASE_KIND = 'force-release'
 
+interface ClaimRequest {
+	kind: 'claim'
+	issue: string
+	is_fullrun?: boolean
+}
+
 type HoldRequest =
-	| { kind: 'release'; claimant: string }
-	| { kind: typeof FORCE_RELEASE_KIND }
-	| { kind: 'claim'; issue: string }
+	ClaimRequest | { kind: 'release'; claimant: string } | { kind: typeof FORCE_RELEASE_KIND }
 
 const FORCE_RELEASE_REQUEST: HoldRequest = { kind: FORCE_RELEASE_KIND }
 
@@ -68,14 +78,21 @@ function release_request(claimant: string): HoldRequest {
 	return { kind: 'release', claimant }
 }
 
+// The flag after a numbered claim: absent, or `--fullrun`. Anything else is a usage error.
+function numbered_claim(issue: string, flag: string | undefined): HoldRequest | undefined {
+	if (flag === undefined) return { kind: 'claim', issue }
+
+	return flag === FULLRUN_FLAG ? { kind: 'claim', issue, is_fullrun: true } : undefined
+}
+
 function parse_claim(argv: ReadonlyArray<string>): HoldRequest | undefined {
-	const [first] = argv
+	const [first, flag] = argv
 
 	if (first === undefined) return { kind: 'claim', issue: run_hold.UNNUMBERED_ISSUE }
 
-	if (argv.length > 1 || !ISSUE_NUMBER_PATTERN.test(first)) return undefined
+	if (argv.length > MAX_CLAIM_ARGUMENTS || !ISSUE_NUMBER_PATTERN.test(first)) return undefined
 
-	return { kind: 'claim', issue: first }
+	return numbered_claim(first, flag)
 }
 
 function parse_release_argument(first: string): HoldRequest | undefined {
@@ -135,8 +152,10 @@ async function blocking_message(read: HoldRead): Promise<string | undefined> {
 
 // A record already here is never overwritten by a claim: overwriting is what the guard exists to
 // prevent, and the person who knows the other run has ended clears it with `run:release --force`.
-function take_free_tree(target: string, issue: string): number {
-	if (run_hold.create_hold(target, issue)) return report_hold()
+function take_free_tree(target: string, request: ClaimRequest): number {
+	const is_taken = run_hold.create_hold(target, request.issue, new Date(), request.is_fullrun)
+
+	if (is_taken) return report_hold()
 
 	return report_busy(run_hold.race_message(run_hold.read_hold(target), target))
 }
@@ -145,11 +164,11 @@ function take_free_tree(target: string, issue: string): number {
 // record with a plain write would tell two sessions that both found it expired that they both won —
 // the race the free path was just fixed for, reintroduced one branch over. Removing it first is what
 // turns the expired record into a free tree; the create is what decides between the two claimants.
-function replace_stale(target: string, issue: string, hold: RunHold): number {
+function replace_stale(target: string, request: ClaimRequest, hold: RunHold): number {
 	console.error(run_hold.stale_message(hold))
 	run_hold.release_hold(target)
 
-	return take_free_tree(target, issue)
+	return take_free_tree(target, request)
 }
 
 // A non-clean preflight verdict is not an error: it is an answer a loop branches on, exactly as
@@ -176,8 +195,8 @@ async function preflight_gate(issue: string, is_linked: boolean): Promise<number
 	return report_preflight(decision)
 }
 
-async function claim(target: string, issue: string, is_linked: boolean): Promise<number> {
-	const gate = await preflight_gate(issue, is_linked)
+async function claim(target: string, request: ClaimRequest, is_linked: boolean): Promise<number> {
+	const gate = await preflight_gate(request.issue, is_linked)
 
 	if (gate !== undefined) return gate
 
@@ -187,7 +206,9 @@ async function claim(target: string, issue: string, is_linked: boolean): Promise
 	if (blocked !== undefined) return report_busy(blocked)
 
 	const code =
-		read.kind === 'stale' ? replace_stale(target, issue, read.hold) : take_free_tree(target, issue)
+		read.kind === 'stale'
+			? replace_stale(target, request, read.hold)
+			: take_free_tree(target, request)
 
 	if (code === SUCCESS_EXIT_CODE) await run_tidy_cli.sweep()
 
@@ -262,7 +283,7 @@ async function read_worktree(): Promise<string | undefined> {
 }
 
 async function dispatch(request: HoldRequest, target: string, is_linked: boolean): Promise<number> {
-	if (request.kind === 'claim') return await claim(target, request.issue, is_linked)
+	if (request.kind === 'claim') return await claim(target, request, is_linked)
 
 	if (request.kind === FORCE_RELEASE_KIND) return force_release(target)
 

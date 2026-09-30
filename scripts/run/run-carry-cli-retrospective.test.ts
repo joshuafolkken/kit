@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
+import { run_carry_cli_fixture } from './run-carry-cli-fixture'
 import { run_event_stream } from './run-event-stream'
 
 // joshuafolkken/kit#2342: the `run:carry --retrospective` close writes its result onto the run's event
@@ -37,6 +38,7 @@ function event_target(): string {
 }
 
 beforeEach(() => {
+	run_carry_cli_fixture.hold_verdict()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])

@@ -63,6 +63,9 @@ interface LaneCostState {
 	directory: string
 	source: MarkerSource
 	carried: (now?: Date) => RunCut | undefined
+	// The issue whose run hold stands over this checkout (joshuafolkken/kit#2760) — how a `fullrun`
+	// held outside a lane is told apart from a person's tree.
+	held_issue: () => string | undefined
 	verdict: () => CostVerdict
 }
 
@@ -71,6 +74,7 @@ function current_state(): LaneCostState {
 		directory: process.cwd(),
 		source: process.env,
 		carried: run_cut.carried_cut_sync,
+		held_issue: run_cut.held_issue_sync,
 		// **Read through the short reuse window** (joshuafolkken/kit#2385). The row now fires per
 		// threshold crossing rather than once per run, so this predicate is a candidate on every edit;
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
@@ -79,20 +83,47 @@ function current_state(): LaneCostState {
 	}
 }
 
-// A dispatched lane child for this checkout with no cut already carried. The dispatch mark is what
-// tells a child apart from a person (joshuafolkken/kit#1904), read from the environment against this
-// lane's own issue so a leaked mark for another issue reads as a person. **The carried-cut half keeps
-// the guard silent between a cut and its resume**, exactly as `pre-gate-cut.ts`'s does: a record naming
-// this issue means a cut is already in flight, and `begin_cut`'s exclusive create would refuse a second
-// one anyway.
-function uncut_lane_child_issue(state: LaneCostState): string | undefined {
+// A dispatched lane child's issue for this checkout. The dispatch mark is what tells a child apart from
+// a person (joshuafolkken/kit#1904), read from the environment against this lane's own issue so a
+// leaked mark for another issue reads as a person.
+function lane_child_issue(state: LaneCostState): string | undefined {
 	if (!lane_child_marker.is_child_of(state.directory, state.source)) return undefined
 
-	const issue = lane_paths.lane_issue_of(state.directory, { ...state.source })
+	return lane_paths.lane_issue_of(state.directory, { ...state.source })
+}
+
+// The issue a run holds this checkout for, read only outside a lane: a lane's hold is its dispatched
+// child's, so a person finishing that lane's work carries no mark and still sees no refusal.
+function held_run_issue(state: LaneCostState): string | undefined {
+	if (lane_paths.lane_issue_of(state.directory, { ...state.source }) !== undefined) return undefined
+
+	return state.held_issue()
+}
+
+// The run this checkout's edits belong to, with no cut already carried — a dispatched lane child, or
+// **a `fullrun` held in its own checkout** (joshuafolkken/kit#2760): the cut was lane-only, so a run a
+// person started grew without a bound mid-implementation. The run hold naming an issue is what marks
+// such a run, and a person's tree holds nothing, so it still sees no refusal. **The carried-cut half
+// keeps the guard silent between a cut and its resume**, exactly as `pre-gate-cut.ts`'s does: a record
+// naming this issue means a cut is already in flight, and `begin_cut`'s exclusive create would refuse
+// a second one anyway.
+function uncut_run_issue(state: LaneCostState): string | undefined {
+	const issue = lane_child_issue(state) ?? held_run_issue(state)
 
 	if (issue === undefined) return undefined
 
 	return state.carried()?.issue === issue ? undefined : issue
+}
+
+// **An unmeasurable session is cut in a lane and left alone outside one.** A lane child's safety net is
+// the pre-gate direction below; a held run outside a lane is a person's own session, so only a measured
+// `over` interrupts it — a provider with no transcript would otherwise refuse every edit it makes.
+function warrants_the_cut(state: LaneCostState): boolean {
+	const verdict = state.verdict()
+
+	if (lane_child_issue(state) === undefined) return verdict === cost_verdict.OVER_VERDICT
+
+	return verdict !== cost_verdict.UNDER_VERDICT
 }
 
 // **The tool-name test comes first and the world is consulted second, the cost measurement last.** This
@@ -109,9 +140,9 @@ function is_over_threshold_edit(
 	call: GuardedCall,
 	state: LaneCostState = current_state(),
 ): boolean {
-	if (!is_edit_tool(call.name) || uncut_lane_child_issue(state) === undefined) return false
+	if (!is_edit_tool(call.name) || uncut_run_issue(state) === undefined) return false
 
-	return state.verdict() !== cost_verdict.UNDER_VERDICT
+	return warrants_the_cut(state)
 }
 
 // **The threshold in the refusal text is assembled from the constant, never spelled** (joshuafolkken/kit#2385).
@@ -125,7 +156,8 @@ const THRESHOLD_TEXT = `${cost_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-toke
 // because `cut` is the only one that ends the turn and a run told merely to "take the cut" would have to
 // read which of the others leave it implementing — the same reason `pre-gate-cut.ts` spells them out.
 const IMPLEMENTATION_CUT_REASON =
-	'⛔ implementation-phase cut: this checkout is a lane dispatched for this issue and its recent-context ' +
+	'⛔ implementation-phase cut: this checkout is a lane dispatched for this issue, or a run holds it for ' +
+	'this issue (joshuafolkken/kit#2760), and its recent-context ' +
 	`cost has crossed the shared ${THRESHOLD_TEXT} threshold mid-implementation, so the thinking accumulated ` +
 	'so far is now re-read on every later request. Take the cut before this edit. ' +
 	'First write a handoff file with the Write tool — the user’s instruction verbatim, what you have ' +
@@ -139,11 +171,12 @@ const IMPLEMENTATION_CUT_REASON =
 	'because the verdict was only ever read at session entry, where the context has not yet grown. The ' +
 	"verdict is `pnpm josh cost --cut`'s exactly — the same per-request billed-input statistic against the " +
 	'same threshold, never a second measurement. Issue `pnpm josh run:cut --impl <N> --handoff <path>` now and read the ' +
-	'verdict: on `cut`, **end the turn immediately** — the fresh process owns the run and continues ' +
-	'implementing, so it must not be waited for; on `not-a-lane`, `unready`, `busy`, `failed` or ' +
+	'verdict: on `cut`, **end the turn immediately** — in a lane the fresh process owns the run and ' +
+	'continues implementing, so it must not be waited for; outside a lane nothing is relaunched, so first ' +
+	'send the `confirmation` Telegram naming the resume command `fullrun #<N>` and keep the hold; on `not-a-lane`, `unready`, `busy`, `failed` or ' +
 	'`unknown`, this process carries the run on and the edit is simply the next call. Never relaunch a ' +
-	'second process after `busy`. This fired because the dispatch mark names this lane; a person working ' +
-	'here carries no mark and sees no refusal, so there is no human-or-child judgement left to make. The ' +
+	'second process after `busy`. This fired because the dispatch mark names this lane or the run hold ' +
+	'names this issue; a person working here carries no mark and holds no run, so sees no refusal, so there is no human-or-child judgement left to make. The ' +
 	'procedure is `.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue this edit once the cut has ' +
 	'answered — an edit reissued right after this refusal passes, so `busy` / `failed` cannot wedge the ' +
 	'run edit after edit; this fires again on the next threshold crossing rather than once per run.'
@@ -195,7 +228,7 @@ const implementation_cut = {
 	is_over_threshold_edit,
 	is_reissued_refusal,
 	takes_the_impl_cut,
-	uncut_lane_child_issue,
+	uncut_run_issue,
 }
 
 export type { LaneCostState }

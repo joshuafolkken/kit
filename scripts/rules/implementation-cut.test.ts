@@ -44,6 +44,7 @@ interface StateOptions {
 	directory?: string
 	mark?: string | undefined
 	cut?: RunCut | undefined
+	held?: string | undefined
 	verdict?: () => CostVerdict
 }
 
@@ -61,9 +62,15 @@ function source_of(mark: string | undefined): MarkerSource {
 // injected source so the suite never has to set the live environment. `verdict` is injected too, so a
 // firing case needs no session transcript on disk.
 function state_of(options: StateOptions = {}): LaneCostState {
-	const { directory = LANE_DIRECTORY, cut, verdict = (): CostVerdict => OVER } = options
+	const { directory = LANE_DIRECTORY, cut, held, verdict = (): CostVerdict => OVER } = options
 
-	return { directory, source: source_of(mark_of(options)), carried: () => cut, verdict }
+	return {
+		directory,
+		source: source_of(mark_of(options)),
+		carried: () => cut,
+		held_issue: () => held,
+		verdict,
+	}
 }
 
 function edit_call(name = EDIT): { name: string; input: unknown } {
@@ -99,38 +106,38 @@ describe('takes_the_impl_cut', () => {
 	)
 })
 
-describe('uncut_lane_child_issue', () => {
+describe('uncut_run_issue', () => {
 	it('names the issue for a marked lane child with no cut carried', () => {
-		expect(implementation_cut.uncut_lane_child_issue(state_of())).toBe(ISSUE)
+		expect(implementation_cut.uncut_run_issue(state_of())).toBe(ISSUE)
 	})
 
 	// **The carried-cut half keeps the guard silent between a cut and its resume.**
 	it('says nothing once a cut record for that issue is carried', () => {
 		const state = state_of({ cut: cut_of(ISSUE) })
 
-		expect(implementation_cut.uncut_lane_child_issue(state)).toBeUndefined()
+		expect(implementation_cut.uncut_run_issue(state)).toBeUndefined()
 	})
 
 	it('still names the issue when the carried record belongs to another one', () => {
 		const state = state_of({ cut: cut_of('2294') })
 
-		expect(implementation_cut.uncut_lane_child_issue(state)).toBe(ISSUE)
+		expect(implementation_cut.uncut_run_issue(state)).toBe(ISSUE)
 	})
 
 	// **A person working in the lane carries no dispatch mark**, so the rule stays silent for them.
 	it('says nothing when the lane carries no dispatch mark', () => {
-		expect(implementation_cut.uncut_lane_child_issue(state_of({ mark: undefined }))).toBeUndefined()
+		expect(implementation_cut.uncut_run_issue(state_of({ mark: undefined }))).toBeUndefined()
 	})
 
 	// **A mark that leaked in from a parent session names some other issue.**
 	it('says nothing when the dispatch mark names another issue', () => {
-		expect(implementation_cut.uncut_lane_child_issue(state_of({ mark: '2294' }))).toBeUndefined()
+		expect(implementation_cut.uncut_run_issue(state_of({ mark: '2294' }))).toBeUndefined()
 	})
 
 	it.each([[LANE_ROOT], [WORK_DIRECTORY], [path.join(LANE_ROOT, 'main')]])(
 		'says nothing about %j, which is not a lane checkout',
 		(directory) => {
-			expect(implementation_cut.uncut_lane_child_issue(state_of({ directory }))).toBeUndefined()
+			expect(implementation_cut.uncut_run_issue(state_of({ directory }))).toBeUndefined()
 		},
 	)
 })
@@ -178,6 +185,51 @@ describe('is_over_threshold_edit', () => {
 
 	it('says nothing about an edit once the cut is carried, without reading the verdict', () => {
 		const state = state_of({ cut: cut_of(ISSUE), verdict: unread_verdict })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#2760: a `fullrun` a person started, held in its own checkout rather than a lane, had
+// no bound on its context mid-implementation. The run hold naming the issue is what marks it.
+function held_run(options: StateOptions = {}): LaneCostState {
+	return state_of({ directory: WORK_DIRECTORY, mark: undefined, held: ISSUE, ...options })
+}
+
+describe('is_over_threshold_edit — a run held outside a lane', () => {
+	it('fires on an edit in an over-threshold held run', () => {
+		expect(implementation_cut.uncut_run_issue(held_run())).toBe(ISSUE)
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), held_run())).toBe(true)
+	})
+
+	it('says nothing when the held run is under threshold', () => {
+		const state = held_run({ verdict: (): CostVerdict => UNDER })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+
+	// A person's own session on a provider with no transcript would otherwise be refused every edit.
+	it('says nothing when the held run cannot be measured', () => {
+		const state = held_run({ verdict: (): CostVerdict => UNMEASURABLE })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+
+	// A lane's hold is its dispatched child's; a person in that lane without the mark is not that run.
+	it.each([[undefined], ['2294']])('says nothing in a held lane whose mark is %j', (mark) => {
+		const state = held_run({ directory: LANE_DIRECTORY, mark })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+
+	it('says nothing once the held run has carried its cut, without reading the verdict', () => {
+		const state = held_run({ cut: cut_of(ISSUE), verdict: unread_verdict })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+
+	it('says nothing about a tree no run holds, without reading the verdict', () => {
+		const state = held_run({ held: undefined, verdict: unread_verdict })
 
 		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
 	})

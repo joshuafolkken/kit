@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { cost_cli } from '#scripts/cost-runtime/cost-cli'
+import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import {
 	run_carry,
 	type CarryClaim,
@@ -44,6 +46,9 @@ const UNKNOWN_VERDICT = 'unknown'
 // the run carries on uncut rather than paying a cold preamble the accumulation it would shed no longer
 // covers, exactly as an under-threshold pre-gate cut carries on to the gate.
 const CAPPED_VERDICT = 'capped'
+// The asking session is over the shared context-cut threshold, so nothing was claimed
+// (joshuafolkken/kit#2760).
+const OVER_VERDICT = 'over'
 const NO_CUTS = 0
 
 const CLAIM_VERDICTS: Record<CarryClaim, string> = {
@@ -235,7 +240,22 @@ function adopt(target: string, request: CarryClaimRequest, is_json: boolean): nu
 	return report_claim(target, read.carry, request, is_json)
 }
 
+// **A session already over the shared cut threshold claims nothing** (joshuafolkken/kit#2760). A claim
+// assumed the asking session was fresh, so a `backlogrun` parent that had taken its cut at 233k could
+// retype the keyword in the same conversation and be answered `resumed` by its own hand-off — measured
+// twice, at 232k and 258k. The verdict is `pnpm josh cost --cut`'s, so no second threshold exists; only a
+// measured `over` refuses, because a provider with no transcript cannot be priced at all.
+function report_over(is_json: boolean): number {
+	console.error(
+		'This session is over the shared context-cut threshold (`pnpm josh cost --cut` answers `over`), so no run was begun or resumed here. End this conversation and type the invocation again in a fresh session.',
+	)
+
+	return report(OVER_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
+}
+
 function claim_record(target: string, request: CarryClaimRequest, is_json: boolean): number {
+	if (cost_cli.session_verdict() === cost_verdict.OVER_VERDICT) return report_over(is_json)
+
 	return request.is_adoption ? adopt(target, request, is_json) : begin(target, request, is_json)
 }
 
@@ -425,6 +445,7 @@ const run_carry_cli = {
 	EXPIRED_VERDICT,
 	MISMATCH_VERDICT,
 	NONE_VERDICT,
+	OVER_VERDICT,
 	RESUMED_VERDICT,
 	STANDING_VERDICT,
 	UNKNOWN_VERDICT,

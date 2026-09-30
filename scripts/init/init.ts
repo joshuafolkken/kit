@@ -15,6 +15,7 @@ import { execaSync } from 'execa'
 import { z } from 'zod'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
+import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { init_static } from './init-static'
@@ -28,6 +29,7 @@ const SAMPLE_INDENT_WIDTH = 4
 const ARGUMENT_START_INDEX = 2
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
+const INIT_USAGE = 'josh init [--profile static|node] [--no-install]'
 
 function write_new_file(action: FileAction, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -218,14 +220,10 @@ function merge_project_package_json(shape: ProjectShape): void {
 
 	writeFileSync(package_json_path, merged)
 	console.info(`  ✔ ${is_existing ? 'updated' : 'created'}   package.json`)
-	// `init` writes the manifest but installs nothing, so a tool it just listed is absent until the
-	// user installs it — and `josh lint` then fails on it rather than skipping it
-	// (joshuafolkken/kit#2709). Saying so here is what tells the user the next step.
-	console.info(`    ${INSTALL_HINT}`)
 }
 
-// A fresh project runs `init` before its first `pnpm install`, so lefthook — added to devDependencies
-// above — is not there yet; the `prepare` script installs the hooks once it is.
+// Under `--no-install` a fresh project has no lefthook yet — added to devDependencies above — so the
+// `prepare` script of the user's own `pnpm install` installs the hooks once it is.
 function install_lefthook(project_root: string = PROJECT_ROOT): void {
 	console.info('\nLefthook:')
 	const bin = resolve_local_bin(project_root, LEFTHOOK_BIN)
@@ -285,8 +283,6 @@ function run_ai_file_actions(shape: ProjectShape): void {
 	// resolved, so `gh repo view` runs once; the position is the pre-existing one.
 	const name_with_owner = init_ai_copy.run_ai_copies(shape)
 
-	if (shape.has_git && shape.profile === 'node') install_lefthook()
-
 	if (shape.has_github) report_repository_settings(name_with_owner)
 
 	if (shape.profile === 'node') plugin_install_hint_module.report_plugin_install_hint()
@@ -302,19 +298,50 @@ function initialize_project(shape: ProjectShape): void {
 
 	run_ai_file_actions(shape)
 	if (shape.profile === 'node') project_config.sync_project_config(PROJECT_ROOT)
-	console.info('\n✅ Done.\n')
+}
+
+// A tool `init` just listed is absent until the user installs it — and `josh lint` then fails on it
+// rather than skipping it (joshuafolkken/kit#2709). Saying so is what tells the user the next step.
+function report_manual_install(shape: ProjectShape): void {
+	console.info(`\nDependencies:\n  ${INSTALL_HINT}`)
+	if (shape.has_git && shape.profile === 'node') install_lefthook()
+}
+
+// The install runs the `prepare` script, which installs the git hooks. A failure is thrown rather
+// than printed, so `josh start` — which calls this entry point — stops before its first commit.
+function finish_dependencies(shape: ProjectShape, is_install: boolean): void {
+	if (!is_install) {
+		report_manual_install(shape)
+
+		return
+	}
+
+	const failure = init_install.run_post_init_steps(PROJECT_ROOT)
+	if (failure !== undefined) throw new Error(failure)
 }
 
 function main(args: ReadonlyArray<string> = []): void {
 	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
-	const requested = project_profile.requested_profile(args)
+	const { is_install, rest } = init_install.split_install_flag(args)
+	const requested = project_profile.requested_profile(rest, INIT_USAGE)
 	const shape = project_profile.inspect_project(PROJECT_ROOT, requested)
 
 	initialize_project(shape)
+	finish_dependencies(shape, is_install)
+	console.info('\n✅ Done.\n')
+}
+
+function run_cli(args: ReadonlyArray<string>): void {
+	try {
+		main(args)
+	} catch (error) {
+		console.error(`\n✖ ${error instanceof Error ? error.message : String(error)}\n`)
+		process.exitCode = 1
+	}
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	main(process.argv.slice(ARGUMENT_START_INDEX))
+	run_cli(process.argv.slice(ARGUMENT_START_INDEX))
 }
 
 const init = {

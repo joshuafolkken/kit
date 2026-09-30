@@ -254,37 +254,43 @@ it — and seven lines had never left a working tree. **So the repeat count belo
 that is empty on every other machine**, and every sighting was a first one, which is the state
 joshuafolkken/kit#1728 created the ledger to end.
 
-- **An ordinary run never commits the ledger, and that is enforced rather than remembered.**
-  `pnpm josh git` stages with `docs/maintainers/observations.md` excluded, in the one staging step every entry
-  point goes through (`scripts/git/git-staging.ts`), so a `fullrun` in the primary checkout **cannot**
-  carry a ledger line into an Issue that has nothing to do with it. It is not a rule a run has to
-  remember at the commit — a run that had to would be the run that forgets.
-- **The parent flushes the ledger as a pull request of its own** — `pnpm josh observations:flush`. It
-  stages that one path and nothing else, commits it on a branch of its own, opens a docs-only pull
-  request, waits on the same required checks every other pull request waits on, merges it and returns
-  the checkout to the default branch. **Nothing is committed to the default branch directly**, which
-  is the constraint this route had to satisfy.
-- **`pnpm josh followup` runs the flush itself, so no run has to remember to** (joshuafolkken/kit#1810).
-  The flush is the ledger's only commit path, and until it was wired into `followup` nothing called
-  it — an appended line stayed in the working tree until a person ran the command by hand, the same
-  defect the staging exclusion above was built to avoid. After the merge and before it releases the working-tree
-  hold, `followup` reads the tree, and **only when the ledger holds a pending append** returns the
-  checkout to the default branch (`pnpm josh ms`) and flushes. A run that appended nothing pays
-  nothing, and a lane skips it (next bullet). A flush that fails is reported and does not take the merge, the
-  epic close or the hold release down with it. **A side effect: on a run that did flush, `followup`
-  ends on the default branch.**
+- **A run's appended lines ride its own commit** (joshuafolkken/kit#2763). `pnpm josh git` stages
+  `docs/maintainers/observations.md` with the run's other changes, in the one staging step every entry
+  point goes through (`scripts/git/git-staging.ts`), so the lines are reviewed and merged with the
+  pull request of the run that recorded them, and the run's CI is the only wait they cost. Until
+  #2763 the ledger was excluded there (joshuafolkken/kit#1756) and every run that appended a line
+  paid a second branch, CI wait and merge after its own — 144 ledger-only pull requests in one month.
+  **Record before the commit, not after the merge:** a finding recorded with `pnpm josh review:record`
+  before `pnpm josh git -y` is carried; the time while CI runs is for the records that need no CI
+  result — filing an observation Issue, drafting the completion report.
+- **A line that breaks the grammar is not carried** (joshuafolkken/kit#2123). The staging step parses
+  the ledger first — after moving lines still on the old path (joshuafolkken/kit#2724) — and on a
+  broken line leaves the ledger out of the commit and says so; the commit itself goes ahead.
+- **What no run's commit carried is flushed as a pull request of its own** — `pnpm josh
+  observations:flush`: a lane's lines (next bullets) and a line appended after the commit, such as a
+  second review round's record. It stages that one path and nothing else, commits it on a branch of
+  its own, opens a docs-only pull request, waits on the same required checks every other pull request
+  waits on, merges it and returns the checkout to the default branch. **Nothing is committed to the
+  default branch directly.**
+- **`pnpm josh followup` runs that flush itself, so no run has to remember to** (joshuafolkken/kit#1810).
+  After the merge and before it releases the working-tree hold, `followup` reads the tree, and **only
+  when the ledger still holds a pending append** returns the checkout to the default branch
+  (`pnpm josh ms`) and flushes. A run whose lines rode its commit pays nothing, and a lane skips it
+  (next bullet). A flush that fails is reported and does not take the merge, the epic close or the
+  hold release down with it. **A side effect: on a run that did flush, `followup` ends on the default
+  branch.**
 - **A lane's writers use the primary checkout's ledger** (joshuafolkken/kit#2419): a lane refuses
   `pnpm josh ms`, so its own copy had no way out. `pnpm josh observations:flush` acts on the primary
   checkout from a lane. **A dispatched lane child does not flush at all** (joshuafolkken/kit#2492): its
   `run:tail` skips the step, and the `backlogrun` flushes every lane's lines once, in one pull request,
   at `pnpm josh run:carry --end`.
-- **Mixing the lines into a child's pull request was considered and is refused.** That is the
-  contamination the exclusion above exists to end, and adopting it would turn the defect into the
-  specification: a ledger line in an unrelated diff is a line no reviewer of that diff has a reason
-  to question.
+- **A lane child's pull request does not carry the lines, and that is deliberate.** Lanes run side by
+  side, and two pull requests that each append at the ledger's tail conflict with each other the
+  moment the first merges — a conflict ends the other's CI wait. The batch's single flush at
+  `run:carry --end` is already one pull request per batch, not one per child.
 - **Run by hand it goes in the primary checkout, once per cycle rather than once per observation** —
-  but with `pnpm josh followup` now flushing automatically (above), a hand run is the exception rather
-  than the rule. It refuses off the default branch and refuses a working tree holding anything besides
+  but with the lines riding the run's commit and `pnpm josh followup` flushing the rest (above), a hand
+  run is the exception rather than the rule. It refuses off the default branch and refuses a working tree holding anything besides
   the ledger, so a run in progress cannot be flushed out from under, and a lane's checkout is never
   the one it acts on.
 - **Nothing to flush is an answer, not a failure.** With the ledger matching the commit it sits on

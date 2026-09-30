@@ -434,10 +434,10 @@ pnpm exec josh start --yes --github --profile static    # unattended, including 
 Initialize project config, selecting a profile and reporting applicable repository settings.
 
 ```bash
-pnpm josh init   # create/merge config files
+pnpm josh init   # create/merge config files, install and format (--no-install skips both)
 ```
 
-**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing.
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails.
 
 See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 
@@ -595,7 +595,7 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 
 **Live-execution evidence (joshuafolkken/kit#2446):** a merge is refused when the branch changes a runtime path (`josh test:declared`'s classification) and the PR body lacks a `## 実機証跡` section of a backticked command plus its fenced output (`issue:lint`'s `## 再現` parser). Pass it with `josh git -y --body-file <path>`.
 
-**Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
+**Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), confirms the Issue closed — closing it with a comment when GitHub did not apply `closes #N` (joshuafolkken/kit#2770) — removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
@@ -623,7 +623,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 ### `josh observations:flush`
 
-Commit the observation ledger (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. It is the ledger's only commit path — `josh git` excludes the ledger from staging.
+Commit the observation ledger lines no run's own commit carried (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run in the primary checkout needs none: `josh git` stages the ledger with the run's own commit when its grammar holds (joshuafolkken/kit#2763), so what is left here is a lane's lines and whatever was appended after a commit.
 
 ```bash
 pnpm josh observations:flush
@@ -903,7 +903,7 @@ Updates pnpm and pins `packageManager` to the newest release on the project's **
 
 #### `josh latest:update`
 
-Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`. Otherwise it also advances a pinned `@aikidosec/safe-chain@<version>` in `preinstall` to the newest release, and moves the `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env of `.github/workflows/ci.yml` and `templates/workflows/ci.yml` with it — the hash is computed from that release's `install-safe-chain.sh`, and a failed download leaves both workflows' pins untouched (the `preinstall` pin still advances, and the next `josh latest` retries).
+Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`. Otherwise it also advances a pinned `@aikidosec/safe-chain@<version>` in `preinstall` to the newest release, and moves the `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env of `.github/workflows/ci.yml`, `templates/workflows/ci.yml` and `.github/workflows/pr-classification.yml` with it — the hash is computed from that release's `install-safe-chain.sh`, and a failed download leaves the workflows' pins untouched (the `preinstall` pin still advances, and the next `josh latest` retries).
 
 ---
 
@@ -1211,7 +1211,7 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 **Options:**
 
 - `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
-- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6.
+- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in [`josh backlog:next`](#josh-backlognext), joshuafolkken/kit#2779).
 
 Several leading epic arguments merge into one candidate pool per repository. A cross-repository dependency resolves only when the blocker is closed **and** its declared version has published. `run`/`wait`/`stop`/`complete` exit `0`; an unusable graph (cycle, or body/relations disagreement) exits `1`.
 
@@ -1292,9 +1292,13 @@ pnpm josh backlog:next --exclude 1630  # skip the issue just merged
 
 - `--exclude <N>` — drop issues from every bucket; comma-separated, repeatable.
 
-stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
+stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `triage` (a candidate is untriaged — see below), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
+
+**Triage gate** (joshuafolkken/kit#2779): a candidate is triaged when it carries `run:solo` (runs alone) or `run:lane` (may run beside others), matched case-insensitively. When any candidate of this repository carries neither, the command prints `triage` and no numbers — an untriaged issue may be one that must run alone, so none of the others may start either — and names the untriaged issues on stderr. `backlog:offer` maps it to the budget answer `untriaged`, `backlog:budget` answers `triage`, and `backlog:drive` hands it back to the parent. The gate runs before the `run:solo` gate below. `epic:next --lanes` applies it to a named epic's lanes too.
 
 **Defect priority** (joshuafolkken/kit#2455): on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline recorded on joshuafolkken/kit#2449 (0.42), the runnable numbers are re-ordered — defects (`- 種別: 不具合` or `route:interrupt`) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
+
+**`run:solo` gate** (joshuafolkken/kit#2776): on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. When nothing is running, the first `run:solo` candidate is printed alone, wherever it ranks (joshuafolkken/kit#2778). While other lanes run, a `run:solo` candidate at the head prints `wait`, and one further down cuts the list, so only the candidates ahead of it are printed. When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]` and rows with neither label `[untriaged]`.
 
 ### `josh backlog:plan`
 
@@ -1303,11 +1307,19 @@ The whole backlog rendered as a plan a person reads before a run starts — four
 ```bash
 pnpm josh backlog:plan
 pnpm josh backlog:plan --exclude 1630  # after #1630 merged
+pnpm josh backlog:plan --waves         # the run order, wave by wave
 ```
 
 - `--exclude <N>` — same exclusion as `backlog:next`.
+- `--waves` — print the order the run takes instead of the sections (joshuafolkken/kit#2778). It assumes each wave merges before the next one starts, leaves out issues a run already has, and plans only this repository. Wave 1 is what `backlog:next` prints for an idle repository; each later wave marks the earlier ones closed and applies the same classification and `run:solo` gate again. A wave of several issues is marked `(parallel)`. Issues no wave reaches are listed last with their reason. Read-only, and refused with named issues or `--only`.
 
-Sections: **Ready now** (runnable children, grouped by repository = the parallelism), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
+```text
+Wave 1  #2770 [run:solo]
+Wave 2  #2765 [run:solo]
+Wave 3  #2774 #2766 #2769   (parallel)
+```
+
+Sections: **Ready now** (runnable children, grouped by repository = the parallelism; a `run:solo` row is marked `[run:solo]`, a row with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
 
 ### `josh backlog:stalled`
 
@@ -1329,13 +1341,13 @@ pnpm josh backlog:budget --answer exhausted  --started "$started" --active "$act
 pnpm josh backlog:budget --answer candidates --started "$started" --active "$active" --merged 3 --running 2 --max 5
 ```
 
-- `--answer <candidates|exhausted|blocked|parked|unreadable>` — `backlog:next`'s answer, mapped.
+- `--answer <candidates|exhausted|blocked|parked|unreadable|untriaged>` — `backlog:next`'s answer, mapped.
 - `--started` / `--active` — when the invocation began / when it last had work (required unless the watch is off).
 - `--idle <minutes>` — after candidates run out, keep polling this long (default 30; `--idle 0` turns the watch off).
 - `--max <count>` — issues one invocation may take (default unlimited); `--merged` and `--running` count against it.
 - `--json` — collapse verdict and reason into `{"budget": "<verdict>", "reason": "…"}`.
 
-stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), or empty with exit 1 if the invocation is unreadable. The whole-run bound (8 hours) is decided here and outranks both budgets, but a `parked` or `unreadable` answer outranks the bound. A watch polls every 5 min.
+stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), `triage` (judge the untriaged issues, then ask again — only after the bound and the maximum), or empty with exit 1 if the invocation is unreadable. The whole-run bound (8 hours) is decided here and outranks both budgets, but a `parked` or `unreadable` answer outranks the bound. A watch polls every 5 min.
 
 ### `josh backlog:offer`
 
@@ -1357,7 +1369,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
+An open carry record supplies the start time, merged count and remaining named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event.
 
 ### `needs-human-review` — the opposite label
 
@@ -1550,11 +1562,12 @@ Guard a working tree so only one run holds it at a time — `run:hold` claims it
 
 ```bash
 pnpm josh run:hold 1091          # claim for issue 1091
+pnpm josh run:hold 1091 --fullrun  # claim as `fullrun #1091` (what `run:entry` runs)
 pnpm josh run:release 1091       # release this run's own record
 pnpm josh run:release --force    # clear a record left by a run that has ended
 ```
 
-**Options:** `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
+**Options:** `--fullrun` (`run:hold <N>`) marks the record as `fullrun #N`'s, the one hold the implementation cut outside a lane acts on (joshuafolkken/kit#2760); `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
 
 **Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an existing branch/PR, or a merged/closed PR), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
 
@@ -1595,7 +1608,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 - `--stopped <reason>` rides on `--end`: the run ended by _stopping_ rather than finishing, so one ⏸️ confirmation is pushed with the reason as the record is cleared, reaching the person after a cut a headless parent's report would not (joshuafolkken/kit#2136). A bare `--end` (a clean finish) stays silent, and because `--end` removes the record a second `--end --stopped` never sends twice. Named without `--end` it is ignored.
 - `--end` over a live record flushes pending ledger lines once (joshuafolkken/kit#2492); a failed flush goes to stderr and the record is still cleared.
 
-**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
+**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` (#2760) exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
 ### `josh run:wake`
 
@@ -1623,6 +1636,9 @@ another live owner's run.
 
 Cut a dispatched lane child before the verification gate. OpenAI uses its lane supervisor; Anthropic
 relaunches directly. With no matching supervisor, OpenAI returns `failed` before writing the cut.
+Outside a lane only an `--impl` cut on a tree `run:hold <N> --fullrun` holds for that issue is taken
+(joshuafolkken/kit#2760): the record is written and nothing is relaunched, so the session ends its turn
+and a fresh `fullrun #<N>` resumes it; every other cut outside a lane answers `not-a-lane`.
 
 ```bash
 pnpm josh run:cut 1839                          # take the cut and hand it to a fresh process
@@ -1641,7 +1657,7 @@ rather than continuing blind.
 
 The relaunched child is started at the **effort of the phase it resumes into** (joshuafolkken/kit#2382): a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while an `--impl` resume into implementation keeps the role default. A stored lane profile keeps its model and takes only the phase's effort, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names and the phase→effort table live in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
 
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or an `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). The setup-phase `--setup` cut (joshuafolkken/kit#2346) is retired (joshuafolkken/kit#2489): a lane child's context is bounded by the threshold-gated implementation cut alone, and `--setup` is a usage error. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, or `incomplete` (matched the tree but carried no instruction).
+**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or an `--impl` cut given none — its resume would answer `incomplete`, joshuafolkken/kit#2484). The setup-phase `--setup` cut (joshuafolkken/kit#2346) is retired (joshuafolkken/kit#2489): a lane child's context is bounded by the threshold-gated implementation cut alone, and `--setup` is a usage error. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` (matched the tree but carried no instruction), or `over` (an implementation cut asked for by a session still over the context-cut threshold; the record is kept for a fresh session, joshuafolkken/kit#2760).
 
 ### `josh run:liveness`
 
@@ -1686,7 +1702,7 @@ Opens a run in one call, folding the four-round-trip entry sequence a lane re-bi
 (joshuafolkken/kit#2372): `run:hold`, `cost --cut` (skipped in a dispatched lane child), `run:prep` and
 `run:step`. The `entry #<N> — hold: … · cost: … · verdict: …` line carries the three facts the run
 branches on; a `busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit — the
-shape `backlog:offer` folded the parent loop head on.
+shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume <N>` before the hold: any answer but `fresh` prints `entry #<N> — resume: <token>` with that command's exit code and claims nothing, since an implementation cut outside a lane keeps its hold (joshuafolkken/kit#2760).
 
 ### `josh run:status`
 
@@ -1807,8 +1823,10 @@ Closes a run in one call, folding the three-round-trip post-merge sequence (josh
 `observations:flush`, `issue:cite` (the closed issue and any follow-ups filed this run) and
 `release:scope`, run in order — the ledger commits before the release scope reads main — and joined
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
-merge and the push above it stay their own calls. **A lane child skips `observations:flush`**; its
-line waits for `pnpm josh run:carry --end` (joshuafolkken/kit#2492).
+merge and the push above it stay their own calls. The flush is residual: a run's appended lines ride
+its own commit (joshuafolkken/kit#2763), so it commits only a line appended after that commit and
+otherwise prints `clean`. **A lane child skips `observations:flush`**; its line waits for
+`pnpm josh run:carry --end` (joshuafolkken/kit#2492).
 
 ### `josh ship`
 

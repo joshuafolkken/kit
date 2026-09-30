@@ -29,6 +29,7 @@ import { run_invocation } from './run-invocation'
 const NO_FREE = 0
 const NO_READY = 0
 const SUCCESS_EXIT_CODE = 0
+const TRIAGE_WORK = 1
 
 interface WorkPorts {
 	// The free-lane count, or `undefined` where the lane limit could not be read.
@@ -41,6 +42,9 @@ async function real_ready_count(): Promise<number | undefined> {
 	const result = await josh_command.josh_run(['backlog:next'], true)
 
 	if (result.code !== SUCCESS_EXIT_CODE) return undefined
+	// A `triage` answer offers no number, but the untriaged issues are a session's to judge
+	// (joshuafolkken/kit#2779) — counted as one piece of work, or the whole pool would idle with nobody judging it.
+	if (backlog_stalled.needs_triage(result.out)) return TRIAGE_WORK
 
 	return backlog_stalled.count_ready_tokens(result.out)
 }

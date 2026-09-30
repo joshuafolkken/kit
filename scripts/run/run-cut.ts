@@ -9,7 +9,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { z } from 'zod'
 import { run_cut_handoff, type Handoff } from './run-cut-handoff'
-import { run_hold } from './run-hold'
+import { run_hold, type RunHold } from './run-hold'
 
 // joshuafolkken/kit#1839: a lane child is a detached `fullrun #<N>` process, and the thinking it
 // accumulates while implementing rides on every later API call in the same session — measured at 176K
@@ -118,6 +118,8 @@ interface CutState {
 	branch: string
 	is_dirty: boolean
 	is_held: boolean
+	// The issue a `fullrun` hold names, absent when the tree is not held by one (joshuafolkken/kit#2760).
+	held_issue?: string | undefined
 }
 
 // The fields a cut is written from, bundled so `begin_cut` stays within the parameter limit. `phase`
@@ -432,22 +434,34 @@ function end_cut(target: string): void {
 	stamp_file.remove_stamp(target)
 }
 
-// Whether a run hold still stands over this tree — present as `held` or as an aged-out `stale`, but
+// The run hold still standing over this tree — present as `held` or as an aged-out `stale`, but
 // present. A tree with no hold at all is not the one a cut was taken in, so the resume refuses it.
-function tree_is_held(directory: string | undefined): boolean {
-	if (directory === undefined) return false
+function hold_of(directory: string | undefined): RunHold | undefined {
+	if (directory === undefined) return undefined
 
 	const read = run_hold.read_hold(run_hold.hold_path(directory))
 
-	return read.kind === 'held' || read.kind === 'stale'
+	return read.kind === 'held' || read.kind === 'stale' ? read.hold : undefined
+}
+
+// The issue a `fullrun` holds this tree for — what tells a `fullrun` held in its own checkout apart from
+// a person's tree (joshuafolkken/kit#2760). A `halfrun` or an in-session `backlogrun` child holds it
+// too, but its cut would be resumed as `fullrun #N`, so only a hold `run:entry` marked names an issue.
+function fullrun_issue(hold: RunHold | undefined): string | undefined {
+	return hold?.is_fullrun === true ? hold.issue : undefined
+}
+
+// The same read taken synchronously, for the `PreToolUse` implementation-cut guard.
+function held_issue_sync(): string | undefined {
+	return fullrun_issue(hold_of(worktree_git_directory_sync()))
 }
 
 async function current_state(): Promise<CutState> {
 	const branch = await git_command.branch()
 	const is_dirty = await run_hold.is_tree_dirty()
-	const directory = await worktree_directory()
+	const hold = hold_of(await worktree_directory())
 
-	return { branch, is_dirty, is_held: tree_is_held(directory) }
+	return { branch, is_dirty, is_held: hold !== undefined, held_issue: fullrun_issue(hold) }
 }
 
 function describe_cut(cut: RunCut): string {
@@ -508,8 +522,10 @@ const run_cut = {
 	describe_cut,
 	end_cut,
 	fresh_cut,
+	fullrun_issue,
 	handed_off_message,
 	has_required_handoff,
+	held_issue_sync,
 	incomplete_message,
 	invocation_for,
 	is_expired,

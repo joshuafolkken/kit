@@ -449,10 +449,11 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "init": [
-      "[--profile static|node]",
+      "[--profile static|node] [--no-install]",
       "developer",
       [
         "files",
+        "network",
         "processes",
       ],
     ],

@@ -53,14 +53,13 @@ function is_force_requested(force_environment: string): boolean {
 // nothing" for "git could not be asked". Every predicate below treats the two differently.
 //
 // **The observation ledger is dropped from the reading, and it is the one line that may be**
-// (joshuafolkken/kit#1756). Since that issue `pnpm josh git` excludes the ledger from
-// what it stages, so a parent's appended line sits modified-but-never-staged for the whole interval
-// between the append and the next `pnpm josh observations:flush` — and every condition below reads a
-// non-empty status as "this operation carries a tree no check has read". Left in, one ledger line
-// would send every commit and every push in the primary checkout back to the full gate for days,
-// which is the reuse this module exists to grant. **Dropping it is sound because nothing can carry
-// it**: the exclusion means the index and the push are byte-for-byte the recorded tree whatever the
-// ledger says, and the ledger's own content is checked by the CI of the pull request the flush opens.
+// (joshuafolkken/kit#1756). Lines are appended throughout a run — a review's record lands after its
+// gate — and every condition below reads a non-empty status as "this operation carries a tree no
+// check has read". Left in, one ledger line would send every commit and every push in the primary
+// checkout back to the full gate, which is the reuse this module exists to grant. **Dropping it is
+// sound because the ledger is no code any check runs**: `pnpm josh git` stages it with the run's
+// commit only after its grammar has been parsed (joshuafolkken/kit#2763), and the rest of its content
+// is checked by the CI of the pull request that carries it.
 async function read_status_lines(): Promise<ReadonlyArray<string> | undefined> {
 	try {
 		const status = await git_command.status()

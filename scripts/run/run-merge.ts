@@ -32,7 +32,9 @@ const ONE = 1
 
 // What a returned child turned out to be, decided from its GitHub state and — for the failed case
 // alone — the exit record.
-// - `merged`      — CLOSED; the child finished and its pull request merged.
+// - `merged`      — CLOSED; the child finished and its pull request merged. Also an OPEN, unparked
+//                   child a merged pull request's `closes #N` names — GitHub merged it without closing
+//                   the issue (joshuafolkken/kit#2769).
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (SKILL.md → §2z).
 // - `parked`      — OPEN and carrying `needs-decision` or `already-done`; a person still owns it.
 // - `split`       — OPEN and carrying `epic`; its work was divided into new children.
@@ -60,6 +62,9 @@ type ChildOutcome =
 interface EndingSignals {
 	is_outage: boolean
 	is_cut: boolean
+	// The merged pull request whose `closes #N` names the child, when GitHub left the child OPEN after
+	// merging it (joshuafolkken/kit#2769).
+	merged_pr?: string | undefined
 }
 
 const NO_SIGNALS: EndingSignals = { is_outage: false, is_cut: false }
@@ -82,8 +87,12 @@ function is_parked(state: IssueState): boolean {
 // An OPEN, unparked child that is not waiting on a person: a declared cut is resumed
 // (joshuafolkken/kit#2484), and it is read before the outage so a cut whose process then lost the API is
 // still resumed from its record; an OPEN, unparked child that could not reach the API is an `outage`,
-// not a `failed` (joshuafolkken/kit#2240).
+// not a `failed` (joshuafolkken/kit#2240). **A merged pull request that closes it is read first**: the
+// work landed and only GitHub's close did not, so it is `merged` — never a failure counted against the
+// guard (joshuafolkken/kit#2769).
 function unfinished_outcome(signals: EndingSignals): ChildOutcome {
+	if (signals.merged_pr !== undefined) return 'merged'
+
 	if (signals.is_cut) return 'cut'
 
 	return signals.is_outage ? 'outage' : 'failed'
@@ -152,15 +161,44 @@ function counters_comment(carry: RunCarry): string {
 	].join('\n')
 }
 
+// Why the run parked a child it judged failed (joshuafolkken/kit#2769). A child that stops itself
+// leaves its own comment; one the driver stops left nothing, so a person opening the issue could not
+// tell why it carried `needs-decision`. Script-emitted, so English.
+interface ParkReason {
+	child: string
+	cause: string
+	carry: RunCarry | undefined
+	output: string | undefined
+}
+
+function streak_line(carry: RunCarry | undefined): string {
+	if (carry === undefined) return '- Consecutive failures: not recorded (no carry record).'
+
+	return `- Consecutive failures: ${String(carry.failures)} of ${String(CONSECUTIVE_FAILURE_LIMIT)} (the run stops at ${String(CONSECUTIVE_FAILURE_LIMIT)}).`
+}
+
+function park_comment(reason: ParkReason): string {
+	const transcript = reason.output === undefined ? '' : ` (\`${reason.output}\`)`
+
+	return [
+		'Parked with `needs-decision` by `pnpm josh run:merge`, the `backlogrun` driver — not by the child itself.',
+		`- Why: ${reason.cause}`,
+		'- Read: the issue is OPEN, carries none of `needs-decision`, `already-done`, `needs-human-review` or `epic`, and no merged pull request’s `closes #N` names it.',
+		streak_line(reason.carry),
+		`- Next: read the child’s transcript${transcript}, then either resume it with \`fullrun #${reason.child}\`, or record the decision here and remove \`needs-decision\`.`,
+	].join('\n')
+}
+
 const run_merge = {
 	CONSECUTIVE_FAILURE_LIMIT,
 	CONSECUTIVE_OUTAGE_LIMIT,
 	change_of,
 	classify_child,
 	counters_comment,
+	park_comment,
 	is_guard_tripped,
 	is_outage_guard_tripped,
 }
 
-export type { ChildOutcome, EndingSignals }
+export type { ChildOutcome, EndingSignals, ParkReason }
 export { run_merge }

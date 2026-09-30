@@ -6,6 +6,7 @@ import { process_identity_fixture } from '#scripts/josh/process-identity-fixture
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
+import { run_carry_cli_fixture } from './run-carry-cli-fixture'
 import { run_event_stream } from './run-event-stream'
 
 // joshuafolkken/kit#1714. Two things are pinned here that prose alone would let a rewrite lose:
@@ -45,14 +46,6 @@ const START = new Date('2026-09-11T00:00:00.000Z')
 // including the one the successor makes (joshuafolkken/kit#1774, folded in by joshuafolkken/kit#1984).
 const NAMED = 'backlogrun #1762 #1749 #1759'
 
-// What `--json` puts on standard output. Only the two fields these tests read are named: `remaining`
-// is the answer a resumed named-issue run acts on, and `started_at` is what says the whole-run bound was not
-// restarted by the resumption.
-interface CarryJson {
-	carry?: { started_at?: string }
-	remaining?: ReadonlyArray<number>
-}
-
 const out: Array<string> = []
 const errors: Array<string> = []
 
@@ -66,11 +59,8 @@ function event_target(): string {
 	return run_event_stream.target_of(REPOSITORY)
 }
 
-function last_json(): CarryJson {
-	return JSON.parse(out.at(-1) ?? '{}') as CarryJson
-}
-
 beforeEach(() => {
+	run_carry_cli_fixture.hold_verdict()
 	out.length = 0
 	errors.length = 0
 	vi.spyOn(console, 'info').mockImplementation((text: string) => {
@@ -372,7 +362,7 @@ describe('a named-issue backlogrun carried across a session cut', () => {
 
 		await run_carry_cli.run(['--json'])
 
-		expect(last_json().remaining).toStrictEqual([1749, 1759])
+		expect(run_carry_cli_fixture.last_json(out).remaining).toStrictEqual([1749, 1759])
 	})
 
 	// The whole-run bound belongs to the record, so the resumption keeps the start the first session
@@ -384,7 +374,7 @@ describe('a named-issue backlogrun carried across a session cut', () => {
 		out.length = 0
 		await run_carry_cli.run(['--json'])
 
-		expect(last_json().carry?.started_at).toBe(START.toISOString())
+		expect(run_carry_cli_fixture.last_json(out).carry?.started_at).toBe(START.toISOString())
 	})
 
 	// A crash never reaches `--cut`, so the successor is refused and a person decides — the same answer
@@ -404,6 +394,6 @@ describe('a named-issue backlogrun carried across a session cut', () => {
 		out.length = 0
 		await run_carry_cli.run(['--json'])
 
-		expect(last_json().remaining).toBeUndefined()
+		expect(run_carry_cli_fixture.last_json(out).remaining).toBeUndefined()
 	})
 })

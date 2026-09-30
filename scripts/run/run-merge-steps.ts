@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { git_followup_issue_close } from '#scripts/git/git-followup-issue-close'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { git_stash } from '#scripts/git/git-stash'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
@@ -34,6 +35,12 @@ const LANES = '--lanes'
 const REPO_FLAG = '--repo'
 const LANE_CLOSE_OCCASION = 'lane close'
 const GIT_ENTRY = '.git'
+const MERGE_CLOSER = 'pnpm josh run:merge'
+const SINGLE_READ = { attempts: 1, interval_ms: 0 }
+// What the driver judged when it parks a child, stated on the issue (joshuafolkken/kit#2769).
+const FAILED_CAUSE = 'the child’s session ended with its issue still open and unfinished.'
+const CUT_RELAUNCH_CAUSE =
+	'its lane held a declared cut, but no successor could be relaunched from it (or it already was once).'
 
 // One returned child's context, gathered from the command line by the CLI.
 interface MergeContext {
@@ -46,6 +53,9 @@ interface MergeContext {
 	// ending apart from a genuine child failure (joshuafolkken/kit#2240); absent leaves outage detection
 	// off, so the child is classified from its GitHub state alone as before.
 	output?: string | undefined
+	// The merged pull request that closes the child, when GitHub left the child OPEN after the merge —
+	// the one `merged` child whose issue this command still has to close (joshuafolkken/kit#2769).
+	merged_pr?: string | undefined
 }
 
 interface FailedResult {
@@ -164,6 +174,22 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge.counters_comment(carry))
 }
 
+// A child merged while GitHub left it OPEN is closed here, through the one close `followup` uses
+// (joshuafolkken/kit#2769). The state was just read OPEN, so it is read once rather than waited on. A
+// close that fails is reported with its recovery and does not undo the merge being counted.
+async function close_merged_open(ctx: MergeContext): Promise<void> {
+	if (ctx.merged_pr === undefined) return
+
+	try {
+		await git_followup_issue_close.ensure_issue_closed(
+			{ issue_number: ctx.child, pr_url: ctx.merged_pr, closer: MERGE_CLOSER },
+			SINGLE_READ,
+		)
+	} catch {
+		console.error(`#${ctx.child}: could not be closed — ${git_followup_issue_close.CLOSE_RECOVERY}`)
+	}
+}
+
 // A merged child: count the merge (which resets the failure streak), return to the default branch,
 // stash any uncommitted work the lane still holds and close it, and mirror the counters onto the epic. Returns the carry when the ownership check
 // fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child
@@ -173,6 +199,7 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 
 	if (refused !== undefined) return refused
 
+	await close_merged_open(ctx)
 	await sync_main()
 	const result = await apply_carry(ctx, {
 		...run_merge.change_of('merged'),
@@ -202,8 +229,10 @@ async function remove_in_progress(child: string): Promise<void> {
 // issue number forever, joshuafolkken/kit#2421), drop the stale `in-progress`, and park it with
 // `needs-decision` so the next offer does not hand the same child straight back. Returns the record
 // so the caller can read the streak against the guard. Returns `is_refused: true` without touching labels when the
-// carry record rejected the count (joshuafolkken/kit#2114).
-async function do_failed(ctx: MergeContext): Promise<FailedResult> {
+// carry record rejected the count (joshuafolkken/kit#2114). A park is always explained on the issue —
+// `cause` says what was judged, and the comment what was read and what a person does next
+// (joshuafolkken/kit#2769).
+async function do_failed(ctx: MergeContext, cause: string = FAILED_CAUSE): Promise<FailedResult> {
 	const result = await apply_carry(ctx, run_merge.change_of('failed'))
 
 	if (result.kind === 'refused') return { carry: result.carry, is_parked: false, is_refused: true }
@@ -213,6 +242,12 @@ async function do_failed(ctx: MergeContext): Promise<FailedResult> {
 	lane_reap.reap_child(ctx.child)
 	await remove_in_progress(ctx.child)
 	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
+
+	if (is_parked) {
+		const reason = { child: ctx.child, cause, carry, output: ctx.output }
+
+		await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.park_comment(reason))
+	}
 
 	return { carry, is_parked, is_refused: false }
 }
@@ -311,6 +346,7 @@ async function ask_next(ctx: MergeContext): Promise<string> {
 }
 
 const run_merge_steps = {
+	CUT_RELAUNCH_CAUSE,
 	apply_carry,
 	ask_next,
 	do_failed,

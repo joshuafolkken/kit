@@ -8,7 +8,7 @@ You have several Issues, or an epic, that an agent may implement and merge witho
 
 1. Opt Issues in by adding the `auto-ok` label yourself — only a person applies it. Adding it to an epic's root opts in every descendant ([`josh backlog:next`](../josh-commands.md#josh-backlognext)). Create the label once per repository as [`josh auto-ok:next`](../josh-commands.md#josh-auto-oknext) shows.
 2. For an epic, check it before running: [`josh epic:audit`](../josh-commands.md#josh-epicaudit) reports contradictions between its children, and [`josh epic:next`](../josh-commands.md#josh-epicnext) shows which are runnable.
-3. Type `backlogrun` to drain the opted-in backlog in dependency order, `backlogrun #N1 #N2` to run named Issues first (they need no label), or `backlogrun #E --only` to run one epic's children and stop.
+3. Type `backlogrun` to drain the opted-in backlog in dependency order, `backlogrun #N1 #N2` to run named Issues first (they need no label), or `backlogrun #E --only` to run one epic's children and stop. Order and isolation are decided for you: before the first Issue starts, the agent records `blocked-by` between Issues that must land in order and labels `run:solo` each Issue that changes the verification path and `run:lane` every other one. [`josh backlog:plan`](../josh-commands.md#josh-backlogplan) shows the result, with `[run:solo]` beside such Issues and `[untriaged]` beside any Issue with neither label, and `josh backlog:plan --waves` shows the order the run will take, wave by wave. A `run:solo` Issue starts only when nothing else is running and nothing starts beside it — when nothing is running it goes first, ahead of the ranking; the rest run in parallel lanes. You may apply `run:solo` or `run:lane` yourself too. While any candidate has neither label, nothing new starts (`josh backlog:next` answers `triage`) until the agent has judged it — this covers an Issue you opt in mid-run.
 4. Put `needs-human-review` on any Issue that must not be committed without you: the run implements and verifies it, then stops before the commit ([the label](../josh-commands.md#needs-human-review--the-opposite-label)).
 
 The run's budgets — the idle watch, the child limit and the whole-run bound — are described in [the two budgets](../../.claude/skills/workflow-commands/backlogrun-steps.md#the-two-budgets).
@@ -20,6 +20,6 @@ The run's budgets — the idle watch, the child limit and the whole-run bound �
 
 ## Common failures
 
-- An Issue is never picked up: it lacks `auto-ok` and is not under an opted-in epic, or it waits on an open dependency (`josh backlog:next` answers `wait`).
+- An Issue is never picked up: it lacks `auto-ok` and is not under an opted-in epic, or it waits on an open dependency or a `run:solo` Issue (`josh backlog:next` answers `wait` and says which).
 - The run stops early: it stops at 30 children, 10 filed Issues or 3 consecutive child failures, and on a `needs-human-review` Issue ([where the run stops](../../.claude/skills/workflow-commands/backlogrun-steps.md#where-the-run-stops)).
 - The session was cut part-way: see [Recover a stopped run](./recover-a-run.md).

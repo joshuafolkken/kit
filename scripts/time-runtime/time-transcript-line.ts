@@ -117,6 +117,9 @@ interface Block {
 	// it is what pairs a launch with the call that later reads its output, so the minutes the command
 	// actually ran can be placed on the timeline instead of only the seconds its launch call took.
 	background_id: string
+	// The id of a subagent this block launched into the background, and `''` for every other block
+	// (joshuafolkken/kit#2774) — apart from `background_id` so the timeline windows stay commands only.
+	agent_id: string
 }
 
 interface TranscriptLine {
@@ -183,6 +186,7 @@ function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
 		error_text: is_error === true ? text.slice(0, ERROR_TEXT_LIMIT) : '',
 		refusal_guard: is_error === true ? guard_from_refusal(text) : '',
 		background_id: time_background.launch_id(text),
+		agent_id: time_background.agent_launch_id(text),
 	}
 }
 

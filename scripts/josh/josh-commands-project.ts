@@ -26,7 +26,11 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/init/init.ts',
 		description: 'Initialize config in a new project',
 		category: 'Project',
-		reference: [PROFILE_ARGUMENTS, 'developer', ['files', 'processes']],
+		reference: [
+			`${PROFILE_ARGUMENTS} [--no-install]`,
+			'developer',
+			['files', 'network', 'processes'],
+		],
 	},
 	sync: {
 		script: 'scripts/sync/sync.ts',

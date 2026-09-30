@@ -76,11 +76,13 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#2353 wired the watcher-guard note into `backlogrun-progress.md` (read by the three
 	// planning entries): kickoff has no headroom, so the addition was offset by tightening that file's
 	// heartbeat prose, keeping every entry within its existing block.
-	{ entry: 'kickoff', bytes: 258_048 },
-	{ entry: 'fullrun', bytes: 258_048 },
-	{ entry: 'halfrun', bytes: 258_048 },
-	{ entry: 'backlogrun', bytes: 262_144 },
-	{ entry: LANE_CHILD, bytes: 86_016 },
+	// joshuafolkken/kit#2762 moved the rationale of five point-of-use documents to
+	// `docs/maintainers/*-rationale.md`, and the ratchet holds the reduction.
+	{ entry: 'kickoff', bytes: 229_376 },
+	{ entry: 'fullrun', bytes: 229_376 },
+	{ entry: 'halfrun', bytes: 229_376 },
+	{ entry: 'backlogrun', bytes: 233_472 },
+	{ entry: LANE_CHILD, bytes: 81_920 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
