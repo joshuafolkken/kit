@@ -1567,7 +1567,7 @@ pnpm josh run:release 1091       # release this run's own record
 pnpm josh run:release --force    # clear a record left by a run that has ended
 ```
 
-**Options:** `--fullrun` (`run:hold <N>`) marks the record as `fullrun #N`'s, the one hold the implementation cut outside a lane acts on (joshuafolkken/kit#2760); `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
+**Options:** `--fullrun` (`run:hold <N>`) marks the record as `fullrun #N`'s (joshuafolkken/kit#2760); `--halfrun-stop` marks a `halfrun` stop for `run:entry` to adopt (#2796); `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
 
 **Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an existing branch/PR, or a merged/closed PR), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
 
@@ -1698,11 +1698,10 @@ Bundles the reads a run makes before its first edit into one call.
 
 ### `josh run:entry`
 
-Opens a run in one call, folding the four-round-trip entry sequence a lane re-billed its context on
-(joshuafolkken/kit#2372): `run:hold`, `cost --cut` (skipped in a dispatched lane child), `run:prep` and
-`run:step`. The `entry #<N> — hold: … · cost: … · verdict: …` line carries the three facts the run
+Opens a run in one call (joshuafolkken/kit#2372): `run:hold`, `cost --cut` (skipped in a lane
+child), `run:prep` and `run:step`. The `entry #<N> — hold: … · cost: … · verdict: …` line carries the three facts the run
 branches on; a `busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit — the
-shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume <N>` before the hold: any answer but `fresh` prints `entry #<N> — resume: <token>` with that command's exit code and claims nothing, since an implementation cut outside a lane keeps its hold (joshuafolkken/kit#2760).
+shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume <N>` before the hold: any answer but `fresh` prints `entry #<N> — resume: <token>` with that command's exit code and claims nothing, since an implementation cut outside a lane keeps its hold (joshuafolkken/kit#2760). A stopped `halfrun`'s hold is adopted: `resume: halfrun` (#2796).
 
 ### `josh run:status`
 

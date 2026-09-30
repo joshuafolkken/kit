@@ -41,12 +41,16 @@ josh latest:scope` and update dependencies only on `required` (`latest-gate.md`;
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
 join the gate before the stop, iterate to no high/medium findings, at most two reviews → `pnpm josh
 test:e2e`, run by **you**, because `halfrun` opens no pull request and there is no CI E2E job; a printed
-skip is the answer where the project has no suite) → send a `confirmation` Telegram with the resume
-commands in the body → **stop**. Plan comments are in the session language. The `confirmation` Telegram
-body MUST include the exact resume commands: `pnpm josh notify --task-type confirmation --issue-url
-"<issue-url>" --body=$'halfrun ready for manual verification\nNext: pnpm josh git -y "<title> #<N>" &&
-pnpm josh followup "<title> #<N>" --notify-message "Implemented <title>\\nCause: ...\\nFix:
-...\\nResult: ...\\n\\nDetails:\\n- <change1>"'`.
+skip is the answer where the project has no suite) → **mark the stop: `pnpm josh run:hold <N>
+--halfrun-stop`** (the record `fullrun #<N>` adopts; `new` passes the filed number) → send a
+`confirmation` Telegram with the resume commands in the body → **stop**. Plan comments are in the session language. The `confirmation` Telegram
+body MUST include the exact resume commands — **`fullrun #<N>` first**, since that is how a verified
+`halfrun` ships (joshuafolkken/kit#2796): its `run:entry` adopts this stop's marked hold and resumes at
+the gate. The direct commands follow for shipping without an agent:
+`pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'halfrun ready for manual
+verification\nNext: fullrun #<N>\nWithout an agent: pnpm josh git -y "<title> #<N>" && pnpm josh
+followup "<title> #<N>" --notify-message "Implemented <title>\\nCause: ...\\nFix: ...\\nResult:
+...\\n\\nDetails:\\n- <change1>"'`. The stop report names the same two, in the same order.
 **Invoking `halfrun` is _not_ authorization to commit, push, or merge** — do not run `pnpm josh git -y` or `pnpm josh followup` yourself. If the user comes
 back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, send another
 `confirmation` Telegram, stop again.
@@ -59,7 +63,8 @@ body per `prompts/collaboration-workflow/issue-template.md`) → add `in-progres
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes"`, popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
 `git switch main && git pull` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
-josh test:e2e` run by **you**) → send the `confirmation` Telegram and **stop**.
+josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` → send the `confirmation`
+Telegram and **stop**.
 
 ## The stop branches
 

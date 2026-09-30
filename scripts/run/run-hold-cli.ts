@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
 import { run_preflight, type PreflightDecision } from './run-preflight'
 import { run_tidy_cli } from './run-tidy-cli'
@@ -46,11 +47,12 @@ const FORCE_FLAG = '--force'
 // What `fullrun #N`'s entry claims with, so the record says the run is a `fullrun` — the one run whose
 // implementation cut outside a lane resumes as `fullrun #N` (joshuafolkken/kit#2760).
 const FULLRUN_FLAG = '--fullrun'
-// The most a claim reads: the issue number and the `--fullrun` flag after it.
+const HALFRUN_STOP_FLAG = '--halfrun-stop'
+// The most a claim reads: the issue number and the one flag after it.
 const MAX_CLAIM_ARGUMENTS = 2
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const USAGE =
-	'Usage: josh run:hold [<issue-number> [--fullrun]] | josh run:release [<issue-number> | --force]'
+	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop]] | josh run:release [<issue-number> | --force]'
 
 const HOLD_VERDICT = 'hold'
 const BUSY_VERDICT = 'busy'
@@ -62,6 +64,7 @@ const NONE_VERDICT = 'none'
 const HELD_VERDICT = 'held'
 
 const FORCE_RELEASE_KIND = 'force-release'
+const HALFRUN_STOP_KIND = 'halfrun-stop'
 
 interface ClaimRequest {
 	kind: 'claim'
@@ -70,7 +73,10 @@ interface ClaimRequest {
 }
 
 type HoldRequest =
-	ClaimRequest | { kind: 'release'; claimant: string } | { kind: typeof FORCE_RELEASE_KIND }
+	| ClaimRequest
+	| { kind: 'release'; claimant: string }
+	| { kind: typeof FORCE_RELEASE_KIND }
+	| { kind: typeof HALFRUN_STOP_KIND; issue: string }
 
 const FORCE_RELEASE_REQUEST: HoldRequest = { kind: FORCE_RELEASE_KIND }
 
@@ -78,9 +84,12 @@ function release_request(claimant: string): HoldRequest {
 	return { kind: 'release', claimant }
 }
 
-// The flag after a numbered claim: absent, or `--fullrun`. Anything else is a usage error.
+// The flag after a numbered claim: absent, `--fullrun` or `--halfrun-stop`. Anything else is a usage
+// error.
 function numbered_claim(issue: string, flag: string | undefined): HoldRequest | undefined {
 	if (flag === undefined) return { kind: 'claim', issue }
+
+	if (flag === HALFRUN_STOP_FLAG) return { kind: HALFRUN_STOP_KIND, issue }
 
 	return flag === FULLRUN_FLAG ? { kind: 'claim', issue, is_fullrun: true } : undefined
 }
@@ -282,8 +291,22 @@ async function read_worktree(): Promise<string | undefined> {
 	}
 }
 
+// **A `halfrun` stop marks its own record** (joshuafolkken/kit#2796) — the positive "this run has ended
+// over its verified diff" that `run:entry` adopts on `fullrun #N`. Another run's record is left alone.
+function mark_halfrun_stop(target: string, issue: string): number {
+	const mark = run_halfrun_resume.mark_stop_at(target, issue)
+
+	if (mark === run_halfrun_resume.MARKED) return report_hold()
+
+	if (mark === run_halfrun_resume.UNREADABLE) return report_unknown()
+
+	return report_busy(run_hold.race_message(run_hold.read_hold(target), target))
+}
+
 async function dispatch(request: HoldRequest, target: string, is_linked: boolean): Promise<number> {
 	if (request.kind === 'claim') return await claim(target, request, is_linked)
+
+	if (request.kind === HALFRUN_STOP_KIND) return mark_halfrun_stop(target, request.issue)
 
 	if (request.kind === FORCE_RELEASE_KIND) return force_release(target)
 

@@ -48,6 +48,10 @@ interface RunHold {
 	// `backlogrun` child — which hold the tree just the same — must not be read as one. Optional and
 	// `| undefined` because a record written before this field existed is simply not a `fullrun`'s.
 	is_fullrun?: boolean | undefined
+	// Set only at a `halfrun`'s stop before commit (`run:hold <N> --halfrun-stop`, joshuafolkken/kit#2796):
+	// the positive record that the run has *ended* over its verified diff, which is what lets
+	// `fullrun #N` adopt the hold. A running `halfrun` or a `backlogrun` child never carries it.
+	is_halfrun_stop?: boolean | undefined
 }
 
 type HoldRead =
@@ -87,6 +91,7 @@ const run_hold_schema = z.object({
 	taken_at: z.string(),
 	pid: z.number(),
 	is_fullrun: z.boolean().optional(),
+	is_halfrun_stop: z.boolean().optional(),
 })
 
 // `undefined` for anything that is not a well-formed record, so the caller decides what a broken one
@@ -154,6 +159,11 @@ function create_hold(
 	is_fullrun?: boolean,
 ): boolean {
 	return stamp_file.create_stamp(target, build_hold(issue, now, is_fullrun))
+}
+
+// The claim a `halfrun` stop leaves behind: the same exclusive create, carrying the stop mark.
+function create_halfrun_stop_hold(target: string, issue: string, now: Date = new Date()): boolean {
+	return stamp_file.create_stamp(target, { ...build_hold(issue, now), is_halfrun_stop: true })
 }
 
 // **A tree with uncommitted work in it is never handed over, however old its record is.** No age can
@@ -249,6 +259,7 @@ const run_hold = {
 	RELEASE_COMMAND,
 	UNNUMBERED_ISSUE,
 	classify,
+	create_halfrun_stop_hold,
 	create_hold,
 	describe_holder,
 	foreign_release_message,

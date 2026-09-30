@@ -4,6 +4,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_report } from './run-cut-report'
 import { run_entry, type EntryParts } from './run-entry'
+import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_hold_cli } from './run-hold-cli'
 import { run_next } from './run-next'
 import { run_prep } from './run-prep'
@@ -33,6 +34,7 @@ const NEWLINE = '\n'
 const HOLD_STOP_NOTE =
 	'(tree not held — see the reason above; clean up and retry, or release with `pnpm josh run:release`)'
 const COST_STOP_NOTE = '(session budget spent — see the figure above; resume in a fresh session)'
+const HALFRUN_RESUME_TOKEN = 'halfrun'
 
 // Exactly one issue number, or the call is refused — `run:entry` opens one run, and a second number
 // would claim and read a second issue a caller reads as this one's.
@@ -126,10 +128,32 @@ function resume_report(issue_number: string, resume: Resume): number {
 	return resume.code
 }
 
+// **A `halfrun` stopped before its commit is resumed, not claimed** (joshuafolkken/kit#2796): its hold
+// is kept over the verified diff, so the claim below would answer `busy` against it. The budget is asked
+// first, as for any run; then the hold is adopted and the run goes to the gate, skipping everything up
+// to and including implementation.
+async function resume_halfrun(issue_number: string): Promise<number> {
+	const cost = await check_cost()
+
+	if (cost === run_entry.COST_OVER) {
+		return stop_report(issue_number, HALFRUN_RESUME_TOKEN, cost, COST_STOP_NOTE)
+	}
+
+	if (!(await run_halfrun_resume.adopt(issue_number))) {
+		return stop_report(issue_number, run_hold_cli.BUSY_VERDICT, cost, HOLD_STOP_NOTE)
+	}
+
+	console.info(`entry #${issue_number} — resume: ${HALFRUN_RESUME_TOKEN}`)
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function open_run(issue_number: string): Promise<number> {
 	const resume = await ask_resume(issue_number)
 
 	if (resume.token !== run_cut_report.FRESH_VERDICT) return resume_report(issue_number, resume)
+
+	if (await run_halfrun_resume.is_pending(issue_number)) return await resume_halfrun(issue_number)
 
 	const hold = await claim_hold(issue_number)
 
@@ -162,7 +186,16 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_entry_cli = { SUCCESS_EXIT_CODE, USAGE, check_cost, claim_hold, main, parse_number, run }
+const run_entry_cli = {
+	HALFRUN_RESUME_TOKEN,
+	SUCCESS_EXIT_CODE,
+	USAGE,
+	check_cost,
+	claim_hold,
+	main,
+	parse_number,
+	run,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
