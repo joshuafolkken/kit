@@ -434,10 +434,10 @@ pnpm exec josh start --yes --github --profile static    # unattended, including 
 Initialize project config, selecting a profile and reporting applicable repository settings.
 
 ```bash
-pnpm josh init   # create/merge config files
+pnpm josh init   # create/merge config files, install and format (--no-install skips both)
 ```
 
-**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing.
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails.
 
 See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 

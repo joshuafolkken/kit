@@ -21,10 +21,10 @@ In your project directory:
 ```bash
 pnpm add -D --allow-build=esbuild @joshuafolkken/kit
 pnpm exec josh init
-pnpm install
-pnpm josh format
 pnpm josh gate
 ```
+
+`josh init` finishes by running `pnpm install` and `josh format` itself; pass `--no-install` to skip both, for example on CI or offline.
 
 `josh init` is the entry without GitHub. To start a new project on the GitHub Issue workflow (`kickoff`), run `pnpm exec josh start` instead of `josh init` — it also creates the Git repository, the GitHub repository and the labels ([init.md → `josh init` or `josh start`](./docs/init.md#josh-init-or-josh-start)).
 

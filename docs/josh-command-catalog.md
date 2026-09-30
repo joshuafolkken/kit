@@ -257,9 +257,9 @@ Upgrade every installed @joshuafolkken toolkit here and open the pull request
 
 ### `josh init` · `josh i`
 
-> **Audience:** developer · **Side effects:** files, processes
+> **Audience:** developer · **Side effects:** files, network, processes
 
-`[--profile static|node]`
+`[--profile static|node] [--no-install]`
 
 Initialize config in a new project
 

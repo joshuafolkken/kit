@@ -27,15 +27,26 @@ const GITHUB_DIR = '.github'
 const STATIC_PROFILE_ENTRY = '"profile": "static"'
 const SECURITY_MD = 'SECURITY.md'
 const STATIC_PRETTIER = 'prettier.config.mjs'
+const NO_INSTALL = '--no-install'
+const INSTALL_HINT = 'run `pnpm install`'
+const PNPM_INSTALL = 'pnpm install'
 
 function write_index_html(): void {
 	writeFileSync(path.join(paths_mock.root, 'index.html'), '<h1>Hello</h1>')
 }
 
-async function run_init(): Promise<void> {
+// The cases below pin what `init` writes, so they skip the install it ends with; the install itself
+// is pinned in its own describe (joshuafolkken/kit#2766).
+async function run_init(args: ReadonlyArray<string> = [NO_INSTALL]): Promise<void> {
 	const { main } = await import('./init')
 
-	main()
+	main(args)
+}
+
+function invoked_commands(): Array<string> {
+	return mocked_execa.mock.calls.map((call) =>
+		[call[0], ...(Array.isArray(call[1]) ? call[1] : [])].join(' '),
+	)
 }
 
 async function rerun_with_python_settings(): Promise<{ settings: string; manifest: string }> {
@@ -95,11 +106,11 @@ describe('Git-free static initialization', () => {
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 
-	it('tells the user to install what it added to package.json', async () => {
+	it('tells the user to install what it added to package.json under --no-install', async () => {
 		write_index_html()
 		await run_init()
 
-		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('run `pnpm install`'))
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(INSTALL_HINT))
 	})
 
 	it('approves only the esbuild build so the first pnpm install succeeds', async () => {
@@ -167,9 +178,7 @@ describe('static initialization after Git adoption', () => {
 		mocked_execa.mockReturnValue(fake_git_result(1, ''))
 		await run_init()
 		await run_init()
-		const invoked = mocked_execa.mock.calls.map((call) =>
-			[call[0], ...(Array.isArray(call[1]) ? call[1] : [])].join(' '),
-		)
+		const invoked = invoked_commands()
 
 		expect(createInterface).not.toHaveBeenCalled()
 		expect(invoked.filter((command) => /git init|repo create|push/u.test(command))).toStrictEqual(
@@ -184,5 +193,36 @@ describe('static initialization after Git adoption', () => {
 
 		expect(existsSync(path.join(paths_mock.root, SECURITY_MD))).toBe(true)
 		expect(existsSync(path.join(paths_mock.root, GITHUB_DIR, 'release.yml'))).toBe(true)
+	})
+})
+
+// `init` ends by installing what it listed and formatting, so the quick start needs no separate
+// `pnpm install` / `josh format` (joshuafolkken/kit#2766).
+describe('the install and format init finishes with', () => {
+	it('installs, then formats, and drops the manual install hint', async () => {
+		write_index_html()
+		mocked_execa.mockReturnValue(fake_git_result(0, ''))
+		await run_init([])
+
+		expect(invoked_commands()).toStrictEqual([PNPM_INSTALL, 'pnpm exec josh format'])
+		expect(console.info).not.toHaveBeenCalledWith(expect.stringContaining(INSTALL_HINT))
+	})
+
+	it('fails without formatting when the install fails', async () => {
+		write_index_html()
+		mocked_execa.mockReturnValue(fake_git_result(1, ''))
+		const { main } = await import('./init')
+
+		expect(() => {
+			main(['--profile', 'static'])
+		}).toThrow('pnpm install failed')
+		expect(invoked_commands()).toStrictEqual([PNPM_INSTALL])
+	})
+
+	it('runs neither under --no-install', async () => {
+		write_index_html()
+		await run_init([NO_INSTALL, '--profile', 'static'])
+
+		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 })
