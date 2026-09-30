@@ -103,6 +103,7 @@ function parts(overrides: Partial<PrepParts>): PrepParts {
 		latest_scope: 'skip',
 		latest_reason: 'window is 12h',
 		has_changes: false,
+		locations: '',
 		...overrides,
 	}
 }

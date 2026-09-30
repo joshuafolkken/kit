@@ -6,10 +6,12 @@ import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { run_prep, type PrepParts } from './run-prep'
+import { run_prep_locate } from './run-prep-locate'
 
 // `josh run:prep <N>` — one call for the reads a `fullrun` makes before its first edit
 // (joshuafolkken/kit#1978): the issue body and comments (`issue:read`), the state, labels and
-// `human_review` line (`issue:state`), and the dependency-update scope (`latest:scope`). Each is
+// `human_review` line (`issue:state`), the dependency-update scope (`latest:scope`), and where the
+// paths and identifiers the body names occur in code (`run-prep-locate.ts`). Each is
 // reused rather than reproduced, and the two body reads run concurrently, so three round trips become
 // one.
 //
@@ -37,6 +39,7 @@ interface PrepReads {
 	state: StateRead
 	latest: LatestDecision
 	has_changes: boolean
+	locations: string
 }
 
 // Exactly one issue number, or the call is refused: `run:prep` prepares one run, and a second number
@@ -90,8 +93,10 @@ async function gather(issue_number: string): Promise<PrepReads> {
 		issue_state_cli.read_issue(issue_number),
 		lane_has_changes(),
 	])
+	// Located from the body just read, so it waits for that read rather than joining the batch above.
+	const locations = await run_prep_locate.locate(content.kind === 'ok' ? content.block : '')
 
-	return { content, state, latest: latest_decision(), has_changes }
+	return { content, state, latest: latest_decision(), has_changes, locations }
 }
 
 function content_body(issue_number: string, content: BlockRead): string {
@@ -110,6 +115,7 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		latest_scope: reads.latest.scope,
 		latest_reason: reads.latest.reason,
 		has_changes: reads.has_changes,
+		locations: reads.locations,
 	}
 }
 
