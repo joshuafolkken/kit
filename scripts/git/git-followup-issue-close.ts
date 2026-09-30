@@ -31,11 +31,15 @@ async function is_issue_closed(issue_number: string): Promise<boolean> {
 	return git_epic_parse.is_state_closed(parsed?.state)
 }
 
+const FOLLOWUP_CLOSER = 'pnpm josh followup'
+
 // English, like every other string a script posts: the comment says why the close came from this
-// command rather than from the pull request, so a reader of the issue is not left guessing.
-function build_close_comment(pr_url: string | undefined): string {
+// command rather than from the pull request, so a reader of the issue is not left guessing. `closer`
+// names the command that closed it — `followup` at the merge, or `run:merge` when a `backlogrun`
+// finds the child still open afterwards (joshuafolkken/kit#2769).
+function build_close_comment(pr_url: string | undefined, closer: string = FOLLOWUP_CLOSER): string {
 	return (
-		`Closed by \`pnpm josh followup\`: ${pr_url ?? 'the merged pull request'} merged, ` +
+		`Closed by \`${closer}\`: ${pr_url ?? 'the merged pull request'} merged, ` +
 		'but GitHub did not apply its ' +
 		'`closes #N` keyword (joshuafolkken/kit#2770).'
 	)
@@ -45,7 +49,7 @@ function build_close_comment(pr_url: string | undefined): string {
 // command that finishes it by hand — an issue left open after a merge is the one thing this step
 // exists to stop going unnoticed.
 async function ensure_issue_closed(
-	input: { issue_number: string | undefined; pr_url: string | undefined },
+	input: { issue_number: string | undefined; pr_url: string | undefined; closer?: string },
 	wait: PollOptions = CLOSE_WAIT,
 ): Promise<void> {
 	const { issue_number } = input
@@ -55,7 +59,7 @@ async function ensure_issue_closed(
 	if (is_done) return
 
 	console.warn(`⚠️  Issue #${issue_number} is still open after the merge — closing it.`)
-	const comment = build_close_comment(input.pr_url)
+	const comment = build_close_comment(input.pr_url, input.closer)
 
 	if (!(await git_gh_command.issue_close(issue_number, comment))) {
 		throw new Error(`gh api could not close issue #${issue_number}`)

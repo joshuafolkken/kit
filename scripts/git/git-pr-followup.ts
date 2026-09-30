@@ -1,3 +1,4 @@
+import { git_closes_keyword } from './git-closes-keyword'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
@@ -15,10 +16,6 @@ import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from '
 
 const { STAGE, lap } = git_followup_stages
 
-// Captures the number, so the one pattern answers both questions the run asks of a PR body: whether
-// the linked issue will auto-close, and — since joshuafolkken/kit#1539 — which issue that is when the
-// invocation did not say. A second pattern here would be two readings of "closes #N" to disagree.
-const CLOSES_PATTERN = /closes\s+#(\d+)/iu
 // Named so a test can pin the note without restating it (joshuafolkken/kit#999).
 const WATCH_FAILED_NOTE = 'pr checks --watch failed; falling through to polling'
 const REPO_NAME_SEPARATOR = '/'
@@ -69,11 +66,7 @@ interface FollowupInput {
 	should_merge: boolean
 }
 
-function parse_closes_issue_number(body: string | undefined): string | undefined {
-	if (body === undefined) return undefined
-
-	return CLOSES_PATTERN.exec(body)?.[1]
-}
+const { parse_closes_issue_number } = git_closes_keyword
 
 function has_closes_keyword(body: string | undefined): boolean {
 	return parse_closes_issue_number(body) !== undefined
