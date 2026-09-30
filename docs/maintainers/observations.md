@@ -628,3 +628,12 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | low | scripts/run/run-entry-cli.ts | 2026-09-30 | #2796
 - rf:bug-risks | low | scripts/run/run-halfrun-resume.ts | 2026-09-30 | #2796
 - rf:bug-risks | low | scripts/run/run-hold-cli.ts | 2026-09-30 | #2796
+- rf:bug-risks | low | scripts/sync/sync.ts | 2026-09-30 | #2797
+- rf:bug-risks | low | scripts/init/start-steps.ts | 2026-09-30 | #2797
+- rf:comments | low | scripts/init/start-plan.ts | 2026-09-30 | #2797
+- rf:bug-risks | low | README.md:19 | 2026-09-30 | #2799
+- rf:assumptions | low | README.md:21 | 2026-09-30 | #2799
+- rf:none | none | - | 2026-09-30 | #2799
+- rf:bug-risks | medium | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
+- rf:bug-risks | low | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
+- rf:bug-risks | medium | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
