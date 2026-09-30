@@ -60,10 +60,16 @@ function adopt_at(target: string, issue: string, is_dirty: boolean): boolean {
 	return run_hold.create_hold(target, issue, new Date(), true)
 }
 
+// **An unreadable git directory is no resume**, never a crash: `run:entry` must still print its one
+// summary line, and the ordinary claim that follows answers `unknown` for the same tree.
 async function hold_target(): Promise<string | undefined> {
-	const directory = await run_hold.worktree_directory()
+	try {
+		const directory = await run_hold.worktree_directory()
 
-	return directory === undefined ? undefined : run_hold.hold_path(directory)
+		return directory === undefined ? undefined : run_hold.hold_path(directory)
+	} catch {
+		return undefined
+	}
 }
 
 // Read-only, so `run:entry` can ask the session budget before it takes anything over.

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_hold } from './run-hold'
 
@@ -97,6 +97,12 @@ describe('run_halfrun_resume.adopt_at — anything else is left to the ordinary 
 
 		expect(run_halfrun_resume.adopt_at(TARGET, ISSUE, is_tree_dirty)).toBe(false)
 		expect(hold_record()).toStrictEqual(before)
+	})
+
+	it('answers no resume rather than throwing when the git directory cannot be read', async () => {
+		vi.spyOn(run_hold, 'worktree_directory').mockRejectedValueOnce(new Error('no git'))
+
+		await expect(run_halfrun_resume.is_pending(ISSUE)).resolves.toBe(false)
 	})
 
 	it('does not adopt a free tree, and writes no record', () => {
