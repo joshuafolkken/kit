@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { api_outage } from '#scripts/agent/api-outage'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
+import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_carry, type CarryOwner, type RunCarry } from './run-carry'
 import { run_ending } from './run-ending'
@@ -202,17 +203,27 @@ function read_is_outage(output: string | undefined): boolean {
 	return api_outage.is_outage(run_ending.read_exit(output))
 }
 
-async function read_signals(ctx: MergeContext): Promise<EndingSignals> {
-	return {
-		is_outage: read_is_outage(ctx.output),
-		is_cut: await run_merge_steps.has_resumable_cut(ctx.child),
-	}
+type IssueRead = Awaited<ReturnType<typeof issue_state_cli.read_issue>>
+
+// The timeline is read only for an OPEN, unparked child — the one classification a merged closing pull
+// request changes. A CLOSED child was closed by GitHub, so it must carry no `merged_pr` for
+// `do_merged` to close again (joshuafolkken/kit#2769).
+async function read_merged_pr(child: string, read: IssueRead): Promise<string | undefined> {
+	if (read.kind !== 'state' || run_merge.classify_child(read.state) !== 'failed') return undefined
+
+	return await issue_closing_pr.read_closing_pr(child)
 }
 
-function outcome_of(
-	read: Awaited<ReturnType<typeof issue_state_cli.read_issue>>,
-	signals: EndingSignals,
-): ChildOutcome {
+async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingSignals> {
+	const [is_cut, merged_pr] = await Promise.all([
+		run_merge_steps.has_resumable_cut(ctx.child),
+		read_merged_pr(ctx.child, read),
+	])
+
+	return { is_outage: read_is_outage(ctx.output), is_cut, merged_pr }
+}
+
+function outcome_of(read: IssueRead, signals: EndingSignals): ChildOutcome {
 	return read.kind === 'state' ? run_merge.classify_child(read.state, signals) : 'unresolved'
 }
 
@@ -238,8 +249,8 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(await run_merge_steps.ask_next(ctx), SUCCESS_EXIT_CODE)
 }
 
-async function on_failed(ctx: MergeContext): Promise<MergeVerdict> {
-	const result = await run_merge_steps.do_failed(ctx)
+async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdict> {
+	const result = await run_merge_steps.do_failed(ctx, cause)
 
 	if (result.is_refused) return report_count_refused(result.carry)
 
@@ -291,7 +302,9 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 
 	if (refused !== undefined) return report_count_refused(refused)
 
-	if (!(await run_merge_steps.resume_cut(ctx.child))) return await on_failed(ctx)
+	if (!(await run_merge_steps.resume_cut(ctx.child))) {
+		return await on_failed(ctx, run_merge_steps.CUT_RELAUNCH_CAUSE)
+	}
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
@@ -358,9 +371,10 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	}
 
 	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
-	const outcome = outcome_of(read, await read_signals(ctx))
+	const signals = await read_signals(ctx, read)
+	const outcome = outcome_of(read, signals)
 
-	return { outcome, ...(await HANDLERS[outcome](ctx)) }
+	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr: signals.merged_pr })) }
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

@@ -24,6 +24,8 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
 }))
 
+vi.mock('#scripts/issue/issue-closing-pr')
+
 vi.mock('#scripts/agent/api-outage', () => ({
 	api_outage: { is_outage: is_outage_mock },
 }))
