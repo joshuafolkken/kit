@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
+import { run_carry_cli_fixture } from './run-carry-cli-fixture'
 
 // joshuafolkken/kit#2136: `--end --stopped` pushes one ⏸️ confirmation as it clears the record, so a
 // person learns a headless run halted after a session cut. The send is mocked, so the wiring — and the
@@ -37,6 +38,7 @@ function target(): string {
 }
 
 beforeEach(() => {
+	run_carry_cli_fixture.hold_verdict()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])

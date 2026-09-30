@@ -1,11 +1,11 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/run-cut'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { pre_gate_cut, type LaneCutState } from './pre-gate-cut'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
@@ -351,11 +351,16 @@ describe('rule_delivery — inside a lane checkout', () => {
 		// A real dispatched child arrives here with the mark set; `current_state` reads it from the live
 		// environment, so the delivery cases below only fire once it names this lane.
 		process.env[lane_child_marker.KEY] = ISSUE
+		// `current_state` prices the live session, which read the machine's whole transcript corpus —
+		// timing out against a large home and passing in CI, where there is none (joshuafolkken/kit#2772).
+		// Held at the CI answer, which keeps the unconditional cut.
+		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue(CONTEXT_UNMEASURABLE)
 	})
 
 	afterAll(() => {
 		process.chdir(ORIGINAL_DIRECTORY)
 		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
+		vi.restoreAllMocks()
 	})
 
 	// The temporary lane sits outside any repository, so the git directory cannot be read and the cut

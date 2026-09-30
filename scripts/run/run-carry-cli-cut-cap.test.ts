@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
+import { run_carry_cli_fixture } from './run-carry-cli-fixture'
 
 // joshuafolkken/kit#2346: `run:carry --cut` past the cap is refused with `capped` and the run carries on
 // uncut, so a run that has begun to churn cannot keep paying a cold preamble the accumulation it sheds
@@ -29,6 +30,7 @@ function target(): string {
 }
 
 beforeEach(() => {
+	run_carry_cli_fixture.hold_verdict()
 	out.length = 0
 	vi.spyOn(console, 'info').mockImplementation((text: string) => {
 		out.push(text)
