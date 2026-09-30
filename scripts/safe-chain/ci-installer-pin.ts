@@ -2,11 +2,15 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execaSync } from 'execa'
 
-// The workflows that install safe-chain on the runner. Both carry the release and the installer's
+// The workflows that install safe-chain on the runner. Each carries the release and the installer's
 // SHA-256 as workflow-level env, so one pin per file moves every "Setup safe-chain" step at once
-// (joshuafolkken/kit#2711). A consumer has only the first, and `josh sync` rewrites it from the
-// template, so moving it anywhere but kit is harmless and short-lived.
-const WORKFLOW_PATHS = ['.github/workflows/ci.yml', 'templates/workflows/ci.yml']
+// (joshuafolkken/kit#2711, joshuafolkken/kit#2765). A consumer has the first and the last, and
+// `josh sync` rewrites both from kit, so moving them anywhere but kit is harmless and short-lived.
+const WORKFLOW_PATHS = [
+	'.github/workflows/ci.yml',
+	'templates/workflows/ci.yml',
+	'.github/workflows/pr-classification.yml',
+]
 // `[ \t]` rather than `\s`: under the `m` flag `\s*` would run across line ends and swallow the
 // blank line that follows the env block.
 const VERSION_RE = /^(?<key>[ \t]*SAFE_CHAIN_INSTALLER_VERSION:[ \t]*)(?<value>\S+)[ \t]*$/mu
