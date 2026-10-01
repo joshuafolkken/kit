@@ -9,7 +9,7 @@ const RUNTIME_FILE = 'scripts/foo.ts'
 const UNIT_TEST_FILE = 'scripts/foo.test.ts'
 
 describe('test_declared.report', () => {
-	it('explains manual browser confirmation for static HTML and CSS', () => {
+	it('explains manual browser confirmation for basic-profile HTML and CSS', () => {
 		const result = test_declared.report(['index.html', 'site.css'], true)
 
 		expect(result.verdict).toBe('exempt')

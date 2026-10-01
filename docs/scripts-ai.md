@@ -11,7 +11,7 @@ TELEGRAM_BOT_TOKEN=<your-bot-token>
 TELEGRAM_CHAT_ID=<your-chat-id>
 ```
 
-The `.env` file is loaded automatically by AI scripts on startup. Both variables are optional — if either is missing, Telegram notifications are skipped with a warning and the workflow continues.
+The `.env` file is loaded automatically by AI scripts on startup. Without both variables `josh notify` exits non-zero, while `josh followup` reports the missed notification and still completes (see [Notification Behavior](#notification-behavior)).
 
 ### `TELEGRAM_BOT_TOKEN`
 

@@ -1,7 +1,7 @@
-import { config as static_config } from './static.js'
+import { config as basic_config } from './basic.js'
 
 export const config = {
-	...static_config,
+	...basic_config,
 	plugins: [
 		'@ianvs/prettier-plugin-sort-imports',
 		'prettier-plugin-svelte',

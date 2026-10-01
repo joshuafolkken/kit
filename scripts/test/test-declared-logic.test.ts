@@ -11,8 +11,8 @@ const DOC_FILE = 'docs/x.md'
 const SATISFIED = 'satisfied'
 const EXEMPT = 'exempt'
 const PROMPT_DOC = 'prompts/review.md'
-const STATIC_HTML = 'index.html'
-const STATIC_CSS = 'site.css'
+const BASIC_HTML = 'index.html'
+const BASIC_CSS = 'site.css'
 
 describe('test_declared_logic.verdict_for', () => {
 	it('is required when a runtime file changed with no test beside it', () => {
@@ -71,13 +71,13 @@ describe('test_declared_logic classification', () => {
 	})
 })
 
-describe('static HTML and CSS changes', () => {
-	it('exempts HTML and CSS only under the static profile', () => {
-		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS], true)).toBe(EXEMPT)
-		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS], false)).toBe('required')
+describe('basic-profile HTML and CSS changes', () => {
+	it('exempts HTML and CSS only under the basic profile', () => {
+		expect(test_declared_logic.verdict_for([BASIC_HTML, BASIC_CSS], true)).toBe(EXEMPT)
+		expect(test_declared_logic.verdict_for([BASIC_HTML, BASIC_CSS], false)).toBe('required')
 	})
 
 	it.each(['app.js', 'app.ts', 'app.tsx'])('still requires a test for %s', (file) => {
-		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS, file], true)).toBe('required')
+		expect(test_declared_logic.verdict_for([BASIC_HTML, BASIC_CSS, file], true)).toBe('required')
 	})
 })

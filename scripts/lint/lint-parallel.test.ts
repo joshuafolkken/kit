@@ -101,15 +101,15 @@ describe('run_lint_checks', () => {
 const NO_ESLINT_CONFIG = 'no ESLint configuration was found'
 const NO_WEB_FILES = 'no HTML, CSS or JavaScript files were found'
 
-function static_project(): void {
-	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+function basic_project(): void {
+	vi.spyOn(project_checks, 'is_basic').mockReturnValue(true)
 	vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(undefined)
 	vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(NO_ESLINT_CONFIG)
 }
 
-describe('static project lint', () => {
+describe('basic project lint', () => {
 	it('runs Prettier for HTML without configuration while skipping ESLint', async () => {
-		static_project()
+		basic_project()
 		mocked_execa.mockResolvedValue(fake_result(0))
 		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
@@ -119,7 +119,7 @@ describe('static project lint', () => {
 	})
 
 	it('skips Prettier when no web file exists', async () => {
-		static_project()
+		basic_project()
 		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(NO_WEB_FILES)
 		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(
 			'no JavaScript or TypeScript files were found',
@@ -132,7 +132,7 @@ describe('static project lint', () => {
 	})
 
 	it('runs ESLint after its configuration is added', async () => {
-		static_project()
+		basic_project()
 		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(undefined)
 		mock_exit_codes(0, 0)
 		expect(await run_lint_parallel_checks()).toBe(0)
@@ -140,9 +140,9 @@ describe('static project lint', () => {
 	})
 })
 
-describe('static project lint over the changed files', () => {
+describe('basic project lint over the changed files', () => {
 	it('skips the same tools the whole-tree run skips', async () => {
-		static_project()
+		basic_project()
 		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(NO_WEB_FILES)
 		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 

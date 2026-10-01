@@ -132,7 +132,7 @@ ${stylesheet_line}}
 }
 
 // A named stylesheet is kept only while it exists: kit ≤1.929 wrote the SvelteKit default into every
-// node project, and keeping that line would leave `josh sync` unable to repair the aborting format.
+// full project, and keeping that line would leave `josh sync` unable to repair the aborting format.
 function existing_stylesheet(existing: string, project_root: string): string | undefined {
 	const named = TAILWIND_STYLESHEET_PATTERN.exec(existing)?.[1]
 

@@ -5,7 +5,7 @@ import { start_prompt } from './start-prompt'
 import { start_steps } from './start-steps'
 
 const SHAPE: ProjectShape = {
-	profile: 'static',
+	profile: 'basic',
 	reason: 'test',
 	has_web: true,
 	has_typescript: false,
@@ -28,7 +28,7 @@ beforeEach(() => {
 	vi.spyOn(start_steps, 'self_run_refusal').mockReturnValue(undefined)
 	vi.spyOn(start_steps, 'github_cli_refusal').mockReturnValue(undefined)
 	vi.spyOn(start_steps, 'run_steps').mockImplementation(() => undefined)
-	vi.spyOn(start_prompt, 'confirm_choices').mockResolvedValue('static')
+	vi.spyOn(start_prompt, 'confirm_choices').mockResolvedValue('basic')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -41,11 +41,11 @@ describe('josh start', () => {
 	})
 
 	it('runs every step unattended with --yes, --github and a profile', async () => {
-		expect(await start.run(['--yes', '--github', '--profile', 'node'], false)).toBe(0)
+		expect(await start.run(['--yes', '--github', '--profile', 'full'], false)).toBe(0)
 		expect(start_prompt.confirm_choices).not.toHaveBeenCalled()
 		expect(start_steps.run_steps).toHaveBeenCalledWith(
 			['git_init', 'initialize', 'commit', 'repository', 'labels'],
-			expect.objectContaining({ profile: 'node', visibility: 'private' }),
+			expect.objectContaining({ profile: 'full', visibility: 'private' }),
 		)
 	})
 
@@ -103,10 +103,10 @@ describe('josh start options', () => {
 	})
 
 	it('reads the profile alongside every switch', () => {
-		const args = ['--yes', '--profile', 'node', '--github', '--public']
+		const args = ['--yes', '--profile', 'full', '--github', '--public']
 
 		expect(start.parse_start_options(args)).toStrictEqual({
-			profile: 'node',
+			profile: 'full',
 			is_yes: true,
 			is_github: true,
 			visibility: 'public',
@@ -119,7 +119,7 @@ describe('josh start options', () => {
 
 	it('rejects an unknown profile', () => {
 		expect(() => start.parse_start_options(['--profile', 'python'])).toThrow(
-			'Profile must be static or node',
+			'Profile must be basic or full',
 		)
 	})
 })

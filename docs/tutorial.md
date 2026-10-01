@@ -6,7 +6,7 @@ For anyone who has installed kit and wants to see the Issue-driven loop once, en
 
 ## Before you start
 
-- kit is installed and `josh init` has run: [getting-started.md](./getting-started.md) for `static`, [package.md](./package.md) for `node`.
+- kit is installed and `josh init` has run: [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
 - Use a **practice repository** on GitHub that you are happy to experiment in, with `gh` installed and signed in (`gh auth login`).
 - An agent that reads the repository's `CLAUDE.md`, such as Claude Code, is open in the repository.
 - Optional: Telegram notifications, so a stopped run reaches you off-screen — [Set up notifications](./how-to/set-up-notifications.md).
@@ -67,7 +67,7 @@ The agent runs every opted-in Issue in dependency order, each one from implement
 
 ## Separately: pull in kit's updates with `josh sync`
 
-Not part of the loop above. After upgrading `@joshuafolkken/kit`, run `pnpm josh sync` to refresh the rules and files kit manages. [Update kit](./how-to/update-kit.md) has the steps, and [sync.md](./sync.md) lists what it overwrites.
+Not part of the loop above. After upgrading `@joshuafolkken/kit` in a `full` project, run `pnpm josh sync` to refresh the rules and files kit manages; a `basic` project needs only the upgrade. [Update kit](./how-to/update-kit.md) has the steps, and [sync.md](./sync.md) lists what it overwrites.
 
 ## Where next
 

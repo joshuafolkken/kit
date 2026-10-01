@@ -15,11 +15,11 @@ import { execaSync } from 'execa'
 import { z } from 'zod'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
+import { init_basic } from './init-basic'
 import { init_bootstrap } from './init-bootstrap'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
-import { init_static } from './init-static'
 import { plugin_install_hint_module } from './plugin-install-hint'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 
@@ -30,7 +30,7 @@ const SAMPLE_INDENT_WIDTH = 4
 const ARGUMENT_START_INDEX = 2
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
-const INIT_USAGE = 'josh init [--profile static|node] [--no-install]'
+const INIT_USAGE = 'josh init [--profile basic|full] [--no-install]'
 
 function write_new_file(action: FileAction, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -44,22 +44,27 @@ function show_sample(action: FileAction): void {
 	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
 }
 
+function report_unchanged(action: FileAction): void {
+	if (action.should_show_sample_when_unchanged === true) show_sample(action)
+	else console.info(`  ✔ unchanged ${action.dest}`)
+}
+
 function merge_existing_file(
 	merge_function: (existing: string) => string,
 	destination_path: string,
-	destination: string,
+	action: FileAction,
 ): void {
 	const existing = readFileSync(destination_path, 'utf8')
 	const merged = merge_function(existing)
 
 	if (merged === existing) {
-		console.info(`  ✔ unchanged ${destination}`)
+		report_unchanged(action)
 
 		return
 	}
 
 	writeFileSync(destination_path, merged)
-	console.info(`  ✔ updated   ${destination}`)
+	console.info(`  ✔ updated   ${action.dest}`)
 }
 
 function execute_file_action(action: FileAction): void {
@@ -78,7 +83,7 @@ function execute_file_action(action: FileAction): void {
 		return
 	}
 
-	merge_existing_file(action.merge, destination_path, action.dest)
+	merge_existing_file(action.merge, destination_path, action)
 }
 
 const engine_pin_schema = z.looseObject({ name: z.string(), version: z.string() })
@@ -181,7 +186,7 @@ function apply_package_json_merges(content: string, has_git = true): string {
 	return package_manager_version.align_development_engines_version(sorted)
 }
 
-function get_static_versions(): { kit: string; prettier: string } {
+function get_basic_versions(): { kit: string; prettier: string } {
 	const manifest = z
 		.object({
 			version: z.string(),
@@ -195,11 +200,11 @@ function get_static_versions(): { kit: string; prettier: string } {
 }
 
 function merged_manifest(existing: string, shape: ProjectShape): string {
-	if (shape.profile === 'static') {
-		return init_static.merge_static_manifest(existing, shape, get_static_versions())
+	if (shape.profile === 'basic') {
+		return init_basic.merge_basic_manifest(existing, shape, get_basic_versions())
 	}
 
-	return init_static.with_recorded_profile(
+	return init_basic.with_recorded_profile(
 		apply_package_json_merges(existing, shape.has_git),
 		shape.profile,
 	)
@@ -210,7 +215,7 @@ function merge_project_package_json(shape: ProjectShape): void {
 	const is_existing = existsSync(package_json_path)
 	const existing = is_existing
 		? readFileSync(package_json_path, 'utf8')
-		: init_static.initial_manifest()
+		: init_basic.initial_manifest()
 	const merged = merged_manifest(existing, shape)
 
 	if (is_existing && merged === existing) {
@@ -246,7 +251,7 @@ function run_config_file_actions(shape: ProjectShape): void {
 	console.info('Config files:')
 
 	if (
-		shape.profile === 'node' &&
+		shape.profile === 'full' &&
 		sync.migrate_prettierrc(path.join(PROJECT_ROOT, PRETTIER_CONFIG_JS))
 	) {
 		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
@@ -286,7 +291,7 @@ function run_ai_file_actions(shape: ProjectShape): void {
 
 	if (shape.has_github) report_repository_settings(name_with_owner)
 
-	if (shape.profile === 'node') plugin_install_hint_module.report_plugin_install_hint()
+	if (shape.profile === 'full') plugin_install_hint_module.report_plugin_install_hint()
 }
 
 function initialize_project(shape: ProjectShape): void {
@@ -298,14 +303,14 @@ function initialize_project(shape: ProjectShape): void {
 	merge_project_package_json(shape)
 
 	run_ai_file_actions(shape)
-	if (shape.profile === 'node') project_config.sync_project_config(PROJECT_ROOT)
+	if (shape.profile === 'full') project_config.sync_project_config(PROJECT_ROOT)
 }
 
 // A tool `init` just listed is absent until the user installs it — and `josh lint` then fails on it
 // rather than skipping it (joshuafolkken/kit#2709). Saying so is what tells the user the next step.
 function report_manual_install(shape: ProjectShape): void {
 	console.info(`\nDependencies:\n  ${INSTALL_HINT}`)
-	if (shape.has_git && shape.profile === 'node') install_lefthook()
+	if (shape.has_git && shape.profile === 'full') install_lefthook()
 }
 
 // The install runs the `prepare` script, which installs the git hooks. A failure is thrown rather

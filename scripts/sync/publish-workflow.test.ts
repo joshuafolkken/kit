@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 const WORKFLOW_PATH = '.github/workflows/publish.yml'
-const PACKAGE_GUIDE = 'docs/package.md'
+const PACKAGE_GUIDE = 'docs/setup/full.md'
+const CLI_GUIDE = 'docs/cli.md'
+const DOCTOR_FIX = 'josh doctor --fix'
 const PACKAGE_API_REFERENCE = 'docs/package-api.md'
 const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
@@ -213,7 +215,7 @@ describe('installation guidance', () => {
 		expect(content).toContain('gh CLI](https://cli.github.com/) for `josh version`')
 	})
 
-	it.each(['docs/cli.md', PACKAGE_GUIDE])(
+	it.each([CLI_GUIDE, PACKAGE_GUIDE])(
 		'uses public npm as the primary installation route in %s',
 		(filename: string) => {
 			const content = readFileSync(filename, 'utf8')
@@ -236,10 +238,14 @@ describe('installation guidance', () => {
 		expect(content).toContain('GitHub Packages versions API')
 	})
 
-	it('keeps the troubleshooting link on the renamed migration section', () => {
+	it('keeps the migration steps in troubleshooting, linked from the CLI guide', () => {
 		const content = readFileSync(TROUBLESHOOTING_GUIDE, 'utf8')
 
-		expect(content).toContain('./cli.md#3-migrating-from-older-versions')
+		const cli_guide = readFileSync(CLI_GUIDE, 'utf8')
+
+		expect(cli_guide).toContain(DOCTOR_FIX)
+		expect(cli_guide).toContain('./troubleshooting.md#stale-')
+		expect(content).toContain(DOCTOR_FIX)
 		expect(content).toContain('kit CI template writes a GitHub Packages credential placeholder')
 	})
 })

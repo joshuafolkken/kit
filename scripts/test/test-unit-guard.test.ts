@@ -106,7 +106,7 @@ describe('test_unit_guard.resolve_guard_action', () => {
 		expect(test_unit_guard.resolve_guard_action(true, true)).toBe('run')
 	})
 
-	it('skips zero tests in a static project even if vitest is installed', () => {
+	it('skips zero tests in a basic project even if vitest is installed', () => {
 		expect(test_unit_guard.resolve_guard_action(true, false, true)).toBe('skip-no-tests')
 	})
 })
@@ -190,7 +190,7 @@ describe('test_unit_guard.run_guarded_unit — the non-running paths', () => {
 	})
 })
 
-describe('static project without unit tests', () => {
+describe('basic project without unit tests', () => {
 	it('reports a skipped check even if vitest is installed', async () => {
 		add_vitest_package()
 		writeFileSync(path.join(ctx.project_directory, PACKAGE_JSON), '{"josh":{"profile":"static"}}')

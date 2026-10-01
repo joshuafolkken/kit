@@ -27,7 +27,7 @@ const TEST_SUFFIXES: ReadonlyArray<string> = ['.e2e.ts', '.test.ts']
 const EXEMPT_PATHS: ReadonlyArray<string> = ['.editorconfig']
 const EXEMPT_PREFIXES: ReadonlyArray<string> = ['.idea/', '.vscode/', 'prompts/']
 const EXEMPT_SUFFIXES: ReadonlyArray<string> = ['.md']
-const STATIC_VISUAL_SUFFIXES: ReadonlyArray<string> = ['.html', '.css']
+const BASIC_VISUAL_SUFFIXES: ReadonlyArray<string> = ['.html', '.css']
 
 function normalize(paths: ReadonlyArray<string>): Array<string> {
 	return paths.map((path) => path.trim()).filter((path) => path !== '')
@@ -37,12 +37,12 @@ function is_test_file(path: string): boolean {
 	return TEST_SUFFIXES.some((suffix) => path.endsWith(suffix))
 }
 
-function is_static_visual(path: string, is_static: boolean): boolean {
-	return is_static && STATIC_VISUAL_SUFFIXES.some((suffix) => path.endsWith(suffix))
+function is_basic_visual(path: string, is_basic: boolean): boolean {
+	return is_basic && BASIC_VISUAL_SUFFIXES.some((suffix) => path.endsWith(suffix))
 }
 
-function is_exempt(path: string, is_static = false): boolean {
-	if (EXEMPT_PATHS.includes(path) || is_static_visual(path, is_static)) return true
+function is_exempt(path: string, is_basic = false): boolean {
+	if (EXEMPT_PATHS.includes(path) || is_basic_visual(path, is_basic)) return true
 
 	return (
 		EXEMPT_SUFFIXES.some((suffix) => path.endsWith(suffix)) ||
@@ -52,31 +52,31 @@ function is_exempt(path: string, is_static = false): boolean {
 
 // A runtime file is one that is neither a test nor exempt. Its presence with no test file beside it is
 // the whole of what `required` reports.
-function is_runtime(path: string, is_static = false): boolean {
-	return !is_test_file(path) && !is_exempt(path, is_static)
+function is_runtime(path: string, is_basic = false): boolean {
+	return !is_test_file(path) && !is_exempt(path, is_basic)
 }
 
 // **A test file changed → `satisfied`, whatever else did.** A runtime file with no test beside it →
 // `required`. Everything left — an all-exempt change, and the empty diff — is `exempt`, because there
 // is no runtime file the change failed to test.
-function verdict_for(paths: ReadonlyArray<string>, is_static = false): Verdict {
+function verdict_for(paths: ReadonlyArray<string>, is_basic = false): Verdict {
 	const changed = normalize(paths)
 
 	if (changed.some((path) => is_test_file(path))) return 'satisfied'
-	if (changed.some((path) => is_runtime(path, is_static))) return 'required'
+	if (changed.some((path) => is_runtime(path, is_basic))) return 'required'
 
 	return 'exempt'
 }
 
 // The runtime files with no test beside them — the `required` detail line, so the answer says which
 // files it is about rather than only that it refused.
-function runtime_files(paths: ReadonlyArray<string>, is_static = false): Array<string> {
-	return normalize(paths).filter((path) => is_runtime(path, is_static))
+function runtime_files(paths: ReadonlyArray<string>, is_basic = false): Array<string> {
+	return normalize(paths).filter((path) => is_runtime(path, is_basic))
 }
 
 // The paths that made the change exempt — the `exempt` detail line.
-function exempt_files(paths: ReadonlyArray<string>, is_static = false): Array<string> {
-	return normalize(paths).filter((path) => is_exempt(path, is_static))
+function exempt_files(paths: ReadonlyArray<string>, is_basic = false): Array<string> {
+	return normalize(paths).filter((path) => is_exempt(path, is_basic))
 }
 
 const test_declared_logic = {

@@ -60,8 +60,8 @@ afterEach(() => {
 })
 
 describe('josh format', () => {
-	it('skips ESLint with a reason and exits 0 on a static project without it', async () => {
-		const root = write_project({ josh: { profile: 'static' } })
+	it('skips ESLint with a reason and exits 0 on a basic project without it', async () => {
+		const root = write_project({ josh: { profile: 'basic' } })
 
 		install_prettier(root)
 		expect(await format.run_format(root)).toBe(0)
@@ -69,15 +69,15 @@ describe('josh format', () => {
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('josh eslint:'))
 	})
 
-	it('runs prettier and then eslint --fix on a node project', async () => {
-		const root = write_project({ josh: { profile: 'node' } })
+	it('runs prettier and then eslint --fix on a full project', async () => {
+		const root = write_project({ josh: { profile: 'full' } })
 
 		expect(await format.run_format(root)).toBe(0)
 		expect(invoked_tools()).toEqual(['prettier', 'eslint'])
 	})
 
 	it('stops at a prettier failure without running eslint', async () => {
-		const root = write_project({ josh: { profile: 'node' } })
+		const root = write_project({ josh: { profile: 'full' } })
 
 		mocked_execa.mockResolvedValueOnce(fake_result(PRETTIER_FAILURE_EXIT_CODE))
 
@@ -86,7 +86,7 @@ describe('josh format', () => {
 	})
 
 	it('refuses extra arguments instead of formatting the whole tree', async () => {
-		const root = write_project({ josh: { profile: 'node' } })
+		const root = write_project({ josh: { profile: 'full' } })
 		const stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		expect(await format.run(['src/app.ts'], root)).toBe(1)
@@ -95,7 +95,7 @@ describe('josh format', () => {
 	})
 
 	it('formats when no extra argument is given', async () => {
-		const root = write_project({ josh: { profile: 'node' } })
+		const root = write_project({ josh: { profile: 'full' } })
 
 		expect(await format.run([], root)).toBe(0)
 		expect(invoked_tools()).toEqual(['prettier', 'eslint'])
@@ -103,8 +103,8 @@ describe('josh format', () => {
 })
 
 describe('josh format without Web files', () => {
-	it('skips Prettier with a reason and exits 0 on a static Python project', async () => {
-		const root = write_project({ josh: { profile: 'static' } }, PYTHON_FILES)
+	it('skips Prettier with a reason and exits 0 on a basic Python project', async () => {
+		const root = write_project({ josh: { profile: 'basic' } }, PYTHON_FILES)
 
 		expect(await format.run_format(root)).toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()

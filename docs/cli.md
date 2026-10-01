@@ -26,36 +26,15 @@ josh help
 
 ## 2. If `josh` isn't found
 
-The pnpm global bin directory isn't on your `PATH` yet:
-
-```bash
-pnpm setup
-exec $SHELL
-which josh   # should now print a path
-```
-
-If `which josh` is still empty, open a new terminal so the updated `PATH` takes effect. You can print the directory to add manually with `pnpm bin -g`.
+The pnpm global bin directory isn't on your `PATH` yet. Run `pnpm setup`, then open a new terminal; the full steps are in [troubleshooting.md](./troubleshooting.md#josh-command-not-found-after-pnpm-add--g).
 
 ## 3. Migrating from older versions
 
-Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/josh` via `postinstall`. That shim is no longer created and can break when its origin project's `node_modules` is removed (e.g. `…/node_modules/.bin/tsx: No such file or directory`), or it can shadow the pnpm-global `josh` on `PATH`. The fastest fix is the built-in self-healing command, which detects the stale shim and removes it for you:
-
-```bash
-josh doctor --fix
-```
-
-Equivalently, remove it by hand and rely on the global install:
-
-```bash
-rm -f ~/.local/bin/josh
-pnpm add -g @joshuafolkken/kit
-```
-
-If the shim keeps coming back, a project pinned `< 0.200.0` is regenerating it on every `pnpm install` — upgrade that project (`pnpm add -D @joshuafolkken/kit@latest`). See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor).
+Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/josh` that can break or shadow the global `josh`. `josh doctor --fix` removes it; the details are in [troubleshooting.md](./troubleshooting.md#stale-localbinjosh-shim-from-an-old-version).
 
 ## Next
 
 - Set up a project: `josh init` is the main entry and needs no Git; `josh start` is the optional entry that also creates the GitHub repository for the Issue workflow — see [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start).
 - Full command reference: [josh-commands.md](./josh-commands.md).
-- Using the kit inside a project too? See [package.md](./package.md).
+- Using the kit inside a project too? See [Set up the full profile](./setup/full.md).
 - Hitting an error? See [troubleshooting.md](./troubleshooting.md).

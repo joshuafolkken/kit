@@ -11,8 +11,10 @@ vi.mock('execa', () => ({ execaSync: vi.fn() }))
 const mocked_execa = vi.mocked(execaSync)
 const KIT_DIR = fileURLToPath(new URL('../../', import.meta.url))
 const KIT_ADD = 'pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit'
+// The project's kit may predate joshuafolkken/kit#2829, so the hand-off spells the profile the way
+// every kit reads it.
 const HANDOFF = 'pnpm exec josh init --profile static'
-const PROFILE_ARGS = ['--profile', 'static']
+const PROFILE_ARGS = ['--profile', 'basic']
 const PACKAGE_JSON = 'package.json'
 const fixture = { root: '' }
 

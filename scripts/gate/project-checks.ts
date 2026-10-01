@@ -1,6 +1,7 @@
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
+import { project_profile } from '#scripts/init/project-profile'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { z } from 'zod'
 
@@ -74,11 +75,11 @@ function josh_settings(manifest: unknown): unknown {
 	return manifest.josh
 }
 
-function is_static_manifest(manifest: unknown): boolean {
+function is_basic_manifest(manifest: unknown): boolean {
 	const josh = josh_settings(manifest)
 	if (typeof josh !== 'object' || josh === null || !('profile' in josh)) return false
 
-	return josh.profile === 'static'
+	return project_profile.parse_profile(josh.profile) === 'basic'
 }
 
 function read_manifest(directory: string): unknown {
@@ -91,8 +92,8 @@ function read_manifest(directory: string): unknown {
 	}
 }
 
-function is_static(directory: string): boolean {
-	return is_static_manifest(read_manifest(directory))
+function is_basic(directory: string): boolean {
+	return is_basic_manifest(read_manifest(directory))
 }
 
 function is_declared(directory: string, package_name: string): boolean {
@@ -124,30 +125,30 @@ function skip_notice(check: string, reason: string): string {
 	return `josh ${check}: ${reason} ${SKIP_MARKER} ${check}.`
 }
 
-// Shared by `josh check` and the gate's type-check step, so neither reaches `tsc` on a static
+// Shared by `josh check` and the gate's type-check step, so neither reaches `tsc` on a basic
 // project that has nothing to type-check (joshuafolkken/kit#2709).
 function type_check_skip_reason(directory: string): string | undefined {
-	if (!is_static(directory)) return undefined
+	if (!is_basic(directory)) return undefined
 	if (!has_files(directory, TYPE_FILES)) return 'no TypeScript files were found'
 	if (!has_config(directory, TYPE_CONFIGS)) return 'no TypeScript configuration was found'
 
 	return missing_tool_reason(directory, 'typescript', 'tsc')
 }
 
-// Shared by `josh lint`, `josh lint:related` and `josh format`, so a static project without Web
+// Shared by `josh lint`, `josh lint:related` and `josh format`, so a basic project without Web
 // files — a Python or Rust project, which `josh init` gives no Prettier — is skipped for the same
 // reason by all three (joshuafolkken/kit#2606, joshuafolkken/kit#2709).
 function prettier_skip_reason(directory: string): string | undefined {
-	if (!is_static(directory)) return undefined
+	if (!is_basic(directory)) return undefined
 	if (!has_files(directory, WEB_FILES)) return 'no HTML, CSS or JavaScript files were found'
 
 	return missing_tool_reason(directory, 'prettier', 'prettier')
 }
 
-// Shared by `josh lint`, `josh lint:related` and `josh format`, so a static project without ESLint
+// Shared by `josh lint`, `josh lint:related` and `josh format`, so a basic project without ESLint
 // is skipped for the same reason by all three (joshuafolkken/kit#2693, joshuafolkken/kit#2709).
 function eslint_skip_reason(directory: string): string | undefined {
-	if (!is_static(directory)) return undefined
+	if (!is_basic(directory)) return undefined
 	if (!has_files(directory, SCRIPT_FILES)) return 'no JavaScript or TypeScript files were found'
 	if (!has_config(directory, ESLINT_CONFIGS)) return 'no ESLint configuration was found'
 
@@ -165,7 +166,7 @@ const project_checks = {
 	has_bin,
 	has_config,
 	has_files,
-	is_static,
+	is_basic,
 	prettier_skip_reason,
 	project_root,
 	skip_notice,

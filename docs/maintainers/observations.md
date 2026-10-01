@@ -637,3 +637,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
 - rf:bug-risks | low | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
 - rf:bug-risks | medium | scripts/git/git-push-transport.ts | 2026-09-30 | #2801
+- rf:comments | low | scripts/build/build-claude-md.ts | 2026-10-01 | #2826
+- rf:comments | low | scripts/lint/lint-parallel.ts | 2026-10-01 | #2826
+- rf:comments | low | scripts/init/init-ai-copy.ts | 2026-10-01 | #2826

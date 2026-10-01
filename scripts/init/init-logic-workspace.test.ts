@@ -140,15 +140,15 @@ describe('init_logic_workspace.merge_workspace_yaml — pnpm build placeholders'
 	})
 })
 
-// joshuafolkken/kit#2785: in a static project `pnpm add` also leaves unrs-resolver's placeholder,
-// pulled in by kit's optional ESLint import peers, and the static template did not answer it.
-describe('init_logic_workspace.merge_workspace_yaml — static template build approvals', () => {
-	const STATIC_TEMPLATE = readFileSync('templates/pnpm-workspace.static.yaml', 'utf8')
+// joshuafolkken/kit#2785: in a basic project `pnpm add` also leaves unrs-resolver's placeholder,
+// pulled in by kit's optional ESLint import peers, and the basic template did not answer it.
+describe('init_logic_workspace.merge_workspace_yaml — basic template build approvals', () => {
+	const BASIC_TEMPLATE = readFileSync('templates/pnpm-workspace.basic.yaml', 'utf8')
 	const AFTER_PNPM_ADD =
 		'allowBuilds:\n  esbuild: true\n  unrs-resolver: set this to true or false\n'
 
-	it('answers every placeholder pnpm add leaves in a static project', () => {
-		const result = init_logic_workspace.merge_workspace_yaml(AFTER_PNPM_ADD, STATIC_TEMPLATE)
+	it('answers every placeholder pnpm add leaves in a basic project', () => {
+		const result = init_logic_workspace.merge_workspace_yaml(AFTER_PNPM_ADD, BASIC_TEMPLATE)
 
 		expect(result).toContain('unrs-resolver: true')
 		expect(result).not.toContain('set this to true or false')

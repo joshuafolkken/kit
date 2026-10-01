@@ -10,7 +10,7 @@ function is_record(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-interface StaticVersions {
+interface BasicVersions {
 	kit: string
 	prettier: string
 }
@@ -30,10 +30,10 @@ function with_recorded_profile(content: string, profile: ProjectShape['profile']
 	return json_format.format_json(manifest)
 }
 
-function merge_static_manifest(
+function merge_basic_manifest(
 	content: string,
 	shape: ProjectShape,
-	versions: StaticVersions,
+	versions: BasicVersions,
 ): string {
 	const with_profile = with_recorded_profile(content, shape.profile)
 	const with_script = init_logic.merge_package_scripts(with_profile, {
@@ -50,6 +50,6 @@ function merge_static_manifest(
 	return init_logic.sort_package_json_keys(with_prettier)
 }
 
-const init_static = { initial_manifest, with_recorded_profile, merge_static_manifest }
-export { init_static }
-export type { StaticVersions }
+const init_basic = { initial_manifest, with_recorded_profile, merge_basic_manifest }
+export { init_basic }
+export type { BasicVersions }

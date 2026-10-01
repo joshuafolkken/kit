@@ -4,9 +4,9 @@ For anyone deciding whether kit fits their project: what it sets up for each pro
 
 ## What it provides
 
-`josh init` picks a profile from the project ([init.md](./init.md#project-profiles) has the rules): `static` for a project without Node tooling (an `index.html` site, or Python, Rust and other languages), `node` for a JavaScript / TypeScript project with npm dependencies.
+`josh init` picks a profile from the project ([init.md](./init.md#project-profiles) has the rules): `basic` for a project without Node tooling (an `index.html` site, or Python, Rust and other languages), `full` for a JavaScript / TypeScript project with npm dependencies.
 
-| Area           | Tool                     | `static`                                                                          | `node`                                             |
+| Area           | Tool                     | `basic`                                                                           | `full`                                             |
 | -------------- | ------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------- |
 | AI assistants  | Claude / Gemini / Cursor | Short `CLAUDE.md` rules, `AGENTS.md` / `GEMINI.md` pointing at it, `.cursorrules` | The full rules in the same files                   |
 | Editor         | VS Code                  | Extension recommendations; save formatting when HTML, CSS or JS files exist       | Extension recommendations and workspace settings   |
@@ -20,13 +20,13 @@ For anyone deciding whether kit fits their project: what it sets up for each pro
 | CI/CD          | GitHub Actions           | No workflows; PR template and release-notes config when a GitHub origin exists    | Workflow templates for CI, tagging, and SonarQube  |
 | Security       | SonarQube + `pnpm audit` | —                                                                                 | `sonar-project.properties` template + audit script |
 
-In a `static` project, `josh gate`, `josh lint` and the other checks skip each tool that has nothing to run and print the reason. kit ships no linter or test runner for languages other than JavaScript and TypeScript.
+In a `basic` project, `josh gate`, `josh lint` and the other checks skip each tool that has nothing to run and print the reason. kit ships no linter or test runner for languages other than JavaScript and TypeScript.
 
 ## How it works
 
-1. **Install** — [getting-started.md](./getting-started.md) for `static`, [package.md](./package.md) for `node`.
-2. **Init** — run `josh init` once. It creates or merges the config files for the profile, copies AI files, and on `node` adds recommended `package.json` scripts and installs git hooks.
-3. **Sync** — run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files.
+1. **Install** — [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
+2. **Init** — run `josh init` once. It creates or merges the config files for the profile, copies AI files and adds the profile's `package.json` scripts and development dependencies, then runs `pnpm install` (which installs the Git hooks in a `full` project with Git) and `josh format`.
+3. **Sync** — in a `full` project, run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files. A `basic` project only upgrades the package ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
 4. **josh CLI** — a single `josh` binary (available as `pnpm josh` after init) gives you git workflow helpers, version management, security auditing, and more.
 
 To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md). To find the steps for a task — updating kit or dependencies, releasing, running Issues — start at [how-to.md](./how-to.md). The full list of guides is in the [README](../README.md#documentation).

@@ -112,5 +112,5 @@ Unlike (b) and (c), this needs no build step of your own, so it also works on a 
 ## Next
 
 - Installing the global CLI? Return to [cli.md §1](./cli.md#1-install-globally).
-- Adding the kit to an existing project? Return to [package.md §1](./package.md#1-install).
+- Adding the kit to an existing project? Return to [Set up the full profile](./setup/full.md).
 - Hitting `401`/`403` or `ERR_PNPM_FETCH`? See [troubleshooting.md](./troubleshooting.md).

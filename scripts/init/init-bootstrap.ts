@@ -3,13 +3,14 @@ import path from 'node:path'
 import { z } from 'zod'
 import { init_install, type InstallStep } from './init-install'
 import { init_logic_workspace } from './init-logic-workspace'
+import { project_profile } from './project-profile'
 
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
-// The static template lists exactly the build scripts kit's own dependency tree carries, which is
+// The basic template lists exactly the build scripts kit's own dependency tree carries, which is
 // what installing kit alone needs approved (joshuafolkken/kit#2785).
-const KIT_BUILDS_TEMPLATE = 'templates/pnpm-workspace.static.yaml'
+const KIT_BUILDS_TEMPLATE = 'templates/pnpm-workspace.basic.yaml'
 const HANDOFF_FAILURE = 'josh init from the project-installed kit failed — see the output above'
 // Set on the handed-off run, so a kit that still does not find itself installed in the project — pnpm
 // put it somewhere else — stops instead of installing and handing off again without end.
@@ -62,7 +63,7 @@ function kit_install_step(has_kit: boolean, template: string): InstallStep {
 }
 
 function handoff_step(args: ReadonlyArray<string>): InstallStep {
-	const handoff_args = ['exec', 'josh', 'init', ...args]
+	const handoff_args = ['exec', 'josh', 'init', ...project_profile.with_legacy_profile_names(args)]
 
 	return {
 		label: `pnpm ${handoff_args.join(' ')}`,
