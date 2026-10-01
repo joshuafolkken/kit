@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
 const { REVIEWER, SCHEDULER, WORKER } = agent_role_profile
-const OPENAI_MODEL = 'gpt-6-sol'
+const OPENAI_MODEL = 'gpt-6.1-sol'
 const ANTHROPIC_MODEL = 'claude-opus-5-5'
 const ANTHROPIC_ENV = { CLAUDE_CODE_SESSION_ID: 'claude-session' }
 const OPENAI_ENV = { CODEX_THREAD_ID: 'codex-thread' }

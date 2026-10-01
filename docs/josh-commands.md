@@ -2032,13 +2032,14 @@ put. The printed PID is the supervisor's.
 Blank means unset. The inherited agent session identifier selects the provider; a missing or
 conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
 refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
-defaults to `gpt-6-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
+defaults to `gpt-6.1-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
 drops to `low` only in the pre-gate phase, on either provider.
 
 The defaults are pinned model ids rather than an alias such as `opus`, so a run log names the exact
 model and a model migration can be measured at unchanged effort. Before launch the selected CLI's
 version is checked against the model it will run: `claude-opus-5-5` needs Claude Code 2.1.280 or later
-(`claude update`), and `gpt-6-sol` needs Codex CLI 0.155.0 or later
+(`claude update`), `gpt-6.1-sol` needs Codex CLI 0.159.1 or later, and a lane recorded with
+`gpt-6-sol` still needs Codex CLI 0.155.0 or later
 (`npm install -g @openai/codex@latest`). A CLI below the floor, or one whose version cannot be read,
 refuses launch with that update named — never a quiet switch to an older model. A lane keeps the
 profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on
