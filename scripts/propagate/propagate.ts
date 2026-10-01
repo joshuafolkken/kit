@@ -11,8 +11,9 @@ import { version_targets } from '#scripts/version/version-targets'
 import { propagate_git } from './propagate-git'
 import { propagate_publish } from './propagate-publish'
 import { propagate_run } from './propagate-run'
+import { propagate_select, type TargetSelection } from './propagate-select'
 import { propagate_steps } from './propagate-steps'
-import { propagate_targets } from './propagate-targets'
+import { propagate_targets, type PropagateTarget } from './propagate-targets'
 
 // `josh propagate` — carry the release this repository just published into every consumer checked
 // out next to it (joshuafolkken/kit#863).
@@ -22,25 +23,56 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const SKIP_PUBLISH_FLAG = '--skip-publish-wait'
 const DRY_RUN_FLAG = '--dry-run'
+const TARGET_FLAG = '--target'
 const KNOWN_FLAGS: ReadonlyArray<string> = [SKIP_PUBLISH_FLAG, DRY_RUN_FLAG]
+// Shown in the usage line only. `--target` carries a value, so it is taken out of argv before the
+// flag-only refusal runs, and this entry never has to match an argument.
+const TARGET_USAGE = `${TARGET_FLAG} <repo>`
 const DRY_RUN_REASON = 'would be propagated'
+const UNTOUCHED_NOTE = 'No consumer was touched.'
 
 interface RunOptions {
 	is_dry_run: boolean
 	is_publish_wait_skipped: boolean
+	// The one consumer to propagate to, when `--target` narrowed the run (joshuafolkken/kit#2755).
+	target?: string
 	// The usage message, when the arguments were not accepted. Carried alongside rather than returned
 	// instead, so the caller has one shape to branch on.
 	usage?: string
 }
 
+interface TargetArgument {
+	rest: Array<string>
+	target?: string
+	usage?: string
+}
+
+// Take `--target <repo>` out of argv. A second `--target` stays in `rest`, where the flag-only
+// refusal rejects it rather than letting one of the two names win silently.
+function split_target(argv: ReadonlyArray<string>): TargetArgument {
+	const index = argv.indexOf(TARGET_FLAG)
+	if (index === -1) return { rest: [...argv] }
+	const target = argv[index + 1]
+	const rest = argv.filter((_, position) => position !== index && position !== index + 1)
+
+	if (target === undefined || target.startsWith('-')) {
+		return { rest, usage: `${TARGET_FLAG} needs a repository name, e.g. ${TARGET_FLAG} app-kit` }
+	}
+
+	return { rest, target }
+}
+
 // Reject anything not on the list rather than ignoring it. `--dryrun` silently falling through to
 // the real write path is the mistake this refusal exists to prevent.
 function parse_options(argv: ReadonlyArray<string>): RunOptions {
+	const { rest, target, usage: target_usage } = split_target(argv)
 	const options: RunOptions = {
-		is_dry_run: argv.includes(DRY_RUN_FLAG),
-		is_publish_wait_skipped: argv.includes(SKIP_PUBLISH_FLAG),
+		is_dry_run: rest.includes(DRY_RUN_FLAG),
+		is_publish_wait_skipped: rest.includes(SKIP_PUBLISH_FLAG),
+		...(target !== undefined && { target }),
 	}
-	const usage = refuse_unknown_flags(argv, KNOWN_FLAGS, 'propagate')
+	const usage =
+		target_usage ?? refuse_unknown_flags(rest, [...KNOWN_FLAGS, TARGET_USAGE], 'propagate')
 
 	return usage === undefined ? options : { ...options, usage }
 }
@@ -126,15 +158,57 @@ async function await_publish(target_version: string, is_skipped: boolean): Promi
 	console.error(
 		`${status_icons.FAIL_ICON} ${target_version} did not become available: ${result.state}.`,
 	)
-	console.error('No consumer was touched.')
+	console.error(UNTOUCHED_NOTE)
 
 	return false
 }
 
-// Everything after the publish wait: resolve the consumers, run each one, print one report.
-function propagate_to_consumers(version: string, is_dry_run: boolean): number {
+// Print whatever the version resolution had to say, and hand back the version when there is one.
+function announce_run_version(resolved: RunVersion): string | undefined {
+	if (resolved.version === undefined) {
+		console.error(resolved.refusal ?? 'Nothing to propagate.')
+
+		return undefined
+	}
+
+	if (resolved.warning !== undefined) console.info(resolved.warning)
+
+	return resolved.version
+}
+
+interface RunPlan {
+	version: string
+	targets: ReadonlyArray<PropagateTarget>
+}
+
+// The consumers this run will consider, narrowed by `--target`. Resolved before the publish wait so
+// a mistyped name fails at once instead of after minutes of polling the registry.
+function resolve_run_targets(version: string, target: string | undefined): TargetSelection {
 	const map = repo_discovery.discover_repositories(PROJECT_ROOT)
 	const targets = propagate_targets.resolve_targets(map, KIT_PACKAGE_NAME, version)
+
+	return propagate_select.select_target(targets, target)
+}
+
+// The version and the consumers, or nothing once whatever stopped the run has been printed.
+function plan_run(options: RunOptions): RunPlan | undefined {
+	const version = announce_run_version(resolve_run_version(PROJECT_ROOT, options.is_dry_run))
+	if (version === undefined) return undefined
+	const selection = resolve_run_targets(version, options.target)
+
+	if (selection.refusal !== undefined) {
+		console.error(selection.refusal)
+		console.error(UNTOUCHED_NOTE)
+
+		return undefined
+	}
+
+	return { version, targets: selection.targets }
+}
+
+// Everything after the publish wait: run each consumer, print one report.
+function propagate_to_consumers(plan: RunPlan, is_dry_run: boolean): number {
+	const { version, targets } = plan
 	const step = is_dry_run
 		? propagate_steps.describe_step
 		: propagate_steps.create_step_runner({
@@ -165,19 +239,6 @@ async function resolve_publish(version: string, options: RunOptions): Promise<bo
 	return await await_publish(version, options.is_dry_run || options.is_publish_wait_skipped)
 }
 
-// Print whatever the version resolution had to say, and hand back the version when there is one.
-function announce_run_version(resolved: RunVersion): string | undefined {
-	if (resolved.version === undefined) {
-		console.error(resolved.refusal ?? 'Nothing to propagate.')
-
-		return undefined
-	}
-
-	if (resolved.warning !== undefined) console.info(resolved.warning)
-
-	return resolved.version
-}
-
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const options = parse_options(argv)
 
@@ -187,11 +248,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const version = announce_run_version(resolve_run_version(PROJECT_ROOT, options.is_dry_run))
-	if (version === undefined) return FAILURE_EXIT_CODE
-	if (!(await resolve_publish(version, options))) return FAILURE_EXIT_CODE
+	const plan = plan_run(options)
+	if (plan === undefined) return FAILURE_EXIT_CODE
+	if (!(await resolve_publish(plan.version, options))) return FAILURE_EXIT_CODE
 
-	return propagate_to_consumers(version, options.is_dry_run)
+	return propagate_to_consumers(plan, options.is_dry_run)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -201,6 +262,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const propagate = {
 	DRY_RUN_REASON,
 	KNOWN_FLAGS,
+	TARGET_FLAG,
 	parse_options,
 	refuse_outside_source_repository,
 	resolve_target_version,

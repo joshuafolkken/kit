@@ -11,6 +11,7 @@ const APP_KIT = '@joshuafolkken/app-kit'
 const REFUSAL = 'Refusing to propagate'
 const MISSPELLED_FLAG = '--dryrun'
 const VERSION = '1.111.0'
+const MISSING_NAME = 'needs a repository'
 
 const state = { workspace: '' }
 
@@ -112,6 +113,39 @@ describe('propagate.parse_options', () => {
 		const { usage } = propagate.parse_options(['--nope'])
 
 		for (const flag of propagate.KNOWN_FLAGS) expect(usage).toContain(flag)
+		expect(usage).toContain(propagate.TARGET_FLAG)
+	})
+})
+
+describe('propagate.parse_options — --target', () => {
+	it('reads the repository name that follows the flag, beside the other flags', () => {
+		const options = propagate.parse_options(['--dry-run', propagate.TARGET_FLAG, 'app-kit'])
+
+		expect(options.usage).toBeUndefined()
+		expect(options.target).toBe('app-kit')
+		expect(options.is_dry_run).toBe(true)
+	})
+
+	it('leaves the target unset when the flag is absent', () => {
+		expect(propagate.parse_options(['--dry-run']).target).toBeUndefined()
+	})
+
+	it('refuses the flag with no repository name after it', () => {
+		expect(propagate.parse_options([propagate.TARGET_FLAG]).usage).toContain(MISSING_NAME)
+	})
+
+	// `--target --dry-run` must not treat the dry-run flag as a repository name.
+	it('refuses a flag where the repository name should be', () => {
+		const options = propagate.parse_options([propagate.TARGET_FLAG, '--dry-run'])
+
+		expect(options.usage).toContain(MISSING_NAME)
+	})
+
+	it('refuses a second --target rather than letting one name win silently', () => {
+		const flag = propagate.TARGET_FLAG
+		const options = propagate.parse_options([flag, 'app-kit', flag, 'game-kit'])
+
+		expect(options.usage).toContain('Unknown argument')
 	})
 })
 

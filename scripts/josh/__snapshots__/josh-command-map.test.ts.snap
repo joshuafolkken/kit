@@ -765,7 +765,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "propagate": [
-      "[--dry-run] [--skip-publish-wait]",
+      "[--dry-run] [--skip-publish-wait] [--target <repo>]",
       "maintainer",
       [
         "files",

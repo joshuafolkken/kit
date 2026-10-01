@@ -64,6 +64,7 @@ const SKIP_REASONS: Readonly<Record<string, string>> = {
 	not_downstream: 'does not depend on this package',
 	missing_checkout: 'no local checkout at the mapped path — reported, not cloned',
 	unreadable: 'package.json could not be read',
+	not_selected: 'not the repository --target named',
 }
 
 // The reason text for a candidate that is not going to be processed. A missing local checkout is

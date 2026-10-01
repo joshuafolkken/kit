@@ -19,8 +19,10 @@ import { z } from 'zod'
 const MANIFEST_NAME = 'package.json'
 const NODE_MODULES = 'node_modules'
 
-// Why a candidate is not going to be processed, or that it is.
-type TargetState = 'ready' | 'up_to_date' | 'not_downstream' | 'missing_checkout' | 'unreadable'
+// Why a candidate is not going to be processed, or that it is. `not_selected` is the one state set
+// after classification: a candidate `--target` left out (joshuafolkken/kit#2755).
+type TargetState =
+	'ready' | 'up_to_date' | 'not_downstream' | 'missing_checkout' | 'unreadable' | 'not_selected'
 
 interface PropagateTarget {
 	repo: string
@@ -156,5 +158,5 @@ const propagate_targets = {
 	resolve_targets,
 }
 
-export type { Manifest, PropagateTarget }
+export type { Manifest, PropagateTarget, TargetState }
 export { propagate_targets }
