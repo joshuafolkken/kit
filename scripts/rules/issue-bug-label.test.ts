@@ -121,6 +121,28 @@ describe('filing without a bug decision', () => {
 	})
 })
 
+describe('filing without issue:lint', () => {
+	it('refuses a filing when issue:lint never ran in the run', () => {
+		writeFileSync(body, BUG_BODY)
+
+		expect(
+			issue_bug_label_rule.needs_classification_labels(`${FILING} -f 'labels[]=bug'`, ''),
+		).toBe(true)
+	})
+
+	it('keeps refusing the lint-less filing after the once-per-run oracle has fired', () => {
+		writeFileSync(body, BUG_BODY)
+		const labeled = `${FILING} -f 'labels[]=bug'`
+		const payload = harness.payload_of('no-lint', labeled, 'Bash', scouted_tail())
+		const deliveries = [0, 1, 2, 3].map((offset) =>
+			rule_delivery(payload, 1_700_000_000_000 + offset),
+		)
+
+		expect(deliveries.at(-1)).toBe(issue_bug_label_rule.ROW.reason)
+		expect(issue_bug_label_rule.ROW.reason).toContain('pnpm josh issue:lint <body-file>')
+	})
+})
+
 describe('issue-bug-label delivery', () => {
 	it('refuses the unlabeled filing after lint', () => {
 		writeFileSync(body, BUG_BODY)
