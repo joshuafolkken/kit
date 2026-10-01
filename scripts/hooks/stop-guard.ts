@@ -10,6 +10,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
+import { last_prompt } from '#scripts/rules/last-prompt'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_cut } from '#scripts/run/run-cut'
 import { run_headless } from '#scripts/run/run-headless'
@@ -70,6 +71,7 @@ async function build_context(
 		tree_clean: !(await run_hold.is_tree_dirty()),
 		notified: lane_park.mentions_confirmation_notify(tail),
 		message: payload_tail.message,
+		prompt: last_prompt.prompt_text(tail),
 		stop_hook_active: payload_tail.stop_hook_active,
 		cut_pending: run_cut.carried_cut_sync() !== undefined,
 		filed: was_filed(tail),

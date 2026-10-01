@@ -1,5 +1,5 @@
 {
-	"version": "1.983.0",
+	"version": "1.998.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
 	"keywords": [
@@ -104,6 +104,10 @@
 		"./prettier": {
 			"types": "./prettier/index.d.ts",
 			"default": "./prettier/index.js"
+		},
+		"./prettier/basic": {
+			"types": "./prettier/basic.d.ts",
+			"default": "./prettier/basic.js"
 		},
 		"./prettier/static": {
 			"types": "./prettier/static.d.ts",

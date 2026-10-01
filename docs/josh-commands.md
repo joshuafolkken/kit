@@ -1,6 +1,6 @@
 # josh CLI — Command Reference
 
-The full reference for every `josh` command; look a command up here rather than reading top to bottom. Commands that need Node tooling (ESLint, `tsc`, Vitest, Playwright) skip in a `static` project and say why.
+The full reference for every `josh` command; look a command up here rather than reading top to bottom. Commands that need Node tooling (ESLint, `tsc`, Vitest, Playwright) skip in a `basic` project and say why.
 
 See also: [Command Catalog](josh-command-catalog.md) — auto-generated from the command map (command name, aliases, synopsis, audience, side effects).
 
@@ -103,7 +103,7 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh format`
 
-Format code with prettier and eslint. A `static` project skips ESLint for the reason `josh lint` prints.
+Format code with prettier and eslint. A `basic` project skips ESLint for the reason `josh lint` prints.
 
 ```bash
 pnpm josh format
@@ -343,7 +343,7 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 ### `josh check`
 
-Type-check with `tsc --noEmit`. A `static` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
+Type-check with `tsc --noEmit`. A `basic` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
 
 ```bash
 pnpm josh check
@@ -399,7 +399,7 @@ Commands for setting up and maintaining a project.
 
 ### `josh profile`
 
-Show the project profile and reason. A saved `josh.profile` takes precedence; `--profile` overrides it.
+Show the project profile and reason. A saved `josh.profile` takes precedence; `--profile` overrides it. A `basic` project also gets a `compat: profile: static (…)` line, so a `ci.yml` synced before the profiles were renamed ([#2829](https://github.com/joshuafolkken/kit/issues/2829)) still recognizes it.
 
 ```bash
 pnpm josh profile
@@ -407,11 +407,11 @@ pnpm josh profile
 
 ### `josh start`
 
-Create a new project for the GitHub Issue workflow in one command, so `kickoff new` works right after it. Use `josh init` instead for a project without GitHub or for a re-run — [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start) compares the two.
+Set a new or existing project up for the GitHub Issue workflow, so `kickoff new` works once the setup is on `main`. Use `josh init` for a project without the workflow or for a re-run — [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start) compares the two and lists the steps per starting state.
 
 ```bash
 pnpm exec josh start                                    # asks for the profile and the repository
-pnpm exec josh start --yes --github --profile static    # unattended, including the GitHub repository
+pnpm exec josh start --yes --github --profile basic    # unattended, including the GitHub repository
 ```
 
 **Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything.
@@ -420,15 +420,16 @@ pnpm exec josh start --yes --github --profile static    # unattended, including 
 
 1. `git init` on `main` — skipped when Git already exists
 2. The same setup `josh init` runs, with the confirmed profile
-3. The initial commit of every file — skipped when the repository already has commits
-4. `gh repo create <directory name> --private` (or `--public`) and push `main`
+3. The initial commit of every file — only without commits
+4. `gh repo create <directory name> --private` (or `--public`) and push `main` — only without an origin
 5. The missing workflow and release-classification labels; existing ones are left unchanged
+6. The setup pull request — only while `main` has commits but no kit: an Issue, a commit of only kit's files on its branch, and the pull request. It never merges
 
-**Options:** `--profile static|node` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults without asking, but is **not** consent to create a repository or push: without `--github` an unattended run stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
+**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
 
-**Existing state:** a directory with a GitHub origin gets only the setup and the missing labels — no commit, repository or push. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
+**Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
 
-**Output / exit codes:** exits 0 when the workflow is ready. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
+**Output / exit codes:** exits 0 when every step has run. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
 
 ### `josh init`
 
@@ -438,7 +439,7 @@ Initialize project config, selecting a profile and reporting applicable reposito
 pnpm josh init   # create/merge config files, install and format (--no-install skips both)
 ```
 
-**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails.
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails. In Git, while the checked-out commit lacks kit, it ends by pointing at [`josh start`](#josh-start).
 
 See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 
@@ -622,7 +623,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 - `--body-file` — read the body from a file (`-` reads stdin); use whenever the body carries a backtick or `$`. Passing both body forms is refused.
 - `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
 
-**Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+**Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or [`JOSH_NOTIFY=off`](scripts-ai.md#josh_notify) to skip.
 
 ### `josh observations:flush`
 
@@ -2031,13 +2032,14 @@ put. The printed PID is the supervisor's.
 Blank means unset. The inherited agent session identifier selects the provider; a missing or
 conflicting identifier refuses launch. Invalid model/effort or unavailable selected CLI/auth
 refuses launch. There is no provider fallback, promotion, or worker retry. OpenAI
-defaults to `gpt-6-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
+defaults to `gpt-6.1-sol` with scheduler/worker/reviewer efforts `medium`/`medium`/`high`; the worker
 drops to `low` only in the pre-gate phase, on either provider.
 
 The defaults are pinned model ids rather than an alias such as `opus`, so a run log names the exact
 model and a model migration can be measured at unchanged effort. Before launch the selected CLI's
 version is checked against the model it will run: `claude-opus-5-5` needs Claude Code 2.1.280 or later
-(`claude update`), and `gpt-6-sol` needs Codex CLI 0.155.0 or later
+(`claude update`), `gpt-6.1-sol` needs Codex CLI 0.159.1 or later, and a lane recorded with
+`gpt-6-sol` still needs Codex CLI 0.155.0 or later
 (`npm install -g @openai/codex@latest`). A CLI below the floor, or one whose version cannot be read,
 refuses launch with that update named — never a quiet switch to an older model. A lane keeps the
 profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on

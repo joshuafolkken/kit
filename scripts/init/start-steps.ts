@@ -1,12 +1,13 @@
 import path from 'node:path'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
-import { execaSync } from 'execa'
 import { main as init_main } from './init'
 import { PACKAGE_DIR } from './init-paths'
+import { kit_setup_state } from './kit-setup-state'
 import type { ProjectProfile, ProjectShape } from './project-profile'
+import { start_exec } from './start-exec'
 import { start_plan, type GitState, type StartStep, type Visibility } from './start-plan'
+import { start_setup_pr } from './start-setup-pr'
 
 interface StepContext {
 	root: string
@@ -20,38 +21,28 @@ const GH_INSTALL_HINT =
 const GH_AUTH_HINT =
 	'GitHub CLI is not signed in. Run gh auth login, then run josh start again. Nothing was changed.'
 
-function succeeds(command: string, args: ReadonlyArray<string>, root: string): boolean {
-	return execaSync(command, args, { cwd: root, reject: false }).exitCode === 0
-}
-
-function read_output(
-	command: string,
-	args: ReadonlyArray<string>,
-	root: string,
-): string | undefined {
-	const result = execaSync(command, args, { cwd: root, reject: false })
-
-	return result.exitCode === 0 ? result.stdout.trim() : undefined
-}
-
-// Every step spawned here dials GitHub directly, past a scanner's loopback proxy, the same as every
-// other `gh` spawn under scripts/ (joshuafolkken/kit#2436); a local `git` step is unaffected by it.
-function run(command: string, args: ReadonlyArray<string>, root: string): void {
-	execaSync(command, args, { ...git_gh_exec.direct_environment(), cwd: root, stdio: 'inherit' })
-}
+const { succeeds, read_output, run } = start_exec
 
 function read_git_state(root: string, shape: ProjectShape): GitState {
 	const { has_git, has_github } = shape
 
 	if (!has_git) {
-		return { has_git, has_github, has_origin: false, branch: undefined, has_commits: false }
+		return {
+			has_git,
+			has_github,
+			has_origin: false,
+			branch: undefined,
+			has_commits: false,
+			has_kit_committed: false,
+		}
 	}
 
 	const has_origin = succeeds('git', ['remote', 'get-url', 'origin'], root)
 	const branch = read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
 	const has_commits = succeeds('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], root)
+	const has_kit_committed = kit_setup_state.is_kit_committed(root)
 
-	return { has_git, has_github, has_origin, branch, has_commits }
+	return { has_git, has_github, has_origin, branch, has_commits, has_kit_committed }
 }
 
 // Every step talks to GitHub, so the CLI is checked before the first write rather than at the step
@@ -82,7 +73,7 @@ function initialize(context: StepContext): void {
 function commit_all(context: StepContext): void {
 	run('git', ['add', '--all'], context.root)
 	// The first commit of a new repository has no branch to come from, so the hook that keeps commits
-	// off main — installed by the initialize step in a node project — would refuse the only commit
+	// off main — installed by the initialize step in a full project — would refuse the only commit
 	// that has to land there.
 	run('git', ['commit', '--no-verify', '--message', 'Initial commit'], context.root)
 	// A repository created by an older `git init` may name its unborn branch `master`.
@@ -103,21 +94,30 @@ function add_missing_labels(): void {
 	repository_labels.ensure_labels('{owner}/{repo}')
 }
 
-const STEP_ACTIONS: Readonly<Record<StartStep, (context: StepContext) => void>> = {
+// Main already has a history here, so the setup reaches it the way every other change does: through
+// an Issue and a pull request a person merges (joshuafolkken/kit#2816).
+async function open_setup_pull_request(context: StepContext): Promise<void> {
+	await start_setup_pr.open(context.root)
+}
+
+type StepAction = (context: StepContext) => void | Promise<void>
+
+const STEP_ACTIONS: Readonly<Record<StartStep, StepAction>> = {
 	git_init: create_git_repository,
 	initialize,
 	commit: commit_all,
 	repository: create_github_repository,
 	labels: add_missing_labels,
+	setup_pr: open_setup_pull_request,
 }
 
-function run_step(
+async function run_step(
 	step: StartStep,
 	context: StepContext,
 	completed: ReadonlyArray<StartStep>,
-): void {
+): Promise<void> {
 	try {
-		STEP_ACTIONS[step](context)
+		await STEP_ACTIONS[step](context)
 	} catch (error) {
 		const cause = error instanceof Error ? error.message : String(error)
 
@@ -125,12 +125,12 @@ function run_step(
 	}
 }
 
-function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext): void {
+async function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext): Promise<void> {
 	for (const [index, step] of steps.entries()) {
 		const position = `${String(index + 1)}/${String(steps.length)}`
 
 		console.info(`\n[${position}] ${start_plan.STEP_LABELS[step]}`)
-		run_step(step, context, steps.slice(0, index))
+		await run_step(step, context, steps.slice(0, index))
 	}
 }
 

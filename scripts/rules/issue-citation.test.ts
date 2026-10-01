@@ -158,3 +158,25 @@ describe('issue_citation.linkify — leaves excluded and unreferenced text untou
 		expect(issue_citation.has_bare_reference(issue_citation.linkify(message, SLUG))).toBe(false)
 	})
 })
+
+describe('issue_citation.unquoted_references', () => {
+	it('drops a bare #N the prompt already carried, even inside a fence there', () => {
+		const prompt = '```\nmerged #7\n```'
+
+		expect(issue_citation.unquoted_references('see #7 and #8', prompt)).toEqual(['#8'])
+	})
+
+	it('drops an owner/repo#N only when the prompt wrote that same reference', () => {
+		const message = `${CROSS_REPO_PROSE} and other/repo#45`
+
+		expect(issue_citation.unquoted_references(message, CROSS_REPO_PROSE)).toEqual(['other/repo#45'])
+	})
+
+	it('keeps a #N whose digits only prefix a quoted number', () => {
+		expect(issue_citation.unquoted_references('see #7', 'closed #70')).toEqual(['#7'])
+	})
+
+	it('keeps every bare reference when the prompt is empty', () => {
+		expect(issue_citation.unquoted_references('see #7', '')).toEqual(['#7'])
+	})
+})

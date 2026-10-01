@@ -11,8 +11,8 @@ const DOC_FILE = 'docs/x.md'
 const SATISFIED = 'satisfied'
 const EXEMPT = 'exempt'
 const PROMPT_DOC = 'prompts/review.md'
-const STATIC_HTML = 'index.html'
-const STATIC_CSS = 'site.css'
+const BASIC_HTML = 'index.html'
+const BASIC_CSS = 'site.css'
 
 describe('test_declared_logic.verdict_for', () => {
 	it('is required when a runtime file changed with no test beside it', () => {
@@ -71,13 +71,55 @@ describe('test_declared_logic classification', () => {
 	})
 })
 
-describe('static HTML and CSS changes', () => {
-	it('exempts HTML and CSS only under the static profile', () => {
-		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS], true)).toBe(EXEMPT)
-		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS], false)).toBe('required')
+describe('basic-profile HTML and CSS changes', () => {
+	it('exempts HTML and CSS only under the basic profile', () => {
+		expect(test_declared_logic.verdict_for([BASIC_HTML, BASIC_CSS], true)).toBe(EXEMPT)
+		expect(test_declared_logic.verdict_for([BASIC_HTML, BASIC_CSS], false)).toBe('required')
 	})
 
 	it.each(['app.js', 'app.ts', 'app.tsx'])('still requires a test for %s', (file) => {
-		expect(test_declared_logic.verdict_for([STATIC_HTML, STATIC_CSS, file], true)).toBe('required')
+		expect(test_declared_logic.verdict_for([BASIC_HTML, BASIC_CSS, file], true)).toBe('required')
+	})
+})
+
+// joshuafolkken/kit#2820: a basic-profile source in a language kit cannot test has no runnable test,
+// so it is confirmed by hand — but only under basic, and never when a JS/TS file rides along.
+describe('basic-profile sources in languages kit cannot test', () => {
+	const LUA_FILES = ['main.lua', 'src/player.lua']
+
+	it('exempts a Lua-only change under the basic profile', () => {
+		expect(test_declared_logic.verdict_for(LUA_FILES, true)).toBe(EXEMPT)
+	})
+
+	it('still requires a test when a TypeScript file changed with the Lua', () => {
+		expect(test_declared_logic.verdict_for([...LUA_FILES, 'tools/build.ts'], true)).toBe('required')
+	})
+
+	it('keeps a Lua change required outside the basic profile', () => {
+		expect(test_declared_logic.verdict_for(LUA_FILES, false)).toBe('required')
+	})
+
+	it.each(['App.svelte', 'lib.mjs', 'lib.cjs', 'lib.mts', 'Main.TS'])(
+		'treats %s as testable',
+		(file) => {
+			expect(test_declared_logic.verdict_for([file], true)).toBe('required')
+		},
+	)
+
+	it.each(['src/data.json', 'package.json', 'config.yaml'])(
+		'keeps data and config %s required',
+		(file) => {
+			expect(test_declared_logic.verdict_for([file], true)).toBe('required')
+		},
+	)
+
+	it('names only the basic-exempt paths as needing a manual check', () => {
+		const paths = [...LUA_FILES, BASIC_HTML, DOC_FILE]
+
+		expect(test_declared_logic.manual_check_files(paths, true)).toStrictEqual([
+			...LUA_FILES,
+			BASIC_HTML,
+		])
+		expect(test_declared_logic.manual_check_files(paths, false)).toStrictEqual([])
 	})
 })

@@ -78,6 +78,7 @@ policy solves directly.
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Inject them as real environment variables. **No `.env` file is needed** — `josh notify` and `josh followup` read one only if it exists |
 | `JOSH_SESSION_LANG`                      | Same — an environment variable is enough                                                                                               |
+| `JOSH_NOTIFY`                            | Set it to `off` instead of the two credentials when the session should notify nobody — every send is skipped with exit code 0          |
 | `JOSH_LANE_LIMIT`                        | **Set it to `2`** on a small container. The default is 6, which is too many for the 4 cores / 16 GB these containers typically have    |
 | `GH_TOKEN`                               | Usually injected already, and `gh api` picks it up without `gh auth login` (which is interactive and cannot be run here)               |
 

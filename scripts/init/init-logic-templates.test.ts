@@ -126,7 +126,7 @@ describe('init_logic_templates.merge_prettier_config', () => {
 		expect(merge_in_project(existing)).toContain(APP_CSS_STYLESHEET)
 	})
 
-	// kit ≤1.929 named the SvelteKit default in every node project; `josh sync` has to drop it (#2710).
+	// kit ≤1.929 named the SvelteKit default in every full project; `josh sync` has to drop it (#2710).
 	it('drops a named stylesheet the project does not have', () => {
 		expect(merge_in_project(NAMED_APP_CSS)).toBe(SPREAD_ONLY)
 	})

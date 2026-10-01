@@ -39,7 +39,7 @@ beforeEach(() => {
 	argv_mock.mockReset().mockReturnValue({
 		kind: 'argv',
 		argv: { command: 'codex', args: ['exec', '--sandbox', 'workspace-write'] },
-		profile: { provider: 'openai', role: 'reviewer', model: 'gpt-6-sol', effort: 'high' },
+		profile: { provider: 'openai', role: 'reviewer', model: 'gpt-6.1-sol', effort: 'high' },
 	})
 	launch_mock.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 0 })
 })

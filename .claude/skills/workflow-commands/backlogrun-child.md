@@ -90,7 +90,7 @@ still bounded at 25 lines. `pnpm josh lane:dispatch` is where a lane's child is 
 child over" in `backlogrun-lanes.md` carries the command.
 
 **The lane child uses the invoking CLI's `worker` profile.** Claude Code defaults to Anthropic
-`claude-opus-5-5` / `medium`; Codex uses `codex exec`, OpenAI `gpt-6-sol` / `medium`, workspace-write and
+`claude-opus-5-5` / `medium`; Codex uses `codex exec`, OpenAI `gpt-6.1-sol` / `medium`, workspace-write and
 JSONL. `JOSH_WORKER_MODEL` overrides Claude Code only; `JOSH_WORKER_EFFORT` covers both providers,
 and legacy `JOSH_LANE_*` applies only here. Bad markers, missing CLI/auth and failure
 refuse or park without fallback or retry.

@@ -13,7 +13,7 @@ import { start_steps } from './start-steps'
 
 const ARGUMENT_START_INDEX = 2
 const READY_MESSAGE = 'GitHub workflow ready. Use kickoff new in your assistant to plan an Issue.'
-const START_USAGE = 'josh start [--profile static|node] [--yes] [--github] [--public]'
+const START_USAGE = 'josh start [--profile basic|full] [--yes] [--github] [--public]'
 const YES_FLAG = '--yes'
 const GITHUB_FLAG = '--github'
 const PUBLIC_FLAG = '--public'
@@ -72,7 +72,11 @@ function prepare(args: ReadonlyArray<string>, is_tty: boolean, root: string): Pr
 
 	stop_on(start_steps.github_cli_refusal(root))
 
-	return { steps: plan.steps, interaction, choices: { options, shape, consent, root } }
+	return {
+		steps: plan.steps,
+		interaction,
+		choices: { options, shape, consent, root, steps: plan.steps },
+	}
 }
 
 async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void> {
@@ -82,7 +86,7 @@ async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void>
 	const profile = await resolve_profile(choices, interaction)
 	const { root, options } = choices
 
-	start_steps.run_steps(steps, { root, profile, visibility: options.visibility })
+	await start_steps.run_steps(steps, { root, profile, visibility: options.visibility })
 	console.info(`\n${READY_MESSAGE}`)
 }
 

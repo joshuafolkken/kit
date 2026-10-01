@@ -41,7 +41,7 @@ Print an agent-read document's byte size against its ceiling and the headroom le
 
 `[arguments...]`
 
-Type-check with tsc (skips a static project with no TypeScript to check)
+Type-check with tsc (skips a basic project with no TypeScript to check)
 
 ---
 
@@ -71,7 +71,7 @@ Report whether the preview server crashed during a failed E2E attempt (CI)
 
 _No arguments._
 
-Format code with prettier and eslint (skips a tool a static project lacks)
+Format code with prettier and eslint (skips a tool a basic project lacks)
 
 ---
 
@@ -111,7 +111,7 @@ Print a file's code lines against the max-lines limit and the headroom left
 
 _No arguments._
 
-Check code with prettier and eslint (skips a tool a static project lacks)
+Check code with prettier and eslint (skips a tool a basic project lacks)
 
 ---
 
@@ -259,7 +259,7 @@ Upgrade every installed @joshuafolkken toolkit here and open the pull request
 
 > **Audience:** developer · **Side effects:** files, network, processes
 
-`[--profile static|node] [--no-install]`
+`[--profile basic|full] [--no-install]`
 
 Initialize config in a new project
 
@@ -269,7 +269,7 @@ Initialize config in a new project
 
 > **Audience:** developer · **Side effects:** files
 
-`[--profile static|node]`
+`[--profile basic|full]`
 
 Show the project profile and the reason for it
 
@@ -309,9 +309,9 @@ Fetch SonarCloud hotspots on a pull request and print each one's Step B disposit
 
 > **Audience:** developer · **Side effects:** files, git, network, processes
 
-`[--profile static|node] [--yes] [--github] [--public]`
+`[--profile basic|full] [--yes] [--github] [--public]`
 
-Create a new project for the GitHub Issue workflow, from git init to labels
+Set a project up for the GitHub Issue workflow, from git init to the setup PR
 
 ---
 

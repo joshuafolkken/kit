@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { init_ai_copy } from './init-ai-copy'
 import type { ProjectShape } from './project-profile'
 
-const STATIC_SHAPE: ProjectShape = {
-	profile: 'static',
+const BASIC_SHAPE: ProjectShape = {
+	profile: 'basic',
 	reason: 'test',
 	has_web: false,
 	has_typescript: false,
@@ -14,8 +14,8 @@ const GIT_ATTRIBUTES = '.gitattributes'
 const SECURITY_MD = 'SECURITY.md'
 
 describe('profile-specific AI files', () => {
-	it('keeps Git-free, Web-free static files to pointers', () => {
-		expect(init_ai_copy.ai_files(STATIC_SHAPE)).toEqual([
+	it('keeps Git-free, Web-free basic files to pointers', () => {
+		expect(init_ai_copy.ai_files(BASIC_SHAPE)).toEqual([
 			'AGENTS.md',
 			'GEMINI.md',
 			'pnpm-workspace.yaml',
@@ -24,7 +24,7 @@ describe('profile-specific AI files', () => {
 
 	it('adds Web and Git files only when those axes are present', () => {
 		const files = init_ai_copy.ai_files({
-			...STATIC_SHAPE,
+			...BASIC_SHAPE,
 			has_web: true,
 			has_git: true,
 			has_github: true,
@@ -36,7 +36,7 @@ describe('profile-specific AI files', () => {
 	})
 
 	it('keeps node development settings without GitHub distribution', () => {
-		const files = init_ai_copy.ai_files({ ...STATIC_SHAPE, profile: 'node' })
+		const files = init_ai_copy.ai_files({ ...BASIC_SHAPE, profile: 'full' })
 
 		expect(files).not.toContain('.claude/settings.json')
 		expect(files).not.toContain(GIT_ATTRIBUTES)

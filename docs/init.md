@@ -6,7 +6,7 @@
 pnpm josh init
 
 # Override the automatic decision for this run
-pnpm josh init --profile static
+pnpm josh init --profile basic
 
 # Write the files only — skip the install and format it ends with
 pnpm josh init --no-install
@@ -14,19 +14,23 @@ pnpm josh init --no-install
 
 ## Project profiles
 
-`josh profile` prints the selected profile and its reason, for example `profile: static (no package.json)`. The profiles are `static` (minimal settings for a project without a Node development toolchain) and `node` (the existing Node toolchain). An `index.html` file does not decide the profile: Vite projects normally have one.
+`josh profile` prints the selected profile and its reason, for example `profile: basic (no package.json)`; a `basic` project also gets a `compat: profile: static (…)` line for workflows synced before the rename below. The profiles are `basic` (AI rules, formatting and editor / Git settings for a project of any language) and `full` (kit also runs the JavaScript / TypeScript toolchain: ESLint, type check, tests, Git hooks and CI). An `index.html` file does not decide the profile: Vite projects normally have one.
 
 | Priority | Condition                                                 | Profile             |
 | -------- | --------------------------------------------------------- | ------------------- |
-| 1        | `--profile static` or `--profile node`                    | The requested value |
+| 1        | `--profile basic` or `--profile full`                     | The requested value |
 | 2        | `package.json` contains `josh.profile`                    | The recorded value  |
-| 3        | No `package.json`                                         | `static`            |
-| 4        | Dependencies other than kit, or a `build` or `dev` script | `node`              |
-| 5        | Metadata-only `package.json`                              | `static`            |
+| 3        | No `package.json`                                         | `basic`             |
+| 4        | Dependencies other than kit, or a `build` or `dev` script | `full`              |
+| 5        | Metadata-only `package.json`                              | `basic`             |
 
-kit itself does not count as a dependency, so `pnpm add -D @joshuafolkken/kit` before `josh init` still selects `static` for an `index.html` site. `josh init` records the first decision in `package.json` as `josh.profile`. Re-running it keeps that profile even after dependencies are added. Pass `--profile` to change the recorded value deliberately. Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
+kit itself does not count as a dependency, so `pnpm add -D @joshuafolkken/kit` before `josh init` still selects `basic` for an `index.html` site. `josh init` records the first decision in `package.json` as `josh.profile`. Re-running it keeps that profile even after dependencies are added. Pass `--profile` to change the recorded value deliberately.
 
-| Setting or tool                                                                     | `static`                                                                                                   | `node`                                    |
+**`basic` and `full` were called `static` and `node`** before [#2829](https://github.com/joshuafolkken/kit/issues/2829). The old names still work everywhere a profile is read: a recorded `josh.profile: static` or `node`, and `--profile static` or `--profile node`, mean `basic` and `full`. A project keeps its recorded old name until `josh init` runs again, which records the new one. The paths a `basic` project initialized earlier imports — `@joshuafolkken/kit/prettier/static` and `dist/CLAUDE.static.md` — keep resolving to the same preset and rules, and re-running `josh init` moves those two kit-written imports in `prettier.config.mjs` and `CLAUDE.md` onto `prettier/basic` and `dist/CLAUDE.basic.md`, leaving the rest of each file alone.
+
+Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
+
+| Setting or tool                                                                     | `basic`                                                                                                    | `full`                                    |
 | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `package.json`, `josh` script, kit dependency                                       | Always                                                                                                     | Existing package scripts and dependencies |
 | Prettier config, Prettier dependency, `.prettierignore`                             | When HTML, CSS, or JavaScript exists                                                                       | Always                                    |
@@ -36,27 +40,46 @@ kit itself does not count as a dependency, so `pnpm add -D @joshuafolkken/kit` b
 | Short AI instructions and pointers                                                  | Always                                                                                                     | Existing full instructions                |
 | `.gitignore`, `.gitattributes`                                                      | When Git exists                                                                                            | When Git exists                           |
 | GitHub files                                                                        | When a GitHub origin exists                                                                                | When a GitHub origin exists               |
+| `JOSH_SESSION_LANG` in `.env`                                                       | Not written — the profile installs no hook that reads it                                                   | On first adoption, when `.env` lacks it   |
 | ESLint, cspell CLI config, Playwright, Lefthook, secretlint, external MCP and hooks | Not installed by default                                                                                   | Existing behavior                         |
 
-VS Code extensions are recommendations, not automatic installs. Code Spell Checker is not part of the initial CLI verification gate. Existing VS Code settings and added extension recommendations are preserved when initialization runs again. The `static` Prettier preset needs no Svelte or Tailwind plugins.
+VS Code extensions are recommendations, not automatic installs. Code Spell Checker is not part of the initial CLI verification gate. Existing VS Code settings and added extension recommendations are preserved when initialization runs again. The `basic` Prettier preset needs no Svelte or Tailwind plugins.
 
-The static Web profile writes `prettier.config.mjs`, which loads under either CommonJS or ESM package settings. Its `.prettierignore` keeps generated files out of formatting without excluding a site's `static/` source directory. A Git-free node project does not receive kit's Git and GitHub `prepare` commands.
+On the `full` profile, `josh init` writes `JOSH_SESSION_LANG` into `.env` from the OS locale — the first non-empty of `LC_ALL`, `LC_MESSAGES` and `LANG` — so a new user's session starts in their language: `ja` for a locale starting with `ja`, `en` otherwise; a `JOSH_SESSION_LANG` already exported in the shell wins over the locale. A project already using kit keeps its language: nothing is written when `.claude/settings.json` already wires the `session:lang` hook or `.env` already sets the value, and the default when it is unset stays `ja` ([#2818](https://github.com/joshuafolkken/kit/issues/2818)).
+
+The basic profile writes `prettier.config.mjs`, which loads under either CommonJS or ESM package settings. Its `.prettierignore` keeps generated files out of formatting without excluding a site's `static/` source directory. A Git-free `full` project does not receive kit's Git and GitHub `prepare` commands.
+
+The distributed `ci.yml` is the same file for both profiles. Its Checks job first runs `josh profile`: a `basic` project then runs `josh gate`, which skips each check the project has no tool or files for, while a `full` project runs the ordered steps — `prepare`, the SvelteKit type check, Prettier, the build, ESLint, the unit tests and the size check ([#2814](https://github.com/joshuafolkken/kit/issues/2814)).
 
 To add Git later, run `git init`, then run `josh init` again to add Git files without changing the recorded profile. After adding a GitHub origin, run `josh init` again for GitHub files.
 
 ## `josh init` or `josh start`
 
-One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `backlogrun`)? If not, run `josh init`. If it will and the project has no GitHub repository yet, run `josh start`.
+One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? If it will, run `josh start` — whether or not the project already has Git or a GitHub repository. If it will not, run `josh init`. The [profile](#project-profiles) is a separate question: both commands choose it the same way.
 
-| Situation                                                    | Run                                                                                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `index.html` only, without Git                               | `josh init`                                                                          |
-| New project that will use the GitHub Issue workflow          | `josh start`                                                                         |
-| Project that already has Git and GitHub, or any re-run       | `josh init`                                                                          |
-| Started without Git, now moving to the GitHub Issue workflow | `josh start` — it runs `git init`, commits what is there, and creates the repository |
+| Situation                                                                                       | Run                                                                  |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| New or existing project that will use the GitHub Issue workflow                                 | `josh start`                                                         |
+| Project that will not use it — no Git, another Git host, or only kit's rules, format and checks | `josh init`                                                          |
+| Any re-run, or an unattended setup from CI or a script                                          | `josh init`                                                          |
+| Set up with `josh init`, now moving to the GitHub Issue workflow                                | `josh start` — its setup step leaves what `josh init` wrote as it is |
 
-- **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository or pushes, so it is safe to re-run and to automate.
-- **`josh start`** asks, and then prepares GitHub: `git init` on `main` → the same setup `josh init` runs → the initial commit → `gh repo create` (private unless `--public`) and push → the workflow labels the repository is missing. Afterwards `kickoff new` works. Its steps and safety rules are in [josh-commands.md → `josh start`](./josh-commands.md#josh-start).
+- **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository, commits or pushes, so it is safe to re-run and to automate. Run in a Git repository whose checked-out commit does not record kit yet, it ends by pointing at `josh start`.
+- **`josh start`** asks, then runs the same setup as `josh init` and carries it to GitHub. What it does depends on what is already there:
+
+| Before `josh start`                       | Steps                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| No Git                                    | `git init` on `main` → setup → initial commit → `gh repo create` and push → labels  |
+| Git without commits                       | setup → initial commit → `gh repo create` and push → labels                         |
+| Commits on `main`, no origin              | setup → `gh repo create` and push the existing `main` → labels → setup pull request |
+| GitHub origin, `main` does not record kit | setup → labels → setup pull request                                                 |
+| GitHub origin, `main` already records kit | setup → labels                                                                      |
+
+"Records kit" means the `package.json` committed on the checked-out `main` lists `@joshuafolkken/kit`. "Labels" adds the workflow and release-classification labels the repository is missing. `gh repo create` makes a private repository unless `--public` is given.
+
+**The setup pull request** brings the setup to a `main` that already has history the way every later change arrives, so nothing is committed to `main` directly ([#2816](https://github.com/joshuafolkken/kit/issues/2816)). It files an Issue titled `Set up @joshuafolkken/kit` with the `ignore-for-release` label, creates the Issue's `<N>-<slug>` branch, stages **only the files kit's setup wrote** — the managed files `josh sync` keeps current, plus `CLAUDE.md`, `prettier.config.mjs`, `.aikido`, `package.json` and `pnpm-lock.yaml` — then commits only those files, pushes and opens the pull request that closes the Issue. Anything else in the working tree, such as a personal note or an editor's own directory — or a file you had already staged — stays out of the commit. The project's own Git hooks run on the commit and the push as on any other. Merging is left to you; once it is merged, `kickoff new` works. On a branch other than `main` there is no pull request to base on `main`, so the step is skipped. If a hook stops the commit, fix the cause and run `josh start` again on the setup branch it left checked out: it reuses that branch's Issue, so no second Issue is filed. If the push or the pull request fails after the commit, finish on the setup branch with `git push` and `pnpm josh pr`.
+
+The steps, options and safety rules are in [josh-commands.md → `josh start`](./josh-commands.md#josh-start).
 
 ## Run from outside the project
 
@@ -66,7 +89,7 @@ pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 
 **Only the kit the project itself installed sets the project up** ([#2794](https://github.com/joshuafolkken/kit/issues/2794)). A `josh init` run from anywhere else — `pnpm dlx`, a global install — first compares its own directory with `node_modules/@joshuafolkken/kit` in the project, by real path. When they differ, it writes nothing itself:
 
-1. **It installs the project's kit.** A project whose `package.json` does not list `@joshuafolkken/kit` gets `pnpm add -D` with the build approvals kit's dependencies need (esbuild and unrs-resolver, read from the `static` workspace template); one that lists it gets `pnpm install`, so the version it chose is kept.
+1. **It installs the project's kit.** A project whose `package.json` does not list `@joshuafolkken/kit` gets `pnpm add -D` with the build approvals kit's dependencies need (esbuild and unrs-resolver, read from the `basic` workspace template); one that lists it gets `pnpm install`, so the version it chose is kept.
 2. **It hands the run to that kit** — `pnpm exec josh init` with the same arguments, in the project root.
 
 `pnpm dlx` caches the package it fetched and reuses it for about a day, so the kit it runs can be older than the registry's. Before this hand-off, that kit wrote its own version into `package.json` and its own templates into the project. Now the version is whatever pnpm resolves for the project, under the project's `minimumReleaseAge`, and the kit of that version does the setup. A cached copy released before the hand-off existed still sets the project up on its own, until the cache expires.
@@ -100,14 +123,14 @@ in an empty directory anywhere else scaffolds exactly as before.
 
 ## Config files
 
-The following table describes the `node` profile. The profile table above lists the smaller `static` set. Each selected file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
+The following table describes the `full` profile. The profile table above lists the smaller `basic` set. Each selected file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
 
 | File                      | If missing                                                                                                                                                  | If exists                                                                                                                             |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `.gitignore`              | Created from `templates/gitignore`                                                                                                                          | Union-merged: missing kit patterns appended, consumer-local entries kept                                                              |
 | `.npmrc`                  | Created with pnpm settings and the public npm default (no scoped registry or GitHub token)                                                                  | Missing lines appended; existing lines kept verbatim, including a GitHub Packages `_authToken` line                                   |
-| `eslint.config.js`        | Created with `create_vanilla_config`                                                                                                                        | Sample shown — add manually                                                                                                           |
-| `prettier.config.js`      | Created with shared config                                                                                                                                  | Sample shown — add manually                                                                                                           |
+| `eslint.config.js`        | Created with `create_vanilla_config`                                                                                                                        | Regenerated from the vanilla template, keeping your `rules` blocks; a config not built on `create_vanilla_config` is left untouched   |
+| `prettier.config.js`      | Created with shared config                                                                                                                                  | Regenerated from the shared preset; only `tailwindStylesheet` is kept                                                                 |
 | `playwright.config.ts`    | Created with `create_playwright_config`                                                                                                                     | Sample shown — add manually                                                                                                           |
 | `tsconfig.json`           | Created with `extends` pointing to the preset, `"types": ["node"]`, and `exclude` covering the generated-output directories plus SvelteKit's own exclusions | Preset entry prepended to `extends` array; missing `exclude` entries appended                                                         |
 | `cspell.config.yaml`      | Created with `import` pointing to the shared word list                                                                                                      | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import)                     |
@@ -162,13 +185,13 @@ They are written unconditionally — kit does not detect SvelteKit, and at `josh
 
 They are also the **default** paths only. If you moved the worker with `kit.files.serviceWorker` in `svelte.config.js`, these globs match nothing and SvelteKit's real exclusion is still replaced — add your own path to `exclude` yourself. The merge only appends, so a hand-added entry survives every later sync.
 
-### eslint.config.js / prettier.config.js / playwright.config.ts
+### playwright.config.ts
 
-These files have no merge strategy. If they already exist, `josh init` prints the generated content so you can copy the relevant parts manually.
+This file has no merge strategy. If it already exists, `josh init` prints the generated content so you can copy the relevant parts manually.
 
 ## Package scripts
 
-The `node` profile adds these scripts to your `package.json`; the `static` profile adds `preinstall` and `josh` — the same safe-chain `preinstall` as `node`:
+The `full` profile adds these scripts to your `package.json`; the `basic` profile adds `preinstall` and `josh` — the same safe-chain `preinstall` as `full`:
 
 | Script       | Command                                                                                                                                             |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -190,7 +213,7 @@ All other toolchain tasks are available as `pnpm josh <command>` subcommands —
 
 ## Dependencies
 
-The `node` profile adds the packages below to `devDependencies`. The `static` profile adds kit and, when Web files exist, Prettier. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
+The `full` profile adds the packages below to `devDependencies`. The `basic` profile adds kit and, when Web files exist, Prettier. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
 
 | Package                                                      | Version                                                                                                         |
 | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
@@ -198,7 +221,7 @@ The `node` profile adds the packages below to `devDependencies`. The `static` pr
 | `@ianvs/prettier-plugin-sort-imports`                        | `^4.7.1`                                                                                                        |
 | `prettier-plugin-svelte`                                     | `^4.1.1`                                                                                                        |
 | `prettier-plugin-tailwindcss`                                | `^0.8.0`                                                                                                        |
-| ESLint, TypeScript and `@playwright/test` (kit's peers)      | versions from kit's own development dependencies; see [package.md](./package.md#1-install)                      |
+| ESLint, TypeScript and `@playwright/test` (kit's peers)      | versions from kit's own development dependencies                                                                |
 | `prettier`, `cspell`, `@types/node`                          | versions from kit's own development dependencies                                                                |
 | `lefthook`                                                   | version from kit's own development dependencies; only when Git exists (the only case `lefthook.yml` is written) |
 | `secretlint`, `@secretlint/secretlint-rule-preset-recommend` | `^13.0.2`; see [Secret scanning](#secret-scanning-pre-commit)                                                   |
@@ -211,23 +234,19 @@ Every generated config has its tool in this list, so `josh init` (which installs
 
 The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries back the kit prettier preset (`@joshuafolkken/kit/prettier`), whose `plugins[]` references all three by name. prettier resolves plugins from the **consumer** project rather than transitively through the kit, so every project that uses the preset must declare them locally — otherwise `prettier`/`josh lint` fails with `Cannot find package`.
 
-The ESLint preset likewise resolves ESLint and its plugins from the consumer project. `josh init` now adds them alongside the generated ESLint config; existing projects upgrading kit without rerunning init can use the migration command in [package.md](./package.md#1-install). The minimal `static` profile and conditional Web tooling are tracked in [#2195](https://github.com/joshuafolkken/kit/issues/2195).
+The ESLint preset likewise resolves ESLint and its plugins from the consumer project. `josh init` adds them alongside the generated ESLint config, and re-running it adds any that an upgraded project is missing ([Update kit](./how-to/update-kit.md)).
 
 ### Available `pnpm josh` subcommands
 
-| Command              | Runs                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `lint`               | `prettier --check .` then `eslint . --cache --cache-strategy content`                                                                                                    |
-| `format`             | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`; a `static` project without Prettier or ESLint skips that tool with a reason, as `lint` does |
-| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`                                                                                          |
-| `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file)                                                                                   |
-| `lefthook:install`   | `lefthook install`                                                                                                                                                       |
-| `lefthook:uninstall` | `lefthook uninstall`                                                                                                                                                     |
-| `lefthook:commit`    | `lefthook run pre-commit`                                                                                                                                                |
-| `lefthook:push`      | `lefthook run pre-push`                                                                                                                                                  |
-| `main:sync`          | `git checkout <default> && git pull --ff-only`, then prunes merged branches with a `[gone]` remote-tracking upstream (refuses inside a linked work tree)                 |
-| `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                                                                                                           |
-| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` (a `static` project with nothing to type-check skips it with the reason)                                     |
+| Command      | Runs                                                                                                                                                                    |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lint`       | `prettier --check .` then `eslint . --cache --cache-strategy content`                                                                                                   |
+| `format`     | `prettier --write .` then `eslint . --fix --cache --cache-strategy content`; a `basic` project without Prettier or ESLint skips that tool with a reason, as `lint` does |
+| `cspell:dot` | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`                                                                                         |
+| `test:unit`  | `vitest run` (skips when vitest is absent; fails when it is present with no test file)                                                                                  |
+| `main:sync`  | `git checkout <default> && git pull --ff-only`, then prunes merged branches with a `[gone]` remote-tracking upstream (refuses inside a linked work tree)                |
+| `main:merge` | `git fetch origin <default>` then `git merge origin/<default>`                                                                                                          |
+| `check`      | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` (a `basic` project with nothing to type-check skips it with the reason)                                     |
 
 SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
 
@@ -235,7 +254,7 @@ Retired scripts (previously managed, now removed): `git`, `git:followup`, `teleg
 
 ## AI files
 
-The following is the `node` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `static` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves the esbuild and unrs-resolver build scripts (kit's CLI runs on tsx, which depends on esbuild; kit's optional ESLint import plugins bring in unrs-resolver; and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
+The following is the `full` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `basic` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves the esbuild and unrs-resolver build scripts (kit's CLI runs on tsx, which depends on esbuild; kit's optional ESLint import plugins bring in unrs-resolver; and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped; in a `full` project the run ends with a hint to run `josh sync` to update it.
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md
@@ -246,6 +265,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
+.github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
 .github/pull_request_template.md
@@ -257,7 +277,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 sonar-project.properties  (generated from GitHub repo name)
 ```
 
-`CLAUDE.md` carries every agent rule, but it is **not byte-copied** — since [#1878](https://github.com/joshuafolkken/kit/issues/1878) it is distributed by import. The package ships an already-path-transformed copy at `node_modules/@joshuafolkken/kit/dist/CLAUDE.md` (generated at publish time by `scripts/build/build-claude-md.ts`). The consumer's tracked `CLAUDE.md` starts with a bootstrap instruction: when kit is absent, run `pnpm install` and reread the file before other work. It then imports `@node_modules/@joshuafolkken/kit/dist/CLAUDE.md`, followed by any project additions. A package update alone keeps the rules current — no `josh sync` needed. `josh init` writes this file when the consumer has none, and leaves an existing one untouched. `AGENTS.md`, `GEMINI.md` and `.cursorrules` **remain byte-copies**, because the other tools that read them (Codex, Gemini CLI, Cursor) do not follow CLAUDE.md's `@import`; `AGENTS.md` and `GEMINI.md` are short pointers to `CLAUDE.md` and hold no rules of their own ([#963](https://github.com/joshuafolkken/kit/issues/963)). The copied files have their `prompts/` and `eslint/` paths rewritten to `node_modules/@joshuafolkken/kit/…` so they resolve in the consuming project — the pointers included, since each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one. The five skills are no longer copied: they ship as the `kit` Claude Code plugin and load from the package (joshuafolkken/kit#1879). `.claude/settings.json` still carries the `permissions.deny` rules a plugin cannot provide, and now also declares the `kit` marketplace and enables the `kit` plugin; the CLI needs a one-time `claude plugin install kit@kit` (settings alone do not auto-install it). `josh sync` removes any stale copied skill directory whose content still matches the shipment.
+`CLAUDE.md` carries every agent rule, but it is **not byte-copied** — since [#1878](https://github.com/joshuafolkken/kit/issues/1878) it is distributed by import. The package ships an already-path-transformed copy at `node_modules/@joshuafolkken/kit/dist/CLAUDE.md` (generated at publish time by `scripts/build/build-claude-md.ts`). The consumer's tracked `CLAUDE.md` starts with a bootstrap instruction: when kit is absent, run `pnpm install` and reread the file before other work. It then imports `@node_modules/@joshuafolkken/kit/dist/CLAUDE.md`, followed by any project additions. A package update alone keeps the rules current — no `josh sync` needed. `josh init` writes this file when the consumer has none, and leaves an existing one untouched. `AGENTS.md`, `GEMINI.md` and `.cursorrules` **remain byte-copies**, because the other tools that read them (Codex, Gemini CLI, Cursor) do not follow CLAUDE.md's `@import`; `AGENTS.md` and `GEMINI.md` are short pointers to `CLAUDE.md` and hold no rules of their own ([#963](https://github.com/joshuafolkken/kit/issues/963)). The copied files have their `prompts/` and `eslint/` paths rewritten to `node_modules/@joshuafolkken/kit/…` so they resolve in the consuming project — the pointers included, since each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one. The four skills (`workflow-commands`, `epic-commands`, `dependency-update`, `verify-ui`) are no longer copied: they ship as the `kit` Claude Code plugin and load from the package (joshuafolkken/kit#1879). `.claude/settings.json` still carries the `permissions.deny` rules a plugin cannot provide, and now also declares the `kit` marketplace and enables the `kit` plugin; the CLI needs a one-time `claude plugin install kit@kit` (settings alone do not auto-install it). `josh sync` removes any stale copied skill directory whose content still matches the shipment.
 
 `sonar-project.properties` is generated from the GitHub repo name fetched via `gh api repos/{owner}/{repo}`. If `gh` is not available or the repo cannot be identified, the file is skipped with a warning.
 
@@ -270,9 +290,9 @@ After all files are processed, `josh init` runs ([#2766](https://github.com/josh
 1. **`pnpm install`** — installs the development dependencies it added. The `prepare` script it runs installs the git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
 2. **`josh format`** — formats every file, including the ones `josh init` just wrote.
 
-A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its initial commit. A failed format is only a warning: in a `node` project `josh format` also runs `eslint --fix`, which fails on the project's own unfixable errors. `josh gate` is deliberately not run: in an existing project it can fail on the project's own code, which is not a failed setup.
+A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its initial commit or setup pull request. A failed format is only a warning: in a `full` project `josh format` also runs `eslint --fix`, which fails on the project's own unfixable errors. `josh gate` is deliberately not run: in an existing project it can fail on the project's own code, which is not a failed setup.
 
-`--no-install` skips both, for CI or an offline machine. `josh init` then prints the `pnpm install` hint and, in a `node` project with Git, runs `lefthook install` only when lefthook is already installed.
+`--no-install` skips both, for CI or an offline machine. `josh init` then prints the `pnpm install` hint and, in a `full` project with Git, runs `lefthook install` only when lefthook is already installed.
 
 ### `core.hooksPath` stops lefthook installing anything
 
@@ -289,7 +309,7 @@ git config --get core.hooksPath                 # prints the path when one is se
 git config --unset-all --local core.hooksPath   # restores git's default — the same directory
 ```
 
-The value is almost always redundant: it names `<repo>/.git/hooks`, which is git's default, so unsetting it changes nothing except that lefthook will install again. Re-run `pnpm install` (or `pnpm lefthook:install`) afterwards.
+The value is almost always redundant: it names `<repo>/.git/hooks`, which is git's default, so unsetting it changes nothing except that lefthook will install again. Re-run `pnpm install` (or `pnpm exec lefthook install`) afterwards.
 
 `lefthook install --reset-hooks-path` does the same unset for you, and `lefthook install --force` installs into the path without touching the setting. **Neither is wired into `prepare` on purpose**: rewriting a developer's git configuration as a side effect of `pnpm install` would break the setup of anyone who set that path deliberately.
 

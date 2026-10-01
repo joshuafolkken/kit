@@ -7,7 +7,7 @@ For anyone who knows what they want to do but not which command does it. Each gu
 | I want to…                                      | Guide                                                      |
 | ----------------------------------------------- | ---------------------------------------------------------- |
 | Add kit to a project I already have             | [Add kit to an existing project](./how-to/add-kit.md)      |
-| Move between the `static` and `node` profiles   | [Switch a project's profile](./how-to/switch-profile.md)   |
+| Move between the `basic` and `full` profiles    | [Switch a project's profile](./how-to/switch-profile.md)   |
 | Get a Telegram message when a run needs me      | [Set up notifications](./how-to/set-up-notifications.md)   |
 | Run the project in a cloud session or container | [Run kit in a cloud session](./how-to/run-in-the-cloud.md) |
 

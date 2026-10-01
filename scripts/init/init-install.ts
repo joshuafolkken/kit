@@ -51,7 +51,7 @@ function did_step_succeed(step: InstallStep, project_root: string): boolean {
 
 // Returns the failure to report, or undefined once the install passed. A failed install stops
 // there: `josh format` runs prettier and the kit itself, both of which the install provides. A failed
-// format does not fail `init` — in a node project it also runs `eslint --fix`, which exits non-zero on
+// format does not fail `init` — in a full project it also runs `eslint --fix`, which exits non-zero on
 // the project's own unfixable errors, and those are the project's result, not the setup's (the
 // reason `josh gate` is left out of `init` too).
 function run_post_init_steps(project_root: string): string | undefined {

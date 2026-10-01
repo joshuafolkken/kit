@@ -7,7 +7,7 @@ vi.mock('execa', () => ({ execaSync: vi.fn() }))
 const mocked_execa = vi.mocked(execaSync)
 const ROOT = '/work/site'
 const PNPM_INSTALL = 'pnpm install'
-const STATIC_PROFILE = ['--profile', 'static']
+const BASIC_PROFILE = ['--profile', 'basic']
 const { NO_INSTALL_FLAG } = init_install
 
 function result(exit_code: number): ReturnType<typeof execaSync> {
@@ -55,7 +55,7 @@ describe('run_post_init_steps', () => {
 		expect(failure).toContain('pnpm install && pnpm josh format')
 	})
 
-	// `josh format` runs `eslint --fix` in a node project, which fails on the project's own code.
+	// `josh format` runs `eslint --fix` in a full project, which fails on the project's own code.
 	it('warns instead of failing when the format fails', () => {
 		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
@@ -68,16 +68,16 @@ describe('run_post_init_steps', () => {
 
 describe('split_install_flag', () => {
 	it('installs by default and leaves the profile arguments untouched', () => {
-		expect(init_install.split_install_flag(['--profile', 'node'])).toStrictEqual({
+		expect(init_install.split_install_flag(['--profile', 'full'])).toStrictEqual({
 			is_install: true,
-			rest: ['--profile', 'node'],
+			rest: ['--profile', 'full'],
 		})
 	})
 
 	it('opts out with --no-install, wherever it appears', () => {
-		expect(init_install.split_install_flag([...STATIC_PROFILE, NO_INSTALL_FLAG])).toStrictEqual({
+		expect(init_install.split_install_flag([...BASIC_PROFILE, NO_INSTALL_FLAG])).toStrictEqual({
 			is_install: false,
-			rest: STATIC_PROFILE,
+			rest: BASIC_PROFILE,
 		})
 		expect(init_install.split_install_flag([NO_INSTALL_FLAG]).rest).toStrictEqual([])
 	})

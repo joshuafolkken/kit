@@ -4,7 +4,7 @@ import type { CommandEntry } from './josh-command-types'
 // no identifier format allows. The same disable sits at the top of `josh-commands-maintenance.ts`
 // for the same reason.
 /* eslint-disable @typescript-eslint/naming-convention */
-const PROFILE_ARGUMENTS = '[--profile static|node]'
+const PROFILE_ARGUMENTS = '[--profile basic|full]'
 const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	profile: {
 		script: 'scripts/init/project-profile-cli.ts',
@@ -14,7 +14,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	},
 	start: {
 		script: 'scripts/init/start.ts',
-		description: 'Create a new project for the GitHub Issue workflow, from git init to labels',
+		description: 'Set a project up for the GitHub Issue workflow, from git init to the setup PR',
 		category: 'Project',
 		reference: [
 			`${PROFILE_ARGUMENTS} [--yes] [--github] [--public]`,

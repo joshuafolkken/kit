@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { json_format } from '#scripts/config-merge/json-format'
 import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
+import { basic_path_migration } from './basic-path-migration'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import type { ProjectShape } from './project-profile'
+import { session_language_environment } from './session-language-environment'
 
 const PRETTIER_CONFIG_JS = 'prettier.config.js'
-const STATIC_PRETTIER_CONFIG = 'prettier.config.mjs'
+const BASIC_PRETTIER_CONFIG = 'prettier.config.mjs'
 const VSCODE_EXTENSIONS_PATH = '.vscode/extensions.json'
 const VSCODE_SETTINGS_PATH = '.vscode/settings.json'
 const TSCONFIG_PATH = 'tsconfig.json'
@@ -17,6 +19,9 @@ interface FileAction {
 	dest: string
 	create: () => string
 	merge?: (existing: string) => string
+	// A merge that only migrates a kit-written line, for a file kit otherwise leaves to the project:
+	// when it changes nothing, the file is reported with the sample to add, as one with no merge is.
+	should_show_sample_when_unchanged?: boolean
 }
 
 function read_package_file(relative_path: string): string {
@@ -59,7 +64,7 @@ function build_vscode_actions(): ReadonlyArray<FileAction> {
 	]
 }
 
-const STATIC_EXTENSIONS = [
+const BASIC_EXTENSIONS = [
 	'streetsidesoftware.code-spell-checker',
 	'pkief.material-icon-theme',
 	'usernamehw.errorlens',
@@ -69,16 +74,16 @@ const STATIC_EXTENSIONS = [
 const PRETTIER_EXTENSION = 'esbenp.prettier-vscode'
 const DEFAULT_FORMATTER = 'editor.defaultFormatter'
 const FORMAT_ON_SAVE = 'editor.formatOnSave'
-const STATIC_LANGUAGES = ['[html]', '[css]', '[javascript]']
+const BASIC_LANGUAGES = ['[html]', '[css]', '[javascript]']
 
-function static_settings(): Record<string, Record<string, unknown>> {
+function basic_settings(): Record<string, Record<string, unknown>> {
 	const formatter = { [DEFAULT_FORMATTER]: PRETTIER_EXTENSION, [FORMAT_ON_SAVE]: true }
 
-	return Object.fromEntries(STATIC_LANGUAGES.map((language) => [language, formatter]))
+	return Object.fromEntries(BASIC_LANGUAGES.map((language) => [language, formatter]))
 }
 
-function build_static_settings_action(): FileAction {
-	const settings = static_settings()
+function build_basic_settings_action(): FileAction {
+	const settings = basic_settings()
 
 	return build_action(
 		VSCODE_SETTINGS_PATH,
@@ -87,10 +92,10 @@ function build_static_settings_action(): FileAction {
 	)
 }
 
-function build_static_vscode_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
+function build_basic_vscode_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 	const recommendations = shape.has_web
-		? [...STATIC_EXTENSIONS, PRETTIER_EXTENSION]
-		: STATIC_EXTENSIONS
+		? [...BASIC_EXTENSIONS, PRETTIER_EXTENSION]
+		: BASIC_EXTENSIONS
 	const actions: Array<FileAction> = [
 		build_action(
 			VSCODE_EXTENSIONS_PATH,
@@ -99,12 +104,12 @@ function build_static_vscode_actions(shape: ProjectShape): ReadonlyArray<FileAct
 		),
 	]
 
-	if (shape.has_web) actions.push(build_static_settings_action())
+	if (shape.has_web) actions.push(build_basic_settings_action())
 
 	return actions
 }
 
-function build_static_tsconfig_action(): FileAction {
+function build_basic_tsconfig_action(): FileAction {
 	return build_action(
 		TSCONFIG_PATH,
 		() => json_format.format_json({ extends: init_logic.get_tsconfig_extends_entry() }),
@@ -187,26 +192,28 @@ function build_gitignore_action(): FileAction {
 	)
 }
 
-function build_static_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
+function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 	const actions: Array<FileAction> = []
 	if (shape.has_git) actions.push(build_gitignore_action())
-	if (shape.has_typescript) actions.push(build_static_tsconfig_action())
+	if (shape.has_typescript) actions.push(build_basic_tsconfig_action())
 
 	if (shape.has_web) {
 		actions.push({
-			dest: STATIC_PRETTIER_CONFIG,
+			dest: BASIC_PRETTIER_CONFIG,
 			create: () =>
-				"import { config } from '@joshuafolkken/kit/prettier/static'\n\nexport default config\n",
+				"import { config } from '@joshuafolkken/kit/prettier/basic'\n\nexport default config\n",
+			merge: (existing) => basic_path_migration.migrate_basic_paths(existing),
+			should_show_sample_when_unchanged: true,
 		})
 	}
 
-	actions.push(...build_static_vscode_actions(shape))
+	actions.push(...build_basic_vscode_actions(shape))
 
 	return actions
 }
 
 function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
-	if (shape?.profile === 'static') return build_static_actions(shape)
+	if (shape?.profile === 'basic') return build_basic_actions(shape)
 
 	return [
 		...(shape?.has_git === false ? [] : [build_gitignore_action()]),
@@ -226,10 +233,11 @@ function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
 		...build_config_file_actions().filter(
 			(action) => shape?.has_git !== false || action.dest !== LEFTHOOK_PATH,
 		),
+		...session_language_environment.build_session_lang_actions(),
 	]
 }
 
 const init_actions = { build_file_actions, read_package_json }
 
 export type { FileAction }
-export { init_actions, PRETTIER_CONFIG_JS }
+export { init_actions, PRETTIER_CONFIG_JS, BASIC_PRETTIER_CONFIG }

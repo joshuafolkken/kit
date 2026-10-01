@@ -6,8 +6,8 @@ import { all_documents, linked_paths, read_document } from './ai-document-fixtur
 // found while the install guides and the overview route readers to it.
 const TUTORIAL = 'docs/tutorial.md'
 const ENTRY_DOCUMENTS: ReadonlyArray<string> = [
-	'docs/getting-started.md',
-	'docs/package.md',
+	'docs/setup/basic.md',
+	'docs/setup/full.md',
 	'docs/overview.md',
 ]
 

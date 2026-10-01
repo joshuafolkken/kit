@@ -9,9 +9,9 @@ const NO_TYPE_FILES = 'no TypeScript files were found'
 
 afterEach(() => vi.restoreAllMocks())
 
-describe('static gate execution', () => {
-	it('assigns the package root to a static project check', async () => {
-		vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+describe('basic gate execution', () => {
+	it('assigns the package root to a basic project check', async () => {
+		vi.spyOn(project_checks, 'is_basic').mockReturnValue(true)
 		vi.spyOn(project_checks, 'project_root').mockReturnValue('/project')
 
 		const check = gate_plan.GATE_CHECKS.find((entry) => entry.label === 'lint')
@@ -38,8 +38,8 @@ describe('static gate execution', () => {
 	})
 })
 
-describe('static gate checks with no target', () => {
-	it('marks the default type-check step as skipped for a static project', async () => {
+describe('basic gate checks with no target', () => {
+	it('marks the default type-check step as skipped for a basic project', async () => {
 		const reason = vi.spyOn(project_checks, 'type_check_skip_reason').mockReturnValue(NO_TYPE_FILES)
 		const check = gate_plan.GATE_CHECKS.find((entry) => entry.label === gate_plan.TYPE_CHECK_LABEL)
 		if (check === undefined) throw new Error('The gate has no type-check step')

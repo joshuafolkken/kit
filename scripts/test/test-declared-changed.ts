@@ -62,7 +62,7 @@ function source_paths(): ReadonlyArray<string> {
 // The verdict over the current working tree. `paths` stays injectable for a direct caller; when it is
 // omitted the injected set is read if one is in force, else the real tree.
 function current_verdict(paths: ReadonlyArray<string> = source_paths()): Verdict {
-	return test_declared_logic.verdict_for(paths, project_checks.is_static(process.cwd()))
+	return test_declared_logic.verdict_for(paths, project_checks.is_basic(process.cwd()))
 }
 
 // Put the injection back to what it was before a `with_paths` span — cleared to the live reader when

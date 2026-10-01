@@ -1,8 +1,8 @@
 # Manual config
 
-For `node` projects that import kit's ESLint, Prettier and tsconfig presets by hand instead of running `josh init`. Use individual configs directly if you prefer not to use `josh init`:
+For `full` projects that import kit's ESLint, Prettier and tsconfig presets by hand instead of running `josh init`. Use individual configs directly if you prefer not to use `josh init`:
 
-Install the optional ESLint dependencies listed in [package.md](./package.md#1-install) before importing the ESLint preset. A kit-only installation does not include them. The same preset import works before and after this change.
+Install ESLint and its plugins before importing the ESLint preset — a kit-only installation does not include them. They are kit's optional peer dependencies; `pnpm view @joshuafolkken/kit peerDependencies` lists each with the range kit supports.
 
 ```js
 // eslint.config.js
@@ -14,7 +14,7 @@ import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 import { config } from '@joshuafolkken/kit/prettier'
 ```
 
-For Svelte formatting, also install `prettier-plugin-svelte` and `svelte` in the project. The kit package itself does not require Svelte.
+The `@joshuafolkken/kit/prettier` preset loads `@ianvs/prettier-plugin-sort-imports`, `prettier-plugin-svelte` and `prettier-plugin-tailwindcss` by name, so install all three in the project ([init.md → Dependencies](./init.md#dependencies)). For a project without Svelte or Tailwind, import `@joshuafolkken/kit/prettier/basic` instead.
 
 ```jsonc
 // tsconfig.json

@@ -31,8 +31,8 @@ beforeEach(() => {
 	vi.clearAllMocks()
 })
 
-test('skips static cspell without configuration and names the reason', async () => {
-	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+test('skips basic cspell without configuration and names the reason', async () => {
+	vi.spyOn(project_checks, 'is_basic').mockReturnValue(true)
 	vi.spyOn(project_checks, 'has_config').mockReturnValue(false)
 	const output = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
@@ -41,8 +41,8 @@ test('skips static cspell without configuration and names the reason', async () 
 	expect(run_process).not.toHaveBeenCalled()
 })
 
-test('runs static cspell after configuration and CLI are installed', async () => {
-	vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+test('runs basic cspell after configuration and CLI are installed', async () => {
+	vi.spyOn(project_checks, 'is_basic').mockReturnValue(true)
 	vi.spyOn(project_checks, 'has_config').mockReturnValue(true)
 	vi.spyOn(project_checks, 'has_bin').mockReturnValue(true)
 	expect(await cspell_cached.run()).toBe(PASS)

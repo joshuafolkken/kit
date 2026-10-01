@@ -8,14 +8,16 @@ pnpm josh sync
 
 Unlike `josh init` (which skips existing files), `josh sync` is designed for keeping managed files up to date. Most managed files are overwritten; `pnpm-workspace.yaml` is merged (see below).
 
+> **`josh sync` follows the recorded profile.** When `package.json` records `josh.profile` as `basic` (or the pre-rename `static`), sync writes only the files `josh init` gives a `basic` project — `AGENTS.md`, `GEMINI.md`, `.cursorrules`, the `basic` templates of `.prettierignore` (only with HTML/CSS/JS files) and `pnpm-workspace.yaml`, `.gitattributes` with Git, and, with a GitHub remote, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/pull_request_template.md` and `.github/release.yml`. It keeps `CLAUDE.md` on the `basic` rules import, moves the pre-rename `CLAUDE.static.md` import and `prettier/static` preset path onto the `basic` ones, and writes none of the workflows, `.claude/settings.json`, `.codex/*`, `.coderabbit.yaml`, Sonar or config files below. Every other project — `full` recorded, or no profile recorded — gets the `full` set this page lists ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
+
 ## What gets synced
 
 ### AI files (overwritten)
 
-These files are copied verbatim from the package, with one path transformation applied (see below):
+These files are copied verbatim from the package, with one path transformation applied (see below). `CLAUDE.md` is not overwritten: sync only ensures its bootstrap line and package import, keeping your additions (see [Path transformation](#path-transformation)).
 
 ```text
-CLAUDE.md           AGENTS.md           GEMINI.md
+AGENTS.md           GEMINI.md
 CODE_OF_CONDUCT.md
 .cursorrules        .coderabbit.yaml    .gitattributes
 .mcp.json           .ncurc.json         .prettierignore
@@ -23,6 +25,7 @@ SECURITY.md         tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
+.github/workflows/pr-classification.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
 .github/pull_request_template.md
@@ -51,7 +54,7 @@ The Codex project files are managed by kit. Sync overwrites both files, and rewr
 > copy is removed, an edited one is kept with a warning.
 >
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
-> (`ci.yml`, `auto-tag.yml`, `production.yml`, `sonar-qube.yml`) is overwritten on
+> (`ci.yml`, `auto-tag.yml`, `dependabot-auto-merge.yml`, `pr-classification.yml`, `production.yml`, `sonar-qube.yml`) is overwritten on
 > each `josh sync`, so action SHA pins are bumped once in the kit and propagated to all consumers —
 > no per-consumer maintenance. The kit's own `github-actions` Dependabot is what bumps those pins at
 > the source; `josh sync` then distributes them. The `github-actions` entry in the distributed
@@ -604,7 +607,7 @@ These files are created by `josh init`. `josh sync` refreshes them in place by r
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `.gitignore`              | Append any missing kit ignore patterns; consumer-local entries are preserved. Matching is per-line and comments/blank lines are skipped, so re-running is a no-op                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `.npmrc`                  | Append-only: any missing line from the kit's required-lines list is added and every existing line is kept verbatim. A `//npm.pkg.github.com/:_authToken=…` line is **not** removed, in either the literal or the `${NODE_AUTH_TOKEN}` form. The kit does not distribute the credential line (pnpm ignores an env-var credential from a project `.npmrc` unless `npmrcAuthFile` declares the file trusted, so distributing it would only warn), but a consumer that has opted in owns a live credential there — and the opt-in commonly lives in a deploy platform's dashboard, invisible to sync. Kit `< 1.60.0` stripped it and broke such deploys; see [authentication.md §4(d)](./authentication.md#4-build-platforms-with-no-user-level-npmrc)                                 |
-| `eslint.config.js`        | Overwrite with the current kit template (no merge — same model as Playwright)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `eslint.config.js`        | Regenerated from the vanilla template, keeping your `rules` blocks; a config not built on `create_vanilla_config` is left untouched                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `tsconfig.json`           | Rewrite a retired `@joshuafolkken/*/tsconfig/*.jsonc` preset path to `.json`, then prepend the kit preset to the `extends` array — unless an `@joshuafolkken/*` tsconfig preset that already embeds kit base is present (e.g. app-kit's `tsconfig/sveltekit.json`) — then strip any `compilerOptions` key whose value equals the kit base preset (removing it as empty); value-divergent overrides and `include` are preserved, and the generated-output directories (`playwright-report`, `test-results`, plus `node_modules` / `build` / `dist`) and SvelteKit's `src/service-worker*` exclusions are union-merged into `exclude`. Rewrites are emitted prettier-clean (arrays are laid out the way prettier would — inline while they fit, one entry per line once they do not) |
 | `cspell.config.yaml`      | Prepend the kit import to the `import:` list, unless already present or superseded by an `@joshuafolkken/*` cspell preset that already imports kit base (e.g. app-kit's or game-kit's import)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `lefthook.yml`            | Prepend the kit preset to the `extends:` list — unless an `@joshuafolkken/*` lefthook preset that already extends kit base is present (e.g. app-kit's `lefthook/sveltekit.yml`); adding a second kit-base extend would crash lefthook with a "possible recursion in extends" error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -647,6 +650,10 @@ kit-family tsconfig presets shipped as `*.jsonc` until kit 1.23. Playwright ≥ 
 ### Ecosystem-preset dedup (app-kit / game-kit consumers)
 
 kit's base layer for `tsconfig.json`, `cspell.config.yaml`, and `lefthook.yml` is added only when the consumer does not already reference an `@joshuafolkken/*` preset for that subsystem. Every ecosystem preset — kit's own base, or an app-kit / game-kit framework preset — embeds, imports, or extends kit base by construction, so a second kit-base reference would be redundant (cspell / tsconfig) or a hard crash (`lefthook.yml` extends `lefthook/base.yml` twice → "possible recursion in extends"). The check reads the consumer's own config content — not its dependency tree — so it works for any current or future `@joshuafolkken` overlay without a hardcoded package name.
+
+### Repository labels (created when missing)
+
+Sync creates any missing release-classification label that the synced `pr-classification.yml` requires on the GitHub repository ([#2797](https://github.com/joshuafolkken/kit/issues/2797)). It is a write to GitHub, not to the working tree; existing labels are left alone.
 
 ## Path transformation
 
@@ -712,4 +719,4 @@ Run `josh sync` whenever you:
 
 - Upgrade `@joshuafolkken/kit` to a new version
 - Want to pull in updated GitHub workflow templates
-- Want to reset AI files (`CLAUDE.md`, `AGENTS.md`, etc.) to the latest package version after local edits
+- Want to reset the copied AI files (`AGENTS.md`, `GEMINI.md`, `.cursorrules`, workflows) to the latest package version after local edits

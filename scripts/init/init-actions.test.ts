@@ -1,12 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { init_actions, type FileAction } from './init-actions'
 import type { ProjectShape } from './project-profile'
+
+// The real builder reads this checkout's own `.claude/settings.json`, which wires the hook and so
+// yields nothing; a fixed action keeps the destination lists independent of the checkout.
+vi.mock('./session-language-environment', () => ({
+	session_language_environment: {
+		build_session_lang_actions: () => [
+			{ dest: '.env', create: () => 'JOSH_SESSION_LANG=en\n', merge: (text: string) => text },
+		],
+	},
+}))
 
 const GITIGNORE = '.gitignore'
 const NPMRC = '.npmrc'
 const ESLINT = 'eslint.config.js'
 const PRETTIER = 'prettier.config.js'
-const STATIC_PRETTIER = 'prettier.config.mjs'
+const BASIC_PRETTIER = 'prettier.config.mjs'
 const PLAYWRIGHT = 'playwright.config.ts'
 const TSCONFIG = 'tsconfig.json'
 const CSPELL = 'cspell.config.yaml'
@@ -14,6 +24,7 @@ const LEFTHOOK = 'lefthook.yml'
 const SECRETLINT = '.secretlintrc.json'
 const VSCODE_EXTENSIONS = '.vscode/extensions.json'
 const VSCODE_SETTINGS = '.vscode/settings.json'
+const ENV_FILE = '.env'
 
 const COMMON_TAIL_DESTINATIONS = [
 	TSCONFIG,
@@ -22,6 +33,7 @@ const COMMON_TAIL_DESTINATIONS = [
 	SECRETLINT,
 	VSCODE_EXTENSIONS,
 	VSCODE_SETTINGS,
+	ENV_FILE,
 ]
 
 const VANILLA_DESTINATIONS = [
@@ -119,7 +131,7 @@ describe('init_actions vscode settings distribution', () => {
 
 function shape(overrides: Partial<ProjectShape> = {}): ProjectShape {
 	return {
-		profile: 'static',
+		profile: 'basic',
 		reason: 'test',
 		has_web: false,
 		has_typescript: false,
@@ -139,7 +151,7 @@ function merge_action(
 	return action?.merge?.(content) ?? ''
 }
 
-describe('static profile file actions', () => {
+describe('basic profile file actions', () => {
 	it('keeps a Web-free, Git-free project minimal', () => {
 		const destinations = init_actions.build_file_actions(shape()).map((action) => action.dest)
 
@@ -150,14 +162,14 @@ describe('static profile file actions', () => {
 		const actions = init_actions.build_file_actions(shape({ has_web: true }))
 		const destinations = actions.map((action) => action.dest)
 
-		expect(destinations).toEqual([STATIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS])
-		expect(actions.find((action) => action.dest === STATIC_PRETTIER)?.create()).toContain(
-			'prettier/static',
+		expect(destinations).toEqual([BASIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS])
+		expect(actions.find((action) => action.dest === BASIC_PRETTIER)?.create()).toContain(
+			'prettier/basic',
 		)
 	})
 })
 
-describe('static profile merge and optional settings', () => {
+describe('basic profile merge and optional settings', () => {
 	it('merges recommendations and preserves existing formatters', () => {
 		const actions = init_actions.build_file_actions(shape({ has_web: true }))
 		const extensions = merge_action(

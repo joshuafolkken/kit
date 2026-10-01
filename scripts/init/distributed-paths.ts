@@ -97,10 +97,32 @@ function ensure_claude_md_import(existing: string | undefined): string {
 	return `${CLAUDE_MD_BOOTSTRAP}\n\n${CLAUDE_MD_IMPORT_LINE}\n\n${updated}`
 }
 
+// The lines `ensure_claude_md_import` writes. A basic project imports other rules, so a sync from
+// before joshuafolkken/kit#2827, or a switch from full, leaves these behind for it to remove.
+const FULL_CLAUDE_MD_LINES = new Set([
+	CLAUDE_MD_BOOTSTRAP,
+	OLD_CLAUDE_MD_BOOTSTRAP,
+	CLAUDE_MD_IMPORT_LINE,
+])
+
+// Each written line goes with the blank line after it, so the rest of the file is left as it was.
+function remove_claude_md_import(content: string): string {
+	const lines = content.split('\n')
+
+	return lines
+		.filter((line, index) => {
+			if (FULL_CLAUDE_MD_LINES.has(line)) return false
+
+			return line !== '' || !FULL_CLAUDE_MD_LINES.has(lines[index - 1] ?? '')
+		})
+		.join('\n')
+}
+
 const distributed_paths = {
 	transform_prompt_paths,
 	transform_distributed_paths,
 	ensure_claude_md_import,
+	remove_claude_md_import,
 	CLAUDE_MD_IMPORT_LINE,
 }
 

@@ -12,6 +12,8 @@ You want a Telegram message when a workflow run needs you or finishes. Every wor
 4. Optionally set `JOSH_SESSION_LANG` to `en` for English message bodies; it defaults to Japanese ([`josh session:lang`](../josh-commands.md#josh-sessionlang)).
 5. Send a test message with [`josh notify`](../josh-commands.md#josh-notify) and the `confirmation` task type.
 
+Not using Telegram at all? Set `JOSH_NOTIFY=off` in `.env` instead of the two credentials; every notification is then skipped with exit code 0 ([`JOSH_NOTIFY`](../scripts-ai.md#josh_notify)).
+
 In a cloud session, set the same values as environment variables instead of a `.env` file ([cloud-session.md](../cloud-session.md#environment-variables)).
 
 ## Check it worked

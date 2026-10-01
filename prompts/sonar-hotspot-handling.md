@@ -17,6 +17,12 @@ comments), but it **does** wait on the required `SonarQube` CI check, so a red g
 `followup` merge. Consumers pick the workflow up verbatim via `josh sync`; do not re-implement the
 gate per consumer.
 
+**A run that cannot see `SONAR_TOKEN` skips the scan and passes**, printing one line that names the
+missing token (joshuafolkken/kit#2815) — a consumer that does not use SonarCloud is never blocked by
+it. The same holds for any run GitHub withholds secrets from (a fork pull request, or a Dependabot
+run without the secret in the Dependabot store), so a repository that relies on this gate keeps
+`SONAR_TOKEN` in both secret stores.
+
 ### New Code vs Overall Code semantics
 
 SonarCloud's default **Sonar way** Quality Gate evaluates **New Code only** — conditions

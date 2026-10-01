@@ -14,7 +14,8 @@
 // a clone avoided. Here only paths that are mechanically certain to touch no runtime code are exempt —
 // the non-executable config and cosmetic-asset arms of `CLAUDE.md`'s "Non-runtime updates" exception
 // stay `required`, and a person declares that exception in the Step 0 work summary. Under-exempting
-// costs one declared exception; over-exempting ships an untested runtime change.
+// costs one declared exception; over-exempting ships an untested runtime change. The one widening is
+// the basic profile's manual check below, for files no runner kit has could test.
 
 type Verdict = 'required' | 'exempt' | 'satisfied'
 
@@ -27,7 +28,30 @@ const TEST_SUFFIXES: ReadonlyArray<string> = ['.e2e.ts', '.test.ts']
 const EXEMPT_PATHS: ReadonlyArray<string> = ['.editorconfig']
 const EXEMPT_PREFIXES: ReadonlyArray<string> = ['.idea/', '.vscode/', 'prompts/']
 const EXEMPT_SUFFIXES: ReadonlyArray<string> = ['.md']
-const STATIC_VISUAL_SUFFIXES: ReadonlyArray<string> = ['.html', '.css']
+const BASIC_VISUAL_SUFFIXES: ReadonlyArray<string> = ['.html', '.css']
+
+// What stays `required` under the basic profile (joshuafolkken/kit#2820): the languages kit's own
+// runner can test, and the data and config formats a JS/TS test can load. Any other file — HTML/CSS, or
+// the source of a project kit does not run, such as Lua — has no test kit could execute, so `required`
+// there would be unsatisfiable; it is confirmed by hand instead. The kept side is enumerated rather than
+// the manual one, because that side is closed.
+const BASIC_REQUIRED_SUFFIXES: ReadonlyArray<string> = [
+	'.ts',
+	'.tsx',
+	'.mts',
+	'.cts',
+	'.js',
+	'.jsx',
+	'.mjs',
+	'.cjs',
+	'.svelte',
+	'.json',
+	'.jsonc',
+	'.json5',
+	'.yaml',
+	'.yml',
+	'.toml',
+]
 
 function normalize(paths: ReadonlyArray<string>): Array<string> {
 	return paths.map((path) => path.trim()).filter((path) => path !== '')
@@ -37,12 +61,21 @@ function is_test_file(path: string): boolean {
 	return TEST_SUFFIXES.some((suffix) => path.endsWith(suffix))
 }
 
-function is_static_visual(path: string, is_static: boolean): boolean {
-	return is_static && STATIC_VISUAL_SUFFIXES.some((suffix) => path.endsWith(suffix))
+// Matched case-insensitively, so `Main.TS` is not mistaken for a language kit cannot test.
+function is_basic_manual(path: string, is_basic: boolean): boolean {
+	const lower = path.toLowerCase()
+
+	return is_basic && BASIC_REQUIRED_SUFFIXES.every((suffix) => !lower.endsWith(suffix))
 }
 
-function is_exempt(path: string, is_static = false): boolean {
-	if (EXEMPT_PATHS.includes(path) || is_static_visual(path, is_static)) return true
+function is_basic_visual(path: string): boolean {
+	const lower = path.toLowerCase()
+
+	return BASIC_VISUAL_SUFFIXES.some((suffix) => lower.endsWith(suffix))
+}
+
+function is_exempt(path: string, is_basic = false): boolean {
+	if (EXEMPT_PATHS.includes(path) || is_basic_manual(path, is_basic)) return true
 
 	return (
 		EXEMPT_SUFFIXES.some((suffix) => path.endsWith(suffix)) ||
@@ -52,31 +85,37 @@ function is_exempt(path: string, is_static = false): boolean {
 
 // A runtime file is one that is neither a test nor exempt. Its presence with no test file beside it is
 // the whole of what `required` reports.
-function is_runtime(path: string, is_static = false): boolean {
-	return !is_test_file(path) && !is_exempt(path, is_static)
+function is_runtime(path: string, is_basic = false): boolean {
+	return !is_test_file(path) && !is_exempt(path, is_basic)
 }
 
 // **A test file changed → `satisfied`, whatever else did.** A runtime file with no test beside it →
 // `required`. Everything left — an all-exempt change, and the empty diff — is `exempt`, because there
 // is no runtime file the change failed to test.
-function verdict_for(paths: ReadonlyArray<string>, is_static = false): Verdict {
+function verdict_for(paths: ReadonlyArray<string>, is_basic = false): Verdict {
 	const changed = normalize(paths)
 
 	if (changed.some((path) => is_test_file(path))) return 'satisfied'
-	if (changed.some((path) => is_runtime(path, is_static))) return 'required'
+	if (changed.some((path) => is_runtime(path, is_basic))) return 'required'
 
 	return 'exempt'
 }
 
 // The runtime files with no test beside them — the `required` detail line, so the answer says which
 // files it is about rather than only that it refused.
-function runtime_files(paths: ReadonlyArray<string>, is_static = false): Array<string> {
-	return normalize(paths).filter((path) => is_runtime(path, is_static))
+function runtime_files(paths: ReadonlyArray<string>, is_basic = false): Array<string> {
+	return normalize(paths).filter((path) => is_runtime(path, is_basic))
 }
 
 // The paths that made the change exempt — the `exempt` detail line.
-function exempt_files(paths: ReadonlyArray<string>, is_static = false): Array<string> {
-	return normalize(paths).filter((path) => is_exempt(path, is_static))
+function exempt_files(paths: ReadonlyArray<string>, is_basic = false): Array<string> {
+	return normalize(paths).filter((path) => is_exempt(path, is_basic))
+}
+
+// The paths exempt only because the basic profile has no runner for them — the ones a person still has
+// to confirm by hand, as opposed to docs and editor settings, which nobody checks.
+function manual_check_files(paths: ReadonlyArray<string>, is_basic: boolean): Array<string> {
+	return normalize(paths).filter((path) => is_exempt(path, is_basic) && !is_exempt(path))
 }
 
 const test_declared_logic = {
@@ -85,9 +124,11 @@ const test_declared_logic = {
 	EXEMPT_SUFFIXES,
 	TEST_SUFFIXES,
 	exempt_files,
+	is_basic_visual,
 	is_exempt,
 	is_runtime,
 	is_test_file,
+	manual_check_files,
 	runtime_files,
 	verdict_for,
 }
