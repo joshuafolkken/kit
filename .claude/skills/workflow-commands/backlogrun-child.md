@@ -295,7 +295,7 @@ answer=$(pnpm josh run:hold 926)   # alias: josh rh ; one token on stdout, prose
 | --- | --- | --- |
 | `hold` | Nothing left behind; the tree is claimed | Start the child. This is the ordinary answer. |
 | `reclaim` | Uncommitted changes, or HEAD off the default branch | Run what stderr printed: `git stash push -u -m "run:hold reclaimed before #<N>"`, then `git switch <default> && git pull`. **`-u` is not optional** (a new `*.test.ts` is untracked). **Then record the stash on `#<N>` as a comment, and ask `run:hold` again** — the check is re-askable. |
-| `resume` | A branch for `#<N>`, or an open pull request, is still here | **Reuse it and run the whole verification gate from the start** — never only the part the interrupted run had not reached. The tools are idempotent; what was missing was that **nobody had verified what the dead run already committed**. |
+| `resume` | An open PR, or a `#<N>` branch with commits or a dirty lane | **Reuse it and run the whole verification gate from the start** — never only the part the interrupted run had not reached. The tools are idempotent; what was missing was that **nobody had verified what the dead run already committed**. |
 | `park` | The pull request for `#<N>` is **merged** or **closed** | **Park the child** — `needs-decision` plus a comment naming what was found — and continue. Carrying on over a merged PR duplicates work; over a closed one revives rejected work. Do not delete the branch, reopen the PR, or commit on top of it. |
 | `busy` | Another **live** run holds this tree | Stop before filing anything — `run:hold`'s own answer, unchanged. |
 | `unknown` | The tree could not be read | Stop the session and report. It is not "the tree is clean". |
@@ -314,6 +314,5 @@ stash reference where there was one.
 
 **It is not asked in a lane** — `run:hold` claimed inside a lane skips the check, and `lane:open`'s own
 answer covers an interrupted lane instead. **Asked in the primary checkout while a lane for that child
-is open, `run:hold` would read `resume`, which is correct** — the branch read
-`git branch --list '<N>-*'` matches `<N>-lane`. The loop never reaches it that way, because `epic:next`
-does not offer a child already carrying `in-progress`.
+is open, `run:hold` reads `resume` only if `<N>-lane` has a commit or a dirty tree** — a clean one
+at the default branch reads `hold`. The loop never gets there, because `epic:next` does not offer a child already carrying `in-progress`.

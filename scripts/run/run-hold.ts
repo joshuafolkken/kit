@@ -170,10 +170,10 @@ function create_halfrun_stop_hold(target: string, issue: string, now: Date = new
 // be chosen that covers a `halfrun` stop or a `needs-human-review` stop: those are held across a
 // person's latency rather than a run's, and the thing that must not be trampled is sitting in the
 // tree where anyone can see it. An unreadable status is dirty, for the reason every other unreadable
-// state here blocks.
-async function is_tree_dirty(): Promise<boolean> {
+// state here blocks. `directory` asks the same of another work tree — a lane — instead of this one.
+async function is_tree_dirty(directory?: string): Promise<boolean> {
 	try {
-		const status = await git_command.status()
+		const status = await git_command.status(directory)
 
 		return status.trim() !== ''
 	} catch {
