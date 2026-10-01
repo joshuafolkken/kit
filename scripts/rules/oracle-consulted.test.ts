@@ -76,7 +76,7 @@ const PKG_MARKERS = [
 	'pnpm josh pkg:scout <keywords>',
 	(PKG_ORACLE?.vocabulary ?? []).join(' | '),
 	PKG_ORACLE?.single_source ?? '',
-	'once per run',
+	'refused until that command is on the transcript',
 ]
 
 describe('reason_for — assembled from the registry, not hand-written', () => {
@@ -90,6 +90,14 @@ describe('pkg:scout — refused on a package add, stood down after the scout', (
 		expect(rule_delivery(payload_of('pkg-refuse', PKG_ADD_COMMAND), NOW_MS)).toBe(
 			reason_of(PKG_SCOUT),
 		)
+	})
+
+	// Once per run let the reissued add through without a scout (joshuafolkken/kit#2807).
+	it('keeps refusing the reissued `pnpm add` until the scout runs', () => {
+		const payload = payload_of('pkg-repeat', PKG_ADD_COMMAND)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(reason_of(PKG_SCOUT))
+		expect(rule_delivery(payload, A_LATER_MS)).toBe(reason_of(PKG_SCOUT))
 	})
 
 	it('stands down once the scout is on the tail', () => {
@@ -120,7 +128,7 @@ describe('issue:lint — refused on a filing, after the filing rows, stood down 
 		const payload = payload_of('lint-ok', FILING_API_COMMAND, 'Bash', tail)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
-		expect(rule_delivery(payload, A_LATER_MS)).toBeUndefined()
+		expect(rule_delivery(payload, A_LATER_MS)).not.toBe(reason_of(ISSUE_LINT))
 	})
 
 	it('is a real oracle whose command the row consults', () => {

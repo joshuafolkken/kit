@@ -15,8 +15,8 @@ import { tail_commands } from './tail-commands'
 // binds. The input is mechanical — has the run filed before, did it fold — so it is a delivered rule
 // rather than resident prose.
 //
-// **It is `issue-scout`'s shape, not `filing-cap`'s.** Once per run with an `already_satisfied`
-// stand-down read off the tail: a filing with no prior filing is stood down (nothing to fold), and so
+// **It is `issue-scout`'s shape, not `filing-cap`'s.** Refused until an `already_satisfied`
+// stand-down read off the tail answers: a filing with no prior filing is stood down (nothing to fold), and so
 // is one the run has already folded. The refusal hands over the command rather than asking the run to
 // "fold first". **No new predicate**: the filing trigger is `bash_triggers.is_issue_filing`, and the
 // prior-filing count is `filing_cap.prior_filing_count`, both reused verbatim.
@@ -55,8 +55,8 @@ const ISSUE_FOLD_REASON =
 	'"<title>" …` — `fold` means file one Issue covering them, `separate` means file them apart ' +
 	'(separable findings whose combined size clears the split guide), and the default is `fold`. Add ' +
 	'`--not-separable` when they are really one deliverable. The procedure is ' +
-	'`.claude/skills/workflow-commands/split-assessment.md` → "The question". It fires once per run ' +
-	'and cannot repeat on the call in hand.'
+	'`.claude/skills/workflow-commands/split-assessment.md` → "The question". Every later filing is ' +
+	'refused until the fold is on the transcript.'
 
 // The enumeration row itself, so `delivered-rules.ts` spreads one entry rather than restating the
 // trigger and reason it already single-sources here. Once per run with the stand-down above.

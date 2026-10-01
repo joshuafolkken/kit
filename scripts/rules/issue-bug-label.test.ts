@@ -130,7 +130,7 @@ describe('filing without issue:lint', () => {
 		).toBe(true)
 	})
 
-	it('keeps refusing the lint-less filing after the once-per-run oracle has fired', () => {
+	it('keeps refusing the lint-less filing on every reissue', () => {
 		writeFileSync(body, BUG_BODY)
 		const labeled = `${FILING} -f 'labels[]=bug'`
 		const payload = harness.payload_of('no-lint', labeled, 'Bash', scouted_tail())
@@ -138,8 +138,20 @@ describe('filing without issue:lint', () => {
 			rule_delivery(payload, 1_700_000_000_000 + offset),
 		)
 
-		expect(deliveries.at(-1)).toBe(issue_bug_label_rule.ROW.reason)
+		for (const reason of deliveries.slice(1)) expect(reason).toContain('issue:lint')
 		expect(issue_bug_label_rule.ROW.reason).toContain('pnpm josh issue:lint <body-file>')
+	})
+
+	it('refuses a filing whose linted body file can no longer be read', () => {
+		const missing = path.join(work, 'gone.md')
+		const gone_lint = time_transcript_fixture.josh_call_line(
+			1,
+			time_transcript_fixture.BRANCH,
+			`pnpm josh issue:lint ${missing}`,
+		)
+		const filing = `gh api repos/joshuafolkken/kit/issues -f title=x -F body=@${missing}`
+
+		expect(issue_bug_label_rule.needs_classification_labels(filing, gone_lint)).toBe(true)
 	})
 })
 

@@ -239,8 +239,8 @@ const ISSUE_COMMENTS_REASON =
 	"except for two answers that are not the run's to make: work a comment reassigns to another " +
 	'Issue is out of scope and is not implemented, and a comment saying the Issue no longer has a ' +
 	'reason to exist stops the run with a `confirmation` Telegram. The procedure is ' +
-	'`.claude/skills/workflow-commands/SKILL.md` → "An Issue\'s comments are part of the Issue". It ' +
-	'fires once per run and cannot repeat on the call in hand.'
+	'`.claude/skills/workflow-commands/SKILL.md` → "An Issue\'s comments are part of the Issue". ' +
+	'Every body-only read is refused until the comments are read.'
 
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
 // the value — is `shell-body-trigger.ts`, beside its own cases, as is the refusal text. A row states
@@ -310,7 +310,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	issue_scout.ROW,
 	filing_cap.ROW,
 	// **`issue-fold` shares the same filing trigger** (joshuafolkken/kit#2213), listed after
-	// `filing-cap`: it refuses a *second* filing the run has not folded, once per run, stood down off
+	// `filing-cap`: it refuses a *second* filing the run has not folded until it is stood down off
 	// the tail when the run has already folded or has filed nothing earlier. It is another instance of
 	// the admissible overlap — the losing rule's delivery is still correct one reissue later — so a
 	// scout-less, unfolded, over-cap second filing is delivered `wip-cap`, then `issue-scout`, then
@@ -703,10 +703,13 @@ function is_first_delivery(
 // **It is a trade, and the other side is named rather than hidden**: an arm allowed inside that window
 // that really does run is not recorded either, so a second one before it fires goes uncaught. A missing
 // record loses one detection; a wrong one blocks every arm until it expires.
-// **Both extras hang off `is_first_delivery`, and a row declares at most one.** `decide` is for a
-// recurring rule (joshuafolkken/kit#1570); `already_satisfied` is for a once-per-run rule the run can
-// satisfy earlier (joshuafolkken/kit#1905), where the earlier act stands the delivery down before the
-// once-per-run record is spent. A row with neither takes `is_first_delivery` unchanged.
+// **Both extras replace `is_first_delivery`, and a row declares at most one.** `decide` is for a
+// recurring rule (joshuafolkken/kit#1570); `already_satisfied` is for a precondition the run satisfies
+// with an earlier act (joshuafolkken/kit#1905), and that act is the only way past it: the row refuses
+// every candidate call until the act is on the tail (joshuafolkken/kit#2807). Once per run, the
+// reissue went through with the precondition still unmet — a guard that passed precisely the run that
+// skipped the procedure. Repeating cannot wedge a run that obeys, because the stand-down answers first.
+// A row with neither takes `is_first_delivery` unchanged.
 function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_block'] {
 	const { decide, already_satisfied } = rule
 
@@ -719,7 +722,7 @@ function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_blo
 		run: GuardRun,
 	): boolean {
 		if (already_satisfied?.(tail, call) === true) return false
-		if (decide === undefined) return is_first_delivery(tail, call, delivered_at_ms, run)
+		if (decide === undefined) return true
 
 		return decide(call, run, !will_batch_guard_refuse(tail, call, run), delivered_at_ms)
 	}
