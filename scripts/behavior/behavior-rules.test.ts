@@ -48,6 +48,35 @@ describe('behavior_rules.is_index_mutation', () => {
 	})
 })
 
+describe('behavior_rules.is_index_mutation with quoted separators', () => {
+	it('does not split on a separator inside a quoted argument', () => {
+		const quoted = [
+			'grep -rniE "commit|josh git|git add" docs/init.md',
+			"grep -E 'x;git commit' file.ts",
+			'rg "a && git add ." scripts',
+		]
+
+		expect(quoted.some((command) => behavior_rules.is_index_mutation(command))).toBe(false)
+	})
+
+	it('still flags a mutation chained or piped outside quotes', () => {
+		const chained = [
+			'git add . && git commit -m x',
+			'cd x; git add -A',
+			'echo x | git add --pathspec-from-file=-',
+			'grep -E "a|b" f && git commit -m "fix: a|b"',
+			"cat > n.md <<EOF\nit's done\nEOF\ngit add n.md && git commit -m 'docs'",
+			String.raw`echo it\'s; git add . ; echo 'x'`,
+			"git commit -m \"$(cat <<'EOF'\nit's a body\nEOF\n)\"",
+			'gh issue comment 1 --body "first\nsecond" && git add . && git commit -m "msg"',
+			String.raw`echo 'C:\' ; git add . ; echo 'x'`,
+			'cat <<EOF > f && git add f\nbody\nEOF',
+		]
+
+		expect(chained.every((command) => behavior_rules.is_index_mutation(command))).toBe(true)
+	})
+})
+
 describe('behavior_rules.command_of', () => {
 	it('reads a Bash command and ignores every other block', () => {
 		expect(behavior_rules.command_of(bash_block(GIT_STATUS))).toBe(GIT_STATUS)

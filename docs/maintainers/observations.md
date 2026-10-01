@@ -666,3 +666,9 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/rules/last-prompt.ts:50 | 2026-10-01 | #2819
 - rf:bug-risks | low | scripts/init/distributed-paths.ts:102 | 2026-10-01 | #2827
 - rf:bug-risks | medium | scripts/init/init-actions.ts | 2026-10-01 | #2818
+- rf:bug-risks | medium | scripts/behavior/behavior-rules.ts | 2026-10-01 | #2841
+- rf:tests | low | scripts/behavior/behavior-rules.test.ts | 2026-10-01 | #2841
+- rf:assumptions | low | scripts/behavior/behavior-rules.ts | 2026-10-01 | #2841
+- rf:bug-risks | medium | scripts/behavior/behavior-rules.ts | 2026-10-01 | #2841
+- rf:bug-risks | medium | scripts/behavior/behavior-rules.ts | 2026-10-01 | #2841
+- rf:tests | low | scripts/behavior/behavior-rules.test.ts | 2026-10-01 | #2841

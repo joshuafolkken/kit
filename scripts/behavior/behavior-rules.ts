@@ -1,4 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import type { Block, TranscriptLine } from '#scripts/time-runtime/time-transcript-line'
 import type { Assertion, Finding } from './behavior-assertion'
 
@@ -57,8 +58,14 @@ function command_of(block: Block): string | undefined {
 // Whether any segment of a command directly mutates the index: it begins with a staging or commit
 // subcommand and is not a dry run. Each `;`/`&&`/`|`-separated segment is judged on its own, so a
 // mutation anywhere in a chain is caught while a mention inside another command's argument is not.
+//
+// Quoted spans are removed before the split (joshuafolkken/kit#2841): a `|` inside a quoted pattern —
+// `grep -E "commit|git add" file` — is not a separator, and cutting there synthesized a segment that
+// began with `git add` out of a read-only search. `unquoted` honors escapes and heredoc bodies, so a
+// stray `it's` cannot pair with a later quote and erase the real `git add` between them.
 function is_index_mutation(command: string): boolean {
-	return command
+	return time_shell
+		.unquoted(command)
 		.split(SEGMENT_SEPARATOR)
 		.map((segment) => segment.trim())
 		.some((segment) => INDEX_MUTATION_HEAD.test(segment) && !is_dry_run(segment))
