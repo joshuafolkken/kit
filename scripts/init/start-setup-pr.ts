@@ -80,25 +80,28 @@ function open_setup_issue_number(): string | undefined {
 	return issue_number.length > 0 ? issue_number : undefined
 }
 
-// A re-run after a failed hook, push or pull request reuses what the failed run made — the branch it
-// left checked out, or the setup Issue still open — so no Issue is filed twice.
+// A re-run after a failed hook reuses what the failed run made — the branch it left checked out, or
+// the setup Issue still open — so no Issue is filed twice.
 function resolve_issue(branch: string | undefined): IssueInfo {
 	const reused = setup_branch_number(branch) ?? open_setup_issue_number()
 
 	return setup_issue(reused ?? file_setup_issue())
 }
 
+// An existing setup branch seen from another branch is not switched to: the setup just rewrote kit's
+// files in this working tree, and a checkout would refuse to overwrite them part-way through.
 function switch_to(branch: string, current: string | undefined, root: string): void {
 	if (current === branch) return
 
 	const reference = `refs/heads/${branch}`
-	const has_branch = start_exec.succeeds(
-		'git',
-		['rev-parse', '--verify', '--quiet', reference],
-		root,
-	)
 
-	start_exec.run('git', has_branch ? ['switch', branch] : ['switch', '--create', branch], root)
+	if (start_exec.succeeds('git', ['rev-parse', '--verify', '--quiet', reference], root)) {
+		throw new Error(
+			`The setup branch ${branch} already exists. Run git switch ${branch}, then josh start again.`,
+		)
+	}
+
+	start_exec.run('git', ['switch', '--create', branch], root)
 }
 
 // The paths are named on the commit as well as on the add, so anything the user had staged before
@@ -114,14 +117,14 @@ function commit_kit_paths(paths: ReadonlyArray<string>, issue: IssueInfo, root: 
 // it is the one step that changes main.
 async function open(root: string): Promise<void> {
 	const paths = kit_written_paths.select(changed_paths(root))
-	const current = start_exec.read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
 
-	if (paths.length === 0 && !is_setup_branch(current)) {
+	if (paths.length === 0) {
 		console.info(NOTHING_TO_COMMIT)
 
 		return
 	}
 
+	const current = start_exec.read_output('git', ['symbolic-ref', '--short', 'HEAD'], root)
 	const issue = resolve_issue(current)
 
 	switch_to(issue.branch_name, current, root)

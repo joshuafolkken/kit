@@ -427,7 +427,7 @@ pnpm exec josh start --yes --github --profile basic    # unattended, including t
 
 **Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
 
-**Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. A re-run on the setup branch resumes step 6 with its Issue. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
+**Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
 
 **Output / exit codes:** exits 0 when every step has run. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
 

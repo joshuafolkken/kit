@@ -46,6 +46,7 @@ describe('the steps josh start plans', () => {
 	})
 })
 
+const SETUP_BRANCH = '7-set-up-joshuafolkken-kit'
 const ON_GITHUB_MAIN: GitState = {
 	...NO_GIT,
 	has_git: true,
@@ -83,14 +84,16 @@ describe('the setup pull request josh start plans (#2816)', () => {
 })
 
 describe('when josh start resumes or skips the setup pull request (#2816)', () => {
-	it('resumes on the setup branch an earlier run left, even after its commit (#2816)', () => {
-		const state = {
-			...ON_GITHUB_MAIN,
-			branch: '7-set-up-joshuafolkken-kit',
-			has_kit_committed: true,
-		}
+	it('resumes on the setup branch a failed hook left before the commit (#2816)', () => {
+		const state = { ...ON_GITHUB_MAIN, branch: SETUP_BRANCH }
 
 		expect(start_plan.plan_steps(state).steps).toContain('setup_pr')
+	})
+
+	it('plans nothing more on the setup branch once kit is committed there', () => {
+		const state = { ...ON_GITHUB_MAIN, branch: SETUP_BRANCH, has_kit_committed: true }
+
+		expect(start_plan.plan_steps(state).steps).not.toContain('setup_pr')
 	})
 
 	it('commits a repository with no history directly, without a pull request', () => {

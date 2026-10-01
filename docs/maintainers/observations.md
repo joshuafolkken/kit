@@ -680,3 +680,5 @@ dropping either side destroys exactly what it exists to record.
 - rf:tests | low | scripts/init/start-setup-pr.test.ts | 2026-10-01 | #2816
 - rf:comments | low | scripts/init/start-setup-pr.ts | 2026-10-01 | #2816
 - rf:comments | low | docs/josh-commands.md | 2026-10-01 | #2816
+- rf:bug-risks | medium | scripts/init/start-plan.ts:68 | 2026-10-01 | #2816
+- rf:bug-risks | medium | scripts/init/start-setup-pr.ts:101 | 2026-10-01 | #2816

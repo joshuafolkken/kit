@@ -15,6 +15,7 @@ const COMMIT = `git commit --message Set up @joshuafolkken/kit #7 -- ${KIT_PATHS
 const PUSH = `git push --set-upstream origin ${BRANCH}`
 const READ_ONLY = ['git ls-files', 'git diff', 'git symbolic-ref', 'git rev-parse']
 const PERSONAL_NOTE = 'employment-test.md'
+const MANIFEST = 'package.json'
 const UNTRACKED = ['CLAUDE.md', PERSONAL_NOTE, '.serena/project.yml', '.github/workflows/ci.yml']
 const mocked_execa = vi.mocked(execaSync)
 
@@ -23,6 +24,7 @@ interface Tree {
 	untracked: ReadonlyArray<string>
 	modified: ReadonlyArray<string>
 	open_issue: string
+	has_branch: boolean
 }
 
 function result(stdout = '', exit_code = 0): ReturnType<typeof execaSync> {
@@ -43,7 +45,7 @@ function git_writes(): Array<string> {
 		.filter((command) => READ_ONLY.every((prefix) => !command.startsWith(prefix)))
 }
 
-// What each read-only git subcommand answers for `tree`; `rev-parse` fails, so no branch exists yet.
+// What each read-only git subcommand answers for `tree`; `rev-parse` answers whether the branch exists.
 function git_answer(subcommand: string, tree: Tree): ReturnType<typeof execaSync> {
 	const listings: Readonly<Record<string, string>> = {
 		'ls-files': tree.untracked.join('\n'),
@@ -51,7 +53,9 @@ function git_answer(subcommand: string, tree: Tree): ReturnType<typeof execaSync
 		'symbolic-ref': tree.branch,
 	}
 
-	return subcommand === 'rev-parse' ? result('', 1) : result(listings[subcommand] ?? '')
+	if (subcommand === 'rev-parse') return result('', tree.has_branch ? 0 : 1)
+
+	return result(listings[subcommand] ?? '')
 }
 
 // The working tree the reported onboarding left: kit's files beside a personal note and an editor's
@@ -60,8 +64,9 @@ function given(tree: Partial<Tree> = {}): void {
 	const full: Tree = {
 		branch: 'main',
 		untracked: UNTRACKED,
-		modified: ['package.json', '.gitignore'],
+		modified: [MANIFEST, '.gitignore'],
 		open_issue: '',
+		has_branch: false,
 		...tree,
 	}
 
@@ -135,13 +140,25 @@ describe('a re-run after the setup pull request failed part-way (#2816)', () => 
 		expect(git_writes()[0]).toBe('git switch --create 5-set-up-joshuafolkken-kit')
 	})
 
-	it('resumes on the setup branch a failed push left, filing and switching nothing', async () => {
-		given({ branch: BRANCH, untracked: [], modified: [] })
+	it('resumes on the setup branch a failed hook left, filing and switching nothing', async () => {
+		given({ branch: BRANCH, untracked: [], modified: ['CLAUDE.md', MANIFEST] })
 		await start_setup_pr.open(ROOT)
 
 		expect(git_gh_exec.exec_gh_api_sync).not.toHaveBeenCalled()
-		expect(git_writes()).toStrictEqual([PUSH])
+		expect(git_writes()).toStrictEqual([
+			'git add -- CLAUDE.md package.json',
+			'git commit --message Set up @joshuafolkken/kit #7 -- CLAUDE.md package.json',
+			PUSH,
+		])
 		expect(git_pr.create_with_issue_info).toHaveBeenCalled()
+	})
+
+	it('stops before switching when the setup branch already exists beside main', async () => {
+		given({ open_issue: '7', has_branch: true })
+
+		await expect(start_setup_pr.open(ROOT)).rejects.toThrow(`git switch ${BRANCH}`)
+		expect(git_writes()).toStrictEqual([])
+		expect(git_pr.create_with_issue_info).not.toHaveBeenCalled()
 	})
 
 	it('recognizes only the setup branch of its own title', () => {
