@@ -69,7 +69,9 @@ function is_basic_manual(path: string, is_basic: boolean): boolean {
 }
 
 function is_basic_visual(path: string): boolean {
-	return BASIC_VISUAL_SUFFIXES.some((suffix) => path.endsWith(suffix))
+	const lower = path.toLowerCase()
+
+	return BASIC_VISUAL_SUFFIXES.some((suffix) => lower.endsWith(suffix))
 }
 
 function is_exempt(path: string, is_basic = false): boolean {

@@ -29,6 +29,13 @@ describe('test_declared.report manual-check instructions', () => {
 		expect(result.detail).not.toContain('browser')
 	})
 
+	it('reads an upper-case HTML suffix as a page for the browser check', () => {
+		const { detail } = test_declared.report(['Index.HTML'], true)
+
+		expect(detail).toContain('browser')
+		expect(detail).not.toContain(RUN_CHECK)
+	})
+
 	it('gives no manual instruction for a documentation-only change', () => {
 		expect(test_declared.report(['docs/x.md'], true).detail).toBe('exempt paths: docs/x.md')
 	})
