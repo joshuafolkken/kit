@@ -37,6 +37,7 @@ const PROVIDER_CLI_TABLE: Readonly<Record<AgentProvider, ProviderCli>> = {
 const MODEL_CLI_FLOORS: ReadonlyMap<string, string> = new Map([
 	['claude-opus-5-5', '2.1.280'],
 	['gpt-6-sol', '0.155.0'],
+	['gpt-6.1-sol', '0.159.1'],
 ])
 
 const default_ports: DiagnosticPorts = {

@@ -33,5 +33,5 @@ test('the review brief hands orchestration the OpenAI reviewer profile', () => {
 		rubric_path: RUBRIC_PATH,
 	})
 
-	expect(brief).toContain('provider=openai role=reviewer model=gpt-6-sol effort=high')
+	expect(brief).toContain('provider=openai role=reviewer model=gpt-6.1-sol effort=high')
 })

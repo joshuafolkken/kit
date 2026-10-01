@@ -44,7 +44,7 @@ const OPENAI_PROVIDER: AgentProvider = 'openai'
 // whenever the CLI moves it, so a run log could not say which model produced it and a model migration
 // could not be measured apart from everything else. A new lane records the id it resolved; a lane
 // created before a migration keeps the model it recorded (`with_phase_effort` leaves it untouched).
-const OPENAI_MODEL = 'gpt-6-sol'
+const OPENAI_MODEL = 'gpt-6.1-sol'
 const ANTHROPIC_MODEL = 'claude-opus-5-5'
 const CODEX_SESSION_KEY = 'CODEX_THREAD_ID'
 

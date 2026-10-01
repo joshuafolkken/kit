@@ -52,6 +52,12 @@ const BRIEF_TWO = 'review:brief --round 2'
 const COMPLETED = { kind: 'completed', pid: 1 } as const
 const SPAWN_NOTE = 'spawn failed'
 const PROFILE_NOTE = 'bad model'
+const OPENAI_REVIEWER_PROFILE = {
+	provider: 'openai',
+	role: 'reviewer',
+	model: 'gpt-6.1-sol',
+	effort: 'high',
+}
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
@@ -99,7 +105,7 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 		resolve_in_mock.mockReturnValue({
 			kind: 'argv',
 			argv: ARGV,
-			profile: { provider: 'openai', role: 'reviewer', model: 'gpt-6-sol', effort: 'high' },
+			profile: OPENAI_REVIEWER_PROFILE,
 		})
 		is_child_mock.mockReturnValue(true)
 		broker_request.mockResolvedValue(true)
@@ -113,7 +119,7 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 		resolve_in_mock.mockReturnValue({
 			kind: 'argv',
 			argv: ARGV,
-			profile: { provider: 'openai', role: 'reviewer', model: 'gpt-6-sol', effort: 'high' },
+			profile: OPENAI_REVIEWER_PROFILE,
 		})
 		is_child_mock.mockReturnValue(true)
 

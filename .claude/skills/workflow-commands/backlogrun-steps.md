@@ -237,7 +237,7 @@ setting are `docs/josh-commands.md` → "`josh run:wake`".
 
 **Every unattended role runs with the provider selected from the invoking CLI and its own profile.**
 Codex sessions use OpenAI; Claude Code sessions use Anthropic. Anthropic uses scheduler
-`claude-opus-5-5`, worker `claude-opus-5-5` and reviewer `claude-opus-5-5`; OpenAI uses `gpt-6-sol`,
+`claude-opus-5-5`, worker `claude-opus-5-5` and reviewer `claude-opus-5-5`; OpenAI uses `gpt-6.1-sol`,
 with role efforts `medium`/`medium`/`high` (scheduler / worker / reviewer) for both. Role overrides
 resolve before launch; model overrides apply only to Claude Code, effort overrides to either provider,
 and legacy `JOSH_LANE_*` values to the worker only. Invalid configuration, a missing or conflicting

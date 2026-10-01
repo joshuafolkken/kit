@@ -5,7 +5,8 @@ import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 const OPENAI_WORKER = agent_role_profile.OPENAI_PROFILES.worker
 const ANTHROPIC_WORKER = agent_role_profile.DEFAULT_PROFILES.worker
 const NOT_LOGGED_IN = 'Not logged in'
-const CODEX_READY: ProcessOutcome = { status: 0, stdout: 'codex-cli 0.156.1' }
+const CODEX_READY: ProcessOutcome = { status: 0, stdout: 'codex-cli 0.159.1' }
+const CODEX_LEGACY: ProcessOutcome = { status: 0, stdout: 'codex-cli 0.156.1' }
 const CLAUDE_READY: ProcessOutcome = { status: 0, stdout: '2.1.280 (Claude Code)' }
 const LOGGED_IN: ProcessOutcome = { status: 0, stdout: 'Logged in' }
 
@@ -51,18 +52,29 @@ describe('OpenAI launch diagnostics', () => {
 // and never falls back to a model the old CLI could run.
 describe('Codex model compatibility diagnostics', () => {
 	it('refuses a Codex CLI older than the model floor, naming the update', () => {
-		const fake = ports({ status: 0, stdout: 'codex-cli 0.154.0-alpha.6.1' })
+		const fake = ports(CODEX_LEGACY)
 		const message = note(OPENAI_WORKER, fake)
 
-		expect(message).toContain('0.155.0')
+		expect(message).toContain('gpt-6.1-sol')
+		expect(message).toContain('0.159.1')
 		expect(message).toContain('npm install -g @openai/codex@latest')
 		expect(fake.run).toHaveBeenCalledTimes(1)
 	})
 
 	it('treats a prerelease of the floor as older than the floor', () => {
 		expect(
-			note(OPENAI_WORKER, ports({ status: 0, stdout: 'codex-cli 0.155.0-alpha.1' })),
-		).toContain('0.155.0 or later')
+			note(OPENAI_WORKER, ports({ status: 0, stdout: 'codex-cli 0.159.1-alpha.1' })),
+		).toContain('0.159.1 or later')
+	})
+
+	it('keeps the previous model available to recorded lanes at its original floor', () => {
+		const legacy = { ...OPENAI_WORKER, model: 'gpt-6-sol' }
+		const fake = ports(CODEX_LEGACY, LOGGED_IN)
+
+		expect(agent_diagnostics.check(legacy, fake)).toStrictEqual({ kind: 'ready' })
+		expect(note(legacy, ports({ status: 0, stdout: 'codex-cli 0.154.0' }))).toContain(
+			'0.155.0 or later',
+		)
 	})
 })
 
