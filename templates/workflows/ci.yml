@@ -200,24 +200,45 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # A `static` project has no `prepare`, no build and no SvelteKit, so the ordered steps below
+      # would fail on its first pull request (joshuafolkken/kit#2814). The profile is read from
+      # `josh profile` rather than re-derived here, and a static project hands the whole check set to
+      # `josh gate`, which already decides per profile which checks apply. A `case` instead of a pipe
+      # into `grep -q`, for the `pipefail` reason given at `Detect E2E specs` below.
+      - name: Resolve project profile
+        id: profile
+        run: |
+          profile=$(pnpm --silent josh profile)
+          echo "${profile}"
+          case "${profile}" in
+            *'profile: static ('*) echo 'is_static=true' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'is_static=false' >> "$GITHUB_OUTPUT" ;;
+          esac
+
       - name: Run spell check
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm josh cspell:dot
 
       - name: Prepare
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm prepare
 
       - name: Run type check
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm exec svelte-kit sync && pnpm exec svelte-check --tsconfig ./tsconfig.json --threshold error
 
       - name: Run prettier check
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm exec prettier --check .
 
       # Build before eslint so generated outputs exist for type-aware linting.
       # The same build output is reused by the size check below.
       - name: Build
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm build
 
       - name: Run eslint check
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm exec eslint . --cache --cache-strategy content
 
       # Vitest browser-mode projects (*.svelte.test.ts) drive a real Playwright browser,
@@ -233,9 +254,15 @@ jobs:
         run: ./node_modules/.bin/playwright install --with-deps ${PLAYWRIGHT_BROWSERS}
 
       - name: Run unit tests
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm josh test:unit
 
+      - name: Run verification gate
+        if: steps.profile.outputs.is_static == 'true'
+        run: pnpm josh gate --verbose
+
       - name: Check bundle size
+        if: steps.profile.outputs.is_static != 'true'
         run: pnpm size-limit
 
   security:
