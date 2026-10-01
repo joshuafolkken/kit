@@ -19,16 +19,26 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    # A consumer that does not use SonarCloud has no SONAR_TOKEN, and the scan would fail on
+    # authentication and turn a required check red (joshuafolkken/kit#2815). `secrets` cannot be read
+    # in a step `if:`, so the secret is lifted into the job env and the steps branch on that instead.
+    # Token presence is the only signal that needs no consumer setup; a run GitHub withholds secrets
+    # from (a fork pull request, Dependabot without the secret) skips too — see sonar-hotspot-handling.md.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
+      - name: Skip SonarQube Scan
+        if: env.SONAR_TOKEN == ''
+        run: echo "SonarQube scan skipped because SONAR_TOKEN is not set."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.SONAR_TOKEN != ''
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
       - name: SonarQube Scan
+        if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
         with:
           # Wait for the SonarCloud Quality Gate and fail this job (a required PR check) when the
           # gate is red, so a PR that introduces a Maintainability / code-smell finding cannot be
           # merged green. Without this flag the scan only uploads results and never blocks.
           args: -Dsonar.qualitygate.wait=true
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
