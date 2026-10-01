@@ -697,3 +697,6 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | low | scripts/lane/lane-leftover.ts | 2026-10-01 | #2857
 - rf:tests | low | scripts/run/run-progress-cli.test.ts:221 | 2026-10-01 | #2859
 - rf:comments | low | docs/josh-commands.md:1952 | 2026-10-01 | #2859
+- rf:tests | low | scripts/init/init-bootstrap.test.ts:169 | 2026-10-01 | #2866
+- rf:confidence | low | scripts/init/init-bootstrap.ts:79 | 2026-10-01 | #2866
+- rf:none | none | - | 2026-10-01 | #2866
