@@ -1,16 +1,14 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execaSync } from 'execa'
 
-// The workflows that install safe-chain on the runner. Each carries the release and the installer's
-// SHA-256 as workflow-level env, so one pin per file moves every "Setup safe-chain" step at once
-// (joshuafolkken/kit#2711, joshuafolkken/kit#2765). A consumer has the first and the last, and
-// `josh sync` rewrites both from kit, so moving them anywhere but kit is harmless and short-lived.
-const WORKFLOW_PATHS = [
-	'.github/workflows/ci.yml',
-	'templates/workflows/ci.yml',
-	'.github/workflows/pr-classification.yml',
-]
+// Where the workflows that install safe-chain on the runner live. Each carries the release and the
+// installer's SHA-256 as workflow-level env, so one pin per file moves every "Setup safe-chain" step
+// at once (joshuafolkken/kit#2711, joshuafolkken/kit#2765). The directories are scanned rather than
+// a file list kept, so a workflow another package distributes — app-kit's `dast.yml` and `load.yml`
+// — moves with the rest (joshuafolkken/kit#2830); a file without the pin is never a target.
+const WORKFLOW_DIRECTORIES = ['.github/workflows', 'templates/workflows']
+const WORKFLOW_FILE_RE = /\.ya?ml$/u
 // `[ \t]` rather than `\s`: under the `m` flag `\s*` would run across line ends and swallow the
 // blank line that follows the env block.
 const VERSION_RE = /^(?<key>[ \t]*SAFE_CHAIN_INSTALLER_VERSION:[ \t]*)(?<value>\S+)[ \t]*$/mu
@@ -25,6 +23,15 @@ interface InstallerPin {
 
 function installer_url(version: string): string {
 	return `https://github.com/AikidoSec/safe-chain/releases/download/${version}/install-safe-chain.sh`
+}
+
+function list_workflows(): Array<string> {
+	return WORKFLOW_DIRECTORIES.filter((directory) => existsSync(directory)).flatMap((directory) =>
+		readdirSync(directory)
+			.filter((file_name) => WORKFLOW_FILE_RE.test(file_name))
+			.toSorted((left, right) => left.localeCompare(right))
+			.map((file_name) => `${directory}/${file_name}`),
+	)
 }
 
 function extract_pinned_version(content: string): string | undefined {
@@ -66,7 +73,7 @@ function write_pin(workflow_path: string, pin: InstallerPin): void {
 	writeFileSync(workflow_path, rewrite_pin(readFileSync(workflow_path, 'utf8'), pin), 'utf8')
 }
 
-function sync(latest: string, workflow_paths: ReadonlyArray<string> = WORKFLOW_PATHS): void {
+function sync(latest: string, workflow_paths: ReadonlyArray<string> = list_workflows()): void {
 	const targets = stale_workflows(latest, workflow_paths)
 	if (targets.length === 0) return
 
@@ -82,7 +89,7 @@ function sync(latest: string, workflow_paths: ReadonlyArray<string> = WORKFLOW_P
 }
 
 const ci_installer_pin = {
-	WORKFLOW_PATHS,
+	list_workflows,
 	installer_url,
 	extract_pinned_version,
 	rewrite_pin,
