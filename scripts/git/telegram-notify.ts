@@ -61,6 +61,8 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	stranded: { icon: '🚨', label: 'Run stranded — nobody is driving it' },
 }
 
+const NOTIFY_SWITCH_KEY = 'JOSH_NOTIFY'
+const NOTIFY_OFF_VALUE = 'off'
 const NOT_CONFIGURED_PREFIX = 'Telegram is not configured'
 const SEND_FAILED_PREFIX = 'Telegram notification failed'
 const REDACTED = '<redacted>'
@@ -134,6 +136,14 @@ function load_config(): TelegramConfig {
 	}
 
 	return { bot_token: result.data.telegram_bot_token, chat_id: result.data.telegram_chat_id }
+}
+
+// **An explicit opt-out is not a missing credential** (joshuafolkken/kit#2821). A consumer who never
+// meant to use Telegram had no way to say so, so every stop printed the #1564 failure as noise. Only
+// the stated value `off` disables the send: an unset or mistyped switch still falls through to
+// `load_config`, so a forgotten setup stays the loud failure #1564 made it.
+function is_notify_disabled(): boolean {
+	return parse_environment_string(process.env[NOTIFY_SWITCH_KEY]).toLowerCase() === NOTIFY_OFF_VALUE
 }
 
 function build_header(task_type: TelegramTaskType, repo_name: string | undefined): string {
@@ -210,7 +220,18 @@ function build_send_failure(error: unknown, config: TelegramConfig): Error {
 // warning and exiting 0, so a message that reached nobody looked exactly like one that arrived.
 //
 // The failure it throws carries a `cause`, and that cause is redacted too — see `build_send_failure`.
+//
+// The opt-out is checked here, before `load_config`, so every caller — the tolerant form included —
+// skips the same way and none has to repeat the check.
 async function send(input: TelegramSendInput): Promise<void> {
+	if (is_notify_disabled()) {
+		console.info(
+			`🔕 Telegram notifications are disabled (${NOTIFY_SWITCH_KEY}=${NOTIFY_OFF_VALUE}).`,
+		)
+
+		return
+	}
+
 	const config = load_config()
 	const text = build_text(input)
 
