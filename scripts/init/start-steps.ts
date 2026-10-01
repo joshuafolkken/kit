@@ -82,7 +82,7 @@ function initialize(context: StepContext): void {
 function commit_all(context: StepContext): void {
 	run('git', ['add', '--all'], context.root)
 	// The first commit of a new repository has no branch to come from, so the hook that keeps commits
-	// off main — installed by the initialize step in a node project — would refuse the only commit
+	// off main — installed by the initialize step in a full project — would refuse the only commit
 	// that has to land there.
 	run('git', ['commit', '--no-verify', '--message', 'Initial commit'], context.root)
 	// A repository created by an older `git init` may name its unborn branch `master`.

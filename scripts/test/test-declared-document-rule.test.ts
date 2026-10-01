@@ -46,11 +46,11 @@ describe('the test-declared rule is routed to the command in CLAUDE.md', () => {
 	})
 })
 
-describe('the static visual exception is documented with its limit', () => {
+describe('the basic visual exception is documented with its limit', () => {
 	it.each([CLAUDE, 'prompts/testing-guide.md'])('%s names the manual browser check', (file) => {
 		const content = read_repo_file(file)
 
-		expect(content).toContain('josh.profile: static')
+		expect(content).toContain('josh.profile: basic')
 		expect(content).toContain('ブラウザー')
 		expect(content).toContain('HTML 内の操作')
 		expect(content).toContain('JavaScript')

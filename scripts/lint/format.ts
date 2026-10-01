@@ -19,7 +19,7 @@ async function run_step(args: ReadonlyArray<string>, directory: string): Promise
 
 // prettier first, deliberately: `eslint --fix` exits 1 whenever a non-autofixable error remains, so
 // putting it first would mean one unused variable anywhere in the tree stops prettier from running.
-// A static project without Prettier or ESLint is skipped with the same reason `josh lint` prints
+// A basic project without Prettier or ESLint is skipped with the same reason `josh lint` prints
 // (joshuafolkken/kit#2693, joshuafolkken/kit#2606).
 async function run_unless_skipped(
 	check: string,

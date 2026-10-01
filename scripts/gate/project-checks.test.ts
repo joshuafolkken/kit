@@ -10,7 +10,7 @@ const PACKAGE_JSON = 'package.json'
 const INDEX_HTML = 'index.html'
 const APP_TS = 'app.ts'
 const TSCONFIG_JSON = 'tsconfig.json'
-const STATIC_MANIFEST = '{"josh":{"profile":"static"}}'
+const BASIC_MANIFEST = '{"josh":{"profile":"basic"}}'
 
 function fixture(): string {
 	const root = mkdtempSync(path.join(tmpdir(), 'josh-project-checks-'))
@@ -25,16 +25,33 @@ afterEach(() => {
 })
 
 describe('project_checks profile and files', () => {
-	it('uses only a recorded static profile', () => {
+	it('uses only a recorded basic profile', () => {
 		const root = fixture()
 
-		expect(project_checks.is_static(root)).toBe(false)
-		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
-		expect(project_checks.is_static(root)).toBe(true)
+		expect(project_checks.is_basic(root)).toBe(false)
+		writeFileSync(path.join(root, PACKAGE_JSON), BASIC_MANIFEST)
+		expect(project_checks.is_basic(root)).toBe(true)
 		mkdirSync(path.join(root, 'src'))
-		expect(project_checks.is_static(path.join(root, 'src'))).toBe(true)
+		expect(project_checks.is_basic(path.join(root, 'src'))).toBe(true)
 	})
+})
 
+// joshuafolkken/kit#2829: a project initialized before the rename recorded `static`, and every skip
+// the gate makes for a basic project must still apply to it.
+describe('project_checks profile names before the rename', () => {
+	it.each([
+		['static', true],
+		['node', false],
+		['full', false],
+	])('reads a recorded %s profile as basic: %s', (recorded, expected) => {
+		const root = fixture()
+
+		writeFileSync(path.join(root, PACKAGE_JSON), JSON.stringify({ josh: { profile: recorded } }))
+		expect(project_checks.is_basic(root)).toBe(expected)
+	})
+})
+
+describe('project_checks files', () => {
 	it('ignores dependency files when looking for web files', () => {
 		const root = fixture()
 
@@ -50,7 +67,7 @@ describe('project_checks profile and files', () => {
 
 		writeFileSync(path.join(root, INDEX_HTML), '')
 		expect(project_checks.has_files(root, project_checks.WEB_FILES)).toBe(true)
-		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
+		writeFileSync(path.join(root, PACKAGE_JSON), BASIC_MANIFEST)
 		mkdirSync(path.join(root, 'src'))
 		expect(project_checks.has_files(path.join(root, 'src'), project_checks.WEB_FILES)).toBe(true)
 	})
@@ -68,7 +85,7 @@ describe('project_checks type-check readiness', () => {
 	it('skips absent TypeScript and enables the check after files and tools arrive', () => {
 		const root = fixture()
 
-		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
+		writeFileSync(path.join(root, PACKAGE_JSON), BASIC_MANIFEST)
 		expect(project_checks.type_check_skip_reason(root)).toContain('no TypeScript files')
 		writeFileSync(path.join(root, APP_TS), '')
 		expect(project_checks.type_check_skip_reason(root)).toContain('no TypeScript configuration')
@@ -93,10 +110,10 @@ describe('project_checks type-check readiness', () => {
 })
 
 describe('project_checks prettier readiness', () => {
-	it('skips Prettier on a static project until Web files and the tool arrive', () => {
+	it('skips Prettier on a basic project until Web files and the tool arrive', () => {
 		const root = fixture()
 
-		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
+		writeFileSync(path.join(root, PACKAGE_JSON), BASIC_MANIFEST)
 		writeFileSync(path.join(root, 'main.py'), '')
 		expect(project_checks.prettier_skip_reason(root)).toContain('no HTML, CSS or JavaScript')
 		writeFileSync(path.join(root, INDEX_HTML), '')
@@ -117,16 +134,16 @@ describe('project_checks prettier readiness', () => {
 		expect(project_checks.prettier_skip_reason(root)).toBeUndefined()
 	})
 
-	it('never skips Prettier on a node project', () => {
+	it('never skips Prettier on a full project', () => {
 		expect(project_checks.prettier_skip_reason(fixture())).toBeUndefined()
 	})
 })
 
 describe('project_checks eslint readiness', () => {
-	it('skips absent ESLint on a static project and enables it once files and tools arrive', () => {
+	it('skips absent ESLint on a basic project and enables it once files and tools arrive', () => {
 		const root = fixture()
 
-		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
+		writeFileSync(path.join(root, PACKAGE_JSON), BASIC_MANIFEST)
 		expect(project_checks.eslint_skip_reason(root)).toContain('no JavaScript or TypeScript')
 		writeFileSync(path.join(root, 'site.js'), '')
 		expect(project_checks.eslint_skip_reason(root)).toContain('no ESLint configuration')
@@ -137,7 +154,7 @@ describe('project_checks eslint readiness', () => {
 		expect(project_checks.eslint_skip_reason(root)).toBeUndefined()
 	})
 
-	it('never skips ESLint on a node project', () => {
+	it('never skips ESLint on a full project', () => {
 		expect(project_checks.eslint_skip_reason(fixture())).toBeUndefined()
 	})
 })
@@ -146,7 +163,7 @@ describe('project_checks optional configuration', () => {
 	it('finds later ESLint and cspell configuration from a subdirectory', () => {
 		const root = fixture()
 
-		writeFileSync(path.join(root, PACKAGE_JSON), STATIC_MANIFEST)
+		writeFileSync(path.join(root, PACKAGE_JSON), BASIC_MANIFEST)
 		mkdirSync(path.join(root, 'src'))
 		const nested = path.join(root, 'src')
 

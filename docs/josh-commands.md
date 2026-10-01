@@ -1,6 +1,6 @@
 # josh CLI — Command Reference
 
-The full reference for every `josh` command; look a command up here rather than reading top to bottom. Commands that need Node tooling (ESLint, `tsc`, Vitest, Playwright) skip in a `static` project and say why.
+The full reference for every `josh` command; look a command up here rather than reading top to bottom. Commands that need Node tooling (ESLint, `tsc`, Vitest, Playwright) skip in a `basic` project and say why.
 
 See also: [Command Catalog](josh-command-catalog.md) — auto-generated from the command map (command name, aliases, synopsis, audience, side effects).
 
@@ -103,7 +103,7 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh format`
 
-Format code with prettier and eslint. A `static` project skips ESLint for the reason `josh lint` prints.
+Format code with prettier and eslint. A `basic` project skips ESLint for the reason `josh lint` prints.
 
 ```bash
 pnpm josh format
@@ -343,7 +343,7 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 ### `josh check`
 
-Type-check with `tsc --noEmit`. A `static` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
+Type-check with `tsc --noEmit`. A `basic` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails.
 
 ```bash
 pnpm josh check
@@ -399,7 +399,7 @@ Commands for setting up and maintaining a project.
 
 ### `josh profile`
 
-Show the project profile and reason. A saved `josh.profile` takes precedence; `--profile` overrides it.
+Show the project profile and reason. A saved `josh.profile` takes precedence; `--profile` overrides it. A `basic` project also gets a `compat: profile: static (…)` line, so a `ci.yml` synced before the profiles were renamed ([#2829](https://github.com/joshuafolkken/kit/issues/2829)) still recognizes it.
 
 ```bash
 pnpm josh profile
@@ -411,7 +411,7 @@ Create a new project for the GitHub Issue workflow in one command, so `kickoff n
 
 ```bash
 pnpm exec josh start                                    # asks for the profile and the repository
-pnpm exec josh start --yes --github --profile static    # unattended, including the GitHub repository
+pnpm exec josh start --yes --github --profile basic    # unattended, including the GitHub repository
 ```
 
 **Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything.
@@ -424,7 +424,7 @@ pnpm exec josh start --yes --github --profile static    # unattended, including 
 4. `gh repo create <directory name> --private` (or `--public`) and push `main`
 5. The missing workflow and release-classification labels; existing ones are left unchanged
 
-**Options:** `--profile static|node` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults without asking, but is **not** consent to create a repository or push: without `--github` an unattended run stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
+**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults without asking, but is **not** consent to create a repository or push: without `--github` an unattended run stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
 
 **Existing state:** a directory with a GitHub origin gets only the setup and the missing labels — no commit, repository or push. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
 

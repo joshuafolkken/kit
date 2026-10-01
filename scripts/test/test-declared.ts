@@ -77,35 +77,35 @@ function typed_runtime_file(path: string): string {
 }
 
 // The word is stdout so a caller can read it alone; the reason — which files, and why — is stderr.
-function exempt_detail(paths: ReadonlyArray<string>, is_static: boolean): string {
-	const exempt = test_declared_logic.exempt_files(paths, is_static)
-	const has_visual = is_static && exempt.some((path) => /\.(?:html|css)$/u.test(path))
+function exempt_detail(paths: ReadonlyArray<string>, is_basic: boolean): string {
+	const exempt = test_declared_logic.exempt_files(paths, is_basic)
+	const has_visual = is_basic && exempt.some((path) => /\.(?:html|css)$/u.test(path))
 	const instruction = has_visual ? ' — confirm the rendered page in a browser' : ''
 
 	return `exempt paths: ${exempt.join(', ')}${instruction}`
 }
 
-function detail_for(verdict: Verdict, paths: ReadonlyArray<string>, is_static = false): string {
+function detail_for(verdict: Verdict, paths: ReadonlyArray<string>, is_basic = false): string {
 	if (verdict === 'required') {
 		const typed = test_declared_logic
-			.runtime_files(paths, is_static)
+			.runtime_files(paths, is_basic)
 			.map((path) => typed_runtime_file(path))
 
 		return `runtime files with no test: ${typed.join(', ')}`
 	}
 
-	if (verdict === 'exempt') return exempt_detail(paths, is_static)
+	if (verdict === 'exempt') return exempt_detail(paths, is_basic)
 
 	return 'a test file changed'
 }
 
 function report(
 	paths: ReadonlyArray<string>,
-	is_static: boolean = project_checks.is_static(process.cwd()),
+	is_basic: boolean = project_checks.is_basic(process.cwd()),
 ): { detail: string; verdict: Verdict } {
-	const verdict = test_declared_logic.verdict_for(paths, is_static)
+	const verdict = test_declared_logic.verdict_for(paths, is_basic)
 
-	return { detail: detail_for(verdict, paths, is_static), verdict }
+	return { detail: detail_for(verdict, paths, is_basic), verdict }
 }
 
 function run(): void {

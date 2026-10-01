@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { init_static } from '#scripts/init/init-static'
+import { init_basic } from '#scripts/init/init-basic'
 import type { ProjectShape } from '#scripts/init/project-profile'
 import { canonical_command, COMMAND_MAP, type CommandEntry } from '#scripts/josh/josh-command-map'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -10,13 +10,13 @@ import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 import { workflow_expression_fixture } from './workflow-expression-fixture'
 
 // joshuafolkken/kit#2814: the distributed `checks` job ran `pnpm prepare` and `svelte-check` for every
-// profile, and a `static` project's manifest has neither a `prepare` script nor SvelteKit — so every
-// static consumer's first pull request went red. The job now reads the profile from `josh profile`
-// and hands a static project to `josh gate`. These guards run the profile step's own script and
+// profile, and a basic project's manifest has neither a `prepare` script nor SvelteKit — so every
+// basic consumer's first pull request went red. The job now reads the profile from `josh profile`
+// and hands a basic project to `josh gate`. These guards run the profile step's own script and
 // evaluate each step's `if:` with GitHub's expression engine, so they test what the runner would do.
 const CHECKS_JOB = 'checks'
 const PROFILE_STEP_ID = 'profile'
-const STATIC_TRUE = 'is_static=true'
+const BASIC_TRUE = 'is_basic=true'
 const OUTPUT_FILE_NAME = 'github-output'
 const EXECUTABLE_MODE = 0o755
 const TSX_BIN = path.resolve('node_modules', '.bin', 'tsx')
@@ -24,7 +24,7 @@ const JOSH_INVOCATION = /\bpnpm\s+(?:--silent\s+)?josh\s+([\w:-]+)/u
 // The `pnpm` sub-commands that are pnpm's own rather than a package script, plus every flag form.
 const SCRIPT_INVOCATION = /\bpnpm\s+(?!exec\b|install\b|store\b|-)([\w:-]+)/gu
 const SVELTE_CHECK = 'svelte-check'
-const STATIC_FORBIDDEN_TOKENS: ReadonlyArray<string> = ['svelte-kit', SVELTE_CHECK, 'pnpm exec']
+const BASIC_FORBIDDEN_TOKENS: ReadonlyArray<string> = ['svelte-kit', SVELTE_CHECK, 'pnpm exec']
 const NODE_REQUIRED_TOKENS: ReadonlyArray<string> = [
 	'pnpm josh cspell:dot',
 	'pnpm prepare',
@@ -36,8 +36,8 @@ const NODE_REQUIRED_TOKENS: ReadonlyArray<string> = [
 	'pnpm size-limit',
 ]
 const GATE_COMMAND = 'pnpm josh gate'
-const STATIC_SHAPE: ProjectShape = {
-	profile: 'static',
+const BASIC_SHAPE: ProjectShape = {
+	profile: 'basic',
 	reason: 'test',
 	has_web: true,
 	has_typescript: false,
@@ -53,12 +53,12 @@ afterAll(() => {
 	rmSync(workspace, { recursive: true, force: true })
 })
 
-function static_manifest(): string {
-	return init_static.merge_static_manifest(init_static.initial_manifest(), STATIC_SHAPE, VERSIONS)
+function basic_manifest(): string {
+	return init_basic.merge_basic_manifest(init_basic.initial_manifest(), BASIC_SHAPE, VERSIONS)
 }
 
-function node_manifest(): string {
-	return init_static.with_recorded_profile(init_static.initial_manifest(), 'node')
+function full_manifest(): string {
+	return init_basic.with_recorded_profile(init_basic.initial_manifest(), 'full')
 }
 
 function checks_steps(): ReadonlyArray<WorkflowStep> {
@@ -117,10 +117,10 @@ function run_profile_step(name: string, manifest: string): string {
 }
 
 // Which steps run for a profile: a step with no `if:` always runs, and the rest are evaluated with
-// the profile step's output and no Playwright to install — a static project declares none.
-function scripts_that_run(is_static: boolean): ReadonlyArray<string> {
+// the profile step's output and no Playwright to install — a basic project declares none.
+function scripts_that_run(is_basic: boolean): ReadonlyArray<string> {
 	const context = {
-		steps: { profile: { outputs: { is_static: String(is_static) } } },
+		steps: { profile: { outputs: { is_basic: String(is_basic) } } },
 		needs: { 'playwright-image': { outputs: { should_install_browsers: 'false' } } },
 	}
 
@@ -149,26 +149,26 @@ describe('the checks job reads the profile from josh profile', () => {
 		expect(invoked_command()).toBe(COMMAND_MAP['profile'])
 	})
 
-	it('reports a static manifest as static', () => {
-		expect(run_profile_step('static', static_manifest())).toContain(STATIC_TRUE)
+	it('reports a basic manifest as basic', () => {
+		expect(run_profile_step('basic', basic_manifest())).toContain(BASIC_TRUE)
 	})
 
-	it('reports a node manifest as not static', () => {
-		expect(run_profile_step('node', node_manifest())).toContain('is_static=false')
+	it('reports a full manifest as not basic', () => {
+		expect(run_profile_step('full', full_manifest())).toContain('is_basic=false')
 	})
 })
 
-describe('a static project runs only what its manifest provides', () => {
+describe('a basic project runs only what its manifest provides', () => {
 	const scripts = scripts_that_run(true)
 
 	it.each(invoked_scripts(scripts))(
 		'calls the package script %j that the manifest declares',
 		(name) => {
-			expect(manifest_scripts(static_manifest())).toContain(name)
+			expect(manifest_scripts(basic_manifest())).toContain(name)
 		},
 	)
 
-	it.each(STATIC_FORBIDDEN_TOKENS)('never runs %j', (token) => {
+	it.each(BASIC_FORBIDDEN_TOKENS)('never runs %j', (token) => {
 		expect(scripts.some((script) => script.includes(token))).toBe(false)
 	})
 
@@ -177,7 +177,7 @@ describe('a static project runs only what its manifest provides', () => {
 	})
 })
 
-describe('a node project keeps every check it ran before', () => {
+describe('a full project keeps every check it ran before', () => {
 	const scripts = scripts_that_run(false)
 
 	it.each(NODE_REQUIRED_TOKENS)('still runs %j', (token) => {

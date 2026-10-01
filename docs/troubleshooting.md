@@ -55,7 +55,7 @@ exec $SHELL
 which josh   # should now print a path
 ```
 
-`pnpm setup` registers `PNPM_HOME` and appends it to `PATH` via your shell rc. If `which josh` is still empty, open a new terminal so the updated `PATH` takes effect.
+`pnpm setup` registers `PNPM_HOME` and appends it to `PATH` via your shell rc. If `which josh` is still empty, open a new terminal so the updated `PATH` takes effect. You can print the directory to add manually with `pnpm bin -g`.
 
 ## Stale `~/.local/bin/josh` shim from an old version
 
@@ -73,7 +73,7 @@ rm -f ~/.local/bin/josh
 which josh   # should now resolve to the pnpm global bin
 ```
 
-If the shim reappears after every `pnpm install`, a project pinned `< 0.200.0` is regenerating it — upgrade that project to `>= 0.200.0`. See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor) and [cli.md §3](./cli.md#3-migrating-from-older-versions).
+If the shim reappears after every `pnpm install`, a project pinned `< 0.200.0` is regenerating it — upgrade that project (`pnpm add -D @joshuafolkken/kit@latest`). See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor).
 
 ## `josh <command>` fails with `MODULE_NOT_FOUND` pointing at a pnpm store path
 
@@ -94,14 +94,14 @@ rm -rf node_modules && pnpm install
 
 ## Wrong Node or pnpm version
 
-The kit targets **pnpm ≥ 11** (see `devEngines` in `package.json`) and **Node ≥ 22.19** (see `engines`). Check:
+kit needs **pnpm 12 or later** and **Node ≥ 22.19** (see `engines`). A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
 
 ```bash
 node -v
 pnpm -v
 ```
 
-If pnpm is older than 11, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
+If pnpm is older than 12 or differs from the project's pin, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
 
 ## `josh sync` reports config drift
 

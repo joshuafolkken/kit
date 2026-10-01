@@ -64,8 +64,8 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 // The two checks are run from here whether they were pointed at the whole tree or at one change's
 // files, so `josh lint:related` reaches prettier and eslint through the same buffering, the same
 // "one failure does not abort the other" reading, and the same exit code (joshuafolkken/kit#1298) —
-// and through the same static-project skip, so a narrowed run never reaches a tool the whole-tree
-// run would have skipped (joshuafolkken/kit#2709). The skip reasons answer nothing for a node
+// and through the same basic-project skip, so a narrowed run never reaches a tool the whole-tree
+// run would have skipped (joshuafolkken/kit#2709). The skip reasons answer nothing for a full
 // project, so the one path serves both profiles.
 async function run_lint_checks(
 	prettier_args: ReadonlyArray<string>,

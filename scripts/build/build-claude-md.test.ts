@@ -1,9 +1,15 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { generate_distributed_claude_md, REPO_ROOT } from './build-claude-md'
+import {
+	build_claude_md,
+	DIST_BASIC_CLAUDE_MDS,
+	generate_distributed_claude_md,
+	REPO_ROOT,
+} from './build-claude-md'
 
 const KIT_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/'
+const BASIC_RULES = 'CLAUDE.basic.md'
 
 // Every backtick-quoted token in the transformed CLAUDE.md that looks like a path (contains a slash).
 function backtick_paths(content: string): ReadonlyArray<string> {
@@ -56,5 +62,20 @@ describe('distributed CLAUDE.md path resolvability (joshuafolkken/kit#1878)', ()
 	it('actually rewrote prompts/ and eslint/ references', () => {
 		expect(content).toContain(`${KIT_PACKAGE_PREFIX}prompts/`)
 		expect(content).toContain(`${KIT_PACKAGE_PREFIX}eslint/`)
+	})
+})
+
+// joshuafolkken/kit#2829: a basic project initialized before the rename imports
+// `dist/CLAUDE.static.md` until `josh init` is re-run and migrates that import.
+describe('basic profile rules under both names', () => {
+	it('ships the basic rules as CLAUDE.basic.md and as the pre-rename CLAUDE.static.md', () => {
+		build_claude_md()
+		const template = readFileSync(path.join(REPO_ROOT, 'templates', BASIC_RULES), 'utf8')
+
+		expect(DIST_BASIC_CLAUDE_MDS.map((file) => path.basename(file))).toStrictEqual([
+			BASIC_RULES,
+			'CLAUDE.static.md',
+		])
+		for (const file of DIST_BASIC_CLAUDE_MDS) expect(readFileSync(file, 'utf8')).toBe(template)
 	})
 })

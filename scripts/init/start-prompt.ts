@@ -18,7 +18,7 @@ const DECLINED =
 // The detected profile is the default, so pressing Enter accepts it; the reason is shown because an
 // ambiguous project is exactly the case this question exists for.
 async function ask_profile(prompt: Interface, shape: ProjectShape): Promise<ProjectProfile> {
-	const question = `Profile — static or node [${shape.profile}, ${shape.reason}]: `
+	const question = `Profile — basic or full [${shape.profile}, ${shape.reason}]: `
 	const raw_answer = await prompt.question(question)
 	const answer = raw_answer.trim()
 	if (answer.length === 0) return shape.profile

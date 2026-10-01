@@ -32,9 +32,9 @@ const mocked_execa = vi.mocked(execaSync)
 const PACKAGE_JSON = 'package.json'
 const GITIGNORE = '.gitignore'
 const GITHUB_DIR = '.github'
-const STATIC_PROFILE_ENTRY = '"profile": "static"'
+const BASIC_PROFILE_ENTRY = '"profile": "basic"'
 const SECURITY_MD = 'SECURITY.md'
-const STATIC_PRETTIER = 'prettier.config.mjs'
+const BASIC_PRETTIER = 'prettier.config.mjs'
 const NO_INSTALL = '--no-install'
 const INSTALL_HINT = 'run `pnpm install`'
 const PNPM_INSTALL = 'pnpm install'
@@ -90,7 +90,7 @@ beforeEach(() => {
 	vi.resetModules()
 	mocked_execa.mockReset()
 	paths_mock.package_dir = fileURLToPath(new URL('../../', import.meta.url))
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'josh-static-init-'))
+	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'josh-basic-init-'))
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
@@ -99,7 +99,7 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('Git-free static initialization', () => {
+describe('Git-free basic initialization', () => {
 	it('creates a minimal manifest and no Git or GitHub files or commands', async () => {
 		writeFileSync(path.join(paths_mock.root, 'main.py'), '')
 		await run_init()
@@ -115,7 +115,7 @@ describe('Git-free static initialization', () => {
 		write_index_html()
 		await run_init()
 
-		expect(existsSync(path.join(paths_mock.root, STATIC_PRETTIER))).toBe(true)
+		expect(existsSync(path.join(paths_mock.root, BASIC_PRETTIER))).toBe(true)
 		expect(readFileSync(path.join(paths_mock.root, '.prettierignore'), 'utf8')).not.toContain(
 			'/static/',
 		)
@@ -146,7 +146,7 @@ describe('Git-free Web and node initialization', () => {
 		writeFileSync(path.join(paths_mock.root, 'site.cjs'), 'module.exports = {}')
 		await run_init()
 
-		expect(existsSync(path.join(paths_mock.root, STATIC_PRETTIER))).toBe(true)
+		expect(existsSync(path.join(paths_mock.root, BASIC_PRETTIER))).toBe(true)
 		expect(existsSync(path.join(paths_mock.root, 'prettier.config.js'))).toBe(false)
 	})
 
@@ -167,13 +167,13 @@ describe('Git-free Web and node initialization', () => {
 
 		expect(settings).toContain('python')
 		expect(manifest).toContain('"prettier"')
-		expect(manifest).toContain(STATIC_PROFILE_ENTRY)
+		expect(manifest).toContain(BASIC_PROFILE_ENTRY)
 		expect(manifest).toContain(`"preinstall": ${JSON.stringify(init_logic.SAFE_CHAIN_CMD)}`)
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 })
 
-describe('static initialization after Git adoption', () => {
+describe('basic initialization after Git adoption', () => {
 	it('adds Git files after Git is introduced without changing the profile', async () => {
 		await run_init()
 		mkdirSync(path.join(paths_mock.root, '.git'))
@@ -185,7 +185,7 @@ describe('static initialization after Git adoption', () => {
 		expect(existsSync(path.join(paths_mock.root, GITIGNORE))).toBe(true)
 		expect(existsSync(path.join(paths_mock.root, '.gitattributes'))).toBe(true)
 		expect(existsSync(path.join(paths_mock.root, SECURITY_MD))).toBe(false)
-		expect(manifest).toContain(STATIC_PROFILE_ENTRY)
+		expect(manifest).toContain(BASIC_PROFILE_ENTRY)
 	})
 
 	// The boundary josh start relies on (joshuafolkken/kit#2197): init, first run or rerun, never
@@ -235,14 +235,14 @@ describe('the install and format init finishes with', () => {
 		const { main } = await import('./init')
 
 		expect(() => {
-			main(['--profile', 'static'])
+			main(['--profile', 'basic'])
 		}).toThrow('pnpm install failed')
 		expect(invoked_commands()).toStrictEqual([PNPM_INSTALL])
 	})
 
 	it('runs neither under --no-install', async () => {
 		write_index_html()
-		await run_init([NO_INSTALL, '--profile', 'static'])
+		await run_init([NO_INSTALL, '--profile', 'basic'])
 
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
@@ -254,7 +254,7 @@ describe('a kit run from outside the project', () => {
 	it('installs the project kit and hands the run to it without writing anything itself', async () => {
 		write_index_html()
 		mocked_execa.mockReturnValue(fake_git_result(0, ''))
-		await run_init(['--profile', 'static'])
+		await run_init(['--profile', 'basic'])
 
 		expect(invoked_commands()).toStrictEqual([
 			'pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit',
@@ -274,7 +274,7 @@ describe('a kit run from outside the project', () => {
 	it('refuses a malformed profile before installing anything', async () => {
 		write_index_html()
 
-		await expect(run_init(['--profile', 'bogus'])).rejects.toThrow('Profile must be static or node')
+		await expect(run_init(['--profile', 'bogus'])).rejects.toThrow('Profile must be basic or full')
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 
@@ -284,5 +284,44 @@ describe('a kit run from outside the project', () => {
 
 		expect(mocked_execa).not.toHaveBeenCalled()
 		expect(existsSync(path.join(paths_mock.root, PACKAGE_JSON))).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#2829: a basic project set up before the rename imports the old paths, and
+// re-running `init` moves exactly those kit-written references, keeping the project's own lines.
+describe('basic initialization of a project set up before the rename', () => {
+	it('moves the CLAUDE.md and Prettier imports onto the basic paths', async () => {
+		write_index_html()
+		const claude_md = path.join(paths_mock.root, 'CLAUDE.md')
+		const prettier_config = path.join(paths_mock.root, BASIC_PRETTIER)
+
+		writeFileSync(
+			claude_md,
+			'@node_modules/@joshuafolkken/kit/dist/CLAUDE.static.md\n\n- Own rule\n',
+		)
+		writeFileSync(
+			prettier_config,
+			"import { config } from '@joshuafolkken/kit/prettier/static'\n\nexport default config\n",
+		)
+		await run_init()
+
+		expect(readFileSync(claude_md, 'utf8')).toBe(
+			'@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.md\n\n- Own rule\n',
+		)
+		expect(readFileSync(prettier_config, 'utf8')).toContain("'@joshuafolkken/kit/prettier/basic'")
+	})
+
+	it('still asks for the kit preset in a Prettier config of the project own', async () => {
+		write_index_html()
+		const prettier_config = path.join(paths_mock.root, BASIC_PRETTIER)
+		const own_config = 'export default { semi: true }\n'
+
+		writeFileSync(prettier_config, own_config)
+		await run_init()
+
+		expect(readFileSync(prettier_config, 'utf8')).toBe(own_config)
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
+			`  ⚠ exists    ${BASIC_PRETTIER} — add manually:`,
+		)
 	})
 })

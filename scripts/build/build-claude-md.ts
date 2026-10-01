@@ -7,11 +7,17 @@ import { init_logic } from '#scripts/init/init-logic'
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
 const DIST_ROOT = path.join(REPO_ROOT, 'dist')
-const STATIC_CLAUDE_FILENAME = 'CLAUDE.static.md'
+const BASIC_CLAUDE_FILENAME = 'CLAUDE.basic.md'
 const SOURCE_CLAUDE_MD = path.join(REPO_ROOT, 'CLAUDE.md')
 const DIST_CLAUDE_MD = path.join(DIST_ROOT, 'CLAUDE.md')
-const SOURCE_STATIC_CLAUDE_MD = path.join(REPO_ROOT, 'templates', STATIC_CLAUDE_FILENAME)
-const DIST_STATIC_CLAUDE_MD = path.join(DIST_ROOT, STATIC_CLAUDE_FILENAME)
+const SOURCE_BASIC_CLAUDE_MD = path.join(REPO_ROOT, 'templates', BASIC_CLAUDE_FILENAME)
+// A basic project's `CLAUDE.md` imports the rules from dist/. One initialized before
+// joshuafolkken/kit#2829 imports them under the profile's old name until `josh init` is re-run
+// and migrates that import, so the same rules ship under both names.
+const DIST_BASIC_CLAUDE_MDS: ReadonlyArray<string> = [
+	path.join(DIST_ROOT, BASIC_CLAUDE_FILENAME),
+	path.join(DIST_ROOT, 'CLAUDE.static.md'),
+]
 
 // Read kit's own CLAUDE.md and apply the distribution path transform. kit's source keeps relative
 // paths so it resolves inside the kit repository; the published copy rewrites them so every backtick
@@ -27,7 +33,9 @@ function generate_distributed_claude_md(): string {
 function build_claude_md(): string {
 	mkdirSync(path.dirname(DIST_CLAUDE_MD), { recursive: true })
 	writeFileSync(DIST_CLAUDE_MD, generate_distributed_claude_md())
-	writeFileSync(DIST_STATIC_CLAUDE_MD, readFileSync(SOURCE_STATIC_CLAUDE_MD, 'utf8'))
+	const basic_rules = readFileSync(SOURCE_BASIC_CLAUDE_MD, 'utf8')
+
+	for (const destination of DIST_BASIC_CLAUDE_MDS) writeFileSync(destination, basic_rules)
 
 	return DIST_CLAUDE_MD
 }
@@ -40,6 +48,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 export {
 	build_claude_md,
+	DIST_BASIC_CLAUDE_MDS,
 	generate_distributed_claude_md,
 	SOURCE_CLAUDE_MD,
 	DIST_CLAUDE_MD,

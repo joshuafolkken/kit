@@ -16,9 +16,9 @@ vi.mock('#scripts/repo/repository-labels', () => ({
 const mocked_execa = vi.mocked(execaSync)
 const GIT_ADD_ALL = 'git add --all'
 const ROOT = path.join(path.sep, 'work', 'my-site')
-const CONTEXT: StepContext = { root: ROOT, profile: 'static', visibility: 'private' }
+const CONTEXT: StepContext = { root: ROOT, profile: 'basic', visibility: 'private' }
 const SHAPE: ProjectShape = {
-	profile: 'static',
+	profile: 'basic',
 	reason: 'test',
 	has_web: true,
 	has_typescript: false,
@@ -112,9 +112,9 @@ describe('the steps josh start runs', () => {
 	})
 
 	it('initializes through the same entry point as josh init, with the confirmed profile', () => {
-		start_steps.run_steps(['initialize'], { ...CONTEXT, profile: 'node' })
+		start_steps.run_steps(['initialize'], { ...CONTEXT, profile: 'full' })
 
-		expect(init_main).toHaveBeenCalledWith(['--profile', 'node'])
+		expect(init_main).toHaveBeenCalledWith(['--profile', 'full'])
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 

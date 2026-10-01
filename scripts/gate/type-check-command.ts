@@ -5,7 +5,7 @@ import { execa } from 'execa'
 import { project_checks } from './project-checks'
 
 // `josh check` — the project-wide TypeScript check. It used to be a bare `tsc --noEmit` shell entry,
-// so on a static project with nothing to type-check it failed with `Command "tsc" not found` while
+// so on a basic project with nothing to type-check it failed with `Command "tsc" not found` while
 // the gate, which asks `type_check_skip_reason` first, skipped the same step
 // (joshuafolkken/kit#2709). Both now read that one decision.
 

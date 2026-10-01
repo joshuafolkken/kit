@@ -39,7 +39,7 @@ afterEach(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-describe('josh check on a static project', () => {
+describe('josh check on a basic project', () => {
 	it('skips with the reason instead of reaching a missing tsc', async () => {
 		const root = fixture('{"josh":{"profile":"static"}}')
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -54,7 +54,7 @@ describe('josh check on a static project', () => {
 	})
 })
 
-describe('josh check on a node project', () => {
+describe('josh check on a full project', () => {
 	it('runs tsc with the cache flags and the forwarded arguments', async () => {
 		const root = fixture(NODE_MANIFEST)
 

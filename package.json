@@ -105,6 +105,10 @@
 			"types": "./prettier/index.d.ts",
 			"default": "./prettier/index.js"
 		},
+		"./prettier/basic": {
+			"types": "./prettier/basic.d.ts",
+			"default": "./prettier/basic.js"
+		},
 		"./prettier/static": {
 			"types": "./prettier/static.d.ts",
 			"default": "./prettier/static.js"

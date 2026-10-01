@@ -29,8 +29,8 @@ describe('test_declared_changed.path_of', () => {
 })
 
 describe('test_declared_changed.current_verdict', () => {
-	it('reads the recorded static profile for HTML-only changes', () => {
-		const profile = vi.spyOn(project_checks, 'is_static').mockReturnValue(true)
+	it('reads the recorded basic profile for HTML-only changes', () => {
+		const profile = vi.spyOn(project_checks, 'is_basic').mockReturnValue(true)
 
 		expect(test_declared_changed.current_verdict(['index.html'])).toBe('exempt')
 		profile.mockRestore()

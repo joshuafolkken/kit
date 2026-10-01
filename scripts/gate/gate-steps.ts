@@ -19,7 +19,7 @@ async function build_gate_step(
 	start_directory: string,
 	plan: GatePlan = gate_plan.resolve_gate_plan(),
 ): Promise<GateStep> {
-	const cwd = project_checks.is_static(start_directory)
+	const cwd = project_checks.is_basic(start_directory)
 		? project_checks.project_root(start_directory)
 		: undefined
 

@@ -13,7 +13,7 @@ import { start_steps } from './start-steps'
 
 const ARGUMENT_START_INDEX = 2
 const READY_MESSAGE = 'GitHub workflow ready. Use kickoff new in your assistant to plan an Issue.'
-const START_USAGE = 'josh start [--profile static|node] [--yes] [--github] [--public]'
+const START_USAGE = 'josh start [--profile basic|full] [--yes] [--github] [--public]'
 const YES_FLAG = '--yes'
 const GITHUB_FLAG = '--github'
 const PUBLIC_FLAG = '--public'

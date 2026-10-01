@@ -4,7 +4,7 @@ import { repo_origin } from '#scripts/discovery/repo-origin'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { execaSync } from 'execa'
 
-type ProjectProfile = 'static' | 'node'
+type ProjectProfile = 'basic' | 'full'
 
 interface ProfileResult {
 	profile: ProjectProfile
@@ -22,11 +22,34 @@ const IGNORED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'build', '.
 const WEB_EXTENSIONS = new Set(['.html', '.css', '.js', '.jsx', '.mjs', '.cjs'])
 const TYPESCRIPT_EXTENSIONS = new Set(['.ts', '.tsx'])
 const PROFILE_ARG_LENGTH = 2
+// The names before joshuafolkken/kit#2829. A project that recorded one, or a script that passes one
+// to `--profile`, keeps working: each reads as the profile it was renamed to.
+const PROFILE_NAMES: Readonly<Record<string, ProjectProfile>> = {
+	basic: 'basic',
+	full: 'full',
+	static: 'basic',
+	node: 'full',
+}
 
 function parse_profile(value: unknown): ProjectProfile | undefined {
-	if (value === 'static' || value === 'node') return value
+	return typeof value === 'string' && Object.hasOwn(PROFILE_NAMES, value)
+		? PROFILE_NAMES[value]
+		: undefined
+}
 
-	return undefined
+// The pre-rename name of each profile, which every kit with `--profile` accepts — the new one only
+// from joshuafolkken/kit#2829 on.
+const LEGACY_NAMES: Readonly<Record<ProjectProfile, string>> = { basic: 'static', full: 'node' }
+
+// A `josh init` handed to the project's kit may run an older kit than the one handing off: the
+// project pinned it, or its `minimumReleaseAge` held the new release back. The pre-rename spelling
+// is the one both kits read.
+function with_legacy_profile_names(args: ReadonlyArray<string>): Array<string> {
+	return args.map((argument, index) => {
+		const profile = args[index - 1] === '--profile' ? parse_profile(argument) : undefined
+
+		return profile === undefined ? argument : LEGACY_NAMES[profile]
+	})
 }
 
 function is_profile_pair(args: ReadonlyArray<string>): boolean {
@@ -35,14 +58,14 @@ function is_profile_pair(args: ReadonlyArray<string>): boolean {
 
 function requested_profile(
 	args: ReadonlyArray<string>,
-	usage = 'josh init [--profile static|node]',
+	usage = 'josh init [--profile basic|full]',
 ): ProjectProfile | undefined {
 	if (args.length === 0) return undefined
 	if (!is_profile_pair(args)) throw new Error(`Usage: ${usage}`)
 
 	const profile = parse_profile(args[1])
 	if (profile !== undefined) return profile
-	throw new Error('Profile must be static or node')
+	throw new Error('Profile must be basic or full')
 }
 
 function read_manifest(root: string): Record<string, unknown> | undefined {
@@ -72,8 +95,8 @@ function has_build_script(value: unknown): boolean {
 }
 
 // kit itself is not evidence of a Node toolchain: `pnpm add -D @joshuafolkken/kit` before
-// `josh init` is the documented order, and it must still leave an `index.html` site static
-// (joshuafolkken/kit#2693).
+// `josh init` is the documented order, and it must still leave an `index.html` site on the basic
+// profile (joshuafolkken/kit#2693).
 function has_project_dependencies(value: unknown): boolean {
 	if (!is_record(value)) return false
 
@@ -85,20 +108,20 @@ function inferred_profile(manifest: Record<string, unknown>): ProfileResult {
 		has_project_dependencies(manifest['dependencies']) ||
 		has_project_dependencies(manifest['devDependencies'])
 	) {
-		return { profile: 'node', reason: 'package dependencies' }
+		return { profile: 'full', reason: 'package dependencies' }
 	}
 
 	if (has_build_script(manifest['scripts'])) {
-		return { profile: 'node', reason: 'build or dev script' }
+		return { profile: 'full', reason: 'build or dev script' }
 	}
 
-	return { profile: 'static', reason: 'metadata-only package.json' }
+	return { profile: 'basic', reason: 'metadata-only package.json' }
 }
 
 function resolve_profile(root: string, requested?: ProjectProfile): ProfileResult {
 	if (requested !== undefined) return { profile: requested, reason: 'explicit --profile' }
 	const manifest = read_manifest(root)
-	if (manifest === undefined) return { profile: 'static', reason: 'no package.json' }
+	if (manifest === undefined) return { profile: 'basic', reason: 'no package.json' }
 	const profile = recorded_profile(manifest)
 	if (profile !== undefined) return { profile, reason: 'package.json josh.profile' }
 
@@ -157,6 +180,12 @@ function inspect_project(root: string, requested?: ProjectProfile): ProjectShape
 	return { ...profile, ...files, has_git, has_github: has_git && has_github_remote(root) }
 }
 
-const project_profile = { resolve_profile, inspect_project, requested_profile }
+const project_profile = {
+	parse_profile,
+	resolve_profile,
+	inspect_project,
+	requested_profile,
+	with_legacy_profile_names,
+}
 export { project_profile }
 export type { ProjectProfile, ProjectShape }

@@ -21,8 +21,8 @@ const NODE_MODULES = 'node_modules'
 // - **`vitest` absent is the young project.** `josh init` installs no vitest and writes no
 //   `test:unit` script, so a freshly-bootstrapped project always lands here — which is the case the
 //   skip was written for, and it keeps it.
-// - **`vitest` present is the node project's declaration that it runs unit tests.** Zero matching
-//   files there is a broken state — a mis-scoped glob, or a deleted suite — and fails. A static
+// - **`vitest` present is the full project's declaration that it runs unit tests.** Zero matching
+//   files there is a broken state — a mis-scoped glob, or a deleted suite — and fails. A basic
 //   project may carry vitest as an unused dependency without declaring a unit suite; zero files
 //   there are reported as skipped, never as a test pass.
 //
@@ -47,19 +47,19 @@ type GuardAction = 'run' | typeof SKIP_ACTION | typeof SKIP_NO_TESTS_ACTION | ty
 // body, and without this a gate that skipped the whole unit suite printed the same five lines as one
 // that ran it.
 const SKIP_REASON = 'vitest is not installed'
-const SKIP_NO_TESTS_REASON = 'no unit test files were found in this static project'
+const SKIP_NO_TESTS_REASON = 'no unit test files were found in this basic project'
 const FAIL_REASON =
 	'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing'
 
 function resolve_guard_action(
 	is_installed: boolean,
 	has_tests: boolean,
-	is_static = false,
+	is_basic = false,
 ): GuardAction {
 	if (!is_installed) return SKIP_ACTION
 	if (has_tests) return 'run'
 
-	return is_static ? SKIP_NO_TESTS_ACTION : FAIL_ACTION
+	return is_basic ? SKIP_NO_TESTS_ACTION : FAIL_ACTION
 }
 
 function is_vitest_installed(project_directory: string): boolean {
@@ -160,7 +160,7 @@ async function run_guarded_vitest(
 	const action = resolve_guard_action(
 		is_installed,
 		has_tests,
-		project_checks.is_static(project_directory),
+		project_checks.is_basic(project_directory),
 	)
 
 	if (action !== 'run') return report_no_run(action, command_label)
