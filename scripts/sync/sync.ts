@@ -1,12 +1,14 @@
 #!/usr/bin/env tsx
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { project_checks } from '#scripts/gate/project-checks'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
-import { transform_copied_content } from '#scripts/init/init-copy-content'
+import { basic_path_migration } from '#scripts/init/basic-path-migration'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { plugin_install_hint_module } from '#scripts/init/plugin-install-hint'
+import { project_profile } from '#scripts/init/project-profile'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { project_config } from '#scripts/safe-chain/project-config'
@@ -14,121 +16,13 @@ import { security_updates } from '#scripts/security/security-updates'
 import { sonar_file } from '#scripts/security/sonar-file'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { package_manager_version } from '#scripts/version/package-manager-version'
-import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
 import { file_content } from './file-content'
-import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
-import { skill_migration, type MigrationResult } from './skill-migration'
+import { sync_ai_files } from './sync-ai-files'
 import { sync_configs } from './sync-configs'
-import { sync_hook_safety } from './sync-hook-safety'
 
-const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const PACKAGE_JSON = 'package.json'
 const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
-const CLAUDE_MD_FILENAME = 'CLAUDE.md'
-const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
-const CODEX_HOOKS_FILE = '.codex/hooks.json'
-
-function sync_ai_file(source_path: string, destination_path: string): boolean {
-	const content = readFileSync(source_path, 'utf8')
-
-	return file_content.write_text_if_changed(
-		destination_path,
-		transform_copied_content(destination_path, content),
-	)
-}
-
-// Both copied hook files must run against the consumer's installed bundle. When sync is run from a
-// newer source than that install, writing either file would leave hooks
-// that fail every prompt (joshuafolkken/kit#1930); skip it and print how to update instead.
-function should_skip_hook_file(filename: string): boolean {
-	if (filename !== CLAUDE_SETTINGS_FILE && filename !== CODEX_HOOKS_FILE) return false
-	const warning = sync_hook_safety.hook_write_warning(
-		PROJECT_ROOT,
-		sync_hook_safety.read_version_at(path.join(PACKAGE_DIR, PACKAGE_JSON)),
-		filename,
-	)
-	if (warning === undefined) return false
-	console.warn(warning)
-
-	return true
-}
-
-function sync_file(filename: string): void {
-	if (should_skip_hook_file(filename)) return
-	const did_change = sync_ai_file(
-		path.join(PACKAGE_DIR, filename),
-		path.join(PROJECT_ROOT, filename),
-	)
-
-	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${filename}`)
-}
-
-function sync_file_mapping(source_path: string, destination_path: string): void {
-	if (!existsSync(source_path)) {
-		console.warn(`  ⚠ skipped   ${path.basename(destination_path)} (not found in package)`)
-
-		return
-	}
-
-	// Routed through sync_ai_file rather than cpSync: templates/workflows/ci.yml is a mapped
-	// file, so a byte copy would hand the consumer the template's own action pins. The pins
-	// have to be resolved from .github/workflows at write time (joshuafolkken/kit#747).
-	const did_change = sync_ai_file(source_path, destination_path)
-
-	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${path.basename(destination_path)}`)
-}
-
-function sync_workspace_yaml(
-	template_path: string,
-	destination_path: string,
-	is_force = false,
-): boolean {
-	const template = readFileSync(template_path, 'utf8')
-	const existing =
-		!is_force && existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
-	const merged = init_logic.merge_workspace_yaml(existing, template)
-
-	return file_content.write_text_if_changed(destination_path, merged)
-}
-
-function sync_ai_copy_file(filename: string, is_force: boolean): void {
-	if (filename === WORKSPACE_YAML) {
-		const did_change = sync_workspace_yaml(
-			path.join(PACKAGE_DIR, WORKSPACE_YAML),
-			path.join(PROJECT_ROOT, WORKSPACE_YAML),
-			is_force,
-		)
-
-		console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${WORKSPACE_YAML}`)
-
-		return
-	}
-
-	sync_file(filename)
-}
-
-// The reason this directory was not synced, or nothing when it was. Both halves answer the same
-// question — what stops the copy — so the caller has one line to print either way.
-function directory_sync_failure(
-	directory_name: string,
-	on_copy: (did_change: boolean) => void,
-): string | undefined {
-	const source_path = path.join(PACKAGE_DIR, directory_name)
-	const destination_path = path.join(PROJECT_ROOT, directory_name)
-
-	return (
-		directory_copy_blocker(source_path, destination_path) ??
-		copy_directory_failure(source_path, destination_path, on_copy)
-	)
-}
-
-function sync_directory(directory_name: string): void {
-	const failure = directory_sync_failure(directory_name, (did_change) => {
-		console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${directory_name}/`)
-	})
-
-	if (failure !== undefined) console.warn(`  ⚠ skipped   ${directory_name}/ (${failure})`)
-}
+const BASIC_PRETTIER_CONFIG = 'prettier.config.mjs'
 
 function did_migrate_prettierrc(destination_path: string): boolean {
 	const legacy_path = path.join(path.dirname(destination_path), '.prettierrc')
@@ -169,6 +63,20 @@ function sync_prettier_config(destination_path: string): void {
 	if (!existsSync(destination_path)) return
 
 	write_merged_prettier_config(destination_path)
+}
+
+// A basic project's prettier config written before joshuafolkken/kit#2829 still imports the static
+// preset path; it is moved onto the basic one with the rule `josh init` applies.
+function sync_basic_prettier_config(destination_path: string): void {
+	if (!existsSync(destination_path)) return
+
+	const existing = readFileSync(destination_path, 'utf8')
+	const did_change = file_content.write_text_if_changed(
+		destination_path,
+		basic_path_migration.migrate_basic_paths(existing),
+	)
+
+	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${BASIC_PRETTIER_CONFIG}`)
 }
 
 function sync_playwright_config(destination_path: string): void {
@@ -218,70 +126,6 @@ function sync_sonar_with_template(name_with_owner: string | undefined, is_force 
 
 	write_function(template_source, path.join(PROJECT_ROOT, destination), identifiers)
 	console.info(`  ✔ synced    ${destination}`)
-}
-
-// A consumer's stale copy of a distributed skill is removed once it still matches the shipment and
-// kept with a warning once it does not (joshuafolkken/kit#1879). Plugin skills compare against the
-// package source; a retired skill compares against the frozen manifest (joshuafolkken/kit#1990). The
-// note distinguishes the two, and `absent` — the consumer never had the copy — prints nothing.
-function report_migration_result(result: MigrationResult): void {
-	if (result.action === 'absent') return
-
-	if (result.action === 'removed') {
-		console.info(
-			`  ✔ removed   ${result.directory}/ (${skill_migration.removed_note(result.source)})`,
-		)
-
-		return
-	}
-
-	console.warn(`  ⚠ kept      ${result.directory}/ (${skill_migration.kept_note(result.source)})`)
-}
-
-function migrate_removed_skills(): void {
-	const plugin = skill_migration.migrate_removed_skill_directories(PACKAGE_DIR, PROJECT_ROOT)
-	const retired = skill_migration.migrate_manifest_skills(PROJECT_ROOT, REMOVED_SKILL_MANIFEST)
-
-	for (const result of [...plugin, ...retired]) report_migration_result(result)
-}
-
-// CLAUDE.md is not byte-copied (joshuafolkken/kit#1878): a consumer's file is one @import of kit's
-// published rules plus the project's own additions below it. Ensure the import line is present
-// without ever disturbing those additions — so this ignores --force, which would otherwise mean
-// discarding a consumer's content.
-function sync_claude_md(destination_path: string): void {
-	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : undefined
-	const ensured = init_logic.ensure_claude_md_import(existing)
-
-	if (ensured === existing) {
-		console.info(`  ✔ unchanged ${CLAUDE_MD_FILENAME}`)
-
-		return
-	}
-
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, ensured)
-	console.info(`  ✔ synced    ${CLAUDE_MD_FILENAME}`)
-}
-
-function sync_ai_copy_all(is_force: boolean): void {
-	console.info('AI files:')
-
-	sync_claude_md(path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME))
-
-	for (const filename of init_logic.get_ai_copy_files()) {
-		sync_ai_copy_file(filename, is_force)
-	}
-
-	for (const { src, dest } of init_logic.get_ai_copy_file_mappings()) {
-		sync_file_mapping(path.join(PACKAGE_DIR, src), path.join(PROJECT_ROOT, dest))
-	}
-
-	for (const directory_name of init_logic.get_ai_copy_directories()) {
-		sync_directory(directory_name)
-	}
-
-	migrate_removed_skills()
 }
 
 function sync_config_files(): void {
@@ -376,7 +220,7 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 }
 
 function sync_project_artifacts(is_force: boolean): void {
-	sync_ai_copy_all(is_force)
+	sync_ai_files.sync_ai_copy_all(is_force)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
 	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
@@ -394,29 +238,47 @@ function sync_project_artifacts(is_force: boolean): void {
 	report_repository_settings(name_with_owner)
 }
 
+// A basic project gets what `josh init` gives that profile and nothing more: its AI file set and the
+// move of its prettier preset path. The full toolchain's configs, Sonar, package.json migrations and
+// repository settings are never written into it (joshuafolkken/kit#2827).
+function sync_basic_artifacts(is_force: boolean): void {
+	console.info('profile: basic (package.json josh.profile)\n')
+	sync_ai_files.sync_ai_copy_all(is_force, project_profile.inspect_project(PROJECT_ROOT, 'basic'))
+	sync_basic_prettier_config(path.join(PROJECT_ROOT, BASIC_PRETTIER_CONFIG))
+}
+
+function sync_full_artifacts(is_force: boolean): void {
+	sync_project_artifacts(is_force)
+	plugin_install_hint_module.report_plugin_install_hint()
+}
+
 // Checked before anything is written, never per file: the damage is the whole run, and a partial
 // sync that stopped halfway would leave the source repository in a state neither `git checkout` nor
 // a re-run describes (joshuafolkken/kit#868).
+//
+// Only a recorded basic profile switches the file set; an unrecorded one stays full, as every
+// project initialized before the profile was recorded was set up.
 function main(): void {
 	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
 
 	const is_force = process.argv.includes('--force')
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
-	sync_project_artifacts(is_force)
-	plugin_install_hint_module.report_plugin_install_hint()
+	if (project_checks.is_basic(PROJECT_ROOT)) sync_basic_artifacts(is_force)
+	else sync_full_artifacts(is_force)
 	console.info('\n✅ Done.\n')
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const sync = {
-	should_skip_hook_file,
-	sync_file_mapping,
-	sync_ai_file,
-	sync_workspace_yaml,
-	sync_claude_md,
+	should_skip_hook_file: sync_ai_files.should_skip_hook_file,
+	sync_file_mapping: sync_ai_files.sync_file_mapping,
+	sync_ai_file: sync_ai_files.sync_ai_file,
+	sync_workspace_yaml: sync_ai_files.sync_workspace_yaml,
+	sync_claude_md: sync_ai_files.sync_claude_md,
 	sync_prettier_config,
+	sync_basic_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,
 	sync_package_manager_version,
@@ -427,4 +289,6 @@ const sync = {
 
 // `sync` is the entry point; `sync_directory` and `main` are exported for their own unit tests, the
 // way `git-pr-checks.ts` exports the helpers beside its namespace.
+const { sync_directory } = sync_ai_files
+
 export { main, sync, sync_directory }

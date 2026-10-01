@@ -8,7 +8,7 @@ pnpm josh sync
 
 Unlike `josh init` (which skips existing files), `josh sync` is designed for keeping managed files up to date. Most managed files are overwritten; `pnpm-workspace.yaml` is merged (see below).
 
-> **`josh sync` is for `full` projects.** It applies the `full` file set below whatever `josh.profile` says, so in a `basic` project it would add the workflows, `.claude/settings.json` and the other files `josh init` deliberately leaves out of that profile. A `basic` project does not need it: its `CLAUDE.md` imports the rules from the installed package, so upgrading the package is enough ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
+> **`josh sync` follows the recorded profile.** When `package.json` records `josh.profile` as `basic` (or the pre-rename `static`), sync writes only the files `josh init` gives a `basic` project — `AGENTS.md`, `GEMINI.md`, `.cursorrules`, the `basic` templates of `.prettierignore` (only with HTML/CSS/JS files) and `pnpm-workspace.yaml`, `.gitattributes` with Git, and, with a GitHub remote, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/pull_request_template.md` and `.github/release.yml`. It keeps `CLAUDE.md` on the `basic` rules import, moves the pre-rename `CLAUDE.static.md` import and `prettier/static` preset path onto the `basic` ones, and writes none of the workflows, `.claude/settings.json`, `.codex/*`, `.coderabbit.yaml`, Sonar or config files below. Every other project — `full` recorded, or no profile recorded — gets the `full` set this page lists ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
 
 ## What gets synced
 

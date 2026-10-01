@@ -9,6 +9,7 @@ import {
 	directory_copy_blocker,
 } from '#scripts/sync/directory-copy-guard'
 import { basic_path_migration } from './basic-path-migration'
+import { distributed_paths } from './distributed-paths'
 import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
@@ -118,9 +119,16 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 	return false
 }
 
-function did_skip_ai_file_copy(filename: string, shape?: ProjectShape): boolean {
+// The package file an AI file is copied from: a basic project gets its own template for a few of
+// them, every other file is copied from the path it is written to.
+function ai_file_source(filename: string, shape?: ProjectShape): string {
 	const basic_source = shape?.profile === 'basic' ? BASIC_SOURCES[filename] : undefined
-	const source_path = package_path(basic_source ?? filename)
+
+	return basic_source ?? filename
+}
+
+function did_skip_ai_file_copy(filename: string, shape?: ProjectShape): boolean {
+	const source_path = package_path(ai_file_source(filename, shape))
 	const destination_path = path.join(PROJECT_ROOT, filename)
 
 	if (filename === WORKSPACE_YAML) {
@@ -239,6 +247,24 @@ function report_existing_claude_md(destination_path: string): void {
 	console.info(`  ✔ updated   ${CLAUDE_MD_FILENAME} (rules import moved to the basic path)`)
 }
 
+function basic_claude_md(): string {
+	return `> If kit is not installed, run \`pnpm install\` first.\n\n${BASIC_CLAUDE_IMPORT}\n`
+}
+
+// A basic CLAUDE.md imports the basic rules alone: the full bootstrap and import are removed, a
+// pre-rename path is moved, and the basic header is restored when no basic import is left
+// (joshuafolkken/kit#2827). The project's own lines stay as they are.
+function ensure_basic_claude_md(existing: string | undefined): string {
+	if (existing === undefined) return basic_claude_md()
+	const kept = basic_path_migration.migrate_basic_paths(
+		distributed_paths.remove_claude_md_import(existing),
+	)
+
+	if (kept.includes(BASIC_CLAUDE_IMPORT)) return kept
+
+	return kept === '' ? basic_claude_md() : `${basic_claude_md()}\n${kept}`
+}
+
 function did_skip_claude_md_import(shape?: ProjectShape): boolean {
 	const destination_path = path.join(PROJECT_ROOT, CLAUDE_MD_FILENAME)
 
@@ -249,9 +275,7 @@ function did_skip_claude_md_import(shape?: ProjectShape): boolean {
 	}
 
 	const content =
-		shape?.profile === 'basic'
-			? `> If kit is not installed, run \`pnpm install\` first.\n\n${BASIC_CLAUDE_IMPORT}\n`
-			: init_logic.ensure_claude_md_import(undefined)
+		shape?.profile === 'basic' ? basic_claude_md() : init_logic.ensure_claude_md_import(undefined)
 
 	writeFileSync(destination_path, content)
 	console.info(`  ✔ created   ${CLAUDE_MD_FILENAME}`)
@@ -298,15 +322,19 @@ function ai_files(shape?: ProjectShape): ReadonlyArray<string> {
 	return files.filter((filename) => should_copy_ai_file(filename, shape))
 }
 
-function ai_mapping_skips(shape?: ProjectShape): ReadonlyArray<boolean> {
+type FileMappings = ReturnType<typeof init_logic.get_ai_copy_file_mappings>
+
+function ai_file_mappings(shape?: ProjectShape): FileMappings {
 	const mappings =
 		shape?.profile === 'basic'
 			? [BASIC_POINTER_MAPPING, ...(shape.has_github ? BASIC_GITHUB_MAPPINGS : [])]
 			: init_logic.get_ai_copy_file_mappings()
 
-	return mappings
-		.filter(({ dest }) => shape?.has_github !== false || !dest.startsWith('.github/'))
-		.map(({ src, dest }) => did_skip_ai_file_mapping(src, dest))
+	return mappings.filter(({ dest }) => shape?.has_github !== false || !dest.startsWith('.github/'))
+}
+
+function ai_mapping_skips(shape?: ProjectShape): ReadonlyArray<boolean> {
+	return ai_file_mappings(shape).map(({ src, dest }) => did_skip_ai_file_mapping(src, dest))
 }
 
 function repository_name(shape?: ProjectShape): string | undefined {
@@ -345,6 +373,9 @@ const init_ai_copy = {
 	copy_ai_file,
 	run_ai_copies,
 	ai_files,
+	ai_file_source,
+	ai_file_mappings,
+	ensure_basic_claude_md,
 }
 
 export { init_ai_copy }

@@ -21,4 +21,4 @@ A `basic` project has grown npm dependencies and you want the `full` toolchain â
 ## Common failures
 
 - The profile does not change after adding dependencies: a recorded profile wins over detection, so pass the profile option explicitly.
-- Files from the old profile remain after moving from `full` to `basic`: `josh init` removes nothing, so delete the `full` tooling you no longer want by hand and check with `josh gate`. Do not run `josh sync` in a `basic` project â€” it applies the `full` file set ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
+- Files from the old profile remain after moving from `full` to `basic`: `josh init` removes nothing, so delete the `full` tooling you no longer want by hand and check with `josh gate`. `josh sync` follows the newly recorded profile, so it writes only the `basic` file set from then on ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
