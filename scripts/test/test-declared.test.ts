@@ -7,14 +7,34 @@ import { test_declared } from './test-declared'
 
 const RUNTIME_FILE = 'scripts/foo.ts'
 const UNIT_TEST_FILE = 'scripts/foo.test.ts'
+const RUN_CHECK = 'run the changed code by hand'
 
-describe('test_declared.report', () => {
+// joshuafolkken/kit#2820: a basic-profile exemption names the manual check it owes — a browser for
+// HTML/CSS, a manual run for a source kit cannot test, and nothing for documentation.
+describe('test_declared.report manual-check instructions', () => {
 	it('explains manual browser confirmation for basic-profile HTML and CSS', () => {
 		const result = test_declared.report(['index.html', 'site.css'], true)
 
 		expect(result.verdict).toBe('exempt')
 		expect(result.detail).toContain('confirm the rendered page in a browser')
+		expect(result.detail).not.toContain(RUN_CHECK)
 	})
+
+	it('explains a manual run for a basic-profile source kit cannot test', () => {
+		const result = test_declared.report(['main.lua'], true)
+
+		expect(result.verdict).toBe('exempt')
+		expect(result.detail).toContain('main.lua')
+		expect(result.detail).toContain(RUN_CHECK)
+		expect(result.detail).not.toContain('browser')
+	})
+
+	it('gives no manual instruction for a documentation-only change', () => {
+		expect(test_declared.report(['docs/x.md'], true).detail).toBe('exempt paths: docs/x.md')
+	})
+})
+
+describe('test_declared.report', () => {
 	it('reports required and names the untested runtime files on the detail', () => {
 		const { detail, verdict } = test_declared.report([RUNTIME_FILE])
 
