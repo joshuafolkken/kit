@@ -505,12 +505,14 @@ Carry the release this repository just published into every consumer repository 
 pnpm josh propagate
 pnpm josh propagate --dry-run           # report targets and steps, write nothing
 pnpm josh propagate --skip-publish-wait # release already known to be published
+pnpm josh propagate --target app-kit    # carry the release into one consumer only
 ```
 
 **Options:**
 
 - `--dry-run` — report targets and steps without writing; skips the publish wait, opens no issues.
 - `--skip-publish-wait` — skip the registry poll for an already-published release.
+- `--target <repo>` — process only that consumer (`app-kit` or `joshuafolkken/app-kit`); the rest are reported `skipped` and left untouched. An unknown, ambiguous or non-dependent name fails before the publish wait, writing nothing.
 
 Per consumer, in order: working-tree check, `pnpm add -D @joshuafolkken/kit@<version>`, `pnpm josh sync`, verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
 

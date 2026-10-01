@@ -279,7 +279,7 @@ Show the project profile and the reason for it
 
 > **Audience:** maintainer · **Side effects:** files, network
 
-`[--dry-run] [--skip-publish-wait]`
+`[--dry-run] [--skip-publish-wait] [--target <repo>]`
 
 Carry the published release into every consumer repository next to this one
 
