@@ -7,6 +7,7 @@ const { context } = stop_rules_fixture
 // joshuafolkken/kit#2329: every stop reason ends on this, so a correction never reprints the reply.
 const NO_REPRINT = 'do not repeat your previous reply'
 const BARE_MESSAGE = 'done in #7'
+const QUOTING_PROMPT = 'explain this log: closed #7'
 
 describe('stop_rules.stop_outcome — stop notification', () => {
 	it('refuses a held tree that stopped without notifying', () => {
@@ -105,6 +106,26 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 		const outcome = stop_rules.stop_outcome(context({ hold_present: true, message: 'paused #7' }))
 
 		expect(outcome.reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	})
+})
+
+// joshuafolkken/kit#2819: a pasted log from another repository carries its own numbers.
+describe('stop_rules.stop_outcome — issue citation quoted from the prompt', () => {
+	it('is silent on a bare #N the prompt already carried', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({ message: BARE_MESSAGE, prompt: QUOTING_PROMPT }),
+		)
+
+		expect(outcome.reason).toBeUndefined()
+	})
+
+	it('still blocks a bare #N the prompt did not carry', () => {
+		const { reason } = stop_rules.stop_outcome(
+			context({ message: 'done in #7 and #8', prompt: QUOTING_PROMPT }),
+		)
+
+		expect(reason).toContain('pnpm josh issue:cite 8')
+		expect(reason).not.toContain('issue:cite 7')
 	})
 })
 

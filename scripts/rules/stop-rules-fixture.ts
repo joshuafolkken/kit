@@ -7,6 +7,7 @@ const BASE: StopContext = {
 	tree_clean: false,
 	notified: false,
 	message: '',
+	prompt: '',
 	stop_hook_active: false,
 	cut_pending: false,
 	filed: false,

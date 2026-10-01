@@ -49,6 +49,8 @@ interface StopContext {
 	notified: boolean
 	// The turn's session-facing reply text.
 	message: string
+	// The person's last prompt — a `#N` it already carried is quoted, not cited (joshuafolkken/kit#2819).
+	prompt: string
 	// This stop already forced a continuation earlier in the prompt — the loop-breaker Claude Code
 	// documents, so a run that will not comply is not blocked forever.
 	stop_hook_active: boolean
@@ -242,8 +244,8 @@ function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean
 }
 
-function citation_reason(message: string): string | undefined {
-	const references = issue_citation.bare_references(message)
+function citation_reason(context: StopContext): string | undefined {
+	const references = issue_citation.unquoted_references(context.message, context.prompt)
 	if (references.length === 0) return undefined
 
 	return build_citation_reason(references)
@@ -255,7 +257,7 @@ function citation_reason(message: string): string | undefined {
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
 
-	return citation_reason(context.message) ?? language_reason(context)
+	return citation_reason(context) ?? language_reason(context)
 }
 
 // The headless wait holds past the loop-breaker until the spin bound is reached.
