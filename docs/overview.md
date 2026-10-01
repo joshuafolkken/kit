@@ -26,7 +26,7 @@ In a `basic` project, `josh gate`, `josh lint` and the other checks skip each to
 
 1. **Install** — [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
 2. **Init** — run `josh init` once. It creates or merges the config files for the profile, copies AI files and adds the profile's `package.json` scripts and development dependencies, then runs `pnpm install` (which installs the Git hooks in a `full` project with Git) and `josh format`.
-3. **Sync** — in a `full` project, run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files. A `basic` project only upgrades the package ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
+3. **Sync** — run `josh sync` after upgrading the package to pull in updated AI files, workflow templates, and other managed files. It follows the recorded profile, so a `basic` project gets only its own file set ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
 4. **josh CLI** — a single `josh` binary (available as `pnpm josh` after init) gives you git workflow helpers, version management, security auditing, and more.
 
 To walk the Issue-driven loop once — file an Issue, have an agent plan and implement it, verify, merge — follow [tutorial.md](./tutorial.md). To find the steps for a task — updating kit or dependencies, releasing, running Issues — start at [how-to.md](./how-to.md). The full list of guides is in the [README](../README.md#documentation).

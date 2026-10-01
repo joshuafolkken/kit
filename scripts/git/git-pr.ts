@@ -202,22 +202,27 @@ async function create_for_issue(
 	)
 }
 
-async function create_with_issue_info(issue_info: IssueInfo, extra_body?: string): Promise<void> {
-	const existing_label = await existing_pr_label(issue_info.branch_name)
+// The label the pull request is opened with — also asked by `git-preflight.ts` before the commit, so
+// a missing classification is reported beside the other unmet preconditions (joshuafolkken/kit#2817).
+async function release_classification(
+	issue_number: string,
+	branch_name: string,
+): Promise<ReleaseClassification> {
+	const existing_label = await existing_pr_label(branch_name)
 
-	if (existing_label !== undefined) {
-		await create_for_issue(issue_info, extra_body, existing_label)
+	if (existing_label !== undefined) return existing_label
 
-		return
-	}
-
-	const issue_json = await git_gh_command.issue_view_json(issue_info.number, 'labels,body')
+	const issue_json = await git_gh_command.issue_view_json(issue_number, 'labels,body')
 
 	if (issue_json === undefined) {
-		throw new Error(`Could not read issue #${issue_info.number} for release classification`)
+		throw new Error(`Could not read issue #${issue_number} for release classification`)
 	}
 
-	const label = pr_classification.select_issue_classification(issue_json)
+	return pr_classification.select_issue_classification(issue_json)
+}
+
+async function create_with_issue_info(issue_info: IssueInfo, extra_body?: string): Promise<void> {
+	const label = await release_classification(issue_info.number, issue_info.branch_name)
 
 	await create_for_issue(issue_info, extra_body, label)
 }
@@ -225,6 +230,7 @@ async function create_with_issue_info(issue_info: IssueInfo, extra_body?: string
 const git_pr = {
 	create,
 	create_with_issue_info,
+	release_classification,
 }
 
 export { git_pr }

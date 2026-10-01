@@ -5,6 +5,7 @@ import { git_commit } from '../scripts/git/git-commit'
 import { git_error } from '../scripts/git/git-error'
 import { git_issue, type IssueInfo } from '../scripts/git/git-issue'
 import { git_pr } from '../scripts/git/git-pr'
+import { git_preflight } from '../scripts/git/git-preflight'
 import { git_prompt, type WorkflowConfirmations } from '../scripts/git/git-prompt'
 import { git_push } from '../scripts/git/git-push'
 import { git_staging } from '../scripts/git/git-staging'
@@ -206,6 +207,14 @@ async function execute_workflow(
 	const { cli_issue_input, is_auto_mode, commit_suffix } = parse_positionals(positionals)
 	const is_non_interactive = is_non_interactive_mode(is_auto_mode, values)
 
+	// Unattended, nobody can fix a precondition between stages — so all are asked before staging.
+	if (is_non_interactive) {
+		await git_preflight.check({
+			cli_input: cli_issue_input,
+			will_open_pr: values['skip-pr'] !== true,
+		})
+	}
+
 	await git_staging.check_and_confirm_staging(values.yes === true)
 
 	const issue_info = await prepare_issue_info(cli_issue_input, is_non_interactive)
@@ -235,6 +244,7 @@ try {
 }
 
 const git_workflow = {
+	execute_workflow,
 	parse_positionals,
 	get_workflow_confirmations,
 	prepare_issue_info,

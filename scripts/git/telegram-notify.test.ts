@@ -16,6 +16,7 @@ const BODY = '- Added foo\n- Changed bar'
 
 const BOT_TOKEN_KEY = 'TELEGRAM_BOT_TOKEN'
 const CHAT_ID_KEY = 'TELEGRAM_CHAT_ID'
+const NOTIFY_SWITCH_KEY = 'JOSH_NOTIFY'
 const GATEWAY_TIMEOUT_STATUS = 504
 const REDACTION_MARKER = '<redacted>'
 const RECOVERY_HINT = 'send it by hand with `pnpm josh notify`'
@@ -26,9 +27,13 @@ const OK_STATUS = 200
 // A developer's own shell may carry these, so every case states exactly what it means to test.
 // `vi.stubEnv` removes the variable when handed `undefined`, and `vi.unstubAllEnvs` puts the
 // environment back whatever it held.
+//
+// The opt-out switch is cleared here too, so a shell that disabled notifications cannot turn every
+// failure case below into a skip.
 function set_credentials(bot_token: string | undefined, chat_id: string | undefined): void {
 	vi.stubEnv(BOT_TOKEN_KEY, bot_token)
 	vi.stubEnv(CHAT_ID_KEY, chat_id)
+	vi.stubEnv(NOTIFY_SWITCH_KEY, undefined)
 }
 
 function stub_fetch(response: { ok: boolean; status: number; statusText: string }): void {
@@ -235,6 +240,47 @@ describe('telegram_notify.send — a notification that reached nobody', () => {
 		await expect(telegram_notify.send(make_base({}))).rejects.toThrow(REDACTION_MARKER)
 		await expect(telegram_notify.send(make_base({}))).rejects.not.toThrow(BOT_TOKEN)
 		await expect(telegram_notify.send(make_base({}))).rejects.not.toThrow(CHAT_ID)
+	})
+})
+
+// joshuafolkken/kit#2821. A consumer who chose not to use Telegram states it once, and only that
+// stated choice skips the send — a forgotten setup still fails as #1564 requires.
+describe('telegram_notify.send — JOSH_NOTIFY=off opts out explicitly', () => {
+	it('skips without credentials, says notifications are disabled, and never fetches', async () => {
+		set_credentials(undefined, undefined)
+		vi.stubEnv(NOTIFY_SWITCH_KEY, ' OFF ')
+		const fetch_spy = vi.fn()
+
+		vi.stubGlobal('fetch', fetch_spy)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await expect(telegram_notify.send(make_base({}))).resolves.toBeUndefined()
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('disabled'))
+		expect(fetch_spy).not.toHaveBeenCalled()
+	})
+
+	it('answers true from the tolerant form and reports nothing', async () => {
+		set_credentials(undefined, undefined)
+		vi.stubEnv(NOTIFY_SWITCH_KEY, 'off')
+		const { errors } = silence_console()
+
+		await expect(telegram_notify.send_or_report(make_base({}), RECOVERY_HINT)).resolves.toBe(true)
+		expect(errors).toHaveLength(0)
+	})
+
+	it('still fails on missing credentials when the switch is unset', async () => {
+		set_credentials(undefined, undefined)
+		silence_console()
+
+		await expect(telegram_notify.send(make_base({}))).rejects.toThrow(BOT_TOKEN_KEY)
+	})
+
+	it('still fails on missing credentials when the switch holds any other value', async () => {
+		set_credentials(undefined, undefined)
+		vi.stubEnv(NOTIFY_SWITCH_KEY, 'no')
+		silence_console()
+
+		await expect(telegram_notify.send(make_base({}))).rejects.toThrow(BOT_TOKEN_KEY)
 	})
 })
 

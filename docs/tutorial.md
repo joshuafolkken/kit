@@ -67,7 +67,7 @@ The agent runs every opted-in Issue in dependency order, each one from implement
 
 ## Separately: pull in kit's updates with `josh sync`
 
-Not part of the loop above. After upgrading `@joshuafolkken/kit` in a `full` project, run `pnpm josh sync` to refresh the rules and files kit manages; a `basic` project needs only the upgrade. [Update kit](./how-to/update-kit.md) has the steps, and [sync.md](./sync.md) lists what it overwrites.
+Not part of the loop above. After upgrading `@joshuafolkken/kit`, run `pnpm josh sync` to refresh the rules and files kit manages; it writes only the file set of the project's profile. [Update kit](./how-to/update-kit.md) has the steps, and [sync.md](./sync.md) lists what it overwrites.
 
 ## Where next
 

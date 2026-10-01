@@ -18,8 +18,23 @@ vi.mock('node:util', () => ({
 	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
 }))
 
+// The order the import-time run reached the pre-fix check and the commit (joshuafolkken/kit#2448).
+const CALL_ORDER = vi.hoisted((): Array<string> => [])
+
+vi.mock('../scripts/git/git-preflight', () => ({
+	git_preflight: {
+		check: vi.fn(async () => {
+			CALL_ORDER.push('preflight')
+		}),
+	},
+}))
+
 vi.mock('../scripts/git/git-staging', () => ({
-	git_staging: { check_and_confirm_staging: vi.fn<() => Promise<void>>().mockResolvedValue() },
+	git_staging: {
+		check_and_confirm_staging: vi.fn(async () => {
+			CALL_ORDER.push('stage')
+		}),
+	},
 }))
 
 vi.mock('../scripts/git/git-branch', () => ({
@@ -42,9 +57,6 @@ vi.mock('../scripts/git/git-prompt', () => ({
 		get_issue_info: vi.fn().mockResolvedValue('fake #42'),
 	},
 }))
-
-// The order the import-time run reached the pre-fix check and the commit (joshuafolkken/kit#2448).
-const CALL_ORDER = vi.hoisted((): Array<string> => [])
 
 // The import-time run commits only on the non-interactive path, so pin it rather than inherit the
 // runner's stdin — an interactive run would otherwise skip the commit and leave the order empty.
@@ -73,10 +85,37 @@ vi.mock('../scripts/git/git-error', () => ({ git_error: { handle: vi.fn() } }))
 
 const { git_workflow } = await import('./git-workflow')
 const IMPORT_TIME_ORDER = [...CALL_ORDER]
+const { git_preflight } = await import('../scripts/git/git-preflight')
+const { git_staging } = await import('../scripts/git/git-staging')
+const { git_branch } = await import('../scripts/git/git-branch')
+const { git_commit } = await import('../scripts/git/git-commit')
+const { git_push } = await import('../scripts/git/git-push')
 
 describe('pre-fix check before the commit', () => {
 	it('asks test:red for the resolved Issue before committing', () => {
-		expect(IMPORT_TIME_ORDER).toStrictEqual(['test:red #42', 'commit'])
+		expect(IMPORT_TIME_ORDER).toStrictEqual(['preflight', 'stage', 'test:red #42', 'commit'])
+	})
+})
+
+describe('preflight before any git change', () => {
+	it('stops before staging, branching, committing and pushing when preflight refuses', async () => {
+		vi.mocked(git_preflight.check).mockRejectedValueOnce(new Error('2 unmet precondition(s)'))
+
+		await expect(git_workflow.execute_workflow({ yes: true }, [])).rejects.toThrow(/unmet/u)
+		expect(git_preflight.check).toHaveBeenCalledWith({ cli_input: undefined, will_open_pr: true })
+		expect(git_staging.check_and_confirm_staging).not.toHaveBeenCalled()
+		expect(git_branch.check_and_create_branch).not.toHaveBeenCalled()
+		expect(git_commit.commit).not.toHaveBeenCalled()
+		expect(git_push.push).not.toHaveBeenCalled()
+	})
+
+	it('passes --skip-pr through so the classification is not asked', async () => {
+		vi.mocked(git_preflight.check).mockRejectedValueOnce(new Error('stop'))
+
+		await expect(
+			git_workflow.execute_workflow({ yes: true, 'skip-pr': true }, []),
+		).rejects.toThrow()
+		expect(git_preflight.check).toHaveBeenCalledWith({ cli_input: undefined, will_open_pr: false })
 	})
 })
 
@@ -196,8 +235,6 @@ describe('resolve_pr_body', () => {
 
 describe('prepare_issue_info — branch name override', () => {
 	it('returns issue_info with branch_name from check_and_create_branch', async () => {
-		const { git_branch } = await import('../scripts/git/git-branch')
-
 		vi.mocked(git_branch.check_and_create_branch).mockResolvedValue(FAKE_BRANCH_NAME)
 
 		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT, true)
@@ -206,8 +243,6 @@ describe('prepare_issue_info — branch name override', () => {
 	})
 
 	it('overrides generated branch_name when check_and_create_branch returns different value', async () => {
-		const { git_branch } = await import('../scripts/git/git-branch')
-
 		vi.mocked(git_branch.check_and_create_branch).mockResolvedValue(ALT_BRANCH_NAME)
 
 		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT, true)
