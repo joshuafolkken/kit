@@ -30,6 +30,9 @@ vi.mock('#scripts/git/git-worktree', () => ({
 vi.mock('./lane-install', () => ({
 	lane_install: { install_dependencies: vi.fn() },
 }))
+vi.mock('./lane-leftover', () => ({
+	lane_leftover: { reclaim: vi.fn() },
+}))
 vi.mock('./lane-registry', () => ({
 	lane_registry: {
 		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
@@ -46,6 +49,7 @@ vi.mock('./lane-registry', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_install } = await import('./lane-install')
+const { lane_leftover } = await import('./lane-leftover')
 const { lane_registry } = await import('./lane-registry')
 const { lane_open } = await import('./lane-open')
 
@@ -67,6 +71,7 @@ const PREVIEW_BASE = 4173
 // (joshuafolkken/kit#1503, #1507). It rides on a successful install and must not refuse the lane.
 const LEFTHOOK_WARNING = 'lefthook install failed: git hooks are NOT installed.'
 const INSTALL_FAILURE = 'ERR_PNPM_OUTDATED_LOCKFILE'
+const REFUSAL = 'holds files'
 
 function install_answers(is_installed: boolean, output: string): void {
 	vi.mocked(lane_install.install_dependencies).mockResolvedValue({ is_installed, output })
@@ -133,6 +138,7 @@ beforeEach(() => {
 	lanes_are([])
 	install_answers(true, '')
 	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	vi.mocked(lane_leftover.reclaim).mockReset()
 	git_answers()
 })
 
@@ -178,6 +184,24 @@ describe('opening a lane', () => {
 		await lane_open.open_lane(ISSUE)
 
 		expect(lane_environment_file(ISSUE)).toBe(`${SEAT_1_LINE}\n`)
+	})
+})
+
+// joshuafolkken/kit#2857: a directory git does not register is cleared, or refused, before anything
+// is created — `lane-leftover.test.ts` pins which leftovers are cleared.
+describe('a leftover directory at the lane path', () => {
+	it('is handed to the leftover check before the work tree is added', async () => {
+		await lane_open.open_lane(ISSUE)
+
+		expect(vi.mocked(lane_leftover.reclaim)).toHaveBeenCalledWith(path.join(LANE_ROOT, ISSUE))
+	})
+
+	it('stops the open, without a work tree or a seat lock, when the check refuses it', async () => {
+		vi.mocked(lane_leftover.reclaim).mockRejectedValue(new Error(REFUSAL))
+
+		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(REFUSAL)
+		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
+		expect(existsSync(seat_lock_path(1))).toBe(false)
 	})
 })
 

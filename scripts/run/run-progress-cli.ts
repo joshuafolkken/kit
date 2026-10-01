@@ -77,7 +77,12 @@ const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_MAX_
 // The repository name is only ever printed, never written against, so the bounded lookup is the right
 // one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
 // watcher neither running nor saying so.
-const REPO_LOOKUP_TIMEOUT_MS = 10_000
+const REPO_LOOKUP_TIMEOUT_SECONDS = 10
+const REPO_LOOKUP_TIMEOUT_MS = REPO_LOOKUP_TIMEOUT_SECONDS * run_progress.MS_PER_SECOND
+// A lookup that timed out or failed is not an argument the caller got wrong, so it is told apart from
+// the usage error — read as one, it sent a person to fix arguments that were correct
+// (joshuafolkken/kit#2859).
+const REPO_UNRESOLVED_NOTICE = `The repository could not be resolved (\`gh\` did not answer within ${String(REPO_LOOKUP_TIMEOUT_SECONDS)}s or failed), so the progress watcher did not start. Pass \`--repo <owner/repo>\` and start it again.`
 
 const DECLINE_NOTICES: Readonly<Record<'idle' | 'unreadable', string>> = {
 	idle: IDLE_NOTICE,
@@ -137,6 +142,12 @@ function is_disabled(): boolean {
 
 function report_usage(): number {
 	console.error(USAGE)
+
+	return FAILURE_EXIT_CODE
+}
+
+function report_repo_unresolved(): number {
+	console.error(REPO_UNRESOLVED_NOTICE)
 
 	return FAILURE_EXIT_CODE
 }
@@ -443,7 +454,7 @@ function to_options(values: ParsedValues): WatchOptions | undefined {
 async function run_watch(values: ParsedValues): Promise<number> {
 	const options = to_options(values)
 
-	if (options === undefined) return report_usage()
+	if (options === undefined) return report_repo_unresolved()
 	if (values.once === true) return await once(options)
 	if (values.wait === true) return await wait_once(options)
 
@@ -487,6 +498,7 @@ const run_progress_cli = {
 	IDLE_NOTICE,
 	LANE_CHILD_NOTICE,
 	MARKED_NOTICE,
+	REPO_UNRESOLVED_NOTICE,
 	TICK_SECONDS,
 	UNREADABLE_NOTICE,
 	USAGE,

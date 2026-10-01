@@ -12,7 +12,11 @@ import { z } from 'zod'
 
 const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 const ISSUE_BUG_LABEL = 'bug'
-const DECLARATION = /^- リリース分類: (.+)$/gmu
+// The line an Issue body declares its release classification with. A body written by a script
+// (`josh propagate`'s upgrade issue) builds it with `declaration`, so the writer and this parser share
+// one format (joshuafolkken/kit#2858).
+const DECLARATION_PREFIX = '- リリース分類: '
+const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
 const LEGACY_LABELS: ReadonlySet<string> = new Set(['semver-major', 'semver-minor'])
 
 const LABEL = z.object({ name: z.string() })
@@ -36,6 +40,10 @@ function classification_error(labels: ReadonlyArray<string>, author: string): st
 	if (selected.length === 1 || author.endsWith('[bot]')) return undefined
 
 	return `Choose one release classification: ${CLASSIFICATION_LABELS.join(', ')}`
+}
+
+function declaration(label: ReleaseClassification): string {
+	return `${DECLARATION_PREFIX}${label}`
 }
 
 function is_classification(value: string): value is ReleaseClassification {
@@ -75,7 +83,7 @@ function select_issue_classification(issue_json: string): ReleaseClassification 
 
 	if (label === undefined || selected.length > 1) {
 		throw new Error(
-			`Choose one release classification before opening the PR: ${CLASSIFICATION_LABELS.join(', ')}; found: ${selected.join(', ') || 'none'}. Add "- リリース分類: <label>" to the Issue body.`,
+			`Choose one release classification before opening the PR: ${CLASSIFICATION_LABELS.join(', ')}; found: ${selected.join(', ') || 'none'}. Add "${DECLARATION_PREFIX}<label>" to the Issue body.`,
 		)
 	}
 
@@ -125,6 +133,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const pr_classification = {
 	classification_error,
 	check_event,
+	declaration,
 	is_classification,
 	select_issue_classification,
 }

@@ -217,11 +217,11 @@ describe('arguments', () => {
 		expect(values?.output).toEqual(['a.jsonl', 'b.jsonl'])
 	})
 
-	it('stops rather than guessing when no repository can be resolved', async () => {
+	it('stops with a lookup failure, not a usage error, when no repository can be resolved', async () => {
 		repo_name.mockReturnValue(undefined)
 
 		await expect(run_progress_cli.run(['--once'])).resolves.toBe(1)
-		expect(output.warned).toEqual([run_progress_cli.USAGE])
+		expect(output.warned).toEqual([run_progress_cli.REPO_UNRESOLVED_NOTICE])
 	})
 
 	it('caps an abandoned watcher at one hour by default', () => {
