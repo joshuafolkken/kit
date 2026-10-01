@@ -17,6 +17,18 @@ const CHOOSE_ERROR = 'Choose one release classification'
 const REPOSITORY = 'owner/repo'
 const PULL_NUMBER = 42
 
+// A script that writes an issue body builds the line with `declaration` (joshuafolkken/kit#2858).
+describe('issue release classification declaration', () => {
+	it.each([BREAKING, ENHANCEMENT, BUGFIX, OTHER, IGNORE] as const)(
+		'accepts the declaration line it builds for %s',
+		(label) => {
+			const issue = JSON.stringify({ labels: [], body: pr_classification.declaration(label) })
+
+			expect(pr_classification.select_issue_classification(issue)).toBe(label)
+		},
+	)
+})
+
 describe('issue release classification', () => {
 	it('maps an issue bug label to the PR bugfix classification', () => {
 		const issue = JSON.stringify({ labels: [{ name: 'bug' }], body: '' })

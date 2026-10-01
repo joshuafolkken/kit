@@ -1,5 +1,7 @@
+import { pr_classification } from '#scripts/ci/pr-classification'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
+import { OTHER_CHANGE_LABEL } from '#scripts/git/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { build_upgrade_shell_command } from '#scripts/version/upgrade-shell-command'
 import { create_version_command_config } from '#scripts/version/version-command-config'
@@ -62,6 +64,10 @@ const PROPAGATE_ORIGIN =
 	'Opened by `josh propagate` from the supplier repository after the release was published.'
 const RUN_NOTE =
 	'The upgrade, the managed-file sync and the verification gate have already run here.'
+// `josh git` refuses to open a pull request for an issue that declares no release classification
+// (joshuafolkken/kit#2666), so the upgrade issue declares one. A dependency upgrade changes no code of
+// the consumer's own, which is what `other-change` covers (joshuafolkken/kit#2858).
+const UPGRADE_CLASSIFICATION = OTHER_CHANGE_LABEL
 const EMPTY_PLAN_TITLE = 'Upgrade the installed toolkits'
 const LAST_SEPARATOR = ' and '
 const NAME_SEPARATOR = ', '
@@ -95,7 +101,14 @@ function plan_body(plan: ReleasePlan): string {
 		.map((release) => `\`${release.package_name}@${release.version}\``)
 		.join(NAME_SEPARATOR)
 
-	return [`Carry ${specs} into this repository.`, '', plan.origin, RUN_NOTE].join('\n')
+	return [
+		`Carry ${specs} into this repository.`,
+		'',
+		plan.origin,
+		RUN_NOTE,
+		'',
+		pr_classification.declaration(UPGRADE_CLASSIFICATION),
+	].join('\n')
 }
 
 function issue_body(package_name: string, version: string): string {

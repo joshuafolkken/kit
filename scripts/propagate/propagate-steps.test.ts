@@ -1,3 +1,4 @@
+import { pr_classification } from '#scripts/ci/pr-classification'
 import { GATE_TARGETS } from '#scripts/gate/verification-gate'
 import {
 	GH_REQUEST_TIMEOUT_MESSAGE,
@@ -5,6 +6,7 @@ import {
 	type GhApiRequest,
 } from '#scripts/git/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
+import { OTHER_CHANGE_LABEL } from '#scripts/git/issue-labels'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { propagate_run, type StepResult } from './propagate-run'
@@ -328,6 +330,17 @@ describe('propagate_steps — one issue names every release the plan carries', (
 		expect(body).toContain(`\`${KIT}@${LATEST}\``)
 		expect(body).toContain(`\`${APP_KIT}@${LATEST}\``)
 		expect(body).toContain(ADOPT_ORIGIN)
+	})
+
+	// `josh git` refuses an issue with no release classification (joshuafolkken/kit#2858).
+	it('declares a release classification the josh git preflight accepts', () => {
+		const bodies = [propagate_steps.plan_body(PLAN), propagate_steps.issue_body(KIT, VERSION)]
+
+		for (const body of bodies) {
+			const issue = JSON.stringify({ labels: [], body })
+
+			expect(pr_classification.select_issue_classification(issue)).toBe(OTHER_CHANGE_LABEL)
+		}
 	})
 
 	// The generalization must leave a propagation run's own issue exactly as it was.
