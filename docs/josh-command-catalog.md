@@ -279,7 +279,7 @@ Show the project profile and the reason for it
 
 > **Audience:** maintainer · **Side effects:** files, network
 
-`[--dry-run] [--skip-publish-wait]`
+`[--dry-run] [--skip-publish-wait] [--target <repo>]`
 
 Carry the published release into every consumer repository next to this one
 
@@ -932,6 +932,16 @@ Print the paste-ready number-link citation line for each issue, in one call
 `<issue> --body <text> | --body-file <path>`
 
 Post one comment to an issue from a file, so no shell expands the body
+
+---
+
+### `josh issue:file` · `josh ifl`
+
+> **Audience:** automation · **Side effects:** network
+
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>]`
+
+File an Issue with every filing step: lint, Origin, duplicate scout, labels, then epic:bundle
 
 ---
 

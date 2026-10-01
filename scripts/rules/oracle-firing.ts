@@ -1,4 +1,3 @@
-import { bash_triggers } from './bash-triggers'
 import { decision_oracle } from './decision-oracle'
 import { shell_segments } from './shell-segments'
 
@@ -32,22 +31,16 @@ function is_package_add(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => PACKAGE_ADD.test(segment))
 }
 
-// The two firing points wired — the oracles whose governed call can be named without guessing: the
-// package add and the Issue filing. The rest declare why none can be named, so the unenforced oracles
-// are visible rather than silently missing.
+// The firing point wired — the oracle whose governed call can be named without guessing: the package
+// add. The Issue filing's `issue:lint` point left with joshuafolkken/kit#2808, when `josh issue:file`
+// began running the lint itself. The rest declare why none can be named, so the unenforced oracles are
+// visible rather than silently missing.
 const FIRING: ReadonlyMap<string, FiringPoint> = new Map([
 	[
 		'pkg:scout',
 		{
 			describes: 'a package-add command (`pnpm add …`, `npm install <pkg>`)',
 			governs: is_package_add,
-		},
-	],
-	[
-		'issue:lint',
-		{
-			describes: 'an Issue-filing call (`gh api …/issues`, `gh issue create`)',
-			governs: bash_triggers.is_issue_filing,
 		},
 	],
 ])
@@ -66,9 +59,12 @@ const SELF = 'the command is itself the governed act; there is no earlier call t
 const LATEST_SCOPE_REASON =
 	'the run it governs (`pnpm josh latest`) is already gated at its point of use by the latest-gate; ' +
 	'a firing here would double-gate it'
-const EPIC_BUNDLE_REASON =
-	'it runs after a filing to place it, and that filing is already gated by `issue-scout`; it has no ' +
-	'earlier call of its own'
+// `josh issue:file` runs the scout, the lint and `epic:bundle` itself, and a filing made any other way
+// is refused by the `direct-filing` row (joshuafolkken/kit#2808) — so none of the three has a call left
+// to gate before.
+const FILING_STEP_REASON =
+	'`pnpm josh issue:file` runs it as one of its filing steps, and a direct filing is refused by the ' +
+	'`direct-filing` delivered rule; there is no separate call left to gate'
 const RELEASE_SCOPE_REASON =
 	'it reads the release owed *after* `pnpm josh followup` has merged (`git_followup_pending`), so it ' +
 	'trails the merge rather than gating it; a firing on `followup` would gate a check that must run ' +
@@ -84,8 +80,9 @@ const NOT_NAMED: ReadonlyMap<string, string> = new Map([
 	['latest:scope', LATEST_SCOPE_REASON],
 	['run:hold', SELF],
 	['cost:cut', READ],
-	['epic:bundle', EPIC_BUNDLE_REASON],
-	['issue:scout', 'the filing it governs is already gated by the `issue-scout` delivered rule'],
+	['epic:bundle', FILING_STEP_REASON],
+	['issue:scout', FILING_STEP_REASON],
+	['issue:lint', FILING_STEP_REASON],
 	[
 		'issue:fold',
 		'the second filing it governs is already gated by the `issue-fold` delivered rule',

@@ -174,11 +174,12 @@ describe('rule_delivery — end to end through the enumeration', () => {
 	})
 
 	// Once per run: the second edit of the same run is not refused again.
-	it('delivers once per run rather than once per call', () => {
+	// Once per run let the reissued edit land with neither question answered (joshuafolkken/kit#2807).
+	it('keeps refusing the reissued edit until both placement commands ran', () => {
 		const payload = edit_payload('append-repeat', '', RULE_SENTENCE)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
-		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBeUndefined()
+		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
 	})
 
 	it('says nothing about a typo fix in a rule document', () => {
@@ -246,8 +247,8 @@ describe('RULE_BODY_REASON — what the refusal states', () => {
 		// The criterion and the delivery enumeration, as pointers rather than restated procedure.
 		[RESIDENCY],
 		[RULE_DELIVERY],
-		// The once-per-run reissue, without which the run cannot land the edit it was refused.
-		['once per run'],
+		// That it repeats until both commands ran, and the reissue that lands the edit afterwards.
+		['refused until both commands are on the transcript'],
 		['reissue this'],
 	])('carries %j', (marker) => {
 		expect(REASON).toContain(marker)

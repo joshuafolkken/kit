@@ -21,7 +21,9 @@ import { tail_commands } from './tail-commands'
 // **A guard-refused filing does not count.** Claude Code writes a denied call to the transcript as a
 // `tool_use` block with an errored `tool_result`, so the WIP cap's own reissue would otherwise
 // double-count one Issue — the same exclusion `investigation-reads.ts` makes for a refused read
-// (joshuafolkken/kit#1764). The filing is counted only where its result carried no guard refusal.
+// (joshuafolkken/kit#1764). **Nor does one `issue:file` held itself** (joshuafolkken/kit#2808): a lint
+// problem or an unacknowledged duplicate exits non-zero having filed nothing, and the reissue is the
+// same Issue. The filing is counted only where its result did not fail.
 
 const FILING_CAP = 10
 // The current call is not yet on the tail, so the count read there is of filings *already* made. At
@@ -31,8 +33,9 @@ const CAP_REACHED = FILING_CAP
 interface TailFilings {
 	// The `tool_use` id of every filing on the tail.
 	filing_ids: Array<string>
-	// Each result's id mapped to the guard that refused it, and `''` for a result no guard refused.
-	refusals: Map<string, string>
+	// The id of every result that came back as a failure — a guard refusal, or `issue:file` holding the
+	// filing itself (a lint problem, an unacknowledged duplicate), which files nothing either.
+	failures: Set<string>
 }
 
 function is_filing_use(block: Block): boolean {
@@ -42,7 +45,7 @@ function is_filing_use(block: Block): boolean {
 }
 
 function collect_block(block: Block, found: TailFilings): void {
-	if (block.result_id !== '') found.refusals.set(block.result_id, block.refusal_guard)
+	if (block.result_id !== '' && block.is_error === true) found.failures.add(block.result_id)
 	if (is_filing_use(block)) found.filing_ids.push(block.id)
 }
 
@@ -55,18 +58,18 @@ function collect_line(line: string, found: TailFilings): void {
 }
 
 function scan_tail(tail: string): TailFilings {
-	const found: TailFilings = { filing_ids: [], refusals: new Map<string, string>() }
+	const found: TailFilings = { filing_ids: [], failures: new Set<string>() }
 
 	for (const line of tail.split('\n')) collect_line(line, found)
 
 	return found
 }
 
-// How many Issues the run has already filed, counting only filings no guard refused.
+// How many Issues the run has already filed, counting only filings whose result did not fail.
 function prior_filing_count(tail: string): number {
-	const { filing_ids, refusals } = scan_tail(tail)
+	const { filing_ids, failures } = scan_tail(tail)
 
-	return filing_ids.filter((id) => (refusals.get(id) ?? '') === '').length
+	return filing_ids.filter((id) => !failures.has(id)).length
 }
 
 // A person's prompt: a `user` line carrying no tool result. Tool results ride `user` lines too, so the

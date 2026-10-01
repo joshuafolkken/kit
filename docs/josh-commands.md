@@ -205,7 +205,8 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 
 **The rules it delivers today:**
 
-- **Backlog WIP cap** — trigger is a `Bash` call that files an Issue (`gh issue create`, or a `title`-bearing POST to a path ending `/issues`).
+- **Direct filing** — trigger is a hand-built filing (`gh issue create`, or a `title`-bearing POST to a path ending `/issues`); refused on every occurrence and pointed at [`josh issue:file`](#josh-issuefile), which runs every filing step itself.
+- **Backlog WIP cap** — trigger is a `Bash` call that files an Issue (`pnpm josh issue:file`).
 - **Issue comments** — trigger reads an Issue body without them (`gh issue view <N>`, or a `GET` ending `…/issues/<N>`); hands over `gh issue view <N> --comments`.
 - **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
@@ -213,7 +214,7 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 - **The implementation-phase cut row**: the trigger is an `Edit` / `Write` from a **lane** working tree that has not yet taken its cut, once the recent-context verdict (`pnpm josh cost --cut`'s, unmeasurable read `!== UNDER` on the safety-net side) is over the shared threshold, handing over `pnpm josh run:cut --impl <N> --handoff <path>`. Unlike the pre-gate row it **fires on every threshold crossing** (joshuafolkken/kit#2385): once per run left a `busy` / `failed` verdict to grow the context unwatched, so it carries `decide` and lets an edit reissued right after a refusal through. The verdict read is reused over a few-second per-checkout window. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source.
 - **Bare `pnpm josh git`** — trigger is a `pnpm josh git` with no `-y` / `--yes` (joshuafolkken/kit#2297); it prompts to confirm the staging, cancels with no TTY, and the run reissues with `-y` after throwing the time away. Hands over `pnpm josh git -y "<title> #<N>"`. Disjoint from the run-tail push row by the flag — that one requires `-y`, this refuses its absence — and it fires on every occurrence.
 
-Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Most rows deliver once per run; some — force push / branch delete, the bare-`git` and run-tail push rows, and the implementation-phase cut — fire on every occurrence.
+Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deliver once per run; some — force push / branch delete, direct filing, the bare-`git` and run-tail push rows, and the implementation-phase cut — fire on every occurrence; and a row that asks for an earlier command (`issue:fold`, the Issue comments, `pkg:scout`, the rule-body placement questions) refuses every call until that command is on the transcript (joshuafolkken/kit#2807).
 
 ### `josh pretool:guard`
 
@@ -223,7 +224,7 @@ The `PreToolUse` dispatcher that routes each pending tool call to the delivered-
 
 ### `josh stop:guard`
 
-The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247, joshuafolkken/kit#2422): one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to run `pnpm josh issue:scout` through the filing, because a first-party filing is Tier A (`SKILL.md` → §2i); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+The `Stop` hook (joshuafolkken/kit#2121, joshuafolkken/kit#2247, joshuafolkken/kit#2422): one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. A reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to file it with `pnpm josh issue:file`, because a first-party filing is Tier A (`SKILL.md` → §2i); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
 `backlogrun` の通常の親ループと次の Issue の取得は監督プロセスが扱う。`stop:guard` は次の Issue の取得をブロック判定に含めない。名前を指定したエピックを判断用の headless セッションに渡した場合は、子レーンの待機保護が残る。停滞と取り残しの検出は Stop イベント時に実行する。
 
@@ -505,12 +506,14 @@ Carry the release this repository just published into every consumer repository 
 pnpm josh propagate
 pnpm josh propagate --dry-run           # report targets and steps, write nothing
 pnpm josh propagate --skip-publish-wait # release already known to be published
+pnpm josh propagate --target app-kit    # carry the release into one consumer only
 ```
 
 **Options:**
 
 - `--dry-run` — report targets and steps without writing; skips the publish wait, opens no issues.
 - `--skip-publish-wait` — skip the registry poll for an already-published release.
+- `--target <repo>` — process only that consumer (`app-kit` or `joshuafolkken/app-kit`); the rest are reported `skipped` and left untouched. An unknown, ambiguous or non-dependent name fails before the publish wait, writing nothing.
 
 Per consumer, in order: working-tree check, `pnpm add -D @joshuafolkken/kit@<version>`, `pnpm josh sync`, verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
 
@@ -993,7 +996,7 @@ State is `OPEN` / `CLOSED` / `MERGED`. `human_review:` answers whether the issue
 
 ### `josh issue:scout`
 
-Before an issue is filed, answer the two questions every filing asks: has this already been filed, and which epic does it belong to.
+Before an issue is filed, answer the two questions every filing asks: has this already been filed, and which epic does it belong to. [`josh issue:file`](#josh-issuefile) runs this scan as a filing step and holds the filing until every candidate is named in `--distinct`.
 
 ```bash
 pnpm josh issue:scout "Stop the gate re-running after every edit"
@@ -1007,6 +1010,36 @@ pnpm josh issue:scout "<title>" --body-file draft.md
 - `--body-file <path>` — 目的・要件・受け入れ条件を含む下書き全文を渡す。読み取り失敗時は候補なしとせず終了する。
 
 The duplicate half scores titles by token overlap; a candidate needs ≥2 significant shared words and similarity ≥0.35. 本文中で明示的に参照した Issue も、見出しが似ていなくても候補に出す。探索が不完全なときは `Duplicates: incomplete` と表示する。The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, and does not replace it.
+
+### `josh issue:file`
+
+Issue を起票する唯一の経路。起票の手順をすべて順番に実行する。`gh api …/issues` や `gh issue create` で直接起票しようとすると、`direct-filing` ガードが毎回拒否してこのコマンドを案内する。
+
+```bash
+pnpm josh issue:file "<title>" --body-file body.md --depth 1
+pnpm josh issue:file "<title>" --body-file body.md --depth 0 --route tier-a --repo joshuafolkken/kit
+pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,2795
+```
+
+**Options:**
+
+- `--body-file <path>` — 本文。必須。
+- `--depth <0|1|2>` — depth ラベル。必須。判定基準は `.claude/skills/workflow-commands/observation-filing.md` → "The depth test"。
+- `--route <tier-a|split|interrupt|review-cap>` — 起票経路を示す `route:` ラベル。経路のない起票では省略する。
+- `--label <name>` — 追加ラベル（例: `epic`）。複数回指定できる。
+- `--repo <owner/repo>` — 起票先。省略時はこのリポジトリ。
+- `--distinct <N,…>` — 重複候補のうち、読んだうえで別物と判断した Issue 番号。
+
+**手順（この順に実行する）:**
+
+1. 起票先が third-party なら拒否する（Tier C）。
+2. 本文を [`josh issue:lint`](#josh-issuelint) と同じ基準で検査する。問題があれば拒否する。
+3. 起票先が別リポジトリなら、`## Origin` 節に起票元 Issue（`owner/repo#N` または URL）があることを確認する。なければ拒否する。
+4. [`josh issue:scout`](#josh-issuescout) と同じ重複探しを行い、報告を表示する。候補があれば、すべてを `--distinct` に指定するまで起票しない。重複なら起票せず、`issue-fold-existing.md` に従って既存 Issue にまとめる。別リポジトリへの起票では `GH_REPO` を起票先に向けるので、重複探しと epic 判定は起票先で行われる。
+5. depth・route・本文に宣言された分類ラベル（`bug` / `enhancement` / `breaking-change`）・追加ラベルを 1 回の作成リクエストで付けて起票し、URL を表示する。
+6. 起票した Issue について [`josh epic:bundle`](#josh-epicbundle) を実行する。応答がなければ `⚠` で再実行を案内する。Issue はすでに作成済みなので、終了コードは 0 のままにする。
+
+手順 1〜4 で拒否したときは何も起票せず、終了コード 1 で終わる。1 回の実行あたりの起票上限（`filing-cap`）と 2 件目の起票前の `issue:fold`（`issue-fold`）は、このコマンドの呼び出しに対して働く。拒否された呼び出しは件数に数えない。
 
 ### `josh issue:fold-existing`
 
@@ -1086,7 +1119,7 @@ Check an issue body file against the template's four required headings — `## �
 pnpm josh issue:lint /tmp/issue-body.md
 ```
 
-Prints `ok` and required labels when headings and either `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1. For `labels: bug`, add `-f 'labels[]=bug'` when filing; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples (joshuafolkken/kit#2123).
+Prints `ok` and required labels when headings and either `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1. [`josh issue:file`](#josh-issuefile) runs this check as a filing step and applies the labels it prints; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples (joshuafolkken/kit#2123).
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現` (joshuafolkken/kit#2212, joshuafolkken/kit#2353). The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](#josh-measurererun) re-runs the baseline.
 
@@ -1217,7 +1250,7 @@ Several leading epic arguments merge into one candidate pool per repository. A c
 
 ### `josh epic:bundle`
 
-Say whether a newly filed issue belongs with ones already in the backlog. It finds candidates and recommends; it writes nothing.
+Say whether a newly filed issue belongs with ones already in the backlog. It finds candidates and recommends; it writes nothing. [`josh issue:file`](#josh-issuefile) runs it on the issue it creates as its last filing step.
 
 ```bash
 pnpm josh epic:bundle 874
@@ -1533,7 +1566,7 @@ Print the decision oracles — commands that answer a rule question from mechani
 pnpm josh oracle:list
 ```
 
-- **The firing point is what makes an oracle enforced** (joshuafolkken/kit#2324). A declared firing point — the action the oracle must precede — wires a generic `oracle-consulted` delivered rule that refuses that action until the oracle's command has run (`scripts/rules/oracle-consulted.ts`). Two are wired: `pkg:scout` (a package add) and `issue:lint` (an Issue filing). `release:scope` is on the reason side, not a firing point: it reads the release owed _after_ `pnpm josh followup` merges, so it trails the merge rather than gating it (joshuafolkken/kit#2334). The rest declare why no firing point can be named and stay **visibly unenforced** rather than silently so, so a new oracle must always answer whether it has a firing point.
+- **The firing point is what makes an oracle enforced** (joshuafolkken/kit#2324). A declared firing point — the action the oracle must precede — wires a generic `oracle-consulted` delivered rule that refuses that action until the oracle's command has run (`scripts/rules/oracle-consulted.ts`). One is wired: `pkg:scout` (a package add). `issue:lint` no longer has one — [`josh issue:file`](#josh-issuefile) runs the lint as a filing step (joshuafolkken/kit#2808). `release:scope` is on the reason side, not a firing point: it reads the release owed _after_ `pnpm josh followup` merges, so it trails the merge rather than gating it (joshuafolkken/kit#2334). The rest declare why no firing point can be named and stay **visibly unenforced** rather than silently so, so a new oracle must always answer whether it has a firing point.
 - Single source: `scripts/rules/decision-oracle.ts` (the enumeration) and `scripts/rules/oracle-firing.ts` (the firing points).
 
 ### `josh rule:value`

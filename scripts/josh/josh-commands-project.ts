@@ -67,7 +67,11 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/propagate/propagate.ts',
 		description: 'Carry the published release into every consumer repository next to this one',
 		category: 'Project',
-		reference: ['[--dry-run] [--skip-publish-wait]', 'maintainer', ['files', 'network']],
+		reference: [
+			'[--dry-run] [--skip-publish-wait] [--target <repo>]',
+			'maintainer',
+			['files', 'network'],
+		],
 	},
 	adopt: {
 		script: 'scripts/adopt/adopt.ts',

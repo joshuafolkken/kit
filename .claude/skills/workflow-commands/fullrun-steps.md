@@ -7,7 +7,7 @@ the run is at, and the sections below carry that step in full.
 
 ## The `fullrun #N` step list
 
-Use `pnpm josh issue:lint` `labels:`; see `prompts/collaboration-workflow/issue-template.md`.
+File Issues with `pnpm josh issue:file` (it applies the classification labels); see `prompts/collaboration-workflow/issue-template.md`.
 
 **Add `in-progress` the moment `run:hold` answered `hold`** (create if missing:
 `gh api repos/{owner}/{repo}/labels -f name=in-progress -f color=0075ca -f description="Work is
@@ -29,7 +29,7 @@ with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate
 iterate to no high/medium findings, at most two reviews → **the clean path folds the ship region into
 one call**, `pnpm josh ship "<title> #<N>"` (gate → commit/push/PR → the CI-wait `followup` → the
 `run:tail` report bookkeeping, stopping at the first failed step; joshuafolkken/kit#2398), with any
-branch-2 filing and `pnpm josh epic:bundle` run before it → **when a second round is due `ship` does not
+branch-2 filing (`pnpm josh issue:file`, which runs `epic:bundle` itself) run before it → **when a second round is due `ship` does not
 fit**: open the PR between the rounds with `pnpm josh git -y "<title> #<N>"`, run round 2 beside CI, then
 `pnpm josh followup` and `pnpm josh run:tail <N>`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`,
 default `ja`). Before implementing, run `git switch main && git pull`, then `pnpm josh latest:scope`
@@ -49,10 +49,10 @@ completion notification, then merges; if blockers are found it exits non-zero �
 ## The `fullrun new` step list
 
 `kickoff new` + `fullrun #N` in one run. Steps: (1) Derive an English title, or use the provided one.
-**(1a) Run `pnpm josh issue:scout "<title>" [--body "<summary>"]` before creating the Issue** — a
-candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` → §2e).
-(2) Create Issue: `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -F
-body=@<body-file>` (per `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3) Add
+(2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (per
+`prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
+that covers the same work stops the run rather than filing a second Issue (`SKILL.md` → §2e). Capture
+`<N>`. (3) Add
 `in-progress` (as above). (4) Post the agreed plan in the session language: fill the body if blank,
 otherwise add a comment. (5) If the working tree already has staged or modified files,
 `git stash push -m "fullrun new: pre-existing changes"` first. (6) `git switch main && git pull`. (7)
@@ -65,8 +65,8 @@ round 1's fixes are in and before the commit. (10) Where the tree was edited aft
 started, re-run `pnpm josh gate` and join it. (11) `pnpm josh git -y "<title> #<N>"` — the pull request
 opens here, between the two rounds. (11a) Run the **second round** now beside the CI, where (9a)
 answered `required` (brief `pnpm josh review:brief --round 2`); a finding it fixes in place is pushed
-before its gate. (12) File whatever the review round cap routed to branch 2, run `pnpm josh epic:bundle
-<new>` on each, and where (9a) answered `skip` record the skip on the Issue. (13) **Where no second
+before its gate. (12) File whatever the review round cap routed to branch 2 with `pnpm josh issue:file`
+(it runs `epic:bundle` on each), and where (9a) answered `skip` record the skip on the Issue. (13) **Where no second
 round was due** (9a `skip`), fold steps (10)–(13) and the release bookkeeping into one call — `pnpm josh
 ship "<title> #<N>" --notify-message "..."` (gate → commit/push/PR → the CI-wait `followup` → `run:tail`,
 stopping at the first failed step; joshuafolkken/kit#2398); **where a second round ran**, the PR opened

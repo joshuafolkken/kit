@@ -12,9 +12,9 @@ import {
 	BODY_READ_API_COMMAND,
 	BODY_READ_COMMAND,
 	COMMENTED_READ_COMMAND,
-	FILING_API_COMMAND,
+	DIRECT_FILING_API_COMMAND,
+	DIRECT_FILING_COMMAND,
 	FILING_COMMAND,
-	scouted_tail,
 	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
 import { delivered_rules_harness } from './delivered-rules-harness'
@@ -40,20 +40,17 @@ const LANE_ISSUE = '2138'
 const LANE_DIRECTORY = path.join(LANE_ROOT, LANE_ISSUE)
 const WIP_CAP = 'wip-cap'
 const ISSUE_COMMENTS = 'issue-comments'
-const ISSUE_SCOUT = 'issue-scout'
+const DIRECT_FILING = 'direct-filing'
 const FILING_CAP_ID = 'filing-cap'
-// A filing is claimed by six rows: WIP, scout, cap, fold, issue:lint, and the bug-label check.
-// A filing whose body also carries a backtick adds `shell-body`.
-const FILING_RULE_COUNT = 6
-const FILING_WITH_BODY_RULE_COUNT = 7
+// An `issue:file` filing is claimed by three rows: WIP, cap and fold. A hand-built filing whose body
+// carries a backtick is claimed by `direct-filing` and `shell-body` (joshuafolkken/kit#2808).
+const FILING_RULE_COUNT = 3
+const DIRECT_FILING_WITH_BODY_RULE_COUNT = 2
 const NOW_MS = 1_700_000_000_000
 // Later than any turn the transcript fixture can carry, so the batching guard's recorded refusal
 // covers the whole open sequence whatever wall clock the fixture used — the state where it has
 // already spoken and will not speak again.
 const BATCH_REFUSED_AT_MS = 9_000_000_000_000
-// Far enough past that record to be a different call: the stand-aside treats a *fresh* stamp as the
-// batching guard speaking about the call in hand.
-const A_LATER_CALL_MS = BATCH_REFUSED_AT_MS + 60_000
 // A test title shared by the delivery blocks' reason-marker assertions, so a row cannot pass under a
 // title another does not use.
 const CARRIES_MARKER = 'carries %j'
@@ -72,7 +69,7 @@ const SHELL_BODY = 'shell-body'
 // comment rather than a filing, so exactly one row claims it.
 const EVALUATED_BODY_COMMAND =
 	'gh api repos/joshuafolkken/kit/issues/1198/comments -f body="see `pnpm josh ms`"'
-const { BRANCH, josh_call_line, open_turn_lines, target_turn_lines } = time_transcript_fixture
+const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
 // Three consecutive single-call turns with the third still open — the one shape `batch:guard`
 // refuses, and therefore the one shape this guard has to stay quiet on.
@@ -167,11 +164,13 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 		expect(delivered_rules.ISSUE_COMMENTS_REASON).toContain(marker)
 	})
 
-	it(ONCE_PER_RUN, () => {
+	// The reissue without the comments is refused again — once per run let it through unread
+	// (joshuafolkken/kit#2807).
+	it('keeps refusing the body-only reissue until the comments are read', () => {
 		const payload = payload_of('body-repeat', BODY_READ_COMMAND)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 
 	// The read the refusal asks for must itself pass, or obeying the rule would wedge the run.
@@ -244,15 +243,13 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call once you have counted')
 	})
 
-	// The tail carries a scout and an `issue:lint`, so the second call is claimed by neither
-	// `issue-scout` nor the `issue:lint` oracle-consulted row — this block is about the WIP cap alone
-	// (joshuafolkken/kit#2119, joshuafolkken/kit#2324).
+	// A first filing, so neither the cap nor the fold claims the second call — this block is about the
+	// WIP cap alone (joshuafolkken/kit#2119).
 	it(ONCE_PER_RUN, () => {
-		const lint_call = josh_call_line(1, BRANCH, 'pnpm josh issue:lint x.md')
-		const payload = payload_of('repeat', FILING_COMMAND, 'Bash', `${scouted_tail()}\n${lint_call}`)
+		const payload = payload_of('repeat', FILING_COMMAND)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(rule_delivery(payload, NOW_MS + 1)).not.toBe(delivered_rules.WIP_CAP_REASON)
 	})
 })
 
@@ -318,13 +315,15 @@ describe('rule_delivery — silent where nothing binds', () => {
 // returning a reason — so a call both hooks refused would lose one of the two reasons with both
 // records already written, and the losing rule could never fire again in that run. It cannot happen
 // for `wip-cap` because the batching guard does not treat a filing call as a candidate at all. **It
-// does treat an Issue read as one**, so `issue-comments` is the row that makes the stand-aside in
-// `is_first_delivery` load-bearing rather than inert — the table below pins both halves, and **any
-// row added to the enumeration has to be re-checked against it**.
+// does treat an Issue read as one**, but `issue-comments` now refuses until the comments are read
+// (joshuafolkken/kit#2807), so it has no once-per-run record to lose and no longer stands aside. The
+// stand-aside in `is_first_delivery` remains for a once-per-run row whose trigger the batching guard
+// also claims — the table below pins both halves, and **any row added to the enumeration has to be
+// re-checked against it**.
 describe('rule_delivery — the two Bash guards never answer about the same call', () => {
 	it.each([
 		[FILING_COMMAND, false],
-		[FILING_API_COMMAND, false],
+		[DIRECT_FILING_API_COMMAND, false],
 		[BODY_READ_COMMAND, true],
 		[BODY_READ_API_COMMAND, true],
 	])('%j as a call the batching guard may also refuse: %s', (command, is_candidate) => {
@@ -333,37 +332,25 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 		)
 	})
 
-	// **The stand-aside, exercised end to end.** On the one history `batch:guard` refuses, the body
-	// read is left to that guard: nothing is delivered and — because the shared shell stamps only
-	// after `should_block` answers true — nothing is recorded, so the rule still fires on the reissue.
-	// A row that delivered here would spend its once-per-run budget on a call that never ran.
-	// **The recovery is asserted on the same transcript, not a fresh one.** A reissue happens inside
-	// the same run with the same tail behind it, so a case that stood aside on one transcript and then
-	// delivered on an empty one would prove nothing about the run that stood aside — and would stay
-	// green while the rule was lost for good.
-	it('stands aside while the batching guard may speak, and delivers once it has', () => {
+	// **The body read no longer stands aside** (joshuafolkken/kit#2807). A stand-down row refuses
+	// until its act is on the tail, so a refusal spends nothing and there is no record to protect —
+	// while standing aside inside the ten-second window would let the reissue through with the
+	// comments still unread. Both on the batched history and on the window just recorded, it refuses.
+	it('refuses a body read on a history the batching guard refuses', () => {
 		const transcript = transcript_for('body-collision', unbatched_text())
-		const call = payload_for(transcript, BODY_READ_COMMAND)
 
-		expect(rule_delivery(call, NOW_MS)).toBeUndefined()
-
-		BATCH_STAMP.record(BATCH_STAMP.path(transcript), BATCH_REFUSED_AT_MS)
-
-		expect(rule_delivery(call, A_LATER_CALL_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(rule_delivery(payload_for(transcript, BODY_READ_COMMAND), NOW_MS)).toBe(
+			delivered_rules.ISSUE_COMMENTS_REASON,
+		)
 	})
 
-	// **The order of the two hooks is not defined, and the answer must not depend on it.** Both are
-	// separate processes started for the same event, and the shared shell stamps before it returns a
-	// reason — so a run where `batch:guard` happened to write first would otherwise see a record, read
-	// it as "already spoken", and deliver on the same call the other hook is refusing. Both records
-	// would then be spent for one surfaced reason, and this rule could never fire again in that run.
-	it('stands aside when the batching guard has just recorded a refusal about this call', () => {
-		const transcript = transcript_for('body-race', unbatched_text())
+	it('refuses a body read inside the batching window, since a stand-down row has no record to protect', () => {
+		const transcript = transcript_for('body-window', unbatched_text())
 		const call = payload_for(transcript, BODY_READ_COMMAND)
 
 		BATCH_STAMP.record(BATCH_STAMP.path(transcript), BATCH_REFUSED_AT_MS)
 
-		expect(rule_delivery(call, BATCH_REFUSED_AT_MS)).toBeUndefined()
+		expect(rule_delivery(call, BATCH_REFUSED_AT_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 
 	// **The stand-aside cannot be exercised end to end through this rule, and that is the invariant
@@ -415,7 +402,7 @@ describe('DELIVERED_RULES — the enumeration', () => {
 
 	it.each([
 		WIP_CAP,
-		ISSUE_SCOUT,
+		DIRECT_FILING,
 		FILING_CAP_ID,
 		ISSUE_COMMENTS,
 		SHELL_BODY,
@@ -437,34 +424,32 @@ describe('DELIVERED_RULES — trigger overlap', () => {
 		EVALUATED_BODY_COMMAND,
 		PIPED_GATE_COMMAND,
 		FOREGROUND_PUSH_COMMAND,
+		DIRECT_FILING_COMMAND,
+		DIRECT_FILING_API_COMMAND,
 	])('is claimed by exactly one rule: %j', (command) => {
 		expect(rules_claiming(command)).toBe(1)
 	})
 
-	// **A filing is the deliberate overlap: six rows claim it** (joshuafolkken/kit#2119,
-	// joshuafolkken/kit#2213, joshuafolkken/kit#2324) — the WIP cap, the scout gate, the per-run cap, the
-	// fold gate, the `issue:lint` oracle-consulted row, and bug-label check — resolved by the reissue chain rather than by
-	// a single winner, so the claim count is asserted rather than the exactly-one invariant above.
-	it.each([FILING_COMMAND, FILING_API_COMMAND])(
-		'is claimed by the six filing rules: %j',
-		(command) => {
-			expect(rules_claiming(command)).toBe(FILING_RULE_COUNT)
-		},
-	)
+	// **An `issue:file` filing is the deliberate overlap: three rows claim it** (joshuafolkken/kit#2119,
+	// joshuafolkken/kit#2213, joshuafolkken/kit#2808) — the WIP cap, the per-run cap and the fold gate —
+	// resolved by the reissue chain rather than by a single winner, so the claim count is asserted rather
+	// than the exactly-one invariant above.
+	it('is claimed by the three filing rules', () => {
+		expect(rules_claiming(FILING_COMMAND)).toBe(FILING_RULE_COUNT)
+	})
 
 	// **The overlap order, asserted rather than assumed** (joshuafolkken/kit#1198,
-	// joshuafolkken/kit#2119, joshuafolkken/kit#2324). A filing whose body carries a backtick is claimed
-	// by seven rows; with the run already scouted the scout gate and the cap stand down, and the fold gate
-	// stands down on a first filing, so `wip-cap` is delivered first and `shell-body` on the reissue —
-	// the `issue:lint` oracle row is last and would deliver only on a further reissue. The stamps are
-	// keyed per `id`, so nothing is lost by losing the race.
-	it('delivers the second rule on the reissue when a filing also carries an evaluated body', () => {
+	// joshuafolkken/kit#2808). A hand-built filing whose body carries a backtick is claimed by
+	// `direct-filing` and `shell-body`; `direct-filing` is listed first and fires on every occurrence, so
+	// it answers the reissue too — the filing itself is the call to replace, and `issue:file` takes its
+	// body by path, which leaves `shell-body` nothing to refuse.
+	it('refuses a direct filing on every reissue even when it also carries an evaluated body', () => {
 		const command = 'gh api repos/o/r/issues -f title="x" -f body="see `pnpm josh ms`"'
-		const payload = payload_of('overlap', command, 'Bash', scouted_tail())
+		const payload = payload_of('overlap', command)
 
-		expect(rules_claiming(command)).toBe(FILING_WITH_BODY_RULE_COUNT)
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.SHELL_BODY_REASON)
+		expect(rules_claiming(command)).toBe(DIRECT_FILING_WITH_BODY_RULE_COUNT)
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.DIRECT_FILING_REASON)
+		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.DIRECT_FILING_REASON)
 	})
 })
 

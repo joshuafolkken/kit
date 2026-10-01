@@ -37,12 +37,13 @@ backlogrun joshuafolkken/kit#858 --only
   explicit instruction that rule requires. **Send a `confirmation` Telegram and stop** — nothing has
   been produced yet, so there is no finding to record and no draft to prepare.
 - **No prefix leaves the behavior exactly as it was** — the target is the session's repository.
-- **`kickoff` needs no checkout**: name the target repository in the path of every `gh api` call and
-  never clone. The one exception is the split path's epic, since `pnpm josh epic` only writes the
-  repository it runs in — run it in that repository's checkout, or fall back to `gh api
-  repos/<owner/repo>/labels …` followed by `gh api repos/<owner/repo>/issues -f title="<epic-title>" -f
-  'labels[]=epic' -F body=@<body-file>`, and report that `epic:check` could not be run. The promote arm has
-  no such fallback: with no checkout there, file the children and stop.
+- **`kickoff` needs no checkout**: name the target repository with `--repo <owner/repo>` on every
+  `pnpm josh issue:file` call and in the path of every `gh api` call, and never clone. The one exception
+  is the split path's epic, since `pnpm josh epic` only writes the repository it runs in — run it in
+  that repository's checkout. With no checkout there, file the children, report that the epic could
+  not be created, and stop — a hand-built `gh api …/issues` filing of the epic is refused by the
+  `direct-filing` guard, and `pnpm josh issue:file` lints an epic body against the Issue template. The
+  promote arm stops the same way.
 - **The implementing entries require a checkout and never create one — when the target is another
   repository.** A prefix naming the session's own repository changes nothing (`fullrun kit#412` in the
   kit checkout behaves exactly as `fullrun #412`). Otherwise resolve the checkout from `pnpm josh

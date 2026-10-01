@@ -97,7 +97,7 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	'**3 つのいずれにも当たらない発見は、従来どおり裁量側の出口を取る。**',
 	'**深刻さの自己申告は条件ではない。**',
 	'**上限に関係なく起票する。**',
-	"-f 'labels[]=route:interrupt'",
+	'--route interrupt',
 	'**偽の依存関係**',
 	'**割り込みは上限の例外であって、明示起動規則の例外ではない。**',
 	// The `--add` without a position, and the ban on `--before` / `--after`. `--before <M>` really does write

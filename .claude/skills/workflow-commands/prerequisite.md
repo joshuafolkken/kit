@@ -25,16 +25,17 @@ stays countable by filing route afterwards. **This paragraph belongs to the prer
 the table** — the label means a filing the run is *blocked by*, so the observation row carries no
 `route:` label of its own (§2i):
 
-Before that call, run `pnpm josh issue:lint <body-file>` and apply every label in its `labels:` answer at creation; `prompts/collaboration-workflow/issue-template.md` is the single source. Keep `route:tier-a` and `depth`.
-
 ```bash
-gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f 'labels[]=depth:<n>' -F body=@<body-file>
+pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route tier-a
 ```
 
+The command lints the body against `prompts/collaboration-workflow/issue-template.md`, applies the
+classification labels it declares, and runs the duplicate scan and `epic:bundle` itself
+(`docs/josh-commands.md` → `josh issue:file`).
+
 Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
-steps after it name a number that does not exist until it is. **`pnpm josh issue:scout "<title>"` goes
-in front of that call, exactly as it does for a `new` entry** (§2e): a filing made mid-run is the one
-most likely to duplicate something.
+steps after it name a number that does not exist until it is. **Its duplicate scan is read exactly as
+it is for a `new` entry** (§2e): a filing made mid-run is the one most likely to duplicate something.
 
 **Each entry point's own branch stays in that entry's file:**
 

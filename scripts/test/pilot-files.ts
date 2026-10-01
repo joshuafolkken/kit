@@ -320,7 +320,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/rules/issue-comments-rule.test.ts',
 	'scripts/rules/issue-depth-label.test.ts',
 	'scripts/rules/issue-fold.test.ts',
-	'scripts/rules/issue-scout.test.ts',
 	'scripts/rules/josh-git-bare.test.ts',
 	'scripts/rules/lane-interactive-ask-rule.test.ts',
 	'scripts/rules/lane-park-rule.test.ts',

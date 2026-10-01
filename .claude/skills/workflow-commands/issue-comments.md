@@ -104,6 +104,6 @@ never the comment text.
 
 **`pnpm josh rule:guard` refuses the body-only read** and hands over the reissue and the conflict rule
 at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`,
-`scripts/rules/delivered-rules.test.ts`). The refusal reaches Claude Code alone and fires once per run,
+`scripts/rules/delivered-rules.test.ts`). The refusal reaches Claude Code alone and repeats until the comments are read,
 so **this file is the rule and the hook is what makes it hard to walk past** — a session that runs
 no hooks still owes the read.

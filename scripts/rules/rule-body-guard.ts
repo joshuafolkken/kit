@@ -22,16 +22,13 @@ import { tail_commands } from './tail-commands'
 // URL is stripped) all fail. What stays is the case the Issue names — writing rule prose into a rule
 // document.
 //
-// **No `decide`, so once per run.** The refusal changes what the run *knows* — that a new rule owes
-// question 0 and the ordering question — which is the shape `rule-delivery.md` says once-per-run is
-// right for: told once, the run applies it to every later rule it writes.
-//
 // **The stand-down is what turned the reminder into a check** (joshuafolkken/kit#2324). Until now the
 // row only *reminded* — it fired once and let the reissue through unconditionally, so "reissue and it
 // goes" meant a computable rule could still be written into prose with nothing having answered the two
 // questions. Now the pass condition is a *record*: the run has run `pnpm josh oracle:list` (question 0)
 // and `pnpm josh run:step` (the ordering question) earlier in the transcript. Both present, the edit is
-// stood down; either missing, it is refused. It passes on answering the questions, not on reading the
+// stood down; either missing, it is refused — on the reissue too, since a row with a stand-down
+// refuses until it is met (joshuafolkken/kit#2807). It passes on answering the questions, not on reading the
 // reminder. Keeping the rule is therefore running those two commands, which `keeps` names.
 
 // The two edit tools the `PreToolUse` matcher routes here. A `Write` carries the whole new file; an
@@ -133,7 +130,7 @@ function writes_rule_prose(
 }
 
 // The instruction in the shape a refusal can carry: what the edit is doing, the two questions it
-// skips, the commands that answer them, and the reissue every once-per-run delivery needs.
+// skips, the commands that answer them, and the reissue once they have run.
 const RULE_BODY_REASON =
 	'⛔ rule written into prose: this edit adds rule text to CLAUDE.md, a `prompts/**` doc or a skill ' +
 	'body. Before it lands, run the residency questions the addition skips. A rule whose answer is ' +
@@ -144,9 +141,9 @@ const RULE_BODY_REASON =
 	'sequencing rule moves into. Only a rule that is neither — not computable, not ordering — stays ' +
 	'prose, and then as a trigger-plus-pointer line rather than a second copy of its procedure. The ' +
 	'criterion is `prompts/collaboration-workflow/residency.md` (question 0 and the ordering question); ' +
-	'the delivery enumeration is `prompts/collaboration-workflow/rule-delivery.md`. This fires once per ' +
-	'run — once you have confirmed the rule can be neither an oracle nor an ordering step, reissue this ' +
-	'edit and it will go through.'
+	'the delivery enumeration is `prompts/collaboration-workflow/rule-delivery.md`. Every such edit is ' +
+	'refused until both commands are on the transcript — run them, confirm the rule can be neither an ' +
+	'oracle nor an ordering step, then reissue this edit.'
 
 // The two placement oracles the residency questions name: question 0 is `pnpm josh oracle:list`, the
 // ordering question is `pnpm josh run:step` (its degenerate pre-implementation form `run:next` counts

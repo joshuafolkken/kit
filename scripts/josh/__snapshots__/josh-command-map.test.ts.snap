@@ -48,6 +48,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "ibl": "issue:backlinks",
     "ici": "issue:cite",
     "icm": "issue:comment",
+    "ifl": "issue:file",
     "ig": "investigation:guard",
     "iln": "issue:lint",
     "ird": "issue:read",
@@ -485,6 +486,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "issue:file": [
+      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "issue:fold": [
       "<title>... [--not-separable] [--json]",
       "automation",
@@ -765,7 +773,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "propagate": [
-      "[--dry-run] [--skip-publish-wait]",
+      "[--dry-run] [--skip-publish-wait] [--target <repo>]",
       "maintainer",
       [
         "files",

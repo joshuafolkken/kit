@@ -11,8 +11,8 @@ import { tail_commands } from './tail-commands'
 // `DeliveredRule` for each such oracle — refused when the run performs the governed action without
 // having run the oracle's command earlier, stood down once it has.
 //
-// **It is `issue-scout`'s shape, generalized.** Each generated row is once per run with an
-// `already_satisfied` stand-down read off the tail — refuse the governed call, hand back the command,
+// **It is `issue-scout`'s shape, generalized.** Each generated row refuses until its
+// `already_satisfied` stand-down reads the command off the tail — refuse the governed call, hand back the command,
 // stand down once that command is on the tail. What `issue-scout` and `issue-fold` hand-wrote per
 // oracle, this reads from the registry: the refusal is assembled from the oracle's decision, command,
 // answer vocabulary and single source, so no oracle carries a hand-written refusal of its own. **No new
@@ -51,8 +51,8 @@ function reason_for(oracle: Oracle, firing_point: FiringPoint): string {
 		`⛔ decision oracle not consulted: this is ${firing_point.describes}, but the run has not run ` +
 		`\`${command_line(oracle)}\` first — the oracle that decides ${oracle.decision.toLowerCase()}. ` +
 		`It answers ${oracle.vocabulary.join(' | ')}; single source ${oracle.single_source}. Reissue ` +
-		`after running it and reading its verdict. It fires once per run and cannot repeat on the call ` +
-		`in hand.`
+		`after running it and reading its verdict. Every such call is refused until that command is on ` +
+		`the transcript.`
 	)
 }
 
