@@ -11,6 +11,7 @@ vi.mock('#scripts/git/git-prompt', () => ({ ask_yes_no_simple: vi.fn() }))
 
 const question = vi.fn<(text: string) => Promise<string>>()
 const close = vi.fn<() => void>()
+const NOTHING_CHANGED = 'Nothing was changed'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
@@ -30,6 +31,7 @@ const CHOICES: Choices = {
 	shape: SHAPE,
 	consent: 'granted',
 	root: path.join(path.sep, 'work', 'my-site'),
+	steps: ['initialize', 'repository', 'labels'],
 }
 
 beforeEach(() => {
@@ -87,8 +89,35 @@ describe('the repository question of josh start', () => {
 		vi.mocked(ask_yes_no_simple).mockResolvedValue(false)
 
 		await expect(start_prompt.confirm_choices({ ...CHOICES, consent: 'ask' })).rejects.toThrow(
-			'Nothing was changed',
+			NOTHING_CHANGED,
 		)
 		expect(close).toHaveBeenCalled()
+	})
+})
+
+describe('the setup pull request question of josh start', () => {
+	const SETUP_PR_CHOICES: Choices = {
+		...CHOICES,
+		consent: 'ask',
+		steps: ['initialize', 'labels', 'setup_pr'],
+	}
+
+	it('asks before opening the setup Issue and pull request, and not about a repository', async () => {
+		question.mockResolvedValue('')
+		vi.mocked(ask_yes_no_simple).mockResolvedValue(true)
+
+		expect(await start_prompt.confirm_choices(SETUP_PR_CHOICES)).toBe('basic')
+		expect(ask_yes_no_simple).toHaveBeenCalledTimes(1)
+		expect(ask_yes_no_simple).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.stringContaining('pull request on GitHub that add the kit setup'),
+		)
+	})
+
+	it('stops before any step when the user declines the pull request', async () => {
+		question.mockResolvedValue('')
+		vi.mocked(ask_yes_no_simple).mockResolvedValue(false)
+
+		await expect(start_prompt.confirm_choices(SETUP_PR_CHOICES)).rejects.toThrow(NOTHING_CHANGED)
 	})
 })

@@ -72,7 +72,11 @@ function prepare(args: ReadonlyArray<string>, is_tty: boolean, root: string): Pr
 
 	stop_on(start_steps.github_cli_refusal(root))
 
-	return { steps: plan.steps, interaction, choices: { options, shape, consent, root } }
+	return {
+		steps: plan.steps,
+		interaction,
+		choices: { options, shape, consent, root, steps: plan.steps },
+	}
 }
 
 async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void> {
@@ -82,7 +86,7 @@ async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void>
 	const profile = await resolve_profile(choices, interaction)
 	const { root, options } = choices
 
-	start_steps.run_steps(steps, { root, profile, visibility: options.visibility })
+	await start_steps.run_steps(steps, { root, profile, visibility: options.visibility })
 	console.info(`\n${READY_MESSAGE}`)
 }
 

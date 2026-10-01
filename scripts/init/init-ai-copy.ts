@@ -378,4 +378,4 @@ const init_ai_copy = {
 	ensure_basic_claude_md,
 }
 
-export { init_ai_copy }
+export { init_ai_copy, CLAUDE_MD_FILENAME }

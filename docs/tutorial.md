@@ -6,7 +6,7 @@ For anyone who has installed kit and wants to see the Issue-driven loop once, en
 
 ## Before you start
 
-- kit is installed and `josh init` has run: [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
+- kit is set up with `josh start`, and its setup is on `main` — merge the setup pull request it opened, if it opened one ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)). The profile guides walk through it: [Set up the basic profile](./setup/basic.md) for `basic`, [Set up the full profile](./setup/full.md) for `full`.
 - Use a **practice repository** on GitHub that you are happy to experiment in, with `gh` installed and signed in (`gh auth login`).
 - An agent that reads the repository's `CLAUDE.md`, such as Claude Code, is open in the repository.
 - Optional: Telegram notifications, so a stopped run reaches you off-screen — [Set up notifications](./how-to/set-up-notifications.md).

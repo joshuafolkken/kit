@@ -1,4 +1,5 @@
 import type { ProjectProfile } from './project-profile'
+import { start_setup_pr } from './start-setup-pr'
 
 type Visibility = 'private' | 'public'
 
@@ -9,7 +10,7 @@ interface StartOptions {
 	visibility: Visibility
 }
 
-type StartStep = 'git_init' | 'initialize' | 'commit' | 'repository' | 'labels'
+type StartStep = 'git_init' | 'initialize' | 'commit' | 'repository' | 'labels' | 'setup_pr'
 
 interface GitState {
 	has_git: boolean
@@ -17,6 +18,7 @@ interface GitState {
 	has_origin: boolean
 	branch: string | undefined
 	has_commits: boolean
+	has_kit_committed: boolean
 }
 
 interface StepPlan {
@@ -47,14 +49,33 @@ const STEP_LABELS: Readonly<Record<StartStep, string>> = {
 	commit: 'Commit every file as the initial commit',
 	repository: 'Create the GitHub repository and push main',
 	labels: 'Add the workflow and release-classification labels the repository is missing',
+	setup_pr: 'Open an Issue and a pull request that add the kit setup to main',
 }
+
+// The GitHub write steps `--yes` alone never consents to.
+const GITHUB_WRITE_STEPS: ReadonlySet<StartStep> = new Set(['repository', 'setup_pr'])
 
 function refused(refusal: string): StepPlan {
 	return { steps: [], refusal }
 }
 
-// A repository that already has a history keeps it: nothing is committed on the user's behalf, and
-// only `main` is pushed, because the Issue workflow branches from and merges into it.
+// Main already has a history but not kit's setup, so the setup reaches main the way every later change
+// does — an Issue and a pull request a person merges — rather than a commit on main
+// (joshuafolkken/kit#2816). On another branch the pull request would not be based on main, so it waits
+// — except the setup branch an earlier run left checked out, where a re-run resumes.
+function needs_setup_pr(state: GitState): boolean {
+	if (!state.has_commits) return false
+	if (start_setup_pr.is_setup_branch(state.branch)) return true
+
+	return !state.has_kit_committed && state.branch === DEFAULT_BRANCH
+}
+
+function with_setup_pr(steps: ReadonlyArray<StartStep>, state: GitState): StepPlan {
+	return { steps: needs_setup_pr(state) ? [...steps, 'setup_pr'] : steps, refusal: undefined }
+}
+
+// A repository that already has a history keeps it: nothing is committed on main on the user's
+// behalf, and only `main` is pushed, because the Issue workflow branches from and merges into it.
 function existing_git_steps(state: GitState): StepPlan {
 	if (!state.has_commits) return { steps: FULL_STEPS.slice(1), refusal: undefined }
 
@@ -64,14 +85,15 @@ function existing_git_steps(state: GitState): StepPlan {
 		)
 	}
 
-	return { steps: ['initialize', 'repository', 'labels'], refusal: undefined }
+	return with_setup_pr(['initialize', 'repository', 'labels'], state)
 }
 
-// An existing GitHub origin is never replaced or pushed to: only the additive steps run. Any other
-// origin is refused here, before the first write — `gh repo create --remote origin` cannot add a
-// remote that already exists, so the run would otherwise fail after initializing the directory.
+// An existing GitHub origin is never replaced, and main is never pushed to: only the additive steps
+// run, plus the setup pull request while main lacks kit. Any other origin is refused here, before the
+// first write — `gh repo create --remote origin` cannot add a remote that already exists, so the run
+// would otherwise fail after initializing the directory.
 function plan_steps(state: GitState): StepPlan {
-	if (state.has_github) return { steps: ['initialize', 'labels'], refusal: undefined }
+	if (state.has_github) return with_setup_pr(['initialize', 'labels'], state)
 
 	if (state.has_origin) {
 		return refused(
@@ -96,22 +118,22 @@ function interaction_of(options: StartOptions, is_tty: boolean): Verdict<Interac
 }
 
 // `--yes` accepts the detected defaults, never the creation of a public-facing resource: an
-// unattended run creates and pushes a repository only when `--github` asks for it by name.
+// unattended run creates a repository, pushes, or opens the setup Issue and pull request only when
+// `--github` asks for it by name.
 function github_consent(
 	steps: ReadonlyArray<StartStep>,
 	options: StartOptions,
 	interaction: Interaction,
 ): Verdict<Consent> {
-	if (!steps.includes('repository') || options.is_github) {
-		return { value: 'granted', refusal: undefined }
-	}
+	const is_github_write = steps.some((step) => GITHUB_WRITE_STEPS.has(step))
 
+	if (!is_github_write || options.is_github) return { value: 'granted', refusal: undefined }
 	if (interaction === 'interactive') return { value: 'ask', refusal: undefined }
 
 	return {
 		value: undefined,
 		refusal:
-			'josh start --yes does not create a GitHub repository or push. Add --github to create one, or run josh init to set up without GitHub.',
+			'josh start --yes does not write to GitHub (create a repository, push, or open the setup pull request). Add --github to allow it, or run josh init to set up without GitHub.',
 	}
 }
 

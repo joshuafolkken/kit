@@ -55,17 +55,31 @@ To add Git later, run `git init`, then run `josh init` again to add Git files wi
 
 ## `josh init` or `josh start`
 
-One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `backlogrun`)? If not, run `josh init`. If it will and the project has no GitHub repository yet, run `josh start`.
+One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? If it will, run `josh start` — whether or not the project already has Git or a GitHub repository. If it will not, run `josh init`. The [profile](#project-profiles) is a separate question: both commands choose it the same way.
 
-| Situation                                                    | Run                                                                                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `index.html` only, without Git                               | `josh init`                                                                          |
-| New project that will use the GitHub Issue workflow          | `josh start`                                                                         |
-| Project that already has Git and GitHub, or any re-run       | `josh init`                                                                          |
-| Started without Git, now moving to the GitHub Issue workflow | `josh start` — it runs `git init`, commits what is there, and creates the repository |
+| Situation                                                                                       | Run                                                                  |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| New or existing project that will use the GitHub Issue workflow                                 | `josh start`                                                         |
+| Project that will not use it — no Git, another Git host, or only kit's rules, format and checks | `josh init`                                                          |
+| Any re-run, or an unattended setup from CI or a script                                          | `josh init`                                                          |
+| Set up with `josh init`, now moving to the GitHub Issue workflow                                | `josh start` — its setup step leaves what `josh init` wrote as it is |
 
-- **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository or pushes, so it is safe to re-run and to automate.
-- **`josh start`** asks, and then prepares GitHub: `git init` on `main` → the same setup `josh init` runs → the initial commit → `gh repo create` (private unless `--public`) and push → the workflow labels the repository is missing. Afterwards `kickoff new` works. Its steps and safety rules are in [josh-commands.md → `josh start`](./josh-commands.md#josh-start).
+- **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository, commits or pushes, so it is safe to re-run and to automate. Run in a Git repository whose checked-out commit does not record kit yet, it ends by pointing at `josh start`.
+- **`josh start`** asks, then runs the same setup as `josh init` and carries it to GitHub. What it does depends on what is already there:
+
+| Before `josh start`                       | Steps                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| No Git                                    | `git init` on `main` → setup → initial commit → `gh repo create` and push → labels  |
+| Git without commits                       | setup → initial commit → `gh repo create` and push → labels                         |
+| Commits on `main`, no origin              | setup → `gh repo create` and push the existing `main` → labels → setup pull request |
+| GitHub origin, `main` does not record kit | setup → labels → setup pull request                                                 |
+| GitHub origin, `main` already records kit | setup → labels                                                                      |
+
+"Records kit" means the `package.json` committed on the checked-out `main` lists `@joshuafolkken/kit`. "Labels" adds the workflow and release-classification labels the repository is missing. `gh repo create` makes a private repository unless `--public` is given.
+
+**The setup pull request** brings the setup to a `main` that already has history the way every later change arrives, so nothing is committed to `main` directly ([#2816](https://github.com/joshuafolkken/kit/issues/2816)). It files an Issue titled `Set up @joshuafolkken/kit` with the `ignore-for-release` label, creates the Issue's `<N>-<slug>` branch, stages **only the files kit's setup wrote** — the managed files `josh sync` keeps current, plus `CLAUDE.md`, `prettier.config.mjs`, `.aikido`, `package.json` and `pnpm-lock.yaml` — then commits only those files, pushes and opens the pull request that closes the Issue. Anything else in the working tree, such as a personal note or an editor's own directory — or a file you had already staged — stays out of the commit. The project's own Git hooks run on the commit and the push as on any other. Merging is left to you; once it is merged, `kickoff new` works. On a branch other than `main` there is no pull request to base on `main`, so the step is skipped. If a hook, the push or the pull request fails, fix the cause and run `josh start` again: on the setup branch it resumes there, and on `main` it reuses the open setup Issue, so no second Issue is filed.
+
+The steps, options and safety rules are in [josh-commands.md → `josh start`](./josh-commands.md#josh-start).
 
 ## Run from outside the project
 
@@ -276,7 +290,7 @@ After all files are processed, `josh init` runs ([#2766](https://github.com/josh
 1. **`pnpm install`** — installs the development dependencies it added. The `prepare` script it runs installs the git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
 2. **`josh format`** — formats every file, including the ones `josh init` just wrote.
 
-A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its initial commit. A failed format is only a warning: in a `full` project `josh format` also runs `eslint --fix`, which fails on the project's own unfixable errors. `josh gate` is deliberately not run: in an existing project it can fail on the project's own code, which is not a failed setup.
+A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its initial commit or setup pull request. A failed format is only a warning: in a `full` project `josh format` also runs `eslint --fix`, which fails on the project's own unfixable errors. `josh gate` is deliberately not run: in an existing project it can fail on the project's own code, which is not a failed setup.
 
 `--no-install` skips both, for CI or an offline machine. `josh init` then prints the `pnpm install` hint and, in a `full` project with Git, runs `lefthook install` only when lefthook is already installed.
 

@@ -146,4 +146,4 @@ function sync_project_config(root: string): boolean {
 
 const project_config = { merge_project_config, sync_project_config }
 
-export { project_config }
+export { project_config, PROJECT_CONFIG_FILE }

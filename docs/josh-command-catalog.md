@@ -311,7 +311,7 @@ Fetch SonarCloud hotspots on a pull request and print each one's Step B disposit
 
 `[--profile basic|full] [--yes] [--github] [--public]`
 
-Create a new project for the GitHub Issue workflow, from git init to labels
+Set a project up for the GitHub Issue workflow, from git init to the setup PR
 
 ---
 

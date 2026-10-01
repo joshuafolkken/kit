@@ -240,4 +240,4 @@ function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
 const init_actions = { build_file_actions, read_package_json }
 
 export type { FileAction }
-export { init_actions, PRETTIER_CONFIG_JS }
+export { init_actions, PRETTIER_CONFIG_JS, BASIC_PRETTIER_CONFIG }

@@ -672,3 +672,11 @@ dropping either side destroys exactly what it exists to record.
 - rf:bug-risks | medium | scripts/behavior/behavior-rules.ts | 2026-10-01 | #2841
 - rf:bug-risks | medium | scripts/behavior/behavior-rules.ts | 2026-10-01 | #2841
 - rf:tests | low | scripts/behavior/behavior-rules.test.ts | 2026-10-01 | #2841
+- rf:bug-risks | medium | scripts/init/start-setup-pr.ts:57 | 2026-10-01 | #2816
+- rf:bug-risks | medium | scripts/init/start-setup-pr.ts:72 | 2026-10-01 | #2816
+- rf:bug-risks | low | scripts/init/kit-setup-state.ts | 2026-10-01 | #2816
+- rf:bug-risks | low | scripts/init/init.ts | 2026-10-01 | #2816
+- rf:bug-risks | low | scripts/init/start-plan.ts | 2026-10-01 | #2816
+- rf:tests | low | scripts/init/start-setup-pr.test.ts | 2026-10-01 | #2816
+- rf:comments | low | scripts/init/start-setup-pr.ts | 2026-10-01 | #2816
+- rf:comments | low | docs/josh-commands.md | 2026-10-01 | #2816
