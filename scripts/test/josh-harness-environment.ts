@@ -85,7 +85,7 @@ type FixtureFile = readonly [string, string]
 
 const TOOLCHAIN_FILES: ReadonlyArray<FixtureFile> = [
 	['.gitignore', 'node_modules\n.*cache\n.tsbuildinfo\npnpm-lock.yaml\n'],
-	['.prettierignore', '*.json\npnpm-lock.yaml\n'],
+	['.prettierignore', '*.json\npnpm-lock.yaml\n_tmp_*\n'],
 	['.prettierrc', json_file({ semi: false, singleQuote: true, useTabs: true })],
 	[
 		'cspell.config.yaml',

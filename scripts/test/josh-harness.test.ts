@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
@@ -191,6 +191,22 @@ describe('josh harness — scenarios from past defects', () => {
 		},
 		SCENARIO_TIMEOUT_MS,
 	)
+})
+
+it('keeps transient files outside the consumer lint scope (#2851)', () => {
+	const consumer = environment('consumer')
+	const transient_file = path.join(consumer.root, '_tmp_2851_probe')
+
+	try {
+		writeFileSync(transient_file, 'transient', 'utf8')
+		const result = execaSync('pnpm', ['exec', 'prettier', '--file-info', transient_file], {
+			cwd: consumer.root,
+		})
+
+		expect(JSON.parse(result.stdout)).toMatchObject({ ignored: true })
+	} finally {
+		rmSync(transient_file, { force: true })
+	}
 })
 
 describe('josh harness — detached consumer gate (#2573)', () => {
