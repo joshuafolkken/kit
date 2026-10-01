@@ -68,6 +68,9 @@ describe('behavior_rules.is_index_mutation with quoted separators', () => {
 			"cat > n.md <<EOF\nit's done\nEOF\ngit add n.md && git commit -m 'docs'",
 			String.raw`echo it\'s; git add . ; echo 'x'`,
 			"git commit -m \"$(cat <<'EOF'\nit's a body\nEOF\n)\"",
+			'gh issue comment 1 --body "first\nsecond" && git add . && git commit -m "msg"',
+			String.raw`echo 'C:\' ; git add . ; echo 'x'`,
+			'cat <<EOF > f && git add f\nbody\nEOF',
 		]
 
 		expect(chained.every((command) => behavior_rules.is_index_mutation(command))).toBe(true)

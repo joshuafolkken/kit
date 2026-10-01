@@ -25,7 +25,6 @@ const DENIED_BASH_PREFIX = 'Permission to use Bash with command '
 // run that only investigated git into a red gate. Splitting on the shell's own separators and
 // requiring the segment to *begin* with the mutation is what tells the command from the quotation.
 const SEGMENT_SEPARATOR = /[\n;&|]+/u
-const LINE_BREAK = '\n'
 const INDEX_MUTATION_HEAD = /^git\s+(?:commit|add|rm\s+--cached|restore\s+--staged)\b/u
 // `git add -n` / `--dry-run` stage nothing, so they are not a mutation — the one such command in the
 // recorded corpus is a `git add -n .` dry run, and reading it as a violation would fail the assertion
@@ -62,24 +61,12 @@ function command_of(block: Block): string | undefined {
 //
 // Quoted spans are removed before the split (joshuafolkken/kit#2841): a `|` inside a quoted pattern —
 // `grep -E "commit|git add" file` — is not a separator, and cutting there synthesized a segment that
-// began with `git add` out of a read-only search.
-//
-// **This rule must err toward flagging**, the opposite of the timing readers that share `unquoted`: a
-// missed reading here is a missed violation. So the quotes are removed one line at a time, after the
-// backslash escapes — a heredoc body's `it's` or an escaped `\'` is an unbalanced quote, and paired
-// with a later one across the whole command it would swallow the real `git add` between them.
-const ESCAPED_CHARACTER = /\\./gu
-
-function command_segments(command: string): ReadonlyArray<string> {
-	return command
-		.split(LINE_BREAK)
-		.flatMap((line) =>
-			time_shell.unquoted(line.replaceAll(ESCAPED_CHARACTER, ' ')).split(SEGMENT_SEPARATOR),
-		)
-}
-
+// began with `git add` out of a read-only search. `unquoted` honors escapes and heredoc bodies, so a
+// stray `it's` cannot pair with a later quote and erase the real `git add` between them.
 function is_index_mutation(command: string): boolean {
-	return command_segments(command)
+	return time_shell
+		.unquoted(command)
+		.split(SEGMENT_SEPARATOR)
 		.map((segment) => segment.trim())
 		.some((segment) => INDEX_MUTATION_HEAD.test(segment) && !is_dry_run(segment))
 }

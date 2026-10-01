@@ -142,3 +142,30 @@ describe('josh_arguments — redirections', () => {
 		expect(redirected).toEqual(time_shell.josh_arguments('pnpm josh lint:related a.ts'))
 	})
 })
+
+describe('unquoted', () => {
+	it('removes single- and double-quoted spans, including multi-line ones', () => {
+		expect(time_shell.unquoted(`grep -E "a|b" f && echo 'c;d'`)).toBe('grep -E   f && echo  ')
+		expect(time_shell.unquoted('gh x --body "a\nb" && git add .')).toBe(
+			'gh x --body   && git add .',
+		)
+	})
+
+	it('does not open a quote at an escaped quote character', () => {
+		expect(time_shell.unquoted(String.raw`echo it\'s; git add . ; echo 'x'`)).toBe(
+			'echo it s; git add . ; echo  ',
+		)
+		expect(time_shell.unquoted(String.raw`echo "a\"b" | c`)).toBe('echo   | c')
+	})
+
+	it('treats a backslash inside single quotes as an ordinary character', () => {
+		expect(time_shell.unquoted(String.raw`echo 'C:\' ; git add .`)).toBe('echo   ; git add .')
+	})
+
+	it('drops a heredoc body but keeps the rest of its marker line', () => {
+		expect(time_shell.unquoted("cat <<EOF > f && git add f\nit's\nEOF\nls")).toBe(
+			'cat   > f && git add f\nls',
+		)
+		expect(time_shell.unquoted("x <<-'END'\n\tdon't\n\tEND")).toBe('x  ')
+	})
+})

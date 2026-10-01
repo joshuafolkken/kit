@@ -45,7 +45,17 @@ const CHAIN_PATTERN = /&&|\|\||;/u
 // invisible here. Erring this way is the cheaper error for every caller: a missed reading costs
 // nothing beyond the reading, while a fragment read as a command answers about work the shell never
 // did, on the shape this repository writes constantly.
-const QUOTED_SPAN_PATTERN = /'[^']*'|"[^"]*"/gu
+//
+// **Escapes and heredoc bodies are text too** (joshuafolkken/kit#2841). A backslash outside single
+// quotes makes the next character literal, so `it\'s` opens nothing and a `"` closes only at an
+// unescaped `"`; inside `'…'` a backslash is an ordinary character, so `'C:\'` still closes. A heredoc
+// body is not shell syntax at all — an `it's` there is prose — so it is removed before the quotes are
+// paired, keeping the rest of its marker line (`cat <<EOF > f && git add f`) where the shell reads it.
+// Without both, a stray quote paired with one much later and erased every command between them.
+const QUOTED_SPAN_PATTERN = /\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*"/gu
+const HEREDOC_MARKER = /(?<!<)<<-?\s*(['"]?)(\w+)\1/u
+const HEREDOC_DELIMITER_GROUP = 2
+const LINE_BREAK = '\n'
 // `set -o pipefail` tells the shell to report the pipeline with the first failing command's status,
 // so nothing in it is discarded. The flag letters are loose because `set -eo pipefail` and
 // `set -euo pipefail` are the same instruction, and the `set` word is required so that a path or a
@@ -146,13 +156,37 @@ function leading_word(command: string): string {
 //
 // **A pipeline under `set -o pipefail` discards nothing**, so it is not this function's business —
 // answering otherwise would name the very form a caller is told to use instead.
+// A line outside a heredoc body is kept with its marker blanked, and a marker opens a body whose
+// delimiter is returned; inside one, every line is dropped through the line that is the delimiter alone.
+function open_heredoc(line: string, kept: Array<string>): string | undefined {
+	kept.push(line.replace(HEREDOC_MARKER, ' '))
+
+	return HEREDOC_MARKER.exec(line)?.[HEREDOC_DELIMITER_GROUP]
+}
+
+function close_heredoc(line: string, delimiter: string): string | undefined {
+	return line.trim() === delimiter ? undefined : delimiter
+}
+
+function without_heredoc_bodies(command: string): string {
+	const kept: Array<string> = []
+	const body: { delimiter?: string | undefined } = {}
+
+	for (const line of command.split(LINE_BREAK)) {
+		body.delimiter =
+			body.delimiter === undefined ? open_heredoc(line, kept) : close_heredoc(line, body.delimiter)
+	}
+
+	return kept.join(LINE_BREAK)
+}
+
 // Quoted text replaced by a space, which is what a reader walking into the middle of a chain has to
 // do before it can trust an operator it finds there. Exported because `time-writes.ts` needs the same
 // removal for a different reason — a quoted `sed` script holds `|` and slashes that read as a
 // pipeline and as paths — and two spellings of "remove the quotes" would disagree the first time one
 // of them learned about a quoting form the other did not.
 function unquoted(command: string): string {
-	return command.replaceAll(QUOTED_SPAN_PATTERN, ' ')
+	return without_heredoc_bodies(command).replaceAll(QUOTED_SPAN_PATTERN, ' ')
 }
 
 function discarded_commands(command: string): Array<string> {
