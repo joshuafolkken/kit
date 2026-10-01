@@ -155,14 +155,14 @@ describe('basic profile file actions', () => {
 	it('keeps a Web-free, Git-free project minimal', () => {
 		const destinations = init_actions.build_file_actions(shape()).map((action) => action.dest)
 
-		expect(destinations).toEqual([VSCODE_EXTENSIONS, ENV_FILE])
+		expect(destinations).toEqual([VSCODE_EXTENSIONS])
 	})
 
 	it('adds Web formatting without Svelte or Playwright tooling', () => {
 		const actions = init_actions.build_file_actions(shape({ has_web: true }))
 		const destinations = actions.map((action) => action.dest)
 
-		expect(destinations).toEqual([BASIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS, ENV_FILE])
+		expect(destinations).toEqual([BASIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS])
 		expect(actions.find((action) => action.dest === BASIC_PRETTIER)?.create()).toContain(
 			'prettier/basic',
 		)
@@ -197,6 +197,6 @@ describe('basic profile merge and optional settings', () => {
 			)
 			.map((action) => action.dest)
 
-		expect(destinations).toEqual([GITIGNORE, TSCONFIG, VSCODE_EXTENSIONS, ENV_FILE])
+		expect(destinations).toEqual([GITIGNORE, TSCONFIG, VSCODE_EXTENSIONS])
 	})
 })

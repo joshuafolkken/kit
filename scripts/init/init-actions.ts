@@ -207,10 +207,7 @@ function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 		})
 	}
 
-	actions.push(
-		...build_basic_vscode_actions(shape),
-		...session_language_environment.build_session_lang_actions(),
-	)
+	actions.push(...build_basic_vscode_actions(shape))
 
 	return actions
 }
