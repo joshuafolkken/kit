@@ -23,7 +23,7 @@ Req N: ...
 
 - **Every user-facing behavior change** (UI interaction, keyboard shortcut, visible state change) must have a corresponding E2E test.
 - **Every logic/utility change** (pure functions, filters, transforms) must have a unit test.
-- **basic の HTML/CSS だけの変更:** `package.json` に `josh.profile: basic`（改名前の `static` も同じ）が記録されていれば自動テストは不要。ブラウザーで対象ページを開き、想定する画面幅でレイアウト・リンク・HTML 内の操作を確認して結果を記録する。同じ変更に JavaScript または TypeScript のファイルが含まれれば自動テストを行う。
+- **basic で kit がテストできない言語だけの変更:** `package.json` に `josh.profile: basic`（改名前の `static` も同じ）が記録され、変更が HTML/CSS や Lua などのソースだけなら自動テストは不要。HTML/CSS はブラウザーで対象ページを開き、想定する画面幅でレイアウト・リンク・HTML 内の操作を確認する。そのほかのソースは変更した処理を実際に動かす。どちらも結果を記録する。同じ変更に JavaScript または TypeScript のファイルが含まれれば自動テストを行う。
 - If a test is genuinely infeasible (e.g., native OS date-picker popup cannot be driven by Playwright), write a comment in the test file explaining why and test the closest observable behavior instead (e.g., that the editor remains open after the `change` event fires).
 - Do **not** report a requirement as done if its test is missing.
 

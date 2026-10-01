@@ -14,7 +14,8 @@
 // a clone avoided. Here only paths that are mechanically certain to touch no runtime code are exempt —
 // the non-executable config and cosmetic-asset arms of `CLAUDE.md`'s "Non-runtime updates" exception
 // stay `required`, and a person declares that exception in the Step 0 work summary. Under-exempting
-// costs one declared exception; over-exempting ships an untested runtime change.
+// costs one declared exception; over-exempting ships an untested runtime change. The one widening is
+// the basic profile's manual check below, for files no runner kit has could test.
 
 type Verdict = 'required' | 'exempt' | 'satisfied'
 
@@ -29,6 +30,29 @@ const EXEMPT_PREFIXES: ReadonlyArray<string> = ['.idea/', '.vscode/', 'prompts/'
 const EXEMPT_SUFFIXES: ReadonlyArray<string> = ['.md']
 const BASIC_VISUAL_SUFFIXES: ReadonlyArray<string> = ['.html', '.css']
 
+// What stays `required` under the basic profile (joshuafolkken/kit#2820): the languages kit's own
+// runner can test, and the data and config formats a JS/TS test can load. Any other file — HTML/CSS, or
+// the source of a project kit does not run, such as Lua — has no test kit could execute, so `required`
+// there would be unsatisfiable; it is confirmed by hand instead. The kept side is enumerated rather than
+// the manual one, because that side is closed.
+const BASIC_REQUIRED_SUFFIXES: ReadonlyArray<string> = [
+	'.ts',
+	'.tsx',
+	'.mts',
+	'.cts',
+	'.js',
+	'.jsx',
+	'.mjs',
+	'.cjs',
+	'.svelte',
+	'.json',
+	'.jsonc',
+	'.json5',
+	'.yaml',
+	'.yml',
+	'.toml',
+]
+
 function normalize(paths: ReadonlyArray<string>): Array<string> {
 	return paths.map((path) => path.trim()).filter((path) => path !== '')
 }
@@ -37,12 +61,21 @@ function is_test_file(path: string): boolean {
 	return TEST_SUFFIXES.some((suffix) => path.endsWith(suffix))
 }
 
-function is_basic_visual(path: string, is_basic: boolean): boolean {
-	return is_basic && BASIC_VISUAL_SUFFIXES.some((suffix) => path.endsWith(suffix))
+// Matched case-insensitively, so `Main.TS` is not mistaken for a language kit cannot test.
+function is_basic_manual(path: string, is_basic: boolean): boolean {
+	const lower = path.toLowerCase()
+
+	return is_basic && BASIC_REQUIRED_SUFFIXES.every((suffix) => !lower.endsWith(suffix))
+}
+
+function is_basic_visual(path: string): boolean {
+	const lower = path.toLowerCase()
+
+	return BASIC_VISUAL_SUFFIXES.some((suffix) => lower.endsWith(suffix))
 }
 
 function is_exempt(path: string, is_basic = false): boolean {
-	if (EXEMPT_PATHS.includes(path) || is_basic_visual(path, is_basic)) return true
+	if (EXEMPT_PATHS.includes(path) || is_basic_manual(path, is_basic)) return true
 
 	return (
 		EXEMPT_SUFFIXES.some((suffix) => path.endsWith(suffix)) ||
@@ -79,15 +112,23 @@ function exempt_files(paths: ReadonlyArray<string>, is_basic = false): Array<str
 	return normalize(paths).filter((path) => is_exempt(path, is_basic))
 }
 
+// The paths exempt only because the basic profile has no runner for them — the ones a person still has
+// to confirm by hand, as opposed to docs and editor settings, which nobody checks.
+function manual_check_files(paths: ReadonlyArray<string>, is_basic: boolean): Array<string> {
+	return normalize(paths).filter((path) => is_exempt(path, is_basic) && !is_exempt(path))
+}
+
 const test_declared_logic = {
 	EXEMPT_PATHS,
 	EXEMPT_PREFIXES,
 	EXEMPT_SUFFIXES,
 	TEST_SUFFIXES,
 	exempt_files,
+	is_basic_visual,
 	is_exempt,
 	is_runtime,
 	is_test_file,
+	manual_check_files,
 	runtime_files,
 	verdict_for,
 }

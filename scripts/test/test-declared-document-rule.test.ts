@@ -46,13 +46,18 @@ describe('the test-declared rule is routed to the command in CLAUDE.md', () => {
 	})
 })
 
-describe('the basic visual exception is documented with its limit', () => {
-	it.each([CLAUDE, 'prompts/testing-guide.md'])('%s names the manual browser check', (file) => {
+// joshuafolkken/kit#2820: the exception covers any source kit cannot test, not HTML/CSS alone, so the
+// manual run for those sources is pinned beside the browser check.
+describe('the basic manual-check exception is documented with its limit', () => {
+	it.each([CLAUDE, 'prompts/testing-guide.md'])('%s names both manual checks', (file) => {
 		const content = read_repo_file(file)
 
 		expect(content).toContain('josh.profile: basic')
 		expect(content).toContain('ブラウザー')
 		expect(content).toContain('HTML 内の操作')
+		expect(content).toContain('テストできない言語')
+		expect(content).toContain('Lua')
+		expect(content).toContain('変更した処理を実際に動かす')
 		expect(content).toContain('JavaScript')
 		expect(content).toContain('TypeScript')
 	})
