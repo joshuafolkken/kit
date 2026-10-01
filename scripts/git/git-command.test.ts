@@ -64,6 +64,19 @@ describe('the status reading names its untracked-files mode', () => {
 	})
 })
 
+// joshuafolkken/kit#2855: the preflight asks a lane's work tree whether it holds uncommitted work, so a
+// directory that never reached git would read this tree in its place and miss the lane's changes.
+describe('the status reading targets another work tree when given its directory', () => {
+	it('runs git status inside the named directory', async () => {
+		const { git_command } = await import('./git-command')
+		const lane_directory = '/repo/.repo-lanes/926'
+
+		await git_command.status(lane_directory)
+
+		expect(execa_mock.state.last_arguments.slice(0, 3)).toEqual(['-C', lane_directory, 'status'])
+	})
+})
+
 // joshuafolkken/kit#907: with git's default quoting, a path containing a non-ASCII byte comes back
 // C-quoted, and a classifier matching a path prefix answers no for a file it should have matched.
 // `josh review:level` reads these same paths, so a dropped match would misjudge the review depth.

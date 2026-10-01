@@ -19,8 +19,11 @@ async function branch(): Promise<string> {
 // recognizes the observation ledger by its path then misses it: `git-staging.ts` stages the directory
 // — ledger included — into an unrelated pull request, and the flush refuses the directory as "other
 // changes".
-async function status(): Promise<string> {
-	return await git_spawn.read(['status', PORCELAIN_FLAG, UNTRACKED_FILES_FLAG])
+// `directory` reads another work tree of the repository — a lane — instead of this one.
+async function status(directory?: string): Promise<string> {
+	const location = directory === undefined ? [] : ['-C', directory]
+
+	return await git_spawn.read([...location, 'status', PORCELAIN_FLAG, UNTRACKED_FILES_FLAG])
 }
 
 // The absolute path every other git command's output is relative to. Asking git rather than reading

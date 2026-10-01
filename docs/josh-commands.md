@@ -1603,7 +1603,7 @@ pnpm josh run:release --force    # clear a record left by a run that has ended
 
 **Options:** `--fullrun` (`run:hold <N>`) marks the record as `fullrun #N`'s (joshuafolkken/kit#2760); `--halfrun-stop` marks a `halfrun` stop for `run:entry` to adopt (#2796); `--force` (`run:release`) removes a record this run did not write, clearing another run's stale claim.
 
-**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an existing branch/PR, or a merged/closed PR), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
+**Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold`: `hold`, `busy`, `reclaim` / `resume` / `park` (preflight found uncommitted work, an open PR or a branch with commits beyond the default branch or uncommitted changes in its lane, or a merged/closed PR; a branch with none of those is no leftover work), `unknown` (exit 1). `run:release`: `released`, `none`, or `held` (exit 1). A record over 8 hours old on a clean tree is replaced; on a dirty or unreadable one, `busy`. A `hold` answer is followed by the `josh run:tidy` sweep below, reported on stderr.
 
 ### `josh run:tidy`
 

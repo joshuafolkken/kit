@@ -14,6 +14,8 @@ vi.mock('#scripts/git/git-command', () => ({
 		branch: vi.fn(),
 		branch_names: vi.fn(),
 		branch_names_remote: vi.fn(),
+		commit_count_beyond: vi.fn(),
+		default_branch_reference: vi.fn(),
 		get_default_branch: vi.fn(),
 		status: vi.fn(),
 	},
@@ -23,20 +25,29 @@ vi.mock('#scripts/git/git-gh-pr-read', () => ({
 	git_gh_pr_read: { pr_exists: vi.fn(), pr_view: vi.fn() },
 }))
 
+vi.mock('#scripts/lane/lane-registry', () => ({
+	lane_registry: { find_open_lane: vi.fn() },
+}))
+
 const { git_command } = await import('#scripts/git/git-command')
 const { git_gh_pr_read } = await import('#scripts/git/git-gh-pr-read')
+const { lane_registry } = await import('#scripts/lane/lane-registry')
 
 const branch = vi.mocked(git_command.branch)
 const branch_names = vi.mocked(git_command.branch_names)
 const branch_names_remote = vi.mocked(git_command.branch_names_remote)
+const commit_count_beyond = vi.mocked(git_command.commit_count_beyond)
+const default_branch_reference = vi.mocked(git_command.default_branch_reference)
 const default_branch = vi.mocked(git_command.get_default_branch)
 const status = vi.mocked(git_command.status)
 const pr_exists = vi.mocked(git_gh_pr_read.pr_exists)
 const pr_view = vi.mocked(git_gh_pr_read.pr_view)
+const find_open_lane = vi.mocked(lane_registry.find_open_lane)
 
 const ISSUE = '926'
 const CLEAN_TREE: TreeState = { branch: 'main', default_branch: 'main', is_dirty: false }
 const NO_WORK: ChildState = { branch_name: undefined, pr_state: 'none' }
+const BASE_REFERENCE = 'origin/main'
 
 function child(pr_state: PrState, branch_name?: string): ChildState {
 	return { branch_name, pr_state }
@@ -50,8 +61,10 @@ function arrange_clean_tree(): void {
 	status.mockResolvedValue('')
 	branch.mockResolvedValue('main')
 	default_branch.mockResolvedValue('main')
+	default_branch_reference.mockResolvedValue(BASE_REFERENCE)
 	branch_names.mockResolvedValue([])
 	branch_names_remote.mockResolvedValue([])
+	commit_count_beyond.mockResolvedValue(1)
 }
 
 afterEach(() => {
@@ -210,6 +223,120 @@ describe('check names the branch the verdict came from', () => {
 		expect(await verdict_from_check()).toBe('clean')
 		expect(pr_exists).not.toHaveBeenCalled()
 		expect(pr_view).not.toHaveBeenCalled()
+	})
+})
+
+// A lane that ended before implementing leaves a branch at the default branch's commit and no pull
+// request; its mere existence is not a partial implementation (joshuafolkken/kit#2855).
+describe('check counts a branch as leftover work only when it holds commits or a pull request', () => {
+	it('answers clean for a branch with no pull request and no commit beyond the default branch', async () => {
+		arrange_clean_tree()
+		branch_names.mockResolvedValue([BRANCH])
+		pr_exists.mockResolvedValue(false)
+		commit_count_beyond.mockResolvedValue(0)
+
+		expect(await verdict_from_check()).toBe('clean')
+		expect(commit_count_beyond).toHaveBeenCalledExactlyOnceWith(BASE_REFERENCE, BRANCH)
+	})
+
+	it('counts a remote-only branch through the remote-tracking ref it was found as', async () => {
+		arrange_clean_tree()
+		branch_names_remote.mockResolvedValue([`origin/${BRANCH}`])
+		pr_exists.mockResolvedValue(false)
+		commit_count_beyond.mockResolvedValue(0)
+
+		expect(await verdict_from_check()).toBe('clean')
+		expect(commit_count_beyond).toHaveBeenCalledExactlyOnceWith(BASE_REFERENCE, `origin/${BRANCH}`)
+	})
+
+	it('resumes when only the remote copy of a local branch holds commits', async () => {
+		arrange_clean_tree()
+		branch_names.mockResolvedValue([BRANCH])
+		branch_names_remote.mockResolvedValue([`origin/${BRANCH}`])
+		pr_exists.mockResolvedValue(false)
+		commit_count_beyond.mockImplementation(async (_base, tip) => (tip === BRANCH ? 0 : 1))
+
+		expect(await verdict_from_check()).toBe('resume')
+		expect(commit_count_beyond).toHaveBeenCalledWith(BASE_REFERENCE, `origin/${BRANCH}`)
+	})
+})
+
+describe('check still resumes a branch that holds commits or a pull request', () => {
+	it('still resumes a branch with commits beyond the default branch and no pull request', async () => {
+		arrange_clean_tree()
+		branch_names.mockResolvedValue([BRANCH])
+		pr_exists.mockResolvedValue(false)
+
+		const decision = await run_preflight.check(ISSUE)
+
+		expect(decision.verdict).toBe('resume')
+		expect(decision.reason).toContain(BRANCH)
+	})
+
+	it('still resumes an open pull request without counting its commits', async () => {
+		arrange_clean_tree()
+		branch_names.mockResolvedValue([BRANCH])
+		pr_exists.mockResolvedValue(true)
+		pr_view.mockResolvedValue(OPEN_PR_JSON)
+		commit_count_beyond.mockResolvedValue(0)
+
+		expect(await verdict_from_check()).toBe('resume')
+		expect(commit_count_beyond).not.toHaveBeenCalled()
+	})
+})
+
+const LANE_DIRECTORY = '/repo/.repo-lanes/926'
+const LANE_CHANGE = ' M src/feature.ts'
+
+function arrange_lane_on(lane_branch: string, lane_status: string, is_stranded = false): void {
+	arrange_clean_tree()
+	branch_names.mockResolvedValue([BRANCH])
+	pr_exists.mockResolvedValue(false)
+	commit_count_beyond.mockResolvedValue(0)
+	find_open_lane.mockResolvedValue({
+		issue: ISSUE,
+		branch: lane_branch,
+		directory: LANE_DIRECTORY,
+		seat: undefined,
+		development_port: undefined,
+		preview_port: undefined,
+		output: undefined,
+		profile: undefined,
+		is_stranded,
+	})
+	status.mockImplementation(async (directory) => (directory === LANE_DIRECTORY ? lane_status : ''))
+}
+
+// A lane stopped mid-implementation holds its work uncommitted on a branch with no commit yet, so
+// commits alone would read it as nothing left behind.
+describe('check counts the uncommitted work a lane holds on a branch with no commits', () => {
+	it('resumes when the lane checked out on the branch has uncommitted changes', async () => {
+		arrange_lane_on(BRANCH, LANE_CHANGE)
+
+		expect(await verdict_from_check()).toBe('resume')
+		expect(find_open_lane).toHaveBeenCalledWith(ISSUE)
+		expect(status).toHaveBeenCalledWith(LANE_DIRECTORY)
+	})
+
+	it('answers clean when that lane is clean', async () => {
+		arrange_lane_on(BRANCH, '')
+
+		expect(await verdict_from_check()).toBe('clean')
+	})
+
+	it('ignores a dirty lane checked out on another branch', async () => {
+		arrange_lane_on('926-lane', LANE_CHANGE)
+
+		expect(await verdict_from_check()).toBe('clean')
+		expect(status).not.toHaveBeenCalledWith(LANE_DIRECTORY)
+	})
+
+	// A stranded lane's directory is gone, and an unreadable status would otherwise read as dirty.
+	it('ignores a stranded lane whose work tree is gone', async () => {
+		arrange_lane_on(BRANCH, LANE_CHANGE, true)
+
+		expect(await verdict_from_check()).toBe('clean')
+		expect(status).not.toHaveBeenCalledWith(LANE_DIRECTORY)
 	})
 })
 

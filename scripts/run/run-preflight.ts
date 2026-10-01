@@ -1,5 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_pr_read } from '#scripts/git/git-gh-pr-read'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { z } from 'zod'
 import { run_hold } from './run-hold'
 import { run_issue_number } from './run-issue-number'
@@ -72,7 +73,7 @@ const GH_PR_STATES: ReadonlyMap<string, PrState> = new Map([
 ])
 
 const CLEAN_REASON =
-	'Nothing was left behind: the tree is clean, HEAD is on the default branch, and this issue has no branch or pull request.'
+	'Nothing was left behind: the tree is clean, HEAD is on the default branch, and this issue has no pull request and no branch holding work.'
 
 const CLEAN_ADVICE = 'Start the child.'
 
@@ -283,22 +284,91 @@ function to_head_branch(name: string): string {
 	return separator_index === NOT_FOUND_INDEX ? name : name.slice(separator_index + 1)
 }
 
-async function read_branch_candidates(issue: string): Promise<Array<string>> {
+function group_by_head(pairs: ReadonlyArray<[string, string]>): Map<string, Array<string>> {
+	const groups = new Map<string, Array<string>>()
+
+	for (const [name, reference] of pairs) groups.set(name, [...(groups.get(name) ?? []), reference])
+
+	return groups
+}
+
+// Each candidate keeps every ref it was found as — the local branch and each remote-tracking ref —
+// because either may be the one holding the commits: a local branch left at the default branch can
+// sit beside a remote one another machine pushed work to, and the stripped head name may not resolve.
+async function read_branch_candidates(issue: string): Promise<Map<string, Array<string>>> {
 	const pattern = `${issue}${ISSUE_BRANCH_SUFFIX}`
 	const [local, remote] = await Promise.all([
 		git_command.branch_names(pattern),
 		git_command.branch_names_remote(`${ANY_REMOTE_PREFIX}${pattern}`),
 	])
 
-	return [...new Set([...local, ...remote.map((name) => to_head_branch(name))])]
+	return group_by_head([
+		...local.map((name): [string, string] => [name, name]),
+		...remote.map((reference): [string, string] => [to_head_branch(reference), reference]),
+	])
+}
+
+async function has_commits_beyond(
+	base: string,
+	references: ReadonlyArray<string>,
+): Promise<boolean> {
+	const counts = await Promise.all(
+		references.map(async (reference) => await git_command.commit_count_beyond(base, reference)),
+	)
+
+	return counts.some((count) => count > 0)
+}
+
+// **A lane stopped mid-implementation holds its work uncommitted**, on a branch with no commit yet —
+// so the lane checked out on the candidate is asked whether its tree is dirty, read the way
+// `run_hold` reads this tree (an unreadable status is dirty). A lane on another branch, or whose
+// directory is gone, holds nothing for this candidate.
+async function is_held_dirty(name: string, lane: LaneInfo | undefined): Promise<boolean> {
+	if (lane?.branch !== name || lane.is_stranded) return false
+
+	return await run_hold.is_tree_dirty(lane.directory)
+}
+
+interface CandidateContext {
+	base: string
+	lane: LaneInfo | undefined
+}
+
+// **A branch with no pull request, no commit beyond the default branch and no uncommitted change in
+// its lane holds no work** (joshuafolkken/kit#2855). A lane that ended before implementing — an
+// operational issue with no code change — leaves exactly that behind, and reading its mere existence
+// as a partial implementation sent the next `fullrun #N` to `resume` over nothing. A branch with a
+// pull request is never counted: whatever its commits, the pull request is the state the verdict is
+// decided on.
+async function read_candidate(
+	name: string,
+	references: ReadonlyArray<string>,
+	context: CandidateContext,
+): Promise<ChildState | undefined> {
+	const state = await read_pr_of_branch(name)
+
+	if (state.pr_state !== NO_PR) return state
+	if (await has_commits_beyond(context.base, references)) return state
+
+	return (await is_held_dirty(name, context.lane)) ? state : undefined
 }
 
 async function read_child_state(issue: string): Promise<ChildState> {
 	const candidates = await read_branch_candidates(issue)
 
-	return pick_child_state(
-		await Promise.all(candidates.map(async (name) => await read_pr_of_branch(name))),
+	if (candidates.size === 0) return NO_CHILD_WORK
+
+	const [base, lane] = await Promise.all([
+		git_command.default_branch_reference(),
+		lane_registry.find_open_lane(issue),
+	])
+	const reads = await Promise.all(
+		[...candidates].map(
+			async ([name, references]) => await read_candidate(name, references, { base, lane }),
+		),
 	)
+
+	return pick_child_state(reads.filter((read): read is ChildState => read !== undefined))
 }
 
 // The child read is skipped where the tree already answers `reclaim`: a `gh` round trip buys nothing
