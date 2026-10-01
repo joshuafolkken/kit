@@ -1,3 +1,4 @@
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { describe, expect, it } from 'vitest'
 import { last_prompt } from './last-prompt'
 
@@ -64,13 +65,29 @@ describe('last_prompt.prompt_text — what the harness wrote is not the prompt',
 
 		expect(last_prompt.prompt_text(tail.join('\n'))).toBe('')
 	})
+})
 
+describe('last_prompt.prompt_text — a workflow invocation quotes nothing', () => {
 	it.each([INVOCATION, 'backlogrun #1 #2', ' kickoff #3', 'halfrun new'])(
 		'yields nothing for the workflow invocation %s',
 		(invocation) => {
 			expect(last_prompt.prompt_text(prompt_line(invocation))).toBe('')
 		},
 	)
+
+	it.each([
+		lane_child_invocation.resume_invocation('2821'),
+		lane_child_invocation.outage_resume_invocation('2821'),
+		lane_child_invocation.ship_stop_invocation('2821'),
+	])('yields nothing for a lane child resume prompt', (resume) => {
+		expect(last_prompt.prompt_text(prompt_line(resume))).toBe('')
+	})
+
+	it('reads a prompt that only mentions a keyword mid-sentence', () => {
+		const prompt = 'why did fullrun stop on #7 in this log?'
+
+		expect(last_prompt.prompt_text(prompt_line(prompt))).toBe(prompt)
+	})
 
 	it('yields nothing for a tail with no prompt on it', () => {
 		expect(last_prompt.prompt_text([ASSISTANT_LINE, 'not json'].join('\n'))).toBe('')

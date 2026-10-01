@@ -13,7 +13,8 @@ import { filing_cap } from './filing-cap'
 // no `origin` (an SDK prompt) or a `human` one is read.
 //
 // **A workflow invocation quotes nothing.** `fullrun #2819` names this repository's own Issue, so a
-// bare `#2819` in that run's report is a citation slip like any other, and the prompt yields no text.
+// bare `#2819` in that run's report is a citation slip like any other, and the prompt yields no text —
+// a resumed lane child's prompt included, since it ends on the same invocation.
 
 const WORKFLOW_KEYWORDS: ReadonlySet<string> = new Set([
 	'kickoff',
@@ -23,6 +24,8 @@ const WORKFLOW_KEYWORDS: ReadonlySet<string> = new Set([
 ])
 const NO_PROMPT = ''
 const HUMAN_ORIGIN = 'human'
+// The word before the prompt's last one — where a trailing `fullrun #N` puts its keyword.
+const KEYWORD_BEFORE_ARGUMENT = -2
 
 const PROMPT_LINE_SCHEMA = z.object({
 	isMeta: z.boolean().nullish(),
@@ -47,10 +50,14 @@ function person_text(line: string): string | undefined {
 	return time_reported_failure.result_text(parsed.data.message.content)
 }
 
+// A keyword opening the prompt is what a person types; a keyword before its one trailing argument is a
+// lane child's resume prompt, whose preamble ends on `fullrun #N` (`lane-child-invocation.ts`).
 function is_invocation(prompt: string): boolean {
-	const [first_word = NO_PROMPT] = prompt.trimStart().split(/\s/u, 1)
+	const words = prompt.trim().split(/\s+/u)
 
-	return WORKFLOW_KEYWORDS.has(first_word)
+	return [words.at(0), words.at(KEYWORD_BEFORE_ARGUMENT)].some((word) =>
+		WORKFLOW_KEYWORDS.has(word ?? NO_PROMPT),
+	)
 }
 
 function prompt_line_text(line: string): string | undefined {
