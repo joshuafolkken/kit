@@ -34,6 +34,10 @@ Identifies the chat or user that receives notifications.
 3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser — the `chat.id` field in the response JSON is your chat ID
 4. Alternatively, forward a message to [@userinfobot](https://t.me/userinfobot) to find your personal user ID
 
+### `JOSH_NOTIFY`
+
+Optional. Set `JOSH_NOTIFY=off` when you do not use Telegram at all ([#2821](https://github.com/joshuafolkken/kit/issues/2821)). Every notification is then skipped with one `🔕 Telegram notifications are disabled` line and exit code 0, and neither Telegram variable is needed. Only `off` (case-insensitive) disables them: unset or any other value keeps the behavior below, so a forgotten setup still fails rather than passing quietly.
+
 ## Commands
 
 | Command         | Script                     | Description                                                   |
@@ -45,6 +49,8 @@ Identifies the chat or user that receives notifications.
 ## Notification Behavior
 
 **A notification that reached nobody is a failure, not a skip** ([#1564](https://github.com/joshuafolkken/kit/issues/1564)). Missing credentials and a refused request are treated the same way, and what happens next depends only on whose job the notification was.
+
+An explicit [`JOSH_NOTIFY=off`](#josh_notify) is the one exception: it records that nobody is meant to be notified, so every send is skipped and nothing below applies.
 
 When `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` is missing or empty, or the send itself fails:
 
