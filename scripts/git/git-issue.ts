@@ -92,14 +92,18 @@ async function lane_issue_title(branch_name: string, issue_number: string): Prom
 	return title
 }
 
+function branch_derivation_error(branch_name: string): string {
+	return `Cannot derive issue info from branch "${branch_name}" in non-interactive mode. ${argument_hint(EXAMPLE_ISSUE_NUMBER)}`
+}
+
+function branch_number(branch_name: string): string | undefined {
+	return BRANCH_NUMBER_PATTERN.exec(branch_name)?.[1]
+}
+
 async function derive_issue_input_from_branch(branch_name: string): Promise<string> {
 	const match = BRANCH_NUMBER_PATTERN.exec(branch_name)
 
-	if (match === null) {
-		throw new Error(
-			`Cannot derive issue info from branch "${branch_name}" in non-interactive mode. ${argument_hint(EXAMPLE_ISSUE_NUMBER)}`,
-		)
-	}
+	if (match === null) throw new Error(branch_derivation_error(branch_name))
 
 	const [, number = '', slug = ''] = match
 	const title = is_lane_branch(branch_name, number)
@@ -162,6 +166,10 @@ const git_issue = {
 	get_and_display,
 	resolve_and_display,
 	derive_from_branch,
+	// The pure halves of the two resolutions above, read by `git-preflight.ts` before anything changes.
+	parse: parse_issue_input,
+	branch_number,
+	branch_derivation_error,
 }
 
 export type { IssueInfo }

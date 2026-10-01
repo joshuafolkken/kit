@@ -134,3 +134,22 @@ describe('git_branch.check_and_create_branch — from non-main default branch', 
 		expect(mocked_checkout_b).toHaveBeenCalledWith(TARGET_BRANCH)
 	})
 })
+
+describe('git_branch.is_mismatch', () => {
+	it('is false on the default branch, where the target is still to be created', () => {
+		expect(git_branch.is_mismatch('main', TARGET_BRANCH, 'main')).toBe(false)
+	})
+
+	it('is false on the target branch itself', () => {
+		expect(git_branch.is_mismatch(TARGET_BRANCH, TARGET_BRANCH, 'main')).toBe(false)
+	})
+
+	it('is false for a branch sharing the issue prefix', () => {
+		expect(git_branch.is_mismatch(SAME_PREFIX_CURRENT, ISSUE_42_BRANCH, 'main')).toBe(false)
+	})
+
+	it('is true for a branch with a different or no issue prefix', () => {
+		expect(git_branch.is_mismatch(ISSUE_99_BRANCH, ISSUE_42_BRANCH, 'main')).toBe(true)
+		expect(git_branch.is_mismatch(NO_PREFIX_BRANCH, ISSUE_42_BRANCH, 'main')).toBe(true)
+	})
+})

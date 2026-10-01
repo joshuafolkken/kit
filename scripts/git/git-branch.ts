@@ -84,6 +84,18 @@ function has_same_issue_prefix(branch_a: string, branch_b: string): boolean {
 	return prefix_a !== undefined && prefix_a === prefix_b
 }
 
+// The one rule `check_and_create_branch` refuses on, kept pure so `git-preflight.ts` asks it before
+// anything is pulled, switched or staged.
+function is_mismatch(
+	current_branch: string,
+	target_branch_name: string,
+	default_branch: string,
+): boolean {
+	if (current_branch === default_branch || current_branch === target_branch_name) return false
+
+	return !has_same_issue_prefix(current_branch, target_branch_name)
+}
+
 async function handle_default_branch(target_branch_name: string): Promise<void> {
 	await pull_latest()
 	const is_branch_exists: boolean = await exists(target_branch_name)
@@ -103,9 +115,7 @@ async function check_and_create_branch(
 		return target_branch_name
 	}
 
-	if (current_branch !== target_branch_name) {
-		if (has_same_issue_prefix(current_branch, target_branch_name)) return current_branch
-
+	if (is_mismatch(current_branch, target_branch_name, default_branch)) {
 		git_error.display_branch_mismatch_error(current_branch, target_branch_name)
 	}
 
@@ -118,6 +128,7 @@ const git_branch = {
 	switch_to,
 	exists,
 	check_and_create_branch,
+	is_mismatch,
 	// Exported so a lane's branch name can be checked against the real matcher rather than against a
 	// second copy of the pattern (joshuafolkken/kit#1497). A copy is what let `lane/<N>` ship: nothing
 	// asserted that the name `lane:open` writes is one this function accepts.
