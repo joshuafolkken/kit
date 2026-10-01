@@ -86,10 +86,21 @@ function resolve_scanner(project_root: string, platform: string): ScannerChoice 
 	return has_path_binary ? { path: BINARY_NAME, is_below_floor: true } : undefined
 }
 
+// **Output is forwarded, never handed the terminal itself.** osv-scanner is a Go binary that probes a
+// terminal on its stdout for its background color (an OSC 11 query followed by a cursor-position
+// request) and never reads the answers, so they sat in the terminal's input queue and surfaced at the
+// next shell prompt as `11;rgb:0101/0404/0909;1R` after a push ran this audit from the pre-push hook.
+// A pipe means the scanner sees no terminal and asks nothing; the `inherit` half still prints its report.
+// The fix belongs here, at the one command that asks, rather than on `git push`: piping the push would
+// make its timeout wait on any process a hook left running (joshuafolkken/kit#2801).
+const FORWARDED_OUTPUT = ['inherit', 'pipe'] as const
+
 function run_scanner(scanner_path: string): number {
 	const { LOCKFILE_PATH, build_scanner_arguments } = security_audit_logic
 	const result = execaSync(scanner_path, [...build_scanner_arguments(LOCKFILE_PATH)], {
-		stdio: 'inherit',
+		stdin: 'inherit',
+		stdout: FORWARDED_OUTPUT,
+		stderr: FORWARDED_OUTPUT,
 		reject: false,
 	})
 

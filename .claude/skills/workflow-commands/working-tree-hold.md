@@ -55,7 +55,8 @@ clean releases it explicitly**: a `fullrun` / `halfrun` that stops on a split, a
 third-party target ends with `pnpm josh run:release <N>` (bare where that run entered as `new`).
 **`halfrun`'s stop before commit keeps the hold**, and so does a `needs-human-review` stop: the
 uncommitted work still in the tree is exactly what a second run would trample, so the release command
-goes in the stop report and the Telegram for the person to type. **An expired record over a tree that
+goes in the stop report and the Telegram for the person to type. **`fullrun #<N>` of the same issue
+adopts a `halfrun`'s kept hold** rather than being refused `busy` by it — "The halfrun resume" below. **An expired record over a tree that
 still has uncommitted changes does not free it**: the command answers `busy` and says to commit, stash,
 or release once the work is done; only an expired record over a clean tree is replaced.
 
@@ -64,3 +65,17 @@ call it themselves; each child runs the `fullrun` procedure, so it claims on ent
 followup` releases it at that child's merge. The command's behavior and the answer table are
 `docs/josh-commands.md` → "`josh run:hold` / `josh run:release`"; this file is the single source of
 the procedure.
+
+## The halfrun resume
+
+**`fullrun #<N>` after a `halfrun` stop resumes it instead of claiming** (joshuafolkken/kit#2796). The
+stop is **recorded, never inferred**: the `halfrun` ends with `pnpm josh run:hold <N> --halfrun-stop`,
+which marks its own record (re-keying a `halfrun new`'s unnumbered one to the filed issue) — a
+`halfrun` still implementing or a `backlogrun` child leaves the same hold over the same dirty tree, and
+must not be adopted. On a marked hold for `#<N>` over a dirty tree, `run:entry` asks the session budget
+(`over` stops as usual), adopts the hold with the `fullrun` mark and prints `entry #<N> — resume:
+halfrun`. **Skip the title, the plan, the split assessment, `git switch main && git pull`,
+`latest:scope` and the implementation**: the diff in the tree is what the person verified. Re-read the
+issue (`pnpm josh issue:read <N>`), then run the gate **in full** from the refactor (`chain-rule.md` →
+"Run the review-to-merge chain") — a fix made during the manual check has had no gate — and ship as
+any `fullrun` does.

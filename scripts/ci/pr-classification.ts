@@ -1,18 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import {
+	BREAKING_CHANGE_LABEL as BREAKING,
+	BUGFIX_LABEL as BUGFIX,
+	RELEASE_CLASSIFICATION_NAMES as CLASSIFICATION_LABELS,
+	ENHANCEMENT_LABEL,
+	type ReleaseClassification,
+} from '#scripts/git/issue-labels'
 import { execaSync } from 'execa'
 import { z } from 'zod'
 
-const BUGFIX = 'bugfix'
-const BREAKING = 'breaking-change'
-const CLASSIFICATION_LABELS = [
-	BREAKING,
-	'enhancement',
-	BUGFIX,
-	'other-change',
-	'ignore-for-release',
-] as const
-type ReleaseClassification = (typeof CLASSIFICATION_LABELS)[number]
 const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 const ISSUE_BUG_LABEL = 'bug'
 const DECLARATION = /^- リリース分類: (.+)$/gmu
@@ -50,7 +47,7 @@ function release_candidates(
 ): ReadonlyArray<ReleaseClassification> {
 	if (!candidates.includes(BREAKING)) return candidates
 
-	return candidates.filter((candidate) => candidate !== 'enhancement')
+	return candidates.filter((candidate) => candidate !== ENHANCEMENT_LABEL)
 }
 
 function issue_candidates(issue_json: string): ReadonlyArray<ReleaseClassification> {
@@ -132,4 +129,8 @@ const pr_classification = {
 	select_issue_classification,
 }
 
-export { pr_classification, CLASSIFICATION_LABELS, type ReleaseClassification }
+export { pr_classification }
+export {
+	RELEASE_CLASSIFICATION_NAMES as CLASSIFICATION_LABELS,
+	type ReleaseClassification,
+} from '#scripts/git/issue-labels'

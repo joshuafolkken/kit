@@ -84,6 +84,22 @@ describe('security_audit.run_scanner', () => {
 			expect.anything(),
 		)
 	})
+
+	// A scanner that finds a terminal queries it and leaves the replies at the shell prompt (#2801).
+	it('forwards the scanner output through a pipe instead of handing it the terminal', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+		security_audit.run_scanner(OSV_SCANNER)
+
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			OSV_SCANNER,
+			expect.anything(),
+			expect.objectContaining({
+				stdin: 'inherit',
+				stdout: ['inherit', 'pipe'],
+				stderr: ['inherit', 'pipe'],
+			}),
+		)
+	})
 })
 
 function fresh_scratch(): string {

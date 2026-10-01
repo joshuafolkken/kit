@@ -1,3 +1,4 @@
+import { CLASSIFICATION_LABELS } from '#scripts/ci/pr-classification'
 import { describe, expect, it } from 'vitest'
 import {
 	ALREADY_DONE_LABEL,
@@ -13,6 +14,8 @@ import {
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
+	RELEASE_CLASSIFICATION_LABELS,
+	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
@@ -107,6 +110,24 @@ describe('WORKFLOW_LABELS', () => {
 
 		expect(names).not.toContain(AUTO_OK_LABEL)
 		expect(names).not.toContain(NEEDS_HUMAN_REVIEW_LABEL)
+	})
+})
+
+describe('RELEASE_CLASSIFICATION_LABELS', () => {
+	// The labels pr-classification.yml requires exactly one of, read by the check from the same list.
+	it('defines the five release classifications the check reads, each with a color and description', () => {
+		expect(RELEASE_CLASSIFICATION_LABELS.map((label) => label.name)).toStrictEqual([
+			...CLASSIFICATION_LABELS,
+		])
+
+		for (const label of RELEASE_CLASSIFICATION_LABELS) {
+			expect(label.color).toMatch(/^[0-9a-f]{6}$/u)
+			expect(label.description.length).toBeGreaterThan(0)
+		}
+	})
+
+	it('is provisioned together with the workflow labels', () => {
+		expect(REPOSITORY_LABELS).toStrictEqual([...WORKFLOW_LABELS, ...RELEASE_CLASSIFICATION_LABELS])
 	})
 })
 

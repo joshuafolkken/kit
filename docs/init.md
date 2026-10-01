@@ -58,6 +58,21 @@ One question decides which to run: **will this project use the GitHub Issue work
 - **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository or pushes, so it is safe to re-run and to automate.
 - **`josh start`** asks, and then prepares GitHub: `git init` on `main` → the same setup `josh init` runs → the initial commit → `gh repo create` (private unless `--public`) and push → the workflow labels the repository is missing. Afterwards `kickoff new` works. Its steps and safety rules are in [josh-commands.md → `josh start`](./josh-commands.md#josh-start).
 
+## Run from outside the project
+
+```bash
+pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
+```
+
+**Only the kit the project itself installed sets the project up** ([#2794](https://github.com/joshuafolkken/kit/issues/2794)). A `josh init` run from anywhere else — `pnpm dlx`, a global install — first compares its own directory with `node_modules/@joshuafolkken/kit` in the project, by real path. When they differ, it writes nothing itself:
+
+1. **It installs the project's kit.** A project whose `package.json` does not list `@joshuafolkken/kit` gets `pnpm add -D` with the build approvals kit's dependencies need (esbuild and unrs-resolver, read from the `static` workspace template); one that lists it gets `pnpm install`, so the version it chose is kept.
+2. **It hands the run to that kit** — `pnpm exec josh init` with the same arguments, in the project root.
+
+`pnpm dlx` caches the package it fetched and reuses it for about a day, so the kit it runs can be older than the registry's. Before this hand-off, that kit wrote its own version into `package.json` and its own templates into the project. Now the version is whatever pnpm resolves for the project, under the project's `minimumReleaseAge`, and the kit of that version does the setup. A cached copy released before the hand-off existed still sets the project up on its own, until the cache expires.
+
+`--no-install` installs nothing, so there is no project kit to hand off to: the kit that is running does the setup, as before.
+
 ## Refused inside the package's own repository
 
 `josh init` writes nothing and exits non-zero when the project it is aimed at **is**

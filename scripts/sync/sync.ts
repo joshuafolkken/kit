@@ -8,6 +8,7 @@ import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { plugin_install_hint_module } from '#scripts/init/plugin-install-hint'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
+import { repository_labels } from '#scripts/repo/repository-labels'
 import { project_config } from '#scripts/safe-chain/project-config'
 import { security_updates } from '#scripts/security/security-updates'
 import { sonar_file } from '#scripts/security/sonar-file'
@@ -364,9 +365,14 @@ function sync_package_json_migrations(destination_path: string): void {
 // unless the repository allows auto-merge (joshuafolkken/kit#834). Neither ever fails the sync: both
 // are GitHub-side state, not synced artifacts. Unconditional, unlike `init`, because `sync`
 // overwrites both files on every run.
+//
+// The labels are the same kind of GitHub-side prerequisite, and one kit *can* write: the synced
+// `pr-classification.yml` requires one of the release classification labels, so the missing ones are
+// created here rather than reported (joshuafolkken/kit#2797).
 function report_repository_settings(name_with_owner: string | undefined): void {
 	security_updates.report_security_updates_section(name_with_owner)
 	auto_merge_setting.report_auto_merge_section(name_with_owner)
+	repository_labels.ensure_labels(name_with_owner)
 }
 
 function sync_project_artifacts(is_force: boolean): void {

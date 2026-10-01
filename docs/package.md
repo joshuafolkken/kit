@@ -17,7 +17,9 @@ The public npm registry serves `@joshuafolkken/kit` without a GitHub token or pr
 pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 ```
 
-kit's CLI runs on tsx, which depends on esbuild, and pnpm fails an install whose dependencies carry an unapproved build script. kit's optional ESLint import plugins likewise bring in unrs-resolver, whose build script needs the same approval. The two `--allow-build` flags record both approvals in `pnpm-workspace.yaml`. Added without them, the command reports the unapproved packages as ignored builds; `josh init` then answers pnpm's placeholder, and the next `pnpm install` succeeds.
+kit's CLI runs on tsx, which depends on esbuild, and pnpm fails an install whose dependencies carry an unapproved build script. kit's optional ESLint import plugins likewise bring in unrs-resolver, whose build script needs the same approval. The two `--allow-build` flags record both approvals in `pnpm-workspace.yaml`. Added without them, the command exits non-zero with `ERR_PNPM_IGNORED_BUILDS` ([#2785](https://github.com/joshuafolkken/kit/issues/2785)), so keep both flags.
+
+To add kit and initialize in one command, `pnpm --allow-build=esbuild dlx @joshuafolkken/kit init` runs this same install with both flags and then the `josh init` below ([init.md → Run from outside the project](./init.md#run-from-outside-the-project)).
 
 The package-only installation provides the shared CLI and common configuration without installing ESLint or Svelte. ESLint is an optional feature: its published preset stays at `@joshuafolkken/kit/eslint/vanilla`, but the project using that preset must also install ESLint and its plugins. `josh init` adds those development dependencies for the config it generates. For a package-only project, skip initialization and import only the common entry points you need.
 
