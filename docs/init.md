@@ -42,6 +42,8 @@ VS Code extensions are recommendations, not automatic installs. Code Spell Check
 
 The static Web profile writes `prettier.config.mjs`, which loads under either CommonJS or ESM package settings. Its `.prettierignore` keeps generated files out of formatting without excluding a site's `static/` source directory. A Git-free node project does not receive kit's Git and GitHub `prepare` commands.
 
+The distributed `ci.yml` is the same file for both profiles. Its Checks job first runs `josh profile`: a `static` project then runs `josh gate`, which skips each check the project has no tool or files for, while a `node` project runs the ordered steps — `prepare`, the SvelteKit type check, Prettier, the build, ESLint, the unit tests and the size check ([#2814](https://github.com/joshuafolkken/kit/issues/2814)).
+
 To add Git later, run `git init`, then run `josh init` again to add Git files without changing the recorded profile. After adding a GitHub origin, run `josh init` again for GitHub files.
 
 ## `josh init` or `josh start`
