@@ -5,6 +5,7 @@ import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_cache } from './lane-cache'
 import { lane_environment } from './lane-environment'
 import { lane_install, type InstallResult } from './lane-install'
+import { lane_leftover } from './lane-leftover'
 import { lane_paths } from './lane-paths'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seed_policy } from './lane-seed'
@@ -234,6 +235,18 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 	}
 }
 
+// Both refusals run before the seat is claimed, so neither leaves a lock behind. A directory at the
+// lane's path that git does not register is `lane_leftover`'s to remove or refuse
+// (joshuafolkken/kit#2857).
+async function clear_the_way(
+	root: string,
+	issue: string,
+	lanes: ReadonlyArray<LaneInfo>,
+): Promise<void> {
+	guard_unreadable(root, lanes)
+	await lane_leftover.reclaim(lane_paths.lane_directory(root, issue))
+}
+
 /**
  * Open the lane for `issue`, or say why it was not opened.
  *
@@ -253,7 +266,7 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 
 	const root = lane_paths.lane_root(repository_root)
 
-	guard_unreadable(root, lanes)
+	await clear_the_way(root, issue, lanes)
 
 	const plan = build_plan(repository_root, root, issue, lanes)
 
