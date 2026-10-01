@@ -171,6 +171,28 @@ function bare_references(message: string): ReadonlyArray<string> {
 	return [...new Set(found)]
 }
 
+// Every reference the prompt carries, each as written — `#N` or `owner/repo#N` — with none of the
+// citation exclusions applied: a number pasted inside a fence or a quote is still the person's.
+function prompt_references(prompt: string): ReadonlySet<string> {
+	const found = new Set<string>()
+
+	for (const match of prompt.matchAll(ISSUE_NUMBER)) {
+		found.add(repo_prefix(prompt, match.index) + match[0])
+	}
+
+	return found
+}
+
+// **A number the person's prompt already carried is quoted, not cited** (joshuafolkken/kit#2819). A
+// pasted log from another repository holds its own `#1`…`#7`; `issue:cite` would link them to this
+// repository's unrelated Issues, so following the refusal would make the reply wrong. Only the exact
+// reference the prompt wrote is exempt, so a bare `#N` the run brought in itself is still refused.
+function unquoted_references(message: string, prompt: string): ReadonlyArray<string> {
+	const quoted = prompt_references(prompt)
+
+	return bare_references(message).filter((reference) => !quoted.has(reference))
+}
+
 function has_bare_reference(message: string): boolean {
 	return bare_references(message).length > 0
 }
@@ -237,6 +259,13 @@ function linkify(message: string, slug: string): string {
 	return out.join('\n')
 }
 
-const issue_citation = { bare_references, cite_arguments, has_bare_reference, linkify, prose_lines }
+const issue_citation = {
+	bare_references,
+	cite_arguments,
+	has_bare_reference,
+	linkify,
+	prose_lines,
+	unquoted_references,
+}
 
 export { issue_citation }

@@ -129,6 +129,7 @@ const filing_cap = {
 	ROW,
 	current_turn,
 	decide,
+	is_prompt_line,
 	prior_filing_count,
 	turn_filing_count,
 }
