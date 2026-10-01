@@ -44,7 +44,9 @@ function matches_linted_file(command: string, lint_path: string): boolean {
 function needs_classification_labels(command: string, tail: string): boolean {
 	const lint_path = latest_lint_path(tail)
 
-	if (lint_path === undefined) return false
+	// No lint in the run means the template headings and classification were never checked — refuse,
+	// as the `issue-scout` row refuses a filing it never saw scouted (joshuafolkken/kit#2806).
+	if (lint_path === undefined) return true
 	const body = linted_body(lint_path)
 
 	if (body === undefined) return false
@@ -68,8 +70,8 @@ function decide(call: { input: unknown }, run: GuardRun): boolean {
 }
 
 const ISSUE_CLASSIFICATION_REASON =
-	'⛔ issue classification mismatch: use the exact body file checked by `pnpm josh issue:lint` ' +
-	'in this creation call (`-F body=@<path>` or `gh issue create --body-file <path>`) and ' +
+	'⛔ issue classification mismatch: run `pnpm josh issue:lint <body-file>` on the body first, then ' +
+	'use that exact body file in this creation call (`-F body=@<path>` or `gh issue create --body-file <path>`) and ' +
 	'apply exactly the `labels:` it reports (`bug`, `enhancement`, `breaking-change`). See ' +
 	'`prompts/collaboration-workflow/issue-template.md`.'
 
