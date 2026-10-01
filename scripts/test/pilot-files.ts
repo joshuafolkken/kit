@@ -199,7 +199,6 @@ const PILOT_FILES: ReadonlyArray<string> = [
 	'scripts/hooks/prompt-hooks.test.ts',
 	'scripts/hooks/reserved-run.test.ts',
 	'scripts/init/claude-plugin-config.test.ts',
-	'scripts/init/init-actions.test.ts',
 	'scripts/init/init-copy-content.test.ts',
 	'scripts/init/init-logic-deploy-vps.test.ts',
 	'scripts/init/init-logic-development-engines.test.ts',

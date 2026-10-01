@@ -1,6 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { init_actions, type FileAction } from './init-actions'
 import type { ProjectShape } from './project-profile'
+
+// The real builder reads this checkout's own `.claude/settings.json`, which wires the hook and so
+// yields nothing; a fixed action keeps the destination lists independent of the checkout.
+vi.mock('./session-language-environment', () => ({
+	session_language_environment: {
+		build_session_lang_actions: () => [
+			{ dest: '.env', create: () => 'JOSH_SESSION_LANG=en\n', merge: (text: string) => text },
+		],
+	},
+}))
 
 const GITIGNORE = '.gitignore'
 const NPMRC = '.npmrc'
@@ -14,6 +24,7 @@ const LEFTHOOK = 'lefthook.yml'
 const SECRETLINT = '.secretlintrc.json'
 const VSCODE_EXTENSIONS = '.vscode/extensions.json'
 const VSCODE_SETTINGS = '.vscode/settings.json'
+const ENV_FILE = '.env'
 
 const COMMON_TAIL_DESTINATIONS = [
 	TSCONFIG,
@@ -22,6 +33,7 @@ const COMMON_TAIL_DESTINATIONS = [
 	SECRETLINT,
 	VSCODE_EXTENSIONS,
 	VSCODE_SETTINGS,
+	ENV_FILE,
 ]
 
 const VANILLA_DESTINATIONS = [
