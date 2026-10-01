@@ -6,7 +6,7 @@ kit needs **Node.js 22.19.0 or later** and **pnpm 12 or later** ([checking and i
 
 ## 1. Choose `josh init` or `josh start`
 
-One question decides it: **will this project use the GitHub Issue workflow** (`kickoff`, `backlogrun`) and has no GitHub repository yet? Then use `josh start` (§3). Otherwise — the project is already on GitHub, or will not use GitHub — use `josh init` (§2). The full table is in [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start).
+One question decides it: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? Then use `josh start` (§3), whether or not the project already has Git or a GitHub repository. Otherwise use `josh init` (§2). Both set up the `full` profile the same way. The full table is in [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start).
 
 ## 2. Install and initialize with `josh init`
 
@@ -27,14 +27,14 @@ pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 
 kit's CLI runs on tsx, which depends on esbuild, and kit's optional ESLint import plugins bring in unrs-resolver; pnpm fails an install whose dependencies carry an unapproved build script. The two `--allow-build` flags record both approvals in `pnpm-workspace.yaml`. Added without them, the command exits non-zero with `ERR_PNPM_IGNORED_BUILDS` ([#2785](https://github.com/joshuafolkken/kit/issues/2785)), so keep both flags. A package-only installation does not include ESLint: a project importing `@joshuafolkken/kit/eslint/vanilla` installs ESLint and its plugins itself ([manual-config.md](../manual-config.md)).
 
-## 3. Start a new GitHub project with `josh start`
+## 3. Set up for the GitHub Issue workflow with `josh start`
 
 ```bash
 pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 pnpm exec josh start
 ```
 
-`josh start` needs the [gh CLI](https://cli.github.com/), signed in. It asks first, then runs `git init` when needed, the same setup as `josh init`, the initial commit, creates the GitHub repository (private unless `--public`) and pushes, and adds the workflow labels. Afterwards `kickoff new` works — see [tutorial.md](../tutorial.md). Its steps and safety rules: [josh-commands.md → `josh start`](../josh-commands.md#josh-start).
+`josh start` needs the [gh CLI](https://cli.github.com/), signed in. It asks first, runs the same setup as §2, then carries it to GitHub: it creates what is missing — Git, the first commit, the repository — and, when `main` already has commits, opens a pull request with only kit's files for you to merge. Which steps run for each starting state: [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start). Once the setup is on `main`, `kickoff new` works — see [tutorial.md](../tutorial.md).
 
 ## 4. Keep it up to date
 

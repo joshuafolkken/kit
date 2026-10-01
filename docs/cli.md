@@ -34,7 +34,7 @@ Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/jos
 
 ## Next
 
-- Set up a project: `josh init` is the main entry and needs no Git; `josh start` is the optional entry that also creates the GitHub repository for the Issue workflow — see [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start).
+- Set up a project: `josh start` for a project that will use the GitHub Issue workflow — it also carries the setup to GitHub — and `josh init` for one that will not, or for a re-run; see [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start).
 - Full command reference: [josh-commands.md](./josh-commands.md).
 - Using the kit inside a project too? See [Set up the full profile](./setup/full.md).
 - Hitting an error? See [troubleshooting.md](./troubleshooting.md).

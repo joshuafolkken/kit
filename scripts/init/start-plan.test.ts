@@ -7,6 +7,7 @@ const NO_GIT: GitState = {
 	has_origin: false,
 	branch: undefined,
 	has_commits: false,
+	has_kit_committed: false,
 }
 const OPTIONS: StartOptions = {
 	profile: undefined,
@@ -15,6 +16,14 @@ const OPTIONS: StartOptions = {
 	visibility: 'private',
 }
 const WITH_REPOSITORY = ['initialize', 'repository'] as const
+const ADD_GITHUB = 'Add --github'
+// A main that already records kit, so no setup pull request is planned.
+const MAIN_WITH_KIT: GitState = {
+	...NO_GIT,
+	branch: 'main',
+	has_commits: true,
+	has_kit_committed: true,
+}
 
 describe('the steps josh start plans', () => {
 	it('runs every step from git init to the labels in a directory without Git', () => {
@@ -37,6 +46,63 @@ describe('the steps josh start plans', () => {
 	})
 })
 
+const SETUP_BRANCH = '7-set-up-joshuafolkken-kit'
+const ON_GITHUB_MAIN: GitState = {
+	...NO_GIT,
+	has_git: true,
+	has_github: true,
+	has_origin: true,
+	branch: 'main',
+	has_commits: true,
+}
+
+describe('the setup pull request josh start plans (#2816)', () => {
+	it('opens the setup pull request when main on GitHub does not hold kit yet', () => {
+		expect(start_plan.plan_steps(ON_GITHUB_MAIN).steps).toStrictEqual([
+			'initialize',
+			'labels',
+			'setup_pr',
+		])
+	})
+
+	it('opens none once main holds kit', () => {
+		const state = { ...ON_GITHUB_MAIN, has_kit_committed: true }
+
+		expect(start_plan.plan_steps(state).steps).toStrictEqual(['initialize', 'labels'])
+	})
+
+	it('opens the pull request after pushing an existing main to a new repository', () => {
+		const state = { ...ON_GITHUB_MAIN, has_github: false, has_origin: false }
+
+		expect(start_plan.plan_steps(state).steps).toStrictEqual([
+			'initialize',
+			'repository',
+			'labels',
+			'setup_pr',
+		])
+	})
+})
+
+describe('when josh start resumes or skips the setup pull request (#2816)', () => {
+	it('resumes on the setup branch a failed hook left before the commit (#2816)', () => {
+		const state = { ...ON_GITHUB_MAIN, branch: SETUP_BRANCH }
+
+		expect(start_plan.plan_steps(state).steps).toContain('setup_pr')
+	})
+
+	it('plans nothing more on the setup branch once kit is committed there', () => {
+		const state = { ...ON_GITHUB_MAIN, branch: SETUP_BRANCH, has_kit_committed: true }
+
+		expect(start_plan.plan_steps(state).steps).not.toContain('setup_pr')
+	})
+
+	it('commits a repository with no history directly, without a pull request', () => {
+		const state = { ...ON_GITHUB_MAIN, has_github: false, has_origin: false, has_commits: false }
+
+		expect(start_plan.plan_steps(state).steps).not.toContain('setup_pr')
+	})
+})
+
 describe('the steps josh start plans in an existing Git repository', () => {
 	it('reuses a Git repository with no commits and makes the first one', () => {
 		const state = { ...NO_GIT, has_git: true, branch: 'master' }
@@ -50,7 +116,7 @@ describe('the steps josh start plans in an existing Git repository', () => {
 	})
 
 	it('pushes an existing main without committing on the user’s behalf', () => {
-		const state = { ...NO_GIT, has_git: true, branch: 'main', has_commits: true }
+		const state = { ...MAIN_WITH_KIT, has_git: true }
 
 		expect(start_plan.plan_steps(state).steps).toStrictEqual(['initialize', 'repository', 'labels'])
 	})
@@ -94,7 +160,7 @@ describe('consent to create the GitHub repository', () => {
 		const verdict = start_plan.github_consent(WITH_REPOSITORY, OPTIONS, 'unattended')
 
 		expect(verdict.value).toBeUndefined()
-		expect(verdict.refusal).toContain('Add --github')
+		expect(verdict.refusal).toContain(ADD_GITHUB)
 	})
 
 	it('creates unattended only with --github', () => {
@@ -109,6 +175,17 @@ describe('consent to create the GitHub repository', () => {
 
 	it('needs no consent when no repository is created', () => {
 		expect(start_plan.github_consent(['labels'], OPTIONS, 'unattended').value).toBe('granted')
+	})
+
+	it('does not take --yes alone as consent to open the setup pull request', () => {
+		const verdict = start_plan.github_consent(['labels', 'setup_pr'], OPTIONS, 'unattended')
+
+		expect(verdict.value).toBeUndefined()
+		expect(verdict.refusal).toContain(ADD_GITHUB)
+	})
+
+	it('asks at a terminal before opening the setup pull request', () => {
+		expect(start_plan.github_consent(['setup_pr'], OPTIONS, 'interactive').value).toBe('ask')
 	})
 })
 

@@ -407,7 +407,7 @@ pnpm josh profile
 
 ### `josh start`
 
-Create a new project for the GitHub Issue workflow in one command, so `kickoff new` works right after it. Use `josh init` instead for a project without GitHub or for a re-run — [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start) compares the two.
+Set a new or existing project up for the GitHub Issue workflow, so `kickoff new` works once the setup is on `main`. Use `josh init` for a project without the workflow or for a re-run — [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start) compares the two and lists the steps per starting state.
 
 ```bash
 pnpm exec josh start                                    # asks for the profile and the repository
@@ -420,15 +420,16 @@ pnpm exec josh start --yes --github --profile basic    # unattended, including t
 
 1. `git init` on `main` — skipped when Git already exists
 2. The same setup `josh init` runs, with the confirmed profile
-3. The initial commit of every file — skipped when the repository already has commits
-4. `gh repo create <directory name> --private` (or `--public`) and push `main`
+3. The initial commit of every file — only without commits
+4. `gh repo create <directory name> --private` (or `--public`) and push `main` — only without an origin
 5. The missing workflow and release-classification labels; existing ones are left unchanged
+6. The setup pull request — only while `main` has commits but no kit: an Issue, a commit of only kit's files on its branch, and the pull request. It never merges
 
-**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults without asking, but is **not** consent to create a repository or push: without `--github` an unattended run stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
+**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required.
 
-**Existing state:** a directory with a GitHub origin gets only the setup and the missing labels — no commit, repository or push. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
+**Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
 
-**Output / exit codes:** exits 0 when the workflow is ready. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
+**Output / exit codes:** exits 0 when every step has run. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
 
 ### `josh init`
 
@@ -438,7 +439,7 @@ Initialize project config, selecting a profile and reporting applicable reposito
 pnpm josh init   # create/merge config files, install and format (--no-install skips both)
 ```
 
-**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails.
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails. In Git, while the checked-out commit lacks kit, it ends by pointing at [`josh start`](#josh-start).
 
 See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 

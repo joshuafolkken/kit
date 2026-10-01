@@ -1,6 +1,6 @@
 # Set up the basic profile
 
-The detailed version of the [Quick start](../../README.md#quick-start) for the `basic` [profile](../init.md#project-profiles). It takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
+The detailed version of the [Quick start](../../README.md#quick-start) for the `basic` [profile](../init.md#project-profiles). It takes a directory that holds only an `index.html` file — or a Python, Rust or other project without Web files — from an empty machine to a formatted, verified project. It needs no Git repository, no GitHub account and no npm token; only the optional GitHub Issue workflow at the end of step 4 needs Git and GitHub. For a JavaScript / TypeScript project, see [Set up the full profile](./full.md).
 
 ## 1. Check the prerequisites
 
@@ -80,7 +80,7 @@ pnpm josh gate
 
 `josh gate` is not part of `josh init`, so a lint error in your own code is never mistaken for a failed setup. The `josh format` that `josh init` ran uses Prettier over every file type it supports — HTML, CSS and JavaScript, and also Markdown, JSON and YAML such as `CLAUDE.md` and `package.json`; running it again changes nothing. `josh gate` runs Prettier's check and skips each check the project does not have, printing why — for example `josh eslint: no ESLint configuration was found — skipping eslint.` A project with no Web files has no Prettier, so both commands skip it with `josh prettier: no HTML, CSS or JavaScript files were found`.
 
-Re-running `pnpm exec josh init` later leaves the files unchanged. To use the GitHub Issue workflow and create the repository in one step, use `josh start` instead ([Set up the full profile → §3](./full.md#3-start-a-new-github-project-with-josh-start) — the same commands apply to a `basic` project).
+Re-running `pnpm exec josh init` later leaves the files unchanged. **If the project will use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`), run `pnpm exec josh start` now — it needs the [gh CLI](https://cli.github.com/), signed in. It leaves this setup as it is and carries it to GitHub: it creates what is missing — Git, the first commit, the repository — and, when `main` already has commits, opens a pull request with only kit's files for you to merge. Which steps run for each starting state: [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start).
 
 ## 5. Check the page in a browser
 

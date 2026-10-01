@@ -20,6 +20,7 @@ import { init_bootstrap } from './init-bootstrap'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
+import { kit_setup_state } from './kit-setup-state'
 import { plugin_install_hint_module } from './plugin-install-hint'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 
@@ -345,18 +346,34 @@ function set_up_project(requested: ProjectProfile | undefined, is_install: boole
 	console.info('\n✅ Done.\n')
 }
 
-function main(args: ReadonlyArray<string> = []): void {
-	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
+// True when this process set the project up — false when it refused, or handed the run to the
+// project's own kit, which then speaks for itself.
+function main(args: ReadonlyArray<string> = []): boolean {
+	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return false
 	const { is_install, rest } = init_install.split_install_flag(args)
 	// Validated before the hand-off, so a malformed invocation is refused before kit is installed.
 	const requested = project_profile.requested_profile(rest, INIT_USAGE)
 
-	if (!is_install || !did_hand_off(args)) set_up_project(requested, is_install)
+	const is_set_up_here = !is_install || !did_hand_off(args)
+
+	if (is_set_up_here) set_up_project(requested, is_install)
+
+	return is_set_up_here
+}
+
+// Only the command a person typed points onward to `josh start`: `josh start` calls `main` itself and
+// is already the next step (joshuafolkken/kit#2816).
+// A setup that failed after writing, such as a failed install, sets the exit code and points nowhere.
+function print_start_hint(): void {
+	if (process.exitCode !== undefined && process.exitCode !== 0) return
+	const hint = kit_setup_state.start_hint(PROJECT_ROOT)
+
+	if (hint !== undefined) console.info(`${hint}\n`)
 }
 
 function run_cli(args: ReadonlyArray<string>): void {
 	try {
-		main(args)
+		if (main(args)) print_start_hint()
 	} catch (error) {
 		console.error(`\n✖ ${error instanceof Error ? error.message : String(error)}\n`)
 		process.exitCode = 1
