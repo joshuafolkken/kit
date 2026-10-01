@@ -6,6 +6,7 @@ import { basic_path_migration } from './basic-path-migration'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import type { ProjectShape } from './project-profile'
+import { session_language_environment } from './session-language-environment'
 
 const PRETTIER_CONFIG_JS = 'prettier.config.js'
 const BASIC_PRETTIER_CONFIG = 'prettier.config.mjs'
@@ -206,7 +207,10 @@ function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 		})
 	}
 
-	actions.push(...build_basic_vscode_actions(shape))
+	actions.push(
+		...build_basic_vscode_actions(shape),
+		...session_language_environment.build_session_lang_actions(),
+	)
 
 	return actions
 }
@@ -232,6 +236,7 @@ function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
 		...build_config_file_actions().filter(
 			(action) => shape?.has_git !== false || action.dest !== LEFTHOOK_PATH,
 		),
+		...session_language_environment.build_session_lang_actions(),
 	]
 }
 

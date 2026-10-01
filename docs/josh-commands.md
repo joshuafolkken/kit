@@ -236,7 +236,7 @@ Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wi
 { "type": "command", "command": "pnpm josh session:lang", "timeout": 10 }
 ```
 
-- Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English.
+- Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English. `josh init` seeds it from the OS locale ([init.md](./init.md)).
 
 ### `josh cspell:dot`
 
