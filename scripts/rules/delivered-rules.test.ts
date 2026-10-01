@@ -51,9 +51,6 @@ const NOW_MS = 1_700_000_000_000
 // covers the whole open sequence whatever wall clock the fixture used — the state where it has
 // already spoken and will not speak again.
 const BATCH_REFUSED_AT_MS = 9_000_000_000_000
-// Far enough past that record to be a different call: the stand-aside treats a *fresh* stamp as the
-// batching guard speaking about the call in hand.
-const A_LATER_CALL_MS = BATCH_REFUSED_AT_MS + 60_000
 // A test title shared by the delivery blocks' reason-marker assertions, so a row cannot pass under a
 // title another does not use.
 const CARRIES_MARKER = 'carries %j'
@@ -167,11 +164,13 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 		expect(delivered_rules.ISSUE_COMMENTS_REASON).toContain(marker)
 	})
 
-	it(ONCE_PER_RUN, () => {
+	// The reissue without the comments is refused again — once per run let it through unread
+	// (joshuafolkken/kit#2807).
+	it('keeps refusing the body-only reissue until the comments are read', () => {
 		const payload = payload_of('body-repeat', BODY_READ_COMMAND)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 
 	// The read the refusal asks for must itself pass, or obeying the rule would wedge the run.
@@ -252,7 +251,7 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		const payload = payload_of('repeat', FILING_COMMAND, 'Bash', `${scouted_tail()}\n${lint_call}`)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(rule_delivery(payload, NOW_MS + 1)).not.toBe(delivered_rules.WIP_CAP_REASON)
 	})
 })
 
@@ -318,9 +317,11 @@ describe('rule_delivery — silent where nothing binds', () => {
 // returning a reason — so a call both hooks refused would lose one of the two reasons with both
 // records already written, and the losing rule could never fire again in that run. It cannot happen
 // for `wip-cap` because the batching guard does not treat a filing call as a candidate at all. **It
-// does treat an Issue read as one**, so `issue-comments` is the row that makes the stand-aside in
-// `is_first_delivery` load-bearing rather than inert — the table below pins both halves, and **any
-// row added to the enumeration has to be re-checked against it**.
+// does treat an Issue read as one**, but `issue-comments` now refuses until the comments are read
+// (joshuafolkken/kit#2807), so it has no once-per-run record to lose and no longer stands aside. The
+// stand-aside in `is_first_delivery` remains for a once-per-run row whose trigger the batching guard
+// also claims — the table below pins both halves, and **any row added to the enumeration has to be
+// re-checked against it**.
 describe('rule_delivery — the two Bash guards never answer about the same call', () => {
 	it.each([
 		[FILING_COMMAND, false],
@@ -333,37 +334,25 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 		)
 	})
 
-	// **The stand-aside, exercised end to end.** On the one history `batch:guard` refuses, the body
-	// read is left to that guard: nothing is delivered and — because the shared shell stamps only
-	// after `should_block` answers true — nothing is recorded, so the rule still fires on the reissue.
-	// A row that delivered here would spend its once-per-run budget on a call that never ran.
-	// **The recovery is asserted on the same transcript, not a fresh one.** A reissue happens inside
-	// the same run with the same tail behind it, so a case that stood aside on one transcript and then
-	// delivered on an empty one would prove nothing about the run that stood aside — and would stay
-	// green while the rule was lost for good.
-	it('stands aside while the batching guard may speak, and delivers once it has', () => {
+	// **The body read no longer stands aside** (joshuafolkken/kit#2807). A stand-down row refuses
+	// until its act is on the tail, so a refusal spends nothing and there is no record to protect —
+	// while standing aside inside the ten-second window would let the reissue through with the
+	// comments still unread. Both on the batched history and on the window just recorded, it refuses.
+	it('refuses a body read on a history the batching guard refuses', () => {
 		const transcript = transcript_for('body-collision', unbatched_text())
-		const call = payload_for(transcript, BODY_READ_COMMAND)
 
-		expect(rule_delivery(call, NOW_MS)).toBeUndefined()
-
-		BATCH_STAMP.record(BATCH_STAMP.path(transcript), BATCH_REFUSED_AT_MS)
-
-		expect(rule_delivery(call, A_LATER_CALL_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(rule_delivery(payload_for(transcript, BODY_READ_COMMAND), NOW_MS)).toBe(
+			delivered_rules.ISSUE_COMMENTS_REASON,
+		)
 	})
 
-	// **The order of the two hooks is not defined, and the answer must not depend on it.** Both are
-	// separate processes started for the same event, and the shared shell stamps before it returns a
-	// reason — so a run where `batch:guard` happened to write first would otherwise see a record, read
-	// it as "already spoken", and deliver on the same call the other hook is refusing. Both records
-	// would then be spent for one surfaced reason, and this rule could never fire again in that run.
-	it('stands aside when the batching guard has just recorded a refusal about this call', () => {
-		const transcript = transcript_for('body-race', unbatched_text())
+	it('refuses a body read inside the batching window, since a stand-down row has no record to protect', () => {
+		const transcript = transcript_for('body-window', unbatched_text())
 		const call = payload_for(transcript, BODY_READ_COMMAND)
 
 		BATCH_STAMP.record(BATCH_STAMP.path(transcript), BATCH_REFUSED_AT_MS)
 
-		expect(rule_delivery(call, BATCH_REFUSED_AT_MS)).toBeUndefined()
+		expect(rule_delivery(call, BATCH_REFUSED_AT_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 
 	// **The stand-aside cannot be exercised end to end through this rule, and that is the invariant

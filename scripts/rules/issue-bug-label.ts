@@ -49,7 +49,9 @@ function needs_classification_labels(command: string, tail: string): boolean {
 	if (lint_path === undefined) return true
 	const body = linted_body(lint_path)
 
-	if (body === undefined) return false
+	// A linted file that can no longer be read leaves the classification unverifiable — refuse, the
+	// same answer as no lint at all (joshuafolkken/kit#2807).
+	if (body === undefined) return true
 
 	if (!matches_linted_file(command, lint_path) || issue_classification.problems(body).length > 0) {
 		return true

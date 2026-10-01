@@ -11,8 +11,8 @@ import { tail_commands } from './tail-commands'
 // that just finished — the one case self-restraint is least able to catch. The input is mechanical —
 // did the run already run the scout — so it is a delivered rule rather than resident prose.
 //
-// **It is `issue-comments`'s shape, not the WIP cap's.** Like that row it is once per run with an
-// `already_satisfied` stand-down read off the tail, and the refusal hands over the command rather than
+// **It is `issue-comments`'s shape, not the WIP cap's.** Like that row it refuses until its
+// `already_satisfied` stand-down reads the act off the tail, and the refusal hands over the command rather than
 // asking the run to "scout first" — a body-only read is refused so the reissue makes the comments
 // present, and here a scout-less filing is refused so the reissue makes the scout present. **No new
 // delivery path**: the trigger is `bash_triggers.is_issue_filing`, reused verbatim.
@@ -46,11 +46,11 @@ const ISSUE_SCOUT_REASON =
 	'summary, citing #N where the work follows one>"` so the epic half can answer), then read its ' +
 	'`Duplicates:` — an **open** candidate covering the same work stops the run rather than filing a ' +
 	'second Issue, and a `(closed)` one means the work is already done — before reissuing this filing. ' +
-	'The procedure is `.claude/skills/workflow-commands/SKILL.md` → §2e. It fires once per run and ' +
-	'cannot repeat on the call in hand.'
+	'The procedure is `.claude/skills/workflow-commands/SKILL.md` → §2e. Every filing is refused until ' +
+	'the scout is on the transcript.'
 
 // The enumeration row itself, so `delivered-rules.ts` spreads one entry rather than restating the
-// trigger and reason it already single-sources here. Once per run with the stand-down above.
+// trigger and reason it already single-sources here. Refused until the stand-down above answers.
 const ROW = {
 	id: 'issue-scout',
 	is_trigger: bash_triggers.on_bash_command(bash_triggers.is_issue_filing),

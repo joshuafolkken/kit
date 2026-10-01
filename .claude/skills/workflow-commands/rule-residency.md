@@ -165,8 +165,8 @@ again (joshuafolkken/kit#1525).
 - **The Issue's comments** — `pnpm josh rule:guard` refuses the `Bash` call that reads an Issue's
   body without them (`gh issue view <N>`, or a `GET` of a path ending `…/issues/<N>`) and hands over
   the reissue that carries them plus the rule for a comment that contradicts the body. It is the one
-  row whose trigger `batch:guard` also considers, so it stands aside on that guard's turn and fires
-  on the reissue. §2g is the procedure and stays here, because a session that runs no hooks still
+  row whose trigger `batch:guard` also considers, yet it refuses on that guard's turn too, since it
+  repeats until the comments are read. §2g is the procedure and stays here, because a session that runs no hooks still
   owes the read (`prompts/collaboration-workflow/rule-delivery.md`,
   `scripts/rules/delivered-rules.test.ts`).
 - **The prohibition on putting a body inside shell double quotes** — `pnpm josh rule:guard` refuses
