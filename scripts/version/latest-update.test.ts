@@ -7,10 +7,15 @@ const build_update_command_mock = vi.hoisted(() =>
 	vi.fn().mockReturnValue(['pnpm', 'update', '--latest']),
 )
 
+const rm_mock = vi.hoisted(() => vi.fn())
+const CACHE_DIRECTORY = vi.hoisted(() => 'cache-directory-fixture')
+
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 vi.mock('node:fs', () => ({
 	readFileSync: vi.fn().mockReturnValue('{"pnpm":{"overrides":{}},"packageManager":"pnpm@11.0.9"}'),
 	writeFileSync: write_mock,
+	mkdtempSync: vi.fn().mockReturnValue(CACHE_DIRECTORY),
+	rmSync: rm_mock,
 }))
 vi.mock('./preinstall-version-update', () => ({
 	preinstall_version_update: { sync: sync_mock },
@@ -144,6 +149,38 @@ describe('latest_update.main — preinstall sync guard', () => {
 		latest_update.main()
 
 		expect(sync_mock).not.toHaveBeenCalled()
+	})
+})
+
+// Regression for joshuafolkken/kit#2805: a metadata cache written through safe-chain before a
+// version aged in would hide that version for up to 24 hours, so every stage resolves against a
+// cache directory created for this run alone, removed once the update is done.
+describe('latest_update.main — fresh metadata cache', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockReset()
+		execa_sync_mock.mockReturnValue({ exitCode: 0 })
+		rm_mock.mockReset()
+		build_update_command_mock.mockReturnValue([PNPM, ...UPDATE_ARGS])
+	})
+
+	it('runs both update stages against the run-owned cache directory', () => {
+		latest_update.main()
+
+		const flag = `--config.cache-dir=${CACHE_DIRECTORY}`
+
+		expect(execa_sync_mock).toHaveBeenNthCalledWith(
+			1,
+			PNPM,
+			[...UPDATE_ARGS, flag],
+			expect.any(Object),
+		)
+		expect(execa_sync_mock).toHaveBeenNthCalledWith(2, PNPM, ['update', flag], expect.any(Object))
+	})
+
+	it('removes the cache directory after the update', () => {
+		latest_update.main()
+
+		expect(rm_mock).toHaveBeenCalledWith(CACHE_DIRECTORY, { recursive: true, force: true })
 	})
 })
 
