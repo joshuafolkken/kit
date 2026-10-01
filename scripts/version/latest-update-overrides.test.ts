@@ -27,7 +27,12 @@ const sync_mock = vi.hoisted(() => vi.fn())
 const read_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
-vi.mock('node:fs', () => ({ readFileSync: read_mock, writeFileSync: vi.fn() }))
+vi.mock('node:fs', () => ({
+	readFileSync: read_mock,
+	writeFileSync: vi.fn(),
+	mkdtempSync: vi.fn().mockReturnValue('cache-directory-fixture'),
+	rmSync: vi.fn(),
+}))
 vi.mock('./preinstall-version-update', () => ({
 	preinstall_version_update: { sync: sync_mock },
 }))

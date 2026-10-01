@@ -11,6 +11,7 @@ import { lockfile_overrides } from '#scripts/overrides/lockfile-overrides'
 import { overrides_files } from '#scripts/overrides/overrides-files'
 import { overrides_check } from '#scripts/overrides/overrides-logic'
 import { execaSync } from 'execa'
+import { fresh_metadata_cache } from './fresh-metadata-cache'
 import { latest_regression, type VersionRegression } from './latest-regression'
 import { preinstall_version_update } from './preinstall-version-update'
 
@@ -99,7 +100,7 @@ function find_regressions_after_update(snapshot: TreeSnapshot): Array<VersionReg
 // Exits zero: the tree is left exactly as it was found, nothing is broken, and every workflow that
 // runs `josh latest` in its preamble would otherwise stop for a situation that resolves itself.
 function update_without_downgrading(snapshot: TreeSnapshot): UpdateOutcome {
-	const status = run_update_stages(build_update_commands())
+	const status = fresh_metadata_cache.run_in_fresh_cache(build_update_commands(), run_update_stages)
 	if (status !== 0) return { status, is_rolled_back: false }
 
 	const regressions = find_regressions_after_update(snapshot)
