@@ -1,12 +1,12 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
+import { shell_segments } from './shell-segments'
 
-// The two trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
+// The trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
 // that lives in its own module can build its own row without importing the enumeration back
-// (joshuafolkken/kit#2119). `is_issue_filing` is the one three rows now share — the WIP cap, the scout
-// gate and the per-run filing cap — so it could not stay a private function of the file that spreads
-// their rows.
+// (joshuafolkken/kit#2119). `is_issue_filing` is the one three rows share — the WIP cap, the per-run
+// filing cap and the fold — so it could not stay a private function of the file that spreads their rows.
 
 // **Only `Bash`, and the omission is deliberate** (joshuafolkken/kit#1390): Claude Code denies one
 // call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself
@@ -33,12 +33,25 @@ const ISSUES_ENDPOINT = /repos\/[^\s'"]*\/issues(?=$|["'\s])/u
 // that limit is recorded beside the non-`gh` one in `prompts/collaboration-workflow/rule-delivery.md`.
 const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
 
-function is_issue_filing(command: string): boolean {
+// A filing made by hand rather than through `josh issue:file` — the call the `direct-filing` row
+// refuses on every occurrence (joshuafolkken/kit#2808).
+function is_direct_filing(command: string): boolean {
 	if (ISSUE_CREATE_COMMAND.test(command)) return true
 
 	return ISSUES_ENDPOINT.test(command) && TITLE_FIELD.test(command)
 }
 
-const bash_triggers = { is_issue_filing, on_bash_command }
+// `pnpm josh issue:file`, in either spelling — **the** filing act once a direct one is refused, so the
+// run-level filing rows (the WIP cap, the per-run cap, the fold) trigger on it. Segment-wise, so a
+// spelling quoted inside another command's body is not read as a filing.
+const FILING_NAMES: ReadonlySet<string> = new Set(['issue:file'])
+
+function is_issue_filing(command: string): boolean {
+	return shell_segments
+		.segments_of(command)
+		.some((segment) => shell_segments.is_josh_command(segment, FILING_NAMES))
+}
+
+const bash_triggers = { is_direct_filing, is_issue_filing, on_bash_command }
 
 export { bash_triggers }

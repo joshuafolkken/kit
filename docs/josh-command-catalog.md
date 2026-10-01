@@ -935,6 +935,16 @@ Post one comment to an issue from a file, so no shell expands the body
 
 ---
 
+### `josh issue:file` · `josh ifl`
+
+> **Audience:** automation · **Side effects:** network
+
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>]`
+
+File an Issue with every filing step: lint, Origin, duplicate scout, labels, then epic:bundle
+
+---
+
 ### `josh issue:fold` · `josh isf`
 
 > **Audience:** automation · **Side effects:** none

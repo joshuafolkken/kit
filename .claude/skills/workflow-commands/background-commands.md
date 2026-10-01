@@ -110,7 +110,7 @@ with. Applied to the three waits a run actually has:
 | --------------- | ----------------- |
 | `pnpm josh gate` | a subagent running `/code-review` with the brief `pnpm josh review:brief` prints |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
-| CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
+| CI, after the push | The second review round where one is due, the branch-2 filing through `pnpm josh issue:file`, which runs `epic:bundle` itself (`prompts/review.md` → "Review round cap") |
 | `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --cut` |
 
 **The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what

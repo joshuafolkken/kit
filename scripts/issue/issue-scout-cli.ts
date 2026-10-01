@@ -7,18 +7,17 @@ import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/ep
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
-import { PAGE_CEILING_CAUSE } from '#scripts/git/listing-cutoff'
-import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { issue_label_schema } from '#scripts/git/schemas'
 import { issue_citation } from '#scripts/rules/issue-citation'
-import { z } from 'zod'
 import {
 	issue_scout,
 	type DuplicateCandidate,
 	type DuplicateSearch,
 	type ScoutIssue,
 } from './issue-scout'
+import { issue_scout_closed, type ClosedScan } from './issue-scout-closed'
+
+const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_about_closed } =
+	issue_scout_closed
 
 // `josh issue:scout "<title>" [--body "<summary>"]` — before an issue is filed, answer the two
 // questions every `new` entry point asks first: has this already been filed, and which epic does it
@@ -43,87 +42,6 @@ const UNKNOWN_REPO_MESSAGE =
 // The draft is handed to `decide_bundle` shaped like any other backlog issue, and it needs a number
 // to be one. Zero is not a valid issue number, so it collides with nothing in the listing.
 const DRAFT_NUMBER = 0
-
-// How far back the closed half of the scan reaches (joshuafolkken/kit#1679). One page: the duplicate
-// this half exists to catch closed hours ago, not months, and the listing is ordered by update so
-// the newest hundred already covers a run's own day several times over.
-//
-// **It is a window, not a cut, which is why reaching it is not warned about.** Every other listing in
-// this command reports its `limit` as a gap, because there the caller wanted the whole backlog and
-// got part of it; here the hundredth-most-recently-updated closed issue is where the question itself
-// stops. A warning printed on every invocation in any repository with a hundred closed issues would
-// carry no signal and would train a reader past the gap lines beside it that do. **The page ceiling
-// is still reported**, and `ClosedScan` below says why the two are not the same event.
-const CLOSED_LIMIT = 100
-
-// Read through `has_any_label` rather than compared directly, for the casing reason
-// `issue-labels.ts` records: GitHub keeps the spelling a label was created with.
-const EPIC_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL])
-
-// The listing's own label shape, not a second spelling of it: a copy here would be the drift the
-// shared schema module exists to prevent.
-const closed_labels_schema = z.array(issue_label_schema).optional()
-
-const closed_row_schema = z.object({
-	number: z.number(),
-	title: z.string().nullable(),
-	labels: closed_labels_schema,
-})
-
-type ClosedRow = z.infer<typeof closed_row_schema>
-
-// `rows` is `undefined` — never `[]` — when the listing failed: "nothing closed recently" is the
-// answer that sends a run straight on to file the duplicate, which is the failure this half was
-// added to prevent.
-function to_closed_row(row: ClosedRow): ScoutIssue {
-	return {
-		number: row.number,
-		title: row.title ?? '',
-		is_closed: true,
-		// A closed epic is still a container, and `epic_bundle_cli`'s marking cannot reach it: that one
-		// is built from the *open* epic listing. Reported as a duplicate it reads as "this work is
-		// already done" against an epic that never had an implementation of its own.
-		is_epic: has_any_label(row.labels, EPIC_LABELS),
-	}
-}
-
-function to_closed_rows(json: string): Array<ScoutIssue> | undefined {
-	const rows = parse_json_array_or_undefined(json, closed_row_schema)
-
-	return rows?.map((row) => to_closed_row(row))
-}
-
-// The rows, and whether the **page ceiling** stopped the paging short of the window. That is a
-// different thing from the `limit` above, which is the window itself: pull requests are filtered out
-// client-side, so a repository whose recent closures are mostly merged pull requests can select
-// fewer than `CLOSED_LIMIT` issue rows while the listing still has more to give. The scan then covers
-// less than it was asked for, which `git-gh-issue.ts`'s disposition table records as a warning.
-interface ClosedScan {
-	rows: Array<ScoutIssue> | undefined
-	is_capped: boolean
-}
-
-async function read_recently_closed(): Promise<ClosedScan> {
-	const { json, is_capped } = await git_gh_command.issue_list_recently_closed(CLOSED_LIMIT)
-
-	return { rows: json === undefined ? undefined : to_closed_rows(json), is_capped }
-}
-
-// The open half already ran, so both of these are gaps in the answer rather than failures of it —
-// the same disposition every other truncated listing in this command takes.
-const CLOSED_UNREADABLE_LINE =
-	'⚠ The recently closed issues could not be read, so the scan below covers open issues only — work that finished hours ago will not appear in it.'
-const CLOSED_CEILING_LINE = `⚠ The recently closed listing ${PAGE_CEILING_CAUSE}, so a duplicate that closed inside the window may not be below.`
-
-function warn_about_closed(scan: ClosedScan): void {
-	if (scan.rows === undefined) {
-		console.error(CLOSED_UNREADABLE_LINE)
-
-		return
-	}
-
-	if (scan.is_capped) console.error(CLOSED_CEILING_LINE)
-}
 
 interface ScoutArguments {
 	title: string
@@ -333,28 +251,32 @@ function format_epic_answer(
 // are still being worked on, and a closed one can neither gain a sibling nor be recommended as an
 // epic — so widening the placement pool with them would answer a different question from the one it
 // was asked (joshuafolkken/kit#1679).
+function duplicates_of(
+	draft: BacklogIssue,
+	issues: ReadonlyArray<BacklogIssue>,
+	closed: ReadonlyArray<ScoutIssue>,
+): DuplicateSearch {
+	const references = epic_audit_logic.parse_references(draft.body, draft.repo)
+
+	return issue_scout.find_duplicates(draft.title ?? '', [...issues, ...closed], references)
+}
+
 function format_report(
 	draft: BacklogIssue,
 	issues: ReadonlyArray<BacklogIssue>,
 	is_membership_established: boolean,
 	closed: ReadonlyArray<ScoutIssue> = [],
 ): string {
-	const references = epic_audit_logic.parse_references(draft.body, draft.repo)
-	const duplicates = issue_scout.find_duplicates(
-		draft.title ?? '',
-		[...issues, ...closed],
-		references,
-	)
 	const decision = epic_bundle.decide_bundle(draft, issues)
 
 	return [
-		format_duplicates(duplicates),
+		format_duplicates(duplicates_of(draft, issues, closed)),
 		format_epic_answer(draft, decision, issues, is_membership_established),
 	].join('\n')
 }
 
 type Widened = Awaited<ReturnType<typeof epic_bundle_cli.widen_with_referenced>>
-type ClosedListing = Awaited<ReturnType<typeof read_recently_closed>>
+type ClosedListing = ClosedScan
 
 function is_duplicate_scan_incomplete(widened: Widened, closed: ClosedListing): boolean {
 	const has_open_gap = widened.cutoff !== undefined && widened.cutoff !== 'none'
@@ -397,16 +319,23 @@ function linkified_report(
 	return issue_citation.linkify(qualified, repo)
 }
 
+// The scan's answer in both shapes it is read in: the report a person reads, and the candidate numbers
+// `issue:file` holds a filing to (joshuafolkken/kit#2808).
+interface ScoutOutcome {
+	report: string
+	candidates: ReadonlyArray<number>
+}
+
 // The backlog is read without its `blocked-by` relations: a draft has no number, so no recorded
 // dependency can name it and it declares none — the reads cannot change either half of the answer,
 // and skipping them takes one request per open issue off the command a run makes before every filing.
-async function report(args: ScoutArguments, repo: string): Promise<number> {
+async function scout(args: ScoutArguments, repo: string): Promise<ScoutOutcome | undefined> {
 	const backlog = await epic_bundle_cli.read_backlog(repo, { include_relations: false })
 
 	if (!backlog.is_readable) {
 		console.error(epic_bundle_cli.unreadable_backlog_message(backlog))
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
 	const draft = draft_of(args, repo)
@@ -420,9 +349,22 @@ async function report(args: ScoutArguments, repo: string): Promise<number> {
 
 	epic_bundle_cli.warn_about_gaps(widened)
 	warn_about_closed(closed)
+	const duplicates = duplicates_of(draft, widened.issues, closed.rows ?? [])
+
 	// The same cut `warn_about_gaps` reports on standard error, read once more so standard output is
 	// held to it too — a ⚠ beside an executable instruction is not what stops a run acting on it.
-	console.info(linkified_report(draft, widened, closed, repo))
+	return {
+		report: linkified_report(draft, widened, closed, repo),
+		candidates: duplicates.candidates.map((candidate) => candidate.number),
+	}
+}
+
+async function report(args: ScoutArguments, repo: string): Promise<number> {
+	const outcome = await scout(args, repo)
+
+	if (outcome === undefined) return FAILURE_EXIT_CODE
+
+	console.info(outcome.report)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -473,10 +415,12 @@ const issue_scout_cli = {
 	format_duplicates,
 	format_epic_decision,
 	format_report,
+	scout,
 	run,
 	main,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
+export type { ScoutArguments, ScoutOutcome }
 export { issue_scout_cli }

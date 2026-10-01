@@ -63,6 +63,17 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> --body <text> | --body-file <path>', 'automation', ['network']],
 	},
+	'issue:file': {
+		script: 'scripts/issue/issue-file-cli.ts',
+		description:
+			'File an Issue with every filing step: lint, Origin, duplicate scout, labels, then epic:bundle',
+		category: 'AI tools',
+		reference: [
+			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>]',
+			'automation',
+			['network'],
+		],
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

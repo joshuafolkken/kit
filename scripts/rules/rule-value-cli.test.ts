@@ -7,7 +7,7 @@ import { rule_value_fixture } from './rule-value-fixture'
 // A filing reaches the WIP-cap trigger; the count in front of it is what keeping the rule looks like,
 // so this run reaches and keeps it. The filing cap declares no `keeps`, so it reads unmeasured.
 const COUNT = 'gh api repos/o/r/issues?state=open --jq length'
-const FILING = 'gh api repos/o/r/issues -f title=x'
+const FILING = 'pnpm josh issue:file "x" --body-file b.md --depth 1'
 const WIP_CAP = 'wip-cap'
 const FILING_CAP = 'filing-cap'
 const ISSUE_COMMENTS = 'issue-comments'

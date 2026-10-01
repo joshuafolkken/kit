@@ -1,5 +1,6 @@
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
-import { filings_tail } from './delivered-rules-fixture'
+import { FILING_COMMAND, filings_tail } from './delivered-rules-fixture'
 import { filing_cap } from './filing-cap'
 
 // joshuafolkken/kit#2119: the cap's counter, over a run's transcript tail. The delivery — refused at
@@ -8,6 +9,19 @@ import { filing_cap } from './filing-cap'
 
 const THREE = 3
 const ONE_REFUSED = 1
+const HELD_MINUTE = 30
+const HELD_ID = 'filing-held'
+const HELD_CALL_LINE = time_transcript_fixture.tool_call_line(
+	HELD_MINUTE,
+	time_transcript_fixture.BRANCH,
+	{ name: 'Bash', input: { command: FILING_COMMAND }, id: HELD_ID },
+)
+const HELD_RESULT_LINE = time_transcript_fixture.error_result_line(
+	HELD_MINUTE,
+	time_transcript_fixture.BRANCH,
+	HELD_ID,
+	'✖ duplicate candidate(s) 12 not declared separate',
+)
 
 describe('prior_filing_count', () => {
 	it('counts every filing the tail carries', () => {
@@ -22,6 +36,13 @@ describe('prior_filing_count', () => {
 		expect(filing_cap.prior_filing_count(filings_tail(THREE, ONE_REFUSED))).toBe(
 			THREE - ONE_REFUSED,
 		)
+	})
+
+	// joshuafolkken/kit#2808: `issue:file` holding a filing itself exits non-zero with no guard named.
+	it('does not count a filing issue:file held without any guard refusing it', () => {
+		const tail = [filings_tail(THREE), HELD_CALL_LINE, HELD_RESULT_LINE].join('\n')
+
+		expect(filing_cap.prior_filing_count(tail)).toBe(THREE)
 	})
 })
 

@@ -136,8 +136,9 @@ const FILING_OFFER_REASON =
 	'⛔ filing offer: your reply offers to file an Issue instead of filing it. Filing into a ' +
 	'first-party repository is Tier A — the trigger is the judgement that it is worth filing, not the ' +
 	"run's progress (`.claude/skills/workflow-commands/SKILL.md` → §2i, `observation-filing.md`). Run " +
-	'`pnpm josh issue:scout "<title>"`, file it, run `pnpm josh epic:bundle <new>`, then end with the ' +
-	'one-line citation of what was filed — do not repeat your previous reply. If it is not worth filing ' +
+	'`pnpm josh issue:file "<title>" --body-file <path> --depth <0|1|2>` — it scouts, lints, labels and ' +
+	'runs `epic:bundle` itself — then end with the one-line citation of what was filed; do not repeat ' +
+	'your previous reply. If it is not worth filing ' +
 	'after all, say so in one line instead.'
 
 // **A headless parent's turn-end is its process's end** (joshuafolkken/kit#2437). Under `claude -p` the

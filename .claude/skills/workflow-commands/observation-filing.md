@@ -20,16 +20,15 @@ on is dropped rather than filed.
 
 **The filing ceilings still apply.** Count this filing in the ten-Issue limit for the run. An
 observation is discretionary, so above 30 open Issues in the target repository, close one first or do
-not file (`prompts/collaboration-workflow/wip-cap.md`). Before the `gh api … issues` call, run
-`pnpm josh issue:scout "<title>"` (`issue-scout.md`). When it is the second filing of the run, run
+not file (`prompts/collaboration-workflow/wip-cap.md`). File it with `pnpm josh issue:file`
+(`issue-scout.md`), which lints the body against `prompts/collaboration-workflow/issue-template.md`,
+applies the classification labels it declares, runs the duplicate scan, and runs `epic:bundle` on the
+new Issue so it is offered by its epic; an `auto-ok` epic adds it to the backlog pool
+(`backlogrun-steps.md` → "What one invocation approves"). When it is the second filing of the run, run
 `pnpm josh issue:fold` first; the guard refuses that filing without the fold
-(`split-assessment.md` → "The same two questions decide the filing-time fold"). After filing, run
-`pnpm josh epic:bundle <new>` so the Issue is offered by its epic; an `auto-ok` epic adds it to the
-backlog pool (`backlogrun-steps.md` → "What one invocation approves").
+(`split-assessment.md` → "The same two questions decide the filing-time fold").
 
 The detail below is read at the filing decision, and the marker suite pins the rules here.
-
-Before filing an observation, run `pnpm josh issue:lint <body-file>` and apply every label in its `labels:` answer at creation; `prompts/collaboration-workflow/issue-template.md` is the single source. Keep the depth label.
 
 ### The depth test — a discretionary filing cites the product work it blocked
 
@@ -53,11 +52,11 @@ it — read off the subject rather than judged**:
 single source**, and a label description that paraphrased it would be a second copy of the rule.
 **Every filing route applies one**, this route and the other three of §2d's table alike: a `new`
 entry point, a `route:tier-a` prerequisite, a `route:interrupt`, a split child and a review round
-cap's branch-2 filing all pass through a `gh api … issues` call, and the depth label goes in it
-beside whatever `route:` label that call already carries.
+cap's branch-2 filing all pass through a `pnpm josh issue:file` call, and the depth goes in it as
+`--depth <n>` beside whatever `--route` that call already carries.
 
 ```bash
-gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:1' -F body=@<body-file>
+pnpm josh issue:file "<title>" --body-file <body-file> --depth 1
 gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue already filed
 ```
 

@@ -24,7 +24,8 @@ const LABEL_MODULE = 'scripts/git/issue-labels.ts'
 const DEPTH_LABEL_COUNT = 3
 // The placeholder spelling every filing template carries — the depth itself varies per Issue, so the
 // template names the flag and §2i names how to choose the number.
-const FILING_FLAG = "-f 'labels[]=depth:<n>'"
+const FILING_FLAG = '--depth <n>'
+const DEPTH_PREFIX = 'depth:'
 
 // Prettier reflows prose, so a marker that spans a line break would fail on formatting alone. Every
 // prose assertion below runs against the collapsed copy; the code-fence markers keep their raw form,
@@ -33,8 +34,10 @@ function unwrapped(path: string): string {
 	return read_repo_file(path).replaceAll(/\s+/gu, ' ')
 }
 
+// The `pnpm josh issue:file` flag for a depth label: the number alone, which the command turns back
+// into the label (joshuafolkken/kit#2808).
 function label_flag(label: string): string {
-	return `-f 'labels[]=${label}'`
+	return `--depth ${label.slice(DEPTH_PREFIX.length)}`
 }
 
 describe('the depth labels', () => {
@@ -90,7 +93,7 @@ describe('the filing-time rule in SKILL.md §2i', () => {
 		expect(read_repo_file(WORKFLOW_SKILL)).toContain(label_flag(label))
 	})
 
-	// **The rule in §2i is not enough on its own**: a run copies the `gh api … issues` line out of the
+	// **The rule in §2i is not enough on its own**: a run copies the `pnpm josh issue:file` line out of the
 	// entry point's own file, so a template without the flag files without the label and the share
 	// reports everything as `unlabelled`. Each document below carries a filing command of its own, and
 	// each is keyed here to the flag. An epic-creating template is deliberately absent — an epic takes

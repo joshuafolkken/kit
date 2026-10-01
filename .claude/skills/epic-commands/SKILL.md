@@ -350,8 +350,9 @@ a publish that predates the change.
 
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
-Run it right after an issue is filed: by `kickoff` / `fullrun` / `halfrun`, or by any Tier A filing
-mid-implementation, including inside a `backlogrun`. **It recommends; it writes nothing.**
+It runs right after an issue is filed: by `kickoff` / `fullrun` / `halfrun`, or by any Tier A filing
+mid-implementation, including inside a `backlogrun`. **`pnpm josh issue:file` runs it as its last step**;
+run it by hand only when that step printed `⚠`. **It recommends; it writes nothing.**
 
 "Two or more always means an epic" only fires when one request is split on the spot. Two issues filed
 days apart that turn out to be the front and back of one job are executed separately, in whatever
@@ -454,9 +455,9 @@ decisions" section above says what to do instead.
 answers the same epic question for an issue that does not exist yet — this decision, called rather
 than restated — and beside it the one thing this one deliberately refuses: whether the work has
 already been filed, from a title comparison (joshuafolkken/kit#1252). **Both run**, and neither
-replaces the other: the scout is what a `new` entry point asks before `gh api … issues`, and
-`epic:bundle` is what it asks afterwards, from the real number and the relations recorded against it.
-Full behavior: `docs/josh-commands.md` → "`josh issue:scout`".
+replaces the other: `pnpm josh issue:file` runs the scout before it creates the issue, and
+`epic:bundle` afterwards, from the real number and the relations recorded against it.
+Full behavior: `docs/josh-commands.md` → "`josh issue:file`".
 
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies` —
 on an addition as much as on a new epic. Without it the batch survives and the reason for it does

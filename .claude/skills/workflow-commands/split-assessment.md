@@ -31,7 +31,7 @@ same conjunction**: separability, and whether the whole clearly exceeds one gate
 `pnpm josh split:assess`, called not recomputed, and `separate` needs both halves exactly as `split`
 does. **There is no second criterion.** §2i's observation, the review round cap's branch 2 and §2d's
 prerequisite each route a second filing through it, delivered by `pnpm josh rule:guard` at the run's
-second `gh api … issues` call, never the first.
+second `pnpm josh issue:file` call, never the first.
 
 ## Why the default is not to split
 
@@ -88,8 +88,9 @@ the whole point of one definition is that where the split was noticed cannot cha
 The epic is the non-closing home for the split rationale. A comment on the first child is buried the
 moment that child merges and closes.
 
-**Each split child is filed with the `route:split` label**, so the backlog's composition stays
-countable by filing route rather than by grepping issue bodies.
+**Each split child is filed with the `route:split` label** —
+`pnpm josh issue:file "<sub-title>" --body-file <body-file> --depth <n> --route split` — so the
+backlog's composition stays countable by filing route rather than by grepping issue bodies.
 
 ## Promote, or create a new epic
 

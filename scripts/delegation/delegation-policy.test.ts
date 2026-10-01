@@ -173,7 +173,7 @@ describe('followup-filing is a third unit on the one mechanism', () => {
 	it('covers the whole filing chain', () => {
 		const step = delegation_policy.find_step(FOLLOWUP_FILING)
 
-		expect(step?.does).toContain('issue:scout')
+		expect(step?.does).toContain('issue:file')
 		expect(step?.does).toContain('epic:bundle')
 		expect(step?.does).toContain('epic --add')
 	})

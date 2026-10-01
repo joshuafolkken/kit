@@ -18,7 +18,7 @@ const ISSUE_COMMENTS = 'issue-comments'
 // (joshuafolkken/kit#2119).
 const FILING_CAP_ID = 'filing-cap'
 
-const FILING = 'gh api repos/o/r/issues -f title=x'
+const FILING = 'pnpm josh issue:file "x" --body-file b.md --depth 1'
 const COUNT = 'gh api repos/o/r/issues?state=open --jq length'
 const BODY_READ = 'gh api repos/o/r/issues/12'
 const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
@@ -273,7 +273,6 @@ describe('rule_value.measure — rules nothing can score', () => {
 			'worktree-mutation',
 			'file-body',
 			'poll-loop',
-			'issue-bug-label',
 			INVESTIGATION,
 		])
 	})

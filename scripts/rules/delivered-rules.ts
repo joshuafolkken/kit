@@ -3,15 +3,14 @@ import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
+import { direct_filing } from './direct-filing'
 import { early_heartbeat } from './early-heartbeat'
 import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
 import { gh_api } from './gh-api'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
-import { issue_bug_label_rule } from './issue-bug-label'
 import { issue_fold } from './issue-fold'
-import { issue_scout } from './issue-scout'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
@@ -135,9 +134,9 @@ type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 const STAMP_PREFIX = 'josh-rule-guard-'
 
 // **`is_issue_filing` and `on_bash_command` moved to `bash-triggers.ts`** (joshuafolkken/kit#2119):
-// three rows now share the filing trigger — the WIP cap, the scout gate and the per-run filing cap —
-// and the last two live in their own modules, which could not import the enumeration back to reach a
-// private function of it. `on_bash_command` went with it because those modules build their own rows.
+// three rows share the filing trigger — the WIP cap, the per-run filing cap and the fold — and the
+// last two live in their own modules, which could not import the enumeration back to reach a private
+// function of it. `on_bash_command` went with it because those modules build their own rows.
 const { is_issue_filing, on_bash_command } = bash_triggers
 
 // The whole of the WIP cap, in the shape a refusal can carry: the count, the refusal, the two
@@ -295,26 +294,24 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// before any of those speak; on a first-party filing it is silent (the owners match), so `wip-cap`
 	// still speaks first, exactly as before. It fires on every occurrence (`git-force.ts`).
 	third_party_write.ROW,
+	// **A hand-built filing is refused on every occurrence** (joshuafolkken/kit#2808) and pointed at
+	// `josh issue:file`, which runs the scout, the lint, the labels, the `## Origin` check and
+	// `epic:bundle` itself. It claims the direct call only, so the rows below — which trigger on the
+	// `issue:file` call — never overlap it.
+	direct_filing.ROW,
 	{
 		id: 'wip-cap',
 		is_trigger: on_bash_command(is_issue_filing),
 		reason: WIP_CAP_REASON,
 		keeps: on_bash_command(counts_open_issues),
 	},
-	// **Three rows share the filing trigger** (joshuafolkken/kit#2119), listed after `wip-cap` so the
-	// backlog count still speaks first: `issue-scout` refuses a filing the run has not scouted (once per
-	// run, stood down once the scout is on the tail), and `filing-cap` refuses every filing past the
-	// per-run ceiling. Each is a real instance of the admissible overlap the comment on `delivery`
-	// describes — the losing rule's delivery is still correct one reissue later — so a scout-less,
-	// over-cap filing is delivered `wip-cap`, then `issue-scout`, then `filing-cap` across its reissues.
-	issue_scout.ROW,
+	// **Two more rows share the filing trigger** (joshuafolkken/kit#2119, joshuafolkken/kit#2213), listed
+	// after `wip-cap` so the backlog count still speaks first: `filing-cap` refuses every filing past
+	// the per-run ceiling, and `issue-fold` refuses a *second* filing the run has not folded. Each is a
+	// real instance of the admissible overlap the comment on `delivery` describes — the losing rule's
+	// delivery is still correct one reissue later — so an unfolded, over-cap second filing is delivered
+	// `wip-cap`, then `filing-cap`, then `issue-fold` across its reissues.
 	filing_cap.ROW,
-	// **`issue-fold` shares the same filing trigger** (joshuafolkken/kit#2213), listed after
-	// `filing-cap`: it refuses a *second* filing the run has not folded until it is stood down off
-	// the tail when the run has already folded or has filed nothing earlier. It is another instance of
-	// the admissible overlap — the losing rule's delivery is still correct one reissue later — so a
-	// scout-less, unfolded, over-cap second filing is delivered `wip-cap`, then `issue-scout`, then
-	// `filing-cap`, then `issue-fold` across its reissues.
 	issue_fold.ROW,
 	{
 		id: 'issue-comments',
@@ -541,13 +538,9 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	rule_body_guard.ROW,
 	// **The generic oracle-consulted rows, one per oracle that declared a firing point**
 	// (joshuafolkken/kit#2324). Each refuses the action the oracle governs when the run has not run that
-	// oracle's command first, stood down once it has — `issue-scout`'s shape read from the registry
-	// rather than hand-written. Listed last so an oracle whose firing point overlaps a filing
-	// (`issue:lint`) delivers on the reissue, after `wip-cap` / `issue-scout` / `filing-cap` /
-	// `issue-fold` have each had their turn. The non-overlapping firing point (`pkg:scout` on a package
-	// add) claims a command no row above matches.
+	// oracle's command first, stood down once it has. Listed last; the one firing point left
+	// (`pkg:scout` on a package add) claims a command no row above matches.
 	...oracle_consulted.ROWS,
-	issue_bug_label_rule.ROW,
 ]
 
 // A turn that issued more than this many calls is a turn that batched. The guard counts turns that
@@ -779,11 +772,11 @@ const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
 	FILE_BODY_REASON: file_body.FILE_BODY_REASON,
+	DIRECT_FILING_REASON: direct_filing.DIRECT_FILING_REASON,
 	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON,
 	ISSUE_FOLD_REASON: issue_fold.ISSUE_FOLD_REASON,
-	ISSUE_SCOUT_REASON: issue_scout.ISSUE_SCOUT_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,
 	LANE_PARK_REASON: lane_park.LANE_PARK_REASON,
 	MEASURED_RULES,
