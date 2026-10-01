@@ -53,11 +53,11 @@ ceiling on what may be recorded. **File nothing when nothing passes** — a run 
 improvement worth carrying files zero Issues, and that is what makes the "file → drain → file again"
 loop converge.
 
-**Exclude what is already filed or already done, through the existing scout** (`SKILL.md` → §2e). Run
-`pnpm josh issue:scout "<title>"` before each `gh api … issues` call: an **open** candidate covering the
-same work means do not file it, and a `(closed)` candidate covering it means the work is already merged.
-Neither exclusion is a new mechanism. After filing, `pnpm josh epic:bundle <new>` places each Issue, as
-after any filing.
+**Exclude what is already filed or already done, through the existing scout** (`SKILL.md` → §2e). File
+each with `pnpm josh issue:file`, which runs the scout before creating anything: an **open** candidate
+covering the same work means do not file it, and a `(closed)` candidate covering it means the work is
+already merged. Neither exclusion is a new mechanism. The same call runs `epic:bundle` on each new
+Issue, as after any filing.
 
 ## `auto-ok`, and closing the step
 

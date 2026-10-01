@@ -2,7 +2,7 @@
 
 **単一ソースはこのファイルである。**
 
-**この規則は常駐していない — 引き金つき配送に移った**（joshuafolkken/kit#1524）。`pnpm josh rule:guard` が Issue を作成する `Bash` 呼び出し（`gh issue create`、または `…/issues` への `title` 付き POST）を拒否し、そこで数え方・拒否・2 つの免除・免除を決める 3 条件を突きつける。起票が無いターンでは何も起きず、それは上限に触れる行為が無いということである。配送は**ラン 1 回につき 1 度**なので、数えたうえで同じ呼び出しをもう一度出せばよい。機構と列挙表は `rule-delivery.md`、配送文の実体は `scripts/rules/delivered-rules.ts` の `WIP_CAP_REASON` にあり、`scripts/backlog/backlog-manufacturing-rule.test.ts` がその中身を固定している。
+**この規則は常駐していない — 引き金つき配送に移った**（joshuafolkken/kit#1524）。`pnpm josh rule:guard` が Issue を作成する `Bash` 呼び出し（`pnpm josh issue:file`。`gh issue create` や `…/issues` への `title` 付き POST による直接起票は `direct-filing` が毎回拒否する）を拒否し、そこで数え方・拒否・2 つの免除・免除を決める 3 条件を突きつける。起票が無いターンでは何も起きず、それは上限に触れる行為が無いということである。配送は**ラン 1 回につき 1 度**なので、数えたうえで同じ呼び出しをもう一度出せばよい。機構と列挙表は `rule-delivery.md`、配送文の実体は `scripts/rules/delivered-rules.ts` の `WIP_CAP_REASON` にあり、`scripts/backlog/backlog-manufacturing-rule.test.ts` がその中身を固定している。
 
 ## 規則
 
@@ -69,10 +69,10 @@ gh api "repos/{owner}/{repo}/issues?state=open&per_page=100" --paginate \
 
 #### 該当したときの手順
 
-1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。起票前に `pnpm josh issue:lint <body-file>` を実行し、その `labels:` に列挙された分類ラベルをすべて同じ作成呼び出しに付ける。`prompts/collaboration-workflow/issue-template.md` の手順に従う。
+1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。起票は `pnpm josh issue:file` で行う。本文の検査、本文が宣言する分類ラベルの付与、重複探し、`epic:bundle` はこのコマンドが実行する（`docs/josh-commands.md` → `josh issue:file`）。
 
    ```bash
-   gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:interrupt' -f 'labels[]=depth:<n>' -F body=@<body-file>
+   pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route interrupt
    ```
 
 2. **超過している事実と、当たった条件の番号を本文に 1 行書く**（例:「オープン 37 件で起票。3 条件のうち 2（文書化された手順が完了できない）に該当」）。**どちらか一方では足りない** — 件数だけでは判定が再現できず、条件だけでは上限の可視化が効かない。

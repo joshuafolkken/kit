@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { bash_triggers } from './bash-triggers'
 import { delivered_rules } from './delivered-rules'
 import {
 	BODY_READ_API_COMMAND,
 	BODY_READ_COMMAND,
 	COMMENTED_READ_COMMAND,
-	FILING_API_COMMAND,
+	DIRECT_FILING_API_COMMAND,
 	FILING_COMMAND,
 	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
@@ -21,17 +22,18 @@ const ISSUE_LIST_COMMAND = 'gh issue list --state open --limit 100'
 // A test title shared by the two rows' blocks, so a row cannot pass under a title the other does not
 // use.
 const LEAVES_ALONE = 'leaves %j alone'
+const READS_A_FILING = 'reads %j as a filing'
 
-// The trigger, judged from the command alone. Both spellings a run reaches for file an Issue; the two
-// below them read the same endpoint without creating anything.
-describe('is_issue_filing', () => {
+// The `direct-filing` trigger, judged from the command alone (joshuafolkken/kit#2808). Both
+// hand-built spellings file an Issue; the reads below them use the same endpoint and create nothing.
+describe('is_direct_filing', () => {
 	it.each([
 		'gh issue create --title "x" --body "y"',
 		'gh issue create --repo joshuafolkken/kit -t x',
-		FILING_API_COMMAND,
+		DIRECT_FILING_API_COMMAND,
 		'gh api repos/{owner}/{repo}/issues -f \'labels[]=epic\' -f title="x"',
-	])('reads %j as a filing', (command) => {
-		expect(delivered_rules.is_issue_filing(command)).toBe(true)
+	])(READS_A_FILING, (command) => {
+		expect(bash_triggers.is_direct_filing(command)).toBe(true)
 	})
 
 	// **A comment endpoint is the case that decides whether this hook is worth having.** Comments are
@@ -43,6 +45,26 @@ describe('is_issue_filing', () => {
 		ISSUES_LISTING_COMMAND,
 		ISSUE_LIST_COMMAND,
 		'gh pr create --title "x"',
+		FILING_COMMAND,
+	])(LEAVES_ALONE, (command) => {
+		expect(bash_triggers.is_direct_filing(command)).toBe(false)
+	})
+})
+
+// The run-level filing rows' trigger: the `josh issue:file` call, in either spelling, and never a
+// spelling quoted inside another command's body.
+describe('is_issue_filing', () => {
+	it.each([FILING_COMMAND, 'pnpm josh ifl "x" --body-file b.md --depth 0'])(
+		READS_A_FILING,
+		(command) => {
+			expect(delivered_rules.is_issue_filing(command)).toBe(true)
+		},
+	)
+
+	it.each([
+		DIRECT_FILING_API_COMMAND,
+		'pnpm josh issue:scout "x"',
+		'gh api repos/joshuafolkken/kit/issues/1/comments -f body="run pnpm josh issue:file"',
 	])(LEAVES_ALONE, (command) => {
 		expect(delivered_rules.is_issue_filing(command)).toBe(false)
 	})

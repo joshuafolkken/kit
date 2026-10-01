@@ -183,7 +183,7 @@ Only branch 2 files an Issue. What follows applies to that branch.
   than being deferred — see below.)
 - **Filing does not end at the Issue.** `epic:next` only ever offers a child the task list of an epic
   names, so an Issue in no epic is never handed to a running `backlogrun` — the deferred finding is parked
-  forever, which reads the same from the backlog. **The three steps run inside the CI wait, not before
+  forever, which reads the same from the backlog. **The steps run inside the CI wait, not before
   the commit.** Where the run opens a pull request — `fullrun`, `backlogrun` — they go after
   `pnpm josh git -y` and before `pnpm josh followup`; where it does not — `halfrun`, or a standalone
   pre-commit self-review — they run as soon as the disposition is decided. **The chain may run in a
@@ -191,14 +191,16 @@ Only branch 2 files an Issue. What follows applies to that branch.
 - **When the round files a second follow-up, run `pnpm josh issue:fold` first.** Several findings from
   one review fold into one Issue by default — the filing-time counterpart to the split assessment,
   reading the same two questions (`.claude/skills/workflow-commands/split-assessment.md` → "The same
-  two questions decide the filing-time fold"). `pnpm josh rule:guard` refuses the second `gh api …
-issues` call until it is folded; the first filing asks nothing.
+  two questions decide the filing-time fold"). `pnpm josh rule:guard` refuses the second
+  `pnpm josh issue:file` call until it is folded; the first filing asks nothing.
 
-  1. File the follow-up Issue referencing the current one, tagged `route:review-cap`. Run `pnpm josh issue:lint <body-file>` first and apply every label in its `labels:` answer at creation, following `prompts/collaboration-workflow/issue-template.md`:
-     `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:review-cap' -f 'labels[]=depth:<n>' -F body=@<body-file>`.
-  2. Run `pnpm josh epic:bundle <new>` — **before the current Issue closes.** The candidate search reads
-     open issues only, so once the parent has closed the command answers `none` permanently.
-  3. Act on its answer. **`epic:bundle` recommends and writes nothing**, so acting means running the
+  1. File the follow-up Issue referencing the current one, tagged `route:review-cap` — **before the current Issue closes.**
+     `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route review-cap`.
+     The command lints the body, applies the classification labels it declares, runs the duplicate scan
+     and then `epic:bundle` on the new Issue (`docs/josh-commands.md` → `josh issue:file`). The
+     `epic:bundle` candidate search reads open issues only, so once the parent has closed it answers
+     `none` permanently.
+  2. Act on the `epic:bundle` answer it prints. **`epic:bundle` recommends and writes nothing**, so acting means running the
      write command yourself — never a hand edit of the epic body, which leaves the task list and the
      `blocked-by` relations disagreeing and `epic:next` returning `error`.
 

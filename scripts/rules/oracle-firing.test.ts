@@ -4,10 +4,10 @@ import { oracle_firing } from './oracle-firing'
 
 // joshuafolkken/kit#2324: every decision oracle owes a firing-point declaration — the governed action,
 // or the reason none can be named. This suite pins the totality (no oracle is left undeclared, none
-// declares both) and the two wired predicates match their governed call and reject the near-misses.
+// declares both) and the wired predicate matches its governed call and rejects the near-misses.
 
 const ORACLE_NAMES = decision_oracle.DECISION_ORACLES.map((oracle) => oracle.name)
-const WIRED = ['pkg:scout', 'issue:lint']
+const WIRED = ['pkg:scout']
 const RELEASE_SCOPE = 'release:scope'
 const PKG_ADD = 'pnpm add lodash'
 const LEAVES_ALONE = 'leaves %j alone'
@@ -42,12 +42,12 @@ describe('the firing / not-named maps cover the registry exactly', () => {
 	})
 })
 
-describe('the two wired firing points are the clearly-nameable ones', () => {
+describe('the wired firing point is the clearly-nameable one', () => {
 	it.each(WIRED)('%s declares a firing point', (name) => {
 		expect(oracle_firing.declaration_for(name).firing_point).toBeDefined()
 	})
 
-	it('exactly two oracles declare a firing point', () => {
+	it('exactly one oracle declares a firing point', () => {
 		expect(oracle_firing.firing_oracles()).toHaveLength(WIRED.length)
 	})
 

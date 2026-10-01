@@ -46,6 +46,7 @@ describe('stop_rules — each delivered text names its single source', () => {
 	it('the filing offer reason points at SKILL.md §2i', () => {
 		expect(stop_rules.FILING_OFFER_REASON).toContain('§2i')
 		expect(stop_rules.FILING_OFFER_REASON).toContain('observation-filing.md')
+		expect(stop_rules.FILING_OFFER_REASON).toContain('pnpm josh issue:file')
 	})
 
 	it('the issue citation reason points at issue-citation.md', () => {

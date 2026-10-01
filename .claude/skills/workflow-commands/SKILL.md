@@ -193,15 +193,15 @@ third of four mid-run discoveries, distinct from an upstream defect, a split (`s
 and an observation (§2i). The full table, the filing command, the `-u`/`stash:pop` steps and the
 10-per-run cap are `prerequisite.md`, its single source, read at that trigger. **When the prerequisite
 is the run's second filing, `pnpm josh issue:fold` runs first** (§2e), and `pnpm josh rule:guard`
-refuses the second `gh api … issues` call until it has.
+refuses the second `pnpm josh issue:file` call until it has.
 
 ## 2e. Before filing a new Issue — `pnpm josh issue:scout`
 
-**Before every new Issue is filed, run `pnpm josh issue:scout <title>` and read its duplicate and epic
-answers.** This applies inside every workflow, including observations and review follow-ups. The
-guard refuses a filing without it. Read `issue-scout.md` at that point for the duplicate, closed-Issue
-and epic decisions; `issue-fold-existing.md` handles a compatible duplicate. `docs/josh-commands.md`
-→ "`josh issue:scout`" defines the command's output.
+**Every new Issue is filed with `pnpm josh issue:file`, which runs the `issue:scout` scan first — read
+its duplicate and epic answers.** This applies inside every workflow, including observations and review
+follow-ups. The guard refuses any other filing call. Read `issue-scout.md` at that point for the
+duplicate, closed-Issue and epic decisions and for `--distinct`; `issue-fold-existing.md` handles a
+compatible duplicate. `docs/josh-commands.md` → "`josh issue:file`" defines the command.
 
 ## 2f. The working-tree hold — one run per tree
 
@@ -239,14 +239,14 @@ parent-wake half at `backlogrun-progress.md` → "The parent keeps no clock of i
 **When a first-party observation is worth filing, file it without asking and continue the run.**
 Read `observation-filing.md` in full before filing: it decides the depth test, filing ceilings, labels,
 second-filing fold, ledger fallback and delegated-child handoff. Use `pnpm josh repo:party` to decide
-first-party status, then run `pnpm josh issue:scout` before filing (§2e). A third-party target remains
+first-party status, then file with `pnpm josh issue:file` (§2e). A third-party target remains
 Tier C (`CLAUDE.md`).
 
 ## 2j. The end-of-run retrospective — read when `run:step` prints it
 
 **When `pnpm josh run:step` prints the retrospective step, read `retrospective.md` in full and run the
-digest it names once.** File up to two worthwhile improvements through `issue:scout` and
-`epic:bundle`, stack the rest in the observation ledger, and close the step with the command described
+digest it names once.** File up to two worthwhile improvements through `issue:file` (scout and
+`epic:bundle` included), stack the rest in the observation ledger, and close the step with the command described
 there. A dispatched lane child never runs the retrospective.
 
 ## 3. What stays resident, and what is read from here

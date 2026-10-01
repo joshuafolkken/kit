@@ -44,16 +44,15 @@ split is found.
 - `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (0) **Scope assessment** per
   `split-assessment.md`. If multiple → the **multi-issue split path**; if single → the **single-issue
   path**. **Single-issue path**: (1) Derive an English title from the conversation, or use the provided
-  title. **(1a) Run `pnpm josh issue:scout "<title>" [--body "<summary>"]` before creating the Issue** —
-  a candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` →
-  §2e). (2) Create Issue: `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>'
-  -F body=@<body-file>` (body per `prompts/collaboration-workflow/issue-template.md`). Capture `<N>`. (3)
+  title. (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` (body
+  per `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a
+  candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` →
+  §2e). Capture `<N>`. (3)
   Post the plan in the session language, using the same body/comment logic as `kickoff #<N>`. (4) Send
   Telegram notification. (5) **Stop** — do not implement. **Multi-issue split path**: (1) For each
-  independent deliverable, derive a focused English title, **run `pnpm josh issue:scout "<sub-title>"`
-  on it** (`SKILL.md` → §2e), and create a separate Issue with the `route:split` label: `gh api
-  repos/{owner}/{repo}/issues -f title="<sub-title>" -f 'labels[]=route:split' -f 'labels[]=depth:<n>'
-  -F body=@<body-file>`. Capture each Issue number. **When the split is filed into a repository other than
+  independent deliverable, derive a focused English title and create a separate Issue with the
+  `route:split` label (its duplicate scan is read per `SKILL.md` → §2e): `pnpm josh issue:file
+  "<sub-title>" --body-file <body-file> --depth <n> --route split`. Capture each Issue number. **When the split is filed into a repository other than
   the one this session is running in**, every child body gets the `## Origin` backlink described in the
   cross-package rule the AI documents keep resident, the epic body carries the same link as prose or a
   plain bullet (never as a checkbox row, which would disable its auto-close), and the originating Issue
@@ -81,4 +80,4 @@ split is found.
   creation call. (3) Send Telegram notification listing all created issues. (4) Present the command
   `backlogrun #<E> --only`. (5) **Stop** — do not implement.
 
-Before filing, run `pnpm josh issue:lint <body-file>` and apply every label in its `labels:` answer at creation, following `prompts/collaboration-workflow/issue-template.md` for classification.
+`pnpm josh issue:file` lints the body and applies the classification labels it declares, following `prompts/collaboration-workflow/issue-template.md` for classification (`docs/josh-commands.md` → `josh issue:file`).

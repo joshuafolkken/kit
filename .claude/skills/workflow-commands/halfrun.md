@@ -1,6 +1,6 @@
 # `halfrun` — the manifest (implement + verify, stop before commit)
 
-When this run files a new Issue, run `pnpm josh issue:lint <body-file>` and apply every label in its `labels:` answer at creation; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification. Keep the existing `depth` and `route` labels.
+When this run files a new Issue, file it with `pnpm josh issue:file`, which lints the body and applies the classification labels it declares beside the `--depth` and `--route` labels; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification.
 
 `halfrun` sits between `kickoff` (plan only) and `fullrun` (full execution with auto-merge). It
 implements the change and runs the full verification gate, then **stops before commit** — nothing is
@@ -56,10 +56,9 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 `confirmation` Telegram, stop again.
 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
-mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → **run `pnpm josh
-issue:scout "<title>" [--body "<summary>"]` before creating the Issue** (`SKILL.md` → §2e) → create the
-Issue (`gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:<n>' -F body=@<body-file>`,
-body per `prompts/collaboration-workflow/issue-template.md`) → add `in-progress` → post the agreed plan → stash
+mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
+(`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`, body per
+`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `SKILL.md` → §2e) → add `in-progress` → post the agreed plan → stash
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes"`, popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
 `git switch main && git pull` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
