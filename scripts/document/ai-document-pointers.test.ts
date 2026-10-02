@@ -69,6 +69,12 @@ describe.each(POINTER_DOCS)('%s — points at the rules instead of copying them'
 	it('says not to copy rules back into it', () => {
 		expect(unwrapped).toContain('Do not copy rules back into this file')
 	})
+
+	// joshuafolkken/kit#2894: the explanation of why this file is a pointer lives once, in
+	// `docs/maintainers/principles-rationale.md`. A copy here is the clone this suite exists to stop.
+	it('carries no copy of the pointer rationale', () => {
+		expect(unwrapped).not.toContain('## Why this file is a pointer')
+	})
 })
 
 describe('the canonical document explains the arrangement', () => {
