@@ -1,6 +1,6 @@
 # @joshuafolkken/kit
 
-A development toolkit for AI-assisted work. `josh start` (or `josh init`, for a project that will not use the GitHub Issue workflow) gives an AI assistant (Claude Code, Codex, Gemini, Cursor) the project's rules, formatting and checks in one command. With `kickoff`, `fullrun` and `backlogrun`, the agent then takes a GitHub Issue through plan → implement → verify → PR → merge, the same way in every project. Why kit exists: [why.md](./docs/why.md) (Japanese).
+A development toolkit for AI-assisted work. One command gives an AI assistant (Claude Code, Codex, Gemini, Cursor) the project's rules, formatting and checks. With `kickoff`, `fullrun` and `backlogrun`, the agent then takes a GitHub Issue through plan → implement → verify → PR → merge, the same way in every project. Why kit exists: [why.md](./docs/why.md) (Japanese).
 
 ## What your project gets
 
@@ -16,29 +16,27 @@ In a `basic` project, `josh` skips each check that has nothing to run and says w
 
 ## Quick start
 
-Requires [Node.js](https://nodejs.org/) 22.19.0+ and [pnpm](https://pnpm.io/) 12+ for every profile ([how to install them](./docs/setup/basic.md#1-check-the-prerequisites)); the [gh CLI](https://cli.github.com/) for `josh version` and the Issue workflow is required by `josh start` and optional otherwise. Run in your project directory.
+Requires [Node.js](https://nodejs.org/) 22.19.0+ and [pnpm](https://pnpm.io/) 12+ ([how to install them](./docs/setup/basic.md#1-check-the-prerequisites)). `josh start` also requires the [gh CLI](https://cli.github.com/). Run in your project directory.
 
-One question picks the command: will the project use the GitHub Issue workflow (`kickoff`, `fullrun`, `backlogrun`)? The [profile](./docs/init.md#project-profiles) is chosen the same way either way.
+Pick by one question: will the project use the GitHub Issue workflow (`kickoff`, `fullrun`, `backlogrun`)?
 
-### The project will use the GitHub Issue workflow
+### With the GitHub Issue workflow
 
 ```bash
 pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 pnpm exec josh start
 ```
 
-With or without Git and a GitHub repository: `josh start` creates what is missing, and when `main` already has commits it opens a pull request with only kit's files for you to merge.
+`josh start` creates the Git and GitHub repositories if missing. If `main` already has commits, it opens a pull request with only kit's files for you to merge.
 
-### The project will not use the GitHub Issue workflow
+### Without the GitHub Issue workflow
 
 ```bash
 pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 pnpm josh gate
 ```
 
-What each command does in each starting state: [init.md → `josh init` or `josh start`](./docs/init.md#josh-init-or-josh-start).
-
-The step-by-step version of these commands, with what each one creates: [Set up the basic profile](./docs/setup/basic.md) · [Set up the full profile](./docs/setup/full.md).
+Details: [what each command does in each starting state](./docs/init.md#josh-init-or-josh-start) · step by step: [basic profile](./docs/setup/basic.md) · [full profile](./docs/setup/full.md).
 
 ## Documentation
 
