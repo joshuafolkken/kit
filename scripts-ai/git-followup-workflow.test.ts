@@ -123,6 +123,12 @@ vi.mock('../scripts/run/run-hold', () => ({
 	},
 }))
 
+// **Mocked for the same reason** (joshuafolkken/kit#2919): `main` runs at import time, so the real step
+// would commit and push the observation ledger of whatever checkout is executing this suite.
+vi.mock('../scripts/git/git-followup-flush', () => ({
+	git_followup_flush: { commit_ledger_step: vi.fn() },
+}))
+
 const { git_followup_workflow } = await import('./git-followup-workflow')
 
 describe('parse_issue_number_from_text', () => {

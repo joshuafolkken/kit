@@ -204,6 +204,7 @@ words:
   - keepalive
   - refspec
   - pathspec
+  - pathspecs
   - issuecomment
   - frontmatter
   - toolkits

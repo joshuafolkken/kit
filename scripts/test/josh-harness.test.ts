@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
-import { OBSERVATION_LEDGER_PATH } from '#scripts/observations/observation-ledger'
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_carry } from '#scripts/run/run-carry'
 import { run_review_steps } from '#scripts/run/run-review-steps'
@@ -17,7 +17,6 @@ const SCENARIO_TIMEOUT_MS = 60_000
 const GATE_TIMEOUT_MS = 180_000
 const MARKER_WAIT_MS = 60_000
 
-const LEDGER = OBSERVATION_LEDGER_PATH
 const GATE_GREEN = 'Gate green'
 const GATE_PASSED = 'verification gate passed'
 const RECORD = 'review:record'
@@ -51,8 +50,12 @@ function decoy_bin(workspace: string): string {
 	return directory
 }
 
-function ledger_text(directory: string): string {
-	return readFileSync(path.join(directory, LEDGER), 'utf8')
+function ledger_at(directory: string, issue: number): string {
+	return path.join(directory, observation_ledger.ledger_file(issue))
+}
+
+function ledger_text(directory: string, issue: number): string {
+	return readFileSync(ledger_at(directory, issue), 'utf8')
 }
 
 function carry_target(opened: JoshEnvironment): string {
@@ -139,7 +142,7 @@ describe.each(KINDS)('josh harness — the %s environment', (kind) => {
 
 			expect(josh_harness.run(opened, [RECORD, '--issue', '101']).exit_code).toBe(0)
 			expect(josh_harness.run(opened, [RECORD, '--check', '--issue', '101']).exit_code).toBe(0)
-			expect(ledger_text(opened.primary)).toContain('#101')
+			expect(ledger_text(opened.root, 101)).toContain('#101')
 		},
 		SCENARIO_TIMEOUT_MS,
 	)
@@ -172,22 +175,22 @@ describe('josh harness — scenarios from past defects', () => {
 			const result = josh_harness.run(consumer, [RECORD, '--issue', '2402'])
 
 			expect(result.exit_code).toBe(0)
-			expect(result.stdout).toContain(path.join(consumer.root, LEDGER))
-			expect(ledger_text(consumer.root)).toContain('#2402')
+			expect(result.stdout).toContain(ledger_at(consumer.root, 2402))
+			expect(ledger_text(consumer.root, 2402)).toContain('#2402')
 		},
 		SCENARIO_TIMEOUT_MS,
 	)
 
 	it(
-		'records a lane review round in the primary checkout, not the lane (#2419)',
+		'records a lane review round in the lane, not the primary checkout (#2919)',
 		() => {
 			const lane = environment('lane')
-			const result = josh_harness.run(lane, [RECORD, '--issue', '2419'])
+			const result = josh_harness.run(lane, [RECORD, '--issue', '2919'])
 
 			expect(result.exit_code).toBe(0)
-			expect(result.stdout).toContain(path.join(lane.primary, LEDGER))
-			expect(ledger_text(lane.primary)).toContain('#2419')
-			expect(existsSync(path.join(lane.root, LEDGER))).toBe(false)
+			expect(result.stdout).toContain(ledger_at(lane.root, 2919))
+			expect(ledger_text(lane.root, 2919)).toContain('#2919')
+			expect(existsSync(ledger_at(lane.primary, 2919))).toBe(false)
 		},
 		SCENARIO_TIMEOUT_MS,
 	)
@@ -249,8 +252,8 @@ describe('josh harness — the same command launched twice at once', () => {
 			])
 
 			expect(results.map((result) => result.exit_code)).toStrictEqual([0, 0])
-			expect(ledger_text(kit.primary)).toContain('#201')
-			expect(ledger_text(kit.primary)).toContain('#202')
+			expect(ledger_text(kit.root, 201)).toContain('#201')
+			expect(ledger_text(kit.root, 202)).toContain('#202')
 		},
 		SCENARIO_TIMEOUT_MS,
 	)

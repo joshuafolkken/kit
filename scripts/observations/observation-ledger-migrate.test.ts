@@ -10,8 +10,16 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { LEGACY_OBSERVATION_LEDGER_PATH, OBSERVATION_LEDGER_PATH } from './observation-ledger'
+import {
+	LEGACY_LEDGER_FILE,
+	LEGACY_OBSERVATION_LEDGER_PATHS,
+	OBSERVATION_LEDGER_DIRECTORY,
+} from './observation-ledger'
 import { observation_ledger_migrate } from './observation-ledger-migrate'
+
+const [SINGLE_FILE_LEDGER_PATH = '', LEGACY_OBSERVATION_LEDGER_PATH = ''] =
+	LEGACY_OBSERVATION_LEDGER_PATHS
+const OBSERVATION_LEDGER_PATH = `${OBSERVATION_LEDGER_DIRECTORY}/${LEGACY_LEDGER_FILE}`
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'observation-ledger-migrate-test-'))
 const OLD_LINE = '- k:a | d1 | 2026-09-29 | x | appended at the old path'
@@ -73,6 +81,21 @@ describe('observation_ledger_migrate.migrate — the old ledger', () => {
 		expect(observation_ledger_migrate.migrate(root)).toBe(true)
 		expect(observation_ledger_migrate.migrate(root)).toBe(false)
 		expect(read(root, OBSERVATION_LEDGER_PATH)).toBe(`${OLD_LINE}\n`)
+	})
+})
+
+describe('observation_ledger_migrate.migrate — the single-file ledgers (joshuafolkken/kit#2919)', () => {
+	// joshuafolkken/kit#2919: both single-file ledgers move into the directory, neither is left behind.
+	it('moves both single-file ledgers into the directory in one call', () => {
+		const root = fresh_root()
+
+		write(root, SINGLE_FILE_LEDGER_PATH, `${NEW_LINE}\n`)
+		write(root, LEGACY_OBSERVATION_LEDGER_PATH, `${OLD_LINE}\n`)
+
+		expect(observation_ledger_migrate.migrate(root)).toBe(true)
+		expect(read(root, OBSERVATION_LEDGER_PATH)).toBe(`${NEW_LINE}\n${OLD_LINE}\n`)
+		expect(existsSync(path.join(root, SINGLE_FILE_LEDGER_PATH))).toBe(false)
+		expect(existsSync(path.join(root, LEGACY_OBSERVATION_LEDGER_PATH))).toBe(false)
 	})
 
 	it('does nothing when there is no old ledger', () => {

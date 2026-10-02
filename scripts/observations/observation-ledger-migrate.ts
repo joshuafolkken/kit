@@ -1,18 +1,19 @@
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import {
-	LEGACY_OBSERVATION_LEDGER_PATH,
+	LEGACY_LEDGER_FILE,
+	LEGACY_OBSERVATION_LEDGER_PATHS,
 	MIGRATION_CLAIM_SUFFIX,
-	OBSERVATION_LEDGER_PATH,
+	OBSERVATION_LEDGER_DIRECTORY,
 } from './observation-ledger'
 import { observation_ledger_line } from './observation-ledger-line'
 
-// Moves the ledger's lines from the path it had before joshuafolkken/kit#2724 to the one it has now
-// (`observation-ledger.ts` carries why both are recognized). Changing the constant alone split the
-// appends across two files: a run still on the old code recreated `docs/observations.md`, and a
-// consumer repository's existing ledger stayed where nothing read it. So resolving the ledger's path
-// migrates first (`observation-ledger-home.ts`), and whatever reached the old path lands at the tail
-// of the new one before anything reads or appends.
+// Moves the ledger's lines from the single files it was before joshuafolkken/kit#2919 into the
+// directory it is now, as `legacy.md` (`observation-ledger.ts` carries why the old paths are still
+// recognized). Changing a constant alone splits the appends: a run still on the old code recreates the
+// old file, and a consumer repository's existing ledger stays where nothing reads it. So resolving the
+// ledger migrates first (`observation-ledger-home.ts`), and whatever reached an old path lands in the
+// directory before anything reads or appends.
 //
 // **The old file is claimed with a rename before it is read.** Two sessions resolving the ledger at
 // once would otherwise both read it and both copy its lines — and a repeated line under one key is
@@ -127,10 +128,7 @@ function absorb_stale(legacy: string, target: string): number {
 	return count
 }
 
-// Returns whether anything was moved. `root` is the checkout the ledger lives in.
-function migrate(root: string): boolean {
-	const legacy = path.join(root, LEGACY_OBSERVATION_LEDGER_PATH)
-	const target = path.join(root, OBSERVATION_LEDGER_PATH)
+function migrate_one(legacy: string, target: string): boolean {
 	const recovered = absorb_stale(legacy, target)
 	const claimed = claim_path(legacy)
 
@@ -139,6 +137,16 @@ function migrate(root: string): boolean {
 	absorb(claimed, target)
 
 	return true
+}
+
+// Returns whether anything was moved. `root` is the checkout the ledger lives in. Every old path is
+// tried — `map` before `some`, so one that moved does not leave the next one where it was.
+function migrate(root: string): boolean {
+	const target = path.join(root, OBSERVATION_LEDGER_DIRECTORY, LEGACY_LEDGER_FILE)
+
+	return LEGACY_OBSERVATION_LEDGER_PATHS.map((legacy) =>
+		migrate_one(path.join(root, legacy), target),
+	).some(Boolean)
 }
 
 const observation_ledger_migrate = { claim_path, migrate }

@@ -55,7 +55,8 @@ that covers the same work stops the run rather than filing a second Issue (`SKIL
 `<N>`. (3) Add
 `in-progress` (as above). (4) Post the agreed plan in the session language: fill the body if blank,
 otherwise add a comment. (5) If the working tree already has staged or modified files,
-`git stash push -m "fullrun new: pre-existing changes"` first. (6) `git switch main && git pull`. (7)
+`git stash push -m "fullrun new: pre-existing changes" -- ':!docs/maintainers/observations'` first
+(joshuafolkken/kit#2919). (6) `git switch main && git pull`. (7)
 `pnpm josh latest:scope`; on `required` run `josh latest` and load the `dependency-update` skill; on
 `skip` neither runs (`latest-gate.md` is the single source). If you stashed in (5),
 `pnpm josh stash:pop "fullrun new: pre-existing changes"` — by message, never a positional `git stash
@@ -78,8 +79,8 @@ release:scope` and close the completion summary with what it answered** (`follow
 ## The release ask — the last step of either form
 
 **One call folds the post-merge bookkeeping** (joshuafolkken/kit#2372): after the merge, `pnpm josh
-run:tail <N>` commits the observation ledger (`observations:flush` — skipped by a dispatched lane child,
-whose `backlogrun` flushes once at `run:carry --end`; joshuafolkken/kit#2492), reads the completion citations
+run:tail <N>` commits ledger lines written outside any issue's run (`observations:flush`,
+joshuafolkken/kit#2919), reads the completion citations
 (`issue:cite`, given the closed issue and any follow-ups filed this run) and decides the release scope
 (`release:scope`) in one round trip, joining each under its own header. **On the clean path `run:tail`
 runs inside `pnpm josh ship`** as its report step (joshuafolkken/kit#2398), so it is a standalone call

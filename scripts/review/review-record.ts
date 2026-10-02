@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger } from './review-finding-ledger'
 
@@ -29,24 +28,15 @@ interface RecordVerdict {
 	issue?: number
 }
 
-// `undefined` for both "the file is absent" and "the file could not be read" — they are the same
-// answer here, a ledger this checkout does not keep, and the caller turns that into `not-required`.
-async function read_ledger(ledger_path: string): Promise<string | undefined> {
-	try {
-		return await readFile(ledger_path, 'utf8')
-	} catch {
-		return undefined
-	}
-}
-
-// The default is the primary checkout's ledger, the one `review:record` writes from a lane
-// (joshuafolkken/kit#2419) — a cwd-relative default read the lane's copy, so the followup gate refused
-// every round recorded from a lane (joshuafolkken/kit#2431).
+// The default is the work tree the check runs in — the one `review:record` wrote to, a lane's in a
+// lane (joshuafolkken/kit#2919). Every file of the directory is read, so the round is found whichever
+// file holds it; a directory that is not there answers `undefined`, a ledger this checkout does not
+// keep, which becomes `not-required`.
 async function check(
 	issue: number,
-	ledger_path: string = observation_ledger_home.ledger_path(),
+	root: string = observation_ledger_home.ledger_root(),
 ): Promise<RecordVerdict> {
-	const content = await read_ledger(ledger_path)
+	const content = await observation_ledger_home.read(root)
 
 	if (content === undefined) return { status: 'not-required' }
 	if (review_finding_ledger.has_issue_record(content, issue)) return { status: 'ok', issue }

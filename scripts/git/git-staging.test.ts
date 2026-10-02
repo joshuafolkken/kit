@@ -1,7 +1,8 @@
 import {
-	LEGACY_OBSERVATION_LEDGER_PATH,
+	LEGACY_OBSERVATION_LEDGER_PATHS,
 	MIGRATION_CLAIM_SUFFIX,
-	OBSERVATION_LEDGER_PATH,
+	observation_ledger,
+	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
 import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,6 +26,9 @@ vi.mock('#scripts/observations/observation-ledger-prepare', () => ({
 	observation_ledger_prepare: { prepare: vi.fn().mockResolvedValue([]) },
 }))
 
+// joshuafolkken/kit#2919: the ledger is a directory of one file per issue; a lane stages its own.
+const OBSERVATION_LEDGER_PATH = observation_ledger.ledger_file(2919)
+const LEGACY_OBSERVATION_LEDGER_PATH = LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? ''
 const MIGRATION_CLAIM_FILE = `${LEGACY_OBSERVATION_LEDGER_PATH}.123${MIGRATION_CLAIM_SUFFIX}`
 const BROKEN_LINE = { line: '- k:broken', reason: 'expected 5 fields' }
 
@@ -166,14 +170,14 @@ describe('git_staging.check_and_confirm_staging — a ledger that breaks the gra
 		vi.mocked(observation_ledger_prepare.prepare).mockResolvedValueOnce([BROKEN_LINE])
 	})
 
-	it('excludes both ledger paths from the tracked-file staging', async () => {
+	it('excludes the ledger directory and every old path from the tracked-file staging', async () => {
 		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
 
 		await git_staging.check_and_confirm_staging(true)
 
 		expect(git_command.add_tracked).toHaveBeenCalledWith([
-			OBSERVATION_LEDGER_PATH,
-			LEGACY_OBSERVATION_LEDGER_PATH,
+			OBSERVATION_LEDGER_DIRECTORY,
+			...LEGACY_OBSERVATION_LEDGER_PATHS,
 		])
 	})
 

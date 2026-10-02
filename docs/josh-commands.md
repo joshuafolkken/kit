@@ -627,13 +627,13 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 ### `josh observations:flush`
 
-Commit the observation ledger lines no run's own commit carried (`docs/maintainers/observations.md`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run in the primary checkout needs none: `josh git` stages the ledger with the run's own commit when its grammar holds (joshuafolkken/kit#2763), so what is left here is a lane's lines and whatever was appended after a commit.
+Commit the observation ledger lines no run's own commit carried (`docs/maintainers/observations/`) as a docs-only pull request of its own (no `closes #N`), wait for the required checks, merge it, and return to the default branch. A run needs none — a lane's included: `josh git` stages the run's own `<N>.md` with its commit when its grammar holds (joshuafolkken/kit#2763), and `pnpm josh followup` commits a line appended after that onto the pull request before it merges (joshuafolkken/kit#2919). What is left here is a line written on the default branch outside any issue's run, in a date-named `<YYYY-MM-DD>.md`.
 
 ```bash
 pnpm josh observations:flush
 ```
 
-**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. `pnpm josh followup` runs this automatically after a merged run, so it is rarely typed by hand. **Run from a lane it acts on the primary checkout**, where the ledger lives (joshuafolkken/kit#2419): it moves there first, and each refusal names that checkout. A lane never flushes (`followup` and `run:tail` skip it); `pnpm josh run:carry --end` commits every lane's lines (joshuafolkken/kit#2492).
+**Behavior:** refuses off the default branch (naming `pnpm josh main:sync`) and refuses when the working tree holds any change besides the ledger (listing those paths). When the ledger matches the commit it sits on it prints `clean` and exits 0. A commit the pre-commit hook rejects is rolled back and its branch removed; a leftover flush branch that holds a commit is landed first, one holding none is discarded. A single run's `pnpm josh run:tail` runs it after the merge, so it is rarely typed by hand. **It acts on the checkout it runs in**: a lane's lines merge with the lane's own pull request, so a lane is refused like any feature branch, and nothing flushes at `pnpm josh run:carry --end` any more (joshuafolkken/kit#2919).
 
 Related: [`josh followup`](#josh-followup).
 
@@ -645,13 +645,13 @@ Re-run a behavior-change Issue's declared baseline after it merges and print the
 pnpm josh measure:rerun /tmp/issue-body.md
 ```
 
-**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations.md`), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
+**Behavior:** when a value has not moved, the premise the rule rested on is recorded as refuted — one line appended to the observation ledger (`docs/maintainers/observations/`, in the file for the issue the checked-out branch leads with, or a date-named file outside any issue's branch), keyed to the command so a second refutation of the same measurement is a same-key repeat the promotion rule counts. It reuses that append-only ledger rather than a second one. A section written in prose (no `` `command` → value `` line) is refused, since a natural-language measurement cannot be re-run. `pnpm josh observations:flush` is the ledger's commit path.
 
 Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint`](#josh-issuelint).
 
 ### `josh review:record`
 
-Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the observation ledger (`docs/maintainers/observations.md`) — the same append-only file the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+Record a `/code-review` round's findings so they survive the run (joshuafolkken/kit#2325). It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`docs/maintainers/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane; joshuafolkken/kit#2919) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
 
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
@@ -1615,7 +1615,7 @@ pnpm josh run:tidy
 ```
 
 - **Lanes:** closes a lane whose issue was closed by a merge, whose work tree has no uncommitted change, whose branch has no commit that no remote reaches, and that no live run holds — then releases its run record.
-- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches `docs/maintainers/observations.md` has its ledger lines appended to the primary checkout's ledger first, less those already there.
+- **Stashes:** drops an entry when every issue its message names (`#N`, a leading `N: `, or an `On N-lane:` branch) was closed by a merge. An entry that touches the observation ledger has its ledger lines appended first to the running work tree's own ledger file, less those any file of `docs/maintainers/observations/` already holds.
 - **Left alone:** an issue closed as not planned or without a merged pull request, an open issue, a stash naming no issue, a lane with changes or unpushed commits.
 
 "Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.
@@ -1859,8 +1859,8 @@ Closes a run in one call, folding the three-round-trip post-merge sequence (josh
 under one header per step, non-zero if any failed. It folds only bookkeeping; the review verdict, the
 merge and the push above it stay their own calls. The flush is residual: a run's appended lines ride
 its own commit (joshuafolkken/kit#2763), so it commits only a line appended after that commit and
-otherwise prints `clean`. **A lane child skips `observations:flush`**; its line waits for
-`pnpm josh run:carry --end` (joshuafolkken/kit#2492).
+otherwise prints `clean`. **A lane child skips `observations:flush`**; its lines merged with its own
+pull request (joshuafolkken/kit#2919).
 
 ### `josh ship`
 
